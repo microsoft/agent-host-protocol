@@ -2194,6 +2194,45 @@
           },
           "description": "Complete replacement {@link AutomationDefinition.triggers}. The host\nvalidates event ids and normalizes event-trigger titles and descriptions."
         },
+        "disableConditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationDisableCondition"
+          },
+          "description": "Complete replacement {@link AutomationDefinition.disableConditions}.\nOmit to leave unchanged; supply an empty array to remove all conditions.\nEach kind may appear at most once; hosts MUST reject duplicate kinds.\nClearing conditions does not change {@link AutomationDefinition.enabled}.",
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterRuns"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterDate"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -7608,6 +7647,41 @@
         "events"
       ]
     },
+    "AutomationAfterRunsCondition": {
+      "type": "object",
+      "description": "Stops scheduling after a fixed number of scheduled runs.",
+      "properties": {
+        "kind": {
+          "const": "afterRuns"
+        },
+        "max": {
+          "type": "integer",
+          "description": "Positive-integer cap on scheduled runs.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "max"
+      ]
+    },
+    "AutomationAfterDateCondition": {
+      "type": "object",
+      "description": "Stops scheduling once a wall-clock date passes.",
+      "properties": {
+        "kind": {
+          "const": "afterDate"
+        },
+        "date": {
+          "type": "string",
+          "description": "ISO 8601 timestamp after which scheduling stops."
+        }
+      },
+      "required": [
+        "kind",
+        "date"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -7721,6 +7795,45 @@
           },
           "description": "Automatic triggers. An empty list means manual-only."
         },
+        "disableConditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationDisableCondition"
+          },
+          "description": "Self-disable rules combined with logical OR: the host sets\n{@link AutomationDefinition.enabled} to `false` when any condition is met.\nAbsent or empty means no automatic disable conditions. Each\n{@link AutomationDisableConditionKind} may appear at most once; hosts MUST\nreject create or update requests containing duplicate kinds.\n\nOnly automatic (scheduled) runs are governed; manual runs via\n{@link RunAutomationParams | runAutomation} are never blocked. For a\n{@link AutomationAfterRunsCondition}, usage is tracked by the host-owned\n{@link AutomationEntry.runCount}. Adding that kind when absent or\na disabled→enabled transition starts a fresh allowance. Clearing the\nconditions does not re-enable a disabled automation. See the\n{@link /guide/automations | Automations Guide}.",
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterRuns"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterDate"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -7750,6 +7863,10 @@
         "nextRunAt": {
           "type": "string",
           "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+        },
+        "runCount": {
+          "type": "number",
+          "description": "Host-owned count of scheduled runs consumed against the current\n{@link AutomationAfterRunsCondition} allowance. Authoritative usage for the\n**current** allowance, not a lifetime total: the host resets it to `0` when\na disabled→enabled transition starts a fresh allowance or a\n{@link AutomationAfterRunsCondition} is added when none was present. It is NOT\nreconstructed from {@link runs} (a bounded, prunable window). The host\nincrements it atomically when it admits a scheduled run, including runs\nlater cancelled or failed.\n\nAbsent when {@link AutomationDefinition.disableConditions} contains no\n{@link AutomationAfterRunsCondition}."
         },
         "runs": {
           "type": "array",
@@ -8582,6 +8699,17 @@
         }
       ],
       "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+    },
+    "AutomationDisableCondition": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationAfterRunsCondition"
+        },
+        {
+          "$ref": "#/$defs/AutomationAfterDateCondition"
+        }
+      ],
+      "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
     },
     "AutomationRunOrigin": {
       "oneOf": [

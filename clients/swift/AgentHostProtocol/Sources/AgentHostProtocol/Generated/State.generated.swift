@@ -1081,6 +1081,14 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case event = "event"
 }
 
+/// Discriminant for an {@link AutomationDisableCondition}.
+public enum AutomationDisableConditionKind: String, Codable, Sendable {
+    /// Stop scheduling after a fixed number of scheduled runs.
+    case afterRuns = "afterRuns"
+    /// Stop scheduling once a wall-clock date passes.
+    case afterDate = "afterDate"
+}
+
 /// Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -6360,6 +6368,20 @@ public struct AutomationDefinition: Codable, Sendable {
     public var enabled: Bool
     /// Automatic triggers. An empty list means manual-only.
     public var triggers: [AutomationTrigger]
+    /// Self-disable rules combined with logical OR: the host sets
+    /// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+    /// Absent or empty means no automatic disable conditions. Each
+    /// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+    /// reject create or update requests containing duplicate kinds.
+    ///
+    /// Only automatic (scheduled) runs are governed; manual runs via
+    /// {@link RunAutomationParams | runAutomation} are never blocked. For a
+    /// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+    /// {@link AutomationEntry.runCount}. Adding that kind when absent or
+    /// a disabled→enabled transition starts a fresh allowance. Clearing the
+    /// conditions does not re-enable a disabled automation. See the
+    /// {@link /guide/automations | Automations Guide}.
+    public var disableConditions: [AutomationDisableCondition]?
     /// Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.
     public var meta: [String: AnyCodable]?
@@ -6370,6 +6392,7 @@ public struct AutomationDefinition: Codable, Sendable {
         case session
         case enabled
         case triggers
+        case disableConditions
         case meta = "_meta"
     }
 
@@ -6379,6 +6402,7 @@ public struct AutomationDefinition: Codable, Sendable {
         session: AutomationSessionTemplate,
         enabled: Bool,
         triggers: [AutomationTrigger],
+        disableConditions: [AutomationDisableCondition]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
@@ -6386,6 +6410,7 @@ public struct AutomationDefinition: Codable, Sendable {
         self.session = session
         self.enabled = enabled
         self.triggers = triggers
+        self.disableConditions = disableConditions
         self.meta = meta
     }
 }
@@ -6403,6 +6428,11 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     /// Complete replacement {@link AutomationDefinition.triggers}. The host
     /// validates event ids and normalizes event-trigger titles and descriptions.
     public var triggers: [AutomationTrigger]?
+    /// Complete replacement {@link AutomationDefinition.disableConditions}.
+    /// Omit to leave unchanged; supply an empty array to remove all conditions.
+    /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+    /// Clearing conditions does not change {@link AutomationDefinition.enabled}.
+    public var disableConditions: [AutomationDisableCondition]?
     /// Complete replacement {@link AutomationDefinition._meta}.
     public var meta: [String: AnyCodable]?
 
@@ -6412,6 +6442,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         case session
         case enabled
         case triggers
+        case disableConditions
         case meta = "_meta"
     }
 
@@ -6421,6 +6452,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         session: AutomationSessionTemplate? = nil,
         enabled: Bool? = nil,
         triggers: [AutomationTrigger]? = nil,
+        disableConditions: [AutomationDisableCondition]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
@@ -6428,7 +6460,36 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         self.session = session
         self.enabled = enabled
         self.triggers = triggers
+        self.disableConditions = disableConditions
         self.meta = meta
+    }
+}
+
+public struct AutomationAfterRunsCondition: Codable, Sendable {
+    public var kind: AutomationDisableConditionKind
+    /// Positive-integer cap on scheduled runs.
+    public var max: Int
+
+    public init(
+        kind: AutomationDisableConditionKind,
+        max: Int
+    ) {
+        self.kind = kind
+        self.max = max
+    }
+}
+
+public struct AutomationAfterDateCondition: Codable, Sendable {
+    public var kind: AutomationDisableConditionKind
+    /// ISO 8601 timestamp after which scheduling stops.
+    public var date: String
+
+    public init(
+        kind: AutomationDisableConditionKind,
+        date: String
+    ) {
+        self.kind = kind
+        self.date = date
     }
 }
 
@@ -6439,6 +6500,18 @@ public struct AutomationEntry: Codable, Sendable {
     public var definition: AutomationDefinition
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
+    /// Host-owned count of scheduled runs consumed against the current
+    /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+    /// **current** allowance, not a lifetime total: the host resets it to `0` when
+    /// a disabled→enabled transition starts a fresh allowance or a
+    /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+    /// reconstructed from {@link runs} (a bounded, prunable window). The host
+    /// increments it atomically when it admits a scheduled run, including runs
+    /// later cancelled or failed.
+    ///
+    /// Absent when {@link AutomationDefinition.disableConditions} contains no
+    /// {@link AutomationAfterRunsCondition}.
+    public var runCount: Int?
     /// Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
     /// {@link AutomationEntry.runsNextCursor} is present.
@@ -6458,6 +6531,7 @@ public struct AutomationEntry: Codable, Sendable {
         case resource
         case definition
         case nextRunAt
+        case runCount
         case runs
         case runsNextCursor
         case operations
@@ -6470,6 +6544,7 @@ public struct AutomationEntry: Codable, Sendable {
         resource: String,
         definition: AutomationDefinition,
         nextRunAt: String? = nil,
+        runCount: Int? = nil,
         runs: [AutomationRunSummary],
         runsNextCursor: String? = nil,
         operations: [AutomationOperation],
@@ -6480,6 +6555,7 @@ public struct AutomationEntry: Codable, Sendable {
         self.resource = resource
         self.definition = definition
         self.nextRunAt = nextRunAt
+        self.runCount = runCount
         self.runs = runs
         self.runsNextCursor = runsNextCursor
         self.operations = operations
@@ -7693,6 +7769,39 @@ public enum AutomationTrigger: Codable, Sendable {
             try value.encode(to: encoder)
         case .event(var value):
             value.kind = .event
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationDisableCondition: Codable, Sendable {
+    case afterRuns(AutomationAfterRunsCondition)
+    case afterDate(AutomationAfterDateCondition)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "afterRuns":
+            self = .afterRuns(try AutomationAfterRunsCondition(from: decoder))
+        case "afterDate":
+            self = .afterDate(try AutomationAfterDateCondition(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationDisableCondition discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .afterRuns(var value):
+            value.kind = .afterRuns
+            try value.encode(to: encoder)
+        case .afterDate(var value):
+            value.kind = .afterDate
             try value.encode(to: encoder)
         }
     }

@@ -97,21 +97,31 @@ function schemaAccepts(
 
   const schema = dereferenceSchema(root, node as Record<string, unknown>);
   const oneOf = schema.oneOf;
-  if (Array.isArray(oneOf)) {
-    return oneOf.filter(branch => schemaAccepts(root, branch as JsonNode, value)).length === 1;
+  if (Array.isArray(oneOf) &&
+      oneOf.filter(branch => schemaAccepts(root, branch as JsonNode, value)).length !== 1) {
+    return false;
   }
 
   const allOf = schema.allOf;
-  if (Array.isArray(allOf)) {
-    return allOf.every(branch => schemaAccepts(root, branch as JsonNode, value));
+  if (Array.isArray(allOf) &&
+      !allOf.every(branch => schemaAccepts(root, branch as JsonNode, value))) {
+    return false;
   }
 
-  if (schema.not) {
-    return !schemaAccepts(root, schema.not as JsonNode, value);
+  if (schema.not && schemaAccepts(root, schema.not as JsonNode, value)) {
+    return false;
   }
 
   if ('const' in schema) {
     return value === schema.const;
+  }
+
+  if (schema.contains && Array.isArray(value)) {
+    const matches = value.filter(item => schemaAccepts(root, schema.contains as JsonNode, item)).length;
+    const minimum = typeof schema.minContains === 'number' ? schema.minContains : 1;
+    if (matches < minimum || (typeof schema.maxContains === 'number' && matches > schema.maxContains)) {
+      return false;
+    }
   }
 
   if (schema.type === 'object' || schema.required || schema.properties) {
@@ -136,13 +146,17 @@ function schemaAccepts(
     case 'string':
       return typeof value === 'string';
     case 'number':
-      return typeof value === 'number';
+    case 'integer':
+      return typeof value === 'number' &&
+        (schema.type !== 'integer' || Number.isInteger(value)) &&
+        (typeof schema.minimum !== 'number' || value >= schema.minimum);
     case 'boolean':
       return typeof value === 'boolean';
     case 'null':
       return value === null;
     case 'array':
-      return Array.isArray(value);
+      return Array.isArray(value) &&
+        (!schema.items || value.every(item => schemaAccepts(root, schema.items as JsonNode, item)));
   }
 
   return true;
@@ -198,6 +212,81 @@ describe('generated JSON schemas', () => {
         assert.equal(required.includes('expiresIn'), false);
         assert.match(expiresIn.description as string, /remaining lifetime, in seconds/);
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
+      });
+
+      it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const afterRuns = { kind: 'afterRuns', max: 3 };
+        const afterDate = { kind: 'afterDate', date: '2026-10-01T00:00:00Z' };
+        const definition = {
+          title: 'Triage',
+          message: { text: 'go', origin: { kind: 'automation' } },
+          session: {},
+          enabled: false,
+          triggers: [],
+        };
+        for (const type of ['AutomationDefinition', 'AutomationDefinitionPatch']) {
+          const target = defs[type];
+          if (!target) continue;
+          const base = type === 'AutomationDefinition' ? definition : {};
+          assert.equal(schemaAccepts(schema, target as JsonNode, base), true, `${type}: absent`);
+          for (const conditions of [[], [afterRuns], [afterDate], [afterRuns, afterDate], [afterDate, afterRuns]]) {
+            assert.equal(schemaAccepts(schema, target as JsonNode, {
+              ...base,
+              disableConditions: conditions,
+            }), true, `${type}: ${JSON.stringify(conditions)}`);
+          }
+        }
+      });
+
+      it('rejects duplicate disable-condition kinds, including different values of the same kind', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const afterRuns = { kind: 'afterRuns', max: 3 };
+        const afterDate = { kind: 'afterDate', date: '2026-10-01T00:00:00Z' };
+        const duplicateConditions = [
+          [afterRuns, afterRuns],
+          [afterRuns, { kind: 'afterRuns', max: 5 }],
+          [afterDate, afterDate],
+          [afterDate, { kind: 'afterDate', date: '2026-11-01T00:00:00Z' }],
+          [afterRuns, afterDate, afterRuns],
+          [afterDate, afterRuns, afterDate],
+        ];
+        for (const type of ['AutomationDefinition', 'AutomationDefinitionPatch']) {
+          const target = defs[type];
+          if (!target) continue;
+          const properties = target.properties as Record<string, JsonNode>;
+          const conditions = properties.disableConditions;
+          assert.ok(conditions, `${type} declares disableConditions`);
+          for (const value of duplicateConditions) {
+            assert.equal(schemaAccepts(schema, conditions, value), false, `${type}: ${JSON.stringify(value)}`);
+          }
+        }
+      });
+
+      it('rejects malformed disable-condition arrays and invalid run caps', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const type of ['AutomationDefinition', 'AutomationDefinitionPatch']) {
+          const target = defs[type];
+          if (!target) continue;
+          const properties = target.properties as Record<string, JsonNode>;
+          for (const value of [
+            null,
+            { kind: 'afterRuns', max: 3 },
+            [null],
+            [{ kind: 'unknown' }],
+            [{ kind: 'afterRuns' }],
+            [{ kind: 'afterDate' }],
+            [{ kind: 'afterRuns', max: 0 }],
+            [{ kind: 'afterRuns', max: -1 }],
+            [{ kind: 'afterRuns', max: 1.5 }],
+            [{ kind: 'maxRuns', maxRuns: 3 }],
+            [{ kind: 'finalDate', finalDate: '2026-10-01T00:00:00Z' }],
+            [{ kind: 'afterRuns', maxRuns: 3 }],
+            [{ kind: 'afterDate', finalDate: '2026-10-01T00:00:00Z' }],
+          ]) {
+            assert.equal(schemaAccepts(schema, properties.disableConditions, value), false, `${type}: ${JSON.stringify(value)}`);
+          }
+        }
       });
 
       it('constrains every ChatOrigin branch to a distinct kind', () => {

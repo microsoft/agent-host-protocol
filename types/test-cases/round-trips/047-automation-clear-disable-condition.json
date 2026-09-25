@@ -1,0 +1,16 @@
+{
+  "name": "automation-clear-disable-condition",
+  "group": "A",
+  "description": "An automation update preserves an explicit empty disableConditions array on the wire to remove all conditions without changing enabled.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": { "disableConditions": [] }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": { "disableConditions": [] }
+  }]
+}

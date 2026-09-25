@@ -1,7 +1,7 @@
 {
   "name": "message-origin-unknown-kind-preserved",
   "group": "A",
-  "description": "MessageOrigin.kind is a directly-typed @nonexhaustive enum (not a union discriminator), so an unrecognized value added by a newer protocol version MUST decode and re-encode verbatim rather than failing the whole message. versioning.md makes additive enum values a PATCH-compatible change, so a client built against an older version has to relay them intact. Unions already cover their own unknown-variant path (fixture 003) and open string fields cover theirs (fixture 024); this fixture covers the remaining case — an unknown value of a closed-looking enum on a plain field.",
+  "description": "MessageOrigin.kind is a directly-typed @nonexhaustive enum (not a union discriminator), so an unrecognized value added by a newer protocol version MUST decode and re-encode verbatim rather than failing the whole message. versioning.md makes additive enum values a PATCH-compatible change, so a client built against an older version has to relay them intact. Unions already cover their own unknown-variant path (`003-customization-unknown-type-preserved`) and open string fields cover theirs (`024-changeset-changekind-known-and-unknown`); this fixture covers the remaining case — an unknown value of a closed-looking enum on a plain field.",
   "type": "StateAction",
   "input": {
     "type": "chat/turnStarted",

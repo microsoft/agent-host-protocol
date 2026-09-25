@@ -47,10 +47,18 @@ same value range — within TS's `number` 53-bit-safe limit, with no width
 divergence.
 
 Unknown-value forward compatibility is covered at all three levels an additive
-protocol change can touch: an unknown **union variant** (fixture 003), an unknown
-value of an **open string field** (fixture 024), and an unknown value of an open
-(`@nonexhaustive`) **enum on a directly-typed field** (fixture 050). The last one
-is the case a closed language enum cannot represent, so it is the one that most
-easily regresses into a whole-message decode failure. Fixture 052 covers the
-related case where that open enum is also a **union discriminator**, which a
-decoder can fail even when it tolerates the enum on a plain field.
+protocol change can touch: an unknown **union variant**
+(`003-customization-unknown-type-preserved`), an unknown value of an **open
+string field** (`024-changeset-changekind-known-and-unknown`), and an unknown
+value of an open (`@nonexhaustive`) **enum on a directly-typed field**
+(`050-message-origin-unknown-kind-preserved`). The last one is the case a closed
+language enum cannot represent, so it is the one that most easily regresses into
+a whole-message decode failure.
+`052-session-origin-unknown-kind-preserved` covers the related case where that
+open enum is also a **union discriminator**, which a decoder can fail even when
+it tolerates the enum on a plain field.
+
+Fixtures are referenced by name rather than by numeric prefix: prefixes are
+assigned per-branch and parallel PRs routinely land colliding ones (several
+numbers are already shared by unrelated fixtures), so a bare "fixture NNN" is
+not a stable identifier.

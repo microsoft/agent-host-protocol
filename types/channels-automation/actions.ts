@@ -10,6 +10,7 @@ import type { Message } from '../channels-chat/state.js';
 import type { URI } from '../common/state.js';
 import type {
   AutomationDefinition,
+  AutomationDisableCondition,
   AutomationEntry,
   AutomationOperation,
   AutomationSessionTemplate,
@@ -42,6 +43,15 @@ export interface AutomationDefinitionPatch {
    * validates event ids and normalizes event-trigger titles and descriptions.
    */
   triggers?: AutomationTrigger[];
+  /**
+   * Complete replacement {@link AutomationDefinition.disableConditions}.
+   * Omit to leave unchanged; supply an empty array to remove all conditions.
+   * Each kind may appear at most once; hosts MUST reject duplicate kinds.
+   * Clearing conditions does not change {@link AutomationDefinition.enabled}.
+   *
+   * @uniqueItemsBy kind
+   */
+  disableConditions?: AutomationDisableCondition[];
   /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
 }

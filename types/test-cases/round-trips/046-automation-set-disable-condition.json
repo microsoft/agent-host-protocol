@@ -1,0 +1,20 @@
+{
+  "name": "automation-set-disable-condition",
+  "group": "A",
+  "description": "An automation update replaces disableConditions with a single afterRuns condition.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": {
+      "disableConditions": [{ "kind": "afterRuns", "max": 3 }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": {
+      "disableConditions": [{ "kind": "afterRuns", "max": 3 }]
+    }
+  }]
+}

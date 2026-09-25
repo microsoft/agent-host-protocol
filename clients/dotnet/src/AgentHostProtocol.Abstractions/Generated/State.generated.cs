@@ -1658,6 +1658,18 @@ public enum AutomationTriggerKind
     Event,
 }
 
+/// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
+[JsonConverter(typeof(WireEnumConverter<AutomationDisableConditionKind>))]
+public enum AutomationDisableConditionKind
+{
+    /// <summary>Stop scheduling after a fixed number of scheduled runs.</summary>
+    [WireValue("afterRuns")]
+    AfterRuns,
+    /// <summary>Stop scheduling once a wall-clock date passes.</summary>
+    [WireValue("afterDate")]
+    AfterDate,
+}
+
 /// <summary>Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -6307,6 +6319,22 @@ public sealed record AutomationDefinition
     /// <summary>Automatic triggers. An empty list means manual-only.</summary>
     public required List<AutomationTrigger> Triggers { get; init; }
 
+    /// <summary>Self-disable rules combined with logical OR: the host sets
+    /// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+    /// Absent or empty means no automatic disable conditions. Each
+    /// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+    /// reject create or update requests containing duplicate kinds.
+    ///
+    /// Only automatic (scheduled) runs are governed; manual runs via
+    /// {@link RunAutomationParams | runAutomation} are never blocked. For a
+    /// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+    /// {@link AutomationEntry.runCount}. Adding that kind when absent or
+    /// a disabled→enabled transition starts a fresh allowance. Clearing the
+    /// conditions does not re-enable a disabled automation. See the
+    /// {@link /guide/automations | Automations Guide}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AutomationDisableCondition>? DisableConditions { get; init; }
+
     /// <summary>Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.</summary>
     [JsonPropertyName("_meta")]
@@ -6342,10 +6370,35 @@ public sealed record AutomationDefinitionPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationTrigger>? Triggers { get; init; }
 
+    /// <summary>Complete replacement {@link AutomationDefinition.disableConditions}.
+    /// Omit to leave unchanged; supply an empty array to remove all conditions.
+    /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+    /// Clearing conditions does not change {@link AutomationDefinition.enabled}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AutomationDisableCondition>? DisableConditions { get; init; }
+
     /// <summary>Complete replacement {@link AutomationDefinition._meta}.</summary>
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Stops scheduling after a fixed number of scheduled runs.</summary>
+public sealed record AutomationAfterRunsCondition
+{
+    public AutomationDisableConditionKind Kind { get; init; } = AutomationDisableConditionKind.AfterRuns;
+
+    /// <summary>Positive-integer cap on scheduled runs.</summary>
+    public long Max { get; init; }
+}
+
+/// <summary>Stops scheduling once a wall-clock date passes.</summary>
+public sealed record AutomationAfterDateCondition
+{
+    public AutomationDisableConditionKind Kind { get; init; } = AutomationDisableConditionKind.AfterDate;
+
+    /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
+    public required string Date { get; init; }
 }
 
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
@@ -6364,6 +6417,20 @@ public sealed class AutomationEntry
     /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
+
+    /// <summary>Host-owned count of scheduled runs consumed against the current
+    /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+    /// **current** allowance, not a lifetime total: the host resets it to `0` when
+    /// a disabled→enabled transition starts a fresh allowance or a
+    /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+    /// reconstructed from {@link runs} (a bounded, prunable window). The host
+    /// increments it atomically when it admits a scheduled run, including runs
+    /// later cancelled or failed.
+    ///
+    /// Absent when {@link AutomationDefinition.disableConditions} contains no
+    /// {@link AutomationAfterRunsCondition}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? RunCount { get; set; }
 
     /// <summary>Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
@@ -7204,6 +7271,33 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>AutomationDisableCondition is an automation's self-disable rule.</summary>
+[JsonConverter(typeof(AutomationDisableConditionConverter))]
+public sealed class AutomationDisableCondition : AhpUnion
+{
+    /// <summary>Creates an empty AutomationDisableCondition (no active variant).</summary>
+    public AutomationDisableCondition() { }
+
+    /// <summary>Creates a AutomationDisableCondition wrapping the given variant value.</summary>
+    public AutomationDisableCondition(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AutomationDisableCondition discriminated union.</summary>
+internal sealed class AutomationDisableConditionConverter : UnionConverter<AutomationDisableCondition>
+{
+    public AutomationDisableConditionConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["afterRuns"] = typeof(AutomationAfterRunsCondition),
+        ["afterDate"] = typeof(AutomationAfterDateCondition),
             },
             allowUnknown: false)
     {

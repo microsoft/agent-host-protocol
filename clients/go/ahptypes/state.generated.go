@@ -514,6 +514,16 @@ const (
 	AutomationTriggerKindEvent AutomationTriggerKind = "event"
 )
 
+// Discriminant for an {@link AutomationDisableCondition}.
+type AutomationDisableConditionKind string
+
+const (
+	// Stop scheduling after a fixed number of scheduled runs.
+	AutomationDisableConditionKindAfterRuns AutomationDisableConditionKind = "afterRuns"
+	// Stop scheduling once a wall-clock date passes.
+	AutomationDisableConditionKindAfterDate AutomationDisableConditionKind = "afterDate"
+)
+
 // Lifecycle status of one automation run.
 //
 // `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -3977,6 +3987,20 @@ type AutomationDefinition struct {
 	Enabled bool `json:"enabled"`
 	// Automatic triggers. An empty list means manual-only.
 	Triggers []AutomationTrigger `json:"triggers"`
+	// Self-disable rules combined with logical OR: the host sets
+	// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+	// Absent or empty means no automatic disable conditions. Each
+	// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+	// reject create or update requests containing duplicate kinds.
+	//
+	// Only automatic (scheduled) runs are governed; manual runs via
+	// {@link RunAutomationParams | runAutomation} are never blocked. For a
+	// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+	// {@link AutomationEntry.runCount}. Adding that kind when absent or
+	// a disabled→enabled transition starts a fresh allowance. Clearing the
+	// conditions does not re-enable a disabled automation. See the
+	// {@link /guide/automations | Automations Guide}.
+	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
 	// Opaque implementation-defined metadata. Clients MUST preserve unknown
 	// entries when updating the definition.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -3999,8 +4023,27 @@ type AutomationDefinitionPatch struct {
 	// Complete replacement {@link AutomationDefinition.triggers}. The host
 	// validates event ids and normalizes event-trigger titles and descriptions.
 	Triggers *[]AutomationTrigger `json:"triggers,omitempty"`
+	// Complete replacement {@link AutomationDefinition.disableConditions}.
+	// Omit to leave unchanged; supply an empty array to remove all conditions.
+	// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+	// Clearing conditions does not change {@link AutomationDefinition.enabled}.
+	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
 	// Complete replacement {@link AutomationDefinition._meta}.
 	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Stops scheduling after a fixed number of scheduled runs.
+type AutomationAfterRunsCondition struct {
+	Kind AutomationDisableConditionKind `json:"kind"`
+	// Positive-integer cap on scheduled runs.
+	Max int64 `json:"max"`
+}
+
+// Stops scheduling once a wall-clock date passes.
+type AutomationAfterDateCondition struct {
+	Kind AutomationDisableConditionKind `json:"kind"`
+	// ISO 8601 timestamp after which scheduling stops.
+	Date string `json:"date"`
 }
 
 // Authoritative state of one automation in {@link AutomationState.entries}.
@@ -4015,6 +4058,18 @@ type AutomationEntry struct {
 	Definition AutomationDefinition `json:"definition"`
 	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
+	// Host-owned count of scheduled runs consumed against the current
+	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+	// **current** allowance, not a lifetime total: the host resets it to `0` when
+	// a disabled→enabled transition starts a fresh allowance or a
+	// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+	// reconstructed from {@link runs} (a bounded, prunable window). The host
+	// increments it atomically when it admits a scheduled run, including runs
+	// later cancelled or failed.
+	//
+	// Absent when {@link AutomationDefinition.disableConditions} contains no
+	// {@link AutomationAfterRunsCondition}.
+	RunCount *int64 `json:"runCount,omitempty"`
 	// Newest-first retained run summaries. This is a bounded window; use
 	// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
 	// {@link AutomationEntry.runsNextCursor} is present.
@@ -5689,6 +5744,68 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"schedule\"")
 	case *AutomationEventTrigger:
 		object["kind"] = json.RawMessage("\"event\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationDisableCondition is an automation's self-disable rule.
+type AutomationDisableCondition struct {
+	Value isAutomationDisableCondition
+}
+
+// isAutomationDisableCondition is the marker interface implemented by every
+// concrete variant of AutomationDisableCondition.
+type isAutomationDisableCondition interface{ isAutomationDisableCondition() }
+
+func (*AutomationAfterRunsCondition) isAutomationDisableCondition() {}
+func (*AutomationAfterDateCondition) isAutomationDisableCondition() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationDisableCondition) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationDisableCondition", "kind")
+	}
+	switch disc {
+	case "afterRuns":
+		var value AutomationAfterRunsCondition
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "afterDate":
+		var value AutomationAfterDateCondition
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationDisableCondition", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationAfterRunsCondition:
+		object["kind"] = json.RawMessage("\"afterRuns\"")
+	case *AutomationAfterDateCondition:
+		object["kind"] = json.RawMessage("\"afterDate\"")
 	}
 	return json.Marshal(object)
 }

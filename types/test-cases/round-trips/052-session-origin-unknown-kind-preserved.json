@@ -1,7 +1,7 @@
 {
   "name": "session-origin-unknown-kind-preserved",
   "group": "A",
-  "description": "SessionOriginKind is @nonexhaustive AND the discriminator of the SessionOrigin union, so an unrecognized kind must be preserved verbatim by the union decoder rather than rejected. This is distinct from fixture 050 (an open enum on a plain field): here the unknown value selects a union variant, so a decoder that tolerates the open enum but still rejects the unknown union discriminator fails the whole message.",
+  "description": "SessionOriginKind is @nonexhaustive AND the discriminator of the SessionOrigin union, so an unrecognized kind must be preserved verbatim by the union decoder rather than rejected. This is distinct from `050-message-origin-unknown-kind-preserved` (an open enum on a plain field): here the unknown value selects a union variant, so a decoder that tolerates the open enum but still rejects the unknown union discriminator fails the whole message.",
   "type": "SessionSummary",
   "input": {
     "resource": "ahp-session:/s1",

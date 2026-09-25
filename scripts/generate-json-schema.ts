@@ -30,6 +30,9 @@ interface JsonSchema {
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   items?: JsonSchema;
+  contains?: JsonSchema;
+  minContains?: number;
+  maxContains?: number;
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
@@ -76,6 +79,43 @@ function getNumericPropertyTag(prop: PropertySignature, tagName: string): number
     );
   }
   return value;
+}
+
+function getUniqueItemsByConstraints(prop: PropertySignature): JsonSchema[] | undefined {
+  const tag = prop.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .find(candidate => candidate.getTagName() === 'uniqueItemsBy');
+  if (!tag) return undefined;
+
+  const key = tag.getCommentText()?.trim();
+  const itemType = prop.getType().getNonNullableType().getArrayElementType();
+  if (!key || !itemType) {
+    throw new Error(
+      `${prop.getSourceFile().getFilePath()}: ${prop.getName()} requires an array and a discriminant for @uniqueItemsBy`,
+    );
+  }
+  const variants = itemType.isUnion() ? itemType.getUnionTypes() : [itemType];
+  const values = variants.map(variant => {
+    const discriminant = variant.getProperty(key);
+    const value = discriminant?.getTypeAtLocation(prop).getLiteralValue();
+    if (!discriminant || discriminant.isOptional() || (typeof value !== 'string' && typeof value !== 'number')) {
+      throw new Error(
+        `${prop.getSourceFile().getFilePath()}: ${prop.getName()} @uniqueItemsBy ${key} requires a required literal discriminant on every array variant`,
+      );
+    }
+    return value;
+  });
+
+  // uniqueItems compares whole objects; count each discriminant instead.
+  return [...new Set(values)].map(value => ({
+    contains: {
+      type: 'object',
+      properties: { [key]: { const: value } },
+      required: [key],
+    },
+    minContains: 0,
+    maxContains: 1,
+  }));
 }
 
 function getInterfaceDescription(node: InterfaceDeclaration): string {
@@ -376,6 +416,10 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
       }
       propSchema.minimum = minimum;
     }
+    const uniqueItemsBy = getUniqueItemsByConstraints(prop);
+    if (uniqueItemsBy) {
+      propSchema.allOf = uniqueItemsBy;
+    }
     schema.properties![name] = propSchema;
     if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {
       if (!schema.required!.includes(name)) {
@@ -655,6 +699,7 @@ function collectRefTargets(node: JsonSchema | undefined, acc: Set<string>): void
     if (m) acc.add(m[1]);
   }
   if (node.items) collectRefTargets(node.items, acc);
+  if (node.contains) collectRefTargets(node.contains, acc);
   if (node.additionalProperties && typeof node.additionalProperties === 'object') {
     collectRefTargets(node.additionalProperties as JsonSchema, acc);
   }

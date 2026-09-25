@@ -1394,6 +1394,17 @@ pub enum AutomationTriggerKind {
     Event,
 }
 
+/// Discriminant for an {@link AutomationDisableCondition}.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationDisableConditionKind {
+    /// Stop scheduling after a fixed number of scheduled runs.
+    #[serde(rename = "afterRuns")]
+    AfterRuns,
+    /// Stop scheduling once a wall-clock date passes.
+    #[serde(rename = "afterDate")]
+    AfterDate,
+}
+
 /// Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -5511,6 +5522,21 @@ pub struct AutomationDefinition {
     pub enabled: bool,
     /// Automatic triggers. An empty list means manual-only.
     pub triggers: Vec<AutomationTrigger>,
+    /// Self-disable rules combined with logical OR: the host sets
+    /// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+    /// Absent or empty means no automatic disable conditions. Each
+    /// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+    /// reject create or update requests containing duplicate kinds.
+    ///
+    /// Only automatic (scheduled) runs are governed; manual runs via
+    /// {@link RunAutomationParams | runAutomation} are never blocked. For a
+    /// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+    /// {@link AutomationEntry.runCount}. Adding that kind when absent or
+    /// a disabled→enabled transition starts a fresh allowance. Clearing the
+    /// conditions does not re-enable a disabled automation. See the
+    /// {@link /guide/automations | Automations Guide}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_conditions: Option<Vec<AutomationDisableCondition>>,
     /// Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -5541,9 +5567,31 @@ pub struct AutomationDefinitionPatch {
     /// validates event ids and normalizes event-trigger titles and descriptions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub triggers: Option<Vec<AutomationTrigger>>,
+    /// Complete replacement {@link AutomationDefinition.disableConditions}.
+    /// Omit to leave unchanged; supply an empty array to remove all conditions.
+    /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+    /// Clearing conditions does not change {@link AutomationDefinition.enabled}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_conditions: Option<Vec<AutomationDisableCondition>>,
     /// Complete replacement {@link AutomationDefinition._meta}.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// Stops scheduling after a fixed number of scheduled runs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationAfterRunsCondition {
+    /// Positive-integer cap on scheduled runs.
+    pub max: i64,
+}
+
+/// Stops scheduling once a wall-clock date passes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationAfterDateCondition {
+    /// ISO 8601 timestamp after which scheduling stops.
+    pub date: String,
 }
 
 /// Authoritative state of one automation in {@link AutomationState.entries}.
@@ -5561,6 +5609,19 @@ pub struct AutomationEntry {
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
+    /// Host-owned count of scheduled runs consumed against the current
+    /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+    /// **current** allowance, not a lifetime total: the host resets it to `0` when
+    /// a disabled→enabled transition starts a fresh allowance or a
+    /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+    /// reconstructed from {@link runs} (a bounded, prunable window). The host
+    /// increments it atomically when it admits a scheduled run, including runs
+    /// later cancelled or failed.
+    ///
+    /// Absent when {@link AutomationDefinition.disableConditions} contains no
+    /// {@link AutomationAfterRunsCondition}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_count: Option<i64>,
     /// Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
     /// {@link AutomationEntry.runsNextCursor} is present.
@@ -6146,6 +6207,16 @@ pub enum AutomationTrigger {
     Schedule(AutomationScheduleTrigger),
     #[serde(rename = "event")]
     Event(AutomationEventTrigger),
+}
+
+/// Self-disable rule for an automation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AutomationDisableCondition {
+    #[serde(rename = "afterRuns")]
+    AfterRuns(AutomationAfterRunsCondition),
+    #[serde(rename = "afterDate")]
+    AfterDate(AutomationAfterDateCondition),
 }
 
 /// Provenance describing how an automation run was created.

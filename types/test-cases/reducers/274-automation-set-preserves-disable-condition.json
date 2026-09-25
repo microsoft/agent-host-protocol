@@ -1,0 +1,50 @@
+{
+  "description": "automation set preserves both definition disable conditions and the host-owned runCount on the upserted entry",
+  "reducer": "automation",
+  "initial": {
+    "entries": []
+  },
+  "actions": [{
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/capped",
+      "definition": {
+        "title": "Capped",
+        "message": { "text": "go", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": false,
+        "triggers": [],
+        "disableConditions": [
+          { "kind": "afterRuns", "max": 3 },
+          { "kind": "afterDate", "date": "2026-08-07T00:00:00Z" }
+        ]
+      },
+      "runCount": 3,
+      "runs": [],
+      "operations": ["update", "remove", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }
+  }],
+  "expected": {
+    "entries": [{
+      "resource": "ahp-automation:/capped",
+      "definition": {
+        "title": "Capped",
+        "message": { "text": "go", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": false,
+        "triggers": [],
+        "disableConditions": [
+          { "kind": "afterRuns", "max": 3 },
+          { "kind": "afterDate", "date": "2026-08-07T00:00:00Z" }
+        ]
+      },
+      "runCount": 3,
+      "runs": [],
+      "operations": ["update", "remove", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  }
+}
