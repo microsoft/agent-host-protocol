@@ -1,0 +1,24 @@
+{
+  "name": "session-active-client-meta-absent",
+  "group": "A",
+  "description": "Backward compatibility for the additive `SessionActiveClient._meta` field: a pre-existing wire payload that omits `_meta` still decodes, and re-encodes with the key omitted entirely rather than emitted as `null`. A peer that never learned about `_meta` keeps interoperating unchanged.",
+  "type": "StateAction",
+  "input": {
+    "type": "session/activeClientSet",
+    "activeClient": {
+      "clientId": "vscode-1",
+      "displayName": "VS Code",
+      "tools": []
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": []
+      }
+    }
+  ]
+}

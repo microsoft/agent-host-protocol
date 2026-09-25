@@ -386,6 +386,51 @@ The grace-period duration and exact policy are host-defined; the protocol only
 defines the `session/activeClientSet` / `session/activeClientRemoved` actions
 used to express the result.
 
+### Active-Client Metadata
+
+Each `SessionActiveClient` carries an optional `_meta` side-channel, following
+the same MCP `_meta` convention used elsewhere in the protocol. It is the place
+to put provider-specific facts about a *connection* — for example the
+participant role a host assigns to it, or whether the host treats it as
+read-only:
+
+```typescript
+dispatch({
+  type: 'session/activeClientSet',
+  activeClient: {
+    clientId: 'my-client-id',
+    displayName: 'VS Code',
+    tools: [],
+    _meta: {
+      'com.example.collaboration': { role: 'viewer', readOnly: true },
+    },
+  },
+});
+```
+
+The protocol assigns `_meta` no meaning of its own — it defines only the
+carrier. Conventions:
+
+- **Namespace your keys.** Use a reverse-DNS (or similarly unique) top-level key
+  so independent producers cannot collide, and keep each producer's payload
+  nested underneath it.
+- **Ignore what you don't know.** Consumers MUST ignore namespaces they do not
+  recognize, and MUST keep working when `_meta` is absent entirely — it is
+  optional and always has been.
+- **Stamp, don't infer.** A host that assigns participant semantics SHOULD state
+  them in `_meta` rather than leaving clients to deduce them from other fields.
+  An empty `tools` or `customizations` list means only that the client publishes
+  nothing; it never means the client is read-only.
+- **Carry it forward.** `session/activeClientSet` replaces the whole entry, so a
+  dispatcher re-publishing an entry it did not author MUST carry the existing
+  `_meta` forward unless it is deliberately restamping it.
+
+::: tip
+`SessionActiveClient._meta` describes one active connection. Facts about the
+session as a whole belong in `SessionState._meta` (replaced with
+`session/metaChanged`).
+:::
+
 ### Cancelling a Removed Client's Tool Calls
 
 When the host removes an active client, it SHOULD also cancel that client's
