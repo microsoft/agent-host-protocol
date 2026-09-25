@@ -127,6 +127,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     // ── Turn Lifecycle ────────────────────────────────────────────────────
 
     case .chatTurnStarted(let a):
+        // A replayed start must not reset the turn in progress or resurrect a finished one.
+        let alreadyStarted = state.activeTurn?.id == a.turnId
+            || state.turns.contains { $0.id == a.turnId }
+        if alreadyStarted {
+            return state
+        }
         var next = state
         next.modifiedAt = a.startedAt
         next.activeTurn = ActiveTurn(
