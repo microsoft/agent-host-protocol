@@ -62,6 +62,31 @@ internal object ChatSourceKindSerializer : KSerializer<ChatSourceKind> {
 }
 
 /**
+ * Native filesystem path grammar used by a host environment.
+ *
+ * This does not change URI syntax: AHP resources remain URIs with
+ * slash-separated, percent-encoded paths.
+ */
+@Serializable(with = PathStyleSerializer::class)
+@JvmInline
+value class PathStyle(val rawValue: String) {
+    companion object {
+        val POSIX: PathStyle = PathStyle("posix")
+        val WINDOWS: PathStyle = PathStyle("windows")
+    }
+}
+
+internal object PathStyleSerializer : KSerializer<PathStyle> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("PathStyle", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: PathStyle) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): PathStyle =
+        PathStyle(decoder.decodeString())
+}
+
+/**
  * Encoding of fetched content data.
  */
 @Serializable
@@ -326,6 +351,17 @@ data class InitializeParams(
 )
 
 @Serializable
+data class HostEnvironment(
+    /**
+     * Authoritative native path grammar for resources in this environment.
+     *
+     * Clients parsing or formatting native paths MUST use this field instead of
+     * inferring path semantics from their local environment.
+     */
+    val pathStyle: PathStyle? = null
+)
+
+@Serializable
 data class InitializeResult(
     /**
      * Protocol version selected by the server. MUST be one of the entries in
@@ -359,6 +395,12 @@ data class InitializeResult(
      * Snapshots for each `initialSubscriptions` URI
      */
     val snapshots: List<Snapshot>,
+    /**
+     * Default execution environment exposed by this host connection.
+     *
+     * Absence means no environment metadata is available.
+     */
+    val environment: HostEnvironment? = null,
     /**
      * Suggested default directory for remote filesystem browsing
      */

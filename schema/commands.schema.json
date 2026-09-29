@@ -131,6 +131,16 @@
         }
       }
     },
+    "HostEnvironment": {
+      "type": "object",
+      "description": "Describes the connection's default host-side execution environment.\n\nThe descriptor applies to {@link InitializeResult.defaultDirectory},\nsession working directories, and `file:` resources handled by the server\nthrough the `resource*` commands, unless more specific environment metadata\nis available. It does not apply to resources provided by the client.\n\nA host that exposes mixed environments MUST only populate fields that have a\nsingle connection-wide default.",
+      "properties": {
+        "pathStyle": {
+          "$ref": "#/$defs/PathStyle",
+          "description": "Authoritative native path grammar for resources in this environment.\n\nClients parsing or formatting native paths MUST use this field instead of\ninferring path semantics from their local environment."
+        }
+      }
+    },
     "InitializeResult": {
       "type": "object",
       "description": "Result of the `initialize` command.\n\n`protocolVersion` is the version the server has selected from the client's\n`protocolVersions` list. The client and server MUST use this version for\nthe rest of the connection. If the server cannot speak any of the offered\nversions it MUST return error code `-32005` (`UnsupportedProtocolVersion`)\nwith required `UnsupportedProtocolVersionErrorData` containing\n`supportedVersions`, instead of a result.",
@@ -158,6 +168,10 @@
             "$ref": "#/$defs/Snapshot"
           },
           "description": "Snapshots for each `initialSubscriptions` URI"
+        },
+        "environment": {
+          "$ref": "#/$defs/HostEnvironment",
+          "description": "Default execution environment exposed by this host connection.\n\nAbsence means no environment metadata is available."
         },
         "defaultDirectory": {
           "$ref": "#/$defs/URI",
@@ -9718,6 +9732,14 @@
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
+    },
+    "PathStyle": {
+      "enum": [
+        "posix",
+        "windows"
+      ],
+      "type": "string",
+      "description": "Native filesystem path grammar used by a host environment.\n\nThis does not change URI syntax: AHP resources remain URIs with\nslash-separated, percent-encoded paths."
     },
     "StateAction": {
       "oneOf": [

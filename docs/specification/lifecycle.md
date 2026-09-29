@@ -52,6 +52,9 @@ The client initiates the connection with an `initialize` **request**. The client
     "_meta": {
       "com.example.chatTargetStateFile": true
     },
+    "environment": {
+      "pathStyle": "posix"
+    },
     "defaultDirectory": "file:///home/testuser",
     "snapshots": [
       {
@@ -67,6 +70,12 @@ The client initiates the connection with an `initialize` **request**. The client
 `protocolVersion` is the version the server selected from the client's `protocolVersions` list. Both peers MUST use this version for the rest of the connection.
 
 `_meta` is an optional, opaque map for implementation-specific extension capabilities advertised by the host. Hosts and clients MAY agree on namespaced keys; clients MUST ignore keys they do not understand. Capabilities needed for interoperable behavior should be added as typed `InitializeResult` fields instead.
+
+`environment` optionally describes the connection's default host-side execution environment. Its fields apply to `defaultDirectory`, session working directories, and `file:` resources handled by the server through the `resource*` methods. They do not apply to resources provided by the client. A host that exposes mixed environments MUST only populate fields that have a single connection-wide default.
+
+`environment.pathStyle` optionally identifies the authoritative grammar for parsing and formatting native filesystem paths. `posix` selects POSIX path grammar and `windows` selects Windows path grammar. It does not change URI syntax: AHP resources remain slash-separated, percent-encoded URIs. Clients MUST NOT infer host path semantics from their local environment.
+
+Older hosts omit `environment`, and older clients ignore it as an unknown optional field. When `environment.pathStyle` is absent or unrecognized, the client SHOULD keep resource handling URI-based and disable or fall back from behavior that requires native path parsing. It MUST NOT substitute the client's local path semantics.
 
 If present, `defaultDirectory` provides a server-local starting location for remote filesystem browsing.
 

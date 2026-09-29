@@ -31,6 +31,19 @@ public enum ChatSourceKind
     SideChat,
 }
 
+/// <summary>Native filesystem path grammar used by a host environment.
+///
+/// This does not change URI syntax: AHP resources remain URIs with
+/// slash-separated, percent-encoded paths.</summary>
+[JsonConverter(typeof(WireEnumConverter<PathStyle>))]
+public enum PathStyle
+{
+    [WireValue("posix")]
+    Posix,
+    [WireValue("windows")]
+    Windows,
+}
+
 /// <summary>Encoding of fetched content data.</summary>
 [JsonConverter(typeof(WireEnumConverter<ContentEncoding>))]
 public enum ContentEncoding
@@ -148,6 +161,25 @@ public sealed record InitializeParams
     public ClientCapabilities? Capabilities { get; init; }
 }
 
+/// <summary>Describes the connection's default host-side execution environment.
+///
+/// The descriptor applies to {@link InitializeResult.defaultDirectory},
+/// session working directories, and `file:` resources handled by the server
+/// through the `resource*` commands, unless more specific environment metadata
+/// is available. It does not apply to resources provided by the client.
+///
+/// A host that exposes mixed environments MUST only populate fields that have a
+/// single connection-wide default.</summary>
+public sealed record HostEnvironment
+{
+    /// <summary>Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PathStyle? PathStyle { get; init; }
+}
+
 /// <summary>Result of the `initialize` command.
 ///
 /// `protocolVersion` is the version the server has selected from the client's
@@ -186,6 +218,12 @@ public sealed record InitializeResult
 
     /// <summary>Snapshots for each `initialSubscriptions` URI</summary>
     public required List<Snapshot> Snapshots { get; init; }
+
+    /// <summary>Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HostEnvironment? Environment { get; init; }
 
     /// <summary>Suggested default directory for remote filesystem browsing</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

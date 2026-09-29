@@ -33,6 +33,17 @@ const (
 	ChatSourceKindSideChat ChatSourceKind = "sideChat"
 )
 
+// Native filesystem path grammar used by a host environment.
+//
+// This does not change URI syntax: AHP resources remain URIs with
+// slash-separated, percent-encoded paths.
+type PathStyle string
+
+const (
+	PathStylePosix   PathStyle = "posix"
+	PathStyleWindows PathStyle = "windows"
+)
+
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -128,6 +139,23 @@ type InitializeParams struct {
 	Capabilities *ClientCapabilities `json:"capabilities,omitempty"`
 }
 
+// Describes the connection's default host-side execution environment.
+//
+// The descriptor applies to {@link InitializeResult.defaultDirectory},
+// session working directories, and `file:` resources handled by the server
+// through the `resource*` commands, unless more specific environment metadata
+// is available. It does not apply to resources provided by the client.
+//
+// A host that exposes mixed environments MUST only populate fields that have a
+// single connection-wide default.
+type HostEnvironment struct {
+	// Authoritative native path grammar for resources in this environment.
+	//
+	// Clients parsing or formatting native paths MUST use this field instead of
+	// inferring path semantics from their local environment.
+	PathStyle *PathStyle `json:"pathStyle,omitempty"`
+}
+
 // Result of the `initialize` command.
 //
 // `protocolVersion` is the version the server has selected from the client's
@@ -158,6 +186,10 @@ type InitializeResult struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Snapshots for each `initialSubscriptions` URI
 	Snapshots []Snapshot `json:"snapshots"`
+	// Default execution environment exposed by this host connection.
+	//
+	// Absence means no environment metadata is available.
+	Environment *HostEnvironment `json:"environment,omitempty"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause

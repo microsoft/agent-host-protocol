@@ -2092,10 +2092,10 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
-  { name: 'InitializeParams' }, { name: 'InitializeResult' },
+  { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
   // record or those fields reference a non-existent type (CS0246).

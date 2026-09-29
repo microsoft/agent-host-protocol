@@ -70,6 +70,45 @@ impl<'de> serde::Deserialize<'de> for ChatSourceKind {
     }
 }
 
+/// Native filesystem path grammar used by a host environment.
+///
+/// This does not change URI syntax: AHP resources remain URIs with
+/// slash-separated, percent-encoded paths.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PathStyle {
+    Posix,
+    Windows,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for PathStyle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Posix => serializer.serialize_str("posix"),
+            Self::Windows => serializer.serialize_str("windows"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PathStyle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "posix" => Self::Posix,
+            "windows" => Self::Windows,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Encoding of fetched content data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContentEncoding {
@@ -231,6 +270,26 @@ pub struct InitializeParams {
     pub capabilities: Option<ClientCapabilities>,
 }
 
+/// Describes the connection's default host-side execution environment.
+///
+/// The descriptor applies to {@link InitializeResult.defaultDirectory},
+/// session working directories, and `file:` resources handled by the server
+/// through the `resource*` commands, unless more specific environment metadata
+/// is available. It does not apply to resources provided by the client.
+///
+/// A host that exposes mixed environments MUST only populate fields that have a
+/// single connection-wide default.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostEnvironment {
+    /// Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_style: Option<PathStyle>,
+}
+
 /// Result of the `initialize` command.
 ///
 /// `protocolVersion` is the version the server has selected from the client's
@@ -265,6 +324,11 @@ pub struct InitializeResult {
     pub meta: Option<JsonObject>,
     /// Snapshots for each `initialSubscriptions` URI
     pub snapshots: Vec<Snapshot>,
+    /// Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<HostEnvironment>,
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_directory: Option<Uri>,
