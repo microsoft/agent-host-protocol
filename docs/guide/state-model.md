@@ -146,6 +146,7 @@ ChatState {
   // Chat summary fields, inlined directly (mirrored into SessionState.chats)
   resource: URI
   title: string
+  description?: string
   status: number          // SessionStatus bitset
   activity?: string
   modifiedAt: string

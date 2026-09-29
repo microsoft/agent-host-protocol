@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`ChatSummary.description` provides optional descriptive text for a chat."
+}
