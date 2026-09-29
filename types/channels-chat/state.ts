@@ -45,6 +45,8 @@ export interface ChatState {
   resource: URI;
   /** Chat title */
   title: string;
+  /** Optional human-readable description of the chat's purpose */
+  description?: string;
   /** Current chat status (reuses SessionStatus shape) */
   status: SessionStatus;
   /** Human-readable description of what the chat is currently doing */
@@ -137,6 +139,8 @@ export interface ChatSummary {
   resource: URI;
   /** Chat title */
   title: string;
+  /** Optional human-readable description of the chat's purpose */
+  description?: string;
   /** Current chat status (reuses SessionStatus shape) */
   status: SessionStatus;
   /** Human-readable description of what the chat is currently doing */

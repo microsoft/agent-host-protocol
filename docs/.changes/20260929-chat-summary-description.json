@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `ChatSummary.description` describes a chat's purpose separately from its transient activity."
+}
