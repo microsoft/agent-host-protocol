@@ -53,15 +53,6 @@ export interface ChatState {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
-   * Current parent chat in the owning session's mutable chat hierarchy.
-   *
-   * Unlike {@link origin}, this relationship may change through `moveChat`.
-   * Absence means the chat is top-level within its session. The referenced
-   * chat MUST belong to the same session and MUST NOT be this chat or one of
-   * its descendants.
-   */
-  parentChat?: URI;
-  /**
    * How the user can interact with this chat. See {@link ChatInteractivity}.
    *
    * Supports agent-team patterns where worker chats are read-only or hidden.
@@ -154,12 +145,6 @@ export interface ChatSummary {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
-   * Current parent chat in the owning session's mutable chat hierarchy.
-   *
-   * See {@link ChatState.parentChat} for the full semantics.
-   */
-  parentChat?: URI;
-  /**
    * How the user can interact with this chat. See {@link ChatInteractivity}.
    *
    * Supports agent-team patterns where worker chats are read-only or hidden.
@@ -218,8 +203,8 @@ export interface SideChatSelection {
 
 /**
  * How a chat came into existence. Clients MAY use it to render creation
- * provenance (fork markers and "spawned by tool" badges). The current mutable
- * hierarchy is represented separately by {@link ChatState.parentChat}.
+ * provenance (fork markers and "spawned by tool" badges). Any host-internal
+ * hierarchy used to move a complete chat subtree is not exposed by AHP.
  *
  * Fork and side-chat origins both carry a stable top-level `turnId` alongside
  * their discriminated `kind` value instead of snapshotting whether that turn

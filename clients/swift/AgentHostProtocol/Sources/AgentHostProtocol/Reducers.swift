@@ -204,11 +204,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.activity = a.activity
         return next
 
-    case .chatParentChanged(let a):
-        var next = state
-        next.parentChat = a.parentChat
-        return next
-
     case .chatChangesetsChanged(let a):
         var next = state
         next.changesets = a.changesets
@@ -1028,7 +1023,6 @@ private func mergeChatSummaryChanges(_ summary: inout ChatSummary, changes: Part
     if let activity = changes.activity { summary.activity = activity }
     if let modifiedAt = changes.modifiedAt { summary.modifiedAt = modifiedAt }
     if let origin = changes.origin { summary.origin = origin }
-    if let parentChat = changes.parentChat { summary.parentChat = parentChat }
     if let workingDirectories = changes.workingDirectories { summary.workingDirectories = workingDirectories }
 }
 

@@ -69,11 +69,11 @@ internal object ChatSourceKindSerializer : KSerializer<ChatSourceKind> {
 value class ChatMoveDestinationKind(val rawValue: String) {
     companion object {
         /**
-         * Move the source chat under another chat.
+         * Move the source chat subtree into an existing session.
          */
-        val CHAT: ChatMoveDestinationKind = ChatMoveDestinationKind("chat")
+        val SESSION: ChatMoveDestinationKind = ChatMoveDestinationKind("session")
         /**
-         * Promote the source chat into a newly allocated top-level session.
+         * Move the source chat subtree into a newly allocated session.
          */
         val NEW_SESSION: ChatMoveDestinationKind = ChatMoveDestinationKind("newSession")
     }
@@ -755,15 +755,15 @@ data class DisposeChatParams(
 )
 
 @Serializable
-data class ChatMoveToChatDestination(
+data class ChatMoveToSessionDestination(
     /**
      * Discriminant
      */
     val kind: ChatMoveDestinationKind,
     /**
-     * Destination parent chat URI.
+     * Destination session URI.
      */
-    val chat: String
+    val session: String
 )
 
 @Serializable
@@ -1849,7 +1849,7 @@ internal object ChatSourceSerializer : KSerializer<ChatSource> {
 sealed interface ChatMoveDestination
 
 @JvmInline
-value class ChatMoveDestinationChat(val value: ChatMoveToChatDestination) : ChatMoveDestination
+value class ChatMoveDestinationSession(val value: ChatMoveToSessionDestination) : ChatMoveDestination
 @JvmInline
 value class ChatMoveDestinationNewSession(val value: ChatMoveToNewSessionDestination) : ChatMoveDestination
 /**
@@ -1876,7 +1876,7 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
         val discriminant = (obj["kind"] as? JsonPrimitive)?.content
             ?: return ChatMoveDestinationUnknown(obj)
         return when (discriminant) {
-            "chat" -> ChatMoveDestinationChat(input.json.decodeFromJsonElement(ChatMoveToChatDestination.serializer(), element))
+            "session" -> ChatMoveDestinationSession(input.json.decodeFromJsonElement(ChatMoveToSessionDestination.serializer(), element))
             "newSession" -> ChatMoveDestinationNewSession(input.json.decodeFromJsonElement(ChatMoveToNewSessionDestination.serializer(), element))
             else -> ChatMoveDestinationUnknown(obj)
         }
@@ -1886,7 +1886,7 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
         val output = encoder as? JsonEncoder
             ?: error("ChatMoveDestination can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is ChatMoveDestinationChat -> output.json.encodeToJsonElement(ChatMoveToChatDestination.serializer(), value.value)
+            is ChatMoveDestinationSession -> output.json.encodeToJsonElement(ChatMoveToSessionDestination.serializer(), value.value)
             is ChatMoveDestinationNewSession -> output.json.encodeToJsonElement(ChatMoveToNewSessionDestination.serializer(), value.value)
             is ChatMoveDestinationUnknown -> value.raw
         }

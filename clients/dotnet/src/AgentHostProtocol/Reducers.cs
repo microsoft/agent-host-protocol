@@ -958,9 +958,6 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
-            case ChatParentChangedAction a:
-                state.ParentChat = a.ParentChat;
-                return ReduceOutcome.Applied;
             case ChatChangesetsChangedAction a:
                 state.Changesets = CopyList(a.Changesets);
                 return ReduceOutcome.Applied;
@@ -1827,7 +1824,6 @@ public static class Reducers
         if (ch.Activity is not null) { s.Activity = ch.Activity; }
         if (ch.ModifiedAt is not null) { s.ModifiedAt = ch.ModifiedAt; }
         if (ch.Origin is not null) { s.Origin = ch.Origin; }
-        if (ch.ParentChat is not null) { s.ParentChat = ch.ParentChat; }
         if (ch.Interactivity is not null) { s.Interactivity = ch.Interactivity; }
         if (ch.WorkingDirectories is not null) { s.WorkingDirectories = ch.WorkingDirectories; }
 

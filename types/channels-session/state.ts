@@ -185,9 +185,8 @@ export interface SessionState extends SessionMetadata {
   /**
    * The chat that receives input when the user addresses the session without
    * selecting a specific chat. This is a UI routing hint, not a hierarchy
-   * marker — {@link ChatSummary.parentChat} defines parentage, and every chat
-   * remains directly addressable. Hosts MAY change this over the session's
-   * lifetime.
+   * marker, and every chat remains directly addressable. Hosts MAY change this
+   * over the session's lifetime.
    */
   defaultChat?: URI;
   /** Session configuration schema and current values */
@@ -536,13 +535,6 @@ export interface SessionChatSummary {
   title: string;
   /** How this chat was created, when known */
   origin?: ChatOrigin;
-  /**
-   * Current parent chat in the session's mutable hierarchy.
-   *
-   * Mirrors {@link ChatSummary.parentChat} for clients that consume only the
-   * lightweight session summary.
-   */
-  parentChat?: URI;
   /**
    * How the user can interact with this chat.
    *

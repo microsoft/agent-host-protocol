@@ -1347,9 +1347,7 @@ data class AgentCapabilities(
      * session starts with. An empty object `{}` advertises multi-chat without
      * source-based creation; set {@link MultipleChatsCapability.fork} or
      * {@link MultipleChatsCapability.sideChat} to allow the corresponding
-     * creation mode, and set {@link MultipleChatsCapability.reparent} or
-     * {@link MultipleChatsCapability.promote} to allow the corresponding
-     * `moveChat` destination.
+     * creation mode.
      */
     val multipleChats: MultipleChatsCapability? = null,
     /**
@@ -1386,23 +1384,7 @@ data class MultipleChatsCapability(
      * the host snapshots the available partial assistant response at creation
      * time. Side-chat support always implies multi-chat support.
      */
-    val sideChat: Boolean? = null,
-    /**
-     * The agent can atomically move a non-default chat under another chat.
-     *
-     * The destination chat may belong to another session on the same host when
-     * the source and destination sessions use the same compatible provider and
-     * agent runtime. When absent or `false`, clients MUST NOT call `moveChat`
-     * with `destination.kind: "chat"`.
-     */
-    val reparent: Boolean? = null,
-    /**
-     * The agent can atomically promote a non-default chat into a new top-level
-     * session on the same host. The new session preserves the source session's
-     * compatible provider and agent runtime. When absent or `false`, clients
-     * MUST NOT call `moveChat` with `destination.kind: "newSession"`.
-     */
-    val promote: Boolean? = null
+    val sideChat: Boolean? = null
 )
 
 @Serializable
@@ -1619,15 +1601,6 @@ data class ChatState(
      */
     val origin: ChatOrigin? = null,
     /**
-     * Current parent chat in the owning session's mutable chat hierarchy.
-     *
-     * Unlike {@link origin}, this relationship may change through `moveChat`.
-     * Absence means the chat is top-level within its session. The referenced
-     * chat MUST belong to the same session and MUST NOT be this chat or one of
-     * its descendants.
-     */
-    val parentChat: String? = null,
-    /**
      * How the user can interact with this chat. See {@link ChatInteractivity}.
      *
      * Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1732,12 +1705,6 @@ data class ChatSummary(
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,
-    /**
-     * Current parent chat in the owning session's mutable chat hierarchy.
-     *
-     * See {@link ChatState.parentChat} for the full semantics.
-     */
-    val parentChat: String? = null,
     /**
      * How the user can interact with this chat. See {@link ChatInteractivity}.
      *
@@ -1848,9 +1815,8 @@ data class SessionState(
     /**
      * The chat that receives input when the user addresses the session without
      * selecting a specific chat. This is a UI routing hint, not a hierarchy
-     * marker — {@link ChatSummary.parentChat} defines parentage, and every chat
-     * remains directly addressable. Hosts MAY change this over the session's
-     * lifetime.
+     * marker, and every chat remains directly addressable. Hosts MAY change this
+     * over the session's lifetime.
      */
     val defaultChat: String? = null,
     /**
@@ -2154,13 +2120,6 @@ data class SessionChatSummary(
      * How this chat was created, when known
      */
     val origin: ChatOrigin? = null,
-    /**
-     * Current parent chat in the session's mutable hierarchy.
-     *
-     * Mirrors {@link ChatSummary.parentChat} for clients that consume only the
-     * lightweight session summary.
-     */
-    val parentChat: String? = null,
     /**
      * How the user can interact with this chat.
      *

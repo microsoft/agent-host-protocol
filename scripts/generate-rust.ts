@@ -1444,7 +1444,6 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
-  { type: 'chat/parentChanged', variantName: 'ChatParentChanged', tsInterface: 'ChatParentChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1715,7 +1714,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource', omitDiscriminants: true }, { name: 'SideChatSource', omitDiscriminants: true }, { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
-  { name: 'ChatMoveToChatDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
+  { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
   { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
@@ -1769,7 +1768,7 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   discriminantField: 'kind',
   doc: 'Destination of an atomic chat move.',
   variants: [
-    { variantName: 'Chat', innerType: 'ChatMoveToChatDestination', wireValue: 'chat' },
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
     { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
   ],
 };

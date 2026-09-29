@@ -41,9 +41,9 @@ public enum ChatSourceKind: Codable, Sendable, Equatable {
 
 /// Destination kind for an atomic chat move.
 public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
-    /// Move the source chat under another chat.
-    case chat
-    /// Promote the source chat into a newly allocated top-level session.
+    /// Move the source chat subtree into an existing session.
+    case session
+    /// Move the source chat subtree into a newly allocated session.
     case newSession
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
@@ -52,7 +52,7 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
         let container = try decoder.singleValueContainer()
         let raw = try container.decode(String.self)
         switch raw {
-        case "chat": self = .chat
+        case "session": self = .session
         case "newSession": self = .newSession
         default: self = .unknown(raw)
         }
@@ -61,7 +61,7 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case .chat: try container.encode("chat")
+        case .session: try container.encode("session")
         case .newSession: try container.encode("newSession")
         case .unknown(let raw): try container.encode(raw)
         }
@@ -835,18 +835,18 @@ public struct DisposeChatParams: Codable, Sendable {
     }
 }
 
-public struct ChatMoveToChatDestination: Codable, Sendable {
+public struct ChatMoveToSessionDestination: Codable, Sendable {
     /// Discriminant
     public var kind: ChatMoveDestinationKind
-    /// Destination parent chat URI.
-    public var chat: String
+    /// Destination session URI.
+    public var session: String
 
     public init(
         kind: ChatMoveDestinationKind,
-        chat: String
+        session: String
     ) {
         self.kind = kind
-        self.chat = chat
+        self.session = session
     }
 }
 
@@ -2269,7 +2269,7 @@ public enum ChatSource: Codable, Sendable {
 }
 
 public enum ChatMoveDestination: Codable, Sendable {
-    case chat(ChatMoveToChatDestination)
+    case session(ChatMoveToSessionDestination)
     case newSession(ChatMoveToNewSessionDestination)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
@@ -2286,8 +2286,8 @@ public enum ChatMoveDestination: Codable, Sendable {
             return
         }
         switch discriminant {
-        case "chat":
-            self = .chat(try ChatMoveToChatDestination(from: decoder))
+        case "session":
+            self = .session(try ChatMoveToSessionDestination(from: decoder))
         case "newSession":
             self = .newSession(try ChatMoveToNewSessionDestination(from: decoder))
         default:
@@ -2297,7 +2297,7 @@ public enum ChatMoveDestination: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
-        case .chat(let value): try value.encode(to: encoder)
+        case .session(let value): try value.encode(to: encoder)
         case .newSession(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }

@@ -35,10 +35,10 @@ public enum ChatSourceKind
 [JsonConverter(typeof(WireEnumConverter<ChatMoveDestinationKind>))]
 public enum ChatMoveDestinationKind
 {
-    /// <summary>Move the source chat under another chat.</summary>
-    [WireValue("chat")]
-    Chat,
-    /// <summary>Promote the source chat into a newly allocated top-level session.</summary>
+    /// <summary>Move the source chat subtree into an existing session.</summary>
+    [WireValue("session")]
+    Session,
+    /// <summary>Move the source chat subtree into a newly allocated session.</summary>
     [WireValue("newSession")]
     NewSession,
 }
@@ -654,52 +654,49 @@ public sealed record DisposeChatParams
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Moves a chat under another chat.</summary>
-public sealed record ChatMoveToChatDestination
+/// <summary>Moves a top-level chat subtree into an existing session.</summary>
+public sealed record ChatMoveToSessionDestination
 {
     /// <summary>Discriminant</summary>
     public ChatMoveDestinationKind Kind { get; init; }
 
-    /// <summary>Destination parent chat URI.</summary>
-    public required string Chat { get; init; }
+    /// <summary>Destination session URI.</summary>
+    public required string Session { get; init; }
 }
 
-/// <summary>Promotes a chat into a newly allocated top-level session.</summary>
+/// <summary>Moves a top-level chat subtree into a newly allocated session.</summary>
 public sealed record ChatMoveToNewSessionDestination
 {
     /// <summary>Discriminant</summary>
     public ChatMoveDestinationKind Kind { get; init; }
 }
 
-/// <summary>Atomically changes a non-default chat's parent and, when necessary, owning
-/// session.
+/// <summary>Atomically moves a non-default top-level chat and its complete host-managed
+/// descendant hierarchy to another session.
 ///
-/// The source is the chat named by `channel`. A `chat` destination reparents it
-/// under the destination chat and moves its descendant subtree into that chat's
-/// session when the sessions differ. A `newSession` destination allocates a new
-/// compatible session, promotes the source to its top level, and makes it that
-/// session's default chat.
+/// The source is the chat named by `channel`. A `session` destination moves the
+/// complete subtree into an existing compatible session. A `newSession`
+/// destination allocates a compatible session, moves the complete subtree into
+/// it, and makes the requested chat that session's default chat. In both cases
+/// the requested chat remains top-level. The host owns the descendant
+/// relationship; AHP does not expose it as chat state.
 ///
 /// The host MUST validate the complete operation before committing it. It MUST
-/// reject a source subtree containing an owning session's default chat, any
-/// active turn in the moved subtree, a destination equal to or below the
-/// source, an unsupported capability, a destination on another host, or
-/// incompatible source and destination provider/agent runtimes. Rejection MUST
-/// leave every chat, session catalog, and root summary unchanged. Unknown
-/// resources use `NotFound`, active turns use `TurnInProgress`, and validation,
-/// capability, compatibility, cycle, and idempotency-key mismatches use
-/// `InvalidParams`.
+/// reject a source that is not top-level, a subtree containing an owning
+/// session's default chat, any active turn in the moved subtree, a destination
+/// equal to the source session, a destination on another host, or incompatible
+/// source and destination provider/agent runtimes. Rejection MUST leave every
+/// chat, session catalog, and root summary unchanged. Unknown resources use
+/// `NotFound`, active turns use `TurnInProgress`, and validation,
+/// compatibility, and idempotency-key mismatches use `InvalidParams`.
 ///
-/// On success the host commits the hierarchy, ownership, and every moved-chat
-/// URI replacement as one transaction before publishing synchronization
-/// messages. Every moved descendant's `parentChat` MUST name the authoritative
-/// post-move URI of its moved parent. `ChatOrigin` remains unchanged, including
-/// historical chat URIs that no longer resolve after replacement.
-/// It then updates affected session catalogs with `session/chatRemoved`,
-/// `session/chatAdded`, and `session/chatUpdated`, dispatches
-/// `chat/parentChanged` on preserved chat channels, and emits `chat/moved` on
-/// previous moved chat channels when subscribers must follow authoritative
-/// result resources.</summary>
+/// On success the host commits ownership, its internal hierarchy, and every
+/// moved-chat URI replacement as one transaction before publishing
+/// synchronization messages. `ChatOrigin` remains unchanged, including
+/// historical chat URIs that no longer resolve after replacement. It then
+/// updates affected session catalogs with `session/chatRemoved` and
+/// `session/chatAdded`, and emits `chat/moved` on previous moved chat channels
+/// when subscribers must follow authoritative result resources.</summary>
 public sealed record MoveChatParams
 {
     /// <summary>Source chat URI.</summary>
@@ -1867,10 +1864,10 @@ internal sealed class ChatMoveDestinationConverter : UnionConverter<ChatMoveDest
             discriminator: "kind",
             variants: new Dictionary<string, Type>
             {
-        ["chat"] = typeof(ChatMoveToChatDestination),
+        ["session"] = typeof(ChatMoveToSessionDestination),
         ["newSession"] = typeof(ChatMoveToNewSessionDestination),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

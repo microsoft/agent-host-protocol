@@ -2,40 +2,21 @@
 
 ## Status
 
-Implemented as an additive, capability-gated AHP contract.
+Implemented as baseline behavior for the protocol version that introduces
+`moveChat`.
 
 ## Motivation
 
-Creation provenance and current organization answer different questions.
-`ChatOrigin` records why a chat exists and must remain stable for audit and
-explanation. Users may later reorganize that chat under another chat or promote
-it into a session without rewriting history. Hosts may also need to migrate the
-backing chat identity when ownership crosses backend session boundaries.
+Hosts may need to transfer a top-level chat and its complete internal hierarchy
+to another session while preserving durable chat state and client subscriptions.
+The hierarchy may include side chats or tool-spawned worker chats, but it is an
+agent implementation detail and is not exposed as AHP chat state.
 
-The contract therefore adds mutable hierarchy state, one atomic command, and a
-scoped routing notification instead of encoding ownership in every chat URI or
-redesigning chat resources.
+The contract provides one atomic command and a scoped routing notification
+instead of requiring clients to coordinate independent remove/add operations or
+infer replacement chat URIs.
 
 ## Contract
-
-### Durable state
-
-`ChatSummary.parentChat?: URI` and `ChatState.parentChat?: URI` are the current
-structural parent. Absence means top-level in the owning session. A present
-parent resolves within that session and the hierarchy is acyclic.
-
-`ChatOrigin` is unchanged. Source-based and tool-based creation initialize
-`parentChat` from the creating chat, but later moves change only hierarchy.
-
-### Capability discovery
-
-`AgentCapabilities.multipleChats` gains:
-
-- `reparent?: boolean` for `{ kind: "chat", chat }`;
-- `promote?: boolean` for `{ kind: "newSession" }`.
-
-Both are opt-in. Cross-session reparenting is limited to the same host and a
-compatible provider/agent runtime.
 
 ### Request and result
 
@@ -43,7 +24,7 @@ compatible provider/agent runtime.
 interface MoveChatParams {
   channel: URI;
   destination:
-    | { kind: 'chat'; chat: URI }
+    | { kind: 'session'; session: URI }
     | { kind: 'newSession' };
   requestId: string;
 }
@@ -60,44 +41,48 @@ interface MoveChatResult {
 }
 ```
 
+The source MUST be a non-default top-level chat. A `session` destination moves
+the source hierarchy into an existing compatible session. A `newSession`
+destination allocates a compatible session and makes the requested chat its
+default chat. The requested chat remains top-level in either destination.
+
 `requestId` makes an uncertain request safe to retry. The root convenience
 fields identify the requested chat and equal the first `movedChats` entry.
-`movedChats` exhaustively maps the root and every descendant, including
-identity-preserving entries, because a host may encode owning-session identity
-in every chat URI. Its deterministic parent-before-child order lets clients
-rewrite references without guessing.
+`movedChats` exhaustively maps the root and every host-managed descendant,
+including identity-preserving entries, because a host may encode owning-session
+identity in every chat URI. Its deterministic root-first, parent-before-child
+order lets clients rewrite references without guessing.
 
 ### Atomicity and synchronization
 
-The requested chat and its descendants move as one subtree. The host validates
-the whole operation and commits ownership, hierarchy, catalogs, default-chat
-state, and all resource replacements before publishing actions or
-notifications. Every descendant's `parentChat` is rewritten to its moved
-parent's mapped destination URI. Immutable `ChatOrigin` remains unchanged even
-when its historical URI no longer resolves. Failure leaves all state unchanged.
+The requested chat and its host-managed descendants move as one subtree. The
+host validates the whole operation and commits ownership, internal hierarchy,
+catalogs, default-chat state, and all resource replacements before publishing
+actions or notifications. Immutable `ChatOrigin` remains unchanged even when
+its historical URI no longer resolves. Failure leaves all state unchanged.
 
-Existing catalog actions synchronize removal and addition. The
-`chat/parentChanged` action updates preserved chat snapshots.
-`chat/moved` is emitted on each affected previous channel in mapping order and
-carries the same exhaustive mapping. The move is committed before delivery, so
-each notification is a complete atomic routing snapshot rather than one step of
-the transaction. Reconnect snapshots remain the durable recovery path.
+Existing catalog actions synchronize removal and addition. `chat/moved` is
+emitted on each affected previous channel in mapping order and carries the same
+exhaustive mapping. The move is committed before delivery, so each notification
+is a complete atomic routing snapshot rather than one step of the transaction.
+Reconnect snapshots remain the durable recovery path.
 
 ### Rejections
 
 The host rejects a move when:
 
+- the source is not a top-level chat according to the host's internal model;
 - the moved subtree contains its current session's default chat;
 - the source or a moved descendant has an active turn;
-- the target would create a cycle;
-- the required capability is absent;
+- the existing destination equals the source session;
 - either resource belongs to another host;
 - the source and destination agent/provider runtimes are incompatible;
 - any source or destination resource is unknown.
 
 ## Alternatives rejected
 
-- **Rewrite `ChatOrigin`:** loses immutable creation provenance.
+- **Expose hierarchy in `ChatState`:** clients do not need the host's internal
+  side-chat or sub-agent structure to render or initiate a top-level move.
 - **Require session-independent chat URIs:** incompatible with hosts whose
   existing routing and storage contracts encode session ownership.
 - **Model the move as independent remove/add requests:** cannot guarantee

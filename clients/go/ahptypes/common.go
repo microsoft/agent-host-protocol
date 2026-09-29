@@ -83,8 +83,6 @@ type PartialChatSummary struct {
 	ModifiedAt *string `json:"modifiedAt,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
-	// Current parent chat in the owning session's mutable chat hierarchy.
-	ParentChat *URI `json:"parentChat,omitempty"`
 	// The subset of the session's working directories this chat uses.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 }

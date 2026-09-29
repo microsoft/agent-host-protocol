@@ -1482,7 +1482,6 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
-  { type: 'chat/parentChanged', variantName: 'ChatParentChanged', tsInterface: 'ChatParentChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
@@ -2104,7 +2103,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ForkChatSource' }, { name: 'SideChatSource' },
   { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
-  { name: 'ChatMoveToChatDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
+  { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -2145,8 +2144,9 @@ const CHAT_SOURCE_UNION: UnionConfig = {
 const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   name: 'ChatMoveDestination',
   discriminantField: 'kind',
+  unknown: true,
   variants: [
-    { variantName: 'Chat', innerType: 'ChatMoveToChatDestination', wireValue: 'chat' },
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
     { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
   ],
 };

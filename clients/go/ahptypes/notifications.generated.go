@@ -147,8 +147,8 @@ type ProgressParams struct {
 // atomically, stop dispatching to replaced old URIs, subscribe to the
 // authoritative session and chat channels as needed, and reconcile from their
 // snapshots. Duplicate notifications for the same mapping are idempotent.
-// Durable hierarchy and catalog truth remain in `ChatState.parentChat` and the
-// affected sessions' catalogs; this routing handoff is not replayed.
+// Durable ownership and catalog truth remain in the affected sessions'
+// catalogs; this routing handoff is not replayed.
 type ChatMovedParams struct {
 	// Previous channel receiving this notification; names one `movedChats[].previousChat`.
 	Channel URI `json:"channel"`

@@ -305,8 +305,8 @@ describe('generated JSON schemas', () => {
         assert.ok(destination, 'ChatMoveDestination must be emitted as a command definition');
         assert.equal(
           schemaAccepts(schema, destination, {
-            kind: 'chat',
-            chat: 'ahp-chat:/parent',
+            kind: 'session',
+            session: 'ahp-session:/destination',
           }),
           true,
         );
@@ -318,7 +318,7 @@ describe('generated JSON schemas', () => {
         );
         assert.equal(
           schemaAccepts(schema, destination, {
-            kind: 'chat',
+            kind: 'session',
           }),
           false,
         );
@@ -360,17 +360,6 @@ describe('generated JSON schemas', () => {
         assert.deepEqual(properties.movedChats.items, { $ref: '#/$defs/MovedChatResource' });
       });
 
-      it('exposes mutable chat hierarchy separately from immutable origin', () => {
-        if (file !== 'state.schema.json') {
-          return;
-        }
-
-        const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        const chatStateProperties = defs.ChatState.properties as Record<string, Record<string, unknown>>;
-        const chatSummaryProperties = defs.ChatSummary.properties as Record<string, Record<string, unknown>>;
-        assert.deepEqual(chatStateProperties.parentChat.$ref, '#/$defs/URI');
-        assert.deepEqual(chatSummaryProperties.parentChat.$ref, '#/$defs/URI');
-      });
     });
   }
 });

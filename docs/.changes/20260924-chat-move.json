@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Atomic `moveChat` reparenting and promotion with mutable `parentChat` hierarchy, capability negotiation, and exhaustive moved-subtree resource mapping."
+  "message": "Atomic `moveChat` transfer of a top-level chat and its complete host-managed hierarchy to an existing or new session, with idempotent requests and exhaustive moved-subtree resource mapping."
 }

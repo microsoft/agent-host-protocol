@@ -1387,7 +1387,6 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/error', caseName: 'chatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', caseName: 'chatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', caseName: 'chatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
-  { type: 'chat/parentChanged', caseName: 'chatParentChanged', tsInterface: 'ChatParentChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'chatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'chatUsage', tsInterface: 'ChatUsageAction' },
@@ -1639,7 +1638,7 @@ const COMMAND_STRUCTS = [
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
-  'ChatMoveToChatDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MovedChatResource', 'MoveChatResult',
+  'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MovedChatResource', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
   'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
@@ -1689,7 +1688,7 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   name: 'ChatMoveDestination',
   discriminantField: 'kind',
   variants: [
-    { caseName: 'chat', structName: 'ChatMoveToChatDestination', discriminantValue: 'chat' },
+    { caseName: 'session', structName: 'ChatMoveToSessionDestination', discriminantValue: 'session' },
     { caseName: 'newSession', structName: 'ChatMoveToNewSessionDestination', discriminantValue: 'newSession' },
   ],
 };

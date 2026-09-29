@@ -744,9 +744,6 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             if let Some(origin) = &a.changes.origin {
                 chat.origin = Some(origin.clone());
             }
-            if let Some(parent_chat) = &a.changes.parent_chat {
-                chat.parent_chat = Some(parent_chat.clone());
-            }
             if let Some(working_directories) = &a.changes.working_directories {
                 chat.working_directories = Some(working_directories.clone());
             }
@@ -1102,10 +1099,6 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
-            ReduceOutcome::Applied
-        }
-        StateAction::ChatParentChanged(a) => {
-            state.parent_chat = a.parent_chat.clone();
             ReduceOutcome::Applied
         }
         StateAction::ChatChangesetsChanged(a) => {
@@ -2212,7 +2205,6 @@ mod tests {
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
-            parent_chat: None,
             interactivity: None,
             working_directories: None,
             changesets: None,
@@ -2370,7 +2362,6 @@ mod tests {
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
-            parent_chat: None,
             interactivity: None,
             working_directories: None,
         };

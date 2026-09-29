@@ -1541,7 +1541,6 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
-  { type: 'chat/parentChanged', variantName: 'ChatParentChanged', tsInterface: 'ChatParentChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1731,7 +1730,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
-  { name: 'ChatMoveToChatDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
+  { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1784,7 +1783,7 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   discriminantField: 'kind',
   doc: 'Destination of an atomic chat move.',
   variants: [
-    { variantName: 'Chat', innerType: 'ChatMoveToChatDestination', wireValue: 'chat' },
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
     { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
   ],
 };
@@ -1954,7 +1953,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateFixedDiscriminantMethods('SideChatSource', 'kind', 'sideChat', 'ChatSourceKind'));
   lines.push('');
-  lines.push(generateFixedDiscriminantMethods('ChatMoveToChatDestination', 'kind', 'chat', 'ChatMoveDestinationKind'));
+  lines.push(generateFixedDiscriminantMethods('ChatMoveToSessionDestination', 'kind', 'session', 'ChatMoveDestinationKind'));
   lines.push('');
   lines.push(generateFixedDiscriminantMethods('ChatMoveToNewSessionDestination', 'kind', 'newSession', 'ChatMoveDestinationKind'));
   lines.push('');
