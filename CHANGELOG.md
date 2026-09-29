@@ -288,6 +288,9 @@ Spec version: `0.5.0`
 
 ### Fixed
 
+- `chat/usage` reducer now updates the matching turn in `turns` when the
+  `turnId` refers to a completed (non-active) turn, rather than ignoring the
+  action.
 - Corrected the `ACTION_INTRODUCED_IN` entries for `annotations/set`,
   `annotations/removed`, `annotations/entrySet`, and `annotations/entryRemoved`
   from `0.3.0` to `0.4.0`. The annotations channel first shipped in the
