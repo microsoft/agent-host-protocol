@@ -1982,6 +1982,15 @@ public sealed record SessionChatSummary
     /// backward compatibility.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
+
+    /// <summary>Whether this chat has been archived independently of its owning session
+    /// (see `chat/isArchivedChanged`).
+    ///
+    /// Generic clients use this to group or filter archived chats in session
+    /// lists without subscribing to the session channel. Absence means the
+    /// chat is not archived.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Archived { get; init; }
 }
 
 /// <summary>Aggregate counts describing the file changes associated with a session.

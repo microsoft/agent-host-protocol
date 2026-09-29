@@ -1220,6 +1220,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether this chat has been archived independently of its owning session\n(see `chat/isArchivedChanged`).\n\nGeneric clients use this to group or filter archived chats in session\nlists without subscribing to the session channel. Absence means the\nchat is not archived."
         }
       },
       "required": [

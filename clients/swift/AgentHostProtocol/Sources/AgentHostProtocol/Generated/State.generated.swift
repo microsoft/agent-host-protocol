@@ -2273,17 +2273,26 @@ public struct SessionChatSummary: Codable, Sendable {
     /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
     /// backward compatibility.
     public var interactivity: ChatInteractivity?
+    /// Whether this chat has been archived independently of its owning session
+    /// (see `chat/isArchivedChanged`).
+    ///
+    /// Generic clients use this to group or filter archived chats in session
+    /// lists without subscribing to the session channel. Absence means the
+    /// chat is not archived.
+    public var archived: Bool?
 
     public init(
         resource: String,
         title: String,
         origin: ChatOrigin? = nil,
-        interactivity: ChatInteractivity? = nil
+        interactivity: ChatInteractivity? = nil,
+        archived: Bool? = nil
     ) {
         self.resource = resource
         self.title = title
         self.origin = origin
         self.interactivity = interactivity
+        self.archived = archived
     }
 }
 

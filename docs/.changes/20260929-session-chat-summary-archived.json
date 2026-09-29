@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`SessionChatSummary.archived` exposes per-chat archived state in the lightweight chat catalog without requiring a session subscription."
+}

@@ -1204,6 +1204,13 @@ type SessionChatSummary struct {
 	// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
 	// backward compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	// Whether this chat has been archived independently of its owning session
+	// (see `chat/isArchivedChanged`).
+	//
+	// Generic clients use this to group or filter archived chats in session
+	// lists without subscribing to the session channel. Absence means the
+	// chat is not archived.
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // Aggregate counts describing the file changes associated with a session.

@@ -2145,7 +2145,16 @@ data class SessionChatSummary(
      * read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
      * backward compatibility.
      */
-    val interactivity: ChatInteractivity? = null
+    val interactivity: ChatInteractivity? = null,
+    /**
+     * Whether this chat has been archived independently of its owning session
+     * (see `chat/isArchivedChanged`).
+     *
+     * Generic clients use this to group or filter archived chats in session
+     * lists without subscribing to the session channel. Absence means the
+     * chat is not archived.
+     */
+    val archived: Boolean? = null
 )
 
 @Serializable
