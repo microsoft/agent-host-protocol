@@ -146,6 +146,7 @@ ChatState {
   // Chat summary fields, inlined directly (mirrored into SessionState.chats)
   resource: URI
   title: string
+  description?: string     // human-readable description of the chat's purpose
   status: number          // SessionStatus bitset
   activity?: string
   modifiedAt: string
@@ -161,6 +162,11 @@ ChatState {
   draft?: Message                     // user's in-progress input
 }
 ```
+
+`description` is optional descriptive text about the chat's purpose, distinct
+from `activity`, which describes what it is currently doing. It is available
+in the `ChatSummary` catalog so clients can display it without subscribing to
+the full chat state.
 
 `changesets` is state-only and deliberately omitted from the lightweight
 `ChatSummary`. Active clients discover it by subscribing to the chat, then

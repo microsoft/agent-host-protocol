@@ -2407,6 +2407,10 @@
           "type": "string",
           "description": "Chat title"
         },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this chat's purpose"
+        },
         "status": {
           "$ref": "#/$defs/SessionStatus",
           "description": "Current chat status (reuses SessionStatus shape)"
@@ -2496,6 +2500,10 @@
         "title": {
           "type": "string",
           "description": "Chat title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this chat's purpose"
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
