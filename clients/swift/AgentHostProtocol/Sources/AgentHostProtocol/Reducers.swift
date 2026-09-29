@@ -1054,6 +1054,7 @@ private func mergeChatSummaryChanges(_ summary: inout ChatSummary, changes: Part
     if let status = changes.status { summary.status = status }
     if let activity = changes.activity { summary.activity = activity }
     if let modifiedAt = changes.modifiedAt { summary.modifiedAt = modifiedAt }
+    if let changesSummary = changes.changes { summary.changes = changesSummary }
     if let origin = changes.origin { summary.origin = origin }
     if let workingDirectories = changes.workingDirectories { summary.workingDirectories = workingDirectories }
 }

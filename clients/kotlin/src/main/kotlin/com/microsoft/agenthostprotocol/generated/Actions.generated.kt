@@ -1577,6 +1577,12 @@ data class PartialChatSummary(
      */
     val modifiedAt: String? = null,
     /**
+     * Aggregate summary of file changes associated with this chat. Servers may
+     * populate this to give clients a quick at-a-glance view of the chat's
+     * footprint without requiring the client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
+    /**
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,

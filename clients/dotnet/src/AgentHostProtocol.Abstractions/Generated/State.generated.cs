@@ -1142,6 +1142,12 @@ public sealed class ChatSummary
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }
 
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; set; }
+
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
@@ -1188,6 +1194,12 @@ public sealed class ChatState
 
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }
+
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; set; }
 
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1868,7 +1880,8 @@ public sealed record SessionToolAuthenticationRequest
 ///   to a subset via {@link ChatSummary.workingDirectories}; aggregating these
 ///   up is meaningless and SHOULD NOT be attempted.
 /// - `changes`: optional roll-up across all chats. Producers MAY sum the
-///   per-chat changeset stats or report the most expensive chat's stats —
+///   per-chat {@link ChatSummary.changes | changes summaries} or report the
+///   most expensive chat's stats —
 ///   whichever is cheaper for the host to compute.
 ///
 /// Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -1977,7 +1990,8 @@ public sealed record SessionChatSummary
     public ChatInteractivity? Interactivity { get; init; }
 }
 
-/// <summary>Aggregate counts describing the file changes associated with a session.
+/// <summary>Aggregate counts describing the file changes associated with a session or
+/// chat.
 ///
 /// All fields are optional so servers can populate only the metrics they
 /// cheaply have available.</summary>
