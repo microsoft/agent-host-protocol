@@ -2496,6 +2496,10 @@
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed because request-specific\nvalidation, such as active turns or destination compatibility, still\napplies. A chat referenced by its owning session's `defaultChat` MUST NOT\nbe movable."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -2585,6 +2589,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -7058,7 +7066,7 @@
     },
     "MoveChatParams": {
       "type": "object",
-      "description": "Atomically moves a non-default top-level chat and its complete host-managed\ndescendant hierarchy to another session.\n\nThe source is the chat named by `channel`. A `session` destination moves the\ncomplete subtree into an existing compatible session. A `newSession`\ndestination allocates a compatible session, moves the complete subtree into\nit, and makes the requested chat that session's default chat. In both cases\nthe requested chat remains top-level. The host owns the descendant\nrelationship; AHP does not expose it as chat state.\n\nThe host MUST validate the complete operation before committing it. It MUST\nreject a source that is not top-level, a subtree containing an owning\nsession's default chat, any active turn in the moved subtree, a destination\nequal to the source session, a destination on another host, or incompatible\nsource and destination provider/agent runtimes. Rejection MUST leave every\nchat, session catalog, and root summary unchanged. Unknown resources use\n`NotFound`, active turns use `TurnInProgress`, and validation,\ncompatibility, and idempotency-key mismatches use `InvalidParams`.\n\nOn success the host commits ownership, its internal hierarchy, and every\nmoved-chat URI replacement as one transaction before publishing\nsynchronization messages. `ChatOrigin` remains unchanged, including\nhistorical chat URIs that no longer resolve after replacement. It then\nupdates affected session catalogs with `session/chatRemoved` and\n`session/chatAdded`, and emits `chat/moved` on previous moved chat channels\nwhen subscribers must follow authoritative result resources.",
+      "description": "Atomically moves a non-default top-level chat and its complete host-managed\ndescendant hierarchy to another session.\n\nThe source is the chat named by `channel`. A `session` destination moves the\ncomplete subtree into an existing compatible session. A `newSession`\ndestination allocates a compatible session, moves the complete subtree into\nit, and makes the requested chat that session's default chat. In both cases\nthe requested chat remains top-level. The host owns the descendant\nrelationship; AHP does not expose it as chat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it. It MUST\nreject a source that does not advertise `movable: true`, a subtree containing\nan owning session's default chat, any active turn in the moved subtree, a destination\nequal to the source session, a destination on another host, or incompatible\nsource and destination provider/agent runtimes. Rejection MUST leave every\nchat, session catalog, and root summary unchanged. Unknown resources use\n`NotFound`, active turns use `TurnInProgress`, and validation,\ncompatibility, and idempotency-key mismatches use `InvalidParams`.\n\nOn success the host commits ownership, its internal hierarchy, and every\nmoved-chat URI replacement as one transaction before publishing\nsynchronization messages. `ChatOrigin` remains unchanged, including\nhistorical chat URIs that no longer resolve after replacement. It then\nupdates affected session catalogs with `session/chatRemoved` and\n`session/chatAdded`, and emits `chat/moved` on previous moved chat channels\nwhen subscribers must follow authoritative result resources.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -8365,6 +8373,9 @@
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatMovableChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
         },
         {
@@ -8817,6 +8828,10 @@
             "origin": {
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
+            },
+            "movable": {
+              "type": "boolean",
+              "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
             },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
@@ -9810,6 +9825,23 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatMovableChangedAction": {
+      "type": "object",
+      "description": "Whether this chat is structurally eligible to be the source of `moveChat`\nchanged.\n\nThe host is authoritative and MUST also update the owning session's chat\ncatalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.\nA chat referenced by its owning session's `defaultChat` MUST always carry\n`movable: false`.",
+      "properties": {
+        "type": {
+          "const": "chat/movableChanged"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be moved."
+        }
+      },
+      "required": [
+        "type",
+        "movable"
       ]
     },
     "ChatChangesetsChangedAction": {

@@ -343,6 +343,34 @@ describe('generated JSON schemas', () => {
         );
       });
 
+      it('exposes optional host-authoritative chat movability and its update action', () => {
+        if (file !== 'state.schema.json' && file !== 'actions.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['ChatState', 'ChatSummary']) {
+          const definition = defs[name];
+          assert.ok(definition, `${name} must be emitted`);
+          const properties = definition.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.movable.type, 'boolean');
+          assert.equal(
+            (definition.required as string[]).includes('movable'),
+            false,
+            `${name}.movable must remain optional so absence means false`,
+          );
+        }
+
+        if (file === 'actions.schema.json') {
+          const action = defs.ChatMovableChangedAction;
+          assert.ok(action, 'ChatMovableChangedAction must be emitted');
+          assert.deepEqual(action.required, ['type', 'movable']);
+          const properties = action.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.type.const, 'chat/movableChanged');
+          assert.equal(properties.movable.type, 'boolean');
+        }
+      });
+
       it('carries the exhaustive moved-chat mapping on routing notifications', () => {
         if (file !== 'notifications.schema.json') {
           return;

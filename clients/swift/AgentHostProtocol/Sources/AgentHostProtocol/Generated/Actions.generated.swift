@@ -31,6 +31,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatError
     case chatTurnResume
     case chatActivityChanged
+    case chatMovableChanged
     case chatChangesetsChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
@@ -136,6 +137,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/error": self = .chatError
         case "chat/turnResume": self = .chatTurnResume
         case "chat/activityChanged": self = .chatActivityChanged
+        case "chat/movableChanged": self = .chatMovableChanged
         case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
@@ -241,6 +243,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatError: try container.encode("chat/error")
         case .chatTurnResume: try container.encode("chat/turnResume")
         case .chatActivityChanged: try container.encode("chat/activityChanged")
+        case .chatMovableChanged: try container.encode("chat/movableChanged")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
@@ -1179,6 +1182,20 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.activity = activity
+    }
+}
+
+public struct ChatMovableChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Whether this chat is structurally eligible to be moved.
+    public var movable: Bool
+
+    public init(
+        type: ActionType,
+        movable: Bool
+    ) {
+        self.type = type
+        self.movable = movable
     }
 }
 
@@ -2393,6 +2410,11 @@ public struct PartialChatSummary: Codable, Sendable {
     public var modifiedAt: String?
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.
+    public var movable: Bool?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -2410,6 +2432,7 @@ public struct PartialChatSummary: Codable, Sendable {
         activity: String? = nil,
         modifiedAt: String? = nil,
         origin: ChatOrigin? = nil,
+        movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil
     ) {
@@ -2419,6 +2442,7 @@ public struct PartialChatSummary: Codable, Sendable {
         self.activity = activity
         self.modifiedAt = modifiedAt
         self.origin = origin
+        self.movable = movable
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
     }
@@ -2453,6 +2477,7 @@ public enum StateAction: Codable, Sendable {
     case chatError(ChatErrorAction)
     case chatTurnResume(ChatTurnResumeAction)
     case chatActivityChanged(ChatActivityChangedAction)
+    case chatMovableChanged(ChatMovableChangedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
@@ -2588,6 +2613,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnResume(try ChatTurnResumeAction(from: decoder))
         case "chat/activityChanged":
             self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
+        case "chat/movableChanged":
+            self = .chatMovableChanged(try ChatMovableChangedAction(from: decoder))
         case "chat/changesetsChanged":
             self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
         case "session/titleChanged":
@@ -2766,6 +2793,7 @@ public enum StateAction: Codable, Sendable {
         case .chatError(let v): try v.encode(to: encoder)
         case .chatTurnResume(let v): try v.encode(to: encoder)
         case .chatActivityChanged(let v): try v.encode(to: encoder)
+        case .chatMovableChanged(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)

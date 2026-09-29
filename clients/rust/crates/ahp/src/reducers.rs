@@ -1101,6 +1101,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.activity = a.activity.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatMovableChanged(a) => {
+            state.movable = Some(a.movable);
+            ReduceOutcome::Applied
+        }
         StateAction::ChatChangesetsChanged(a) => {
             state.changesets = a.changesets.clone();
             ReduceOutcome::Applied
@@ -2205,6 +2209,7 @@ mod tests {
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
+            movable: None,
             interactivity: None,
             working_directories: None,
             changesets: None,
@@ -2362,6 +2367,7 @@ mod tests {
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
+            movable: None,
             interactivity: None,
             working_directories: None,
         };

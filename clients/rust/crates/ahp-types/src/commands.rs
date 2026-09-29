@@ -778,9 +778,13 @@ pub struct ChatMoveToNewSessionDestination {}
 /// the requested chat remains top-level. The host owns the descendant
 /// relationship; AHP does not expose it as chat state.
 ///
+/// Clients MUST only request a move when the source chat advertises
+/// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
+/// eligibility, not a guarantee that request-specific validation will succeed.
+///
 /// The host MUST validate the complete operation before committing it. It MUST
-/// reject a source that is not top-level, a subtree containing an owning
-/// session's default chat, any active turn in the moved subtree, a destination
+/// reject a source that does not advertise `movable: true`, a subtree containing
+/// an owning session's default chat, any active turn in the moved subtree, a destination
 /// equal to the source session, a destination on another host, or incompatible
 /// source and destination provider/agent runtimes. Rejection MUST leave every
 /// chat, session catalog, and root summary unchanged. Unknown resources use

@@ -171,6 +171,15 @@ The requested chat remains top-level. AHP does not expose the descendant
 relationship; the host is authoritative for determining the complete hierarchy
 that moves with the requested chat.
 
+The host exposes structural move eligibility through `ChatState.movable` and
+`ChatSummary.movable`; absence means `false`. Clients MUST only offer or invoke
+`moveChat` for a chat that advertises `movable: true`. The chat referenced by
+its owning session's `defaultChat` MUST NOT be movable. The flag does not
+guarantee success for a specific request: active turns, destination
+compatibility, and concurrent state changes are still validated when the host
+handles the command. Hosts publish `chat/movableChanged` and the corresponding
+`session/chatUpdated` when eligibility changes.
+
 Moving ownership may replace every chat URI in the subtree, including
 descendants, because a host's URI format may encode the owning session. The
 result maps every moved resource explicitly:
@@ -208,7 +217,7 @@ therefore name a previous URI that no longer resolves.
 
 Before changing any state, the host MUST reject:
 
-- a source that is not top-level according to the host's internal model;
+- a source that does not advertise `movable: true`;
 - a source subtree containing its owning session's `defaultChat`;
 - an active turn in the source or any moved descendant;
 - an unknown source or destination;

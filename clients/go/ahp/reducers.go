@@ -559,6 +559,10 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatMovableChangedAction:
+		movable := a.Movable
+		state.Movable = &movable
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatChangesetsChangedAction:
 		if a.Changesets == nil {
 			state.Changesets = nil

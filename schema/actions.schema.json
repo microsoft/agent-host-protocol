@@ -228,6 +228,10 @@
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
             },
+            "movable": {
+              "type": "boolean",
+              "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
+            },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
               "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -1333,6 +1337,23 @@
         "type"
       ]
     },
+    "ChatMovableChangedAction": {
+      "type": "object",
+      "description": "Whether this chat is structurally eligible to be the source of `moveChat`\nchanged.\n\nThe host is authoritative and MUST also update the owning session's chat\ncatalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.\nA chat referenced by its owning session's `defaultChat` MUST always carry\n`movable: false`.",
+      "properties": {
+        "type": {
+          "const": "chat/movableChanged"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be moved."
+        }
+      },
+      "required": [
+        "type",
+        "movable"
+      ]
+    },
     "ChatChangesetsChangedAction": {
       "type": "object",
       "description": "The {@link Changeset | catalogue of changesets} the agent host advertises\nfor this chat changed. Replaces\n{@link ChatState.changesets | `state.changesets`} entirely\n(full-replacement semantics) — set to `undefined` to clear the catalogue.\n\nEntries SHOULD describe Branch, Uncommitted Changes, or other views scoped\nto the chat's effective {@link ChatState.workingDirectories | working\ndirectories}. Clients subscribe to each advertised changeset URI for\nfile-level updates through the existing `changeset/*` action stream.",
@@ -2415,6 +2436,9 @@
         },
         {
           "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovableChangedAction"
         },
         {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
@@ -4865,6 +4889,10 @@
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed because request-specific\nvalidation, such as active turns or destination compatibility, still\napplies. A chat referenced by its owning session's `defaultChat` MUST NOT\nbe movable."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -4954,6 +4982,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -8767,6 +8799,9 @@
         },
         {
           "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovableChangedAction"
         },
         {
           "$ref": "#/$defs/ChatChangesetsChangedAction"

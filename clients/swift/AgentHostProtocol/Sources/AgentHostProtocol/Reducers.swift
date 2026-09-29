@@ -204,6 +204,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.activity = a.activity
         return next
 
+    case .chatMovableChanged(let a):
+        var next = state
+        next.movable = a.movable
+        return next
+
     case .chatChangesetsChanged(let a):
         var next = state
         next.changesets = a.changesets

@@ -1135,6 +1135,13 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
 
+    /// <summary>Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Movable { get; set; }
+
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1181,6 +1188,17 @@ public sealed class ChatState
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
+
+    /// <summary>Whether this chat is structurally eligible to be the source of
+    /// `moveChat`.
+    ///
+    /// The host is authoritative. Absence means `false`. A `true` value does not
+    /// guarantee that a particular request will succeed because request-specific
+    /// validation, such as active turns or destination compatibility, still
+    /// applies. A chat referenced by its owning session's `defaultChat` MUST NOT
+    /// be movable.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Movable { get; set; }
 
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///

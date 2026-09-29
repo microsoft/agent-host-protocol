@@ -1601,6 +1601,17 @@ data class ChatState(
      */
     val origin: ChatOrigin? = null,
     /**
+     * Whether this chat is structurally eligible to be the source of
+     * `moveChat`.
+     *
+     * The host is authoritative. Absence means `false`. A `true` value does not
+     * guarantee that a particular request will succeed because request-specific
+     * validation, such as active turns or destination compatibility, still
+     * applies. A chat referenced by its owning session's `defaultChat` MUST NOT
+     * be movable.
+     */
+    val movable: Boolean? = null,
+    /**
      * How the user can interact with this chat. See {@link ChatInteractivity}.
      *
      * Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1705,6 +1716,13 @@ data class ChatSummary(
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,
+    /**
+     * Whether this chat is structurally eligible to be the source of
+     * `moveChat`. Absence means `false`.
+     *
+     * See {@link ChatState.movable} for the full semantics.
+     */
+    val movable: Boolean? = null,
     /**
      * How the user can interact with this chat. See {@link ChatInteractivity}.
      *

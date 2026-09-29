@@ -1628,6 +1628,15 @@ public struct ChatState: Codable, Sendable {
     public var modifiedAt: String
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`.
+    ///
+    /// The host is authoritative. Absence means `false`. A `true` value does not
+    /// guarantee that a particular request will succeed because request-specific
+    /// validation, such as active turns or destination compatibility, still
+    /// applies. A chat referenced by its owning session's `defaultChat` MUST NOT
+    /// be movable.
+    public var movable: Bool?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1692,6 +1701,7 @@ public struct ChatState: Codable, Sendable {
         case activity
         case modifiedAt
         case origin
+        case movable
         case interactivity
         case workingDirectories
         case changesets
@@ -1711,6 +1721,7 @@ public struct ChatState: Codable, Sendable {
         activity: String? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
+        movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
@@ -1728,6 +1739,7 @@ public struct ChatState: Codable, Sendable {
         self.activity = activity
         self.modifiedAt = modifiedAt
         self.origin = origin
+        self.movable = movable
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
         self.changesets = changesets
@@ -1754,6 +1766,11 @@ public struct ChatSummary: Codable, Sendable {
     public var modifiedAt: String
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.
+    public var movable: Bool?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1771,6 +1788,7 @@ public struct ChatSummary: Codable, Sendable {
         activity: String? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
+        movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil
     ) {
@@ -1780,6 +1798,7 @@ public struct ChatSummary: Codable, Sendable {
         self.activity = activity
         self.modifiedAt = modifiedAt
         self.origin = origin
+        self.movable = movable
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
     }

@@ -963,6 +963,9 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
 
+    is StateActionChatMovableChanged ->
+        state.copy(movable = action.value.movable)
+
     is StateActionChatChangesetsChanged ->
         state.copy(changesets = action.value.changesets)
 

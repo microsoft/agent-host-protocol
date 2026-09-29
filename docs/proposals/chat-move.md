@@ -46,6 +46,13 @@ the source hierarchy into an existing compatible session. A `newSession`
 destination allocates a compatible session and makes the requested chat its
 default chat. The requested chat remains top-level in either destination.
 
+`ChatState.movable` and `ChatSummary.movable` let clients discover whether a
+chat is structurally eligible to be the source. The host is authoritative,
+absence means `false`, and the chat referenced by a session's `defaultChat`
+MUST NOT be movable. A client only offers or invokes `moveChat` for
+`movable: true`. The flag does not guarantee that a particular destination or
+the chat's current transient state will pass request-time validation.
+
 `requestId` makes an uncertain request safe to retry. The root convenience
 fields identify the requested chat and equal the first `movedChats` entry.
 `movedChats` exhaustively maps the root and every host-managed descendant,
@@ -71,7 +78,7 @@ Reconnect snapshots remain the durable recovery path.
 
 The host rejects a move when:
 
-- the source is not a top-level chat according to the host's internal model;
+- the source does not advertise `movable: true`;
 - the moved subtree contains its current session's default chat;
 - the source or a moved descendant has an active turn;
 - the existing destination equals the source session;

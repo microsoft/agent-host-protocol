@@ -53,6 +53,17 @@ export interface ChatState {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
+   * Whether this chat is structurally eligible to be the source of
+   * `moveChat`.
+   *
+   * The host is authoritative. Absence means `false`. A `true` value does not
+   * guarantee that a particular request will succeed because request-specific
+   * validation, such as active turns or destination compatibility, still
+   * applies. A chat referenced by its owning session's `defaultChat` MUST NOT
+   * be movable.
+   */
+  movable?: boolean;
+  /**
    * How the user can interact with this chat. See {@link ChatInteractivity}.
    *
    * Supports agent-team patterns where worker chats are read-only or hidden.
@@ -144,6 +155,13 @@ export interface ChatSummary {
   modifiedAt: string;
   /** How this chat came into existence */
   origin?: ChatOrigin;
+  /**
+   * Whether this chat is structurally eligible to be the source of
+   * `moveChat`. Absence means `false`.
+   *
+   * See {@link ChatState.movable} for the full semantics.
+   */
+  movable?: boolean;
   /**
    * How the user can interact with this chat. See {@link ChatInteractivity}.
    *

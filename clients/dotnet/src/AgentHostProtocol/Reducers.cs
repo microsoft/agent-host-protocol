@@ -958,6 +958,9 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
+            case ChatMovableChangedAction a:
+                state.Movable = a.Movable;
+                return ReduceOutcome.Applied;
             case ChatChangesetsChangedAction a:
                 state.Changesets = CopyList(a.Changesets);
                 return ReduceOutcome.Applied;

@@ -58,6 +58,13 @@ Three discrete actions keep `SessionState.chats` in sync as chats come and go. S
 
 The producer of the chat's own [`ChatState`](./chat-channel#state) is responsible for emitting matching `session/chatUpdated` actions so the catalog and the per-chat channel stay consistent. Atomic moves across sessions use `session/chatRemoved` on the previous owner and `session/chatAdded` on the new owner; see [Moving chats](./chat-channel#moving-chats).
 
+When `defaultChat` is set, its matching `ChatSummary` MUST NOT advertise
+`movable: true`. If changing `defaultChat` changes either the old or new
+default chat's structural move eligibility, the host publishes the corresponding
+`session/chatUpdated` and `chat/movableChanged` actions. Clients do not derive
+eligibility from origin or presentation hierarchy; the host remains
+authoritative.
+
 ### Chat aggregation
 
 [`SessionSummary`](/reference/session#sessionsummary) carries session-wide identity (`resource`, `provider`, `createdAt`, `workingDirectories`) but several of its mutable fields are aggregates derived from the session's chats. Producers SHOULD apply these rules so clients that only consume the session summary (a session list, for example) still see meaningful state:
