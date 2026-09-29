@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`reorderChat` command and `session/chatsReordered` action reposition a top-level chat hierarchy within its owning session's durable, host-authoritative catalog order via `ChatReorderDestination` (`start`/`end`/`before`/`after`), independent of `moveChat` ownership transfer."
+}

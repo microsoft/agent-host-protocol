@@ -36,6 +36,7 @@ value class ActionType(val rawValue: String) {
         val SESSION_CHAT_ADDED: ActionType = ActionType("session/chatAdded")
         val SESSION_CHAT_REMOVED: ActionType = ActionType("session/chatRemoved")
         val SESSION_CHAT_UPDATED: ActionType = ActionType("session/chatUpdated")
+        val SESSION_CHATS_REORDERED: ActionType = ActionType("session/chatsReordered")
         val SESSION_DEFAULT_CHAT_CHANGED: ActionType = ActionType("session/defaultChatChanged")
         val CHAT_TURN_STARTED: ActionType = ActionType("chat/turnStarted")
         val CHAT_DELTA: ActionType = ActionType("chat/delta")
@@ -228,6 +229,19 @@ data class SessionChatUpdatedAction(
      * senders; receivers SHOULD ignore them if present.
      */
     val changes: PartialChatSummary
+)
+
+@Serializable
+data class SessionChatsReorderedAction(
+    val type: ActionType,
+    /**
+     * The complete moved unit, in its new contiguous relative order.
+     */
+    val chats: List<String>,
+    /**
+     * The relative placement destination that produced this order.
+     */
+    val destination: ChatReorderDestination
 )
 
 @Serializable
@@ -1633,6 +1647,7 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionChatAdded(val value: SessionChatAddedAction) : StateAction
 @JvmInline value class StateActionSessionChatRemoved(val value: SessionChatRemovedAction) : StateAction
 @JvmInline value class StateActionSessionChatUpdated(val value: SessionChatUpdatedAction) : StateAction
+@JvmInline value class StateActionSessionChatsReordered(val value: SessionChatsReorderedAction) : StateAction
 @JvmInline value class StateActionSessionDefaultChatChanged(val value: SessionDefaultChatChangedAction) : StateAction
 @JvmInline value class StateActionChatTurnStarted(val value: ChatTurnStartedAction) : StateAction
 @JvmInline value class StateActionChatDelta(val value: ChatDeltaAction) : StateAction
@@ -1748,6 +1763,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/chatAdded" -> StateActionSessionChatAdded(input.json.decodeFromJsonElement(SessionChatAddedAction.serializer(), element))
             "session/chatRemoved" -> StateActionSessionChatRemoved(input.json.decodeFromJsonElement(SessionChatRemovedAction.serializer(), element))
             "session/chatUpdated" -> StateActionSessionChatUpdated(input.json.decodeFromJsonElement(SessionChatUpdatedAction.serializer(), element))
+            "session/chatsReordered" -> StateActionSessionChatsReordered(input.json.decodeFromJsonElement(SessionChatsReorderedAction.serializer(), element))
             "session/defaultChatChanged" -> StateActionSessionDefaultChatChanged(input.json.decodeFromJsonElement(SessionDefaultChatChangedAction.serializer(), element))
             "chat/turnStarted" -> StateActionChatTurnStarted(input.json.decodeFromJsonElement(ChatTurnStartedAction.serializer(), element))
             "chat/delta" -> StateActionChatDelta(input.json.decodeFromJsonElement(ChatDeltaAction.serializer(), element))
@@ -1856,6 +1872,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionChatAdded -> output.json.encodeToJsonElement(SessionChatAddedAction.serializer(), value.value)
             is StateActionSessionChatRemoved -> output.json.encodeToJsonElement(SessionChatRemovedAction.serializer(), value.value)
             is StateActionSessionChatUpdated -> output.json.encodeToJsonElement(SessionChatUpdatedAction.serializer(), value.value)
+            is StateActionSessionChatsReordered -> output.json.encodeToJsonElement(SessionChatsReorderedAction.serializer(), value.value)
             is StateActionSessionDefaultChatChanged -> output.json.encodeToJsonElement(SessionDefaultChatChangedAction.serializer(), value.value)
             is StateActionChatTurnStarted -> output.json.encodeToJsonElement(ChatTurnStartedAction.serializer(), value.value)
             is StateActionChatDelta -> output.json.encodeToJsonElement(ChatDeltaAction.serializer(), value.value)

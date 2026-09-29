@@ -185,6 +185,12 @@ chat hierarchy's owning session without rewriting origin; any descendant
 hierarchy used for the move is owned internally by the host and is not exposed
 as chat state. See [Moving chats](/specification/chat-channel#moving-chats).
 
+`SessionState.chats` is a durable, host-authoritative order, not just a set:
+besides `chatAdded`/`chatRemoved`/`chatUpdated`, `reorderChat` repositions a
+top-level chat hierarchy within its own session's catalog without changing
+ownership, hierarchy, or any chat URI. See
+[Reordering chats](/specification/chat-channel#reordering-chats).
+
 The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
 
 ## Turns

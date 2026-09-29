@@ -262,6 +262,55 @@ second move, including after reconnect or an uncertain response. The host keeps
 that result at least while the resulting chat exists. Reusing the key with a
 different source or destination is `InvalidParams`.
 
+### Reordering chats
+
+[`reorderChat`](/reference/chat#reorderchat) repositions a top-level chat and
+its complete host-managed descendant hierarchy within its owning session's
+chat catalog (`SessionState.chats`). Unlike `moveChat`, reordering never
+changes ownership, hierarchy, or any chat URI — it only changes the durable
+catalog order that the host reports to clients. The chat referenced by
+`params.channel` is the source. Its destination is one of:
+
+- `{ kind: "start" }` — move to the first position in the catalog.
+- `{ kind: "end" }` — move to the last position in the catalog.
+- `{ kind: "before", anchor }` — move immediately before the chat named by
+  `anchor`.
+- `{ kind: "after", anchor }` — move immediately after the chat named by
+  `anchor`.
+
+`anchor` MUST name a different top-level chat in the same session. If `anchor`
+no longer resolves in the same session by the time the host applies the
+reorder, the host falls back to `{ kind: "end" }` semantics for that request
+rather than rejecting it, because a concurrent removal of the anchor is not a
+client error.
+
+Reordering does not use `ChatState.movable` or `ChatSummary.movable` — that
+flag is scoped to `moveChat` ownership transfer only. Reordering imposes no
+comparable eligibility flag: any top-level chat, including the session's
+`defaultChat`, MAY be reordered. The host still MUST reject a request whose
+source is not top-level, or whose source is unknown.
+
+`SessionChatsReordered` (`session/chatsReordered`) is the sole action a
+client needs to converge the durable order; no chat-channel notification is
+emitted because reordering never changes a chat's URI, ownership, or any
+other observable chat state. Its `chats` field lists, in requested-order,
+every URI that the host reordered — for a single-chat request this is one
+element, but the host reports every URI in the moved subtree so that clients
+which track hierarchy locally can also relocate descendants without a
+separate lookup. Its `destination` field echoes the resolved placement.
+
+The host is authoritative for `SessionState.chats` order and persists it
+durably: it reflects the same order after a reconnect or host restart. A
+chat's position does not otherwise change on its own — only `chatAdded` (which
+appends), `chatRemoved`, and `chatsReordered` alter it. Reordering
+consolidates the source's entire subtree into one contiguous block at the
+destination, even if the subtree was previously scattered through the
+catalog; AHP does not expose the hierarchy that produced that consolidation.
+
+`requestId` is a durable idempotency key with the same semantics as
+`moveChat`'s: retrying the same channel and destination with the same key
+returns the original result and MUST NOT apply a second reorder.
+
 ### Pulling a chat into another chat
 
 A message can attach a bounded transcript using a

@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
+use crate::commands::ChatReorderDestination;
+#[allow(unused_imports)]
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
@@ -37,6 +39,7 @@ pub enum ActionType {
     SessionChatAdded,
     SessionChatRemoved,
     SessionChatUpdated,
+    SessionChatsReordered,
     SessionDefaultChatChanged,
     ChatTurnStarted,
     ChatDelta,
@@ -149,6 +152,7 @@ impl serde::Serialize for ActionType {
             Self::SessionChatAdded => serializer.serialize_str("session/chatAdded"),
             Self::SessionChatRemoved => serializer.serialize_str("session/chatRemoved"),
             Self::SessionChatUpdated => serializer.serialize_str("session/chatUpdated"),
+            Self::SessionChatsReordered => serializer.serialize_str("session/chatsReordered"),
             Self::SessionDefaultChatChanged => {
                 serializer.serialize_str("session/defaultChatChanged")
             }
@@ -321,6 +325,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/chatAdded" => Self::SessionChatAdded,
             "session/chatRemoved" => Self::SessionChatRemoved,
             "session/chatUpdated" => Self::SessionChatUpdated,
+            "session/chatsReordered" => Self::SessionChatsReordered,
             "session/defaultChatChanged" => Self::SessionDefaultChatChanged,
             "chat/turnStarted" => Self::ChatTurnStarted,
             "chat/delta" => Self::ChatDelta,
@@ -534,6 +539,32 @@ pub struct SessionChatUpdatedAction {
     /// Identity fields (`resource`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.
     pub changes: PartialChatSummary,
+}
+
+/// The owning session's chat catalog order changed following an atomic
+/// `reorderChat` commit.
+///
+/// Host-emitted convergence signal; it never originates from a client
+/// dispatch. `chats` is the complete moved unit — the repositioned top-level
+/// chat plus every host-managed descendant, in their existing relative order
+/// — and `destination` is the same relative placement that produced it.
+///
+/// Reducers MUST extract every URI listed in `chats` from the current
+/// catalog (preserving their relative order), then reinsert them
+/// contiguously at the position `destination` names, resolving `before` /
+/// `after` against each anchor's *current* catalog position so replay
+/// converges even when other catalog changes interleave. An unresolvable
+/// `anchor` (e.g. a future protocol version's `destination.kind` this client
+/// does not recognise) falls back to `end`, so no chat is ever silently
+/// dropped from the catalog. AHP does not expose which entries in `chats`
+/// are descendants of the repositioned chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChatsReorderedAction {
+    /// The complete moved unit, in its new contiguous relative order.
+    pub chats: Vec<Uri>,
+    /// The relative placement destination that produced this order.
+    pub destination: ChatReorderDestination,
 }
 
 /// The default chat input-routing hint for this session changed.
@@ -2294,6 +2325,8 @@ pub enum StateAction {
     SessionChatRemoved(SessionChatRemovedAction),
     #[serde(rename = "session/chatUpdated")]
     SessionChatUpdated(SessionChatUpdatedAction),
+    #[serde(rename = "session/chatsReordered")]
+    SessionChatsReordered(SessionChatsReorderedAction),
     #[serde(rename = "session/defaultChatChanged")]
     SessionDefaultChatChanged(SessionDefaultChatChangedAction),
     #[serde(rename = "chat/turnStarted")]

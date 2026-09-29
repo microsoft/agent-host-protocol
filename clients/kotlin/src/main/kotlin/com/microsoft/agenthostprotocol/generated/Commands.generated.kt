@@ -90,6 +90,46 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 }
 
 /**
+ * Destination kind for a relative-placement chat reorder.
+ *
+ * `before`/`after` name another top-level chat (`anchor`) rather than a
+ * numeric index, so the request always lands next to an identified chat
+ * regardless of concurrent catalog changes elsewhere in the session.
+ */
+@Serializable(with = ChatReorderDestinationKindSerializer::class)
+@JvmInline
+value class ChatReorderDestinationKind(val rawValue: String) {
+    companion object {
+        /**
+         * Move to the first position in the owning session's chat catalog.
+         */
+        val START: ChatReorderDestinationKind = ChatReorderDestinationKind("start")
+        /**
+         * Move to the last position in the owning session's chat catalog.
+         */
+        val END: ChatReorderDestinationKind = ChatReorderDestinationKind("end")
+        /**
+         * Move immediately before `anchor`.
+         */
+        val BEFORE: ChatReorderDestinationKind = ChatReorderDestinationKind("before")
+        /**
+         * Move immediately after `anchor`.
+         */
+        val AFTER: ChatReorderDestinationKind = ChatReorderDestinationKind("after")
+    }
+}
+
+internal object ChatReorderDestinationKindSerializer : KSerializer<ChatReorderDestinationKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ChatReorderDestinationKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ChatReorderDestinationKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ChatReorderDestinationKind =
+        ChatReorderDestinationKind(decoder.decodeString())
+}
+
+/**
  * Encoding of fetched content data.
  */
 @Serializable
@@ -842,6 +882,89 @@ data class MoveChatResult(
      * MUST NOT infer replacements for chats absent from this list.
      */
     val movedChats: List<MovedChatResource>
+)
+
+@Serializable
+data class ChatReorderToStartDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatReorderDestinationKind
+)
+
+@Serializable
+data class ChatReorderToEndDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatReorderDestinationKind
+)
+
+@Serializable
+data class ChatReorderBeforeDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatReorderDestinationKind,
+    /**
+     * Top-level chat URI the moved chat is placed immediately before.
+     */
+    val anchor: String
+)
+
+@Serializable
+data class ChatReorderAfterDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatReorderDestinationKind,
+    /**
+     * Top-level chat URI the moved chat is placed immediately after.
+     */
+    val anchor: String
+)
+
+@Serializable
+data class ReorderChatParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Desired relative placement among the owning session's top-level chats.
+     */
+    val destination: ChatReorderDestination,
+    /**
+     * Durable client-generated idempotency key.
+     *
+     * Retrying the same logical request with the same `requestId`, source
+     * chat, and destination MUST return the original {@link ReorderChatResult},
+     * including after reconnect or an uncertain response. Reusing the key with
+     * a different source chat or destination MUST be rejected with
+     * `InvalidParams`.
+     */
+    val requestId: String
+)
+
+@Serializable
+data class ReorderChatResult(
+    /**
+     * Owning session URI.
+     */
+    val session: String,
+    /**
+     * The complete moved unit — `channel` plus every host-managed descendant —
+     * in its new contiguous relative order within the owning session's chat
+     * catalog. Identical to the `chats` field of the corresponding
+     * `session/chatsReordered` action.
+     */
+    val chats: List<String>
 )
 
 @Serializable
@@ -1889,6 +2012,65 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
             is ChatMoveDestinationSession -> output.json.encodeToJsonElement(ChatMoveToSessionDestination.serializer(), value.value)
             is ChatMoveDestinationNewSession -> output.json.encodeToJsonElement(ChatMoveToNewSessionDestination.serializer(), value.value)
             is ChatMoveDestinationUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+// ─── ChatReorderDestination Union ────────────────────────────────────────────
+
+@Serializable(with = ChatReorderDestinationSerializer::class)
+sealed interface ChatReorderDestination
+
+@JvmInline
+value class ChatReorderDestinationStart(val value: ChatReorderToStartDestination) : ChatReorderDestination
+@JvmInline
+value class ChatReorderDestinationEnd(val value: ChatReorderToEndDestination) : ChatReorderDestination
+@JvmInline
+value class ChatReorderDestinationBefore(val value: ChatReorderBeforeDestination) : ChatReorderDestination
+@JvmInline
+value class ChatReorderDestinationAfter(val value: ChatReorderAfterDestination) : ChatReorderDestination
+/**
+ * Forward-compat catch-all for unknown ChatReorderDestination discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class ChatReorderDestinationUnknown(val raw: JsonObject) : ChatReorderDestination
+
+internal object ChatReorderDestinationSerializer : KSerializer<ChatReorderDestination> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ChatReorderDestination")
+
+    override fun deserialize(decoder: Decoder): ChatReorderDestination {
+        val input = decoder as? JsonDecoder
+            ?: error("ChatReorderDestination can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for ChatReorderDestination")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return ChatReorderDestinationUnknown(obj)
+        return when (discriminant) {
+            "start" -> ChatReorderDestinationStart(input.json.decodeFromJsonElement(ChatReorderToStartDestination.serializer(), element))
+            "end" -> ChatReorderDestinationEnd(input.json.decodeFromJsonElement(ChatReorderToEndDestination.serializer(), element))
+            "before" -> ChatReorderDestinationBefore(input.json.decodeFromJsonElement(ChatReorderBeforeDestination.serializer(), element))
+            "after" -> ChatReorderDestinationAfter(input.json.decodeFromJsonElement(ChatReorderAfterDestination.serializer(), element))
+            else -> ChatReorderDestinationUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ChatReorderDestination) {
+        val output = encoder as? JsonEncoder
+            ?: error("ChatReorderDestination can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ChatReorderDestinationStart -> output.json.encodeToJsonElement(ChatReorderToStartDestination.serializer(), value.value)
+            is ChatReorderDestinationEnd -> output.json.encodeToJsonElement(ChatReorderToEndDestination.serializer(), value.value)
+            is ChatReorderDestinationBefore -> output.json.encodeToJsonElement(ChatReorderBeforeDestination.serializer(), value.value)
+            is ChatReorderDestinationAfter -> output.json.encodeToJsonElement(ChatReorderAfterDestination.serializer(), value.value)
+            is ChatReorderDestinationUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

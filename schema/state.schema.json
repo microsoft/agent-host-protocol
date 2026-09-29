@@ -789,7 +789,7 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable: it persists across host\nrestarts and reconnects like any other session state, and every\nsubscriber converges on the identical order via `session/chatAdded`\n(append), `session/chatRemoved`, and `session/chatsReordered`.\n`reorderChat` repositions a top-level chat and its complete\nhost-managed descendant subtree as one contiguous unit, without\nexposing the descendant relationship itself."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",

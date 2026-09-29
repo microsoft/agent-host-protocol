@@ -68,6 +68,47 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Destination kind for a relative-placement chat reorder.
+///
+/// `before`/`after` name another top-level chat (`anchor`) rather than a
+/// numeric index, so the request always lands next to an identified chat
+/// regardless of concurrent catalog changes elsewhere in the session.
+public enum ChatReorderDestinationKind: Codable, Sendable, Equatable {
+    /// Move to the first position in the owning session's chat catalog.
+    case start
+    /// Move to the last position in the owning session's chat catalog.
+    case end
+    /// Move immediately before `anchor`.
+    case before
+    /// Move immediately after `anchor`.
+    case after
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "start": self = .start
+        case "end": self = .end
+        case "before": self = .before
+        case "after": self = .after
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .start: try container.encode("start")
+        case .end: try container.encode("end")
+        case .before: try container.encode("before")
+        case .after: try container.encode("after")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -943,6 +984,113 @@ public struct MoveChatResult: Codable, Sendable {
         self.session = session
         self.chat = chat
         self.movedChats = movedChats
+    }
+}
+
+public struct ChatReorderToStartDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatReorderDestinationKind
+
+    public init(
+        kind: ChatReorderDestinationKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct ChatReorderToEndDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatReorderDestinationKind
+
+    public init(
+        kind: ChatReorderDestinationKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct ChatReorderBeforeDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatReorderDestinationKind
+    /// Top-level chat URI the moved chat is placed immediately before.
+    public var anchor: String
+
+    public init(
+        kind: ChatReorderDestinationKind,
+        anchor: String
+    ) {
+        self.kind = kind
+        self.anchor = anchor
+    }
+}
+
+public struct ChatReorderAfterDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatReorderDestinationKind
+    /// Top-level chat URI the moved chat is placed immediately after.
+    public var anchor: String
+
+    public init(
+        kind: ChatReorderDestinationKind,
+        anchor: String
+    ) {
+        self.kind = kind
+        self.anchor = anchor
+    }
+}
+
+public struct ReorderChatParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Desired relative placement among the owning session's top-level chats.
+    public var destination: ChatReorderDestination
+    /// Durable client-generated idempotency key.
+    ///
+    /// Retrying the same logical request with the same `requestId`, source
+    /// chat, and destination MUST return the original {@link ReorderChatResult},
+    /// including after reconnect or an uncertain response. Reusing the key with
+    /// a different source chat or destination MUST be rejected with
+    /// `InvalidParams`.
+    public var requestId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case destination
+        case requestId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        destination: ChatReorderDestination,
+        requestId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.destination = destination
+        self.requestId = requestId
+    }
+}
+
+public struct ReorderChatResult: Codable, Sendable {
+    /// Owning session URI.
+    public var session: String
+    /// The complete moved unit — `channel` plus every host-managed descendant —
+    /// in its new contiguous relative order within the owning session's chat
+    /// catalog. Identical to the `chats` field of the corresponding
+    /// `session/chatsReordered` action.
+    public var chats: [String]
+
+    public init(
+        session: String,
+        chats: [String]
+    ) {
+        self.session = session
+        self.chats = chats
     }
 }
 
@@ -2299,6 +2447,50 @@ public enum ChatMoveDestination: Codable, Sendable {
         switch self {
         case .session(let value): try value.encode(to: encoder)
         case .newSession(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum ChatReorderDestination: Codable, Sendable {
+    case start(ChatReorderToStartDestination)
+    case end(ChatReorderToEndDestination)
+    case before(ChatReorderBeforeDestination)
+    case after(ChatReorderAfterDestination)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "start":
+            self = .start(try ChatReorderToStartDestination(from: decoder))
+        case "end":
+            self = .end(try ChatReorderToEndDestination(from: decoder))
+        case "before":
+            self = .before(try ChatReorderBeforeDestination(from: decoder))
+        case "after":
+            self = .after(try ChatReorderAfterDestination(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .start(let value): try value.encode(to: encoder)
+        case .end(let value): try value.encode(to: encoder)
+        case .before(let value): try value.encode(to: encoder)
+        case .after(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

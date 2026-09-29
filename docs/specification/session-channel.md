@@ -41,22 +41,24 @@ Once a session reaches `lifecycle: 'ready'`, clients may create chats on it with
 
 Session-scoped actions dispatched on this channel are limited to:
 
-- Catalog mutations — `session/chatAdded`, `session/chatRemoved`, `session/chatUpdated`, and `session/defaultChatChanged`.
+- Catalog mutations — `session/chatAdded`, `session/chatRemoved`, `session/chatUpdated`, `session/chatsReordered`, and `session/defaultChatChanged`.
 - Session-wide configuration — active-client tracking, customizations, changesets, lifecycle transitions.
 
 All actions dispatched on this channel travel on `ActionEnvelope`s whose `channel` is the session URI. Action payloads do NOT carry their own session URI — the channel comes from the envelope.
 
 ### Chat catalog mutations
 
-Three discrete actions keep `SessionState.chats` in sync as chats come and go. Sessions with a single chat trivially round-trip a `session/chatAdded` once at creation; multi-chat sessions exercise all three:
+Four discrete actions keep `SessionState.chats` in sync as chats come, go, change, and reorder. Sessions with a single chat trivially round-trip a `session/chatAdded` once at creation; multi-chat sessions exercise all four:
 
 | Action | Payload | Reducer behavior |
 |---|---|---|
 | `session/chatAdded` | `summary: ChatSummary` | Upsert by `summary.resource`. Appends when no entry has the same URI; otherwise replaces the existing entry. Mirrors `root/sessionAdded`. |
 | `session/chatRemoved` | `chat: URI` | Removes the matching entry. No-op when no entry matches. If `state.defaultChat` referenced the removed URI, the reducer clears it. Mirrors `root/sessionRemoved`. |
 | `session/chatUpdated` | `chat: URI, changes: Partial<ChatSummary>` | Merges the non-identity fields of `changes` onto the matching entry. No-op when no entry matches; clients SHOULD then wait for a `session/chatAdded`. Identity fields (`resource`) MUST NOT be carried in `changes`. Mirrors `root/sessionSummaryChanged`. |
+| `session/chatsReordered` | `chats: URI[], destination: ChatReorderDestination` | Extracts every entry named in `chats` (preserving their relative order) and reinserts that contiguous block at the position resolved from `destination`, falling back to the end when a `before`/`after` anchor is absent. Emitted by [`reorderChat`](./chat-channel#reordering-chats). |
 
-The producer of the chat's own [`ChatState`](./chat-channel#state) is responsible for emitting matching `session/chatUpdated` actions so the catalog and the per-chat channel stay consistent. Atomic moves across sessions use `session/chatRemoved` on the previous owner and `session/chatAdded` on the new owner; see [Moving chats](./chat-channel#moving-chats).
+The producer of the chat's own [`ChatState`](./chat-channel#state) is responsible for emitting matching `session/chatUpdated` actions so the catalog and the per-chat channel stay consistent. Atomic moves across sessions use `session/chatRemoved` on the previous owner and `session/chatAdded` on the new owner; see [Moving chats](./chat-channel#moving-chats). Reordering only ever affects the reordered session's own catalog; see [Reordering chats](./chat-channel#reordering-chats).
+
 
 When `defaultChat` is set, its matching `ChatSummary` MUST NOT advertise
 `movable: true`. If changing `defaultChat` changes either the old or new

@@ -12,6 +12,7 @@ import type {
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
+  SessionChatsReorderedAction,
   SessionDefaultChatChangedAction,
   SessionTitleChangedAction,
   SessionServerToolsChangedAction,
@@ -136,6 +137,7 @@ export type SessionAction =
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
+  | SessionChatsReorderedAction
   | SessionDefaultChatChangedAction
   | SessionTitleChangedAction
   | SessionServerToolsChangedAction
@@ -186,6 +188,7 @@ export type ServerSessionAction =
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
+  | SessionChatsReorderedAction
   | SessionDefaultChatChangedAction
   | SessionServerToolsChangedAction
   | SessionInputNeededSetAction
@@ -435,6 +438,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionChatAdded]: false,
   [ActionType.SessionChatRemoved]: false,
   [ActionType.SessionChatUpdated]: false,
+  [ActionType.SessionChatsReordered]: false,
   [ActionType.SessionDefaultChatChanged]: false,
   [ActionType.SessionTitleChanged]: true,
   [ActionType.SessionServerToolsChanged]: false,

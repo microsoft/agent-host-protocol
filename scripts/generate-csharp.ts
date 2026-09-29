@@ -1465,6 +1465,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
   { type: 'session/chatRemoved', variantName: 'SessionChatRemoved', tsInterface: 'SessionChatRemovedAction' },
   { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
+  { type: 'session/chatsReordered', variantName: 'SessionChatsReordered', tsInterface: 'SessionChatsReorderedAction' },
   { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
   { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
@@ -2076,7 +2077,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatReorderDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
@@ -2106,6 +2107,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
+  { name: 'ChatReorderToStartDestination' }, { name: 'ChatReorderToEndDestination' }, { name: 'ChatReorderBeforeDestination' }, { name: 'ChatReorderAfterDestination' },
+  { name: 'ReorderChatParams' }, { name: 'ReorderChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -2150,6 +2153,18 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   variants: [
     { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
     { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
+  ],
+};
+
+const CHAT_REORDER_DESTINATION_UNION: UnionConfig = {
+  name: 'ChatReorderDestination',
+  discriminantField: 'kind',
+  unknown: true,
+  variants: [
+    { variantName: 'Start', innerType: 'ChatReorderToStartDestination', wireValue: 'start' },
+    { variantName: 'End', innerType: 'ChatReorderToEndDestination', wireValue: 'end' },
+    { variantName: 'Before', innerType: 'ChatReorderBeforeDestination', wireValue: 'before' },
+    { variantName: 'After', innerType: 'ChatReorderAfterDestination', wireValue: 'after' },
   ],
 };
 
@@ -2588,7 +2603,7 @@ function checkExhaustiveness(project: Project): void {
     // (TOOL_INPUT_UNION_CS), not through the discriminated-union list.
     'ToolInput',
     'ChatToolCallConfirmedAction', 'ChatToolCallApprovedAction', 'ChatToolCallDeniedAction',
-    'ChatSource', 'ChatMoveDestination', 'ChatAction',
+    'ChatSource', 'ChatMoveDestination', 'ChatReorderDestination', 'ChatAction',
     // SessionMetadata is the shared base interface whose fields are denormalized
     // (inlined) into both SessionState and SessionSummary; it has no standalone
     // C# record by design.

@@ -269,6 +269,31 @@
         "type"
       ]
     },
+    "SessionChatsReorderedAction": {
+      "type": "object",
+      "description": "The owning session's chat catalog order changed following an atomic\n`reorderChat` commit.\n\nHost-emitted convergence signal; it never originates from a client\ndispatch. `chats` is the complete moved unit — the repositioned top-level\nchat plus every host-managed descendant, in their existing relative order\n— and `destination` is the same relative placement that produced it.\n\nReducers MUST extract every URI listed in `chats` from the current\ncatalog (preserving their relative order), then reinsert them\ncontiguously at the position `destination` names, resolving `before` /\n`after` against each anchor's *current* catalog position so replay\nconverges even when other catalog changes interleave. An unresolvable\n`anchor` (e.g. a future protocol version's `destination.kind` this client\ndoes not recognise) falls back to `end`, so no chat is ever silently\ndropped from the catalog. AHP does not expose which entries in `chats`\nare descendants of the repositioned chat.",
+      "properties": {
+        "type": {
+          "const": "session/chatsReordered"
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "The complete moved unit, in its new contiguous relative order."
+        },
+        "destination": {
+          "$ref": "#/$defs/ChatReorderDestination",
+          "description": "The relative placement destination that produced this order."
+        }
+      },
+      "required": [
+        "type",
+        "chats",
+        "destination"
+      ]
+    },
     "SessionTitleChangedAction": {
       "type": "object",
       "description": "Session title updated. Fired by the server when the title is auto-generated\nfrom conversation, or dispatched by a client to rename a session.",
@@ -3288,7 +3313,7 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable: it persists across host\nrestarts and reconnects like any other session state, and every\nsubscriber converges on the identical order via `session/chatAdded`\n(append), `session/chatRemoved`, and `session/chatsReordered`.\n`reorderChat` repositions a top-level chat and its complete\nhost-managed descendant subtree as one contiguous unit, without\nexposing the descendant relationship itself."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
@@ -8706,6 +8731,9 @@
           "$ref": "#/$defs/SessionChatUpdatedAction"
         },
         {
+          "$ref": "#/$defs/SessionChatsReorderedAction"
+        },
+        {
           "$ref": "#/$defs/SessionDefaultChatChangedAction"
         },
         {
@@ -9005,6 +9033,23 @@
       "type": "string",
       "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
     },
+    "ChatReorderDestination": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatReorderToStartDestination"
+        },
+        {
+          "$ref": "#/$defs/ChatReorderToEndDestination"
+        },
+        {
+          "$ref": "#/$defs/ChatReorderBeforeDestination"
+        },
+        {
+          "$ref": "#/$defs/ChatReorderAfterDestination"
+        }
+      ],
+      "description": "Identifies the relative-placement destination of a chat reorder."
+    },
     "ToolCallConfirmationReason": {
       "enum": [
         "not-needed",
@@ -9156,6 +9201,68 @@
       ],
       "type": "string",
       "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationEntry.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
+    },
+    "ChatReorderToStartDestination": {
+      "type": "object",
+      "description": "Moves to the first position in the owning session's chat catalog.",
+      "properties": {
+        "kind": {
+          "const": "start",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ChatReorderToEndDestination": {
+      "type": "object",
+      "description": "Moves to the last position in the owning session's chat catalog.",
+      "properties": {
+        "kind": {
+          "const": "end",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ChatReorderBeforeDestination": {
+      "type": "object",
+      "description": "Moves immediately before another top-level chat in the same session.",
+      "properties": {
+        "kind": {
+          "const": "before",
+          "description": "Discriminant"
+        },
+        "anchor": {
+          "$ref": "#/$defs/URI",
+          "description": "Top-level chat URI the moved chat is placed immediately before."
+        }
+      },
+      "required": [
+        "kind",
+        "anchor"
+      ]
+    },
+    "ChatReorderAfterDestination": {
+      "type": "object",
+      "description": "Moves immediately after another top-level chat in the same session.",
+      "properties": {
+        "kind": {
+          "const": "after",
+          "description": "Discriminant"
+        },
+        "anchor": {
+          "$ref": "#/$defs/URI",
+          "description": "Top-level chat URI the moved chat is placed immediately after."
+        }
+      },
+      "required": [
+        "kind",
+        "anchor"
+      ]
     }
   }
 }

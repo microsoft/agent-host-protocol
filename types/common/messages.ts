@@ -58,6 +58,8 @@ import type {
   CreateChatParams,
   MoveChatParams,
   MoveChatResult,
+  ReorderChatParams,
+  ReorderChatResult,
   DisposeChatParams,
 } from '../channels-chat/commands.js';
 import type {
@@ -166,6 +168,7 @@ export interface CommandMap {
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
+  'reorderChat': { params: ReorderChatParams; result: ReorderChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };

@@ -891,6 +891,8 @@ public static class Reducers
                 return ApplySessionChatRemoved(state, a);
             case SessionChatUpdatedAction a:
                 return ApplySessionChatUpdated(state, a);
+            case SessionChatsReorderedAction a:
+                return ApplySessionChatsReordered(state, a);
             case SessionDefaultChatChangedAction a:
                 state.DefaultChat = a.DefaultChat;
                 return ReduceOutcome.Applied;
@@ -1846,6 +1848,50 @@ public static class Reducers
         // `MultipleWorkingDirectoriesCapability.ImmutablePrimary`. The set itself is
         // merged above, as the rust, go, kotlin, and swift clients also do.
         return ReduceOutcome.Applied;
+    }
+
+    private static ReduceOutcome ApplySessionChatsReordered(SessionState state, SessionChatsReorderedAction a)
+    {
+        HashSet<string> moved = new(a.Chats);
+        List<ChatSummary> movedEntries = new();
+        foreach (string resource in a.Chats)
+        {
+            ChatSummary? found = state.Chats.Find(c => c.Resource == resource);
+            if (found is not null)
+            {
+                movedEntries.Add(found);
+            }
+        }
+
+        if (movedEntries.Count == 0)
+        {
+            return ReduceOutcome.NoOp;
+        }
+
+        List<ChatSummary> remaining = state.Chats.FindAll(c => !moved.Contains(c.Resource));
+        int insertAt = a.Destination.Value switch
+        {
+            ChatReorderToStartDestination => 0,
+            ChatReorderBeforeDestination before => IndexOfAnchorOrEnd(remaining, before.Anchor),
+            ChatReorderAfterDestination after => IndexOfAnchorInclusive(remaining, after.Anchor),
+            _ => remaining.Count,
+        };
+
+        remaining.InsertRange(insertAt, movedEntries);
+        state.Chats = remaining;
+        return ReduceOutcome.Applied;
+    }
+
+    private static int IndexOfAnchorOrEnd(List<ChatSummary> remaining, string anchor)
+    {
+        int idx = remaining.FindIndex(c => c.Resource == anchor);
+        return idx < 0 ? remaining.Count : idx;
+    }
+
+    private static int IndexOfAnchorInclusive(List<ChatSummary> remaining, string anchor)
+    {
+        int idx = remaining.FindIndex(c => c.Resource == anchor);
+        return idx < 0 ? remaining.Count : idx + 1;
     }
 
     private static ReduceOutcome ApplyCustomizationUpdated(SessionState state, SessionCustomizationUpdatedAction a)

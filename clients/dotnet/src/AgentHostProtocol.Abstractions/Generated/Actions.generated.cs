@@ -27,6 +27,8 @@ public enum ActionType
     SessionChatRemoved,
     [WireValue("session/chatUpdated")]
     SessionChatUpdated,
+    [WireValue("session/chatsReordered")]
+    SessionChatsReordered,
     [WireValue("session/defaultChatChanged")]
     SessionDefaultChatChanged,
     [WireValue("chat/turnStarted")]
@@ -1125,6 +1127,34 @@ public sealed record SessionChatUpdatedAction
     /// Identity fields (`resource`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.</summary>
     public required PartialChatSummary Changes { get; init; }
+}
+
+/// <summary>The owning session's chat catalog order changed following an atomic
+/// `reorderChat` commit.
+///
+/// Host-emitted convergence signal; it never originates from a client
+/// dispatch. `chats` is the complete moved unit — the repositioned top-level
+/// chat plus every host-managed descendant, in their existing relative order
+/// — and `destination` is the same relative placement that produced it.
+///
+/// Reducers MUST extract every URI listed in `chats` from the current
+/// catalog (preserving their relative order), then reinsert them
+/// contiguously at the position `destination` names, resolving `before` /
+/// `after` against each anchor's *current* catalog position so replay
+/// converges even when other catalog changes interleave. An unresolvable
+/// `anchor` (e.g. a future protocol version's `destination.kind` this client
+/// does not recognise) falls back to `end`, so no chat is ever silently
+/// dropped from the catalog. AHP does not expose which entries in `chats`
+/// are descendants of the repositioned chat.</summary>
+public sealed record SessionChatsReorderedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>The complete moved unit, in its new contiguous relative order.</summary>
+    public required List<string> Chats { get; init; }
+
+    /// <summary>The relative placement destination that produced this order.</summary>
+    public required ChatReorderDestination Destination { get; init; }
 }
 
 /// <summary>The default chat input-routing hint for this session changed.</summary>
@@ -2689,6 +2719,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["session/chatAdded"] = typeof(SessionChatAddedAction),
         ["session/chatRemoved"] = typeof(SessionChatRemovedAction),
         ["session/chatUpdated"] = typeof(SessionChatUpdatedAction),
+        ["session/chatsReordered"] = typeof(SessionChatsReorderedAction),
         ["session/defaultChatChanged"] = typeof(SessionDefaultChatChangedAction),
         ["chat/turnStarted"] = typeof(ChatTurnStartedAction),
         ["chat/delta"] = typeof(ChatDeltaAction),

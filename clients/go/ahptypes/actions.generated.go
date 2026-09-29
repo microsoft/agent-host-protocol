@@ -26,6 +26,7 @@ const (
 	ActionTypeSessionChatAdded                    ActionType = "session/chatAdded"
 	ActionTypeSessionChatRemoved                  ActionType = "session/chatRemoved"
 	ActionTypeSessionChatUpdated                  ActionType = "session/chatUpdated"
+	ActionTypeSessionChatsReordered               ActionType = "session/chatsReordered"
 	ActionTypeSessionDefaultChatChanged           ActionType = "session/defaultChatChanged"
 	ActionTypeChatTurnStarted                     ActionType = "chat/turnStarted"
 	ActionTypeChatDelta                           ActionType = "chat/delta"
@@ -217,6 +218,31 @@ type SessionChatUpdatedAction struct {
 	// Identity fields (`resource`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
+}
+
+// The owning session's chat catalog order changed following an atomic
+// `reorderChat` commit.
+//
+// Host-emitted convergence signal; it never originates from a client
+// dispatch. `chats` is the complete moved unit — the repositioned top-level
+// chat plus every host-managed descendant, in their existing relative order
+// — and `destination` is the same relative placement that produced it.
+//
+// Reducers MUST extract every URI listed in `chats` from the current
+// catalog (preserving their relative order), then reinsert them
+// contiguously at the position `destination` names, resolving `before` /
+// `after` against each anchor's *current* catalog position so replay
+// converges even when other catalog changes interleave. An unresolvable
+// `anchor` (e.g. a future protocol version's `destination.kind` this client
+// does not recognise) falls back to `end`, so no chat is ever silently
+// dropped from the catalog. AHP does not expose which entries in `chats`
+// are descendants of the repositioned chat.
+type SessionChatsReorderedAction struct {
+	Type ActionType `json:"type"`
+	// The complete moved unit, in its new contiguous relative order.
+	Chats []URI `json:"chats"`
+	// The relative placement destination that produced this order.
+	Destination ChatReorderDestination `json:"destination"`
 }
 
 // The default chat input-routing hint for this session changed.
@@ -1738,6 +1764,7 @@ func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
 func (*SessionChatRemovedAction) isStateAction()                  {}
 func (*SessionChatUpdatedAction) isStateAction()                  {}
+func (*SessionChatsReorderedAction) isStateAction()               {}
 func (*SessionDefaultChatChangedAction) isStateAction()           {}
 func (*ChatTurnStartedAction) isStateAction()                     {}
 func (*ChatDeltaAction) isStateAction()                           {}
@@ -1889,6 +1916,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/chatUpdated":
 		var value SessionChatUpdatedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/chatsReordered":
+		var value SessionChatsReorderedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

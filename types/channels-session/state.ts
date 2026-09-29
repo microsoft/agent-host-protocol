@@ -180,7 +180,17 @@ export interface SessionState extends SessionMetadata {
    * reconnecting in time, or reconnect without resubscribing to the session.
    */
   activeClients: SessionActiveClient[];
-  /** Catalog of chats in this session. */
+  /**
+   * Catalog of chats in this session.
+   *
+   * Order is host-authoritative and durable: it persists across host
+   * restarts and reconnects like any other session state, and every
+   * subscriber converges on the identical order via `session/chatAdded`
+   * (append), `session/chatRemoved`, and `session/chatsReordered`.
+   * `reorderChat` repositions a top-level chat and its complete
+   * host-managed descendant subtree as one contiguous unit, without
+   * exposing the descendant relationship itself.
+   */
   chats: ChatSummary[];
   /**
    * The chat that receives input when the user addresses the session without

@@ -830,6 +830,34 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 }
 
+// resolveReorderInsertionIndex resolves a [ahptypes.ChatReorderDestination]
+// to an index into remaining (the catalog with every moved entry already
+// extracted). An unresolved before/after anchor falls back to the end,
+// mirroring the canonical TypeScript reducer.
+func resolveReorderInsertionIndex(destination ahptypes.ChatReorderDestination, remaining []ahptypes.ChatSummary) int {
+	switch d := destination.Value.(type) {
+	case *ahptypes.ChatReorderToStartDestination:
+		return 0
+	case *ahptypes.ChatReorderBeforeDestination:
+		for i := range remaining {
+			if remaining[i].Resource == d.Anchor {
+				return i
+			}
+		}
+		return len(remaining)
+	case *ahptypes.ChatReorderAfterDestination:
+		for i := range remaining {
+			if remaining[i].Resource == d.Anchor {
+				return i + 1
+			}
+		}
+		return len(remaining)
+	default:
+		// ChatReorderToEndDestination and any forward-compat unknown variant.
+		return len(remaining)
+	}
+}
+
 // ─── Session Reducer ───────────────────────────────────────────────────
 
 // ApplyActionToSession applies action to the [ahptypes.SessionState]
@@ -873,6 +901,34 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.SessionChatsReorderedAction:
+		moved := make(map[ahptypes.URI]struct{}, len(a.Chats))
+		var movedEntries []ahptypes.ChatSummary
+		for _, resource := range a.Chats {
+			for i := range state.Chats {
+				if state.Chats[i].Resource == resource {
+					moved[resource] = struct{}{}
+					movedEntries = append(movedEntries, state.Chats[i])
+					break
+				}
+			}
+		}
+		if len(movedEntries) == 0 {
+			return ReduceOutcomeNoOp
+		}
+		remaining := make([]ahptypes.ChatSummary, 0, len(state.Chats))
+		for _, c := range state.Chats {
+			if _, ok := moved[c.Resource]; !ok {
+				remaining = append(remaining, c)
+			}
+		}
+		insertAt := resolveReorderInsertionIndex(a.Destination, remaining)
+		reordered := make([]ahptypes.ChatSummary, 0, len(remaining)+len(movedEntries))
+		reordered = append(reordered, remaining[:insertAt]...)
+		reordered = append(reordered, movedEntries...)
+		reordered = append(reordered, remaining[insertAt:]...)
+		state.Chats = reordered
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionDefaultChatChangedAction:
 		state.DefaultChat = a.DefaultChat
 		return ReduceOutcomeApplied

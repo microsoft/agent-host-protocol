@@ -211,6 +211,9 @@ internal static class GeneratedActionMetadata
             case SessionChatRemovedAction value:
                 actionType = value.Type;
                 return true;
+            case SessionChatsReorderedAction value:
+                actionType = value.Type;
+                return true;
             case SessionChatUpdatedAction value:
                 actionType = value.Type;
                 return true;
@@ -445,6 +448,7 @@ internal static class GeneratedActionMetadata
             ActionType.SessionChangesetsChanged => "session/changesetsChanged",
             ActionType.SessionChatAdded => "session/chatAdded",
             ActionType.SessionChatRemoved => "session/chatRemoved",
+            ActionType.SessionChatsReordered => "session/chatsReordered",
             ActionType.SessionChatUpdated => "session/chatUpdated",
             ActionType.SessionConfigChanged => "session/configChanged",
             ActionType.SessionCreationFailed => "session/creationFailed",

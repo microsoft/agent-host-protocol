@@ -1,0 +1,57 @@
+{
+  "description": "session/chatsReordered is a no-op when none of the named chats match the catalog",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/c1",
+        "title": "Chat 1",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Chat 2",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "origin": { "kind": "user" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatsReordered",
+      "chats": ["ahp-chat:/does-not-exist"],
+      "destination": { "kind": "start" }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/c1",
+        "title": "Chat 1",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Chat 2",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "origin": { "kind": "user" }
+      }
+    ]
+  }
+}

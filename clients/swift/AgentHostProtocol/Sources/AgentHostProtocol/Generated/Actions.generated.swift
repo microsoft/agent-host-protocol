@@ -13,6 +13,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionChatAdded
     case sessionChatRemoved
     case sessionChatUpdated
+    case sessionChatsReordered
     case sessionDefaultChatChanged
     case chatTurnStarted
     case chatDelta
@@ -120,6 +121,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/chatAdded": self = .sessionChatAdded
         case "session/chatRemoved": self = .sessionChatRemoved
         case "session/chatUpdated": self = .sessionChatUpdated
+        case "session/chatsReordered": self = .sessionChatsReordered
         case "session/defaultChatChanged": self = .sessionDefaultChatChanged
         case "chat/turnStarted": self = .chatTurnStarted
         case "chat/delta": self = .chatDelta
@@ -227,6 +229,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionChatAdded: try container.encode("session/chatAdded")
         case .sessionChatRemoved: try container.encode("session/chatRemoved")
         case .sessionChatUpdated: try container.encode("session/chatUpdated")
+        case .sessionChatsReordered: try container.encode("session/chatsReordered")
         case .sessionDefaultChatChanged: try container.encode("session/defaultChatChanged")
         case .chatTurnStarted: try container.encode("chat/turnStarted")
         case .chatDelta: try container.encode("chat/delta")
@@ -463,6 +466,24 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
         self.type = type
         self.chat = chat
         self.changes = changes
+    }
+}
+
+public struct SessionChatsReorderedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The complete moved unit, in its new contiguous relative order.
+    public var chats: [String]
+    /// The relative placement destination that produced this order.
+    public var destination: ChatReorderDestination
+
+    public init(
+        type: ActionType,
+        chats: [String],
+        destination: ChatReorderDestination
+    ) {
+        self.type = type
+        self.chats = chats
+        self.destination = destination
     }
 }
 
@@ -2476,6 +2497,7 @@ public enum StateAction: Codable, Sendable {
     case sessionChatAdded(SessionChatAddedAction)
     case sessionChatRemoved(SessionChatRemovedAction)
     case sessionChatUpdated(SessionChatUpdatedAction)
+    case sessionChatsReordered(SessionChatsReorderedAction)
     case sessionDefaultChatChanged(SessionDefaultChatChangedAction)
     case chatTurnStarted(ChatTurnStartedAction)
     case chatDelta(ChatDeltaAction)
@@ -2595,6 +2617,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionChatRemoved(try SessionChatRemovedAction(from: decoder))
         case "session/chatUpdated":
             self = .sessionChatUpdated(try SessionChatUpdatedAction(from: decoder))
+        case "session/chatsReordered":
+            self = .sessionChatsReordered(try SessionChatsReorderedAction(from: decoder))
         case "session/defaultChatChanged":
             self = .sessionDefaultChatChanged(try SessionDefaultChatChangedAction(from: decoder))
         case "chat/turnStarted":
@@ -2795,6 +2819,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionChatAdded(let v): try v.encode(to: encoder)
         case .sessionChatRemoved(let v): try v.encode(to: encoder)
         case .sessionChatUpdated(let v): try v.encode(to: encoder)
+        case .sessionChatsReordered(let v): try v.encode(to: encoder)
         case .sessionDefaultChatChanged(let v): try v.encode(to: encoder)
         case .chatTurnStarted(let v): try v.encode(to: encoder)
         case .chatDelta(let v): try v.encode(to: encoder)
