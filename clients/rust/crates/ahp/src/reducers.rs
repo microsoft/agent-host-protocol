@@ -1398,6 +1398,10 @@ fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> 
 
 fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
+        let started_at = match &tc {
+            ToolCallState::Running(value) if value.started_at.is_some() => value.started_at.clone(),
+            _ => a.started_at.clone(),
+        };
         let mut base = tool_call_meta(&tc);
         base.intention = a.intention.clone().or(base.intention);
         base.tool_input = a.tool_input.clone().or(base.tool_input);
@@ -1423,6 +1427,7 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                         invocation_message: a.invocation_message.clone(),
                         confirmed,
                         selected_option: None,
+                        started_at,
                         content: None,
                     })
                 } else {
@@ -1507,6 +1512,7 @@ fn apply_tool_call_confirmed(
                     None => ToolCallConfirmationReason::NotNeeded,
                 },
                 selected_option,
+                started_at: a.started_at.clone(),
                 content: None,
             })
         } else {
@@ -1544,6 +1550,7 @@ fn apply_tool_call_complete(
             confirmed,
             selected_option,
             pre_auth_content,
+            started_at,
             from_auth_required,
         ) = match tc {
             ToolCallState::Running(s) => (
@@ -1552,12 +1559,14 @@ fn apply_tool_call_complete(
                 s.confirmed,
                 s.selected_option,
                 None,
+                s.started_at,
                 false,
             ),
             ToolCallState::PendingConfirmation(s) => (
                 s.invocation_message,
                 s.tool_input,
                 ToolCallConfirmationReason::NotNeeded,
+                None,
                 None,
                 None,
                 false,
@@ -1578,6 +1587,7 @@ fn apply_tool_call_complete(
                     s.confirmed,
                     s.selected_option,
                     s.content,
+                    s.started_at,
                     true,
                 )
             }
@@ -1605,6 +1615,8 @@ fn apply_tool_call_complete(
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
+                started_at,
+                duration: a.duration.map(|duration| duration.max(0)),
             })
         } else {
             ToolCallState::Completed(ToolCallCompletedState {
@@ -1623,6 +1635,8 @@ fn apply_tool_call_complete(
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
+                started_at,
+                duration: a.duration.map(|duration| duration.max(0)),
             })
         }
     })
@@ -1653,6 +1667,8 @@ fn apply_tool_call_result_confirmed(
                 error: s.error,
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
+                started_at: s.started_at,
+                duration: s.duration,
             })
         } else {
             ToolCallState::Cancelled(ToolCallCancelledState {
@@ -1712,6 +1728,7 @@ fn apply_tool_call_auth_required(
                     invocation_message: s.invocation_message,
                     confirmed: s.confirmed,
                     selected_option: s.selected_option,
+                    started_at: s.started_at,
                     status: ToolCallStatus::AuthRequired,
                     auth: a.auth.clone(),
                     content: s.content,
@@ -1741,6 +1758,7 @@ fn apply_tool_call_auth_resolved(
                 invocation_message: s.invocation_message,
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
+                started_at: s.started_at,
                 content: s.content,
             }),
             other => other,

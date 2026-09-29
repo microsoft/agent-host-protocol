@@ -33,7 +33,8 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run",
-      "confirmed": "not-needed"
+      "confirmed": "not-needed",
+      "startedAt": "1970-01-01T00:00:03.000Z"
     },
     {
       "type": "chat/toolCallComplete",
@@ -43,6 +44,7 @@
         "success": true,
         "pastTenseMessage": "Done"
       },
+      "duration": 2500,
       "requiresResultConfirmation": true
     },
     {
@@ -77,6 +79,8 @@
             "invocationMessage": "Run",
             "toolInput": null,
             "confirmed": "not-needed",
+            "startedAt": "1970-01-01T00:00:03.000Z",
+            "duration": 2500,
             "success": true,
             "pastTenseMessage": "Done",
             "content": null,

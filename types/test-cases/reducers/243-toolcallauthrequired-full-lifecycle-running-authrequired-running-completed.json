@@ -40,7 +40,8 @@
       "toolInput": {
         "uri": "file:///tool-inputs/tool-input.json"
       },
-      "confirmed": "not-needed"
+      "confirmed": "not-needed",
+      "startedAt": "1970-01-01T00:00:03.000Z"
     },
     {
       "type": "chat/toolCallAuthRequired",
@@ -69,7 +70,8 @@
       "result": {
         "success": true,
         "pastTenseMessage": "Searched repo"
-      }
+      },
+      "duration": 2500
     }
   ],
   "expected": {
@@ -102,6 +104,8 @@
               "uri": "file:///tool-inputs/tool-input.json"
             },
             "confirmed": "not-needed",
+            "startedAt": "1970-01-01T00:00:03.000Z",
+            "duration": 2500,
             "success": true,
             "pastTenseMessage": "Searched repo"
           }

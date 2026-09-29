@@ -1201,6 +1201,10 @@ public static class Reducers
 
                 if (a.Confirmed is not null)
                 {
+                    string? startedAt = tc.Value is ToolCallRunningState running
+                        && running.StartedAt is not null
+                            ? running.StartedAt
+                            : a.StartedAt;
                     return new ToolCallState(new ToolCallRunningState
                     {
                         Status = ToolCallStatus.Running,
@@ -1213,6 +1217,7 @@ public static class Reducers
                         InvocationMessage = a.InvocationMessage,
                         ToolInput = readyToolInput,
                         Confirmed = a.Confirmed.Value,
+                        StartedAt = startedAt,
                     });
                 }
 
@@ -1304,6 +1309,7 @@ public static class Reducers
                     ToolInput = toolInput,
                     Confirmed = confirmed,
                     SelectedOption = selected,
+                    StartedAt = a.StartedAt,
                 });
             }
 
@@ -1342,6 +1348,7 @@ public static class Reducers
             ToolCallConfirmationReason confirmed = ToolCallConfirmationReason.NotNeeded;
             ConfirmationOption? selectedOption = null;
             List<ToolResultContent>? preAuthContent = null;
+            string? startedAt = null;
             bool fromAuthRequired = false;
 
             switch (tc.Value)
@@ -1351,6 +1358,7 @@ public static class Reducers
                     toolInput = v.ToolInput;
                     confirmed = v.Confirmed;
                     selectedOption = v.SelectedOption;
+                    startedAt = v.StartedAt;
                     break;
                 case ToolCallPendingConfirmationState v:
                     invocation = v.InvocationMessage;
@@ -1374,6 +1382,7 @@ public static class Reducers
                     toolInput = v.ToolInput;
                     confirmed = v.Confirmed;
                     selectedOption = v.SelectedOption;
+                    startedAt = v.StartedAt;
                     // Preserve any partial content produced before the call paused for
                     // auth — a client cancelling from `auth-required` without
                     // authenticating never resumes execution, so this is the only content
@@ -1410,6 +1419,8 @@ public static class Reducers
                     Error = a.Result.Error,
                     Confirmed = confirmed,
                     SelectedOption = selectedOption,
+                    StartedAt = startedAt,
+                    Duration = a.Duration.HasValue ? Math.Max(0, a.Duration.Value) : null,
                 });
             }
 
@@ -1431,6 +1442,8 @@ public static class Reducers
                 Error = a.Result.Error,
                 Confirmed = confirmed,
                 SelectedOption = selectedOption,
+                StartedAt = startedAt,
+                Duration = a.Duration.HasValue ? Math.Max(0, a.Duration.Value) : null,
             });
         });
     }
@@ -1469,6 +1482,7 @@ public static class Reducers
                 ToolInput = running.ToolInput,
                 Confirmed = running.Confirmed,
                 SelectedOption = running.SelectedOption,
+                StartedAt = running.StartedAt,
                 Content = CopyList(running.Content),
                 Auth = a.Auth,
             });
@@ -1503,6 +1517,7 @@ public static class Reducers
                 ToolInput = authRequired.ToolInput,
                 Confirmed = authRequired.Confirmed,
                 SelectedOption = authRequired.SelectedOption,
+                StartedAt = authRequired.StartedAt,
                 Content = CopyList(authRequired.Content),
             });
         });
@@ -1542,6 +1557,8 @@ public static class Reducers
                     Error = s.Error,
                     Confirmed = s.Confirmed,
                     SelectedOption = s.SelectedOption,
+                    StartedAt = s.StartedAt,
+                    Duration = s.Duration,
                 });
             }
 

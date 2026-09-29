@@ -230,6 +230,13 @@ export interface ChatToolCallReadyAction extends ToolCallActionBase {
   /** If set, the tool was auto-confirmed and transitions directly to `running` */
   confirmed?: ToolCallConfirmationReason;
   /**
+   * ISO 8601 timestamp when tool execution first started.
+   *
+   * Set when `confirmed` transitions a tool call into `running`. When resuming
+   * after re-confirmation, repeat the original execution start timestamp.
+   */
+  startedAt?: string;
+  /**
    * Options the server offers for this confirmation. When present, the client
    * SHOULD render these instead of a plain approve/deny UI. Each option
    * belongs to a {@link ConfirmationOptionGroup} so the client can still
@@ -251,6 +258,14 @@ export interface ChatToolCallApprovedAction extends ToolCallActionBase {
   approved: true;
   /** How the tool was confirmed */
   confirmed: ToolCallConfirmationReason;
+  /**
+   * ISO 8601 timestamp when tool execution first started.
+   *
+   * Set when this approval transitions a tool call into `running`. When
+   * resuming after re-confirmation, repeat the original execution start
+   * timestamp.
+   */
+  startedAt?: string;
   /**
    * Edited tool input parameters, if the client modified them before confirming.
    *
@@ -335,6 +350,18 @@ export interface ChatToolCallCompleteAction extends ToolCallActionBase {
   type: ActionType.ChatToolCallComplete;
   /** Execution result */
   result: ToolCallResult;
+  /**
+   * Elapsed tool execution duration in milliseconds, measured by the
+   * producer's own clock. Clients MUST NOT derive this by subtracting
+   * timestamps — cross-client clocks may differ — and MUST treat it as
+   * opaque, producer-supplied data.
+   *
+   * When both timing fields are available, the execution completion timestamp
+   * is the tool call state's `startedAt` plus `duration`.
+   *
+   * @integer
+   */
+  duration?: number;
   /** If true, the result requires client approval before finalizing */
   requiresResultConfirmation?: boolean;
 }

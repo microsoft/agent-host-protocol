@@ -3203,6 +3203,12 @@ data class ToolCallRunningState(
      * The confirmation option the user selected, if confirmation options were provided
      */
     val selectedOption: ConfirmationOption? = null,
+    /**
+     * ISO 8601 timestamp when tool execution first started.
+     *
+     * Absent when timing was not reported by the producer.
+     */
+    val startedAt: String? = null,
     val status: ToolCallStatus,
     /**
      * Partial content produced while the tool is still executing.
@@ -3265,6 +3271,12 @@ data class ToolCallAuthRequiredState(
      * The confirmation option the user selected, if confirmation options were provided
      */
     val selectedOption: ConfirmationOption? = null,
+    /**
+     * ISO 8601 timestamp when tool execution first started.
+     *
+     * Absent when timing was not reported by the producer.
+     */
+    val startedAt: String? = null,
     val status: ToolCallStatus,
     /**
      * The authentication challenge blocking this invocation.
@@ -3352,6 +3364,23 @@ data class ToolCallPendingResultConfirmationState(
      * The confirmation option the user selected, if confirmation options were provided
      */
     val selectedOption: ConfirmationOption? = null,
+    /**
+     * ISO 8601 timestamp when tool execution first started.
+     *
+     * Absent when timing was not reported by the producer.
+     */
+    val startedAt: String? = null,
+    /**
+     * Elapsed tool execution duration in milliseconds, measured by the
+     * producer's own clock.
+     *
+     * Available after execution finishes when reported by the producer. Clients
+     * MUST NOT derive this by subtracting timestamps — cross-client clocks may
+     * differ — and MUST treat it as opaque, producer-supplied data. When both
+     * timing fields are available, the execution completion timestamp is
+     * `startedAt + duration`.
+     */
+    val duration: Long? = null,
     val status: ToolCallStatus
 )
 
@@ -3431,6 +3460,23 @@ data class ToolCallCompletedState(
      * The confirmation option the user selected, if confirmation options were provided
      */
     val selectedOption: ConfirmationOption? = null,
+    /**
+     * ISO 8601 timestamp when tool execution first started.
+     *
+     * Absent when timing was not reported by the producer.
+     */
+    val startedAt: String? = null,
+    /**
+     * Elapsed tool execution duration in milliseconds, measured by the
+     * producer's own clock.
+     *
+     * Available after execution finishes when reported by the producer. Clients
+     * MUST NOT derive this by subtracting timestamps — cross-client clocks may
+     * differ — and MUST treat it as opaque, producer-supplied data. When both
+     * timing fields are available, the execution completion timestamp is
+     * `startedAt + duration`.
+     */
+    val duration: Long? = null,
     val status: ToolCallStatus
 )
 

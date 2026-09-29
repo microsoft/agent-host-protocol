@@ -1092,6 +1092,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 invocationMessage = a.invocationMessage,
                                 status = ToolCallStatus.RUNNING,
                                 confirmed = a.confirmed,
+                                startedAt = (tc as? ToolCallStateRunning)?.value?.startedAt
+                                    ?: a.startedAt,
                             ),
                         )
                     } else {
@@ -1149,6 +1151,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 confirmed = a.confirmed
                                     ?: ToolCallConfirmationReason.USER_ACTION,
                                 selectedOption = selectedOption,
+                                startedAt = a.startedAt,
                             ),
                         )
                     } else {
@@ -1180,18 +1183,28 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val result = a.result
         refreshChatSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
-                val (invocationMessage, toolInput, confirmed, selectedOption, preAuthContent, fromAuthRequired) = when (tc) {
+                val (
+                    invocationMessage,
+                    toolInput,
+                    confirmed,
+                    selectedOption,
+                    startedAt,
+                    preAuthContent,
+                    fromAuthRequired,
+                ) = when (tc) {
                     is ToolCallStateRunning -> CompleteCtx(
                         tc.value.invocationMessage,
                         tc.value.toolInput,
                         tc.value.confirmed,
                         tc.value.selectedOption,
+                        tc.value.startedAt,
                         null,
                     )
                     is ToolCallStatePendingConfirmation -> CompleteCtx(
                         tc.value.invocationMessage,
                         tc.value.toolInput,
                         ToolCallConfirmationReason.NOT_NEEDED,
+                        null,
                         null,
                         null,
                     )
@@ -1210,6 +1223,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             tc.value.toolInput,
                             tc.value.confirmed,
                             tc.value.selectedOption,
+                            tc.value.startedAt,
                             tc.value.content,
                             fromAuthRequired = true,
                         )
@@ -1241,6 +1255,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             status = ToolCallStatus.PENDING_RESULT_CONFIRMATION,
                             confirmed = confirmed,
                             selectedOption = selectedOption,
+                            startedAt = startedAt,
+                            duration = a.duration?.coerceAtLeast(0),
                         ),
                     )
                 } else {
@@ -1262,6 +1278,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             status = ToolCallStatus.COMPLETED,
                             confirmed = confirmed,
                             selectedOption = selectedOption,
+                            startedAt = startedAt,
+                            duration = a.duration?.coerceAtLeast(0),
                         ),
                     )
                 }
@@ -1294,6 +1312,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 status = ToolCallStatus.COMPLETED,
                                 confirmed = tc.value.confirmed,
                                 selectedOption = tc.value.selectedOption,
+                                startedAt = tc.value.startedAt,
+                                duration = tc.value.duration,
                             ),
                         )
                     } else {
@@ -1351,6 +1371,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 invocationMessage = tc.value.invocationMessage,
                                 confirmed = tc.value.confirmed,
                                 selectedOption = tc.value.selectedOption,
+                                startedAt = tc.value.startedAt,
                                 status = ToolCallStatus.AUTH_REQUIRED,
                                 auth = a.auth,
                                 content = tc.value.content,
@@ -1382,6 +1403,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             invocationMessage = tc.value.invocationMessage,
                             confirmed = tc.value.confirmed,
                             selectedOption = tc.value.selectedOption,
+                            startedAt = tc.value.startedAt,
                             status = ToolCallStatus.RUNNING,
                             content = tc.value.content,
                         ),
@@ -1574,14 +1596,14 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
 /**
  * Locally scoped helper for tool-call completion to avoid Pair/Triple noise
- * when carrying the four context fields from the prior tool call state into
- * the new one.
+ * when carrying context from the prior tool call state into the new one.
  */
 private data class CompleteCtx(
     val invocationMessage: com.microsoft.agenthostprotocol.generated.StringOrMarkdown,
     val toolInput: ToolInput?,
     val confirmed: ToolCallConfirmationReason,
     val selectedOption: ConfirmationOption?,
+    val startedAt: String?,
     val preAuthContent: List<ToolResultContent>?,
     /** Whether this context came from `auth-required` (a cancellation), which forces a terminal completion. */
     val fromAuthRequired: Boolean = false,
