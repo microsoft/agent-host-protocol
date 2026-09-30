@@ -1857,12 +1857,26 @@ public static class Reducers
         {
             return ReduceOutcome.NoOp;
         }
-        if (a.Chats.Select((resource, index) => resource == state.Chats[index].Resource).All(matches => matches))
+
+        bool unchanged = true;
+        for (int i = 0; i < a.Chats.Count; i++)
+        {
+            if (a.Chats[i] != state.Chats[i].Resource)
+            {
+                unchanged = false;
+                break;
+            }
+        }
+        if (unchanged)
         {
             return ReduceOutcome.NoOp;
         }
 
-        Dictionary<string, ChatSummary> summaries = state.Chats.ToDictionary(c => c.Resource);
+        Dictionary<string, ChatSummary> summaries = new(state.Chats.Count);
+        foreach (ChatSummary summary in state.Chats)
+        {
+            summaries[summary.Resource] = summary;
+        }
         List<ChatSummary> reordered = new(a.Chats.Count);
         foreach (string resource in a.Chats)
         {
