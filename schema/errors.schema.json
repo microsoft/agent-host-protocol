@@ -640,7 +640,7 @@
       "properties": {
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
-          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding mode."
+          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding\ncreation mode."
         },
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
@@ -900,11 +900,11 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable. Catalog order is independent of\n`defaultChat`."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker — chats remain equal peers at the protocol level. Hosts MAY change\nthis over the session's lifetime."
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This routing designation does not determine the\nchat's catalog position. Hosts MAY change it over the session's lifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -1207,11 +1207,11 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+          "description": "Lightweight host-authoritative ordered chat catalog."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "Chat that receives input when no specific chat is selected."
+          "description": "Chat that receives input when none is selected, independent of catalog position."
         }
       },
       "required": [
@@ -1225,7 +1225,7 @@
     },
     "SessionChatSummary": {
       "type": "object",
-      "description": "Lightweight chat information suitable for listing a session without\nsubscribing to its session channel.",
+      "description": "Lightweight chat information in a session catalog.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -1242,6 +1242,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether this chat has been archived independently of its owning session\n(see `chat/isArchivedChanged`).\n\nGeneric clients use this to group or filter archived chats in session\nlists without subscribing to the session channel. Absence means the\nchat is not archived."
         }
       },
       "required": [
@@ -2536,6 +2540,10 @@
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is eligible to be the source of `moveChat`, including\nsame-session ordering.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed. A chat referenced by its\nowning session's `defaultChat` MUST NOT be movable."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -2629,6 +2637,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -7104,6 +7116,77 @@
         "chat"
       ]
     },
+    "ChatMoveToSessionDestination": {
+      "type": "object",
+      "description": "Moves a chat within or into an existing session.",
+      "properties": {
+        "kind": {
+          "const": "session",
+          "description": "Discriminant"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Destination session URI."
+        },
+        "after": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat after which to place the requested chat.\n\nThe anchor MUST be a different chat in the destination session. When\nomitted, the requested chat is placed at the beginning of the catalog."
+        }
+      },
+      "required": [
+        "kind",
+        "session"
+      ]
+    },
+    "ChatMoveToNewSessionDestination": {
+      "type": "object",
+      "description": "Moves a top-level chat subtree into a newly allocated session.",
+      "properties": {
+        "kind": {
+          "const": "newSession",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "MoveChatParams": {
+      "type": "object",
+      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Source chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "destination": {
+          "$ref": "#/$defs/ChatMoveDestination",
+          "description": "Atomic move destination."
+        }
+      },
+      "required": [
+        "channel",
+        "destination"
+      ]
+    },
+    "MoveChatResult": {
+      "type": "object",
+      "description": "Result of an atomic chat move.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Authoritative owning session URI after the move."
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
     "DisposeChatParams": {
       "type": "object",
       "description": "Disposes a chat and cleans up server-side resources.",
@@ -7611,7 +7694,7 @@
           ]
         }
       ],
-      "description": "How a chat came into existence. Clients MAY use it to render\ncontextual UI (parent indicators, fork markers, \"spawned by tool\" badges).\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
+      "description": "How a chat came into existence. Clients MAY use it to render creation\nprovenance (fork markers and \"spawned by tool\" badges). Any host-internal\nhierarchy used to move a complete chat subtree is not exposed by AHP.\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
     },
     "ChatInteractivity": {
       "enum": [
@@ -8222,6 +8305,9 @@
           "$ref": "#/$defs/SessionChatUpdatedAction"
         },
         {
+          "$ref": "#/$defs/SessionChatsReorderedAction"
+        },
+        {
           "$ref": "#/$defs/SessionDefaultChatChangedAction"
         },
         {
@@ -8343,6 +8429,9 @@
         },
         {
           "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovableChangedAction"
         },
         {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
@@ -8537,6 +8626,17 @@
         }
       ],
       "description": "Identifies a source chat for a new chat."
+    },
+    "ChatMoveDestination": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatMoveToSessionDestination"
+        },
+        {
+          "$ref": "#/$defs/ChatMoveToNewSessionDestination"
+        }
+      ],
+      "description": "Identifies the destination of an atomic chat move."
     },
     "ChangesetOperationTarget": {
       "oneOf": [
@@ -8791,6 +8891,10 @@
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
             },
+            "movable": {
+              "type": "boolean",
+              "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
+            },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
               "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -8810,6 +8914,26 @@
         "type",
         "chat",
         "changes"
+      ]
+    },
+    "SessionChatsReorderedAction": {
+      "type": "object",
+      "description": "The owning session's authoritative chat catalog order changed.\n\nHost-emitted convergence signal; it never originates from a client\ndispatch. `chats` is the complete resulting order and MUST contain every\nchat currently in the session exactly once. Reducers replace the catalog\norder while preserving each matching summary. Invalid or incomplete orders\nare ignored.",
+      "properties": {
+        "type": {
+          "const": "session/chatsReordered"
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "Every chat URI in authoritative catalog order."
+        }
+      },
+      "required": [
+        "type",
+        "chats"
       ]
     },
     "SessionDefaultChatChangedAction": {
@@ -9789,6 +9913,23 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatMovableChangedAction": {
+      "type": "object",
+      "description": "Whether this chat is structurally eligible to be the source of `moveChat`\nchanged.\n\nThe host is authoritative and MUST also update the owning session's chat\ncatalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.\nA chat referenced by its owning session's `defaultChat` MUST always carry\n`movable: false`.",
+      "properties": {
+        "type": {
+          "const": "chat/movableChanged"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be moved."
+        }
+      },
+      "required": [
+        "type",
+        "movable"
       ]
     },
     "ChatChangesetsChangedAction": {

@@ -204,6 +204,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.activity = a.activity
         return next
 
+    case .chatMovableChanged(let a):
+        var next = state
+        next.movable = a.movable
+        return next
+
     case .chatChangesetsChanged(let a):
         var next = state
         next.changesets = a.changesets
@@ -741,6 +746,20 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
     case .sessionDefaultChatChanged(let a):
         var next = state
         next.defaultChat = a.defaultChat
+        return next
+
+    case .sessionChatsReordered(let a):
+        guard a.chats.count == state.chats.count, Set(a.chats).count == state.chats.count else {
+            return state
+        }
+        let reordered = a.chats.compactMap { resource in
+            state.chats.first { $0.resource == resource }
+        }
+        guard reordered.count == state.chats.count else {
+            return state
+        }
+        var next = state
+        next.chats = reordered
         return next
 
     // ── Metadata ──────────────────────────────────────────────────────────

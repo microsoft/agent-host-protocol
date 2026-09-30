@@ -56,6 +56,8 @@ import type {
 } from '../channels-session/commands.js';
 import type {
   CreateChatParams,
+  MoveChatParams,
+  MoveChatResult,
   DisposeChatParams,
 } from '../channels-chat/commands.js';
 import type {
@@ -162,6 +164,7 @@ export interface CommandMap {
   'createSession': { params: CreateSessionParams; result: null };
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
+  'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };

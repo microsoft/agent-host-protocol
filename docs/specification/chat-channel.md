@@ -10,7 +10,12 @@ A chat channel carries the full state of a single conversation thread: turns, st
 ahp-chat:/<uuid>
 ```
 
-The path is a server-unique identifier (typically a UUID) allocated by the server when the chat is created. The owning session URI is **not** encoded in the chat URI — the relationship is expressed via the session's [`chats`](/reference/session#sessionstate) catalog and each chat's [`origin`](/reference/chat#chatorigin).
+The path is a server-unique identifier allocated by the server when the chat is
+created. Clients MUST treat the full URI as opaque. A host MAY encode owning
+session identity in the path for routing or storage, but ownership is
+authoritatively expressed by the session's
+[`chats`](/reference/session#sessionstate) catalog and creation provenance by
+each chat's [`origin`](/reference/chat#chatorigin).
 
 Multiple chat channels may be active simultaneously. Clients subscribe to each chat whose state they want to track.
 
@@ -62,7 +67,7 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 ## Relationship to the session channel
 
 - A chat's [`ChatSummary`](/reference/chat#chatsummary) appears in the session's [`SessionState.chats`](/reference/session#sessionstate) catalog. The session reducer keeps that catalog in sync with the underlying chat lifecycle.
-- The session may also expose [`defaultChat`](/reference/session#sessionstate) as a UI routing hint for input that is addressed to the session as a whole. This is advisory only — chats remain equal peers at the protocol level.
+- The session may also expose [`defaultChat`](/reference/session#sessionstate) as a UI routing hint for input that is addressed to the session as a whole. Every chat remains directly addressable.
 - Session-level fields such as [`status`](/reference/session#sessionsummary), `activity`, and `modifiedAt` are aggregates derived from the session's chats. See the [Session Channel specification](./session-channel#chat-aggregation) for the derivation rules.
 
 ## Lifecycle
@@ -138,16 +143,85 @@ Each chat advertises how it came into existence via [`ChatOrigin`](/reference/ch
 | `sideChat` | Created as an independent side conversation using context through a specific source turn — payload references the source chat URI and stable source `turnId`, which may have been active or historical when the chat was created, and MAY retain an immutable `selection` snapshot captured at create acceptance. |
 | `tool` | Spawned by a tool call running in another chat — payload references the source chat URI and tool call id (e.g. a sub-agent delegation). |
 
-Clients MAY use the origin to render contextual UI (parent indicators, fork markers, "spawned by tool" badges), but origin is **not** a hierarchy — every chat is equally addressable.
+Clients MAY use the origin to render creation-provenance UI (fork markers,
+"spawned by tool" badges). Origin does not expose any host-internal hierarchy;
+every chat remains directly addressable.
 
 A tool-spawned worker is described from both ends of the same edge. The worker chat carries the canonical record via its `tool` origin (the spawning chat URI and tool call id). The spawning tool call surfaces the same relationship forward through a [`ToolResultSubagentContent`](/reference/chat#toolresultsubagentcontent) block in its result, whose `resource` is the worker **chat** URI (`ahp-chat:/<cid>`, not a session URI). The tool call that emits that block is the one named by the worker chat's `origin.toolCallId`; hosts MUST keep the two consistent.
 
-#### Ancestry and nesting depth
+#### Provenance after a move
 
-A `fork`, `sideChat`, or `tool` origin names only the chat's **immediate** source chat (by URI), together with the turn or tool call that produced it. A chat's ancestry is therefore not stored directly; it is the chain you reconstruct by following `origin.chat` from one chat to the next. Because a tool-spawned chat can itself run tools that spawn further chats, these chains can be arbitrarily deep.
+A `fork`, `sideChat`, or `tool` origin permanently names the chat that created
+it, together with the turn or tool call that produced it. `moveChat` never
+rewrites this provenance. Moving a chat preserves its URI; a historical
+`origin.chat` may stop resolving only if the referenced chat is later pruned.
 
-- **No protocol-imposed depth limit.** AHP does not cap nesting depth or fan-out, and the wire carries no depth counter or maximum-depth field. Any bound is a host policy decision that the protocol neither enforces nor advertises; hosts SHOULD guard against runaway recursion or unbounded fan-out on their side.
-- **Ancestry is advisory and may be incomplete.** Every chat is a flat, equally-addressable peer in the session's [`chats`](/reference/session#sessionstate) catalog — `origin` is a rendering hint, not a structural parent link. A source chat MAY be pruned (`session/chatRemoved`) while a chat it spawned lives on, so an `origin.chat` URI is not guaranteed to resolve. Clients reconstructing ancestry MUST tolerate missing references and SHOULD guard against cycles and unbounded depth (for example, by capping how deep they walk or render).
+### Moving chats
+
+[`moveChat`](/reference/chat#movechat) atomically changes a chat's owning
+session or its position in the current session's ordered chat catalog. The
+source is the chat URI in `params.channel`. Its destination is one of:
+
+- `{ kind: "session", session, after? }` — move into an existing session, or
+  reorder within the current session. `after` places the requested chat
+  immediately after another chat in that session; absence places it first.
+- `{ kind: "newSession" }` — allocate a session, transfer the source hierarchy,
+  and make the source the new session's `defaultChat`.
+
+When `session` is the current owning session, only the requested public catalog
+entry is repositioned. When ownership changes, the requested chat and its
+complete host-managed descendant hierarchy transfer together. AHP does not
+expose that hierarchy.
+
+The host exposes eligibility through `ChatState.movable` and
+`ChatSummary.movable`; absence means `false`. Clients MUST only offer or invoke
+`moveChat` for a chat that advertises `movable: true`. The chat referenced by
+its owning session's `defaultChat` MUST NOT advertise `movable: true`.
+Default status does not constrain catalog position: another movable chat may be
+placed before or after the default chat, and the default chat may be an `after`
+anchor. Hosts publish `chat/movableChanged` and the corresponding
+`session/chatUpdated` when eligibility changes.
+
+```json
+{
+  "session": "ahp-session:/destination"
+}
+```
+
+The result always reports the authoritative destination session. Every moved
+chat keeps its URI, state, and byte-for-byte `ChatOrigin`, so existing
+chat-channel subscriptions remain valid.
+
+#### Validation
+
+At minimum, the source MUST exist and advertise `movable: true`; the destination
+session and optional `after` chat MUST resolve; the anchor MUST belong to the
+destination session; and the source MUST NOT anchor itself. Hosts MAY reject
+unsupported destinations or transient source conditions. Failure has no
+observable effect on ownership or catalog order.
+
+Success preserves every moved chat URI, state, and origin, and converges the
+durable session catalogs. The protocol does not require provider equality,
+prohibit active turns universally, or otherwise expose host-specific storage
+and runtime constraints.
+
+#### Atomic synchronization
+
+The host validates and persists ownership, its internal hierarchy, catalog
+order, and default-chat state before publishing synchronization actions:
+
+1. Cross-session moves use `session/chatRemoved` and `session/chatAdded` for
+   every transferred catalog entry.
+2. Ordering changes use `session/chatsReordered`, whose `chats` field is the
+   complete authoritative resulting URI order.
+3. Root notifications add a newly allocated session and update affected
+   `SessionSummary.chats` catalogs.
+
+These messages describe a transaction that is already committed; their delivery
+does not define atomicity. Clients observing only a subset of channels reconcile
+from snapshots. After an uncertain `newSession` response, clients SHOULD
+reconcile root and session state rather than blindly retrying anonymous
+allocation.
 
 ### Pulling a chat into another chat
 

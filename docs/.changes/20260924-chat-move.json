@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Atomic stable-URI `moveChat` transfer and same-session ordering for host-authorized chats, with per-chat `movable` discovery and durable authoritative catalogs."
+}

@@ -26,6 +26,7 @@ const (
 	ActionTypeSessionChatAdded                    ActionType = "session/chatAdded"
 	ActionTypeSessionChatRemoved                  ActionType = "session/chatRemoved"
 	ActionTypeSessionChatUpdated                  ActionType = "session/chatUpdated"
+	ActionTypeSessionChatsReordered               ActionType = "session/chatsReordered"
 	ActionTypeSessionDefaultChatChanged           ActionType = "session/defaultChatChanged"
 	ActionTypeChatTurnStarted                     ActionType = "chat/turnStarted"
 	ActionTypeChatDelta                           ActionType = "chat/delta"
@@ -44,6 +45,7 @@ const (
 	ActionTypeChatError                           ActionType = "chat/error"
 	ActionTypeChatTurnResume                      ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                 ActionType = "chat/activityChanged"
+	ActionTypeChatMovableChanged                  ActionType = "chat/movableChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
@@ -216,6 +218,19 @@ type SessionChatUpdatedAction struct {
 	// Identity fields (`resource`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
+}
+
+// The owning session's authoritative chat catalog order changed.
+//
+// Host-emitted convergence signal; it never originates from a client
+// dispatch. `chats` is the complete resulting order and MUST contain every
+// chat currently in the session exactly once. Reducers replace the catalog
+// order while preserving each matching summary. Invalid or incomplete orders
+// are ignored.
+type SessionChatsReorderedAction struct {
+	Type ActionType `json:"type"`
+	// Every chat URI in authoritative catalog order.
+	Chats []URI `json:"chats"`
 }
 
 // The default chat input-routing hint for this session changed.
@@ -642,6 +657,19 @@ type ChatActivityChangedAction struct {
 	Type ActionType `json:"type"`
 	// Human-readable description of current activity; omit or set `undefined` to clear
 	Activity *string `json:"activity,omitempty"`
+}
+
+// Whether this chat is structurally eligible to be the source of `moveChat`
+// changed.
+//
+// The host is authoritative and MUST also update the owning session's chat
+// catalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.
+// A chat referenced by its owning session's `defaultChat` MUST always carry
+// `movable: false`.
+type ChatMovableChangedAction struct {
+	Type ActionType `json:"type"`
+	// Whether this chat is structurally eligible to be moved.
+	Movable bool `json:"movable"`
 }
 
 // The {@link Changeset | catalogue of changesets} the agent host advertises
@@ -1724,6 +1752,7 @@ func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
 func (*SessionChatRemovedAction) isStateAction()                  {}
 func (*SessionChatUpdatedAction) isStateAction()                  {}
+func (*SessionChatsReorderedAction) isStateAction()               {}
 func (*SessionDefaultChatChangedAction) isStateAction()           {}
 func (*ChatTurnStartedAction) isStateAction()                     {}
 func (*ChatDeltaAction) isStateAction()                           {}
@@ -1742,6 +1771,7 @@ func (*ChatTurnCancelledAction) isStateAction()                   {}
 func (*ChatErrorAction) isStateAction()                           {}
 func (*ChatTurnResumeAction) isStateAction()                      {}
 func (*ChatActivityChangedAction) isStateAction()                 {}
+func (*ChatMovableChangedAction) isStateAction()                  {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
@@ -1878,6 +1908,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "session/chatsReordered":
+		var value SessionChatsReorderedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "session/defaultChatChanged":
 		var value SessionDefaultChatChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -1982,6 +2018,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/activityChanged":
 		var value ChatActivityChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/movableChanged":
+		var value ChatMovableChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

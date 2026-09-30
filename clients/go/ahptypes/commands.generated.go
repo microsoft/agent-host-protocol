@@ -33,6 +33,16 @@ const (
 	ChatSourceKindSideChat ChatSourceKind = "sideChat"
 )
 
+// Destination kind for an atomic chat move.
+type ChatMoveDestinationKind string
+
+const (
+	// Move the source chat subtree into an existing session.
+	ChatMoveDestinationKindSession ChatMoveDestinationKind = "session"
+	// Move the source chat subtree into a newly allocated session.
+	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
+)
+
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -511,6 +521,71 @@ type DisposeChatParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Moves a chat within or into an existing session.
+type ChatMoveToSessionDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+	// Destination session URI.
+	Session URI `json:"session"`
+	// Chat after which to place the requested chat.
+	//
+	// The anchor MUST be a different chat in the destination session. When
+	// omitted, the requested chat is placed at the beginning of the catalog.
+	After *URI `json:"after,omitempty"`
+}
+
+// Moves a top-level chat subtree into a newly allocated session.
+type ChatMoveToNewSessionDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+}
+
+// Atomically moves a host-authorized chat within or between sessions.
+//
+// The source is the chat named by `channel`. When a `session` destination is
+// the source's current session, only the requested entry is repositioned in
+// that session's public chat catalog. When it names another session, the host
+// transfers the requested chat and its complete host-managed descendant
+// hierarchy. The optional `after` anchor positions the requested chat in the
+// destination catalog; when omitted, the requested chat is placed first.
+//
+// A `newSession` destination allocates a session, transfers the complete
+// hierarchy, and makes the requested chat that session's non-movable default
+// chat. The host owns descendant relationships; AHP does not expose them as
+// chat state.
+//
+// Clients MUST only request a move when the source chat advertises
+// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
+// eligibility, not a guarantee that request-specific validation will succeed.
+//
+// The host MUST validate the complete operation before committing it and MAY
+// reject unsupported destinations or transient source conditions. At minimum,
+// the source MUST exist and advertise `movable: true`; the destination and
+// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+// Rejection leaves ownership, catalog order, chat state, and root summaries
+// unchanged.
+//
+// On success every moved chat keeps its URI, state, and immutable
+// `ChatOrigin`. The host commits ownership and catalog order before publishing
+// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+// root summary updates as applicable. Session and root snapshots are the
+// durable recovery path after reconnect or an uncertain response.
+type MoveChatParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Atomic move destination.
+	Destination ChatMoveDestination `json:"destination"`
+}
+
+// Result of an atomic chat move.
+type MoveChatResult struct {
+	// Authoritative owning session URI after the move.
+	Session URI `json:"session"`
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1370,6 +1445,62 @@ func (v SideChatSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
+func (v *ChatMoveToSessionDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToSessionDestination", "kind")
+	}
+	if disc != "session" {
+		return unknownDiscriminatorError("ChatMoveToSessionDestination", "kind", disc)
+	}
+	type wire ChatMoveToSessionDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToSessionDestination(raw)
+	v.Kind = ChatMoveDestinationKindSession
+	return nil
+}
+
+func (v ChatMoveToSessionDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToSessionDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindSession
+	return json.Marshal(raw)
+}
+
+func (v *ChatMoveToNewSessionDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToNewSessionDestination", "kind")
+	}
+	if disc != "newSession" {
+		return unknownDiscriminatorError("ChatMoveToNewSessionDestination", "kind", disc)
+	}
+	type wire ChatMoveToNewSessionDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToNewSessionDestination(raw)
+	v.Kind = ChatMoveDestinationKindNewSession
+	return nil
+}
+
+func (v ChatMoveToNewSessionDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToNewSessionDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindNewSession
+	return json.Marshal(raw)
+}
+
 // ─── ChatSource Union ─────────────────────────────────────────────────
 
 // ChatSource identifies how a new chat uses a source chat.
@@ -1421,6 +1552,68 @@ func (u *ChatSource) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u ChatSource) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*ChatSourceUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// ─── ChatMoveDestination Union ────────────────────────────────────────
+
+// Destination of an atomic chat move.
+type ChatMoveDestination struct {
+	Value isChatMoveDestination
+}
+
+// isChatMoveDestination is the marker interface implemented by every
+// concrete variant of ChatMoveDestination.
+type isChatMoveDestination interface{ isChatMoveDestination() }
+
+func (*ChatMoveToSessionDestination) isChatMoveDestination()    {}
+func (*ChatMoveToNewSessionDestination) isChatMoveDestination() {}
+
+// ChatMoveDestinationUnknown carries an unrecognized ChatMoveDestination variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatMoveDestinationUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ChatMoveDestinationUnknown) isChatMoveDestination() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *ChatMoveDestination) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "session":
+		var value ChatMoveToSessionDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "newSession":
+		var value ChatMoveToNewSessionDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ChatMoveDestinationUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatMoveDestinationUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

@@ -106,6 +106,9 @@ internal static class GeneratedActionMetadata
             case ChatIsArchivedChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatMovableChangedAction value:
+                actionType = value.Type;
+                return true;
             case ChatPendingMessageRemovedAction value:
                 actionType = value.Type;
                 return true;
@@ -206,6 +209,9 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case SessionChatRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case SessionChatsReorderedAction value:
                 actionType = value.Type;
                 return true;
             case SessionChatUpdatedAction value:

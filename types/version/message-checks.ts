@@ -57,6 +57,7 @@ type _ExpectedCommands =
   | 'createSession'
   | 'disposeSession'
   | 'createChat'
+  | 'moveChat'
   | 'disposeChat'
   | 'createTerminal'
   | 'disposeTerminal'

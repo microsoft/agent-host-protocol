@@ -559,6 +559,10 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatMovableChangedAction:
+		movable := a.Movable
+		state.Movable = &movable
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatChangesetsChangedAction:
 		if a.Changesets == nil {
 			state.Changesets = nil
@@ -872,6 +876,39 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.SessionChatsReorderedAction:
+		if len(a.Chats) != len(state.Chats) {
+			return ReduceOutcomeNoOp
+		}
+		unchanged := true
+		for i, resource := range a.Chats {
+			if state.Chats[i].Resource != resource {
+				unchanged = false
+				break
+			}
+		}
+		if unchanged {
+			return ReduceOutcomeNoOp
+		}
+		summaries := make(map[ahptypes.URI]ahptypes.ChatSummary, len(state.Chats))
+		for _, summary := range state.Chats {
+			summaries[summary.Resource] = summary
+		}
+		seen := make(map[ahptypes.URI]struct{}, len(a.Chats))
+		reordered := make([]ahptypes.ChatSummary, 0, len(a.Chats))
+		for _, resource := range a.Chats {
+			if _, duplicate := seen[resource]; duplicate {
+				return ReduceOutcomeNoOp
+			}
+			summary, ok := summaries[resource]
+			if !ok {
+				return ReduceOutcomeNoOp
+			}
+			seen[resource] = struct{}{}
+			reordered = append(reordered, summary)
+		}
+		state.Chats = reordered
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionDefaultChatChangedAction:
 		state.DefaultChat = a.DefaultChat
 		return ReduceOutcomeApplied

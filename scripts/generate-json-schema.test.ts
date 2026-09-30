@@ -383,6 +383,97 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+
+      it('constrains stable chat move destinations and results', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const destination = defs.ChatMoveDestination;
+        assert.ok(destination, 'ChatMoveDestination must be emitted as a command definition');
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'session',
+            session: 'ahp-session:/destination',
+            after: 'ahp-chat:/anchor',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'newSession',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'session',
+          }),
+          false,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'unknown',
+          }),
+          false,
+        );
+
+        assert.deepEqual(defs.MoveChatParams.required, ['channel', 'destination']);
+        assert.equal(
+          Object.hasOwn(defs.MoveChatParams.properties as object, 'requestId'),
+          false,
+        );
+        assert.deepEqual(defs.MoveChatResult.required, ['session']);
+        assert.deepEqual(
+          Object.keys(defs.MoveChatResult.properties as object),
+          ['session'],
+        );
+      });
+
+      it('exposes optional host-authoritative chat movability and its update action', () => {
+        if (file !== 'state.schema.json' && file !== 'actions.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['ChatState', 'ChatSummary']) {
+          const definition = defs[name];
+          assert.ok(definition, `${name} must be emitted`);
+          const properties = definition.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.movable.type, 'boolean');
+          assert.equal(
+            (definition.required as string[]).includes('movable'),
+            false,
+            `${name}.movable must remain optional so absence means false`,
+          );
+        }
+
+        if (file === 'actions.schema.json') {
+          const action = defs.ChatMovableChangedAction;
+          assert.ok(action, 'ChatMovableChangedAction must be emitted');
+          assert.deepEqual(action.required, ['type', 'movable']);
+          const properties = action.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.type.const, 'chat/movableChanged');
+          assert.equal(properties.movable.type, 'boolean');
+        }
+      });
+
+      it('carries the complete authoritative session chat order', () => {
+        if (file !== 'actions.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const action = defs.SessionChatsReorderedAction;
+        assert.ok(action, 'SessionChatsReorderedAction must be emitted');
+        assert.deepEqual(action.required, ['type', 'chats']);
+        const properties = action.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.chats.type, 'array');
+        assert.deepEqual(properties.chats.items, { $ref: '#/$defs/URI' });
+        assert.equal(Object.hasOwn(properties, 'destination'), false);
+      });
+
     });
   }
 });

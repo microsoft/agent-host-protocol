@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Preserve unknown future chat move destinations when decoding and re-encoding with the .NET client.",
+  "targets": ["dotnet"]
+}

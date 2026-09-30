@@ -694,7 +694,8 @@ type AgentCapabilities struct {
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
 	// source-based creation; set {@link MultipleChatsCapability.fork} or
-	// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+	// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+	// creation mode.
 	MultipleChats *MultipleChatsCapability `json:"multipleChats,omitempty"`
 	// The session's agent can be granted tool access to more than one working
 	// directory. The directories are treated as equal peers except where the
@@ -917,11 +918,13 @@ type SessionState struct {
 	// reconnecting in time, or reconnect without resubscribing to the session.
 	ActiveClients []SessionActiveClient `json:"activeClients"`
 	// Catalog of chats in this session.
+	//
+	// Order is host-authoritative and durable. Catalog order is independent of
+	// `defaultChat`.
 	Chats []ChatSummary `json:"chats"`
 	// The chat that receives input when the user addresses the session without
-	// selecting a specific chat. This is a UI routing hint, not a hierarchy
-	// marker — chats remain equal peers at the protocol level. Hosts MAY change
-	// this over the session's lifetime.
+	// selecting a specific chat. This routing designation does not determine the
+	// chat's catalog position. Hosts MAY change it over the session's lifetime.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
 	// Session configuration schema and current values
 	Config *SessionConfigState `json:"config,omitempty"`
@@ -1193,18 +1196,13 @@ type SessionSummary struct {
 	// SHOULD keep the payload small because summaries appear in session lists
 	// and session notifications.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Lightweight ordered chat catalog for session-list presentation.
-	//
-	// This intentionally omits volatile chat state such as status and activity,
-	// while retaining interactivity so generic clients can hide chats or present
-	// them as read-only without subscribing to the session channel.
+	// Lightweight host-authoritative ordered chat catalog.
 	Chats []SessionChatSummary `json:"chats,omitempty"`
-	// Chat that receives input when no specific chat is selected.
+	// Chat that receives input when none is selected, independent of catalog position.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
 }
 
-// Lightweight chat information suitable for listing a session without
-// subscribing to its session channel.
+// Lightweight chat information in a session catalog.
 type SessionChatSummary struct {
 	// Canonical chat URI
 	Resource URI `json:"resource"`
@@ -1218,6 +1216,13 @@ type SessionChatSummary struct {
 	// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
 	// backward compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	// Whether this chat has been archived independently of its owning session
+	// (see `chat/isArchivedChanged`).
+	//
+	// Generic clients use this to group or filter archived chats in session
+	// lists without subscribing to the session channel. Absence means the
+	// chat is not archived.
+	Archived *bool `json:"archived,omitempty"`
 }
 
 // Aggregate counts describing the file changes associated with a session or
@@ -1262,6 +1267,13 @@ type ChatState struct {
 	Changes *ChangesSummary `json:"changes,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Whether this chat is eligible to be the source of `moveChat`, including
+	// same-session ordering.
+	//
+	// The host is authoritative. Absence means `false`. A `true` value does not
+	// guarantee that a particular request will succeed. A chat referenced by its
+	// owning session's `defaultChat` MUST NOT be movable.
+	Movable *bool `json:"movable,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1340,6 +1352,11 @@ type ChatSummary struct {
 	Changes *ChangesSummary `json:"changes,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Whether this chat is structurally eligible to be the source of
+	// `moveChat`. Absence means `false`.
+	//
+	// See {@link ChatState.movable} for the full semantics.
+	Movable *bool `json:"movable,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.

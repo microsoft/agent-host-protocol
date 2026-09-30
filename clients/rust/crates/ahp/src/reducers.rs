@@ -756,6 +756,30 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             state.default_chat = a.default_chat.clone();
             ReduceOutcome::Applied
         }
+        StateAction::SessionChatsReordered(a) => {
+            let unique: std::collections::HashSet<&str> =
+                a.chats.iter().map(String::as_str).collect();
+            if a.chats.len() != state.chats.len() || unique.len() != state.chats.len() {
+                return ReduceOutcome::NoOp;
+            }
+            if a.chats
+                .iter()
+                .zip(&state.chats)
+                .all(|(resource, summary)| resource == &summary.resource)
+            {
+                return ReduceOutcome::NoOp;
+            }
+            let mut reordered = Vec::with_capacity(a.chats.len());
+            for resource in &a.chats {
+                let Some(summary) = state.chats.iter().find(|chat| &chat.resource == resource)
+                else {
+                    return ReduceOutcome::NoOp;
+                };
+                reordered.push(summary.clone());
+            }
+            state.chats = reordered;
+            ReduceOutcome::Applied
+        }
         StateAction::SessionTitleChanged(a) => {
             state.title = a.title.clone();
             ReduceOutcome::Applied
@@ -1120,6 +1144,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatMovableChanged(a) => {
+            state.movable = Some(a.movable);
             ReduceOutcome::Applied
         }
         StateAction::ChatChangesetsChanged(a) => {
@@ -2227,6 +2255,7 @@ mod tests {
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             changes: None,
             origin: None,
+            movable: None,
             interactivity: None,
             working_directories: None,
             changesets: None,
@@ -2385,6 +2414,7 @@ mod tests {
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             changes: None,
             origin: None,
+            movable: None,
             interactivity: None,
             working_directories: None,
         };

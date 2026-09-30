@@ -182,6 +182,16 @@ the host also snapshots that exact selected text (which MUST be non-empty) into
 the created chat's `origin`; `responsePartId` there is advisory provenance, not
 a range.
 
+`origin` is immutable creation provenance. `moveChat` may change a top-level
+chat hierarchy's owning session without rewriting origin; any descendant
+hierarchy used for the move is owned internally by the host and is not exposed
+as chat state. See [Moving chats](/specification/chat-channel#moving-chats).
+
+`SessionState.chats` is a durable, host-authoritative order, not just a set.
+`moveChat` can reposition a movable chat within its current session without
+changing ownership, hierarchy, or any chat URI. `defaultChat` is not pinned to
+any catalog position. See [Moving chats](/specification/chat-channel#moving-chats).
+
 The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
 
 ## Turns

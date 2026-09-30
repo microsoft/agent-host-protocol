@@ -1644,7 +1644,8 @@ pub struct AgentCapabilities {
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
     /// source-based creation; set {@link MultipleChatsCapability.fork} or
-    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+    /// creation mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_chats: Option<MultipleChatsCapability>,
     /// The session's agent can be granted tool access to more than one working
@@ -1902,6 +1903,14 @@ pub struct ChatState {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
+    /// Whether this chat is eligible to be the source of `moveChat`, including
+    /// same-session ordering.
+    ///
+    /// The host is authoritative. Absence means `false`. A `true` value does not
+    /// guarantee that a particular request will succeed. A chat referenced by its
+    /// owning session's `defaultChat` MUST NOT be movable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movable: Option<bool>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1994,6 +2003,12 @@ pub struct ChatSummary {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movable: Option<bool>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -2089,11 +2104,13 @@ pub struct SessionState {
     /// reconnecting in time, or reconnect without resubscribing to the session.
     pub active_clients: Vec<SessionActiveClient>,
     /// Catalog of chats in this session.
+    ///
+    /// Order is host-authoritative and durable. Catalog order is independent of
+    /// `defaultChat`.
     pub chats: Vec<ChatSummary>,
     /// The chat that receives input when the user addresses the session without
-    /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker — chats remain equal peers at the protocol level. Hosts MAY change
-    /// this over the session's lifetime.
+    /// selecting a specific chat. This routing designation does not determine the
+    /// chat's catalog position. Hosts MAY change it over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
     /// Session configuration schema and current values
@@ -2425,20 +2442,15 @@ pub struct SessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.
+    /// Lightweight host-authoritative ordered chat catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chats: Option<Vec<SessionChatSummary>>,
-    /// Chat that receives input when no specific chat is selected.
+    /// Chat that receives input when none is selected, independent of catalog position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
 }
 
-/// Lightweight chat information suitable for listing a session without
-/// subscribing to its session channel.
+/// Lightweight chat information in a session catalog.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionChatSummary {
@@ -2456,6 +2468,14 @@ pub struct SessionChatSummary {
     /// backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Whether this chat has been archived independently of its owning session
+    /// (see `chat/isArchivedChanged`).
+    ///
+    /// Generic clients use this to group or filter archived chats in session
+    /// lists without subscribing to the session channel. Absence means the
+    /// chat is not archived.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived: Option<bool>,
 }
 
 /// Aggregate counts describing the file changes associated with a session or

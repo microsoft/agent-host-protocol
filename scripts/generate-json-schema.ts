@@ -602,6 +602,20 @@ function generateCommandsSchema(project: Project): JsonSchema {
     schema.$defs![name] = interfaceToSchema(iface, project);
   }
 
+  // Add command type aliases (e.g. ChatSource and ChatMoveDestination).
+  for (const commandSf of findProtocolSourceFiles(project, 'commands.ts')) {
+    for (const ta of commandSf.getTypeAliases()) {
+      const name = ta.getName();
+      const typeText = ta.getTypeNode()?.getText() || '';
+      schema.$defs![name] = typeTextToSchema(typeText, project);
+      const rawDesc = ta.getJsDocs()[0]?.getDescription();
+      const desc = rawDesc ? normalizeDescription(rawDesc) : '';
+      if (desc) {
+        schema.$defs![name].description = desc;
+      }
+    }
+  }
+
   // Add referenced types from state.ts and actions.ts
   for (const file of ['state.ts', 'actions.ts']) {
     const ifaces = collectInterfacesFromFile(project, file);

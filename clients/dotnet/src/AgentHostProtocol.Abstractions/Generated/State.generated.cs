@@ -1907,7 +1907,8 @@ public sealed record AgentCapabilities
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
     /// source-based creation; set {@link MultipleChatsCapability.fork} or
-    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.</summary>
+    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+    /// creation mode.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleChatsCapability? MultipleChats { get; init; }
 
@@ -2185,6 +2186,13 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
 
+    /// <summary>Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Movable { get; set; }
+
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -2237,6 +2245,15 @@ public sealed class ChatState
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
+
+    /// <summary>Whether this chat is eligible to be the source of `moveChat`, including
+    /// same-session ordering.
+    ///
+    /// The host is authoritative. Absence means `false`. A `true` value does not
+    /// guarantee that a particular request will succeed. A chat referenced by its
+    /// owning session's `defaultChat` MUST NOT be movable.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Movable { get; set; }
 
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
@@ -2649,13 +2666,15 @@ public sealed class SessionState
     /// reconnecting in time, or reconnect without resubscribing to the session.</summary>
     public required List<SessionActiveClient> ActiveClients { get; set; }
 
-    /// <summary>Catalog of chats in this session.</summary>
+    /// <summary>Catalog of chats in this session.
+    ///
+    /// Order is host-authoritative and durable. Catalog order is independent of
+    /// `defaultChat`.</summary>
     public required List<ChatSummary> Chats { get; set; }
 
     /// <summary>The chat that receives input when the user addresses the session without
-    /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker — chats remain equal peers at the protocol level. Hosts MAY change
-    /// this over the session's lifetime.</summary>
+    /// selecting a specific chat. This routing designation does not determine the
+    /// chat's catalog position. Hosts MAY change it over the session's lifetime.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
@@ -2987,21 +3006,16 @@ public sealed class SessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    /// <summary>Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.</summary>
+    /// <summary>Lightweight host-authoritative ordered chat catalog.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SessionChatSummary>? Chats { get; set; }
 
-    /// <summary>Chat that receives input when no specific chat is selected.</summary>
+    /// <summary>Chat that receives input when none is selected, independent of catalog position.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 }
 
-/// <summary>Lightweight chat information suitable for listing a session without
-/// subscribing to its session channel.</summary>
+/// <summary>Lightweight chat information in a session catalog.</summary>
 public sealed record SessionChatSummary
 {
     /// <summary>Canonical chat URI</summary>
@@ -3021,6 +3035,15 @@ public sealed record SessionChatSummary
     /// backward compatibility.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
+
+    /// <summary>Whether this chat has been archived independently of its owning session
+    /// (see `chat/isArchivedChanged`).
+    ///
+    /// Generic clients use this to group or filter archived chats in session
+    /// lists without subscribing to the session channel. Absence means the
+    /// chat is not archived.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Archived { get; init; }
 }
 
 /// <summary>Aggregate counts describing the file changes associated with a session or
