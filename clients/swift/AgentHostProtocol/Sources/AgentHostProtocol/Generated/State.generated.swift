@@ -1643,6 +1643,10 @@ public struct ChatState: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -1708,6 +1712,7 @@ public struct ChatState: Codable, Sendable {
         case status
         case activity
         case modifiedAt
+        case changes
         case origin
         case interactivity
         case workingDirectories
@@ -1727,6 +1732,7 @@ public struct ChatState: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil,
@@ -1744,6 +1750,7 @@ public struct ChatState: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
@@ -1769,6 +1776,10 @@ public struct ChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -1787,6 +1798,7 @@ public struct ChatSummary: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil
@@ -1796,6 +1808,7 @@ public struct ChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories

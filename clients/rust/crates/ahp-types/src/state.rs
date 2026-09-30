@@ -1894,6 +1894,11 @@ pub struct ChatState {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
@@ -1981,6 +1986,11 @@ pub struct ChatSummary {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
@@ -2354,7 +2364,8 @@ pub struct SessionToolAuthenticationRequest {
 ///   to a subset via {@link ChatSummary.workingDirectories}; aggregating these
 ///   up is meaningless and SHOULD NOT be attempted.
 /// - `changes`: optional roll-up across all chats. Producers MAY sum the
-///   per-chat changeset stats or report the most expensive chat's stats —
+///   per-chat {@link ChatSummary.changes | changes summaries} or report the
+///   most expensive chat's stats —
 ///   whichever is cheaper for the host to compute.
 ///
 /// Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -2447,7 +2458,8 @@ pub struct SessionChatSummary {
     pub interactivity: Option<ChatInteractivity>,
 }
 
-/// Aggregate counts describing the file changes associated with a session.
+/// Aggregate counts describing the file changes associated with a session or
+/// chat.
 ///
 /// All fields are optional so servers can populate only the metrics they
 /// cheaply have available.

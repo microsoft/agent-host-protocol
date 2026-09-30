@@ -588,6 +588,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 status = c.status ?: prior.status,
                 activity = c.activity ?: prior.activity,
                 modifiedAt = c.modifiedAt ?: prior.modifiedAt,
+                changes = c.changes ?: prior.changes,
                 origin = c.origin ?: prior.origin,
                 workingDirectories = c.workingDirectories ?: prior.workingDirectories,
             )
