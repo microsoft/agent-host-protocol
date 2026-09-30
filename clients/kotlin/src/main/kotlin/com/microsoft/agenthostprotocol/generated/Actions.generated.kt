@@ -235,13 +235,9 @@ data class SessionChatUpdatedAction(
 data class SessionChatsReorderedAction(
     val type: ActionType,
     /**
-     * The complete moved unit, in its new contiguous relative order.
+     * Every chat URI in authoritative catalog order.
      */
-    val chats: List<String>,
-    /**
-     * The relative placement destination that produced this order.
-     */
-    val destination: ChatReorderDestination
+    val chats: List<String>
 )
 
 @Serializable

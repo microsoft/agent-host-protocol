@@ -1897,14 +1897,12 @@ pub struct ChatState {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
-    /// Whether this chat is structurally eligible to be the source of
-    /// `moveChat`.
+    /// Whether this chat is eligible to be the source of `moveChat`, including
+    /// same-session ordering.
     ///
     /// The host is authoritative. Absence means `false`. A `true` value does not
-    /// guarantee that a particular request will succeed because request-specific
-    /// validation, such as active turns or destination compatibility, still
-    /// applies. A chat referenced by its owning session's `defaultChat` MUST NOT
-    /// be movable.
+    /// guarantee that a particular request will succeed. A chat referenced by its
+    /// owning session's `defaultChat` MUST NOT be movable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub movable: Option<bool>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -2101,18 +2099,12 @@ pub struct SessionState {
     pub active_clients: Vec<SessionActiveClient>,
     /// Catalog of chats in this session.
     ///
-    /// Order is host-authoritative and durable: it persists across host
-    /// restarts and reconnects like any other session state, and every
-    /// subscriber converges on the identical order via `session/chatAdded`
-    /// (append), `session/chatRemoved`, and `session/chatsReordered`.
-    /// `reorderChat` repositions a top-level chat and its complete
-    /// host-managed descendant subtree as one contiguous unit, without
-    /// exposing the descendant relationship itself.
+    /// Order is host-authoritative and durable. Catalog order is independent of
+    /// `defaultChat`.
     pub chats: Vec<ChatSummary>,
     /// The chat that receives input when the user addresses the session without
-    /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker, and every chat remains directly addressable. Hosts MAY change this
-    /// over the session's lifetime.
+    /// selecting a specific chat. This routing designation does not determine the
+    /// chat's catalog position. Hosts MAY change it over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
     /// Session configuration schema and current values
@@ -2444,20 +2436,15 @@ pub struct SessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.
+    /// Lightweight host-authoritative ordered chat catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chats: Option<Vec<SessionChatSummary>>,
-    /// Chat that receives input when no specific chat is selected.
+    /// Chat that receives input when none is selected, independent of catalog position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
 }
 
-/// Lightweight chat information suitable for listing a session without
-/// subscribing to its session channel.
+/// Lightweight chat information in a session catalog.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionChatSummary {

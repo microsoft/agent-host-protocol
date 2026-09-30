@@ -644,11 +644,6 @@ function generateNotificationsSchema(project: Project): JsonSchema {
     schema.$defs![name] = interfaceToSchema(iface, project);
   }
 
-  const movedChatResource = findInterface(project, 'MovedChatResource');
-  if (movedChatResource) {
-    schema.$defs!['MovedChatResource'] = interfaceToSchema(movedChatResource, project);
-  }
-
   // Add ProtocolNotification discriminated union
   const notifNames = Array.from(notifIfaces.keys());
   schema.$defs!['ProtocolNotification'] = {

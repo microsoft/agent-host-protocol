@@ -1,5 +1,5 @@
 {
-  "description": "session/chatsReordered moves a chat immediately before an anchor",
+  "description": "session/chatsReordered applies the complete authoritative order with a chat at the start",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -34,8 +34,7 @@
   "actions": [
     {
       "type": "session/chatsReordered",
-      "chats": ["ahp-chat:/c3"],
-      "destination": { "kind": "before", "anchor": "ahp-chat:/c1" }
+      "chats": ["ahp-chat:/c3", "ahp-chat:/c1", "ahp-chat:/c2"]
     }
   ],
   "expected": {

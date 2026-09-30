@@ -1213,14 +1213,12 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
 
-    /// <summary>Whether this chat is structurally eligible to be the source of
-    /// `moveChat`.
+    /// <summary>Whether this chat is eligible to be the source of `moveChat`, including
+    /// same-session ordering.
     ///
     /// The host is authoritative. Absence means `false`. A `true` value does not
-    /// guarantee that a particular request will succeed because request-specific
-    /// validation, such as active turns or destination compatibility, still
-    /// applies. A chat referenced by its owning session's `defaultChat` MUST NOT
-    /// be movable.</summary>
+    /// guarantee that a particular request will succeed. A chat referenced by its
+    /// owning session's `defaultChat` MUST NOT be movable.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Movable { get; set; }
 
@@ -1637,19 +1635,13 @@ public sealed class SessionState
 
     /// <summary>Catalog of chats in this session.
     ///
-    /// Order is host-authoritative and durable: it persists across host
-    /// restarts and reconnects like any other session state, and every
-    /// subscriber converges on the identical order via `session/chatAdded`
-    /// (append), `session/chatRemoved`, and `session/chatsReordered`.
-    /// `reorderChat` repositions a top-level chat and its complete
-    /// host-managed descendant subtree as one contiguous unit, without
-    /// exposing the descendant relationship itself.</summary>
+    /// Order is host-authoritative and durable. Catalog order is independent of
+    /// `defaultChat`.</summary>
     public required List<ChatSummary> Chats { get; set; }
 
     /// <summary>The chat that receives input when the user addresses the session without
-    /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker, and every chat remains directly addressable. Hosts MAY change this
-    /// over the session's lifetime.</summary>
+    /// selecting a specific chat. This routing designation does not determine the
+    /// chat's catalog position. Hosts MAY change it over the session's lifetime.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
@@ -1981,21 +1973,16 @@ public sealed class SessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    /// <summary>Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.</summary>
+    /// <summary>Lightweight host-authoritative ordered chat catalog.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SessionChatSummary>? Chats { get; set; }
 
-    /// <summary>Chat that receives input when no specific chat is selected.</summary>
+    /// <summary>Chat that receives input when none is selected, independent of catalog position.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 }
 
-/// <summary>Lightweight chat information suitable for listing a session without
-/// subscribing to its session channel.</summary>
+/// <summary>Lightweight chat information in a session catalog.</summary>
 public sealed record SessionChatSummary
 {
     /// <summary>Canonical chat URI</summary>

@@ -22,9 +22,6 @@ import {
 } from './state.js';
 import type { SessionAction } from '../action-origin.generated.js';
 import { softAssertNever } from '../common/reducer-helpers.js';
-import type { ChatReorderDestination } from '../channels-chat/commands.js';
-import { ChatReorderDestinationKind } from '../channels-chat/commands.js';
-import type { ChatSummary } from '../channels-chat/state.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -132,35 +129,6 @@ function applyCustomizationEnablement(customization: Customization | ChildCustom
   }
 }
 
-/**
- * Resolves a {@link ChatReorderDestination} to a splice index within
- * `remaining` (the catalog with the moved chats already extracted).
- *
- * `before`/`after` resolve against the anchor's *current* position in
- * `remaining`, so replay converges even when other catalog changes
- * interleave. An anchor absent from `remaining` — including every
- * unrecognized future `destination.kind` this reducer does not know about —
- * falls back to `end`, so the moved chats are never dropped from the
- * catalog.
- */
-function resolveReorderInsertionIndex(destination: ChatReorderDestination, remaining: readonly ChatSummary[]): number {
-  switch (destination.kind) {
-    case ChatReorderDestinationKind.Start:
-      return 0;
-    case ChatReorderDestinationKind.Before: {
-      const idx = remaining.findIndex(c => c.resource === destination.anchor);
-      return idx < 0 ? remaining.length : idx;
-    }
-    case ChatReorderDestinationKind.After: {
-      const idx = remaining.findIndex(c => c.resource === destination.anchor);
-      return idx < 0 ? remaining.length : idx + 1;
-    }
-    case ChatReorderDestinationKind.End:
-    default:
-      return remaining.length;
-  }
-}
-
 // ─── Session Reducer ─────────────────────────────────────────────────────────
 
 /**
@@ -226,18 +194,22 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
     }
 
     case ActionType.SessionChatsReordered: {
-      const moved = new Set(action.chats);
       const list = state.chats;
-      const movedEntries = action.chats
-        .map(resource => list.find(c => c.resource === resource))
-        .filter((c): c is (typeof list)[number] => c !== undefined);
-      if (movedEntries.length === 0) {
+      if (action.chats.length !== list.length || new Set(action.chats).size !== list.length) {
         return state;
       }
-      const remaining = list.filter(c => !moved.has(c.resource));
-      const insertAt = resolveReorderInsertionIndex(action.destination, remaining);
-      const reordered = remaining.slice();
-      reordered.splice(insertAt, 0, ...movedEntries);
+      const summaries = new Map(list.map(summary => [summary.resource, summary]));
+      const reordered = [];
+      for (const resource of action.chats) {
+        const summary = summaries.get(resource);
+        if (!summary) {
+          return state;
+        }
+        reordered.push(summary);
+      }
+      if (reordered.every((summary, index) => summary === list[index])) {
+        return state;
+      }
       return { ...state, chats: reordered };
     }
 

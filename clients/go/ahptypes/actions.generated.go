@@ -220,29 +220,17 @@ type SessionChatUpdatedAction struct {
 	Changes PartialChatSummary `json:"changes"`
 }
 
-// The owning session's chat catalog order changed following an atomic
-// `reorderChat` commit.
+// The owning session's authoritative chat catalog order changed.
 //
 // Host-emitted convergence signal; it never originates from a client
-// dispatch. `chats` is the complete moved unit — the repositioned top-level
-// chat plus every host-managed descendant, in their existing relative order
-// — and `destination` is the same relative placement that produced it.
-//
-// Reducers MUST extract every URI listed in `chats` from the current
-// catalog (preserving their relative order), then reinsert them
-// contiguously at the position `destination` names, resolving `before` /
-// `after` against each anchor's *current* catalog position so replay
-// converges even when other catalog changes interleave. An unresolvable
-// `anchor` (e.g. a future protocol version's `destination.kind` this client
-// does not recognise) falls back to `end`, so no chat is ever silently
-// dropped from the catalog. AHP does not expose which entries in `chats`
-// are descendants of the repositioned chat.
+// dispatch. `chats` is the complete resulting order and MUST contain every
+// chat currently in the session exactly once. Reducers replace the catalog
+// order while preserving each matching summary. Invalid or incomplete orders
+// are ignored.
 type SessionChatsReorderedAction struct {
 	Type ActionType `json:"type"`
-	// The complete moved unit, in its new contiguous relative order.
+	// Every chat URI in authoritative catalog order.
 	Chats []URI `json:"chats"`
-	// The relative placement destination that produced this order.
-	Destination ChatReorderDestination `json:"destination"`
 }
 
 // The default chat input-routing hint for this session changed.

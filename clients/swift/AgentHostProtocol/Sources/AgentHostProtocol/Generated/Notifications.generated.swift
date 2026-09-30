@@ -121,40 +121,6 @@ public struct ProgressParams: Codable, Sendable {
     }
 }
 
-public struct ChatMovedParams: Codable, Sendable {
-    /// Previous channel receiving this notification; names one `movedChats[].previousChat`.
-    public var channel: String
-    /// Owning session URI before the move.
-    public var previousSession: String
-    /// Requested root chat URI before the move.
-    public var previousChat: String
-    /// Authoritative owning session URI after the move.
-    public var session: String
-    /// Authoritative requested root chat URI after the move.
-    public var chat: String
-    /// Exhaustive ordered mapping for the complete moved subtree.
-    ///
-    /// Identical in every `chat/moved` notification for this move and in the
-    /// corresponding {@link MoveChatResult}.
-    public var movedChats: [MovedChatResource]
-
-    public init(
-        channel: String,
-        previousSession: String,
-        previousChat: String,
-        session: String,
-        chat: String,
-        movedChats: [MovedChatResource]
-    ) {
-        self.channel = channel
-        self.previousSession = previousSession
-        self.previousChat = previousChat
-        self.session = session
-        self.chat = chat
-        self.movedChats = movedChats
-    }
-}
-
 public struct AuthRequiredParams: Codable, Sendable {
     /// Channel URI this notification belongs to
     public var channel: String
@@ -272,13 +238,9 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// SHOULD keep the payload small because summaries appear in session lists
     /// and session notifications.
     public var meta: [String: AnyCodable]?
-    /// Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.
+    /// Lightweight host-authoritative ordered chat catalog.
     public var chats: [SessionChatSummary]?
-    /// Chat that receives input when no specific chat is selected.
+    /// Chat that receives input when none is selected, independent of catalog position.
     public var defaultChat: String?
 
     enum CodingKeys: String, CodingKey {

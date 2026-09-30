@@ -833,34 +833,6 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 }
 
-// resolveReorderInsertionIndex resolves a [ahptypes.ChatReorderDestination]
-// to an index into remaining (the catalog with every moved entry already
-// extracted). An unresolved before/after anchor falls back to the end,
-// mirroring the canonical TypeScript reducer.
-func resolveReorderInsertionIndex(destination ahptypes.ChatReorderDestination, remaining []ahptypes.ChatSummary) int {
-	switch d := destination.Value.(type) {
-	case *ahptypes.ChatReorderToStartDestination:
-		return 0
-	case *ahptypes.ChatReorderBeforeDestination:
-		for i := range remaining {
-			if remaining[i].Resource == d.Anchor {
-				return i
-			}
-		}
-		return len(remaining)
-	case *ahptypes.ChatReorderAfterDestination:
-		for i := range remaining {
-			if remaining[i].Resource == d.Anchor {
-				return i + 1
-			}
-		}
-		return len(remaining)
-	default:
-		// ChatReorderToEndDestination and any forward-compat unknown variant.
-		return len(remaining)
-	}
-}
-
 // ─── Session Reducer ───────────────────────────────────────────────────
 
 // ApplyActionToSession applies action to the [ahptypes.SessionState]
@@ -905,31 +877,36 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		}
 		return ReduceOutcomeNoOp
 	case *ahptypes.SessionChatsReorderedAction:
-		moved := make(map[ahptypes.URI]struct{}, len(a.Chats))
-		var movedEntries []ahptypes.ChatSummary
-		for _, resource := range a.Chats {
-			for i := range state.Chats {
-				if state.Chats[i].Resource == resource {
-					moved[resource] = struct{}{}
-					movedEntries = append(movedEntries, state.Chats[i])
-					break
-				}
-			}
-		}
-		if len(movedEntries) == 0 {
+		if len(a.Chats) != len(state.Chats) {
 			return ReduceOutcomeNoOp
 		}
-		remaining := make([]ahptypes.ChatSummary, 0, len(state.Chats))
-		for _, c := range state.Chats {
-			if _, ok := moved[c.Resource]; !ok {
-				remaining = append(remaining, c)
+		unchanged := true
+		for i, resource := range a.Chats {
+			if state.Chats[i].Resource != resource {
+				unchanged = false
+				break
 			}
 		}
-		insertAt := resolveReorderInsertionIndex(a.Destination, remaining)
-		reordered := make([]ahptypes.ChatSummary, 0, len(remaining)+len(movedEntries))
-		reordered = append(reordered, remaining[:insertAt]...)
-		reordered = append(reordered, movedEntries...)
-		reordered = append(reordered, remaining[insertAt:]...)
+		if unchanged {
+			return ReduceOutcomeNoOp
+		}
+		summaries := make(map[ahptypes.URI]ahptypes.ChatSummary, len(state.Chats))
+		for _, summary := range state.Chats {
+			summaries[summary.Resource] = summary
+		}
+		seen := make(map[ahptypes.URI]struct{}, len(a.Chats))
+		reordered := make([]ahptypes.ChatSummary, 0, len(a.Chats))
+		for _, resource := range a.Chats {
+			if _, duplicate := seen[resource]; duplicate {
+				return ReduceOutcomeNoOp
+			}
+			summary, ok := summaries[resource]
+			if !ok {
+				return ReduceOutcomeNoOp
+			}
+			seen[resource] = struct{}{}
+			reordered = append(reordered, summary)
+		}
 		state.Chats = reordered
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionDefaultChatChangedAction:

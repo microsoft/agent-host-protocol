@@ -139,11 +139,11 @@
               "items": {
                 "$ref": "#/$defs/SessionChatSummary"
               },
-              "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+              "description": "Lightweight host-authoritative ordered chat catalog."
             },
             "defaultChat": {
               "$ref": "#/$defs/URI",
-              "description": "Chat that receives input when no specific chat is selected."
+              "description": "Chat that receives input when none is selected, independent of catalog position."
             }
           },
           "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`, `createdAt`) never change and\nMUST be omitted by senders; receivers SHOULD ignore them if present."
@@ -184,47 +184,6 @@
         "channel",
         "progressToken",
         "progress"
-      ]
-    },
-    "ChatMovedParams": {
-      "type": "object",
-      "description": "Sent on each previous moved chat channel after an atomic `moveChat` commit.\n\nEvery notification for one move carries the same authoritative resources and\nexhaustive ordered `movedChats` mapping as {@link MoveChatResult}. The host\nemits them in `movedChats` order on each old channel whose ownership or URI\nchanged. The move is already atomically committed before the first\nnotification; ordering is only a deterministic delivery aid, not the\ntransaction boundary.\n\nA client receiving any one notification MUST apply the complete mapping\natomically, stop dispatching to replaced old URIs, subscribe to the\nauthoritative session and chat channels as needed, and reconcile from their\nsnapshots. Duplicate notifications for the same mapping are idempotent.\nDurable ownership and catalog truth remain in the affected sessions'\ncatalogs; this routing handoff is not replayed.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Previous channel receiving this notification; names one `movedChats[].previousChat`."
-        },
-        "previousSession": {
-          "$ref": "#/$defs/URI",
-          "description": "Owning session URI before the move."
-        },
-        "previousChat": {
-          "$ref": "#/$defs/URI",
-          "description": "Requested root chat URI before the move."
-        },
-        "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Authoritative owning session URI after the move."
-        },
-        "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Authoritative requested root chat URI after the move."
-        },
-        "movedChats": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/MovedChatResource"
-          },
-          "description": "Exhaustive ordered mapping for the complete moved subtree.\n\nIdentical in every `chat/moved` notification for this move and in the\ncorresponding {@link MoveChatResult}."
-        }
-      },
-      "required": [
-        "channel",
-        "previousSession",
-        "previousChat",
-        "session",
-        "chat",
-        "movedChats"
       ]
     },
     "OtlpExportLogsParams": {
@@ -284,24 +243,6 @@
         "payload"
       ]
     },
-    "MovedChatResource": {
-      "type": "object",
-      "description": "Authoritative URI mapping for one chat in a moved subtree.",
-      "properties": {
-        "previousChat": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI before the move."
-        },
-        "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Authoritative chat URI after the move."
-        }
-      },
-      "required": [
-        "previousChat",
-        "chat"
-      ]
-    },
     "ProtocolNotification": {
       "description": "Discriminated union of all protocol notifications.",
       "oneOf": [
@@ -319,9 +260,6 @@
         },
         {
           "$ref": "#/$defs/ProgressParams"
-        },
-        {
-          "$ref": "#/$defs/ChatMovedParams"
         },
         {
           "$ref": "#/$defs/OtlpExportLogsParams"
@@ -1130,11 +1068,11 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable: it persists across host\nrestarts and reconnects like any other session state, and every\nsubscriber converges on the identical order via `session/chatAdded`\n(append), `session/chatRemoved`, and `session/chatsReordered`.\n`reorderChat` repositions a top-level chat and its complete\nhost-managed descendant subtree as one contiguous unit, without\nexposing the descendant relationship itself."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable. Catalog order is independent of\n`defaultChat`."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker, and every chat remains directly addressable. Hosts MAY change this\nover the session's lifetime."
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This routing designation does not determine the\nchat's catalog position. Hosts MAY change it over the session's lifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -1437,11 +1375,11 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+          "description": "Lightweight host-authoritative ordered chat catalog."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "Chat that receives input when no specific chat is selected."
+          "description": "Chat that receives input when none is selected, independent of catalog position."
         }
       },
       "required": [
@@ -1455,7 +1393,7 @@
     },
     "SessionChatSummary": {
       "type": "object",
-      "description": "Lightweight chat information suitable for listing a session without\nsubscribing to its session channel.",
+      "description": "Lightweight chat information in a session catalog.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -2762,7 +2700,7 @@
         },
         "movable": {
           "type": "boolean",
-          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed because request-specific\nvalidation, such as active turns or destination compatibility, still\napplies. A chat referenced by its owning session's `defaultChat` MUST NOT\nbe movable."
+          "description": "Whether this chat is eligible to be the source of `moveChat`, including\nsame-session ordering.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed. A chat referenced by its\nowning session's `defaultChat` MUST NOT be movable."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",

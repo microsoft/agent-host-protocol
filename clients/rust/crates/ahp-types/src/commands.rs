@@ -108,56 +108,6 @@ impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
     }
 }
 
-/// Destination kind for a relative-placement chat reorder.
-///
-/// `before`/`after` name another top-level chat (`anchor`) rather than a
-/// numeric index, so the request always lands next to an identified chat
-/// regardless of concurrent catalog changes elsewhere in the session.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ChatReorderDestinationKind {
-    /// Move to the first position in the owning session's chat catalog.
-    Start,
-    /// Move to the last position in the owning session's chat catalog.
-    End,
-    /// Move immediately before `anchor`.
-    Before,
-    /// Move immediately after `anchor`.
-    After,
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    Unknown(String),
-}
-
-impl serde::Serialize for ChatReorderDestinationKind {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Start => serializer.serialize_str("start"),
-            Self::End => serializer.serialize_str("end"),
-            Self::Before => serializer.serialize_str("before"),
-            Self::After => serializer.serialize_str("after"),
-            Self::Unknown(value) => serializer.serialize_str(value),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ChatReorderDestinationKind {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            "start" => Self::Start,
-            "end" => Self::End,
-            "before" => Self::Before,
-            "after" => Self::After,
-            _ => Self::Unknown(raw),
-        })
-    }
-}
-
 /// Encoding of fetched content data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContentEncoding {
@@ -805,12 +755,18 @@ pub struct DisposeChatParams {
     pub meta: Option<JsonObject>,
 }
 
-/// Moves a top-level chat subtree into an existing session.
+/// Moves a chat within or into an existing session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMoveToSessionDestination {
     /// Destination session URI.
     pub session: Uri,
+    /// Chat after which to place the requested chat.
+    ///
+    /// The anchor MUST be a different chat in the destination session. When
+    /// omitted, the requested chat is placed at the beginning of the catalog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<Uri>,
 }
 
 /// Moves a top-level chat subtree into a newly allocated session.
@@ -818,36 +774,36 @@ pub struct ChatMoveToSessionDestination {
 #[serde(rename_all = "camelCase")]
 pub struct ChatMoveToNewSessionDestination {}
 
-/// Atomically moves a non-default top-level chat and its complete host-managed
-/// descendant hierarchy to another session.
+/// Atomically moves a host-authorized chat within or between sessions.
 ///
-/// The source is the chat named by `channel`. A `session` destination moves the
-/// complete subtree into an existing compatible session. A `newSession`
-/// destination allocates a compatible session, moves the complete subtree into
-/// it, and makes the requested chat that session's default chat. In both cases
-/// the requested chat remains top-level. The host owns the descendant
-/// relationship; AHP does not expose it as chat state.
+/// The source is the chat named by `channel`. When a `session` destination is
+/// the source's current session, only the requested entry is repositioned in
+/// that session's public chat catalog. When it names another session, the host
+/// transfers the requested chat and its complete host-managed descendant
+/// hierarchy. The optional `after` anchor positions the requested chat in the
+/// destination catalog; when omitted, the requested chat is placed first.
+///
+/// A `newSession` destination allocates a session, transfers the complete
+/// hierarchy, and makes the requested chat that session's non-movable default
+/// chat. The host owns descendant relationships; AHP does not expose them as
+/// chat state.
 ///
 /// Clients MUST only request a move when the source chat advertises
 /// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
 /// eligibility, not a guarantee that request-specific validation will succeed.
 ///
-/// The host MUST validate the complete operation before committing it. It MUST
-/// reject a source that does not advertise `movable: true`, a subtree containing
-/// an owning session's default chat, any active turn in the moved subtree, a destination
-/// equal to the source session, a destination on another host, or incompatible
-/// source and destination provider/agent runtimes. Rejection MUST leave every
-/// chat, session catalog, and root summary unchanged. Unknown resources use
-/// `NotFound`, active turns use `TurnInProgress`, and validation,
-/// compatibility, and idempotency-key mismatches use `InvalidParams`.
+/// The host MUST validate the complete operation before committing it and MAY
+/// reject unsupported destinations or transient source conditions. At minimum,
+/// the source MUST exist and advertise `movable: true`; the destination and
+/// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+/// Rejection leaves ownership, catalog order, chat state, and root summaries
+/// unchanged.
 ///
-/// On success the host commits ownership, its internal hierarchy, and every
-/// moved-chat URI replacement as one transaction before publishing
-/// synchronization messages. `ChatOrigin` remains unchanged, including
-/// historical chat URIs that no longer resolve after replacement. It then
-/// updates affected session catalogs with `session/chatRemoved` and
-/// `session/chatAdded`, and emits `chat/moved` on previous moved chat channels
-/// when subscribers must follow authoritative result resources.
+/// On success every moved chat keeps its URI, state, and immutable
+/// `ChatOrigin`. The host commits ownership and catalog order before publishing
+/// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+/// root summary updates as applicable. Session and root snapshots are the
+/// durable recovery path after reconnect or an uncertain response.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveChatParams {
@@ -859,143 +815,14 @@ pub struct MoveChatParams {
     pub meta: Option<JsonObject>,
     /// Atomic move destination.
     pub destination: ChatMoveDestination,
-    /// Durable client-generated idempotency key.
-    ///
-    /// Retrying the same logical request with the same `requestId`, source, and
-    /// destination MUST return the original {@link MoveChatResult}, including
-    /// after reconnect or an uncertain response. Reusing the key with a different
-    /// source or destination MUST be rejected with `InvalidParams`.
-    pub request_id: String,
 }
 
-/// Authoritative URI mapping for one chat in a moved subtree.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MovedChatResource {
-    /// Chat URI before the move.
-    pub previous_chat: Uri,
-    /// Authoritative chat URI after the move.
-    pub chat: Uri,
-}
-
-/// Authoritative resources before and after an atomic chat move.
-///
-/// `previousChat` and `chat` identify the requested root and equal the first
-/// entry of `movedChats`. They are retained as a convenience for callers that
-/// only need to follow the requested chat. `movedChats` is the exhaustive
-/// authoritative mapping for the complete moved subtree.
+/// Result of an atomic chat move.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveChatResult {
-    /// Owning session URI before the move.
-    pub previous_session: Uri,
-    /// Source chat URI before the move.
-    pub previous_chat: Uri,
     /// Authoritative owning session URI after the move.
     pub session: Uri,
-    /// Authoritative requested root chat URI after the move.
-    pub chat: Uri,
-    /// Exhaustive URI mapping for every chat in the moved subtree, including
-    /// entries whose URI was preserved.
-    ///
-    /// The first entry MUST map `previousChat` to `chat`. Remaining entries are
-    /// ordered in deterministic depth-first pre-order: every parent precedes its
-    /// descendants, and siblings retain their order from the source session's
-    /// `chats` catalog. Clients MUST apply the complete mapping atomically and
-    /// MUST NOT infer replacements for chats absent from this list.
-    pub moved_chats: Vec<MovedChatResource>,
-}
-
-/// Moves to the first position in the owning session's chat catalog.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatReorderToStartDestination {}
-
-/// Moves to the last position in the owning session's chat catalog.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatReorderToEndDestination {}
-
-/// Moves immediately before another top-level chat in the same session.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatReorderBeforeDestination {
-    /// Top-level chat URI the moved chat is placed immediately before.
-    pub anchor: Uri,
-}
-
-/// Moves immediately after another top-level chat in the same session.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatReorderAfterDestination {
-    /// Top-level chat URI the moved chat is placed immediately after.
-    pub anchor: Uri,
-}
-
-/// Atomically repositions a top-level chat and its complete host-managed
-/// descendant subtree within the owning session's chat catalog order
-/// (`SessionState.chats`). Unlike `moveChat`, ownership never changes: the
-/// source stays in the same session, and every chat keeps its existing URI.
-///
-/// The source is the chat named by `channel`. A chat is top-level when it has
-/// no `origin`, or an `origin.kind` of `"user"`; forked, side-chat, and
-/// tool-spawned chats are host-managed descendants and MUST NOT be named
-/// directly as `channel` or as a `before`/`after` `anchor`. The host owns the
-/// descendant relationship; AHP does not expose it as chat state, so the
-/// complete moved unit — the requested chat plus every host-managed
-/// descendant, in their existing relative order — is reported back verbatim
-/// in `ReorderChatResult.chats` and the corresponding
-/// `session/chatsReordered` action, without revealing which entries are
-/// descendants.
-///
-/// The host MUST validate the complete operation before committing it. It
-/// MUST reject an unknown source or `anchor` chat, a source or `anchor` that
-/// is not top-level, an `anchor` inside the source's own moved subtree, and
-/// idempotency-key mismatches. Rejection MUST leave the owning session's chat
-/// catalog order and root summary unchanged. Unknown resources use
-/// `NotFound`; every other validation failure, including idempotency-key
-/// mismatches, uses `InvalidParams`.
-///
-/// On success the host commits the new catalog order as one transaction
-/// before publishing synchronization messages, then dispatches
-/// `session/chatsReordered` on the owning session channel so every
-/// subscriber — including one that never dispatched the request — converges
-/// on the identical authoritative order, and updates
-/// `root/sessionSummaryChanged` so `SessionSummary.chats` mirrors the new
-/// order. The reordered order is durable: it persists across host restarts
-/// and reconnects like any other session state.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReorderChatParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Desired relative placement among the owning session's top-level chats.
-    pub destination: ChatReorderDestination,
-    /// Durable client-generated idempotency key.
-    ///
-    /// Retrying the same logical request with the same `requestId`, source
-    /// chat, and destination MUST return the original {@link ReorderChatResult},
-    /// including after reconnect or an uncertain response. Reusing the key with
-    /// a different source chat or destination MUST be rejected with
-    /// `InvalidParams`.
-    pub request_id: String,
-}
-
-/// Result of the `reorderChat` command.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReorderChatResult {
-    /// Owning session URI.
-    pub session: Uri,
-    /// The complete moved unit — `channel` plus every host-managed descendant —
-    /// in its new contiguous relative order within the owning session's chat
-    /// catalog. Identical to the `chats` field of the corresponding
-    /// `session/chatsReordered` action.
-    pub chats: Vec<Uri>,
 }
 
 /// Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1983,26 +1810,6 @@ pub enum ChatMoveDestination {
     Session(ChatMoveToSessionDestination),
     #[serde(rename = "newSession")]
     NewSession(ChatMoveToNewSessionDestination),
-    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
-    /// Reducers treat this as a no-op.
-    #[serde(untagged)]
-    Unknown(serde_json::Value),
-}
-
-// ─── ChatReorderDestination Union ─────────────────────────────────────
-
-/// Relative-placement destination of a chat reorder.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum ChatReorderDestination {
-    #[serde(rename = "start")]
-    Start(ChatReorderToStartDestination),
-    #[serde(rename = "end")]
-    End(ChatReorderToEndDestination),
-    #[serde(rename = "before")]
-    Before(ChatReorderBeforeDestination),
-    #[serde(rename = "after")]
-    After(ChatReorderAfterDestination),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

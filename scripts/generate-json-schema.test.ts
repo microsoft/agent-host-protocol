@@ -384,7 +384,7 @@ describe('generated JSON schemas', () => {
         );
       });
 
-      it('constrains chat move destinations and authoritative results', () => {
+      it('constrains stable chat move destinations and results', () => {
         if (file !== 'commands.schema.json') {
           return;
         }
@@ -396,6 +396,7 @@ describe('generated JSON schemas', () => {
           schemaAccepts(schema, destination, {
             kind: 'session',
             session: 'ahp-session:/destination',
+            after: 'ahp-chat:/anchor',
           }),
           true,
         );
@@ -418,17 +419,15 @@ describe('generated JSON schemas', () => {
           false,
         );
 
-        assert.deepEqual(
-          defs.MoveChatResult.required,
-          ['previousSession', 'previousChat', 'session', 'chat', 'movedChats'],
+        assert.deepEqual(defs.MoveChatParams.required, ['channel', 'destination']);
+        assert.equal(
+          Object.hasOwn(defs.MoveChatParams.properties as object, 'requestId'),
+          false,
         );
-        const resultProperties = defs.MoveChatResult.properties as Record<string, Record<string, unknown>>;
-        const movedChats = resultProperties.movedChats;
-        assert.equal(movedChats.type, 'array');
-        assert.deepEqual(movedChats.items, { $ref: '#/$defs/MovedChatResource' });
+        assert.deepEqual(defs.MoveChatResult.required, ['session']);
         assert.deepEqual(
-          defs.MovedChatResource.required,
-          ['previousChat', 'chat'],
+          Object.keys(defs.MoveChatResult.properties as object),
+          ['session'],
         );
       });
 
@@ -460,21 +459,19 @@ describe('generated JSON schemas', () => {
         }
       });
 
-      it('carries the exhaustive moved-chat mapping on routing notifications', () => {
-        if (file !== 'notifications.schema.json') {
+      it('carries the complete authoritative session chat order', () => {
+        if (file !== 'actions.schema.json') {
           return;
         }
 
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        const params = defs.ChatMovedParams;
-        assert.ok(params, 'ChatMovedParams must be emitted as a notification definition');
-        assert.deepEqual(
-          params.required,
-          ['channel', 'previousSession', 'previousChat', 'session', 'chat', 'movedChats'],
-        );
-        const properties = params.properties as Record<string, Record<string, unknown>>;
-        assert.equal(properties.movedChats.type, 'array');
-        assert.deepEqual(properties.movedChats.items, { $ref: '#/$defs/MovedChatResource' });
+        const action = defs.SessionChatsReorderedAction;
+        assert.ok(action, 'SessionChatsReorderedAction must be emitted');
+        assert.deepEqual(action.required, ['type', 'chats']);
+        const properties = action.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.chats.type, 'array');
+        assert.deepEqual(properties.chats.items, { $ref: '#/$defs/URI' });
+        assert.equal(Object.hasOwn(properties, 'destination'), false);
       });
 
     });

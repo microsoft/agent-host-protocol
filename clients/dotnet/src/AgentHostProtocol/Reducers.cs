@@ -1853,46 +1853,29 @@ public static class Reducers
 
     private static ReduceOutcome ApplySessionChatsReordered(SessionState state, SessionChatsReorderedAction a)
     {
-        HashSet<string> moved = new(a.Chats);
-        List<ChatSummary> movedEntries = new();
-        foreach (string resource in a.Chats)
+        if (a.Chats.Count != state.Chats.Count || new HashSet<string>(a.Chats).Count != state.Chats.Count)
         {
-            ChatSummary? found = state.Chats.Find(c => c.Resource == resource);
-            if (found is not null)
-            {
-                movedEntries.Add(found);
-            }
+            return ReduceOutcome.NoOp;
         }
-
-        if (movedEntries.Count == 0)
+        if (a.Chats.Select((resource, index) => resource == state.Chats[index].Resource).All(matches => matches))
         {
             return ReduceOutcome.NoOp;
         }
 
-        List<ChatSummary> remaining = state.Chats.FindAll(c => !moved.Contains(c.Resource));
-        int insertAt = a.Destination.Value switch
+        Dictionary<string, ChatSummary> summaries = state.Chats.ToDictionary(c => c.Resource);
+        List<ChatSummary> reordered = new(a.Chats.Count);
+        foreach (string resource in a.Chats)
         {
-            ChatReorderToStartDestination => 0,
-            ChatReorderBeforeDestination before => IndexOfAnchorOrEnd(remaining, before.Anchor),
-            ChatReorderAfterDestination after => IndexOfAnchorInclusive(remaining, after.Anchor),
-            _ => remaining.Count,
-        };
+            if (!summaries.TryGetValue(resource, out ChatSummary? summary))
+            {
+                return ReduceOutcome.NoOp;
+            }
 
-        remaining.InsertRange(insertAt, movedEntries);
-        state.Chats = remaining;
+            reordered.Add(summary);
+        }
+
+        state.Chats = reordered;
         return ReduceOutcome.Applied;
-    }
-
-    private static int IndexOfAnchorOrEnd(List<ChatSummary> remaining, string anchor)
-    {
-        int idx = remaining.FindIndex(c => c.Resource == anchor);
-        return idx < 0 ? remaining.Count : idx;
-    }
-
-    private static int IndexOfAnchorInclusive(List<ChatSummary> remaining, string anchor)
-    {
-        int idx = remaining.FindIndex(c => c.Resource == anchor);
-        return idx < 0 ? remaining.Count : idx + 1;
     }
 
     private static ReduceOutcome ApplyCustomizationUpdated(SessionState state, SessionCustomizationUpdatedAction a)

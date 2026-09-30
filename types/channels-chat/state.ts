@@ -65,14 +65,12 @@ export interface ChatState {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
-   * Whether this chat is structurally eligible to be the source of
-   * `moveChat`.
+   * Whether this chat is eligible to be the source of `moveChat`, including
+   * same-session ordering.
    *
    * The host is authoritative. Absence means `false`. A `true` value does not
-   * guarantee that a particular request will succeed because request-specific
-   * validation, such as active turns or destination compatibility, still
-   * applies. A chat referenced by its owning session's `defaultChat` MUST NOT
-   * be movable.
+   * guarantee that a particular request will succeed. A chat referenced by its
+   * owning session's `defaultChat` MUST NOT be movable.
    */
   movable?: boolean;
   /**

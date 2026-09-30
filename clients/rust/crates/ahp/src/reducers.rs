@@ -56,10 +56,9 @@ use ahp_types::actions::{
     ChatToolCallDeltaAction, ChatToolCallReadyAction, ChatToolCallResultConfirmedAction,
     ChatTurnStartedAction, StateAction,
 };
-use ahp_types::commands::ChatReorderDestination;
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChatSummary, ChildCustomization,
+    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
     ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
     InputRequestResponsePart, McpServerCustomization, McpServerStartingState, McpServerState,
     McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
@@ -758,44 +757,27 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             ReduceOutcome::Applied
         }
         StateAction::SessionChatsReordered(a) => {
-            let moved: std::collections::HashSet<&str> =
-                a.chats.iter().map(|resource| resource.as_str()).collect();
-            let moved_entries: Vec<ChatSummary> = a
-                .chats
-                .iter()
-                .filter_map(|resource| {
-                    state
-                        .chats
-                        .iter()
-                        .find(|chat| &chat.resource == resource)
-                        .cloned()
-                })
-                .collect();
-            if moved_entries.is_empty() {
+            let unique: std::collections::HashSet<&str> =
+                a.chats.iter().map(String::as_str).collect();
+            if a.chats.len() != state.chats.len() || unique.len() != state.chats.len() {
                 return ReduceOutcome::NoOp;
             }
-            let mut remaining: Vec<ChatSummary> = state
-                .chats
+            if a.chats
                 .iter()
-                .filter(|chat| !moved.contains(chat.resource.as_str()))
-                .cloned()
-                .collect();
-            let insert_at = match &a.destination {
-                ChatReorderDestination::Start(_) => 0,
-                ChatReorderDestination::End(_) => remaining.len(),
-                ChatReorderDestination::Before(before) => remaining
-                    .iter()
-                    .position(|chat| chat.resource == before.anchor)
-                    .unwrap_or(remaining.len()),
-                ChatReorderDestination::After(after) => remaining
-                    .iter()
-                    .position(|chat| chat.resource == after.anchor)
-                    .map(|idx| idx + 1)
-                    .unwrap_or(remaining.len()),
-                ChatReorderDestination::Unknown(_) => remaining.len(),
-            };
-            remaining.splice(insert_at..insert_at, moved_entries);
-            state.chats = remaining;
+                .zip(&state.chats)
+                .all(|(resource, summary)| resource == &summary.resource)
+            {
+                return ReduceOutcome::NoOp;
+            }
+            let mut reordered = Vec::with_capacity(a.chats.len());
+            for resource in &a.chats {
+                let Some(summary) = state.chats.iter().find(|chat| &chat.resource == resource)
+                else {
+                    return ReduceOutcome::NoOp;
+                };
+                reordered.push(summary.clone());
+            }
+            state.chats = reordered;
             ReduceOutcome::Applied
         }
         StateAction::SessionTitleChanged(a) => {

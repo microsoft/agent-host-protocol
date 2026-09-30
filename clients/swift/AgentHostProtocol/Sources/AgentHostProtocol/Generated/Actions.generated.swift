@@ -471,19 +471,15 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
 
 public struct SessionChatsReorderedAction: Codable, Sendable {
     public var type: ActionType
-    /// The complete moved unit, in its new contiguous relative order.
+    /// Every chat URI in authoritative catalog order.
     public var chats: [String]
-    /// The relative placement destination that produced this order.
-    public var destination: ChatReorderDestination
 
     public init(
         type: ActionType,
-        chats: [String],
-        destination: ChatReorderDestination
+        chats: [String]
     ) {
         self.type = type
         self.chats = chats
-        self.destination = destination
     }
 }
 

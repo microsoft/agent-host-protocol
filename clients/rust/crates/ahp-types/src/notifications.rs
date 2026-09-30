@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
-use crate::commands::MovedChatResource;
-#[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
     ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
@@ -179,41 +177,6 @@ pub struct ProgressParams {
     pub message: Option<String>,
 }
 
-/// Sent on each previous moved chat channel after an atomic `moveChat` commit.
-///
-/// Every notification for one move carries the same authoritative resources and
-/// exhaustive ordered `movedChats` mapping as {@link MoveChatResult}. The host
-/// emits them in `movedChats` order on each old channel whose ownership or URI
-/// changed. The move is already atomically committed before the first
-/// notification; ordering is only a deterministic delivery aid, not the
-/// transaction boundary.
-///
-/// A client receiving any one notification MUST apply the complete mapping
-/// atomically, stop dispatching to replaced old URIs, subscribe to the
-/// authoritative session and chat channels as needed, and reconcile from their
-/// snapshots. Duplicate notifications for the same mapping are idempotent.
-/// Durable ownership and catalog truth remain in the affected sessions'
-/// catalogs; this routing handoff is not replayed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatMovedParams {
-    /// Previous channel receiving this notification; names one `movedChats[].previousChat`.
-    pub channel: Uri,
-    /// Owning session URI before the move.
-    pub previous_session: Uri,
-    /// Requested root chat URI before the move.
-    pub previous_chat: Uri,
-    /// Authoritative owning session URI after the move.
-    pub session: Uri,
-    /// Authoritative requested root chat URI after the move.
-    pub chat: Uri,
-    /// Exhaustive ordered mapping for the complete moved subtree.
-    ///
-    /// Identical in every `chat/moved` notification for this move and in the
-    /// corresponding {@link MoveChatResult}.
-    pub moved_chats: Vec<MovedChatResource>,
-}
-
 /// Sent by the server when a protected resource requires (re-)authentication.
 ///
 /// This notification MAY be associated with any channel — for example, an
@@ -357,14 +320,10 @@ pub struct PartialSessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.
+    /// Lightweight host-authoritative ordered chat catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chats: Option<Vec<SessionChatSummary>>,
-    /// Chat that receives input when no specific chat is selected.
+    /// Chat that receives input when none is selected, independent of catalog position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
 }

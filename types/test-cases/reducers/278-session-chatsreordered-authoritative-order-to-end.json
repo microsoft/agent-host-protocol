@@ -1,5 +1,5 @@
 {
-  "description": "session/chatsReordered moves a chat to the end of the catalog",
+  "description": "session/chatsReordered applies the complete authoritative order with a chat at the end",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -34,8 +34,7 @@
   "actions": [
     {
       "type": "session/chatsReordered",
-      "chats": ["ahp-chat:/c1"],
-      "destination": { "kind": "end" }
+      "chats": ["ahp-chat:/c2", "ahp-chat:/c3", "ahp-chat:/c1"]
     }
   ],
   "expected": {

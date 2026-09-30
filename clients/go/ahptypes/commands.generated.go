@@ -43,24 +43,6 @@ const (
 	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
 )
 
-// Destination kind for a relative-placement chat reorder.
-//
-// `before`/`after` name another top-level chat (`anchor`) rather than a
-// numeric index, so the request always lands next to an identified chat
-// regardless of concurrent catalog changes elsewhere in the session.
-type ChatReorderDestinationKind string
-
-const (
-	// Move to the first position in the owning session's chat catalog.
-	ChatReorderDestinationKindStart ChatReorderDestinationKind = "start"
-	// Move to the last position in the owning session's chat catalog.
-	ChatReorderDestinationKindEnd ChatReorderDestinationKind = "end"
-	// Move immediately before `anchor`.
-	ChatReorderDestinationKindBefore ChatReorderDestinationKind = "before"
-	// Move immediately after `anchor`.
-	ChatReorderDestinationKindAfter ChatReorderDestinationKind = "after"
-)
-
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -541,12 +523,17 @@ type DisposeChatParams struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Moves a top-level chat subtree into an existing session.
+// Moves a chat within or into an existing session.
 type ChatMoveToSessionDestination struct {
 	// Discriminant
 	Kind ChatMoveDestinationKind `json:"kind"`
 	// Destination session URI.
 	Session URI `json:"session"`
+	// Chat after which to place the requested chat.
+	//
+	// The anchor MUST be a different chat in the destination session. When
+	// omitted, the requested chat is placed at the beginning of the catalog.
+	After *URI `json:"after,omitempty"`
 }
 
 // Moves a top-level chat subtree into a newly allocated session.
@@ -555,36 +542,36 @@ type ChatMoveToNewSessionDestination struct {
 	Kind ChatMoveDestinationKind `json:"kind"`
 }
 
-// Atomically moves a non-default top-level chat and its complete host-managed
-// descendant hierarchy to another session.
+// Atomically moves a host-authorized chat within or between sessions.
 //
-// The source is the chat named by `channel`. A `session` destination moves the
-// complete subtree into an existing compatible session. A `newSession`
-// destination allocates a compatible session, moves the complete subtree into
-// it, and makes the requested chat that session's default chat. In both cases
-// the requested chat remains top-level. The host owns the descendant
-// relationship; AHP does not expose it as chat state.
+// The source is the chat named by `channel`. When a `session` destination is
+// the source's current session, only the requested entry is repositioned in
+// that session's public chat catalog. When it names another session, the host
+// transfers the requested chat and its complete host-managed descendant
+// hierarchy. The optional `after` anchor positions the requested chat in the
+// destination catalog; when omitted, the requested chat is placed first.
+//
+// A `newSession` destination allocates a session, transfers the complete
+// hierarchy, and makes the requested chat that session's non-movable default
+// chat. The host owns descendant relationships; AHP does not expose them as
+// chat state.
 //
 // Clients MUST only request a move when the source chat advertises
 // `movable: true` in its `ChatState` or `ChatSummary`. This is structural
 // eligibility, not a guarantee that request-specific validation will succeed.
 //
-// The host MUST validate the complete operation before committing it. It MUST
-// reject a source that does not advertise `movable: true`, a subtree containing
-// an owning session's default chat, any active turn in the moved subtree, a destination
-// equal to the source session, a destination on another host, or incompatible
-// source and destination provider/agent runtimes. Rejection MUST leave every
-// chat, session catalog, and root summary unchanged. Unknown resources use
-// `NotFound`, active turns use `TurnInProgress`, and validation,
-// compatibility, and idempotency-key mismatches use `InvalidParams`.
+// The host MUST validate the complete operation before committing it and MAY
+// reject unsupported destinations or transient source conditions. At minimum,
+// the source MUST exist and advertise `movable: true`; the destination and
+// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+// Rejection leaves ownership, catalog order, chat state, and root summaries
+// unchanged.
 //
-// On success the host commits ownership, its internal hierarchy, and every
-// moved-chat URI replacement as one transaction before publishing
-// synchronization messages. `ChatOrigin` remains unchanged, including
-// historical chat URIs that no longer resolve after replacement. It then
-// updates affected session catalogs with `session/chatRemoved` and
-// `session/chatAdded`, and emits `chat/moved` on previous moved chat channels
-// when subscribers must follow authoritative result resources.
+// On success every moved chat keeps its URI, state, and immutable
+// `ChatOrigin`. The host commits ownership and catalog order before publishing
+// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+// root summary updates as applicable. Session and root snapshots are the
+// durable recovery path after reconnect or an uncertain response.
 type MoveChatParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -593,136 +580,12 @@ type MoveChatParams struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Atomic move destination.
 	Destination ChatMoveDestination `json:"destination"`
-	// Durable client-generated idempotency key.
-	//
-	// Retrying the same logical request with the same `requestId`, source, and
-	// destination MUST return the original {@link MoveChatResult}, including
-	// after reconnect or an uncertain response. Reusing the key with a different
-	// source or destination MUST be rejected with `InvalidParams`.
-	RequestId string `json:"requestId"`
 }
 
-// Authoritative URI mapping for one chat in a moved subtree.
-type MovedChatResource struct {
-	// Chat URI before the move.
-	PreviousChat URI `json:"previousChat"`
-	// Authoritative chat URI after the move.
-	Chat URI `json:"chat"`
-}
-
-// Authoritative resources before and after an atomic chat move.
-//
-// `previousChat` and `chat` identify the requested root and equal the first
-// entry of `movedChats`. They are retained as a convenience for callers that
-// only need to follow the requested chat. `movedChats` is the exhaustive
-// authoritative mapping for the complete moved subtree.
+// Result of an atomic chat move.
 type MoveChatResult struct {
-	// Owning session URI before the move.
-	PreviousSession URI `json:"previousSession"`
-	// Source chat URI before the move.
-	PreviousChat URI `json:"previousChat"`
 	// Authoritative owning session URI after the move.
 	Session URI `json:"session"`
-	// Authoritative requested root chat URI after the move.
-	Chat URI `json:"chat"`
-	// Exhaustive URI mapping for every chat in the moved subtree, including
-	// entries whose URI was preserved.
-	//
-	// The first entry MUST map `previousChat` to `chat`. Remaining entries are
-	// ordered in deterministic depth-first pre-order: every parent precedes its
-	// descendants, and siblings retain their order from the source session's
-	// `chats` catalog. Clients MUST apply the complete mapping atomically and
-	// MUST NOT infer replacements for chats absent from this list.
-	MovedChats []MovedChatResource `json:"movedChats"`
-}
-
-// Moves to the first position in the owning session's chat catalog.
-type ChatReorderToStartDestination struct {
-	// Discriminant
-	Kind ChatReorderDestinationKind `json:"kind"`
-}
-
-// Moves to the last position in the owning session's chat catalog.
-type ChatReorderToEndDestination struct {
-	// Discriminant
-	Kind ChatReorderDestinationKind `json:"kind"`
-}
-
-// Moves immediately before another top-level chat in the same session.
-type ChatReorderBeforeDestination struct {
-	// Discriminant
-	Kind ChatReorderDestinationKind `json:"kind"`
-	// Top-level chat URI the moved chat is placed immediately before.
-	Anchor URI `json:"anchor"`
-}
-
-// Moves immediately after another top-level chat in the same session.
-type ChatReorderAfterDestination struct {
-	// Discriminant
-	Kind ChatReorderDestinationKind `json:"kind"`
-	// Top-level chat URI the moved chat is placed immediately after.
-	Anchor URI `json:"anchor"`
-}
-
-// Atomically repositions a top-level chat and its complete host-managed
-// descendant subtree within the owning session's chat catalog order
-// (`SessionState.chats`). Unlike `moveChat`, ownership never changes: the
-// source stays in the same session, and every chat keeps its existing URI.
-//
-// The source is the chat named by `channel`. A chat is top-level when it has
-// no `origin`, or an `origin.kind` of `"user"`; forked, side-chat, and
-// tool-spawned chats are host-managed descendants and MUST NOT be named
-// directly as `channel` or as a `before`/`after` `anchor`. The host owns the
-// descendant relationship; AHP does not expose it as chat state, so the
-// complete moved unit — the requested chat plus every host-managed
-// descendant, in their existing relative order — is reported back verbatim
-// in `ReorderChatResult.chats` and the corresponding
-// `session/chatsReordered` action, without revealing which entries are
-// descendants.
-//
-// The host MUST validate the complete operation before committing it. It
-// MUST reject an unknown source or `anchor` chat, a source or `anchor` that
-// is not top-level, an `anchor` inside the source's own moved subtree, and
-// idempotency-key mismatches. Rejection MUST leave the owning session's chat
-// catalog order and root summary unchanged. Unknown resources use
-// `NotFound`; every other validation failure, including idempotency-key
-// mismatches, uses `InvalidParams`.
-//
-// On success the host commits the new catalog order as one transaction
-// before publishing synchronization messages, then dispatches
-// `session/chatsReordered` on the owning session channel so every
-// subscriber — including one that never dispatched the request — converges
-// on the identical authoritative order, and updates
-// `root/sessionSummaryChanged` so `SessionSummary.chats` mirrors the new
-// order. The reordered order is durable: it persists across host restarts
-// and reconnects like any other session state.
-type ReorderChatParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
-	// Optional JSON-serializable metadata associated with this request.
-	// Receivers MUST ignore keys they do not understand.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Desired relative placement among the owning session's top-level chats.
-	Destination ChatReorderDestination `json:"destination"`
-	// Durable client-generated idempotency key.
-	//
-	// Retrying the same logical request with the same `requestId`, source
-	// chat, and destination MUST return the original {@link ReorderChatResult},
-	// including after reconnect or an uncertain response. Reusing the key with
-	// a different source chat or destination MUST be rejected with
-	// `InvalidParams`.
-	RequestId string `json:"requestId"`
-}
-
-// Result of the `reorderChat` command.
-type ReorderChatResult struct {
-	// Owning session URI.
-	Session URI `json:"session"`
-	// The complete moved unit — `channel` plus every host-managed descendant —
-	// in its new contiguous relative order within the owning session's chat
-	// catalog. Identical to the `chats` field of the corresponding
-	// `session/chatsReordered` action.
-	Chats []URI `json:"chats"`
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1638,118 +1501,6 @@ func (v ChatMoveToNewSessionDestination) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-func (v *ChatReorderToStartDestination) UnmarshalJSON(data []byte) error {
-	disc, ok, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return missingDiscriminatorError("ChatReorderToStartDestination", "kind")
-	}
-	if disc != "start" {
-		return unknownDiscriminatorError("ChatReorderToStartDestination", "kind", disc)
-	}
-	type wire ChatReorderToStartDestination
-	var raw wire
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*v = ChatReorderToStartDestination(raw)
-	v.Kind = ChatReorderDestinationKindStart
-	return nil
-}
-
-func (v ChatReorderToStartDestination) MarshalJSON() ([]byte, error) {
-	type wire ChatReorderToStartDestination
-	raw := wire(v)
-	raw.Kind = ChatReorderDestinationKindStart
-	return json.Marshal(raw)
-}
-
-func (v *ChatReorderToEndDestination) UnmarshalJSON(data []byte) error {
-	disc, ok, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return missingDiscriminatorError("ChatReorderToEndDestination", "kind")
-	}
-	if disc != "end" {
-		return unknownDiscriminatorError("ChatReorderToEndDestination", "kind", disc)
-	}
-	type wire ChatReorderToEndDestination
-	var raw wire
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*v = ChatReorderToEndDestination(raw)
-	v.Kind = ChatReorderDestinationKindEnd
-	return nil
-}
-
-func (v ChatReorderToEndDestination) MarshalJSON() ([]byte, error) {
-	type wire ChatReorderToEndDestination
-	raw := wire(v)
-	raw.Kind = ChatReorderDestinationKindEnd
-	return json.Marshal(raw)
-}
-
-func (v *ChatReorderBeforeDestination) UnmarshalJSON(data []byte) error {
-	disc, ok, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return missingDiscriminatorError("ChatReorderBeforeDestination", "kind")
-	}
-	if disc != "before" {
-		return unknownDiscriminatorError("ChatReorderBeforeDestination", "kind", disc)
-	}
-	type wire ChatReorderBeforeDestination
-	var raw wire
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*v = ChatReorderBeforeDestination(raw)
-	v.Kind = ChatReorderDestinationKindBefore
-	return nil
-}
-
-func (v ChatReorderBeforeDestination) MarshalJSON() ([]byte, error) {
-	type wire ChatReorderBeforeDestination
-	raw := wire(v)
-	raw.Kind = ChatReorderDestinationKindBefore
-	return json.Marshal(raw)
-}
-
-func (v *ChatReorderAfterDestination) UnmarshalJSON(data []byte) error {
-	disc, ok, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return missingDiscriminatorError("ChatReorderAfterDestination", "kind")
-	}
-	if disc != "after" {
-		return unknownDiscriminatorError("ChatReorderAfterDestination", "kind", disc)
-	}
-	type wire ChatReorderAfterDestination
-	var raw wire
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	*v = ChatReorderAfterDestination(raw)
-	v.Kind = ChatReorderDestinationKindAfter
-	return nil
-}
-
-func (v ChatReorderAfterDestination) MarshalJSON() ([]byte, error) {
-	type wire ChatReorderAfterDestination
-	raw := wire(v)
-	raw.Kind = ChatReorderDestinationKindAfter
-	return json.Marshal(raw)
-}
-
 // ─── ChatSource Union ─────────────────────────────────────────────────
 
 // ChatSource identifies how a new chat uses a source chat.
@@ -1863,82 +1614,6 @@ func (u *ChatMoveDestination) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*ChatMoveDestinationUnknown); ok {
-		if len(unk.Raw) == 0 {
-			return []byte("null"), nil
-		}
-		return unk.Raw, nil
-	}
-	if u.Value == nil {
-		return []byte("null"), nil
-	}
-	return json.Marshal(u.Value)
-}
-
-// ─── ChatReorderDestination Union ──────────────────────────────────────
-
-// Relative-placement destination of a chat reorder.
-type ChatReorderDestination struct {
-	Value isChatReorderDestination
-}
-
-// isChatReorderDestination is the marker interface implemented by every
-// concrete variant of ChatReorderDestination.
-type isChatReorderDestination interface{ isChatReorderDestination() }
-
-func (*ChatReorderToStartDestination) isChatReorderDestination() {}
-func (*ChatReorderToEndDestination) isChatReorderDestination()   {}
-func (*ChatReorderBeforeDestination) isChatReorderDestination()  {}
-func (*ChatReorderAfterDestination) isChatReorderDestination()   {}
-
-// ChatReorderDestinationUnknown carries an unrecognized ChatReorderDestination variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type ChatReorderDestinationUnknown struct {
-	Raw json.RawMessage
-}
-
-func (*ChatReorderDestinationUnknown) isChatReorderDestination() {}
-
-// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
-func (u *ChatReorderDestination) UnmarshalJSON(data []byte) error {
-	disc, _, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	switch disc {
-	case "start":
-		var value ChatReorderToStartDestination
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "end":
-		var value ChatReorderToEndDestination
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "before":
-		var value ChatReorderBeforeDestination
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "after":
-		var value ChatReorderAfterDestination
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	default:
-		raw := make(json.RawMessage, len(data))
-		copy(raw, data)
-		u.Value = &ChatReorderDestinationUnknown{Raw: raw}
-	}
-	return nil
-}
-
-// MarshalJSON encodes the active variant back to JSON.
-func (u ChatReorderDestination) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*ChatReorderDestinationUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

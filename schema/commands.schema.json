@@ -1331,7 +1331,7 @@
     },
     "ChatMoveToSessionDestination": {
       "type": "object",
-      "description": "Moves a top-level chat subtree into an existing session.",
+      "description": "Moves a chat within or into an existing session.",
       "properties": {
         "kind": {
           "const": "session",
@@ -1340,6 +1340,10 @@
         "session": {
           "$ref": "#/$defs/URI",
           "description": "Destination session URI."
+        },
+        "after": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat after which to place the requested chat.\n\nThe anchor MUST be a different chat in the destination session. When\nomitted, the requested chat is placed at the beginning of the catalog."
         }
       },
       "required": [
@@ -1362,7 +1366,7 @@
     },
     "MoveChatParams": {
       "type": "object",
-      "description": "Atomically moves a non-default top-level chat and its complete host-managed\ndescendant hierarchy to another session.\n\nThe source is the chat named by `channel`. A `session` destination moves the\ncomplete subtree into an existing compatible session. A `newSession`\ndestination allocates a compatible session, moves the complete subtree into\nit, and makes the requested chat that session's default chat. In both cases\nthe requested chat remains top-level. The host owns the descendant\nrelationship; AHP does not expose it as chat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it. It MUST\nreject a source that does not advertise `movable: true`, a subtree containing\nan owning session's default chat, any active turn in the moved subtree, a destination\nequal to the source session, a destination on another host, or incompatible\nsource and destination provider/agent runtimes. Rejection MUST leave every\nchat, session catalog, and root summary unchanged. Unknown resources use\n`NotFound`, active turns use `TurnInProgress`, and validation,\ncompatibility, and idempotency-key mismatches use `InvalidParams`.\n\nOn success the host commits ownership, its internal hierarchy, and every\nmoved-chat URI replacement as one transaction before publishing\nsynchronization messages. `ChatOrigin` remains unchanged, including\nhistorical chat URIs that no longer resolve after replacement. It then\nupdates affected session catalogs with `session/chatRemoved` and\n`session/chatAdded`, and emits `chat/moved` on previous moved chat channels\nwhen subscribers must follow authoritative result resources.",
+      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1376,181 +1380,24 @@
         "destination": {
           "$ref": "#/$defs/ChatMoveDestination",
           "description": "Atomic move destination."
-        },
-        "requestId": {
-          "type": "string",
-          "description": "Durable client-generated idempotency key.\n\nRetrying the same logical request with the same `requestId`, source, and\ndestination MUST return the original {@link MoveChatResult}, including\nafter reconnect or an uncertain response. Reusing the key with a different\nsource or destination MUST be rejected with `InvalidParams`."
         }
       },
       "required": [
         "channel",
-        "destination",
-        "requestId"
-      ]
-    },
-    "MovedChatResource": {
-      "type": "object",
-      "description": "Authoritative URI mapping for one chat in a moved subtree.",
-      "properties": {
-        "previousChat": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI before the move."
-        },
-        "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Authoritative chat URI after the move."
-        }
-      },
-      "required": [
-        "previousChat",
-        "chat"
+        "destination"
       ]
     },
     "MoveChatResult": {
       "type": "object",
-      "description": "Authoritative resources before and after an atomic chat move.\n\n`previousChat` and `chat` identify the requested root and equal the first\nentry of `movedChats`. They are retained as a convenience for callers that\nonly need to follow the requested chat. `movedChats` is the exhaustive\nauthoritative mapping for the complete moved subtree.",
+      "description": "Result of an atomic chat move.",
       "properties": {
-        "previousSession": {
-          "$ref": "#/$defs/URI",
-          "description": "Owning session URI before the move."
-        },
-        "previousChat": {
-          "$ref": "#/$defs/URI",
-          "description": "Source chat URI before the move."
-        },
         "session": {
           "$ref": "#/$defs/URI",
           "description": "Authoritative owning session URI after the move."
-        },
-        "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Authoritative requested root chat URI after the move."
-        },
-        "movedChats": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/MovedChatResource"
-          },
-          "description": "Exhaustive URI mapping for every chat in the moved subtree, including\nentries whose URI was preserved.\n\nThe first entry MUST map `previousChat` to `chat`. Remaining entries are\nordered in deterministic depth-first pre-order: every parent precedes its\ndescendants, and siblings retain their order from the source session's\n`chats` catalog. Clients MUST apply the complete mapping atomically and\nMUST NOT infer replacements for chats absent from this list."
         }
       },
       "required": [
-        "previousSession",
-        "previousChat",
-        "session",
-        "chat",
-        "movedChats"
-      ]
-    },
-    "ChatReorderToStartDestination": {
-      "type": "object",
-      "description": "Moves to the first position in the owning session's chat catalog.",
-      "properties": {
-        "kind": {
-          "const": "start",
-          "description": "Discriminant"
-        }
-      },
-      "required": [
-        "kind"
-      ]
-    },
-    "ChatReorderToEndDestination": {
-      "type": "object",
-      "description": "Moves to the last position in the owning session's chat catalog.",
-      "properties": {
-        "kind": {
-          "const": "end",
-          "description": "Discriminant"
-        }
-      },
-      "required": [
-        "kind"
-      ]
-    },
-    "ChatReorderBeforeDestination": {
-      "type": "object",
-      "description": "Moves immediately before another top-level chat in the same session.",
-      "properties": {
-        "kind": {
-          "const": "before",
-          "description": "Discriminant"
-        },
-        "anchor": {
-          "$ref": "#/$defs/URI",
-          "description": "Top-level chat URI the moved chat is placed immediately before."
-        }
-      },
-      "required": [
-        "kind",
-        "anchor"
-      ]
-    },
-    "ChatReorderAfterDestination": {
-      "type": "object",
-      "description": "Moves immediately after another top-level chat in the same session.",
-      "properties": {
-        "kind": {
-          "const": "after",
-          "description": "Discriminant"
-        },
-        "anchor": {
-          "$ref": "#/$defs/URI",
-          "description": "Top-level chat URI the moved chat is placed immediately after."
-        }
-      },
-      "required": [
-        "kind",
-        "anchor"
-      ]
-    },
-    "ReorderChatParams": {
-      "type": "object",
-      "description": "Atomically repositions a top-level chat and its complete host-managed\ndescendant subtree within the owning session's chat catalog order\n(`SessionState.chats`). Unlike `moveChat`, ownership never changes: the\nsource stays in the same session, and every chat keeps its existing URI.\n\nThe source is the chat named by `channel`. A chat is top-level when it has\nno `origin`, or an `origin.kind` of `\"user\"`; forked, side-chat, and\ntool-spawned chats are host-managed descendants and MUST NOT be named\ndirectly as `channel` or as a `before`/`after` `anchor`. The host owns the\ndescendant relationship; AHP does not expose it as chat state, so the\ncomplete moved unit — the requested chat plus every host-managed\ndescendant, in their existing relative order — is reported back verbatim\nin `ReorderChatResult.chats` and the corresponding\n`session/chatsReordered` action, without revealing which entries are\ndescendants.\n\nThe host MUST validate the complete operation before committing it. It\nMUST reject an unknown source or `anchor` chat, a source or `anchor` that\nis not top-level, an `anchor` inside the source's own moved subtree, and\nidempotency-key mismatches. Rejection MUST leave the owning session's chat\ncatalog order and root summary unchanged. Unknown resources use\n`NotFound`; every other validation failure, including idempotency-key\nmismatches, uses `InvalidParams`.\n\nOn success the host commits the new catalog order as one transaction\nbefore publishing synchronization messages, then dispatches\n`session/chatsReordered` on the owning session channel so every\nsubscriber — including one that never dispatched the request — converges\non the identical authoritative order, and updates\n`root/sessionSummaryChanged` so `SessionSummary.chats` mirrors the new\norder. The reordered order is durable: it persists across host restarts\nand reconnects like any other session state.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI to reposition (the moved subtree's top-level root)."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "destination": {
-          "$ref": "#/$defs/ChatReorderDestination",
-          "description": "Desired relative placement among the owning session's top-level chats."
-        },
-        "requestId": {
-          "type": "string",
-          "description": "Durable client-generated idempotency key.\n\nRetrying the same logical request with the same `requestId`, source\nchat, and destination MUST return the original {@link ReorderChatResult},\nincluding after reconnect or an uncertain response. Reusing the key with\na different source chat or destination MUST be rejected with\n`InvalidParams`."
-        }
-      },
-      "required": [
-        "channel",
-        "destination",
-        "requestId"
-      ]
-    },
-    "ReorderChatResult": {
-      "type": "object",
-      "description": "Result of the `reorderChat` command.",
-      "properties": {
-        "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Owning session URI."
-        },
-        "chats": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/URI"
-          },
-          "description": "The complete moved unit — `channel` plus every host-managed descendant —\nin its new contiguous relative order within the owning session's chat\ncatalog. Identical to the `chats` field of the corresponding\n`session/chatsReordered` action."
-        }
-      },
-      "required": [
-        "session",
-        "chats"
+        "session"
       ]
     },
     "DisposeChatParams": {
@@ -1921,23 +1768,6 @@
         }
       ],
       "description": "Identifies the destination of an atomic chat move."
-    },
-    "ChatReorderDestination": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/ChatReorderToStartDestination"
-        },
-        {
-          "$ref": "#/$defs/ChatReorderToEndDestination"
-        },
-        {
-          "$ref": "#/$defs/ChatReorderBeforeDestination"
-        },
-        {
-          "$ref": "#/$defs/ChatReorderAfterDestination"
-        }
-      ],
-      "description": "Identifies the relative-placement destination of a chat reorder."
     },
     "ChangesetOperationTarget": {
       "oneOf": [
@@ -2788,11 +2618,11 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable: it persists across host\nrestarts and reconnects like any other session state, and every\nsubscriber converges on the identical order via `session/chatAdded`\n(append), `session/chatRemoved`, and `session/chatsReordered`.\n`reorderChat` repositions a top-level chat and its complete\nhost-managed descendant subtree as one contiguous unit, without\nexposing the descendant relationship itself."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable. Catalog order is independent of\n`defaultChat`."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker, and every chat remains directly addressable. Hosts MAY change this\nover the session's lifetime."
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This routing designation does not determine the\nchat's catalog position. Hosts MAY change it over the session's lifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -3095,11 +2925,11 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+          "description": "Lightweight host-authoritative ordered chat catalog."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "Chat that receives input when no specific chat is selected."
+          "description": "Chat that receives input when none is selected, independent of catalog position."
         }
       },
       "required": [
@@ -3113,7 +2943,7 @@
     },
     "SessionChatSummary": {
       "type": "object",
-      "description": "Lightweight chat information suitable for listing a session without\nsubscribing to its session channel.",
+      "description": "Lightweight chat information in a session catalog.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -4420,7 +4250,7 @@
         },
         "movable": {
           "type": "boolean",
-          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed because request-specific\nvalidation, such as active turns or destination compatibility, still\napplies. A chat referenced by its owning session's `defaultChat` MUST NOT\nbe movable."
+          "description": "Whether this chat is eligible to be the source of `moveChat`, including\nsame-session ordering.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed. A chat referenced by its\nowning session's `defaultChat` MUST NOT be movable."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -7940,7 +7770,7 @@
     },
     "SessionChatsReorderedAction": {
       "type": "object",
-      "description": "The owning session's chat catalog order changed following an atomic\n`reorderChat` commit.\n\nHost-emitted convergence signal; it never originates from a client\ndispatch. `chats` is the complete moved unit — the repositioned top-level\nchat plus every host-managed descendant, in their existing relative order\n— and `destination` is the same relative placement that produced it.\n\nReducers MUST extract every URI listed in `chats` from the current\ncatalog (preserving their relative order), then reinsert them\ncontiguously at the position `destination` names, resolving `before` /\n`after` against each anchor's *current* catalog position so replay\nconverges even when other catalog changes interleave. An unresolvable\n`anchor` (e.g. a future protocol version's `destination.kind` this client\ndoes not recognise) falls back to `end`, so no chat is ever silently\ndropped from the catalog. AHP does not expose which entries in `chats`\nare descendants of the repositioned chat.",
+      "description": "The owning session's authoritative chat catalog order changed.\n\nHost-emitted convergence signal; it never originates from a client\ndispatch. `chats` is the complete resulting order and MUST contain every\nchat currently in the session exactly once. Reducers replace the catalog\norder while preserving each matching summary. Invalid or incomplete orders\nare ignored.",
       "properties": {
         "type": {
           "const": "session/chatsReordered"
@@ -7950,17 +7780,12 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The complete moved unit, in its new contiguous relative order."
-        },
-        "destination": {
-          "$ref": "#/$defs/ChatReorderDestination",
-          "description": "The relative placement destination that produced this order."
+          "description": "Every chat URI in authoritative catalog order."
         }
       },
       "required": [
         "type",
-        "chats",
-        "destination"
+        "chats"
       ]
     },
     "SessionTitleChangedAction": {

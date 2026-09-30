@@ -8,13 +8,14 @@ Implemented as baseline behavior for the protocol version that introduces
 ## Motivation
 
 Hosts may need to transfer a top-level chat and its complete internal hierarchy
-to another session while preserving durable chat state and client subscriptions.
-The hierarchy may include side chats or tool-spawned worker chats, but it is an
-agent implementation detail and is not exposed as AHP chat state.
+to another session, or reorder a chat within its current session, while
+preserving durable chat state and client subscriptions. The hierarchy may
+include side chats or tool-spawned worker chats, but it is a host implementation
+detail and is not exposed as AHP chat state.
 
-The contract provides one atomic command and a scoped routing notification
-instead of requiring clients to coordinate independent remove/add operations or
-infer replacement chat URIs.
+The contract provides one atomic command for both ownership transfer and
+same-session ordering. Chat URIs are stable, so existing chat subscriptions
+remain valid.
 
 ## Contract
 
@@ -24,75 +25,64 @@ infer replacement chat URIs.
 interface MoveChatParams {
   channel: URI;
   destination:
-    | { kind: 'session'; session: URI }
+    | { kind: 'session'; session: URI; after?: URI }
     | { kind: 'newSession' };
-  requestId: string;
 }
 
 interface MoveChatResult {
-  previousSession: URI;
-  previousChat: URI;
   session: URI;
-  chat: URI;
-  movedChats: {
-    previousChat: URI;
-    chat: URI;
-  }[];
 }
 ```
 
-The source MUST be a non-default top-level chat. A `session` destination moves
-the source hierarchy into an existing compatible session. A `newSession`
-destination allocates a compatible session and makes the requested chat its
-default chat. The requested chat remains top-level in either destination.
+A `session` destination names either the current session or another existing
+session. When it is the current session, only the requested public catalog
+entry is reordered. When it is another session, the requested chat and its
+complete host-managed descendant hierarchy transfer together. `after` places
+the requested entry immediately after another chat in the destination; when it
+is absent, the requested entry is placed first.
+
+A `newSession` destination allocates a session, transfers the complete
+hierarchy, and makes the requested chat its non-movable default chat.
 
 `ChatState.movable` and `ChatSummary.movable` let clients discover whether a
-chat is structurally eligible to be the source. The host is authoritative,
-absence means `false`, and the chat referenced by a session's `defaultChat`
-MUST NOT be movable. A client only offers or invokes `moveChat` for
-`movable: true`. The flag does not guarantee that a particular destination or
-the chat's current transient state will pass request-time validation.
-
-`requestId` makes an uncertain request safe to retry. The root convenience
-fields identify the requested chat and equal the first `movedChats` entry.
-`movedChats` exhaustively maps the root and every host-managed descendant,
-including identity-preserving entries, because a host may encode owning-session
-identity in every chat URI. Its deterministic root-first, parent-before-child
-order lets clients rewrite references without guessing.
+chat is eligible to be moved or reordered. The host is authoritative, absence
+means `false`, and the chat referenced by a session's `defaultChat` MUST NOT be
+movable. Default status does not pin catalog position: movable chats may be
+placed before or after the default chat, and may use it as an `after` anchor.
 
 ### Atomicity and synchronization
 
-The requested chat and its host-managed descendants move as one subtree. The
-host validates the whole operation and commits ownership, internal hierarchy,
-catalogs, default-chat state, and all resource replacements before publishing
-actions or notifications. Immutable `ChatOrigin` remains unchanged even when
-its historical URI no longer resolves. Failure leaves all state unchanged.
+For cross-session moves, the requested chat and its host-managed descendants
+move as one unit. For same-session moves, only the requested public catalog
+entry changes position. The host validates the whole operation and commits
+ownership, internal hierarchy, catalogs, and default-chat state before
+publishing synchronization actions. Failure leaves all state unchanged.
 
-Existing catalog actions synchronize removal and addition. `chat/moved` is
-emitted on each affected previous channel in mapping order and carries the same
-exhaustive mapping. The move is committed before delivery, so each notification
-is a complete atomic routing snapshot rather than one step of the transaction.
-Reconnect snapshots remain the durable recovery path.
+Every moved chat keeps its URI, state, and immutable `ChatOrigin`. Existing
+catalog actions synchronize removals and additions.
+`session/chatsReordered` carries the complete authoritative resulting URI order
+when ordering changes. Root summaries mirror the same catalogs.
 
-### Rejections
+Reconnect snapshots are the durable recovery path. Because anonymous
+`newSession` allocation has no idempotency key, a client with an uncertain
+response reconciles root and session snapshots rather than blindly retrying and
+possibly allocating another session.
 
-The host rejects a move when:
+### Validation
 
-- the source does not advertise `movable: true`;
-- the moved subtree contains its current session's default chat;
-- the source or a moved descendant has an active turn;
-- the existing destination equals the source session;
-- either resource belongs to another host;
-- the source and destination agent/provider runtimes are incompatible;
-- any source or destination resource is unknown.
+At minimum, the source must exist and advertise `movable: true`; the destination
+and optional anchor must resolve; and the source cannot anchor itself. Hosts may
+reject unsupported destinations or transient source conditions. Any rejection
+leaves ownership and order unchanged. Success preserves chat URIs, state, and
+origin while converging the durable session and root catalogs.
 
 ## Alternatives rejected
 
 - **Expose hierarchy in `ChatState`:** clients do not need the host's internal
   side-chat or sub-agent structure to render or initiate a top-level move.
-- **Require session-independent chat URIs:** incompatible with hosts whose
-  existing routing and storage contracts encode session ownership.
+- **Replace chat URIs on transfer:** breaks active subscriptions and requires
+  an ephemeral routing handoff that cannot be recovered after reconnect.
 - **Model the move as independent remove/add requests:** cannot guarantee
   all-or-nothing ownership, hierarchy, and identity changes.
-- **Return only the requested root's destination URI:** leaves descendant
-  references stale when cross-session ownership replaces the entire subtree.
+- **Separate reorder command:** duplicates eligibility, validation, and
+  synchronization semantics already expressed by same-session `moveChat`.

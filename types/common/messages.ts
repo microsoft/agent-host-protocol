@@ -58,8 +58,6 @@ import type {
   CreateChatParams,
   MoveChatParams,
   MoveChatResult,
-  ReorderChatParams,
-  ReorderChatResult,
   DisposeChatParams,
 } from '../channels-chat/commands.js';
 import type {
@@ -90,7 +88,6 @@ import type {
   SessionSummaryChangedParams,
   ProgressParams,
 } from '../channels-root/notifications.js';
-import type { ChatMovedParams } from '../channels-chat/notifications.js';
 import type { AuthRequiredParams } from './notifications.js';
 import type {
   OtlpExportLogsParams,
@@ -168,7 +165,6 @@ export interface CommandMap {
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
-  'reorderChat': { params: ReorderChatParams; result: ReorderChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
@@ -251,7 +247,6 @@ export interface ServerNotificationMap {
   'root/sessionRemoved': { params: SessionRemovedParams };
   'root/sessionSummaryChanged': { params: SessionSummaryChangedParams };
   'root/progress': { params: ProgressParams };
-  'chat/moved': { params: ChatMovedParams };
   'auth/required': { params: AuthRequiredParams };
   'otlp/exportLogs': { params: OtlpExportLogsParams };
   'otlp/exportTraces': { params: OtlpExportTracesParams };

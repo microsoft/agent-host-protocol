@@ -43,28 +43,6 @@ public enum ChatMoveDestinationKind
     NewSession,
 }
 
-/// <summary>Destination kind for a relative-placement chat reorder.
-///
-/// `before`/`after` name another top-level chat (`anchor`) rather than a
-/// numeric index, so the request always lands next to an identified chat
-/// regardless of concurrent catalog changes elsewhere in the session.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatReorderDestinationKind>))]
-public enum ChatReorderDestinationKind
-{
-    /// <summary>Move to the first position in the owning session's chat catalog.</summary>
-    [WireValue("start")]
-    Start,
-    /// <summary>Move to the last position in the owning session's chat catalog.</summary>
-    [WireValue("end")]
-    End,
-    /// <summary>Move immediately before `anchor`.</summary>
-    [WireValue("before")]
-    Before,
-    /// <summary>Move immediately after `anchor`.</summary>
-    [WireValue("after")]
-    After,
-}
-
 /// <summary>Encoding of fetched content data.</summary>
 [JsonConverter(typeof(WireEnumConverter<ContentEncoding>))]
 public enum ContentEncoding
@@ -676,7 +654,7 @@ public sealed record DisposeChatParams
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Moves a top-level chat subtree into an existing session.</summary>
+/// <summary>Moves a chat within or into an existing session.</summary>
 public sealed record ChatMoveToSessionDestination
 {
     /// <summary>Discriminant</summary>
@@ -684,6 +662,13 @@ public sealed record ChatMoveToSessionDestination
 
     /// <summary>Destination session URI.</summary>
     public required string Session { get; init; }
+
+    /// <summary>Chat after which to place the requested chat.
+    ///
+    /// The anchor MUST be a different chat in the destination session. When
+    /// omitted, the requested chat is placed at the beginning of the catalog.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? After { get; init; }
 }
 
 /// <summary>Moves a top-level chat subtree into a newly allocated session.</summary>
@@ -693,36 +678,36 @@ public sealed record ChatMoveToNewSessionDestination
     public ChatMoveDestinationKind Kind { get; init; }
 }
 
-/// <summary>Atomically moves a non-default top-level chat and its complete host-managed
-/// descendant hierarchy to another session.
+/// <summary>Atomically moves a host-authorized chat within or between sessions.
 ///
-/// The source is the chat named by `channel`. A `session` destination moves the
-/// complete subtree into an existing compatible session. A `newSession`
-/// destination allocates a compatible session, moves the complete subtree into
-/// it, and makes the requested chat that session's default chat. In both cases
-/// the requested chat remains top-level. The host owns the descendant
-/// relationship; AHP does not expose it as chat state.
+/// The source is the chat named by `channel`. When a `session` destination is
+/// the source's current session, only the requested entry is repositioned in
+/// that session's public chat catalog. When it names another session, the host
+/// transfers the requested chat and its complete host-managed descendant
+/// hierarchy. The optional `after` anchor positions the requested chat in the
+/// destination catalog; when omitted, the requested chat is placed first.
+///
+/// A `newSession` destination allocates a session, transfers the complete
+/// hierarchy, and makes the requested chat that session's non-movable default
+/// chat. The host owns descendant relationships; AHP does not expose them as
+/// chat state.
 ///
 /// Clients MUST only request a move when the source chat advertises
 /// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
 /// eligibility, not a guarantee that request-specific validation will succeed.
 ///
-/// The host MUST validate the complete operation before committing it. It MUST
-/// reject a source that does not advertise `movable: true`, a subtree containing
-/// an owning session's default chat, any active turn in the moved subtree, a destination
-/// equal to the source session, a destination on another host, or incompatible
-/// source and destination provider/agent runtimes. Rejection MUST leave every
-/// chat, session catalog, and root summary unchanged. Unknown resources use
-/// `NotFound`, active turns use `TurnInProgress`, and validation,
-/// compatibility, and idempotency-key mismatches use `InvalidParams`.
+/// The host MUST validate the complete operation before committing it and MAY
+/// reject unsupported destinations or transient source conditions. At minimum,
+/// the source MUST exist and advertise `movable: true`; the destination and
+/// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+/// Rejection leaves ownership, catalog order, chat state, and root summaries
+/// unchanged.
 ///
-/// On success the host commits ownership, its internal hierarchy, and every
-/// moved-chat URI replacement as one transaction before publishing
-/// synchronization messages. `ChatOrigin` remains unchanged, including
-/// historical chat URIs that no longer resolve after replacement. It then
-/// updates affected session catalogs with `session/chatRemoved` and
-/// `session/chatAdded`, and emits `chat/moved` on previous moved chat channels
-/// when subscribers must follow authoritative result resources.</summary>
+/// On success every moved chat keeps its URI, state, and immutable
+/// `ChatOrigin`. The host commits ownership and catalog order before publishing
+/// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+/// root summary updates as applicable. Session and root snapshots are the
+/// durable recovery path after reconnect or an uncertain response.</summary>
 public sealed record MoveChatParams
 {
     /// <summary>Source chat URI.</summary>
@@ -736,158 +721,13 @@ public sealed record MoveChatParams
 
     /// <summary>Atomic move destination.</summary>
     public required ChatMoveDestination Destination { get; init; }
-
-    /// <summary>Durable client-generated idempotency key.
-    ///
-    /// Retrying the same logical request with the same `requestId`, source, and
-    /// destination MUST return the original {@link MoveChatResult}, including
-    /// after reconnect or an uncertain response. Reusing the key with a different
-    /// source or destination MUST be rejected with `InvalidParams`.</summary>
-    public required string RequestId { get; init; }
 }
 
-/// <summary>Authoritative URI mapping for one chat in a moved subtree.</summary>
-public sealed record MovedChatResource
-{
-    /// <summary>Chat URI before the move.</summary>
-    public required string PreviousChat { get; init; }
-
-    /// <summary>Authoritative chat URI after the move.</summary>
-    public required string Chat { get; init; }
-}
-
-/// <summary>Authoritative resources before and after an atomic chat move.
-///
-/// `previousChat` and `chat` identify the requested root and equal the first
-/// entry of `movedChats`. They are retained as a convenience for callers that
-/// only need to follow the requested chat. `movedChats` is the exhaustive
-/// authoritative mapping for the complete moved subtree.</summary>
+/// <summary>Result of an atomic chat move.</summary>
 public sealed record MoveChatResult
 {
-    /// <summary>Owning session URI before the move.</summary>
-    public required string PreviousSession { get; init; }
-
-    /// <summary>Source chat URI before the move.</summary>
-    public required string PreviousChat { get; init; }
-
     /// <summary>Authoritative owning session URI after the move.</summary>
     public required string Session { get; init; }
-
-    /// <summary>Authoritative requested root chat URI after the move.</summary>
-    public required string Chat { get; init; }
-
-    /// <summary>Exhaustive URI mapping for every chat in the moved subtree, including
-    /// entries whose URI was preserved.
-    ///
-    /// The first entry MUST map `previousChat` to `chat`. Remaining entries are
-    /// ordered in deterministic depth-first pre-order: every parent precedes its
-    /// descendants, and siblings retain their order from the source session's
-    /// `chats` catalog. Clients MUST apply the complete mapping atomically and
-    /// MUST NOT infer replacements for chats absent from this list.</summary>
-    public required List<MovedChatResource> MovedChats { get; init; }
-}
-
-/// <summary>Moves to the first position in the owning session's chat catalog.</summary>
-public sealed record ChatReorderToStartDestination
-{
-    /// <summary>Discriminant</summary>
-    public ChatReorderDestinationKind Kind { get; init; }
-}
-
-/// <summary>Moves to the last position in the owning session's chat catalog.</summary>
-public sealed record ChatReorderToEndDestination
-{
-    /// <summary>Discriminant</summary>
-    public ChatReorderDestinationKind Kind { get; init; }
-}
-
-/// <summary>Moves immediately before another top-level chat in the same session.</summary>
-public sealed record ChatReorderBeforeDestination
-{
-    /// <summary>Discriminant</summary>
-    public ChatReorderDestinationKind Kind { get; init; }
-
-    /// <summary>Top-level chat URI the moved chat is placed immediately before.</summary>
-    public required string Anchor { get; init; }
-}
-
-/// <summary>Moves immediately after another top-level chat in the same session.</summary>
-public sealed record ChatReorderAfterDestination
-{
-    /// <summary>Discriminant</summary>
-    public ChatReorderDestinationKind Kind { get; init; }
-
-    /// <summary>Top-level chat URI the moved chat is placed immediately after.</summary>
-    public required string Anchor { get; init; }
-}
-
-/// <summary>Atomically repositions a top-level chat and its complete host-managed
-/// descendant subtree within the owning session's chat catalog order
-/// (`SessionState.chats`). Unlike `moveChat`, ownership never changes: the
-/// source stays in the same session, and every chat keeps its existing URI.
-///
-/// The source is the chat named by `channel`. A chat is top-level when it has
-/// no `origin`, or an `origin.kind` of `"user"`; forked, side-chat, and
-/// tool-spawned chats are host-managed descendants and MUST NOT be named
-/// directly as `channel` or as a `before`/`after` `anchor`. The host owns the
-/// descendant relationship; AHP does not expose it as chat state, so the
-/// complete moved unit — the requested chat plus every host-managed
-/// descendant, in their existing relative order — is reported back verbatim
-/// in `ReorderChatResult.chats` and the corresponding
-/// `session/chatsReordered` action, without revealing which entries are
-/// descendants.
-///
-/// The host MUST validate the complete operation before committing it. It
-/// MUST reject an unknown source or `anchor` chat, a source or `anchor` that
-/// is not top-level, an `anchor` inside the source's own moved subtree, and
-/// idempotency-key mismatches. Rejection MUST leave the owning session's chat
-/// catalog order and root summary unchanged. Unknown resources use
-/// `NotFound`; every other validation failure, including idempotency-key
-/// mismatches, uses `InvalidParams`.
-///
-/// On success the host commits the new catalog order as one transaction
-/// before publishing synchronization messages, then dispatches
-/// `session/chatsReordered` on the owning session channel so every
-/// subscriber — including one that never dispatched the request — converges
-/// on the identical authoritative order, and updates
-/// `root/sessionSummaryChanged` so `SessionSummary.chats` mirrors the new
-/// order. The reordered order is durable: it persists across host restarts
-/// and reconnects like any other session state.</summary>
-public sealed record ReorderChatParams
-{
-    /// <summary>Chat URI to reposition (the moved subtree's top-level root).</summary>
-    public required string Channel { get; init; }
-
-    /// <summary>Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.</summary>
-    [JsonPropertyName("_meta")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Meta { get; init; }
-
-    /// <summary>Desired relative placement among the owning session's top-level chats.</summary>
-    public required ChatReorderDestination Destination { get; init; }
-
-    /// <summary>Durable client-generated idempotency key.
-    ///
-    /// Retrying the same logical request with the same `requestId`, source
-    /// chat, and destination MUST return the original {@link ReorderChatResult},
-    /// including after reconnect or an uncertain response. Reusing the key with
-    /// a different source chat or destination MUST be rejected with
-    /// `InvalidParams`.</summary>
-    public required string RequestId { get; init; }
-}
-
-/// <summary>Result of the `reorderChat` command.</summary>
-public sealed record ReorderChatResult
-{
-    /// <summary>Owning session URI.</summary>
-    public required string Session { get; init; }
-
-    /// <summary>The complete moved unit — `channel` plus every host-managed descendant —
-    /// in its new contiguous relative order within the owning session's chat
-    /// catalog. Identical to the `chats` field of the corresponding
-    /// `session/chatsReordered` action.</summary>
-    public required List<string> Chats { get; init; }
 }
 
 /// <summary>Returns a list of session summaries. Used to populate session lists and sidebars.

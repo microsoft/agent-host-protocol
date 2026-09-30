@@ -602,23 +602,12 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionChatsReordered -> {
         val a = action.value
-        val movedResources = a.chats.toSet()
-        val movedEntries = a.chats.mapNotNull { resource -> state.chats.firstOrNull { it.resource == resource } }
-        if (movedEntries.isEmpty()) {
+        val summaries = state.chats.associateBy { it.resource }
+        if (a.chats.size != state.chats.size || a.chats.toSet().size != state.chats.size) {
             state
         } else {
-            val remaining = state.chats.filter { it.resource !in movedResources }
-            val insertAt = when (val destination = a.destination) {
-                is ChatReorderDestinationStart -> 0
-                is ChatReorderDestinationBefore -> remaining.indexOfFirst { it.resource == destination.value.anchor }
-                    .let { if (it < 0) remaining.size else it }
-                is ChatReorderDestinationAfter -> remaining.indexOfFirst { it.resource == destination.value.anchor }
-                    .let { if (it < 0) remaining.size else it + 1 }
-                else -> remaining.size
-            }
-            val reordered = remaining.toMutableList()
-            reordered.addAll(insertAt, movedEntries)
-            state.copy(chats = reordered)
+            val reordered = a.chats.mapNotNull(summaries::get)
+            if (reordered.size != state.chats.size) state else state.copy(chats = reordered)
         }
     }
 

@@ -1615,10 +1615,6 @@ function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
-  lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::commands::ChatReorderDestination;');
-  lines.push('');
-
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
   const actionTypeEnum = findEnum(project, 'ActionType');
@@ -1720,7 +1716,7 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatReorderDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
@@ -1738,10 +1734,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ForkChatSource', omitDiscriminants: true }, { name: 'SideChatSource', omitDiscriminants: true }, { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
-  { name: 'MoveChatParams' }, { name: 'MovedChatResource' }, { name: 'MoveChatResult' },
-  { name: 'ChatReorderToStartDestination', omitDiscriminants: true }, { name: 'ChatReorderToEndDestination', omitDiscriminants: true },
-  { name: 'ChatReorderBeforeDestination', omitDiscriminants: true }, { name: 'ChatReorderAfterDestination', omitDiscriminants: true },
-  { name: 'ReorderChatParams' }, { name: 'ReorderChatResult' },
+  { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1799,18 +1792,6 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-const CHAT_REORDER_DESTINATION_UNION: UnionConfig = {
-  name: 'ChatReorderDestination',
-  discriminantField: 'kind',
-  doc: 'Relative-placement destination of a chat reorder.',
-  variants: [
-    { variantName: 'Start', innerType: 'ChatReorderToStartDestination', wireValue: 'start' },
-    { variantName: 'End', innerType: 'ChatReorderToEndDestination', wireValue: 'end' },
-    { variantName: 'Before', innerType: 'ChatReorderBeforeDestination', wireValue: 'before' },
-    { variantName: 'After', innerType: 'ChatReorderAfterDestination', wireValue: 'after' },
-  ],
-};
-
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
@@ -1854,10 +1835,6 @@ function generateCommandsFile(project: Project): string {
   lines.push('// ─── ChatMoveDestination Union ────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
-  lines.push('// ─── ChatReorderDestination Union ─────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(project, CHAT_REORDER_DESTINATION_UNION));
-  lines.push('');
-
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
   lines.push('');
@@ -1968,7 +1945,6 @@ const NOTIFICATION_STRUCTS = [
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
   'ProgressParams',
-  'ChatMovedParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
   'OtlpExportTracesParams',
@@ -1977,8 +1953,6 @@ const NOTIFICATION_STRUCTS = [
 
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::commands::MovedChatResource;');
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary};');
   lines.push('');
@@ -2269,7 +2243,6 @@ function checkExhaustiveness(project: Project): void {
     'ChatOrigin',                   // hand-generated union for inline variants
     'ChatSource',
     'ChatMoveDestination',
-    'ChatReorderDestination',
     'PingParams',
     'TerminalClaim',
     'TerminalContentPart',

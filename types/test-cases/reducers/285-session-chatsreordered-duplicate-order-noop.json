@@ -1,5 +1,5 @@
 {
-  "description": "session/chatsReordered moves a chat to the start of the catalog",
+  "description": "session/chatsReordered ignores an authoritative order containing a duplicate chat",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -21,21 +21,13 @@
         "status": 1,
         "modifiedAt": "1970-01-01T00:00:02.000Z",
         "origin": { "kind": "user" }
-      },
-      {
-        "resource": "ahp-chat:/c3",
-        "title": "Chat 3",
-        "status": 1,
-        "modifiedAt": "1970-01-01T00:00:03.000Z",
-        "origin": { "kind": "user" }
       }
     ]
   },
   "actions": [
     {
       "type": "session/chatsReordered",
-      "chats": ["ahp-chat:/c3"],
-      "destination": { "kind": "start" }
+      "chats": ["ahp-chat:/c2", "ahp-chat:/c2"]
     }
   ],
   "expected": {
@@ -45,13 +37,6 @@
     "lifecycle": "ready",
     "activeClients": [],
     "chats": [
-      {
-        "resource": "ahp-chat:/c3",
-        "title": "Chat 3",
-        "status": 1,
-        "modifiedAt": "1970-01-01T00:00:03.000Z",
-        "origin": { "kind": "user" }
-      },
       {
         "resource": "ahp-chat:/c1",
         "title": "Chat 1",

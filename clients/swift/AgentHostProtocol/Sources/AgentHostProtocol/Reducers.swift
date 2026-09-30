@@ -749,32 +749,17 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         return next
 
     case .sessionChatsReordered(let a):
-        let moved = Set(a.chats)
-        let movedEntries = a.chats.compactMap { resource in state.chats.first { $0.resource == resource } }
-        guard !movedEntries.isEmpty else {
+        guard a.chats.count == state.chats.count, Set(a.chats).count == state.chats.count else {
             return state
         }
-        var remaining = state.chats.filter { !moved.contains($0.resource) }
-        let insertAt: Int
-        switch a.destination {
-        case .start:
-            insertAt = 0
-        case .end:
-            insertAt = remaining.count
-        case .before(let destination):
-            insertAt = remaining.firstIndex { $0.resource == destination.anchor } ?? remaining.count
-        case .after(let destination):
-            if let idx = remaining.firstIndex(where: { $0.resource == destination.anchor }) {
-                insertAt = idx + 1
-            } else {
-                insertAt = remaining.count
-            }
-        case .unknown:
-            insertAt = remaining.count
+        let reordered = a.chats.compactMap { resource in
+            state.chats.first { $0.resource == resource }
         }
-        remaining.insert(contentsOf: movedEntries, at: insertAt)
+        guard reordered.count == state.chats.count else {
+            return state
+        }
         var next = state
-        next.chats = remaining
+        next.chats = reordered
         return next
 
     // ── Metadata ──────────────────────────────────────────────────────────

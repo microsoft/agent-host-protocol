@@ -127,37 +127,6 @@ data class ProgressParams(
 )
 
 @Serializable
-data class ChatMovedParams(
-    /**
-     * Previous channel receiving this notification; names one `movedChats[].previousChat`.
-     */
-    val channel: String,
-    /**
-     * Owning session URI before the move.
-     */
-    val previousSession: String,
-    /**
-     * Requested root chat URI before the move.
-     */
-    val previousChat: String,
-    /**
-     * Authoritative owning session URI after the move.
-     */
-    val session: String,
-    /**
-     * Authoritative requested root chat URI after the move.
-     */
-    val chat: String,
-    /**
-     * Exhaustive ordered mapping for the complete moved subtree.
-     *
-     * Identical in every `chat/moved` notification for this move and in the
-     * corresponding {@link MoveChatResult}.
-     */
-    val movedChats: List<MovedChatResource>
-)
-
-@Serializable
 data class AuthRequiredParams(
     /**
      * Channel URI this notification belongs to
@@ -291,15 +260,11 @@ data class PartialSessionSummary(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Lightweight ordered chat catalog for session-list presentation.
-     *
-     * This intentionally omits volatile chat state such as status and activity,
-     * while retaining interactivity so generic clients can hide chats or present
-     * them as read-only without subscribing to the session channel.
+     * Lightweight host-authoritative ordered chat catalog.
      */
     val chats: List<SessionChatSummary>? = null,
     /**
-     * Chat that receives input when no specific chat is selected.
+     * Chat that receives input when none is selected, independent of catalog position.
      */
     val defaultChat: String? = null
 )

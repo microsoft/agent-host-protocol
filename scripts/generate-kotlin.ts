@@ -1737,7 +1737,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatReorderDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
@@ -1750,9 +1750,7 @@ const COMMAND_STRUCTS = [
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
-  'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MovedChatResource', 'MoveChatResult',
-  'ChatReorderToStartDestination', 'ChatReorderToEndDestination', 'ChatReorderBeforeDestination', 'ChatReorderAfterDestination',
-  'ReorderChatParams', 'ReorderChatResult',
+  'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
   'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
@@ -1804,17 +1802,6 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   variants: [
     { caseName: 'Session', structName: 'ChatMoveToSessionDestination', discriminantValue: 'session' },
     { caseName: 'NewSession', structName: 'ChatMoveToNewSessionDestination', discriminantValue: 'newSession' },
-  ],
-};
-
-const CHAT_REORDER_DESTINATION_UNION: UnionConfig = {
-  name: 'ChatReorderDestination',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'Start', structName: 'ChatReorderToStartDestination', discriminantValue: 'start' },
-    { caseName: 'End', structName: 'ChatReorderToEndDestination', discriminantValue: 'end' },
-    { caseName: 'Before', structName: 'ChatReorderBeforeDestination', discriminantValue: 'before' },
-    { caseName: 'After', structName: 'ChatReorderAfterDestination', discriminantValue: 'after' },
   ],
 };
 
@@ -2013,11 +2000,6 @@ function generateCommandsFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
 
-  lines.push('// ─── ChatReorderDestination Union ────────────────────────────────────────────');
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CHAT_REORDER_DESTINATION_UNION));
-  lines.push('');
-
   lines.push('// ─── ReconnectResult Union ──────────────────────────────────────────────────');
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
@@ -2040,7 +2022,6 @@ const NOTIFICATION_STRUCTS = [
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
   'ProgressParams',
-  'ChatMovedParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
   'OtlpExportTracesParams',
@@ -2390,7 +2371,6 @@ function checkExhaustiveness(project: Project): void {
     'ChatOrigin',                // hand-generated union for inline variants
     'ChatSource',                // CHAT_SOURCE_UNION discriminated union
     'ChatMoveDestination',       // CHAT_MOVE_DESTINATION_UNION discriminated union
-    'ChatReorderDestination',    // CHAT_REORDER_DESTINATION_UNION discriminated union
     'ChatToolCallApprovedAction', // merged into ChatToolCallConfirmedAction
     'ChatToolCallDeniedAction',   // merged into ChatToolCallConfirmedAction
     'ChatToolCallConfirmedAction', // emitted as merged variant
