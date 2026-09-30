@@ -458,7 +458,7 @@ data class ChatToolCallReadyAction(
     /**
      * File edits that this tool call will perform, for preview before confirmation
      */
-    val edits: JsonElement? = null,
+    val edits: FileEditCollection? = null,
     /**
      * Whether the agent host allows the client to edit the tool's input parameters before confirming
      */
@@ -1600,6 +1600,12 @@ data class PartialChatSummary(
      * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
      */
     val modifiedAt: String? = null,
+    /**
+     * Aggregate summary of file changes associated with this chat. Servers may
+     * populate this to give clients a quick at-a-glance view of the chat's
+     * footprint without requiring the client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
     /**
      * How this chat came into existence
      */

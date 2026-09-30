@@ -1081,6 +1081,14 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case event = "event"
 }
 
+/// Discriminant for an {@link AutomationDisableCondition}.
+public enum AutomationDisableConditionKind: String, Codable, Sendable {
+    /// Stop scheduling after a fixed number of scheduled runs.
+    case afterRuns = "afterRuns"
+    /// Stop scheduling once a wall-clock date passes.
+    case afterDate = "afterDate"
+}
+
 /// Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -1626,6 +1634,10 @@ public struct ChatState: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// Whether this chat is structurally eligible to be the source of
@@ -1700,6 +1712,7 @@ public struct ChatState: Codable, Sendable {
         case status
         case activity
         case modifiedAt
+        case changes
         case origin
         case movable
         case interactivity
@@ -1720,6 +1733,7 @@ public struct ChatState: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -1738,6 +1752,7 @@ public struct ChatState: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
@@ -1764,6 +1779,10 @@ public struct ChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// Whether this chat is structurally eligible to be the source of
@@ -1787,6 +1806,7 @@ public struct ChatSummary: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -1797,6 +1817,7 @@ public struct ChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
@@ -3492,7 +3513,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     /// Risk assessment that informed the confirmation requirement.
     public var riskAssessment: ToolCallRiskAssessment?
     /// File edits that this tool call will perform, for preview before confirmation
-    public var edits: AnyCodable?
+    public var edits: FileEditCollection?
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     public var editable: Bool?
     /// Options the server offers for this confirmation. When present, the client
@@ -3530,7 +3551,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         status: ToolCallStatus,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
-        edits: AnyCodable? = nil,
+        edits: FileEditCollection? = nil,
         editable: Bool? = nil,
         options: [ConfirmationOption]? = nil
     ) {
@@ -4201,17 +4222,17 @@ public struct ToolResultResourceContent: Codable, Sendable {
 
 public struct ToolResultFileEditContent: Codable, Sendable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
-    public var before: AnyCodable?
+    public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
-    public var after: AnyCodable?
+    public var after: FileEditSide?
     /// Optional diff display metadata
-    public var diff: AnyCodable?
+    public var diff: FileEditDiffStats?
     public var type: ToolResultContentType
 
     public init(
-        before: AnyCodable? = nil,
-        after: AnyCodable? = nil,
-        diff: AnyCodable? = nil,
+        before: FileEditSide? = nil,
+        after: FileEditSide? = nil,
+        diff: FileEditDiffStats? = nil,
         type: ToolResultContentType
     ) {
         self.before = before
@@ -5403,22 +5424,62 @@ public struct ToolCallMcpContributor: Codable, Sendable {
     }
 }
 
-public struct FileEdit: Codable, Sendable {
-    /// The file state before the edit. Absent for file creations or for in-place file edits.
-    public var before: AnyCodable?
-    /// The file state after the edit. Absent for file deletions.
-    public var after: AnyCodable?
-    /// Optional diff display metadata
-    public var diff: AnyCodable?
+public struct FileEditSide: Codable, Sendable {
+    /// URI of the file on this side of the edit
+    public var uri: String
+    /// Reference to the file content on this side of the edit
+    public var content: ContentRef
 
     public init(
-        before: AnyCodable? = nil,
-        after: AnyCodable? = nil,
-        diff: AnyCodable? = nil
+        uri: String,
+        content: ContentRef
+    ) {
+        self.uri = uri
+        self.content = content
+    }
+}
+
+public struct FileEditDiffStats: Codable, Sendable {
+    /// Number of items added (e.g., lines for text files, cells for notebooks)
+    public var added: Int?
+    /// Number of items removed (e.g., lines for text files, cells for notebooks)
+    public var removed: Int?
+
+    public init(
+        added: Int? = nil,
+        removed: Int? = nil
+    ) {
+        self.added = added
+        self.removed = removed
+    }
+}
+
+public struct FileEdit: Codable, Sendable {
+    /// The file state before the edit. Absent for file creations or for in-place file edits.
+    public var before: FileEditSide?
+    /// The file state after the edit. Absent for file deletions.
+    public var after: FileEditSide?
+    /// Optional diff display metadata
+    public var diff: FileEditDiffStats?
+
+    public init(
+        before: FileEditSide? = nil,
+        after: FileEditSide? = nil,
+        diff: FileEditDiffStats? = nil
     ) {
         self.before = before
         self.after = after
         self.diff = diff
+    }
+}
+
+public struct FileEditCollection: Codable, Sendable {
+    public var items: [FileEdit]
+
+    public init(
+        items: [FileEdit]
+    ) {
+        self.items = items
     }
 }
 
@@ -6347,6 +6408,20 @@ public struct AutomationDefinition: Codable, Sendable {
     public var enabled: Bool
     /// Automatic triggers. An empty list means manual-only.
     public var triggers: [AutomationTrigger]
+    /// Self-disable rules combined with logical OR: the host sets
+    /// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+    /// Absent or empty means no automatic disable conditions. Each
+    /// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+    /// reject create or update requests containing duplicate kinds.
+    ///
+    /// Only automatic (scheduled) runs are governed; manual runs via
+    /// {@link RunAutomationParams | runAutomation} are never blocked. For a
+    /// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+    /// {@link AutomationEntry.runCount}. Adding that kind when absent or
+    /// a disabled→enabled transition starts a fresh allowance. Clearing the
+    /// conditions does not re-enable a disabled automation. See the
+    /// {@link /guide/automations | Automations Guide}.
+    public var disableConditions: [AutomationDisableCondition]?
     /// Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.
     public var meta: [String: AnyCodable]?
@@ -6357,6 +6432,7 @@ public struct AutomationDefinition: Codable, Sendable {
         case session
         case enabled
         case triggers
+        case disableConditions
         case meta = "_meta"
     }
 
@@ -6366,6 +6442,7 @@ public struct AutomationDefinition: Codable, Sendable {
         session: AutomationSessionTemplate,
         enabled: Bool,
         triggers: [AutomationTrigger],
+        disableConditions: [AutomationDisableCondition]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
@@ -6373,6 +6450,7 @@ public struct AutomationDefinition: Codable, Sendable {
         self.session = session
         self.enabled = enabled
         self.triggers = triggers
+        self.disableConditions = disableConditions
         self.meta = meta
     }
 }
@@ -6390,6 +6468,11 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     /// Complete replacement {@link AutomationDefinition.triggers}. The host
     /// validates event ids and normalizes event-trigger titles and descriptions.
     public var triggers: [AutomationTrigger]?
+    /// Complete replacement {@link AutomationDefinition.disableConditions}.
+    /// Omit to leave unchanged; supply an empty array to remove all conditions.
+    /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+    /// Clearing conditions does not change {@link AutomationDefinition.enabled}.
+    public var disableConditions: [AutomationDisableCondition]?
     /// Complete replacement {@link AutomationDefinition._meta}.
     public var meta: [String: AnyCodable]?
 
@@ -6399,6 +6482,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         case session
         case enabled
         case triggers
+        case disableConditions
         case meta = "_meta"
     }
 
@@ -6408,6 +6492,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         session: AutomationSessionTemplate? = nil,
         enabled: Bool? = nil,
         triggers: [AutomationTrigger]? = nil,
+        disableConditions: [AutomationDisableCondition]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
@@ -6415,7 +6500,36 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         self.session = session
         self.enabled = enabled
         self.triggers = triggers
+        self.disableConditions = disableConditions
         self.meta = meta
+    }
+}
+
+public struct AutomationAfterRunsCondition: Codable, Sendable {
+    public var kind: AutomationDisableConditionKind
+    /// Positive-integer cap on scheduled runs.
+    public var max: Int
+
+    public init(
+        kind: AutomationDisableConditionKind,
+        max: Int
+    ) {
+        self.kind = kind
+        self.max = max
+    }
+}
+
+public struct AutomationAfterDateCondition: Codable, Sendable {
+    public var kind: AutomationDisableConditionKind
+    /// ISO 8601 timestamp after which scheduling stops.
+    public var date: String
+
+    public init(
+        kind: AutomationDisableConditionKind,
+        date: String
+    ) {
+        self.kind = kind
+        self.date = date
     }
 }
 
@@ -6426,6 +6540,18 @@ public struct AutomationEntry: Codable, Sendable {
     public var definition: AutomationDefinition
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
+    /// Host-owned count of scheduled runs consumed against the current
+    /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+    /// **current** allowance, not a lifetime total: the host resets it to `0` when
+    /// a disabled→enabled transition starts a fresh allowance or a
+    /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+    /// reconstructed from {@link runs} (a bounded, prunable window). The host
+    /// increments it atomically when it admits a scheduled run, including runs
+    /// later cancelled or failed.
+    ///
+    /// Absent when {@link AutomationDefinition.disableConditions} contains no
+    /// {@link AutomationAfterRunsCondition}.
+    public var runCount: Int?
     /// Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
     /// {@link AutomationEntry.runsNextCursor} is present.
@@ -6445,6 +6571,7 @@ public struct AutomationEntry: Codable, Sendable {
         case resource
         case definition
         case nextRunAt
+        case runCount
         case runs
         case runsNextCursor
         case operations
@@ -6457,6 +6584,7 @@ public struct AutomationEntry: Codable, Sendable {
         resource: String,
         definition: AutomationDefinition,
         nextRunAt: String? = nil,
+        runCount: Int? = nil,
         runs: [AutomationRunSummary],
         runsNextCursor: String? = nil,
         operations: [AutomationOperation],
@@ -6467,6 +6595,7 @@ public struct AutomationEntry: Codable, Sendable {
         self.resource = resource
         self.definition = definition
         self.nextRunAt = nextRunAt
+        self.runCount = runCount
         self.runs = runs
         self.runsNextCursor = runsNextCursor
         self.operations = operations
@@ -7680,6 +7809,39 @@ public enum AutomationTrigger: Codable, Sendable {
             try value.encode(to: encoder)
         case .event(var value):
             value.kind = .event
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationDisableCondition: Codable, Sendable {
+    case afterRuns(AutomationAfterRunsCondition)
+    case afterDate(AutomationAfterDateCondition)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "afterRuns":
+            self = .afterRuns(try AutomationAfterRunsCondition(from: decoder))
+        case "afterDate":
+            self = .afterDate(try AutomationAfterDateCondition(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationDisableCondition discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .afterRuns(var value):
+            value.kind = .afterRuns
+            try value.encode(to: encoder)
+        case .afterDate(var value):
+            value.kind = .afterDate
             try value.encode(to: encoder)
         }
     }

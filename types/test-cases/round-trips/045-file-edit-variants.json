@@ -1,0 +1,36 @@
+{
+  "name": "file-edit-variants",
+  "group": "A",
+  "description": "A changeset preserves file-edit variants, metadata, and optional field presence.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-changeset:/c1",
+    "fromSeq": 1,
+    "state": {
+      "status": "ready",
+      "files": [
+        {"id":"create","edit":{"after":{"uri":"file:///workspace/new.txt","content":{"uri":"ahp-content:/new","sizeHint":32,"contentType":"text/plain","nonce":"v1"}},"diff":{"added":2147483648,"removed":0}},"_meta":{"vendor":{"keep":true}}},
+        {"id":"delete","edit":{"before":{"uri":"file:///workspace/deleted.txt","content":{"uri":"ahp-content:/deleted"}},"diff":{"removed":1}}},
+        {"id":"rename","edit":{"before":{"uri":"file:///workspace/old.txt","content":{"uri":"ahp-content:/renamed"}},"after":{"uri":"file:///workspace/renamed.txt","content":{"uri":"ahp-content:/renamed"}}}},
+        {"id":"edit","edit":{"before":{"uri":"file:///workspace/edit.txt","content":{"uri":"ahp-content:/before"}},"after":{"uri":"file:///workspace/edit.txt","content":{"uri":"ahp-content:/after"}},"diff":{"added":1,"removed":1}}},
+        {"id":"in-place","edit":{"after":{"uri":"file:///workspace/existing.txt","content":{"uri":"ahp-content:/existing"}},"diff":{}}},
+        {"id":"empty","edit":{}}
+      ]
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-changeset:/c1",
+    "fromSeq": 1,
+    "state": {
+      "status": "ready",
+      "files": [
+        {"id":"create","edit":{"after":{"uri":"file:///workspace/new.txt","content":{"uri":"ahp-content:/new","sizeHint":32,"contentType":"text/plain","nonce":"v1"}},"diff":{"added":2147483648,"removed":0}},"_meta":{"vendor":{"keep":true}}},
+        {"id":"delete","edit":{"before":{"uri":"file:///workspace/deleted.txt","content":{"uri":"ahp-content:/deleted"}},"diff":{"removed":1}}},
+        {"id":"rename","edit":{"before":{"uri":"file:///workspace/old.txt","content":{"uri":"ahp-content:/renamed"}},"after":{"uri":"file:///workspace/renamed.txt","content":{"uri":"ahp-content:/renamed"}}}},
+        {"id":"edit","edit":{"before":{"uri":"file:///workspace/edit.txt","content":{"uri":"ahp-content:/before"}},"after":{"uri":"file:///workspace/edit.txt","content":{"uri":"ahp-content:/after"}},"diff":{"added":1,"removed":1}}},
+        {"id":"in-place","edit":{"after":{"uri":"file:///workspace/existing.txt","content":{"uri":"ahp-content:/existing"}},"diff":{}}},
+        {"id":"empty","edit":{}}
+      ]
+    }
+  }]
+}

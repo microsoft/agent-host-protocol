@@ -1387,7 +1387,7 @@ public sealed record ChatToolCallReadyAction
 
     /// <summary>File edits that this tool call will perform, for preview before confirmation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Edits { get; init; }
+    public FileEditCollection? Edits { get; init; }
 
     /// <summary>Whether the agent host allows the client to edit the tool's input parameters before confirming</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2622,6 +2622,12 @@ public sealed record PartialChatSummary
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModifiedAt { get; init; }
+
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; init; }
 
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

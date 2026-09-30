@@ -17,14 +17,14 @@ use crate::commands::ChatReorderDestination;
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
-    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, McpAuthRequirement, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
-    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
-    ToolResultContent, Turn, UsageInfo,
+    ChangesSummary, Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus,
+    ChangesetStatus, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity,
+    ChatOrigin, ChatSummary, ConfirmationOption, ContentRef, Customization,
+    CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement,
+    McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -756,7 +756,7 @@ pub struct ChatToolCallReadyAction {
     pub risk_assessment: Option<ToolCallRiskAssessment>,
     /// File edits that this tool call will perform, for preview before confirmation
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edits: Option<AnyValue>,
+    pub edits: Option<FileEditCollection>,
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editable: Option<bool>,
@@ -2281,6 +2281,11 @@ pub struct PartialChatSummary {
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modified_at: Option<String>,
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,

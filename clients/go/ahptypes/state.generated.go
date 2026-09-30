@@ -514,6 +514,16 @@ const (
 	AutomationTriggerKindEvent AutomationTriggerKind = "event"
 )
 
+// Discriminant for an {@link AutomationDisableCondition}.
+type AutomationDisableConditionKind string
+
+const (
+	// Stop scheduling after a fixed number of scheduled runs.
+	AutomationDisableConditionKindAfterRuns AutomationDisableConditionKind = "afterRuns"
+	// Stop scheduling once a wall-clock date passes.
+	AutomationDisableConditionKindAfterDate AutomationDisableConditionKind = "afterDate"
+)
+
 // Lifecycle status of one automation run.
 //
 // `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -1136,7 +1146,8 @@ type SessionToolAuthenticationRequest struct {
 //     to a subset via {@link ChatSummary.workingDirectories}; aggregating these
 //     up is meaningless and SHOULD NOT be attempted.
 //   - `changes`: optional roll-up across all chats. Producers MAY sum the
-//     per-chat changeset stats or report the most expensive chat's stats —
+//     per-chat {@link ChatSummary.changes | changes summaries} or report the
+//     most expensive chat's stats —
 //     whichever is cheaper for the host to compute.
 //
 // Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -1221,7 +1232,8 @@ type SessionChatSummary struct {
 	Archived *bool `json:"archived,omitempty"`
 }
 
-// Aggregate counts describing the file changes associated with a session.
+// Aggregate counts describing the file changes associated with a session or
+// chat.
 //
 // All fields are optional so servers can populate only the metrics they
 // cheaply have available.
@@ -1256,6 +1268,10 @@ type ChatState struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
+	// Aggregate summary of file changes associated with this chat. Servers may
+	// populate this to give clients a quick at-a-glance view of the chat's
+	// footprint without requiring the client to subscribe to a changeset.
+	Changes *ChangesSummary `json:"changes,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// Whether this chat is structurally eligible to be the source of
@@ -1339,6 +1355,10 @@ type ChatSummary struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
+	// Aggregate summary of file changes associated with this chat. Servers may
+	// populate this to give clients a quick at-a-glance view of the chat's
+	// footprint without requiring the client to subscribe to a changeset.
+	Changes *ChangesSummary `json:"changes,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// Whether this chat is structurally eligible to be the source of
@@ -2172,7 +2192,7 @@ type ToolCallPendingConfirmationState struct {
 	// Risk assessment that informed the confirmation requirement.
 	RiskAssessment *ToolCallRiskAssessment `json:"riskAssessment,omitempty"`
 	// File edits that this tool call will perform, for preview before confirmation
-	Edits *json.RawMessage `json:"edits,omitempty"`
+	Edits *FileEditCollection `json:"edits,omitempty"`
 	// Whether the agent host allows the client to edit the tool's input parameters before confirming
 	Editable *bool `json:"editable,omitempty"`
 	// Options the server offers for this confirmation. When present, the client
@@ -2499,11 +2519,11 @@ type ToolResultResourceContent struct {
 // Describes a file modification performed by a tool.
 type ToolResultFileEditContent struct {
 	// The file state before the edit. Absent for file creations or for in-place file edits.
-	Before *json.RawMessage `json:"before,omitempty"`
+	Before *FileEditSide `json:"before,omitempty"`
 	// The file state after the edit. Absent for file deletions.
-	After *json.RawMessage `json:"after,omitempty"`
+	After *FileEditSide `json:"after,omitempty"`
 	// Optional diff display metadata
-	Diff *json.RawMessage      `json:"diff,omitempty"`
+	Diff *FileEditDiffStats    `json:"diff,omitempty"`
 	Type ToolResultContentType `json:"type"`
 }
 
@@ -3319,17 +3339,35 @@ type ToolCallMcpContributor struct {
 	CustomizationId string `json:"customizationId"`
 }
 
+type FileEditSide struct {
+	// URI of the file on this side of the edit
+	Uri URI `json:"uri"`
+	// Reference to the file content on this side of the edit
+	Content ContentRef `json:"content"`
+}
+
+type FileEditDiffStats struct {
+	// Number of items added (e.g., lines for text files, cells for notebooks)
+	Added *int64 `json:"added,omitempty"`
+	// Number of items removed (e.g., lines for text files, cells for notebooks)
+	Removed *int64 `json:"removed,omitempty"`
+}
+
 // Describes a file modification with before/after state and diff metadata.
 //
 // Supports creates (only `after`), deletes (only `before`), renames/moves
 // (different `uri` in `before` and `after`), and edits (same `uri`, different content).
 type FileEdit struct {
 	// The file state before the edit. Absent for file creations or for in-place file edits.
-	Before *json.RawMessage `json:"before,omitempty"`
+	Before *FileEditSide `json:"before,omitempty"`
 	// The file state after the edit. Absent for file deletions.
-	After *json.RawMessage `json:"after,omitempty"`
+	After *FileEditSide `json:"after,omitempty"`
 	// Optional diff display metadata
-	Diff *json.RawMessage `json:"diff,omitempty"`
+	Diff *FileEditDiffStats `json:"diff,omitempty"`
+}
+
+type FileEditCollection struct {
+	Items []FileEdit `json:"items"`
 }
 
 // Outcome of a command run in a terminal-style tool, filled in on
@@ -3981,6 +4019,20 @@ type AutomationDefinition struct {
 	Enabled bool `json:"enabled"`
 	// Automatic triggers. An empty list means manual-only.
 	Triggers []AutomationTrigger `json:"triggers"`
+	// Self-disable rules combined with logical OR: the host sets
+	// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+	// Absent or empty means no automatic disable conditions. Each
+	// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+	// reject create or update requests containing duplicate kinds.
+	//
+	// Only automatic (scheduled) runs are governed; manual runs via
+	// {@link RunAutomationParams | runAutomation} are never blocked. For a
+	// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+	// {@link AutomationEntry.runCount}. Adding that kind when absent or
+	// a disabled→enabled transition starts a fresh allowance. Clearing the
+	// conditions does not re-enable a disabled automation. See the
+	// {@link /guide/automations | Automations Guide}.
+	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
 	// Opaque implementation-defined metadata. Clients MUST preserve unknown
 	// entries when updating the definition.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -4003,8 +4055,27 @@ type AutomationDefinitionPatch struct {
 	// Complete replacement {@link AutomationDefinition.triggers}. The host
 	// validates event ids and normalizes event-trigger titles and descriptions.
 	Triggers *[]AutomationTrigger `json:"triggers,omitempty"`
+	// Complete replacement {@link AutomationDefinition.disableConditions}.
+	// Omit to leave unchanged; supply an empty array to remove all conditions.
+	// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+	// Clearing conditions does not change {@link AutomationDefinition.enabled}.
+	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
 	// Complete replacement {@link AutomationDefinition._meta}.
 	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Stops scheduling after a fixed number of scheduled runs.
+type AutomationAfterRunsCondition struct {
+	Kind AutomationDisableConditionKind `json:"kind"`
+	// Positive-integer cap on scheduled runs.
+	Max int64 `json:"max"`
+}
+
+// Stops scheduling once a wall-clock date passes.
+type AutomationAfterDateCondition struct {
+	Kind AutomationDisableConditionKind `json:"kind"`
+	// ISO 8601 timestamp after which scheduling stops.
+	Date string `json:"date"`
 }
 
 // Authoritative state of one automation in {@link AutomationState.entries}.
@@ -4019,6 +4090,18 @@ type AutomationEntry struct {
 	Definition AutomationDefinition `json:"definition"`
 	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
+	// Host-owned count of scheduled runs consumed against the current
+	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+	// **current** allowance, not a lifetime total: the host resets it to `0` when
+	// a disabled→enabled transition starts a fresh allowance or a
+	// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+	// reconstructed from {@link runs} (a bounded, prunable window). The host
+	// increments it atomically when it admits a scheduled run, including runs
+	// later cancelled or failed.
+	//
+	// Absent when {@link AutomationDefinition.disableConditions} contains no
+	// {@link AutomationAfterRunsCondition}.
+	RunCount *int64 `json:"runCount,omitempty"`
 	// Newest-first retained run summaries. This is a bounded window; use
 	// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
 	// {@link AutomationEntry.runsNextCursor} is present.
@@ -5693,6 +5776,68 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"schedule\"")
 	case *AutomationEventTrigger:
 		object["kind"] = json.RawMessage("\"event\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationDisableCondition is an automation's self-disable rule.
+type AutomationDisableCondition struct {
+	Value isAutomationDisableCondition
+}
+
+// isAutomationDisableCondition is the marker interface implemented by every
+// concrete variant of AutomationDisableCondition.
+type isAutomationDisableCondition interface{ isAutomationDisableCondition() }
+
+func (*AutomationAfterRunsCondition) isAutomationDisableCondition() {}
+func (*AutomationAfterDateCondition) isAutomationDisableCondition() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationDisableCondition) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationDisableCondition", "kind")
+	}
+	switch disc {
+	case "afterRuns":
+		var value AutomationAfterRunsCondition
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "afterDate":
+		var value AutomationAfterDateCondition
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationDisableCondition", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationAfterRunsCondition:
+		object["kind"] = json.RawMessage("\"afterRuns\"")
+	case *AutomationAfterDateCondition:
+		object["kind"] = json.RawMessage("\"afterDate\"")
 	}
 	return json.Marshal(object)
 }

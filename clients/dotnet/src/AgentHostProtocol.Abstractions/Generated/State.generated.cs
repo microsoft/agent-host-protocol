@@ -633,6 +633,18 @@ public enum AutomationTriggerKind
     Event,
 }
 
+/// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
+[JsonConverter(typeof(WireEnumConverter<AutomationDisableConditionKind>))]
+public enum AutomationDisableConditionKind
+{
+    /// <summary>Stop scheduling after a fixed number of scheduled runs.</summary>
+    [WireValue("afterRuns")]
+    AfterRuns,
+    /// <summary>Stop scheduling once a wall-clock date passes.</summary>
+    [WireValue("afterDate")]
+    AfterDate,
+}
+
 /// <summary>Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -1131,6 +1143,12 @@ public sealed class ChatSummary
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }
 
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; set; }
+
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
@@ -1184,6 +1202,12 @@ public sealed class ChatState
 
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }
+
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; set; }
 
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1883,7 +1907,8 @@ public sealed record SessionToolAuthenticationRequest
 ///   to a subset via {@link ChatSummary.workingDirectories}; aggregating these
 ///   up is meaningless and SHOULD NOT be attempted.
 /// - `changes`: optional roll-up across all chats. Producers MAY sum the
-///   per-chat changeset stats or report the most expensive chat's stats —
+///   per-chat {@link ChatSummary.changes | changes summaries} or report the
+///   most expensive chat's stats —
 ///   whichever is cheaper for the host to compute.
 ///
 /// Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -2001,7 +2026,8 @@ public sealed record SessionChatSummary
     public bool? Archived { get; init; }
 }
 
-/// <summary>Aggregate counts describing the file changes associated with a session.
+/// <summary>Aggregate counts describing the file changes associated with a session or
+/// chat.
 ///
 /// All fields are optional so servers can populate only the metrics they
 /// cheaply have available.</summary>
@@ -2882,7 +2908,7 @@ public sealed record ToolCallPendingConfirmationState
 
     /// <summary>File edits that this tool call will perform, for preview before confirmation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Edits { get; init; }
+    public FileEditCollection? Edits { get; init; }
 
     /// <summary>Whether the agent host allows the client to edit the tool's input parameters before confirming</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3361,15 +3387,15 @@ public sealed record ToolResultFileEditContent
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
 
     public ToolResultContentType Type { get; init; }
 }
@@ -4439,6 +4465,26 @@ public sealed record ToolCallMcpContributor
     public required string CustomizationId { get; init; }
 }
 
+public sealed record FileEditSide
+{
+    /// <summary>URI of the file on this side of the edit</summary>
+    public required string Uri { get; init; }
+
+    /// <summary>Reference to the file content on this side of the edit</summary>
+    public required ContentRef Content { get; init; }
+}
+
+public sealed record FileEditDiffStats
+{
+    /// <summary>Number of items added (e.g., lines for text files, cells for notebooks)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Added { get; init; }
+
+    /// <summary>Number of items removed (e.g., lines for text files, cells for notebooks)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Removed { get; init; }
+}
+
 /// <summary>Describes a file modification with before/after state and diff metadata.
 ///
 /// Supports creates (only `after`), deletes (only `before`), renames/moves
@@ -4447,15 +4493,20 @@ public sealed record FileEdit
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
+}
+
+public sealed record FileEditCollection
+{
+    public required List<FileEdit> Items { get; init; }
 }
 
 /// <summary>Lightweight terminal metadata exposed on the root state.</summary>
@@ -5277,6 +5328,22 @@ public sealed record AutomationDefinition
     /// <summary>Automatic triggers. An empty list means manual-only.</summary>
     public required List<AutomationTrigger> Triggers { get; init; }
 
+    /// <summary>Self-disable rules combined with logical OR: the host sets
+    /// {@link AutomationDefinition.enabled} to `false` when any condition is met.
+    /// Absent or empty means no automatic disable conditions. Each
+    /// {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+    /// reject create or update requests containing duplicate kinds.
+    ///
+    /// Only automatic (scheduled) runs are governed; manual runs via
+    /// {@link RunAutomationParams | runAutomation} are never blocked. For a
+    /// {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+    /// {@link AutomationEntry.runCount}. Adding that kind when absent or
+    /// a disabled→enabled transition starts a fresh allowance. Clearing the
+    /// conditions does not re-enable a disabled automation. See the
+    /// {@link /guide/automations | Automations Guide}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AutomationDisableCondition>? DisableConditions { get; init; }
+
     /// <summary>Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.</summary>
     [JsonPropertyName("_meta")]
@@ -5312,10 +5379,35 @@ public sealed record AutomationDefinitionPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationTrigger>? Triggers { get; init; }
 
+    /// <summary>Complete replacement {@link AutomationDefinition.disableConditions}.
+    /// Omit to leave unchanged; supply an empty array to remove all conditions.
+    /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
+    /// Clearing conditions does not change {@link AutomationDefinition.enabled}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AutomationDisableCondition>? DisableConditions { get; init; }
+
     /// <summary>Complete replacement {@link AutomationDefinition._meta}.</summary>
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Stops scheduling after a fixed number of scheduled runs.</summary>
+public sealed record AutomationAfterRunsCondition
+{
+    public AutomationDisableConditionKind Kind { get; init; }
+
+    /// <summary>Positive-integer cap on scheduled runs.</summary>
+    public long Max { get; init; }
+}
+
+/// <summary>Stops scheduling once a wall-clock date passes.</summary>
+public sealed record AutomationAfterDateCondition
+{
+    public AutomationDisableConditionKind Kind { get; init; }
+
+    /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
+    public required string Date { get; init; }
 }
 
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
@@ -5334,6 +5426,20 @@ public sealed class AutomationEntry
     /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
+
+    /// <summary>Host-owned count of scheduled runs consumed against the current
+    /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+    /// **current** allowance, not a lifetime total: the host resets it to `0` when
+    /// a disabled→enabled transition starts a fresh allowance or a
+    /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+    /// reconstructed from {@link runs} (a bounded, prunable window). The host
+    /// increments it atomically when it admits a scheduled run, including runs
+    /// later cancelled or failed.
+    ///
+    /// Absent when {@link AutomationDefinition.disableConditions} contains no
+    /// {@link AutomationAfterRunsCondition}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? RunCount { get; set; }
 
     /// <summary>Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
@@ -6174,6 +6280,33 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>AutomationDisableCondition is an automation's self-disable rule.</summary>
+[JsonConverter(typeof(AutomationDisableConditionConverter))]
+public sealed class AutomationDisableCondition : AhpUnion
+{
+    /// <summary>Creates an empty AutomationDisableCondition (no active variant).</summary>
+    public AutomationDisableCondition() { }
+
+    /// <summary>Creates a AutomationDisableCondition wrapping the given variant value.</summary>
+    public AutomationDisableCondition(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AutomationDisableCondition discriminated union.</summary>
+internal sealed class AutomationDisableConditionConverter : UnionConverter<AutomationDisableCondition>
+{
+    public AutomationDisableConditionConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["afterRuns"] = typeof(AutomationAfterRunsCondition),
+        ["afterDate"] = typeof(AutomationAfterDateCondition),
             },
             allowUnknown: false)
     {

@@ -1,0 +1,57 @@
+{
+  "description": "an authoritative automation set clears all disable conditions and the count without re-enabling the automation",
+  "reducer": "automation",
+  "initial": {
+    "entries": [{
+      "resource": "ahp-automation:/capped",
+      "definition": {
+        "title": "Capped",
+        "message": { "text": "go", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": false,
+        "triggers": [],
+        "disableConditions": [{ "kind": "afterRuns", "max": 3 }]
+      },
+      "runCount": 3,
+      "runs": [],
+      "operations": ["update", "remove", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  },
+  "actions": [{
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/capped",
+      "definition": {
+        "title": "Capped",
+        "message": { "text": "go", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": false,
+        "triggers": [],
+        "disableConditions": []
+      },
+      "runs": [],
+      "operations": ["update", "remove", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-02T00:00:00Z"
+    }
+  }],
+  "expected": {
+    "entries": [{
+      "resource": "ahp-automation:/capped",
+      "definition": {
+        "title": "Capped",
+        "message": { "text": "go", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": false,
+        "triggers": [],
+        "disableConditions": []
+      },
+      "runs": [],
+      "operations": ["update", "remove", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-02T00:00:00Z"
+    }]
+  }
+}

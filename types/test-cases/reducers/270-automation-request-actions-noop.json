@@ -1,5 +1,5 @@
 {
-  "description": "automation create and update requests leave authoritative catalogue state unchanged",
+  "description": "automation create and update requests, including replacing or clearing disable conditions, leave authoritative catalogue state unchanged",
   "reducer": "automation",
   "initial": {
     "entries": [{
@@ -9,8 +9,10 @@
         "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
-        "triggers": []
+        "triggers": [],
+        "disableConditions": [{ "kind": "afterRuns", "max": 3 }]
       },
+      "runCount": 2,
       "runs": [],
       "operations": ["update", "remove", "run"],
       "createdAt": "2025-01-01T00:00:00Z",
@@ -26,7 +28,8 @@
         "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
-        "triggers": []
+        "triggers": [],
+        "disableConditions": []
       }
     },
     {
@@ -35,6 +38,21 @@
       "changes": {
         "title": "Updated"
       }
+    },
+    {
+      "type": "automation/updateRequested",
+      "resource": "ahp-automation:/a1",
+      "changes": {
+        "disableConditions": [
+          { "kind": "afterRuns", "max": 5 },
+          { "kind": "afterDate", "date": "2026-08-07T00:00:00Z" }
+        ]
+      }
+    },
+    {
+      "type": "automation/updateRequested",
+      "resource": "ahp-automation:/a1",
+      "changes": { "disableConditions": [] }
     }
   ],
   "expected": {
@@ -45,8 +63,10 @@
         "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
-        "triggers": []
+        "triggers": [],
+        "disableConditions": [{ "kind": "afterRuns", "max": 3 }]
       },
+      "runCount": 2,
       "runs": [],
       "operations": ["update", "remove", "run"],
       "createdAt": "2025-01-01T00:00:00Z",

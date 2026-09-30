@@ -86,6 +86,11 @@ when (val action = envelope.action) {
 }
 ```
 
+When migrating to a release with typed file-edit models, see the
+[file-edit migration guide](../../docs/guide/changesets.md#typed-file-edit-models).
+It covers the new model names, constructor and property changes, and decoding
+behavior. This is a client API migration, not a new JSON protocol.
+
 ### What's in the box
 
 - **`com.microsoft.agenthostprotocol.Ahp`** — `Ahp.json` configured `Json` instance.

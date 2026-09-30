@@ -1095,6 +1095,23 @@ enum class AutomationTriggerKind {
 }
 
 /**
+ * Discriminant for an {@link AutomationDisableCondition}.
+ */
+@Serializable
+enum class AutomationDisableConditionKind {
+    /**
+     * Stop scheduling after a fixed number of scheduled runs.
+     */
+    @SerialName("afterRuns")
+    AFTER_RUNS,
+    /**
+     * Stop scheduling once a wall-clock date passes.
+     */
+    @SerialName("afterDate")
+    AFTER_DATE
+}
+
+/**
  * Lifecycle status of one automation run.
  *
  * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
@@ -1597,6 +1614,12 @@ data class ChatState(
      */
     val modifiedAt: String,
     /**
+     * Aggregate summary of file changes associated with this chat. Servers may
+     * populate this to give clients a quick at-a-glance view of the chat's
+     * footprint without requiring the client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
+    /**
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,
@@ -1712,6 +1735,12 @@ data class ChatSummary(
      * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
      */
     val modifiedAt: String,
+    /**
+     * Aggregate summary of file changes associated with this chat. Servers may
+     * populate this to give clients a quick at-a-glance view of the chat's
+     * footprint without requiring the client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
     /**
      * How this chat came into existence
      */
@@ -3156,7 +3185,7 @@ data class ToolCallPendingConfirmationState(
     /**
      * File edits that this tool call will perform, for preview before confirmation
      */
-    val edits: JsonElement? = null,
+    val edits: FileEditCollection? = null,
     /**
      * Whether the agent host allows the client to edit the tool's input parameters before confirming
      */
@@ -3669,15 +3698,15 @@ data class ToolResultFileEditContent(
     /**
      * The file state before the edit. Absent for file creations or for in-place file edits.
      */
-    val before: JsonElement? = null,
+    val before: FileEditSide? = null,
     /**
      * The file state after the edit. Absent for file deletions.
      */
-    val after: JsonElement? = null,
+    val after: FileEditSide? = null,
     /**
      * Optional diff display metadata
      */
-    val diff: JsonElement? = null,
+    val diff: FileEditDiffStats? = null,
     val type: ToolResultContentType
 )
 
@@ -4622,19 +4651,48 @@ data class ToolCallMcpContributor(
 )
 
 @Serializable
+data class FileEditSide(
+    /**
+     * URI of the file on this side of the edit
+     */
+    val uri: String,
+    /**
+     * Reference to the file content on this side of the edit
+     */
+    val content: ContentRef
+)
+
+@Serializable
+data class FileEditDiffStats(
+    /**
+     * Number of items added (e.g., lines for text files, cells for notebooks)
+     */
+    val added: Long? = null,
+    /**
+     * Number of items removed (e.g., lines for text files, cells for notebooks)
+     */
+    val removed: Long? = null
+)
+
+@Serializable
 data class FileEdit(
     /**
      * The file state before the edit. Absent for file creations or for in-place file edits.
      */
-    val before: JsonElement? = null,
+    val before: FileEditSide? = null,
     /**
      * The file state after the edit. Absent for file deletions.
      */
-    val after: JsonElement? = null,
+    val after: FileEditSide? = null,
     /**
      * Optional diff display metadata
      */
-    val diff: JsonElement? = null
+    val diff: FileEditDiffStats? = null
+)
+
+@Serializable
+data class FileEditCollection(
+    val items: List<FileEdit>
 )
 
 @Serializable
@@ -5431,6 +5489,22 @@ data class AutomationDefinition(
      */
     val triggers: List<AutomationTrigger>,
     /**
+     * Self-disable rules combined with logical OR: the host sets
+     * {@link AutomationDefinition.enabled} to `false` when any condition is met.
+     * Absent or empty means no automatic disable conditions. Each
+     * {@link AutomationDisableConditionKind} may appear at most once; hosts MUST
+     * reject create or update requests containing duplicate kinds.
+     *
+     * Only automatic (scheduled) runs are governed; manual runs via
+     * {@link RunAutomationParams | runAutomation} are never blocked. For a
+     * {@link AutomationAfterRunsCondition}, usage is tracked by the host-owned
+     * {@link AutomationEntry.runCount}. Adding that kind when absent or
+     * a disabled→enabled transition starts a fresh allowance. Clearing the
+     * conditions does not re-enable a disabled automation. See the
+     * {@link /guide/automations | Automations Guide}.
+     */
+    val disableConditions: List<AutomationDisableCondition>? = null,
+    /**
      * Opaque implementation-defined metadata. Clients MUST preserve unknown
      * entries when updating the definition.
      */
@@ -5463,10 +5537,35 @@ data class AutomationDefinitionPatch(
      */
     val triggers: List<AutomationTrigger>? = null,
     /**
+     * Complete replacement {@link AutomationDefinition.disableConditions}.
+     * Omit to leave unchanged; supply an empty array to remove all conditions.
+     * Each kind may appear at most once; hosts MUST reject duplicate kinds.
+     * Clearing conditions does not change {@link AutomationDefinition.enabled}.
+     */
+    val disableConditions: List<AutomationDisableCondition>? = null,
+    /**
      * Complete replacement {@link AutomationDefinition._meta}.
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationAfterRunsCondition(
+    val kind: AutomationDisableConditionKind,
+    /**
+     * Positive-integer cap on scheduled runs.
+     */
+    val max: Long
+)
+
+@Serializable
+data class AutomationAfterDateCondition(
+    val kind: AutomationDisableConditionKind,
+    /**
+     * ISO 8601 timestamp after which scheduling stops.
+     */
+    val date: String
 )
 
 @Serializable
@@ -5483,6 +5582,20 @@ data class AutomationEntry(
      * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
+    /**
+     * Host-owned count of scheduled runs consumed against the current
+     * {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
+     * **current** allowance, not a lifetime total: the host resets it to `0` when
+     * a disabled→enabled transition starts a fresh allowance or a
+     * {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
+     * reconstructed from {@link runs} (a bounded, prunable window). The host
+     * increments it atomically when it admits a scheduled run, including runs
+     * later cancelled or failed.
+     *
+     * Absent when {@link AutomationDefinition.disableConditions} contains no
+     * {@link AutomationAfterRunsCondition}.
+     */
+    val runCount: Long? = null,
     /**
      * Newest-first retained run summaries. This is a bounded window; use
      * {@link FetchAutomationRunsParams | fetchAutomationRuns} when
@@ -6886,6 +6999,50 @@ internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
         val discriminant = when (value) {
             is AutomationTriggerSchedule -> "schedule"
             is AutomationTriggerEvent -> "event"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationDisableConditionSerializer::class)
+sealed interface AutomationDisableCondition
+
+@JvmInline
+value class AutomationDisableConditionAfterRuns(val value: AutomationAfterRunsCondition) : AutomationDisableCondition
+@JvmInline
+value class AutomationDisableConditionAfterDate(val value: AutomationAfterDateCondition) : AutomationDisableCondition
+
+internal object AutomationDisableConditionSerializer : KSerializer<AutomationDisableCondition> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationDisableCondition")
+
+    override fun deserialize(decoder: Decoder): AutomationDisableCondition {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationDisableCondition can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationDisableCondition")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on AutomationDisableCondition")
+        return when (discriminant) {
+            "afterRuns" -> AutomationDisableConditionAfterRuns(input.json.decodeFromJsonElement(AutomationAfterRunsCondition.serializer(), element))
+            "afterDate" -> AutomationDisableConditionAfterDate(input.json.decodeFromJsonElement(AutomationAfterDateCondition.serializer(), element))
+            else -> error("Unknown AutomationDisableCondition discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationDisableCondition) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationDisableCondition can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationDisableConditionAfterRuns -> output.json.encodeToJsonElement(AutomationAfterRunsCondition.serializer(), value.value)
+            is AutomationDisableConditionAfterDate -> output.json.encodeToJsonElement(AutomationAfterDateCondition.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationDisableConditionAfterRuns -> "afterRuns"
+            is AutomationDisableConditionAfterDate -> "afterDate"
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

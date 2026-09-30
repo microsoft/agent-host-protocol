@@ -1,0 +1,26 @@
+{
+  "name": "automation-combined-disable-conditions",
+  "group": "A",
+  "description": "An automation update carries both disable-condition kinds, preserving their order even though evaluation is order-independent.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": {
+      "disableConditions": [
+        { "kind": "afterDate", "date": "2026-08-07T00:00:00Z" },
+        { "kind": "afterRuns", "max": 3 }
+      ]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": {
+      "disableConditions": [
+        { "kind": "afterDate", "date": "2026-08-07T00:00:00Z" },
+        { "kind": "afterRuns", "max": 3 }
+      ]
+    }
+  }]
+}

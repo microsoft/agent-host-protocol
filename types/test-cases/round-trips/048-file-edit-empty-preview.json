@@ -1,0 +1,8 @@
+{
+  "name": "file-edit-empty-preview",
+  "group": "A",
+  "description": "An empty preview keeps its required items array.",
+  "type": "StateAction",
+  "input": {"type":"chat/toolCallReady","turnId":"t1","toolCallId":"tc1","invocationMessage":"Review","edits":{"items":[]}},
+  "acceptableOutputs": [{"type":"chat/toolCallReady","turnId":"t1","toolCallId":"tc1","invocationMessage":"Review","edits":{"items":[]}}]
+}

@@ -224,6 +224,10 @@
               "type": "string",
               "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
             },
+            "changes": {
+              "$ref": "#/$defs/ChangesSummary",
+              "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
+            },
             "origin": {
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
@@ -962,18 +966,7 @@
           "description": "Risk assessment that informed the confirmation requirement."
         },
         "edits": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/FileEdit"
-              }
-            }
-          },
-          "required": [
-            "items"
-          ],
+          "$ref": "#/$defs/FileEditCollection",
           "description": "File edits that this tool call will perform, for preview before confirmation"
         },
         "editable": {
@@ -2251,6 +2244,45 @@
           },
           "description": "Complete replacement {@link AutomationDefinition.triggers}. The host\nvalidates event ids and normalizes event-trigger titles and descriptions."
         },
+        "disableConditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationDisableCondition"
+          },
+          "description": "Complete replacement {@link AutomationDefinition.disableConditions}.\nOmit to leave unchanged; supply an empty array to remove all conditions.\nEach kind may appear at most once; hosts MUST reject duplicate kinds.\nClearing conditions does not change {@link AutomationDefinition.enabled}.",
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterRuns"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterDate"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -2810,55 +2842,67 @@
         "uri"
       ]
     },
+    "FileEditSide": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the file on this side of the edit"
+        },
+        "content": {
+          "$ref": "#/$defs/ContentRef",
+          "description": "Reference to the file content on this side of the edit"
+        }
+      },
+      "required": [
+        "uri",
+        "content"
+      ]
+    },
+    "FileEditDiffStats": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "number",
+          "description": "Number of items added (e.g., lines for text files, cells for notebooks)"
+        },
+        "removed": {
+          "type": "number",
+          "description": "Number of items removed (e.g., lines for text files, cells for notebooks)"
+        }
+      }
+    },
     "FileEdit": {
       "type": "object",
       "description": "Describes a file modification with before/after state and diff metadata.\n\nSupports creates (only `after`), deletes (only `before`), renames/moves\n(different `uri` in `before` and `after`), and edits (same `uri`, different content).",
       "properties": {
         "before": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state before the edit. Absent for file creations or for in-place file edits."
         },
         "after": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state after the edit. Absent for file deletions."
         },
         "diff": {
-          "type": "object",
-          "properties": {
-            "added": {
-              "type": "number"
-            },
-            "removed": {
-              "type": "number"
-            }
-          },
+          "$ref": "#/$defs/FileEditDiffStats",
           "description": "Optional diff display metadata"
         }
       }
+    },
+    "FileEditCollection": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FileEdit"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
     },
     "UsageInfo": {
       "type": "object",
@@ -3557,7 +3601,7 @@
     },
     "SessionSummary": {
       "type": "object",
-      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `workingDirectories`: the session-level set. Individual chats MAY restrict\n  to a subset via {@link ChatSummary.workingDirectories}; aggregating these\n  up is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat changeset stats or report the most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
+      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `workingDirectories`: the session-level set. Individual chats MAY restrict\n  to a subset via {@link ChatSummary.workingDirectories}; aggregating these\n  up is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat {@link ChatSummary.changes | changes summaries} or report the\n  most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
       "properties": {
         "provider": {
           "type": "string",
@@ -3668,7 +3712,7 @@
     },
     "ChangesSummary": {
       "type": "object",
-      "description": "Aggregate counts describing the file changes associated with a session.\n\nAll fields are optional so servers can populate only the metrics they\ncheaply have available.",
+      "description": "Aggregate counts describing the file changes associated with a session or\nchat.\n\nAll fields are optional so servers can populate only the metrics they\ncheaply have available.",
       "properties": {
         "additions": {
           "type": "number",
@@ -4935,6 +4979,10 @@
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
         },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
+        },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
@@ -5028,6 +5076,10 @@
         "modifiedAt": {
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+        },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
         },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
@@ -6370,18 +6422,7 @@
           "description": "Risk assessment that informed the confirmation requirement."
         },
         "edits": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/FileEdit"
-              }
-            }
-          },
-          "required": [
-            "items"
-          ],
+          "$ref": "#/$defs/FileEditCollection",
           "description": "File edits that this tool call will perform, for preview before confirmation"
         },
         "editable": {
@@ -6886,47 +6927,15 @@
       "description": "Describes a file modification performed by a tool.",
       "properties": {
         "before": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state before the edit. Absent for file creations or for in-place file edits."
         },
         "after": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state after the edit. Absent for file deletions."
         },
         "diff": {
-          "type": "object",
-          "properties": {
-            "added": {
-              "type": "number"
-            },
-            "removed": {
-              "type": "number"
-            }
-          },
+          "$ref": "#/$defs/FileEditDiffStats",
           "description": "Optional diff display metadata"
         },
         "type": {
@@ -7691,6 +7700,41 @@
         "events"
       ]
     },
+    "AutomationAfterRunsCondition": {
+      "type": "object",
+      "description": "Stops scheduling after a fixed number of scheduled runs.",
+      "properties": {
+        "kind": {
+          "const": "afterRuns"
+        },
+        "max": {
+          "type": "integer",
+          "description": "Positive-integer cap on scheduled runs.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "max"
+      ]
+    },
+    "AutomationAfterDateCondition": {
+      "type": "object",
+      "description": "Stops scheduling once a wall-clock date passes.",
+      "properties": {
+        "kind": {
+          "const": "afterDate"
+        },
+        "date": {
+          "type": "string",
+          "description": "ISO 8601 timestamp after which scheduling stops."
+        }
+      },
+      "required": [
+        "kind",
+        "date"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -7804,6 +7848,45 @@
           },
           "description": "Automatic triggers. An empty list means manual-only."
         },
+        "disableConditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationDisableCondition"
+          },
+          "description": "Self-disable rules combined with logical OR: the host sets\n{@link AutomationDefinition.enabled} to `false` when any condition is met.\nAbsent or empty means no automatic disable conditions. Each\n{@link AutomationDisableConditionKind} may appear at most once; hosts MUST\nreject create or update requests containing duplicate kinds.\n\nOnly automatic (scheduled) runs are governed; manual runs via\n{@link RunAutomationParams | runAutomation} are never blocked. For a\n{@link AutomationAfterRunsCondition}, usage is tracked by the host-owned\n{@link AutomationEntry.runCount}. Adding that kind when absent or\na disabled→enabled transition starts a fresh allowance. Clearing the\nconditions does not re-enable a disabled automation. See the\n{@link /guide/automations | Automations Guide}.",
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterRuns"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "afterDate"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -7833,6 +7916,10 @@
         "nextRunAt": {
           "type": "string",
           "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+        },
+        "runCount": {
+          "type": "number",
+          "description": "Host-owned count of scheduled runs consumed against the current\n{@link AutomationAfterRunsCondition} allowance. Authoritative usage for the\n**current** allowance, not a lifetime total: the host resets it to `0` when\na disabled→enabled transition starts a fresh allowance or a\n{@link AutomationAfterRunsCondition} is added when none was present. It is NOT\nreconstructed from {@link runs} (a bounded, prunable window). The host\nincrements it atomically when it admits a scheduled run, including runs\nlater cancelled or failed.\n\nAbsent when {@link AutomationDefinition.disableConditions} contains no\n{@link AutomationAfterRunsCondition}."
         },
         "runs": {
           "type": "array",
@@ -8665,6 +8752,17 @@
         }
       ],
       "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+    },
+    "AutomationDisableCondition": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationAfterRunsCondition"
+        },
+        {
+          "$ref": "#/$defs/AutomationAfterDateCondition"
+        }
+      ],
+      "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
     },
     "AutomationRunOrigin": {
       "oneOf": [

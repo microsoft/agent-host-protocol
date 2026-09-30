@@ -15,8 +15,10 @@ for install snippets and per-language entry points.
 - **Go** — `go get github.com/microsoft/agent-host-protocol/clients/go@latest` for the `ahptypes`, `ahp`, and `ahpws` packages, mirroring the Rust three-crate split. See [the Go client](https://github.com/microsoft/agent-host-protocol/tree/main/clients/go).
 - **[AHPX](https://github.com/TylerLeonhardt/ahpx)** — A command-line and Node.js client for connecting to AHP servers, managing sessions, and sending prompts.
 - **[VS Code](https://github.com/microsoft/vscode)** — VS Code includes Agent Sessions client code for working with AHP hosts.
+- **[ahpc](https://github.com/softov/ahpc)** — A terminal client for AHP: commands, an interactive chat TUI, and a tool server that lets an agent elsewhere drive the sessions on a host.
 
 ## Servers
 
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation. Start in [`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node) when browsing the repository.
 - **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
+- **[ahpd](https://github.com/softov/ahpd)** — An open-source AHP host over WebSocket, that runs plugins: the agent, the ports and the server tools are all installed rather than built in, and `@ahpd/sdk` is the library to build a host of your own.

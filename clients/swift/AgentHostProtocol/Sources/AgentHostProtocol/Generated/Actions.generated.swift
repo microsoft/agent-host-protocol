@@ -748,7 +748,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     /// Risk assessment that informed the confirmation requirement.
     public var riskAssessment: ToolCallRiskAssessment?
     /// File edits that this tool call will perform, for preview before confirmation
-    public var edits: AnyCodable?
+    public var edits: FileEditCollection?
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     public var editable: Bool?
     /// If set, the tool was auto-confirmed and transitions directly to `running`
@@ -787,7 +787,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         toolInput: ToolInput? = nil,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
-        edits: AnyCodable? = nil,
+        edits: FileEditCollection? = nil,
         editable: Bool? = nil,
         confirmed: ToolCallConfirmationReason? = nil,
         options: [ConfirmationOption]? = nil
@@ -2446,6 +2446,10 @@ public struct PartialChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String?
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// Whether this chat is structurally eligible to be the source of
@@ -2469,6 +2473,7 @@ public struct PartialChatSummary: Codable, Sendable {
         status: SessionStatus? = nil,
         activity: String? = nil,
         modifiedAt: String? = nil,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -2479,6 +2484,7 @@ public struct PartialChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity

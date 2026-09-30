@@ -19,7 +19,7 @@ The Agent Host Protocol (AHP) defines how a portable, standalone sessions server
 | **Swift** | [SwiftPM: `microsoft/agent-host-protocol`](https://github.com/microsoft/agent-host-protocol) | [![Tag](https://img.shields.io/github/v/tag/microsoft/agent-host-protocol?filter=v*&label=SwiftPM&logo=swift)](https://github.com/microsoft/agent-host-protocol/tags) | [package README](clients/swift/AgentHostProtocol/README.md) · [CHANGELOG](clients/swift/CHANGELOG.md) |
 | **.NET** | [`Microsoft.VisualStudioCode.AgentHostProtocol`](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol) · [`Microsoft.VisualStudioCode.AgentHostProtocol.Abstractions`](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol.Abstractions) | [![NuGet](https://img.shields.io/nuget/v/Microsoft.VisualStudioCode.AgentHostProtocol.svg?logo=nuget)](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol) | [`clients/dotnet/`](clients/dotnet/) · [CHANGELOG](clients/dotnet/CHANGELOG.md) |
 
-Other clients: [**AHPX**](https://github.com/TylerLeonhardt/ahpx) (CLI + Node.js client) and [**VS Code**](https://github.com/microsoft/vscode) (built-in Agent Sessions client).
+Other clients: [**AHPX**](https://github.com/TylerLeonhardt/ahpx) (CLI + Node.js client), [**VS Code**](https://github.com/microsoft/vscode) (built-in Agent Sessions client) and [**ahpc**](https://github.com/softov/ahpc) (terminal client).
 
 The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two or more hosts at once (single-host consumers use the same API via `MultiHostClient::single` / `.single(...)` / `hosts.Single(...)` / `MultiHostClient.SingleAsync(...)`). See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host).
 
@@ -27,6 +27,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation ([`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node)).
 - **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
+- **[ahpd](https://github.com/softov/ahpd)** — An open-source AHP host over WebSocket, that runs plugins: the agent, the ports and the server tools are all installed rather than built in, and `@ahpd/sdk` is the library to build a host of your own.
 
 ## Versioning and releases
 
