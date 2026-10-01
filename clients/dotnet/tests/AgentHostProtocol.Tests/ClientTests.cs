@@ -105,17 +105,24 @@ public sealed class ClientTests
 
     private static TcpConnectionSubscription TcpCreation() => new()
     {
-        Type = "tcpConnection", Host = "localhost", Port = 3000, Encoding = TcpDataEncoding.Base64,
-        ReceiveWindowBytes = 4, MaximumChunkSize = 2,
+        Type = "tcpConnection",
+        Host = "localhost",
+        Port = 3000,
+        Encoding = TcpDataEncoding.Base64,
+        ReceiveWindowBytes = 4,
+        MaximumChunkSize = 2,
     };
 
     private static Snapshot TcpSnapshot(string resource = "ahp-tcp:/created") => new()
     {
-        Resource = resource, FromSeq = 0, State = new SnapshotState
+        Resource = resource,
+        FromSeq = 0,
+        State = new SnapshotState
         {
             Tcp = new TcpConnectionState
             {
-                Session = "ahp-session:/s1", Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                Session = "ahp-session:/s1",
+                Target = new TcpTarget { Host = "localhost", Port = 3000 },
                 Encoding = TcpDataEncoding.Base64,
                 Input = new FlowControlledByteDirectionState { WindowBytes = 4, MaximumChunkSize = 2 },
                 Output = new FlowControlledByteDirectionState { WindowBytes = 4, MaximumChunkSize = 2 },
@@ -130,7 +137,8 @@ public sealed class ClientTests
         var multi = new MultiHostClient();
         var add = multi.AddHostAsync(new HostConfig
         {
-            Id = new HostId("tcp"), ClientId = "owner",
+            Id = new HostId("tcp"),
+            ClientId = "owner",
             ReconnectPolicy = autoReconnect
                 ? new ReconnectPolicy { InitialBackoff = TimeSpan.FromMilliseconds(1), MaxBackoff = TimeSpan.FromMilliseconds(10) }
                 : ReconnectPolicy.Disabled,
@@ -144,7 +152,8 @@ public sealed class ClientTests
         var initial = await servers.Reader.ReadAsync(token);
         await TcpResponse(initial, await TcpRequest(initial, "initialize", token), new InitializeResult
         {
-            ProtocolVersion = ProtocolVersion.Current, Snapshots = new(),
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
             TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
         }, token);
         await TcpHostSessions(initial, token);
@@ -180,7 +189,8 @@ public sealed class ClientTests
         Assert.False(write.IsCompleted);
         await FakeHost.SendNotificationAsync(oldServer, "action", new ActionEnvelope
         {
-            Channel = ProtocolVersion.RootResourceUri, ServerSeq = 50,
+            Channel = ProtocolVersion.RootResourceUri,
+            ServerSeq = 50,
             Action = new StateAction(new RootActiveSessionsChangedAction { Type = ActionType.RootActiveSessionsChanged, ActiveSessions = 1 }),
         }, token);
         while (multi.Host(id)!.ServerSeq != 50) await Task.Delay(1, token);
@@ -195,7 +205,9 @@ public sealed class ClientTests
         Assert.Contains(connection.Resource, parameters.Subscriptions);
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Missing = new(), Actions = new()
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
             {
                 new ActionEnvelope { Channel = connection.Resource, ServerSeq = 3,
                     Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }) },
@@ -269,7 +281,8 @@ public sealed class ClientTests
             {
                 ErrorResponse = new JsonRpcErrorResponse
                 {
-                    Id = request.Id, Error = new JsonRpcErrorObject { Code = -32601, Message = "reconnect unavailable" },
+                    Id = request.Id,
+                    Error = new JsonRpcErrorObject { Code = -32601, Message = "reconnect unavailable" },
                 },
             }), token);
         }
@@ -380,10 +393,18 @@ public sealed class ClientTests
     private static async Task TcpPush(MemTransport server, long sequence, StateAction action, CancellationToken token, ActionOrigin? origin = null, string? rejectionReason = null, string channel = "ahp-tcp:/created")
         => await server.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
         {
-            Notification = new JsonRpcNotification { Method = "action", Params = Ser.SerializeToElement(new ActionEnvelope
+            Notification = new JsonRpcNotification
             {
-                Channel = channel, ServerSeq = sequence, Action = action, Origin = origin, RejectionReason = rejectionReason,
-            }) },
+                Method = "action",
+                Params = Ser.SerializeToElement(new ActionEnvelope
+                {
+                    Channel = channel,
+                    ServerSeq = sequence,
+                    Action = action,
+                    Origin = origin,
+                    RejectionReason = rejectionReason,
+                })
+            },
         }), token);
 
     private static async Task TcpUnrelatedBurst(AhpClient client, MemTransport server, long firstSequence, CancellationToken token)
@@ -411,7 +432,8 @@ public sealed class ClientTests
         var initialize = client.InitializeAsync("owner", cancellationToken: token);
         await TcpResponse(server, await TcpRequest(server, "initialize", token), new InitializeResult
         {
-            ProtocolVersion = ProtocolVersion.Current, Snapshots = new(),
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
             TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
         }, token);
         await initialize;
@@ -446,7 +468,10 @@ public sealed class ClientTests
         await using var fresh = AhpClient.Connect(side, new ClientConfig { SubscriptionBufferCapacity = 2 });
         var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", LastSeenServerSeq = 0, Subscriptions = new(),
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 0,
+            Subscriptions = new(),
         }, new[] { connection }, token);
         var request = await TcpRequest(server, "reconnect", token);
         await TcpUnrelatedBurst(fresh, server, 2, token);
@@ -458,7 +483,8 @@ public sealed class ClientTests
         }
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Missing = new(),
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
             Actions = overflow ? new() : new()
             {
                 new ActionEnvelope { Channel = connection.Resource, ServerSeq = 1,
@@ -491,26 +517,39 @@ public sealed class ClientTests
         var initialize = client.InitializeAsync("owner", cancellationToken: token);
         await TcpResponse(server, await TcpRequest(server, "initialize", token), new InitializeResult
         {
-            ProtocolVersion = ProtocolVersion.Current, Snapshots = new(),
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
             TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
         }, token);
         await initialize;
         var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
         {
-            Type = "tcpConnection", Host = "localhost", Port = 3000, Encoding = TcpDataEncoding.Base64,
-            ReceiveWindowBytes = Math.Max(4, maximumChunkSize), MaximumChunkSize = maximumChunkSize,
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = Math.Max(4, maximumChunkSize),
+            MaximumChunkSize = maximumChunkSize,
         }, token);
         var direction = new FlowControlledByteDirectionState { WindowBytes = Math.Max(4, maximumChunkSize), MaximumChunkSize = maximumChunkSize, ReceivedBytes = invalidSnapshot ? 1 : 0 };
         await TcpResponse(server, await TcpRequest(server, "subscribe", token), new SubscribeResult
         {
-            Snapshot = new Snapshot { Resource = "ahp-tcp:/created", FromSeq = 0, State = new SnapshotState
+            Snapshot = new Snapshot
             {
-                Tcp = new TcpConnectionState
+                Resource = "ahp-tcp:/created",
+                FromSeq = 0,
+                State = new SnapshotState
                 {
-                    Session = "ahp-session:/s1", Target = new TcpTarget { Host = "localhost", Port = 3000 },
-                    Encoding = TcpDataEncoding.Base64, Input = direction, Output = direction,
-                },
-            } },
+                    Tcp = new TcpConnectionState
+                    {
+                        Session = "ahp-session:/s1",
+                        Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                        Encoding = TcpDataEncoding.Base64,
+                        Input = direction,
+                        Output = direction,
+                    },
+                }
+            },
         }, token);
         if (firstAction)
             await TcpPush(server, 1, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
@@ -534,7 +573,8 @@ public sealed class ClientTests
         TcpProtocol.ValidateRequest("ahp-session:/s1", create, capability);
         Assert.Equal("tcpConnection", Ser.SerializeToElement(new SubscribeParams
         {
-            Channel = "ahp-session:/s1", Create = create,
+            Channel = "ahp-session:/s1",
+            Create = create,
         }).GetProperty("create").GetProperty("type").GetString());
         Assert.Throws<InvalidOperationException>(() =>
             TcpProtocol.ValidateRequest("ahp-session:/s1", create with { Type = "tcp" }, capability));
@@ -577,14 +617,20 @@ public sealed class ClientTests
         var (oldSide, oldServer) = MemTransport.CreatePair();
         await using var old = AhpClient.Connect(oldSide);
         var connection = await OpenTcp(old, oldServer, token);
-        await connection.AcceptAsync(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 10,
-            Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 0 }) });
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 10,
+            Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 0 })
+        });
         await old.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
         var (side, server) = MemTransport.CreatePair();
         await using var fresh = AhpClient.Connect(side);
         var parameters = new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", LastSeenServerSeq = 100,
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 100,
             Subscriptions = new() { "ahp-session:/s1" },
         };
         var reconnect = fresh.ReconnectTcpConnectionsAsync(parameters, new[] { connection }, token);
@@ -592,15 +638,25 @@ public sealed class ClientTests
         Assert.Equal(10, Ser.Deserialize<ReconnectParams>(request.Params!.Value).LastSeenServerSeq);
         var actions = new System.Collections.Generic.List<ActionEnvelope>();
         for (long sequence = 11; sequence <= 101; sequence++)
-            actions.Add(new ActionEnvelope { Channel = sequence == 50 ? connection.Resource : "ahp-session:/s1", ServerSeq = sequence,
+            actions.Add(new ActionEnvelope
+            {
+                Channel = sequence == 50 ? connection.Resource : "ahp-session:/s1",
+                ServerSeq = sequence,
                 Action = sequence == 50
                     ? new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" })
-                    : new StateAction(new SessionTitleChangedAction { Type = ActionType.SessionTitleChanged, Title = $"title-{sequence}" }) });
-        actions.Add(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 102,
-            Action = new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 }) });
+                    : new StateAction(new SessionTitleChangedAction { Type = ActionType.SessionTitleChanged, Title = $"title-{sequence}" })
+            });
+        actions.Add(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 102,
+            Action = new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 })
+        });
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Actions = actions, Missing = new() { "ahp-session:/missing" },
+            Type = ReconnectResultType.Replay,
+            Actions = actions,
+            Missing = new() { "ahp-session:/missing" },
         }), token);
         var returned = Assert.IsType<ReconnectReplayResult>((await reconnect.WaitAsync(token)).Value);
         Assert.Equal(100, parameters.LastSeenServerSeq);
@@ -673,13 +729,22 @@ public sealed class ClientTests
         Assert.Equal(new byte[] { 7, 8 }, await read.WaitAsync(token));
         var credit = await TcpDispatch(server, token);
         Assert.Equal(2, Assert.IsType<TcpDataConsumedAction>(credit.Action.Value).ConsumedBytes);
-        await connection.AcceptAsync(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 4,
-            Action = new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose }) });
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 4,
+            Action = new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose })
+        });
         Assert.False(connection.IsClosed);
         Assert.False(drain.IsCompleted);
         Assert.Equal(1, client.EventListenerCount);
-        await connection.AcceptAsync(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 5,
-            Action = credit.Action, Origin = new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq } });
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 5,
+            Action = credit.Action,
+            Origin = new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq }
+        });
         Assert.False(connection.IsClosed);
         await TcpPush(server, 6, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }), token);
         await TcpUnsubscribe(server, connection.Resource, token);
@@ -704,8 +769,12 @@ public sealed class ClientTests
         using var cancellation = new CancellationTokenSource();
         var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
         {
-            Type = "tcpConnection", Host = "localhost", Port = 3000, Encoding = TcpDataEncoding.Base64,
-            ReceiveWindowBytes = 4, MaximumChunkSize = 2,
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = 4,
+            MaximumChunkSize = 2,
         }, cancellation.Token);
         _ = await TcpRequest(server, "subscribe", token);
         cancellation.Cancel();
@@ -733,8 +802,12 @@ public sealed class ClientTests
         Assert.False(drain.IsCompleted);
         if (reset)
         {
-            await connection.AcceptAsync(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 1,
-                Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }) });
+            await connection.AcceptAsync(new ActionEnvelope
+            {
+                Channel = connection.Resource,
+                ServerSeq = 1,
+                Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" })
+            });
             await TcpPush(server, 2, new StateAction(new TcpHostResetAction { Type = ActionType.TcpHostReset, Reason = TcpResetReason.ProtocolError }), token);
             await TcpUnsubscribe(server, connection.Resource, token);
             await Assert.ThrowsAsync<InvalidOperationException>(() => connection.ReadAsync(token));
@@ -770,13 +843,18 @@ public sealed class ClientTests
         await using var fresh = AhpClient.Connect(side);
         var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", LastSeenServerSeq = 0, Subscriptions = new(),
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 0,
+            Subscriptions = new(),
         }, new[] { connection }, token);
         var request = await TcpRequest(server, "reconnect", token);
         Assert.Contains(connection.Resource, Ser.Deserialize<ReconnectParams>(request.Params!.Value).Subscriptions);
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Missing = new(), Actions = new()
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
             {
                 new() { Channel = connection.Resource, ServerSeq = 1, Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }) },
                 new() { Channel = connection.Resource, ServerSeq = 2, Action = new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose }) },
@@ -812,8 +890,12 @@ public sealed class ClientTests
         using var cancellation = new CancellationTokenSource();
         var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
         {
-            Type = "tcpConnection", Host = "localhost", Port = 3000, Encoding = TcpDataEncoding.Base64,
-            ReceiveWindowBytes = 4, MaximumChunkSize = 2,
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = 4,
+            MaximumChunkSize = 2,
         }, cancellation.Token);
         var request = await TcpRequest(server, "subscribe", token);
         if (cancel) cancellation.Cancel();
@@ -887,13 +969,18 @@ public sealed class ClientTests
         await using var fresh = AhpClient.Connect(side);
         var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", Subscriptions = new(), LastSeenServerSeq = 20,
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            Subscriptions = new(),
+            LastSeenServerSeq = 20,
         }, new[] { connection }, token);
         var request = await TcpRequest(server, "reconnect", token);
         Assert.Equal(3, Ser.Deserialize<ReconnectParams>(request.Params!.Value).LastSeenServerSeq);
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Missing = new(), Actions = new()
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
             {
                 new() { Channel = connection.Resource, ServerSeq = 4, Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }) },
             },
@@ -1048,7 +1135,9 @@ public sealed class ClientTests
             new[] { connection }, token));
         var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", LastSeenServerSeq = 20,
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 20,
             Subscriptions = new() { "ahp-session:/s1" },
         }, new[] { connection }, token);
         var request = await TcpRequest(server, "reconnect", token);
@@ -1061,11 +1150,18 @@ public sealed class ClientTests
                 Origin = new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq } },
         };
         if (acknowledged)
-            actions.Add(new ActionEnvelope { Channel = connection.Resource, ServerSeq = 2, Action = original.Action,
-                Origin = new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq } });
+            actions.Add(new ActionEnvelope
+            {
+                Channel = connection.Resource,
+                ServerSeq = 2,
+                Action = original.Action,
+                Origin = new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq }
+            });
         await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
         {
-            Type = ReconnectResultType.Replay, Actions = actions, Missing = new(),
+            Type = ReconnectResultType.Replay,
+            Actions = actions,
+            Missing = new(),
         }), token);
         await TcpPush(server, 3, original.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq });
         await TcpPush(server, 4, new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 }), token);
@@ -1100,7 +1196,10 @@ public sealed class ClientTests
         await using var fresh = AhpClient.Connect(freshSide);
         var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
         {
-            Channel = ProtocolVersion.RootResourceUri, ClientId = "owner", Subscriptions = new(), LastSeenServerSeq = 0,
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            Subscriptions = new(),
+            LastSeenServerSeq = 0,
         }, new[] { connection }, token);
         var request = await TcpRequest(server, "reconnect", token);
         var result = snapshot
@@ -1292,12 +1391,17 @@ public sealed class ClientTests
                 Snapshot = new Snapshot
                 {
                     Resource = "ahp-tcp:/created",
-                    State = new SnapshotState { Tcp = new TcpConnectionState
+                    State = new SnapshotState
                     {
-                        Session = parameters.Channel,
-                        Target = new TcpTarget { Host = "localhost", Port = 3000 },
-                        Encoding = TcpDataEncoding.Base64, Input = direction, Output = direction,
-                    } },
+                        Tcp = new TcpConnectionState
+                        {
+                            Session = parameters.Channel,
+                            Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                            Encoding = TcpDataEncoding.Base64,
+                            Input = direction,
+                            Output = direction,
+                        }
+                    },
                     FromSeq = 0,
                 },
             };
@@ -1312,7 +1416,8 @@ public sealed class ClientTests
                     Method = "action",
                     Params = Ser.SerializeToElement(new ActionEnvelope
                     {
-                        Channel = "ahp-tcp:/created", ServerSeq = 1,
+                        Channel = "ahp-tcp:/created",
+                        ServerSeq = 1,
                         Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "AA==" }),
                     }),
                 },
@@ -1324,8 +1429,12 @@ public sealed class ClientTests
             Channel = "ahp-session:/s1",
             Create = new TcpConnectionSubscription
             {
-                Type = "tcpConnection", Host = "localhost", Port = 3000, Encoding = TcpDataEncoding.Base64,
-                ReceiveWindowBytes = 8, MaximumChunkSize = 8,
+                Type = "tcpConnection",
+                Host = "localhost",
+                Port = 3000,
+                Encoding = TcpDataEncoding.Base64,
+                ReceiveWindowBytes = 8,
+                MaximumChunkSize = 8,
             },
         }, cts.Token);
         await server;

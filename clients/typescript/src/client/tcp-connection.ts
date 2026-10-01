@@ -64,6 +64,11 @@ function requireTcp(condition: boolean, message: string): asserts condition {
 /** @internal Shared wire validation for consumers and hosts; host policy is separate. */
 export function validateTcpRequest(session: string, create: TcpConnectionSubscription): void {
   requireTcp(typeof session === 'string' && session.startsWith('ahp-session:'), 'TCP creation requires a parent session');
+  validateTcpCreation(create);
+}
+
+/** @internal TCP options independent of the embedding host's session identity. */
+export function validateTcpCreation(create: TcpConnectionSubscription): void {
   requireTcp(!!create && create.type === 'tcpConnection', 'Invalid TCP creation kind');
   requireTcp(typeof create.host === 'string' && create.host.length > 0 && !/[\s/\0]/.test(create.host), 'Invalid TCP host');
   requireTcp(Number.isInteger(create.port) && create.port >= 1 && create.port <= 65535, 'Invalid TCP port');

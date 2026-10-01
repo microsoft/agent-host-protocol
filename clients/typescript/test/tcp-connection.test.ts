@@ -598,6 +598,11 @@ test('a late reconnect response cannot resurrect a stream abandoned on timeout',
 
 test('TCP creation validates wire parameters before dispatch', async t => {
   const h = await setup(t);
+  for (const parent of ['', 'copilotcli:/session', 'ahp-tcp:/connection']) {
+    await assert.rejects(h.client.openTcpConnection(parent, create), {
+      name: 'TcpConnectionError', reason: TcpResetReason.ProtocolError, message: 'TCP creation requires a parent session',
+    });
+  }
   for (const host of ['', ' ', 'bad host', 'localhost\n', 'local\0host', 'host/path', 'https://localhost']) {
     await assert.rejects(h.client.openTcpConnection(session, { ...create, host }), {
       name: 'TcpConnectionError', reason: TcpResetReason.ProtocolError, message: 'Invalid TCP host',
