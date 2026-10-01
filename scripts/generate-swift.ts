@@ -680,6 +680,7 @@ const STATE_ENUMS = [
   'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus',
   'TerminalClaimKind', 'TerminalLifecycleStatus',
+  'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -695,6 +696,7 @@ const STATE_STRUCTS = [
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
+  'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'Message',
@@ -976,6 +978,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { caseName: 'toolConfirmation', structName: 'SessionToolConfirmationRequest', discriminantValue: 'toolConfirmation' },
     { caseName: 'toolClientExecution', structName: 'SessionToolClientExecutionRequest', discriminantValue: 'toolClientExecution' },
     { caseName: 'toolAuthentication', structName: 'SessionToolAuthenticationRequest', discriminantValue: 'toolAuthentication' },
+  ],
+};
+
+const BACKGROUND_WORK_UNION: UnionConfig = {
+  name: 'BackgroundWork',
+  discriminantField: 'kind',
+  // Open union: future protocol versions may add new background work kinds.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'shell', structName: 'BackgroundShellWork', discriminantValue: 'shell' },
+    { caseName: 'subagent', structName: 'BackgroundSubagentWork', discriminantValue: 'subagent' },
   ],
 };
 
@@ -1354,6 +1367,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, TERMINAL_LIFECYCLE_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
+  lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
@@ -1403,6 +1417,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/error', caseName: 'chatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', caseName: 'chatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', caseName: 'chatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundWorkSet', caseName: 'chatBackgroundWorkSet', tsInterface: 'ChatBackgroundWorkSetAction' },
+  { type: 'chat/backgroundWorkRemoved', caseName: 'chatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
   { type: 'chat/movableChanged', caseName: 'chatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'chatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
@@ -2401,6 +2417,7 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallRiskAssessment',       // TOOL_CALL_RISK_ASSESSMENT_UNION discriminated union
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()

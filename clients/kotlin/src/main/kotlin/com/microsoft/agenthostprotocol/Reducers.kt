@@ -11,6 +11,7 @@ import com.microsoft.agenthostprotocol.generated.*
 import java.time.Instant
 import java.time.format.DateTimeFormatterBuilder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
 
@@ -251,6 +252,13 @@ private fun customizationId(c: Customization): String? = when (c) {
     // Returning `null` mirrors Rust's `Customization::Unknown(_) => None`, so
     // an unknown container can never collide with a real id during lookups.
     is CustomizationUnknown -> null
+}
+
+private fun backgroundWorkId(w: BackgroundWork): String? = when (w) {
+    is BackgroundWorkShell -> w.value.id
+    is BackgroundWorkSubagent -> w.value.id
+    // Kinds from newer hosts still carry the common `id`, so they can be replaced and removed.
+    is BackgroundWorkUnknown -> (w.raw["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
 }
 
 private fun sessionInputRequestId(r: SessionInputRequest): String? = when (r) {
@@ -1004,6 +1012,33 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
+
+    is StateActionChatBackgroundWorkSet -> {
+        val work = action.value.work
+        val id = backgroundWorkId(work)
+        if (id == null) state else {
+            val list = state.backgroundWork ?: emptyList()
+            val idx = list.indexOfFirst { backgroundWorkId(it) == id }
+            val updated = if (idx < 0) {
+                list + work
+            } else {
+                list.toMutableList().also { it[idx] = work }
+            }
+            state.copy(backgroundWork = updated)
+        }
+    }
+
+    is StateActionChatBackgroundWorkRemoved -> {
+        val list = state.backgroundWork
+        val idx = list?.indexOfFirst { backgroundWorkId(it) == action.value.id } ?: -1
+        if (list == null || idx < 0) {
+            state
+        } else {
+            val next = list.toMutableList()
+            next.removeAt(idx)
+            state.copy(backgroundWork = next)
+        }
+    }
 
     is StateActionChatMovableChanged ->
         state.copy(movable = action.value.movable)

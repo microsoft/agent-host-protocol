@@ -1,0 +1,66 @@
+{
+  "name": "session-chat-summary-changes-round-trip",
+  "group": "A",
+  "description": "SessionSummary chat catalog entries preserve optional per-chat change counts so list clients can render them without subscribing to the session or chat channel.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Agent team",
+    "status": 1,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "changes": {
+      "additions": 15,
+      "deletions": 4,
+      "files": 3
+    },
+    "chats": [
+      {
+        "resource": "ahp-chat:/lead",
+        "title": "Lead"
+      },
+      {
+        "resource": "ahp-chat:/worker",
+        "title": "Worker",
+        "changes": {
+          "additions": 12,
+          "deletions": 3,
+          "files": 2
+        }
+      }
+    ],
+    "defaultChat": "ahp-chat:/lead"
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Agent team",
+      "status": 1,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "changes": {
+        "additions": 15,
+        "deletions": 4,
+        "files": 3
+      },
+      "chats": [
+        {
+          "resource": "ahp-chat:/lead",
+          "title": "Lead"
+        },
+        {
+          "resource": "ahp-chat:/worker",
+          "title": "Worker",
+          "changes": {
+            "additions": 12,
+            "deletions": 3,
+            "files": 2
+          }
+        }
+      ],
+      "defaultChat": "ahp-chat:/lead"
+    }
+  ]
+}

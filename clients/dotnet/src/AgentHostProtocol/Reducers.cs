@@ -91,6 +91,14 @@ public static class Reducers
     // the shared base). Unknown future kinds are preserved as a raw JsonElement
     // by the union converter — read the id structurally so forward-compat entries
     // still upsert/remove correctly.
+    private static string BackgroundWorkId(BackgroundWork work) => work.Value switch
+    {
+        BackgroundShellWork v => v.Id,
+        BackgroundSubagentWork v => v.Id,
+        JsonElement e when e.TryGetProperty("id", out JsonElement id) => id.GetString() ?? string.Empty,
+        _ => string.Empty,
+    };
+
     private static string SessionInputRequestId(SessionInputRequest req) => req.Value switch
     {
         SessionChatInputRequest v => v.Id,
@@ -971,6 +979,33 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
+            case ChatBackgroundWorkSetAction a:
+                {
+                    string workId = BackgroundWorkId(a.Work);
+                    state.BackgroundWork ??= new List<BackgroundWork>();
+                    int idx = state.BackgroundWork.FindIndex(w => BackgroundWorkId(w) == workId);
+                    if (idx < 0)
+                    {
+                        state.BackgroundWork.Add(a.Work);
+                    }
+                    else
+                    {
+                        state.BackgroundWork[idx] = a.Work;
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case ChatBackgroundWorkRemovedAction a:
+                {
+                    int idx = state.BackgroundWork?.FindIndex(w => BackgroundWorkId(w) == a.Id) ?? -1;
+                    if (idx < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    state.BackgroundWork!.RemoveAt(idx);
+                    return ReduceOutcome.Applied;
+                }
             case ChatMovableChangedAction a:
                 state.Movable = a.Movable;
                 return ReduceOutcome.Applied;

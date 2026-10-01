@@ -57,12 +57,12 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerCustomization, McpServerStartingState, McpServerState,
-    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
-    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
+    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
+    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
+    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
     TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
     TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
@@ -480,6 +480,14 @@ fn session_input_request_id(r: &SessionInputRequest) -> Option<&str> {
         SessionInputRequest::ToolClientExecution(x) => Some(x.id.as_str()),
         SessionInputRequest::ToolAuthentication(x) => Some(x.id.as_str()),
         SessionInputRequest::Unknown(v) => v.get("id").and_then(serde_json::Value::as_str),
+    }
+}
+
+fn background_work_id(w: &BackgroundWork) -> Option<&str> {
+    match w {
+        BackgroundWork::Shell(x) => Some(x.id.as_str()),
+        BackgroundWork::Subagent(x) => Some(x.id.as_str()),
+        BackgroundWork::Unknown(v) => v.get("id").and_then(serde_json::Value::as_str),
     }
 }
 
@@ -1144,6 +1152,34 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatBackgroundWorkSet(a) => {
+            let Some(action_id) = background_work_id(&a.work) else {
+                return ReduceOutcome::NoOp;
+            };
+            let list = state.background_work.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|w| background_work_id(w) == Some(action_id))
+            {
+                list[idx] = a.work.clone();
+            } else {
+                list.push(a.work.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatBackgroundWorkRemoved(a) => {
+            let Some(list) = state.background_work.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list
+                .iter()
+                .position(|w| background_work_id(w) == Some(a.id.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
             ReduceOutcome::Applied
         }
         StateAction::ChatMovableChanged(a) => {
@@ -2252,6 +2288,7 @@ mod tests {
             title: String::new(),
             status: SessionStatus::Idle.bits(),
             activity: None,
+            background_work: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             changes: None,
             origin: None,

@@ -82,6 +82,12 @@ internal static class GeneratedActionMetadata
             case ChatActivityChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatBackgroundWorkRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatBackgroundWorkSetAction value:
+                actionType = value.Type;
+                return true;
             case ChatChangesetsChangedAction value:
                 actionType = value.Type;
                 return true;

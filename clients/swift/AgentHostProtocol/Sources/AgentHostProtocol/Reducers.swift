@@ -72,6 +72,16 @@ private func refineToolCallContributor(_ current: ToolCallContributor?, _ next: 
     return next
 }
 
+/// Extracts the stable `id` of background work, including kinds from newer hosts.
+private func backgroundWorkID(_ w: BackgroundWork) -> String? {
+    switch w {
+    case .shell(let x): return x.id
+    case .subagent(let x): return x.id
+    // Kinds from newer hosts still carry the common `id`, so they can be replaced and removed.
+    case .unknown(let raw): return (raw.value as? [String: Any])?["id"] as? String
+    }
+}
+
 /// Extracts the stable `id` of a session input request, or `nil` for unknown variants.
 private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
     switch r {
@@ -202,6 +212,24 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatActivityChanged(let a):
         var next = state
         next.activity = a.activity
+        return next
+
+    case .chatBackgroundWorkSet(let a):
+        guard let id = backgroundWorkID(a.work) else { return state }
+        var next = state
+        var work = state.backgroundWork ?? []
+        if let idx = work.firstIndex(where: { backgroundWorkID($0) == id }) {
+            work[idx] = a.work
+        } else {
+            work.append(a.work)
+        }
+        next.backgroundWork = work
+        return next
+
+    case .chatBackgroundWorkRemoved(let a):
+        guard let idx = state.backgroundWork?.firstIndex(where: { backgroundWorkID($0) == a.id }) else { return state }
+        var next = state
+        next.backgroundWork?.remove(at: idx)
         return next
 
     case .chatMovableChanged(let a):

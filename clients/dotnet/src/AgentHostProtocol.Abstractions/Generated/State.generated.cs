@@ -1195,6 +1195,62 @@ public enum TerminalLifecycleStatus
     Exited,
 }
 
+/// <summary>Kind of {@link BackgroundWork}.
+///
+/// This is a general/typological union (not a lifecycle), so the discriminant is
+/// a `*Kind`.</summary>
+[JsonConverter(typeof(BackgroundWorkKindConverter))]
+public readonly struct BackgroundWorkKind : IEquatable<BackgroundWorkKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public BackgroundWorkKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>A shell command that continues after its initiating tool call returns.</summary>
+    public static readonly BackgroundWorkKind Shell = new BackgroundWorkKind("shell");
+
+    /// <summary>A subagent running in the background.</summary>
+    public static readonly BackgroundWorkKind Subagent = new BackgroundWorkKind("subagent");
+
+    /// <inheritdoc />
+    public bool Equals(BackgroundWorkKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is BackgroundWorkKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(BackgroundWorkKind left, BackgroundWorkKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(BackgroundWorkKind left, BackgroundWorkKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="BackgroundWorkKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class BackgroundWorkKindConverter : JsonConverter<BackgroundWorkKind>
+{
+    /// <inheritdoc />
+    public override BackgroundWorkKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new BackgroundWorkKind(reader.GetString() ?? throw new JsonException("BackgroundWorkKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, BackgroundWorkKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Discriminant for the {@link McpServerState} union.</summary>
 [JsonConverter(typeof(McpServerStatusConverter))]
 public readonly struct McpServerStatus : IEquatable<McpServerStatus>
@@ -2207,6 +2263,71 @@ public sealed class ChatSummary
     public List<string>? WorkingDirectories { get; set; }
 }
 
+/// <summary>A shell command continuing outside its initiating tool call. Covers shells
+/// tied to the agent's lifetime (attached) and shells that outlive it
+/// (detached). Whether a shell is attached is provider-specific and goes in its
+/// `_meta`.</summary>
+public sealed record BackgroundShellWork
+{
+    /// <summary>Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable label, such as the command's purpose or the subagent's name.</summary>
+    public required string Label { get; init; }
+
+    /// <summary>ISO 8601 timestamp when the work started.</summary>
+    public required string StartedAt { get; init; }
+
+    /// <summary>Provider-specific metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    public BackgroundWorkKind Kind { get; init; } = BackgroundWorkKind.Shell;
+
+    /// <summary>Command line, displayed as plain text.</summary>
+    public required string Command { get; init; }
+
+    /// <summary>Terminal carrying this shell's output. Hosts SHOULD set this whenever they
+    /// can show that output. Clients open it like
+    /// {@link ToolResultTerminalContent.resource}; `isPty` on its
+    /// {@link TerminalState} says whether the output is plain text.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Terminal { get; init; }
+}
+
+/// <summary>A subagent running in the background. Its own state lives in its chat.</summary>
+public sealed record BackgroundSubagentWork
+{
+    /// <summary>Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable label, such as the command's purpose or the subagent's name.</summary>
+    public required string Label { get; init; }
+
+    /// <summary>ISO 8601 timestamp when the work started.</summary>
+    public required string StartedAt { get; init; }
+
+    /// <summary>Provider-specific metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    public BackgroundWorkKind Kind { get; init; } = BackgroundWorkKind.Subagent;
+
+    /// <summary>The subagent's chat: the same chat the spawning tool call's
+    /// {@link ToolResultSubagentContent.resource} points to.</summary>
+    public required string Chat { get; init; }
+}
+
 /// <summary>Full state for a single chat, loaded when a client subscribes to the chat's
 /// URI.
 ///
@@ -2287,6 +2408,17 @@ public sealed class ChatState
     /// obtain it by subscribing to the chat channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Changeset>? Changesets { get; set; }
+
+    /// <summary>Work running in the background for this chat, such as shells and
+    /// subagents. Only active work is listed: hosts remove an entry once the work
+    /// ends. An entry may have been started by an earlier turn rather than the
+    /// {@link ChatState.activeTurn | activeTurn}.
+    ///
+    /// Like {@link ChatState.changesets | changesets}, this is intentionally
+    /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
+    /// chat channel.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BackgroundWork>? BackgroundWork { get; set; }
 
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
@@ -3044,6 +3176,14 @@ public sealed record SessionChatSummary
     /// chat is not archived.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Archived { get; init; }
+
+    /// <summary>Aggregate summary of file changes associated with this chat.
+    ///
+    /// Servers may populate this so session lists can show per-chat change
+    /// counts without subscribing to the session or chat channel. Updates travel
+    /// with the rest of the catalog in `root/sessionSummaryChanged`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; init; }
 }
 
 /// <summary>Aggregate counts describing the file changes associated with a session or
@@ -7228,6 +7368,33 @@ internal sealed class SessionInputRequestConverter : UnionConverter<SessionInput
         ["toolConfirmation"] = typeof(SessionToolConfirmationRequest),
         ["toolClientExecution"] = typeof(SessionToolClientExecutionRequest),
         ["toolAuthentication"] = typeof(SessionToolAuthenticationRequest),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>Work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.</summary>
+[JsonConverter(typeof(BackgroundWorkConverter))]
+public sealed class BackgroundWork : AhpUnion
+{
+    /// <summary>Creates an empty BackgroundWork (no active variant).</summary>
+    public BackgroundWork() { }
+
+    /// <summary>Creates a BackgroundWork wrapping the given variant value.</summary>
+    public BackgroundWork(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the BackgroundWork discriminated union.</summary>
+internal sealed class BackgroundWorkConverter : UnionConverter<BackgroundWork>
+{
+    public BackgroundWorkConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["shell"] = typeof(BackgroundShellWork),
+        ["subagent"] = typeof(BackgroundSubagentWork),
             },
             allowUnknown: true)
     {

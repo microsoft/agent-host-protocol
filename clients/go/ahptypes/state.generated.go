@@ -359,6 +359,19 @@ const (
 	TerminalLifecycleStatusExited  TerminalLifecycleStatus = "exited"
 )
 
+// Kind of {@link BackgroundWork}.
+//
+// This is a general/typological union (not a lifecycle), so the discriminant is
+// a `*Kind`.
+type BackgroundWorkKind string
+
+const (
+	// A shell command that continues after its initiating tool call returns.
+	BackgroundWorkKindShell BackgroundWorkKind = "shell"
+	// A subagent running in the background.
+	BackgroundWorkKindSubagent BackgroundWorkKind = "subagent"
+)
+
 // Discriminant for the {@link McpServerState} union.
 type McpServerStatus string
 
@@ -1223,6 +1236,12 @@ type SessionChatSummary struct {
 	// lists without subscribing to the session channel. Absence means the
 	// chat is not archived.
 	Archived *bool `json:"archived,omitempty"`
+	// Aggregate summary of file changes associated with this chat.
+	//
+	// Servers may populate this so session lists can show per-chat change
+	// counts without subscribing to the session or chat channel. Updates travel
+	// with the rest of the catalog in `root/sessionSummaryChanged`.
+	Changes *ChangesSummary `json:"changes,omitempty"`
 }
 
 // Aggregate counts describing the file changes associated with a session or
@@ -1301,6 +1320,15 @@ type ChatState struct {
 	// This catalogue is intentionally absent from {@link ChatSummary}; clients
 	// obtain it by subscribing to the chat channel.
 	Changesets []Changeset `json:"changesets,omitempty"`
+	// Work running in the background for this chat, such as shells and
+	// subagents. Only active work is listed: hosts remove an entry once the work
+	// ends. An entry may have been started by an earlier turn rather than the
+	// {@link ChatState.activeTurn | activeTurn}.
+	//
+	// Like {@link ChatState.changesets | changesets}, this is intentionally
+	// absent from {@link ChatSummary}; clients obtain it by subscribing to the
+	// chat channel.
+	BackgroundWork *[]BackgroundWork `json:"backgroundWork,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1366,6 +1394,53 @@ type ChatSummary struct {
 	// The subset of the session's working directories this chat uses.
 	// See {@link ChatState.workingDirectories} for the full semantics.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+}
+
+// A shell command continuing outside its initiating tool call. Covers shells
+// tied to the agent's lifetime (attached) and shells that outlive it
+// (detached). Whether a shell is attached is provider-specific and goes in its
+// `_meta`.
+type BackgroundShellWork struct {
+	// Identifier of this entry, unique within the owning chat across all kinds.
+	// The host derives it however it likes (for example from the kind plus the
+	// agent's own task id); consumers MUST treat it as opaque. It is the key for
+	// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+	// convention.
+	Id string `json:"id"`
+	// Human-readable label, such as the command's purpose or the subagent's name.
+	Label string `json:"label"`
+	// ISO 8601 timestamp when the work started.
+	StartedAt string `json:"startedAt"`
+	// Provider-specific metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	Kind BackgroundWorkKind         `json:"kind"`
+	// Command line, displayed as plain text.
+	Command string `json:"command"`
+	// Terminal carrying this shell's output. Hosts SHOULD set this whenever they
+	// can show that output. Clients open it like
+	// {@link ToolResultTerminalContent.resource}; `isPty` on its
+	// {@link TerminalState} says whether the output is plain text.
+	Terminal *URI `json:"terminal,omitempty"`
+}
+
+// A subagent running in the background. Its own state lives in its chat.
+type BackgroundSubagentWork struct {
+	// Identifier of this entry, unique within the owning chat across all kinds.
+	// The host derives it however it likes (for example from the kind plus the
+	// agent's own task id); consumers MUST treat it as opaque. It is the key for
+	// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+	// convention.
+	Id string `json:"id"`
+	// Human-readable label, such as the command's purpose or the subagent's name.
+	Label string `json:"label"`
+	// ISO 8601 timestamp when the work started.
+	StartedAt string `json:"startedAt"`
+	// Provider-specific metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	Kind BackgroundWorkKind         `json:"kind"`
+	// The subagent's chat: the same chat the spawning tool call's
+	// {@link ToolResultSubagentContent.resource} points to.
+	Chat URI `json:"chat"`
 }
 
 // Immutable selected-text snapshot captured when a side chat is created.
@@ -5637,6 +5712,66 @@ func (u *SessionInputRequest) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u SessionInputRequest) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*SessionInputRequestUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// BackgroundWork is work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.
+type BackgroundWork struct {
+	Value isBackgroundWork
+}
+
+// isBackgroundWork is the marker interface implemented by every
+// concrete variant of BackgroundWork.
+type isBackgroundWork interface{ isBackgroundWork() }
+
+func (*BackgroundShellWork) isBackgroundWork()    {}
+func (*BackgroundSubagentWork) isBackgroundWork() {}
+
+// BackgroundWorkUnknown carries an unrecognized BackgroundWork variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type BackgroundWorkUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*BackgroundWorkUnknown) isBackgroundWork() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *BackgroundWork) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "shell":
+		var value BackgroundShellWork
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "subagent":
+		var value BackgroundSubagentWork
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &BackgroundWorkUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u BackgroundWork) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*BackgroundWorkUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

@@ -77,6 +77,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatActivityChanged = new ActionType("chat/activityChanged");
 
+    public static readonly ActionType ChatBackgroundWorkSet = new ActionType("chat/backgroundWorkSet");
+
+    public static readonly ActionType ChatBackgroundWorkRemoved = new ActionType("chat/backgroundWorkRemoved");
+
     public static readonly ActionType ChatMovableChanged = new ActionType("chat/movableChanged");
 
     public static readonly ActionType ChatChangesetsChanged = new ActionType("chat/changesetsChanged");
@@ -1765,6 +1769,25 @@ public sealed record ChatActivityChangedAction
     public string? Activity { get; init; }
 }
 
+/// <summary>Adds or replaces a {@link BackgroundWork} entry by `id`, independently of turn
+/// state.</summary>
+public sealed record ChatBackgroundWorkSetAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatBackgroundWorkSet;
+
+    /// <summary>The complete entry.</summary>
+    public required BackgroundWork Work { get; init; }
+}
+
+/// <summary>Removes finished or no-longer-tracked background work; unknown IDs are a no-op.</summary>
+public sealed record ChatBackgroundWorkRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatBackgroundWorkRemoved;
+
+    /// <summary>The {@link BackgroundWorkBase.id | id} of the entry to remove.</summary>
+    public required string Id { get; init; }
+}
+
 /// <summary>Whether this chat is structurally eligible to be the source of `moveChat`
 /// changed.
 ///
@@ -2772,6 +2795,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/backgroundWorkSet"] = typeof(ChatBackgroundWorkSetAction),
+        ["chat/backgroundWorkRemoved"] = typeof(ChatBackgroundWorkRemovedAction),
         ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),

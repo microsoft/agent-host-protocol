@@ -361,7 +361,8 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     const presenceSensitiveCollection = (iface.getName() === 'AutomationDefinitionPatch'
       && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
-        && tsName === 'disableConditions');
+        && tsName === 'disableConditions')
+      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -725,6 +726,7 @@ const STATE_ENUMS = [
   'ConfirmationOptionKind', 'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus',
   'TerminalClaimKind', 'TerminalLifecycleStatus',
+  'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -758,6 +760,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ChangesSummary' },
   { name: 'ChatState' },
   { name: 'ChatSummary' },
+  { name: 'BackgroundShellWork' },
+  { name: 'BackgroundSubagentWork' },
   { name: 'SideChatSelection' },
   { name: 'PendingMessage' },
   { name: 'ProjectInfo' },
@@ -1124,6 +1128,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { variantName: 'ToolConfirmation', innerType: 'SessionToolConfirmationRequest', wireValue: 'toolConfirmation' },
     { variantName: 'ToolClientExecution', innerType: 'SessionToolClientExecutionRequest', wireValue: 'toolClientExecution' },
     { variantName: 'ToolAuthentication', innerType: 'SessionToolAuthenticationRequest', wireValue: 'toolAuthentication' },
+  ],
+  unknown: true,
+};
+
+const BACKGROUND_WORK_UNION: UnionConfig = {
+  name: 'BackgroundWork',
+  discriminantField: 'kind',
+  doc: 'BackgroundWork is work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.',
+  variants: [
+    { variantName: 'Shell', innerType: 'BackgroundShellWork', wireValue: 'shell' },
+    { variantName: 'Subagent', innerType: 'BackgroundSubagentWork', wireValue: 'subagent' },
   ],
   unknown: true,
 };
@@ -1510,6 +1525,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, TERMINAL_LIFECYCLE_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
+  lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
@@ -1563,6 +1579,8 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundWorkSet', variantName: 'ChatBackgroundWorkSet', tsInterface: 'ChatBackgroundWorkSetAction' },
+  { type: 'chat/backgroundWorkRemoved', variantName: 'ChatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
   { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
@@ -2361,6 +2379,7 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallRiskAssessment',
     'TerminalLifecycleState',
     'SessionInputRequest',
+    'BackgroundWork',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',

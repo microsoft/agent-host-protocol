@@ -32,6 +32,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatError
     case chatTurnResume
     case chatActivityChanged
+    case chatBackgroundWorkSet
+    case chatBackgroundWorkRemoved
     case chatMovableChanged
     case chatChangesetsChanged
     case chatWorkingDirectorySet
@@ -140,6 +142,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/error": self = .chatError
         case "chat/turnResume": self = .chatTurnResume
         case "chat/activityChanged": self = .chatActivityChanged
+        case "chat/backgroundWorkSet": self = .chatBackgroundWorkSet
+        case "chat/backgroundWorkRemoved": self = .chatBackgroundWorkRemoved
         case "chat/movableChanged": self = .chatMovableChanged
         case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
@@ -248,6 +252,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatError: try container.encode("chat/error")
         case .chatTurnResume: try container.encode("chat/turnResume")
         case .chatActivityChanged: try container.encode("chat/activityChanged")
+        case .chatBackgroundWorkSet: try container.encode("chat/backgroundWorkSet")
+        case .chatBackgroundWorkRemoved: try container.encode("chat/backgroundWorkRemoved")
         case .chatMovableChanged: try container.encode("chat/movableChanged")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
@@ -1202,6 +1208,34 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.activity = activity
+    }
+}
+
+public struct ChatBackgroundWorkSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// The complete entry.
+    public var work: BackgroundWork
+
+    public init(
+        type: ActionType,
+        work: BackgroundWork
+    ) {
+        self.type = type
+        self.work = work
+    }
+}
+
+public struct ChatBackgroundWorkRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The {@link BackgroundWorkBase.id | id} of the entry to remove.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
     }
 }
 
@@ -2518,6 +2552,8 @@ public enum StateAction: Codable, Sendable {
     case chatError(ChatErrorAction)
     case chatTurnResume(ChatTurnResumeAction)
     case chatActivityChanged(ChatActivityChangedAction)
+    case chatBackgroundWorkSet(ChatBackgroundWorkSetAction)
+    case chatBackgroundWorkRemoved(ChatBackgroundWorkRemovedAction)
     case chatMovableChanged(ChatMovableChangedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
@@ -2657,6 +2693,10 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnResume(try ChatTurnResumeAction(from: decoder))
         case "chat/activityChanged":
             self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
+        case "chat/backgroundWorkSet":
+            self = .chatBackgroundWorkSet(try ChatBackgroundWorkSetAction(from: decoder))
+        case "chat/backgroundWorkRemoved":
+            self = .chatBackgroundWorkRemoved(try ChatBackgroundWorkRemovedAction(from: decoder))
         case "chat/movableChanged":
             self = .chatMovableChanged(try ChatMovableChangedAction(from: decoder))
         case "chat/changesetsChanged":
@@ -2840,6 +2880,8 @@ public enum StateAction: Codable, Sendable {
         case .chatError(let v): try v.encode(to: encoder)
         case .chatTurnResume(let v): try v.encode(to: encoder)
         case .chatActivityChanged(let v): try v.encode(to: encoder)
+        case .chatBackgroundWorkSet(let v): try v.encode(to: encoder)
+        case .chatBackgroundWorkRemoved(let v): try v.encode(to: encoder)
         case .chatMovableChanged(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)

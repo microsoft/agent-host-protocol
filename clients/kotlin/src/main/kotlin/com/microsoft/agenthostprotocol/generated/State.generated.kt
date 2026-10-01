@@ -767,6 +767,37 @@ enum class TerminalLifecycleStatus {
 }
 
 /**
+ * Kind of {@link BackgroundWork}.
+ *
+ * This is a general/typological union (not a lifecycle), so the discriminant is
+ * a `*Kind`.
+ */
+@Serializable(with = BackgroundWorkKindSerializer::class)
+@JvmInline
+value class BackgroundWorkKind(val rawValue: String) {
+    companion object {
+        /**
+         * A shell command that continues after its initiating tool call returns.
+         */
+        val SHELL: BackgroundWorkKind = BackgroundWorkKind("shell")
+        /**
+         * A subagent running in the background.
+         */
+        val SUBAGENT: BackgroundWorkKind = BackgroundWorkKind("subagent")
+    }
+}
+
+internal object BackgroundWorkKindSerializer : KSerializer<BackgroundWorkKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("BackgroundWorkKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: BackgroundWorkKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): BackgroundWorkKind =
+        BackgroundWorkKind(decoder.decodeString())
+}
+
+/**
  * Discriminant for the {@link McpServerState} union.
  */
 @Serializable(with = McpServerStatusSerializer::class)
@@ -1674,6 +1705,17 @@ data class ChatState(
      */
     val changesets: List<Changeset>? = null,
     /**
+     * Work running in the background for this chat, such as shells and
+     * subagents. Only active work is listed: hosts remove an entry once the work
+     * ends. An entry may have been started by an earlier turn rather than the
+     * {@link ChatState.activeTurn | activeTurn}.
+     *
+     * Like {@link ChatState.changesets | changesets}, this is intentionally
+     * absent from {@link ChatSummary}; clients obtain it by subscribing to the
+     * chat channel.
+     */
+    val backgroundWork: List<BackgroundWork>? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,
@@ -1965,6 +2007,74 @@ data class SessionActiveClient(
 )
 
 @Serializable
+data class BackgroundShellWork(
+    /**
+     * Identifier of this entry, unique within the owning chat across all kinds.
+     * The host derives it however it likes (for example from the kind plus the
+     * agent's own task id); consumers MUST treat it as opaque. It is the key for
+     * the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+     * convention.
+     */
+    val id: String,
+    /**
+     * Human-readable label, such as the command's purpose or the subagent's name.
+     */
+    val label: String,
+    /**
+     * ISO 8601 timestamp when the work started.
+     */
+    val startedAt: String,
+    /**
+     * Provider-specific metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    val kind: BackgroundWorkKind,
+    /**
+     * Command line, displayed as plain text.
+     */
+    val command: String,
+    /**
+     * Terminal carrying this shell's output. Hosts SHOULD set this whenever they
+     * can show that output. Clients open it like
+     * {@link ToolResultTerminalContent.resource}; `isPty` on its
+     * {@link TerminalState} says whether the output is plain text.
+     */
+    val terminal: String? = null
+)
+
+@Serializable
+data class BackgroundSubagentWork(
+    /**
+     * Identifier of this entry, unique within the owning chat across all kinds.
+     * The host derives it however it likes (for example from the kind plus the
+     * agent's own task id); consumers MUST treat it as opaque. It is the key for
+     * the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+     * convention.
+     */
+    val id: String,
+    /**
+     * Human-readable label, such as the command's purpose or the subagent's name.
+     */
+    val label: String,
+    /**
+     * ISO 8601 timestamp when the work started.
+     */
+    val startedAt: String,
+    /**
+     * Provider-specific metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    val kind: BackgroundWorkKind,
+    /**
+     * The subagent's chat: the same chat the spawning tool call's
+     * {@link ToolResultSubagentContent.resource} points to.
+     */
+    val chat: String
+)
+
+@Serializable
 data class SessionChatInputRequest(
     /**
      * Stable key for this entry, unique within the session's
@@ -2187,7 +2297,15 @@ data class SessionChatSummary(
      * lists without subscribing to the session channel. Absence means the
      * chat is not archived.
      */
-    val archived: Boolean? = null
+    val archived: Boolean? = null,
+    /**
+     * Aggregate summary of file changes associated with this chat.
+     *
+     * Servers may populate this so session lists can show per-chat change
+     * counts without subscribing to the session or chat channel. Updates travel
+     * with the rest of the catalog in `root/sessionSummaryChanged`.
+     */
+    val changes: ChangesSummary? = null
 )
 
 @Serializable
@@ -6901,6 +7019,54 @@ internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest>
             is SessionInputRequestToolClientExecution -> output.json.encodeToJsonElement(SessionToolClientExecutionRequest.serializer(), value.value)
             is SessionInputRequestToolAuthentication -> output.json.encodeToJsonElement(SessionToolAuthenticationRequest.serializer(), value.value)
             is SessionInputRequestUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+@Serializable(with = BackgroundWorkSerializer::class)
+sealed interface BackgroundWork
+
+@JvmInline
+value class BackgroundWorkShell(val value: BackgroundShellWork) : BackgroundWork
+@JvmInline
+value class BackgroundWorkSubagent(val value: BackgroundSubagentWork) : BackgroundWork
+/**
+ * Forward-compat catch-all for unknown BackgroundWork discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class BackgroundWorkUnknown(val raw: JsonObject) : BackgroundWork
+
+internal object BackgroundWorkSerializer : KSerializer<BackgroundWork> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("BackgroundWork")
+
+    override fun deserialize(decoder: Decoder): BackgroundWork {
+        val input = decoder as? JsonDecoder
+            ?: error("BackgroundWork can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for BackgroundWork")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return BackgroundWorkUnknown(obj)
+        return when (discriminant) {
+            "shell" -> BackgroundWorkShell(input.json.decodeFromJsonElement(BackgroundShellWork.serializer(), element))
+            "subagent" -> BackgroundWorkSubagent(input.json.decodeFromJsonElement(BackgroundSubagentWork.serializer(), element))
+            else -> BackgroundWorkUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: BackgroundWork) {
+        val output = encoder as? JsonEncoder
+            ?: error("BackgroundWork can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is BackgroundWorkShell -> output.json.encodeToJsonElement(BackgroundShellWork.serializer(), value.value)
+            is BackgroundWorkSubagent -> output.json.encodeToJsonElement(BackgroundSubagentWork.serializer(), value.value)
+            is BackgroundWorkUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

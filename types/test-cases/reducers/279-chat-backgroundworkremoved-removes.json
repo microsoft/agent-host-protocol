@@ -1,0 +1,53 @@
+{
+  "description": "removing finished background work keeps other entries and chat status",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "shell",
+        "id": "shell-1",
+        "label": "Run tests",
+        "command": "npm test",
+        "startedAt": "2026-09-25T00:00:00.000Z"
+      },
+      {
+        "kind": "subagent",
+        "id": "subagent-1",
+        "label": "Review changes",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "chat": "ahp-chat:/session/subagent-tool-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/backgroundWorkRemoved",
+      "id": "shell-1"
+    },
+    {
+      "type": "chat/backgroundWorkRemoved",
+      "id": "missing"
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "subagent",
+        "id": "subagent-1",
+        "label": "Review changes",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "chat": "ahp-chat:/session/subagent-tool-1"
+      }
+    ]
+  }
+}

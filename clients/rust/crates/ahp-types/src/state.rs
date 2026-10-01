@@ -994,6 +994,47 @@ pub enum TerminalLifecycleStatus {
     Exited,
 }
 
+/// Kind of {@link BackgroundWork}.
+///
+/// This is a general/typological union (not a lifecycle), so the discriminant is
+/// a `*Kind`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackgroundWorkKind {
+    /// A shell command that continues after its initiating tool call returns.
+    Shell,
+    /// A subagent running in the background.
+    Subagent,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for BackgroundWorkKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Shell => serializer.serialize_str("shell"),
+            Self::Subagent => serializer.serialize_str("subagent"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BackgroundWorkKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "shell" => Self::Shell,
+            "subagent" => Self::Subagent,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Discriminant for the {@link McpServerState} union.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum McpServerStatus {
@@ -1941,6 +1982,16 @@ pub struct ChatState {
     /// obtain it by subscribing to the chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Work running in the background for this chat, such as shells and
+    /// subagents. Only active work is listed: hosts remove an entry once the work
+    /// ends. An entry may have been started by an earlier turn rather than the
+    /// {@link ChatState.activeTurn | activeTurn}.
+    ///
+    /// Like {@link ChatState.changesets | changesets}, this is intentionally
+    /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
+    /// chat channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_work: Option<Vec<BackgroundWork>>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -2020,6 +2071,58 @@ pub struct ChatSummary {
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+}
+
+/// A shell command continuing outside its initiating tool call. Covers shells
+/// tied to the agent's lifetime (attached) and shells that outlive it
+/// (detached). Whether a shell is attached is provider-specific and goes in its
+/// `_meta`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundShellWork {
+    /// Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.
+    pub id: String,
+    /// Human-readable label, such as the command's purpose or the subagent's name.
+    pub label: String,
+    /// ISO 8601 timestamp when the work started.
+    pub started_at: String,
+    /// Provider-specific metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Command line, displayed as plain text.
+    pub command: String,
+    /// Terminal carrying this shell's output. Hosts SHOULD set this whenever they
+    /// can show that output. Clients open it like
+    /// {@link ToolResultTerminalContent.resource}; `isPty` on its
+    /// {@link TerminalState} says whether the output is plain text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<Uri>,
+}
+
+/// A subagent running in the background. Its own state lives in its chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundSubagentWork {
+    /// Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.
+    pub id: String,
+    /// Human-readable label, such as the command's purpose or the subagent's name.
+    pub label: String,
+    /// ISO 8601 timestamp when the work started.
+    pub started_at: String,
+    /// Provider-specific metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// The subagent's chat: the same chat the spawning tool call's
+    /// {@link ToolResultSubagentContent.resource} points to.
+    pub chat: Uri,
 }
 
 /// Immutable selected-text snapshot captured when a side chat is created.
@@ -2476,6 +2579,13 @@ pub struct SessionChatSummary {
     /// chat is not archived.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived: Option<bool>,
+    /// Aggregate summary of file changes associated with this chat.
+    ///
+    /// Servers may populate this so session lists can show per-chat change
+    /// counts without subscribing to the session or chat channel. Updates travel
+    /// with the rest of the catalog in `root/sessionSummaryChanged`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
 }
 
 /// Aggregate counts describing the file changes associated with a session or
@@ -6213,6 +6323,19 @@ pub enum SessionInputRequest {
     ToolClientExecution(SessionToolClientExecutionRequest),
     #[serde(rename = "toolAuthentication")]
     ToolAuthentication(Box<SessionToolAuthenticationRequest>),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+/// Work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum BackgroundWork {
+    #[serde(rename = "shell")]
+    Shell(BackgroundShellWork),
+    #[serde(rename = "subagent")]
+    Subagent(BackgroundSubagentWork),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

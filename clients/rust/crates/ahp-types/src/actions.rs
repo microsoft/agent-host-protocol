@@ -15,14 +15,15 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    ChangesSummary, Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus,
-    ChangesetStatus, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity,
-    ChatOrigin, ChatSummary, ConfirmationOption, ContentRef, Customization,
-    CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement,
-    McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    BackgroundWork, ChangesSummary, Changeset, ChangesetFile, ChangesetOperation,
+    ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer, ChatInputRequest,
+    ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary, ConfirmationOption,
+    ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart,
+    FileEditCollection, McpAuthRequirement, McpServerState, Message, ModelSelection,
+    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
+    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
+    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
+    ToolResultContent, Turn, UsageInfo,
 };
 // ─── ActionType ──────────────────────────────────────────────────────
 
@@ -55,6 +56,8 @@ pub enum ActionType {
     ChatError,
     ChatTurnResume,
     ChatActivityChanged,
+    ChatBackgroundWorkSet,
+    ChatBackgroundWorkRemoved,
     ChatMovableChanged,
     ChatChangesetsChanged,
     ChatWorkingDirectorySet,
@@ -174,6 +177,10 @@ impl serde::Serialize for ActionType {
             Self::ChatError => serializer.serialize_str("chat/error"),
             Self::ChatTurnResume => serializer.serialize_str("chat/turnResume"),
             Self::ChatActivityChanged => serializer.serialize_str("chat/activityChanged"),
+            Self::ChatBackgroundWorkSet => serializer.serialize_str("chat/backgroundWorkSet"),
+            Self::ChatBackgroundWorkRemoved => {
+                serializer.serialize_str("chat/backgroundWorkRemoved")
+            }
             Self::ChatMovableChanged => serializer.serialize_str("chat/movableChanged"),
             Self::ChatChangesetsChanged => serializer.serialize_str("chat/changesetsChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
@@ -341,6 +348,8 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/error" => Self::ChatError,
             "chat/turnResume" => Self::ChatTurnResume,
             "chat/activityChanged" => Self::ChatActivityChanged,
+            "chat/backgroundWorkSet" => Self::ChatBackgroundWorkSet,
+            "chat/backgroundWorkRemoved" => Self::ChatBackgroundWorkRemoved,
             "chat/movableChanged" => Self::ChatMovableChanged,
             "chat/changesetsChanged" => Self::ChatChangesetsChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
@@ -1074,6 +1083,23 @@ pub struct ChatActivityChangedAction {
     /// Human-readable description of current activity; omit or set `undefined` to clear
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+}
+
+/// Adds or replaces a {@link BackgroundWork} entry by `id`, independently of turn
+/// state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatBackgroundWorkSetAction {
+    /// The complete entry.
+    pub work: BackgroundWork,
+}
+
+/// Removes finished or no-longer-tracked background work; unknown IDs are a no-op.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatBackgroundWorkRemovedAction {
+    /// The {@link BackgroundWorkBase.id | id} of the entry to remove.
+    pub id: String,
 }
 
 /// Whether this chat is structurally eligible to be the source of `moveChat`
@@ -2353,6 +2379,10 @@ pub enum StateAction {
     ChatTurnResume(ChatTurnResumeAction),
     #[serde(rename = "chat/activityChanged")]
     ChatActivityChanged(ChatActivityChangedAction),
+    #[serde(rename = "chat/backgroundWorkSet")]
+    ChatBackgroundWorkSet(ChatBackgroundWorkSetAction),
+    #[serde(rename = "chat/backgroundWorkRemoved")]
+    ChatBackgroundWorkRemoved(ChatBackgroundWorkRemovedAction),
     #[serde(rename = "chat/movableChanged")]
     ChatMovableChanged(ChatMovableChangedAction),
     #[serde(rename = "chat/changesetsChanged")]
