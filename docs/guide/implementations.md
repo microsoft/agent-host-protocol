@@ -16,6 +16,7 @@ for install snippets and per-language entry points.
 - **[AHPX](https://github.com/TylerLeonhardt/ahpx)** — A command-line and Node.js client for connecting to AHP servers, managing sessions, and sending prompts.
 - **[VS Code](https://github.com/microsoft/vscode)** — VS Code includes Agent Sessions client code for working with AHP hosts.
 - **[ahpc](https://github.com/softov/ahpc)** — A terminal client for AHP: commands, an interactive chat TUI, and a tool server that lets an agent elsewhere drive the sessions on a host.
+- **[WeChat AHP](https://github.com/formulahendry/vscode-wechat-ahp)** — A VS Code extension for continuing an existing local Agent Host conversation from WeChat and receiving completed text replies.
 
 ## Servers
 
