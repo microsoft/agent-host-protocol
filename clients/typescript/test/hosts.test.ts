@@ -616,10 +616,10 @@ test('aggregatedSessions sorts by modifiedAt descending and tags hostLabel', asy
   }
 });
 
-test('sessionSummaryChanged replaces the compact chat read projection', async () => {
+test('sessionSummaryChanged replaces the compact chat status projection', async () => {
   const initial = makeSummary('copilot:/s1', 'Session', 1_000);
   initial.chats = [
-    { resource: 'ahp-chat:/default', title: 'Default', isRead: false },
+    { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle },
   ];
   const state: FakeHostState = makeFakeState({
     sessions: [initial],
@@ -633,7 +633,7 @@ test('sessionSummaryChanged replaces the compact chat read projection', async ()
           session: initial.resource,
           changes: {
             chats: [
-              { resource: 'ahp-chat:/default', title: 'Default', isRead: true },
+              { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived },
             ],
           },
         },
@@ -654,11 +654,11 @@ test('sessionSummaryChanged replaces the compact chat read projection', async ()
       transportFactory: makeBasicFactory(state),
     });
     await waitUntil(() =>
-      multi.aggregatedSessions()[0]?.summary.chats?.[0]?.isRead === true
+      multi.aggregatedSessions()[0]?.summary.chats?.[0]?.status === (SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived)
     );
 
     assert.deepEqual(multi.aggregatedSessions()[0]?.summary.chats, [
-      { resource: 'ahp-chat:/default', title: 'Default', isRead: true },
+      { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived },
     ]);
   } finally {
     await multi.shutdown();

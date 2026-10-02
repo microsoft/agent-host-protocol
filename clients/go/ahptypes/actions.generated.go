@@ -212,8 +212,8 @@ type SessionChatRemovedAction struct {
 // SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
 //
 // Mirrors the root-channel `root/sessionSummaryChanged` notification.
-// When `changes.status` changes the `IsRead` bit, the host MUST project that
-// exact value into the matching `SessionChatSummary.isRead` field and publish
+// When `changes.status` changes, the host MUST project that exact value into
+// the matching `SessionChatSummary.status` field and publish
 // the updated compact chat catalog through `root/sessionSummaryChanged`.
 type SessionChatUpdatedAction struct {
 	Type ActionType `json:"type"`
@@ -825,7 +825,7 @@ type ChatDraftChangedAction struct {
 // owning session or sibling chats. Use `session/isReadChanged` only to change
 // the owning session's independent read state. After accepting this action,
 // the host also synchronizes the addressed chat's `ChatSummary.status` and
-// `SessionChatSummary.isRead` projections.
+// `SessionChatSummary.status` projections.
 type ChatIsReadChangedAction struct {
 	Type ActionType `json:"type"`
 	// Whether the chat has been read

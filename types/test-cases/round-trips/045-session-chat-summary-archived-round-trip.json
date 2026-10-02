@@ -1,7 +1,7 @@
 {
   "name": "session-chat-summary-archived-round-trip",
   "group": "A",
-  "description": "SessionSummary chat catalog entries preserve the optional archived flag so generic clients can group or filter archived chats without subscribing to the session channel.",
+  "description": "SessionSummary chat catalog entries preserve archived and read flags in the required status bitset so generic clients can group or filter archived chats without subscribing to the session channel.",
   "type": "SessionSummary",
   "input": {
     "resource": "ahp-session:/s1",
@@ -13,12 +13,13 @@
     "chats": [
       {
         "resource": "ahp-chat:/lead",
-        "title": "Lead"
+        "title": "Lead",
+        "status": 33
       },
       {
         "resource": "ahp-chat:/worker",
         "title": "Worker",
-        "archived": true
+        "status": 97
       }
     ],
     "defaultChat": "ahp-chat:/lead"
@@ -34,12 +35,13 @@
       "chats": [
         {
           "resource": "ahp-chat:/lead",
-          "title": "Lead"
+          "title": "Lead",
+          "status": 33
         },
         {
           "resource": "ahp-chat:/worker",
           "title": "Worker",
-          "archived": true
+          "status": 97
         }
       ],
       "defaultChat": "ahp-chat:/lead"

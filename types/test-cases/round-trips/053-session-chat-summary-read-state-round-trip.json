@@ -1,7 +1,7 @@
 {
   "name": "session-chat-summary-read-state-round-trip",
   "group": "A",
-  "description": "SessionSummary chat catalog entries preserve exact read and unread states while allowing older hosts to omit the unknown read state.",
+  "description": "SessionSummary chat catalog entries preserve read, unread, activity, archived, and unknown future bits in the required status bitset.",
   "type": "SessionSummary",
   "input": {
     "resource": "ahp-session:/s1",
@@ -14,16 +14,17 @@
       {
         "resource": "ahp-chat:/lead",
         "title": "Lead",
-        "isRead": true
+        "status": 33
       },
       {
         "resource": "ahp-chat:/worker",
         "title": "Worker",
-        "isRead": false
+        "status": 24
       },
       {
-        "resource": "ahp-chat:/legacy",
-        "title": "Legacy"
+        "resource": "ahp-chat:/future",
+        "title": "Future",
+        "status": 225
       }
     ],
     "defaultChat": "ahp-chat:/lead"
@@ -40,16 +41,17 @@
         {
           "resource": "ahp-chat:/lead",
           "title": "Lead",
-          "isRead": true
+          "status": 33
         },
         {
           "resource": "ahp-chat:/worker",
           "title": "Worker",
-          "isRead": false
+          "status": 24
         },
         {
-          "resource": "ahp-chat:/legacy",
-          "title": "Legacy"
+          "resource": "ahp-chat:/future",
+          "title": "Future",
+          "status": 225
         }
       ],
       "defaultChat": "ahp-chat:/lead"
