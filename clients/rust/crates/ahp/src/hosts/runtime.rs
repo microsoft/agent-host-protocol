@@ -803,7 +803,11 @@ mod tests {
         apply_summary_changes(&mut summary, &changes);
 
         assert_eq!(
-            summary.chats.as_ref().and_then(|chats| chats.first()).and_then(|chat| chat.is_read),
+            summary
+                .chats
+                .as_ref()
+                .and_then(|chats| chats.first())
+                .and_then(|chat| chat.is_read),
             Some(true)
         );
     }
