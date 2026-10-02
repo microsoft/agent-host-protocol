@@ -1241,24 +1241,54 @@ private func reconnectResult(for mode: ReconnectResponseMode) -> [String: Any] {
     switch mode {
     case .emptyReplay:
         return [
-            "type": "replay",
-            "actions": [],
-            "missing": [],
+            "channels": [
+                channelReplayRecoveryJSON(channel: RootResourceURI, actions: [])
+            ],
         ] as [String: Any]
     case .replayWithMissingAndLiveAction:
         return [
-            "type": "replay",
-            "actions": [
-                actionEnvelopeJSON(serverSeq: 42, activeSessions: 7)
+            "channels": [
+                channelReplayRecoveryJSON(
+                    channel: RootResourceURI,
+                    actions: [actionEnvelopeJSON(serverSeq: 42, activeSessions: 7)]
+                ),
+                channelMissingRecoveryJSON(channel: "copilot:/missing"),
             ],
-            "missing": ["copilot:/missing"],
         ] as [String: Any]
     case .snapshotRootOnly:
         return [
-            "type": "snapshot",
-            "snapshots": [rootSnapshot(fromSeq: 77, activeSessions: 9)],
+            "channels": [
+                channelSnapshotRecoveryJSON(
+                    channel: RootResourceURI,
+                    snapshot: rootSnapshot(fromSeq: 77, activeSessions: 9)
+                ),
+                channelMissingRecoveryJSON(channel: "copilot:/missing"),
+            ],
         ] as [String: Any]
     }
+}
+
+private func channelReplayRecoveryJSON(channel: String, actions: [[String: Any]]) -> [String: Any] {
+    [
+        "kind": "replay",
+        "channel": channel,
+        "actions": actions,
+    ]
+}
+
+private func channelSnapshotRecoveryJSON(channel: String, snapshot: [String: Any]) -> [String: Any] {
+    [
+        "kind": "snapshot",
+        "channel": channel,
+        "snapshot": snapshot,
+    ]
+}
+
+private func channelMissingRecoveryJSON(channel: String) -> [String: Any] {
+    [
+        "kind": "missing",
+        "channel": channel,
+    ]
 }
 
 private func rootSnapshot(fromSeq: Int, activeSessions: Int) -> [String: Any] {
@@ -1353,7 +1383,13 @@ private func startDispatchRecordingHost(
                 case "reconnect":
                     _ = await sendResponse(
                         to: id,
-                        result: ["type": "replay", "actions": [], "missing": []] as [String: Any],
+                        result: [
+                            "channels": [[
+                                "kind": "replay",
+                                "channel": RootResourceURI,
+                                "actions": [],
+                            ] as [String: Any]],
+                        ] as [String: Any],
                         on: transport
                     )
                 case "listSessions":

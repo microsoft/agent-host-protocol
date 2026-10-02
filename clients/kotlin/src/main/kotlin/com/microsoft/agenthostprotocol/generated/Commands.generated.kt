@@ -23,14 +23,25 @@ import kotlinx.serialization.json.contentOrNull
 // ─── Command Enums ──────────────────────────────────────────────────────────
 
 /**
- * Discriminant for reconnect result types.
+ * Discriminant for per-channel reconnect recovery outcomes.
  */
 @Serializable
-enum class ReconnectResultType {
+enum class ChannelRecoveryKind {
+    /**
+     * The server replayed the channel's missed actions.
+     */
     @SerialName("replay")
     REPLAY,
+    /**
+     * The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead.
+     */
     @SerialName("snapshot")
-    SNAPSHOT
+    SNAPSHOT,
+    /**
+     * The channel can no longer be resumed (e.g. disposed, or no longer permitted).
+     */
+    @SerialName("missing")
+    MISSING
 }
 
 /**
@@ -520,44 +531,82 @@ data class ReconnectParams(
      */
     val clientId: String,
     /**
-     * Last `serverSeq` the client received
+     * Per-channel replay checkpoints for every channel the client is still subscribed to.
      */
-    val lastSeenServerSeq: Long,
-    /**
-     * URIs the client was subscribed to
-     */
-    val subscriptions: List<String>
+    val subscriptions: List<ChannelReplayCursor>
 )
 
 @Serializable
-data class ReconnectReplayResult(
+data class ChannelReplayCursor(
     /**
-     * Discriminant
+     * The subscribed channel URI.
      */
-    val type: ReconnectResultType,
+    val channel: String,
     /**
-     * Missed action envelopes since `lastSeenServerSeq`
+     * `serverSeq` of the last action the client fully applied or safely
+     * retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+     * last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+     *
+     * `0` means the client has no baseline for `channel` yet — e.g. it
+     * subscribed but the `subscribe`/`initialize` response snapshot (if any)
+     * never arrived before the connection dropped. The server MUST NOT use
+     * another channel's progress to advance this checkpoint, and MUST NOT
+     * use it to seed the connection's global `serverSeq` identity (see
+     * {@link InitializeResult.serverSeq}).
      */
-    val actions: List<ActionEnvelope>,
-    /**
-     * URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-     * This includes resources that no longer exist (e.g. disposed sessions or
-     * terminals) as well as resources the client is no longer permitted to
-     * observe. Clients SHOULD drop these from their local subscription set.
-     */
-    val missing: List<String>
+    val lastSeenServerSeq: Long
 )
 
 @Serializable
-data class ReconnectSnapshotResult(
+data class ReconnectResult(
+    /**
+     * One recovery outcome per requested subscription, in any order.
+     */
+    val channels: List<ChannelRecovery>
+)
+
+@Serializable
+data class ChannelReplayRecovery(
     /**
      * Discriminant
      */
-    val type: ReconnectResultType,
+    val kind: ChannelRecoveryKind,
     /**
-     * Fresh snapshots for each subscription
+     * The channel this recovery applies to.
      */
-    val snapshots: List<Snapshot>
+    val channel: String,
+    /**
+     * Missed action envelopes since the requested `lastSeenServerSeq`.
+     */
+    val actions: List<ActionEnvelope>
+)
+
+@Serializable
+data class ChannelSnapshotRecovery(
+    /**
+     * Discriminant
+     */
+    val kind: ChannelRecoveryKind,
+    /**
+     * The channel this recovery applies to.
+     */
+    val channel: String,
+    /**
+     * Fresh snapshot the client MUST use as its new baseline for this channel.
+     */
+    val snapshot: Snapshot
+)
+
+@Serializable
+data class ChannelMissingRecovery(
+    /**
+     * Discriminant
+     */
+    val kind: ChannelRecoveryKind,
+    /**
+     * The channel this recovery applies to.
+     */
+    val channel: String
 )
 
 @Serializable
@@ -1873,41 +1922,45 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
     }
 }
 
-// ─── ReconnectResult Union ──────────────────────────────────────────────────
+// ─── ChannelRecovery Union ──────────────────────────────────────────────────
 
-@Serializable(with = ReconnectResultSerializer::class)
-sealed interface ReconnectResult
+@Serializable(with = ChannelRecoverySerializer::class)
+sealed interface ChannelRecovery
 
 @JvmInline
-value class ReconnectResultReplay(val value: ReconnectReplayResult) : ReconnectResult
+value class ChannelRecoveryReplay(val value: ChannelReplayRecovery) : ChannelRecovery
 @JvmInline
-value class ReconnectResultSnapshot(val value: ReconnectSnapshotResult) : ReconnectResult
+value class ChannelRecoverySnapshot(val value: ChannelSnapshotRecovery) : ChannelRecovery
+@JvmInline
+value class ChannelRecoveryMissing(val value: ChannelMissingRecovery) : ChannelRecovery
 
-internal object ReconnectResultSerializer : KSerializer<ReconnectResult> {
+internal object ChannelRecoverySerializer : KSerializer<ChannelRecovery> {
     override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("ReconnectResult")
+        buildClassSerialDescriptor("ChannelRecovery")
 
-    override fun deserialize(decoder: Decoder): ReconnectResult {
+    override fun deserialize(decoder: Decoder): ChannelRecovery {
         val input = decoder as? JsonDecoder
-            ?: error("ReconnectResult can only be deserialized from JSON")
+            ?: error("ChannelRecovery can only be deserialized from JSON")
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
-            ?: error("Expected JsonObject for ReconnectResult")
-        val discriminant = (obj["type"] as? JsonPrimitive)?.content
-            ?: error("Missing type discriminator on ReconnectResult")
+            ?: error("Expected JsonObject for ChannelRecovery")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on ChannelRecovery")
         return when (discriminant) {
-            "replay" -> ReconnectResultReplay(input.json.decodeFromJsonElement(ReconnectReplayResult.serializer(), element))
-            "snapshot" -> ReconnectResultSnapshot(input.json.decodeFromJsonElement(ReconnectSnapshotResult.serializer(), element))
-            else -> error("Unknown ReconnectResult discriminator: $discriminant")
+            "replay" -> ChannelRecoveryReplay(input.json.decodeFromJsonElement(ChannelReplayRecovery.serializer(), element))
+            "snapshot" -> ChannelRecoverySnapshot(input.json.decodeFromJsonElement(ChannelSnapshotRecovery.serializer(), element))
+            "missing" -> ChannelRecoveryMissing(input.json.decodeFromJsonElement(ChannelMissingRecovery.serializer(), element))
+            else -> error("Unknown ChannelRecovery discriminator: $discriminant")
         }
     }
 
-    override fun serialize(encoder: Encoder, value: ReconnectResult) {
+    override fun serialize(encoder: Encoder, value: ChannelRecovery) {
         val output = encoder as? JsonEncoder
-            ?: error("ReconnectResult can only be serialized to JSON")
+            ?: error("ChannelRecovery can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is ReconnectResultReplay -> output.json.encodeToJsonElement(ReconnectReplayResult.serializer(), value.value)
-            is ReconnectResultSnapshot -> output.json.encodeToJsonElement(ReconnectSnapshotResult.serializer(), value.value)
+            is ChannelRecoveryReplay -> output.json.encodeToJsonElement(ChannelReplayRecovery.serializer(), value.value)
+            is ChannelRecoverySnapshot -> output.json.encodeToJsonElement(ChannelSnapshotRecovery.serializer(), value.value)
+            is ChannelRecoveryMissing -> output.json.encodeToJsonElement(ChannelMissingRecovery.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }

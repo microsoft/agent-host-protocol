@@ -4,10 +4,14 @@ import Foundation
 
 // MARK: - Command Enums
 
-/// Discriminant for reconnect result types.
-public enum ReconnectResultType: String, Codable, Sendable {
+/// Discriminant for per-channel reconnect recovery outcomes.
+public enum ChannelRecoveryKind: String, Codable, Sendable {
+    /// The server replayed the channel's missed actions.
     case replay = "replay"
+    /// The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead.
     case snapshot = "snapshot"
+    /// The channel can no longer be resumed (e.g. disposed, or no longer permitted).
+    case missing = "missing"
 }
 
 /// How a new chat uses its source chat and turn.
@@ -526,16 +530,13 @@ public struct ReconnectParams: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Client identifier from the original connection
     public var clientId: String
-    /// Last `serverSeq` the client received
-    public var lastSeenServerSeq: Int
-    /// URIs the client was subscribed to
-    public var subscriptions: [String]
+    /// Per-channel replay checkpoints for every channel the client is still subscribed to.
+    public var subscriptions: [ChannelReplayCursor]
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case clientId
-        case lastSeenServerSeq
         case subscriptions
     }
 
@@ -543,51 +544,100 @@ public struct ReconnectParams: Codable, Sendable {
         channel: String,
         meta: [String: AnyCodable]? = nil,
         clientId: String,
-        lastSeenServerSeq: Int,
-        subscriptions: [String]
+        subscriptions: [ChannelReplayCursor]
     ) {
         self.channel = channel
         self.meta = meta
         self.clientId = clientId
-        self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
     }
 }
 
-public struct ReconnectReplayResult: Codable, Sendable {
-    /// Discriminant
-    public var type: ReconnectResultType
-    /// Missed action envelopes since `lastSeenServerSeq`
-    public var actions: [ActionEnvelope]
-    /// URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-    /// This includes resources that no longer exist (e.g. disposed sessions or
-    /// terminals) as well as resources the client is no longer permitted to
-    /// observe. Clients SHOULD drop these from their local subscription set.
-    public var missing: [String]
+public struct ChannelReplayCursor: Codable, Sendable {
+    /// The subscribed channel URI.
+    public var channel: String
+    /// `serverSeq` of the last action the client fully applied or safely
+    /// retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+    /// last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+    ///
+    /// `0` means the client has no baseline for `channel` yet — e.g. it
+    /// subscribed but the `subscribe`/`initialize` response snapshot (if any)
+    /// never arrived before the connection dropped. The server MUST NOT use
+    /// another channel's progress to advance this checkpoint, and MUST NOT
+    /// use it to seed the connection's global `serverSeq` identity (see
+    /// {@link InitializeResult.serverSeq}).
+    public var lastSeenServerSeq: Int
 
     public init(
-        type: ReconnectResultType,
-        actions: [ActionEnvelope],
-        missing: [String]
+        channel: String,
+        lastSeenServerSeq: Int
     ) {
-        self.type = type
-        self.actions = actions
-        self.missing = missing
+        self.channel = channel
+        self.lastSeenServerSeq = lastSeenServerSeq
     }
 }
 
-public struct ReconnectSnapshotResult: Codable, Sendable {
-    /// Discriminant
-    public var type: ReconnectResultType
-    /// Fresh snapshots for each subscription
-    public var snapshots: [Snapshot]
+public struct ReconnectResult: Codable, Sendable {
+    /// One recovery outcome per requested subscription, in any order.
+    public var channels: [ChannelRecovery]
 
     public init(
-        type: ReconnectResultType,
-        snapshots: [Snapshot]
+        channels: [ChannelRecovery]
     ) {
-        self.type = type
-        self.snapshots = snapshots
+        self.channels = channels
+    }
+}
+
+public struct ChannelReplayRecovery: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChannelRecoveryKind
+    /// The channel this recovery applies to.
+    public var channel: String
+    /// Missed action envelopes since the requested `lastSeenServerSeq`.
+    public var actions: [ActionEnvelope]
+
+    public init(
+        kind: ChannelRecoveryKind,
+        channel: String,
+        actions: [ActionEnvelope]
+    ) {
+        self.kind = kind
+        self.channel = channel
+        self.actions = actions
+    }
+}
+
+public struct ChannelSnapshotRecovery: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChannelRecoveryKind
+    /// The channel this recovery applies to.
+    public var channel: String
+    /// Fresh snapshot the client MUST use as its new baseline for this channel.
+    public var snapshot: Snapshot
+
+    public init(
+        kind: ChannelRecoveryKind,
+        channel: String,
+        snapshot: Snapshot
+    ) {
+        self.kind = kind
+        self.channel = channel
+        self.snapshot = snapshot
+    }
+}
+
+public struct ChannelMissingRecovery: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChannelRecoveryKind
+    /// The channel this recovery applies to.
+    public var channel: String
+
+    public init(
+        kind: ChannelRecoveryKind,
+        channel: String
+    ) {
+        self.kind = kind
+        self.channel = channel
     }
 }
 
@@ -2286,14 +2336,15 @@ public enum ChatMoveDestination: Codable, Sendable {
     }
 }
 
-// MARK: - ReconnectResult Union
+// MARK: - ChannelRecovery Union
 
-public enum ReconnectResult: Codable, Sendable {
-    case replay(ReconnectReplayResult)
-    case snapshot(ReconnectSnapshotResult)
+public enum ChannelRecovery: Codable, Sendable {
+    case replay(ChannelReplayRecovery)
+    case snapshot(ChannelSnapshotRecovery)
+    case missing(ChannelMissingRecovery)
 
     private enum DiscriminantKey: String, CodingKey {
-        case discriminant = "type"
+        case discriminant = "kind"
     }
 
     public init(from decoder: Decoder) throws {
@@ -2301,11 +2352,13 @@ public enum ReconnectResult: Codable, Sendable {
         let discriminant = try container.decode(String.self, forKey: .discriminant)
         switch discriminant {
         case "replay":
-            self = .replay(try ReconnectReplayResult(from: decoder))
+            self = .replay(try ChannelReplayRecovery(from: decoder))
         case "snapshot":
-            self = .snapshot(try ReconnectSnapshotResult(from: decoder))
+            self = .snapshot(try ChannelSnapshotRecovery(from: decoder))
+        case "missing":
+            self = .missing(try ChannelMissingRecovery(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ReconnectResult discriminant: \(discriminant)")
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChannelRecovery discriminant: \(discriminant)")
         }
     }
 
@@ -2313,6 +2366,7 @@ public enum ReconnectResult: Codable, Sendable {
         switch self {
         case .replay(let value): try value.encode(to: encoder)
         case .snapshot(let value): try value.encode(to: encoder)
+        case .missing(let value): try value.encode(to: encoder)
         }
     }
 }

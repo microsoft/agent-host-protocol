@@ -90,7 +90,7 @@ See [Authentication](/specification/authentication) for the full specification.
 
 ## Reconnection
 
-If the transport connection drops, the client reconnects and sends a `reconnect` **request**:
+If the transport connection drops, the client reconnects and sends a `reconnect` **request** carrying one replay checkpoint per subscribed channel, instead of a single connection-wide watermark:
 
 ```json
 {
@@ -100,48 +100,50 @@ If the transport connection drops, the client reconnects and sends a `reconnect`
   "params": {
     "channel": "ahp-root://",
     "clientId": "client-abc",
-    "lastSeenServerSeq": 42,
-    "subscriptions": ["ahp-root://", "ahp-session:/<uuid>"]
-  }
-}
-```
-
-The server MUST include all replayed data in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "type": "replay",
-    "actions": [
-      { "channel": "ahp-chat:/<cid>", "action": { "type": "chat/delta", ... }, "serverSeq": 43 },
-      { "channel": "ahp-chat:/<cid>", "action": { "type": "chat/delta", ... }, "serverSeq": 44 }
-    ],
-    "missing": ["ahp-session:/<disposed-uuid>"]
-  }
-}
-```
-
-The `missing` array lists subscriptions from the request that the server cannot resume — for example, sessions or terminals that have been disposed, or resources the client is no longer permitted to observe. Clients SHOULD drop these from their local subscription set.
-
-If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "result": {
-    "type": "snapshot",
-    "snapshots": [
-      { "resource": "ahp-root://", "state": { ... }, "fromSeq": 50 },
-      { "resource": "ahp-session:/<uuid>", "state": { ... }, "fromSeq": 50 }
+    "subscriptions": [
+      { "channel": "ahp-root://", "lastSeenServerSeq": 42 },
+      { "channel": "ahp-session:/<uuid>", "lastSeenServerSeq": 40 }
     ]
   }
 }
 ```
 
-Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
+Each `ChannelReplayCursor.lastSeenServerSeq` is the `serverSeq` the client last fully applied (or the `fromSeq` of the snapshot it last used to initialize that channel) — **never** a connection-wide value. A single shared watermark lets a fast-moving channel's `serverSeq` silently race ahead of a slower channel's: if channel A has an undelivered action at `serverSeq=100` and channel B goes on to deliver `serverSeq=101`, a connection-wide `lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking one checkpoint per channel prevents that cross-channel skip without claiming any ordering *between* channels. A channel with no baseline yet (e.g. it subscribed but never received its initial snapshot before the connection dropped) sends `0`.
+
+The server MUST include all replayed and snapshotted data in the response before returning, and MUST include exactly one recovery outcome per requested subscription — some channels may replay, others may receive a fresh snapshot, and others may be reported missing, all in the same response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "channels": [
+      {
+        "kind": "replay",
+        "channel": "ahp-chat:/<cid>",
+        "actions": [
+          { "channel": "ahp-chat:/<cid>", "action": { "type": "chat/delta", ... }, "serverSeq": 43 },
+          { "channel": "ahp-chat:/<cid>", "action": { "type": "chat/delta", ... }, "serverSeq": 44 }
+        ]
+      },
+      {
+        "kind": "snapshot",
+        "channel": "ahp-session:/<uuid>",
+        "snapshot": { "resource": "ahp-session:/<uuid>", "state": { ... }, "fromSeq": 50 }
+      },
+      { "kind": "missing", "channel": "ahp-session:/<disposed-uuid>" }
+    ]
+  }
+}
+```
+
+- `kind: "replay"` means the server included every action the channel missed since the requested `lastSeenServerSeq`, in ascending `serverSeq` order. Stateless channels with nothing to snapshot always use this outcome, with an empty `actions` list when there is nothing to replay.
+- `kind: "snapshot"` means the gap for that channel exceeded its replay buffer; the client MUST discard its prior state for that channel and re-initialize from the included snapshot, whose `fromSeq` becomes the channel's new baseline.
+- `kind: "missing"` means the server can no longer resume that channel — for example, a session or terminal that has been disposed, or a resource the client is no longer permitted to observe. Clients SHOULD drop these channels from their local subscription set.
+
+Because each channel's outcome is independent, one reconnect response may mix all three kinds, and the client MUST apply each channel's recovery using only that channel's own cursor — never another channel's progress, and never the connection's global `serverSeq` identity (see `InitializeResult.serverSeq` in the [`initialize`](/reference/common#initialize) reference).
+
+Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions).
 
 ## Unexpected Disconnection
 

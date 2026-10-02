@@ -9,14 +9,19 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-/// <summary>Discriminant for reconnect result types.</summary>
-[JsonConverter(typeof(WireEnumConverter<ReconnectResultType>))]
-public enum ReconnectResultType
+/// <summary>Discriminant for per-channel reconnect recovery outcomes.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChannelRecoveryKind>))]
+public enum ChannelRecoveryKind
 {
+    /// <summary>The server replayed the channel's missed actions.</summary>
     [WireValue("replay")]
     Replay,
+    /// <summary>The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead.</summary>
     [WireValue("snapshot")]
     Snapshot,
+    /// <summary>The channel can no longer be resumed (e.g. disposed, or no longer permitted).</summary>
+    [WireValue("missing")]
+    Missing,
 }
 
 /// <summary>How a new chat uses its source chat and turn.</summary>
@@ -523,8 +528,10 @@ public sealed record AutomationCustomizationsCapability
 {
 }
 
-/// <summary>Re-establishes a dropped connection. The server replays missed actions or
-/// provides fresh snapshots.</summary>
+/// <summary>Re-establishes a dropped connection. The server recovers each subscribed
+/// channel independently — some channels may replay, others may receive a
+/// fresh snapshot, and others may be reported missing, all in the same
+/// response (see {@link ChannelRecovery}).</summary>
 public sealed record ReconnectParams
 {
     public required string Channel { get; init; }
@@ -538,39 +545,96 @@ public sealed record ReconnectParams
     /// <summary>Client identifier from the original connection</summary>
     public required string ClientId { get; init; }
 
-    /// <summary>Last `serverSeq` the client received</summary>
-    public long LastSeenServerSeq { get; init; }
-
-    /// <summary>URIs the client was subscribed to</summary>
-    public required List<string> Subscriptions { get; init; }
+    /// <summary>Per-channel replay checkpoints for every channel the client is still subscribed to.</summary>
+    public required List<ChannelReplayCursor> Subscriptions { get; init; }
 }
 
-/// <summary>Reconnect result when the server can replay from the requested sequence.
+/// <summary>A single subscribed channel's replay checkpoint, carried in
+/// `ReconnectParams.subscriptions`.
 ///
-/// The server MUST include all replayed data in the response.</summary>
-public sealed record ReconnectReplayResult
+/// Each subscription recovers independently from its own `lastSeenServerSeq`
+/// instead of one connection-wide watermark. A single shared watermark lets a
+/// fast-moving channel's `serverSeq` silently race ahead of a slower
+/// channel's — if channel A has an undelivered action at `serverSeq=100` and
+/// channel B goes on to deliver `serverSeq=101`, a connection-wide
+/// `lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking
+/// one checkpoint per channel prevents that cross-channel skip without
+/// claiming any ordering *between* channels.</summary>
+public sealed record ChannelReplayCursor
 {
-    /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; } = ReconnectResultType.Replay;
+    /// <summary>The subscribed channel URI.</summary>
+    public required string Channel { get; init; }
 
-    /// <summary>Missed action envelopes since `lastSeenServerSeq`</summary>
-    public required List<ActionEnvelope> Actions { get; init; }
-
-    /// <summary>URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-    /// This includes resources that no longer exist (e.g. disposed sessions or
-    /// terminals) as well as resources the client is no longer permitted to
-    /// observe. Clients SHOULD drop these from their local subscription set.</summary>
-    public required List<string> Missing { get; init; }
+    /// <summary>`serverSeq` of the last action the client fully applied or safely
+    /// retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+    /// last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+    ///
+    /// `0` means the client has no baseline for `channel` yet — e.g. it
+    /// subscribed but the `subscribe`/`initialize` response snapshot (if any)
+    /// never arrived before the connection dropped. The server MUST NOT use
+    /// another channel's progress to advance this checkpoint, and MUST NOT
+    /// use it to seed the connection's global `serverSeq` identity (see
+    /// {@link InitializeResult.serverSeq}).</summary>
+    public long LastSeenServerSeq { get; init; }
 }
 
-/// <summary>Reconnect result when the gap exceeds the replay buffer.</summary>
-public sealed record ReconnectSnapshotResult
+/// <summary>Result of the `reconnect` command.
+///
+/// The server MUST include all replayed and snapshotted data in the response
+/// before returning, and MUST include exactly one {@link ChannelRecovery} per
+/// channel named in `ReconnectParams.subscriptions`.</summary>
+public sealed record ReconnectResult
+{
+    /// <summary>One recovery outcome per requested subscription, in any order.</summary>
+    public required List<ChannelRecovery> Channels { get; init; }
+}
+
+/// <summary>Recovery outcome for a channel that replayed cleanly.
+///
+/// The server MUST include every action the channel missed since the
+/// matching `ChannelReplayCursor.lastSeenServerSeq`, in ascending `serverSeq`
+/// order, and MUST only include actions whose `ActionEnvelope.channel`
+/// equals `channel`.</summary>
+public sealed record ChannelReplayRecovery
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; } = ReconnectResultType.Snapshot;
+    public ChannelRecoveryKind Kind { get; init; } = ChannelRecoveryKind.Replay;
 
-    /// <summary>Fresh snapshots for each subscription</summary>
-    public required List<Snapshot> Snapshots { get; init; }
+    /// <summary>The channel this recovery applies to.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Missed action envelopes since the requested `lastSeenServerSeq`.</summary>
+    public required List<ActionEnvelope> Actions { get; init; }
+}
+
+/// <summary>Recovery outcome for a channel whose gap exceeded its replay buffer.
+///
+/// Absent for stateless channels that have no state to snapshot; the server
+/// MUST instead use {@link ChannelReplayRecovery} with an empty `actions`
+/// list (or {@link ChannelMissingRecovery}, if the channel itself no longer
+/// exists) for those.</summary>
+public sealed record ChannelSnapshotRecovery
+{
+    /// <summary>Discriminant</summary>
+    public ChannelRecoveryKind Kind { get; init; } = ChannelRecoveryKind.Snapshot;
+
+    /// <summary>The channel this recovery applies to.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Fresh snapshot the client MUST use as its new baseline for this channel.</summary>
+    public required Snapshot Snapshot { get; init; }
+}
+
+/// <summary>Recovery outcome for a channel the server cannot resume — e.g. a disposed
+/// session or terminal, or a resource the client is no longer permitted to
+/// observe. Clients SHOULD drop `channel` from their local subscription set.</summary>
+public sealed record ChannelMissingRecovery
+{
+    /// <summary>Discriminant</summary>
+    public ChannelRecoveryKind Kind { get; init; } = ChannelRecoveryKind.Missing;
+
+    /// <summary>The channel this recovery applies to.</summary>
+    public required string Channel { get; init; }
 }
 
 /// <summary>Subscribe to a URI-identified channel.
@@ -1939,29 +2003,30 @@ public sealed record FetchAutomationRunsResult
 {
 }
 
-// ─── ReconnectResult Union ────────────────────────────────────────────
+// ─── ChannelRecovery Union ────────────────────────────────────────────
 
-/// <summary>ReconnectResult is the result of the `reconnect` command.</summary>
-[JsonConverter(typeof(ReconnectResultConverter))]
-public sealed class ReconnectResult : AhpUnion
+/// <summary>ChannelRecovery is the per-channel reconnect recovery outcome.</summary>
+[JsonConverter(typeof(ChannelRecoveryConverter))]
+public sealed class ChannelRecovery : AhpUnion
 {
-    /// <summary>Creates an empty ReconnectResult (no active variant).</summary>
-    public ReconnectResult() { }
+    /// <summary>Creates an empty ChannelRecovery (no active variant).</summary>
+    public ChannelRecovery() { }
 
-    /// <summary>Creates a ReconnectResult wrapping the given variant value.</summary>
-    public ReconnectResult(object? value) : base(value) { }
+    /// <summary>Creates a ChannelRecovery wrapping the given variant value.</summary>
+    public ChannelRecovery(object? value) : base(value) { }
 }
 
-/// <summary>System.Text.Json converter for the ReconnectResult discriminated union.</summary>
-internal sealed class ReconnectResultConverter : UnionConverter<ReconnectResult>
+/// <summary>System.Text.Json converter for the ChannelRecovery discriminated union.</summary>
+internal sealed class ChannelRecoveryConverter : UnionConverter<ChannelRecovery>
 {
-    public ReconnectResultConverter()
+    public ChannelRecoveryConverter()
         : base(
-            discriminator: "type",
+            discriminator: "kind",
             variants: new Dictionary<string, Type>
             {
-        ["replay"] = typeof(ReconnectReplayResult),
-        ["snapshot"] = typeof(ReconnectSnapshotResult),
+        ["replay"] = typeof(ChannelReplayRecovery),
+        ["snapshot"] = typeof(ChannelSnapshotRecovery),
+        ["missing"] = typeof(ChannelMissingRecovery),
             },
             allowUnknown: false)
     {

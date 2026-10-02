@@ -1771,7 +1771,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ChannelRecoveryKind', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
@@ -1782,8 +1782,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
-  { name: 'ReconnectReplayResult', omitDiscriminants: true },
-  { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
+  { name: 'ChannelReplayCursor' },
+  { name: 'ReconnectResult' },
+  { name: 'ChannelReplayRecovery', omitDiscriminants: true },
+  { name: 'ChannelSnapshotRecovery', omitDiscriminants: true },
+  { name: 'ChannelMissingRecovery', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
   { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
@@ -1816,14 +1819,16 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
 ];
 
-const RECONNECT_RESULT_UNION: UnionConfig = {
-  name: 'ReconnectResult',
-  discriminantField: 'type',
-  doc: 'ReconnectResult is the result of the `reconnect` command.',
+const CHANNEL_RECOVERY_UNION: UnionConfig = {
+  name: 'ChannelRecovery',
+  discriminantField: 'kind',
+  doc: 'ChannelRecovery is the per-channel reconnect recovery outcome.',
   variants: [
-    { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
-    { variantName: 'Snapshot', innerType: 'ReconnectSnapshotResult', wireValue: 'snapshot' },
+    { variantName: 'Replay', innerType: 'ChannelReplayRecovery', wireValue: 'replay' },
+    { variantName: 'Snapshot', innerType: 'ChannelSnapshotRecovery', wireValue: 'snapshot' },
+    { variantName: 'Missing', innerType: 'ChannelMissingRecovery', wireValue: 'missing' },
   ],
+  injectDiscriminantOnMarshal: true,
 };
 
 const CHAT_SOURCE_UNION: UnionConfig = {
@@ -2021,8 +2026,8 @@ function generateCommandsFile(project: Project): string {
   lines.push('// ─── ChatMoveDestination Union ────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
-  lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
+  lines.push('// ─── ChannelRecovery Union ────────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, CHANNEL_RECOVERY_UNION));
   lines.push('');
 
   lines.push('// ─── Changeset Operation Unions ───────────────────────────────────────\n');
@@ -2397,7 +2402,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputRequest',
     'BackgroundWork',
     'ToolCallConfirmationState',
-    'ReconnectResult',
+    'ChannelRecovery',
     'SessionOrigin',
     'AutomationTrigger',
     'AutomationDisableCondition',

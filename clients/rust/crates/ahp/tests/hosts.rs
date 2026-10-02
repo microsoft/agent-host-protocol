@@ -54,6 +54,12 @@ impl Transport for MemTransport {
 
 // ─── Fake host ──────────────────────────────────────────────────────────────
 
+/// Pluggable per-channel-cursor reconnect responder, overriding the
+/// default empty-replay-per-channel behaviour. Mirrors the TypeScript
+/// harness's `handleReconnect` callback.
+type ReconnectResponder =
+    Arc<dyn Fn(&ahp_types::commands::ReconnectParams) -> ahp_types::commands::ReconnectResult + Send + Sync>;
+
 #[derive(Clone)]
 struct FakeHostState {
     /// Sequential serverSeq counter shared across reconnects on this host.
@@ -64,6 +70,16 @@ struct FakeHostState {
     sessions: Vec<ahp_types::state::SessionSummary>,
     /// Automation support to advertise in `InitializeResult`.
     automations: Option<AutomationCapabilities>,
+    /// Optional override for the `reconnect` response; see
+    /// [`ReconnectResponder`]. Defaults to an empty `Replay` per
+    /// requested channel when unset.
+    handle_reconnect: Option<ReconnectResponder>,
+    /// Every `reconnect` request's params, in order, recorded across
+    /// every connection cloned from this state (shared via `Arc`).
+    reconnect_requests: Arc<std::sync::Mutex<Vec<ahp_types::commands::ReconnectParams>>>,
+    /// Snapshot to return from `subscribe` for a given channel, if any.
+    subscribe_snapshots:
+        Arc<std::sync::Mutex<std::collections::HashMap<String, ahp_types::state::Snapshot>>>,
 }
 
 impl FakeHostState {
@@ -73,6 +89,9 @@ impl FakeHostState {
             agents: vec![],
             sessions: vec![],
             automations: None,
+            handle_reconnect: None,
+            reconnect_requests: Arc::new(std::sync::Mutex::new(Vec::new())),
+            subscribe_snapshots: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 
@@ -89,6 +108,15 @@ impl FakeHostState {
     fn with_automations(mut self, automations: AutomationCapabilities) -> Self {
         self.automations = Some(automations);
         self
+    }
+
+    fn with_handle_reconnect(mut self, handler: ReconnectResponder) -> Self {
+        self.handle_reconnect = Some(handler);
+        self
+    }
+
+    fn reconnect_requests(&self) -> Vec<ahp_types::commands::ReconnectParams> {
+        self.reconnect_requests.lock().unwrap().clone()
     }
 }
 
@@ -201,10 +229,34 @@ fn handle_request(req: &JsonRpcRequest, state: &FakeHostState) -> serde_json::Va
                 "automations": state.automations,
             })
         }
-        "reconnect" => serde_json::json!({
-            "type": "replay",
-            "actions": []
-        }),
+        "reconnect" => {
+            let params: ahp_types::commands::ReconnectParams = req
+                .params
+                .clone()
+                .and_then(|p| serde_json::from_value(p).ok())
+                .expect("reconnect request must carry ReconnectParams");
+            state.reconnect_requests.lock().unwrap().push(params.clone());
+            let result = match &state.handle_reconnect {
+                Some(handler) => handler(&params),
+                // Default: reply with an empty replay for every
+                // requested channel so the supervisor moves on.
+                None => ahp_types::commands::ReconnectResult {
+                    channels: params
+                        .subscriptions
+                        .iter()
+                        .map(|sub| {
+                            ahp_types::commands::ChannelRecovery::Replay(
+                                ahp_types::commands::ChannelReplayRecovery {
+                                    channel: sub.channel.clone(),
+                                    actions: vec![],
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+            };
+            serde_json::to_value(result).unwrap()
+        }
         "listSessions" => serde_json::json!({ "items": state.sessions }),
         "subscribe" => {
             let resource = req
@@ -215,6 +267,9 @@ fn handle_request(req: &JsonRpcRequest, state: &FakeHostState) -> serde_json::Va
                 .and_then(|v| v.as_str())
                 .unwrap_or(ahp_types::ROOT_RESOURCE_URI)
                 .to_string();
+            if let Some(snapshot) = state.subscribe_snapshots.lock().unwrap().get(&resource) {
+                return serde_json::json!({ "snapshot": snapshot });
+            }
             let seq = state.server_seq.load(Ordering::SeqCst);
             serde_json::json!({
                 "snapshot": {
@@ -1074,6 +1129,296 @@ async fn add_host_cancellation_releases_pending_reservation() {
     );
 }
 
+// ─── Per-channel reconnect cursor regression tests ─────────────────────────
+//
+// These four tests prove the actual bug fix: a single connection-wide
+// reconnect watermark would let a fast channel's progress silently
+// skip a slower channel's undelivered actions on reconnect. Per-channel
+// cursors must keep every subscribed channel's replay checkpoint
+// completely independent.
+
+#[tokio::test]
+async fn reconnect_sends_independent_per_channel_cursors_a_fast_channel_never_advances_a_slower_one()
+{
+    let a = "ahp-canvas:/a".to_string();
+    let b = "ahp-canvas:/b".to_string();
+    let state = FakeHostState::new();
+
+    let multi = MultiHostClient::new();
+    multi
+        .add_host(HostConfig::new(
+            "divergent",
+            "divergent",
+            make_action_injecting_factory(state.clone(), b.clone(), 101),
+        ))
+        .await
+        .unwrap();
+    let id = HostId::new("divergent");
+    wait_for_state(&multi, &id, |s| s.is_connected(), 2000).await;
+
+    multi.subscribe(&id, a.clone()).await.unwrap();
+    multi.subscribe(&id, b.clone()).await.unwrap();
+
+    // B races ahead to serverSeq=101 via the injected notification
+    // while A never receives anything. A single connection-wide
+    // watermark would send `lastSeenServerSeq: 101` for every channel
+    // on the next reconnect and silently skip any of A's undelivered
+    // actions below that value; per-channel cursors must keep A at its
+    // own baseline instead.
+    wait_until(2000, || async {
+        multi.host(&id).await.map(|h| h.server_seq).unwrap_or(0) >= 101
+    })
+    .await;
+
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 1 }).await;
+
+    let req = state.reconnect_requests().into_iter().next().unwrap();
+    let cursor_for = |ch: &str| {
+        req.subscriptions
+            .iter()
+            .find(|s| s.channel == ch)
+            .map(|s| s.last_seen_server_seq)
+    };
+    assert_eq!(cursor_for(&b), Some(101), "B's cursor should reflect its own progress");
+    assert_eq!(
+        cursor_for(&a),
+        Some(0),
+        "A's cursor must stay at its own baseline — never advanced by B"
+    );
+
+}
+
+#[tokio::test]
+async fn channel_replay_recovery_advances_only_that_channels_cursor() {
+    let a = "ahp-canvas:/a".to_string();
+    let b = "ahp-canvas:/b".to_string();
+
+    let a_for_handler = a.clone();
+    let state = FakeHostState::new().with_handle_reconnect(Arc::new(move |params| {
+        let channels = params
+            .subscriptions
+            .iter()
+            .map(|sub| {
+                if sub.channel == a_for_handler {
+                    ahp_types::commands::ChannelRecovery::Replay(
+                        ahp_types::commands::ChannelReplayRecovery {
+                            channel: sub.channel.clone(),
+                            actions: vec![
+                                make_canvas_envelope(&sub.channel, 10),
+                                make_canvas_envelope(&sub.channel, 11),
+                            ],
+                        },
+                    )
+                } else {
+                    ahp_types::commands::ChannelRecovery::Replay(
+                        ahp_types::commands::ChannelReplayRecovery {
+                            channel: sub.channel.clone(),
+                            actions: vec![],
+                        },
+                    )
+                }
+            })
+            .collect();
+        ahp_types::commands::ReconnectResult { channels }
+    }));
+
+    let multi = MultiHostClient::new();
+    multi
+        .add_host(HostConfig::new(
+            "replay",
+            "replay",
+            make_basic_factory(state.clone()),
+        ))
+        .await
+        .unwrap();
+    let id = HostId::new("replay");
+    wait_for_state(&multi, &id, |s| s.is_connected(), 2000).await;
+
+    multi.subscribe(&id, a.clone()).await.unwrap();
+    multi.subscribe(&id, b.clone()).await.unwrap();
+
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 1 }).await;
+
+    // The *next* reconnect after the replay must report A's advanced
+    // cursor (11) while B — which had an empty replay — stays at 0.
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 2 }).await;
+
+    let reqs = state.reconnect_requests();
+    let req = reqs.last().unwrap();
+    let cursor_for = |ch: &str| {
+        req.subscriptions
+            .iter()
+            .find(|s| s.channel == ch)
+            .map(|s| s.last_seen_server_seq)
+    };
+    assert_eq!(cursor_for(&a), Some(11), "A's cursor should reflect the exhausted replay");
+    assert_eq!(cursor_for(&b), Some(0), "B's cursor must be untouched by A's replay");
+
+}
+
+#[tokio::test]
+async fn channel_snapshot_recovery_sets_that_channels_cursor_from_the_snapshot_from_seq_baseline() {
+    let a = "ahp-canvas:/a".to_string();
+
+    let state = FakeHostState::new().with_handle_reconnect(Arc::new(|params| {
+        let channels = params
+            .subscriptions
+            .iter()
+            .map(|sub| {
+                ahp_types::commands::ChannelRecovery::Snapshot(
+                    ahp_types::commands::ChannelSnapshotRecovery {
+                        channel: sub.channel.clone(),
+                        snapshot: ahp_types::state::Snapshot {
+                            resource: sub.channel.clone(),
+                            state: ahp_types::state::SnapshotState::Canvas(Box::new(
+                                make_canvas_state(&sub.channel),
+                            )),
+                            from_seq: 50,
+                        },
+                    },
+                )
+            })
+            .collect();
+        ahp_types::commands::ReconnectResult { channels }
+    }));
+
+    let multi = MultiHostClient::new();
+    multi
+        .add_host(HostConfig::new(
+            "snap",
+            "snap",
+            make_basic_factory(state.clone()),
+        ))
+        .await
+        .unwrap();
+    let id = HostId::new("snap");
+    wait_for_state(&multi, &id, |s| s.is_connected(), 2000).await;
+
+    multi.subscribe(&id, a.clone()).await.unwrap();
+
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 1 }).await;
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 2 }).await;
+
+    let reqs = state.reconnect_requests();
+    let req = reqs.last().unwrap();
+    assert_eq!(
+        req.subscriptions
+            .iter()
+            .find(|s| s.channel == a)
+            .map(|s| s.last_seen_server_seq),
+        Some(50)
+    );
+
+}
+
+#[tokio::test]
+async fn a_channel_reported_missing_on_reconnect_is_dropped_from_subscriptions_and_not_re_requested()
+{
+    let a = "ahp-canvas:/a".to_string();
+    let gone = "ahp-canvas:/gone".to_string();
+
+    let gone_for_handler = gone.clone();
+    let state = FakeHostState::new().with_handle_reconnect(Arc::new(move |params| {
+        let channels = params
+            .subscriptions
+            .iter()
+            .map(|sub| {
+                if sub.channel == gone_for_handler {
+                    ahp_types::commands::ChannelRecovery::Missing(
+                        ahp_types::commands::ChannelMissingRecovery {
+                            channel: sub.channel.clone(),
+                        },
+                    )
+                } else {
+                    ahp_types::commands::ChannelRecovery::Replay(
+                        ahp_types::commands::ChannelReplayRecovery {
+                            channel: sub.channel.clone(),
+                            actions: vec![],
+                        },
+                    )
+                }
+            })
+            .collect();
+        ahp_types::commands::ReconnectResult { channels }
+    }));
+
+    let multi = MultiHostClient::new();
+    multi
+        .add_host(HostConfig::new(
+            "missing",
+            "missing",
+            make_basic_factory(state.clone()),
+        ))
+        .await
+        .unwrap();
+    let id = HostId::new("missing");
+    wait_for_state(&multi, &id, |s| s.is_connected(), 2000).await;
+
+    multi.subscribe(&id, a.clone()).await.unwrap();
+    multi.subscribe(&id, gone.clone()).await.unwrap();
+
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 1 }).await;
+    wait_until(2000, || async {
+        !multi
+            .host(&id)
+            .await
+            .map(|h| h.subscriptions.contains(&gone))
+            .unwrap_or(true)
+    })
+    .await;
+    assert!(
+        multi
+            .host(&id)
+            .await
+            .unwrap()
+            .subscriptions
+            .contains(&a),
+        "A should remain subscribed"
+    );
+
+    multi.reconnect_host(&id).await.unwrap();
+    wait_until(2000, || async { state.reconnect_requests().len() >= 2 }).await;
+    let reqs = state.reconnect_requests();
+    let req = reqs.last().unwrap();
+    assert!(
+        !req.subscriptions.iter().any(|s| s.channel == gone),
+        "missing channel must not be re-requested"
+    );
+
+}
+
+fn make_canvas_state(instance_id: &str) -> ahp_types::state::CanvasState {
+    ahp_types::state::CanvasState {
+        instance_id: instance_id.to_string(),
+        extension_id: "fake".into(),
+        extension_name: None,
+        canvas_id: "fake-canvas".into(),
+        title: None,
+        status: None,
+        url: None,
+    }
+}
+
+fn make_canvas_envelope(channel: &str, server_seq: u64) -> ahp_types::actions::ActionEnvelope {
+    ahp_types::actions::ActionEnvelope {
+        channel: channel.to_string(),
+        action: ahp_types::actions::StateAction::CanvasStateChanged(
+            ahp_types::actions::CanvasStateChangedAction {
+                canvas: make_canvas_state(channel),
+            },
+        ),
+        server_seq,
+        origin: None,
+        rejection_reason: None,
+    }
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::SessionSummary {
@@ -1151,6 +1496,105 @@ fn make_injecting_factory(
     }
 }
 
+/// Factory used by the divergent-per-channel-cursor regression test.
+/// Drives a basic fake host, then — shortly after the first
+/// `initialize`/`reconnect` response — fans in a single raw `action`
+/// notification for `channel` at `server_seq`. The short delay gives
+/// the test time to finish its `subscribe` round trips before the
+/// notification races in, mirroring the channel-B-races-ahead scenario
+/// the per-channel cursor fix is meant to cover.
+fn make_action_injecting_factory(
+    state: FakeHostState,
+    channel: String,
+    server_seq: u64,
+) -> impl Fn(
+    HostId,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<BoxedTransport, TransportError>> + Send>,
+> + Send
+       + Sync
+       + 'static {
+    let state = Arc::new(state);
+    move |_host_id| {
+        let state = state.clone();
+        let channel = channel.clone();
+        Box::pin(async move {
+            let (client_side, server_side) = pair();
+            tokio::spawn(drive_fake_host_with_action_injection(
+                server_side,
+                (*state).clone(),
+                channel,
+                server_seq,
+            ));
+            Ok(BoxedTransport::new(client_side))
+        })
+    }
+}
+
+async fn drive_fake_host_with_action_injection(
+    mut transport: MemTransport,
+    state: FakeHostState,
+    channel: String,
+    server_seq: u64,
+) {
+    let mut injection_ran = false;
+    loop {
+        let frame = match transport.recv().await {
+            Ok(Some(f)) => f,
+            _ => return,
+        };
+        let msg = match frame.into_parsed() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if let JsonRpcMessage::Request(req) = msg {
+            let was_init = matches!(req.method.as_str(), "initialize" | "reconnect");
+            let result = handle_request(&req, &state);
+            let resp = JsonRpcMessage::SuccessResponse(JsonRpcSuccessResponse {
+                jsonrpc: JsonRpcVersion::V2,
+                id: req.id,
+                result: ahp_types::common::AnyValue::from(result),
+            });
+            if transport
+                .send(TransportMessage::encode(&resp).unwrap())
+                .await
+                .is_err()
+            {
+                return;
+            }
+            if !injection_ran && was_init {
+                injection_ran = true;
+                tokio::time::sleep(Duration::from_millis(30)).await;
+                let payload = serde_json::json!({
+                    "channel": channel,
+                    "action": {
+                        "type": "canvas/stateChanged",
+                        "canvas": {
+                            "instanceId": "a",
+                            "extensionId": "fake",
+                            "canvasId": "fake-canvas",
+                        },
+                    },
+                    "serverSeq": server_seq,
+                    "origin": null,
+                });
+                let notif = JsonRpcMessage::Notification(JsonRpcNotification {
+                    jsonrpc: JsonRpcVersion::V2,
+                    method: "action".into(),
+                    params: Some(ahp_types::common::AnyValue::from(payload)),
+                });
+                if transport
+                    .send(TransportMessage::encode(&notif).unwrap())
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 /// Factory used by the reconnect-replay test. The first connect responds
 /// to `initialize` normally with a non-zero `serverSeq` and a single
 /// subscription so the next connect chooses the `reconnect` arm. When
@@ -1209,19 +1653,23 @@ async fn drive_fake_host_replay(
                 // action carrying serverSeq=42 (advances past the
                 // pre-seeded 40).
                 serde_json::json!({
-                    "type": "replay",
-                    "actions": [
+                    "channels": [
                         {
+                            "kind": "replay",
                             "channel": ahp_types::ROOT_RESOURCE_URI,
-                            "action": {
-                                "type": "root/activeSessionsChanged",
-                                "activeSessions": 7
-                            },
-                            "serverSeq": 42,
-                            "origin": null,
+                            "actions": [
+                                {
+                                    "channel": ahp_types::ROOT_RESOURCE_URI,
+                                    "action": {
+                                        "type": "root/activeSessionsChanged",
+                                        "activeSessions": 7
+                                    },
+                                    "serverSeq": 42,
+                                    "origin": null,
+                                }
+                            ]
                         }
-                    ],
-                    "missing": []
+                    ]
                 })
             } else {
                 handle_request(&req, &state)

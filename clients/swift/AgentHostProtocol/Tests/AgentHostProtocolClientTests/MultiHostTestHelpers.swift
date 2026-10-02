@@ -122,9 +122,11 @@ struct FakeHost {
             ]
         case "reconnect":
             return [
-                "type": "replay",
-                "actions": [],
-                "missing": [],
+                "channels": [[
+                    "kind": "replay",
+                    "channel": RootResourceURI,
+                    "actions": [],
+                ] as [String: Any]],
             ] as [String: Any]
         case "listSessions":
             let items = sessionSummariesToJSON(state.sessions)

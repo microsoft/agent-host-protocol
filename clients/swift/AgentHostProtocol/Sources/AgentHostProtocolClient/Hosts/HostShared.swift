@@ -19,7 +19,18 @@ internal struct HostInternal {
     var lastError: String?
     var lastConnectedAt: Date?
     var protocolVersion: String?
+    /// Highest `serverSeq` ever observed across any channel. Informational
+    /// only (surfaced on `HostHandle` for diagnostics) — it is never used to
+    /// decide reconnect eligibility or what to replay. Per-channel recovery
+    /// uses `channelCursors` instead, so a fast channel's progress can never
+    /// cause a slower channel's undelivered actions to be skipped.
     var serverSeq: Int
+    /// Per-channel replay cursors: the highest `serverSeq` fully applied (or
+    /// snapshot baseline established) for each currently-subscribed channel.
+    /// Keyed by channel URI. Drives the `subscriptions` sent on
+    /// `AHPClient.reconnect` and is only ever advanced by envelopes or
+    /// snapshots for the matching channel — never cross-channel.
+    var channelCursors: [String: Int]
     var defaultDirectory: String?
     var automations: AutomationCapabilities?
     var rootState: RootState
@@ -87,16 +98,28 @@ internal actor HostShared {
         body(&internalState)
     }
 
-    /// Convenience: append a subscription URI if not already present.
-    func appendSubscription(_ uri: String) {
+    /// Convenience: append a subscription URI if not already present, and
+    /// seed/raise its replay cursor from `baselineServerSeq` (typically the
+    /// subscribe response's `snapshot.fromSeq`, when present). Never lowers
+    /// an already-tracked cursor — a re-subscribe shouldn't rewind a channel
+    /// that's already caught up further via reconnect/replay.
+    func appendSubscription(_ uri: String, baselineServerSeq: Int? = nil) {
         if !internalState.subscriptions.contains(uri) {
             internalState.subscriptions.append(uri)
         }
+        if let current = internalState.channelCursors[uri] {
+            if let baselineServerSeq, baselineServerSeq > current {
+                internalState.channelCursors[uri] = baselineServerSeq
+            }
+        } else {
+            internalState.channelCursors[uri] = baselineServerSeq ?? 0
+        }
     }
 
-    /// Convenience: remove a subscription URI.
+    /// Convenience: remove a subscription URI and its replay cursor.
     func removeSubscription(_ uri: String) {
         internalState.subscriptions.removeAll { $0 == uri }
+        internalState.channelCursors.removeValue(forKey: uri)
     }
 
     /// Convenience: read the last error string.
