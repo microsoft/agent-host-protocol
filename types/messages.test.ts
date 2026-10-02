@@ -29,6 +29,7 @@ function readChannelSources(baseName: string): string {
     'channels-root',
     'channels-session',
     'channels-chat',
+    'channels-canvas',
     'channels-terminal',
     'channels-changeset',
     'channels-annotations',

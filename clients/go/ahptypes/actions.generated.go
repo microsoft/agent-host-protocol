@@ -49,6 +49,8 @@ const (
 	ActionTypeChatBackgroundWorkRemoved           ActionType = "chat/backgroundWorkRemoved"
 	ActionTypeChatMovableChanged                  ActionType = "chat/movableChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
+	ActionTypeChatCanvasesChanged                 ActionType = "chat/canvasesChanged"
+	ActionTypeCanvasStateChanged                  ActionType = "canvas/stateChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
 	ActionTypeSessionTitleChanged                 ActionType = "session/titleChanged"
@@ -702,6 +704,27 @@ type ChatChangesetsChangedAction struct {
 	Type ActionType `json:"type"`
 	// New catalogue, or `undefined` to clear it.
 	Changesets []Changeset `json:"changesets,omitempty"`
+}
+
+// The live canvas channels exposed by this chat changed.
+//
+// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+// `undefined` to clear the collection.
+type ChatCanvasesChangedAction struct {
+	Type ActionType `json:"type"`
+	// New canvas channel references, or `undefined` to clear the collection.
+	Canvases []CanvasReference `json:"canvases,omitempty"`
+}
+
+// The presentation state for this canvas changed.
+//
+// Replaces the subscribed canvas channel state entirely. Full-replacement
+// semantics intentionally keep this early-development channel free to evolve
+// without expanding the stable chat action surface.
+type CanvasStateChangedAction struct {
+	Type ActionType `json:"type"`
+	// New authoritative canvas state.
+	Canvas CanvasState `json:"canvas"`
 }
 
 // Session title updated. Fired by the server when the title is auto-generated
@@ -1794,6 +1817,8 @@ func (*ChatBackgroundWorkSetAction) isStateAction()               {}
 func (*ChatBackgroundWorkRemovedAction) isStateAction()           {}
 func (*ChatMovableChangedAction) isStateAction()                  {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
+func (*ChatCanvasesChangedAction) isStateAction()                 {}
+func (*CanvasStateChangedAction) isStateAction()                  {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
 func (*ChatReasoningAction) isStateAction()                       {}
@@ -2063,6 +2088,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/changesetsChanged":
 		var value ChatChangesetsChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasesChanged":
+		var value ChatCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/stateChanged":
+		var value CanvasStateChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

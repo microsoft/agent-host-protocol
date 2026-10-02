@@ -2242,7 +2242,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -2266,6 +2266,9 @@
             },
             {
               "$ref": "#/$defs/ChatState"
+            },
+            {
+              "$ref": "#/$defs/CanvasState"
             },
             {
               "$ref": "#/$defs/AutomationState"
@@ -4309,6 +4312,13 @@
             "$ref": "#/$defs/BackgroundWork"
           },
           "description": "Work running in the background for this chat, such as shells and\nsubagents. Only active work is listed: hosts remove an entry once the work\nends. An entry may have been started by an earlier turn rather than the\n{@link ChatState.activeTurn | activeTurn}.\n\nLike {@link ChatState.changesets | changesets}, this is intentionally\nabsent from {@link ChatSummary}; clients obtain it by subscribing to the\nchat channel."
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasReference"
+          },
+          "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
         "turns": {
           "type": "array",
@@ -6429,6 +6439,58 @@
         "type",
         "resource",
         "title"
+      ]
+    },
+    "CanvasReference": {
+      "type": "object",
+      "description": "Stable reference to a subscribable canvas channel.\n\nChat state intentionally carries only this reference so the experimental\ncanvas presentation model can evolve without changing the stable chat\nchannel shape.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Canvas channel URI. Subscribe to this resource for the full state."
+        }
+      },
+      "required": [
+        "resource"
+      ]
+    },
+    "CanvasState": {
+      "type": "object",
+      "description": "Full state for one live canvas, returned when a client subscribes to its\n`ahp-canvas:` URI.\n\nThe client already knows the subscribed resource, so the state does not\nredundantly carry its channel URI.",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "description": "Stable caller-supplied instance identifier."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Owning extension/provider identifier."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Owning extension display name, when available."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas type identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Provider-supplied title, when available."
+        },
+        "status": {
+          "type": "string",
+          "description": "Provider-supplied status text, when available."
+        },
+        "url": {
+          "$ref": "#/$defs/URI",
+          "description": "Current absolute HTTP(S) source URL; absent when the live source is unavailable.\nHosts MUST clear this field when the provider becomes unavailable.\n\nSource URLs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
+        }
+      },
+      "required": [
+        "instanceId",
+        "extensionId",
+        "canvasId"
       ]
     },
     "TerminalInfo": {
@@ -9092,6 +9154,25 @@
         "type"
       ]
     },
+    "ChatCanvasesChangedAction": {
+      "type": "object",
+      "description": "The live canvas channels exposed by this chat changed.\n\nReplaces {@link ChatState.canvases | `state.canvases`} entirely. Set to\n`undefined` to clear the collection.",
+      "properties": {
+        "type": {
+          "const": "chat/canvasesChanged"
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasReference"
+          },
+          "description": "New canvas channel references, or `undefined` to clear the collection."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ChatWorkingDirectorySetAction": {
       "type": "object",
       "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nbe one of the owning session's {@link SessionState.workingDirectories}; a host\nMUST reject a directory that is not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
@@ -9397,6 +9478,23 @@
         "type",
         "requestId",
         "response"
+      ]
+    },
+    "CanvasStateChangedAction": {
+      "type": "object",
+      "description": "The presentation state for this canvas changed.\n\nReplaces the subscribed canvas channel state entirely. Full-replacement\nsemantics intentionally keep this early-development channel free to evolve\nwithout expanding the stable chat action surface.",
+      "properties": {
+        "type": {
+          "const": "canvas/stateChanged"
+        },
+        "canvas": {
+          "$ref": "#/$defs/CanvasState",
+          "description": "New authoritative canvas state."
+        }
+      },
+      "required": [
+        "type",
+        "canvas"
       ]
     },
     "TerminalDataAction": {
@@ -10301,6 +10399,12 @@
         },
         {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatCanvasesChangedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasStateChangedAction"
         },
         {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"

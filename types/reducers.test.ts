@@ -21,6 +21,7 @@ import {
   rootReducer,
   sessionReducer,
   chatReducer,
+  canvasReducer,
   terminalReducer,
   changesetReducer,
   annotationsReducer,
@@ -31,7 +32,7 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -52,6 +53,7 @@ function readChannelSources(baseName: string): string {
     'channels-root',
     'channels-session',
     'channels-chat',
+    'channels-canvas',
     'channels-terminal',
     'channels-changeset',
     'channels-annotations',
@@ -73,11 +75,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | CanvasState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -119,6 +121,8 @@ describe('reducer fixtures', () => {
           state = rootReducer(state as RootState, action as any);
         } else if (fixture.reducer === 'chat') {
           state = chatReducer(state as ChatState, action as any);
+        } else if (fixture.reducer === 'canvas') {
+          state = canvasReducer(state as CanvasState, action as any);
         } else if (fixture.reducer === 'terminal') {
           state = terminalReducer(state as TerminalState, action as any);
         } else if (fixture.reducer === 'changeset') {

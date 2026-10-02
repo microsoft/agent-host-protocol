@@ -45,6 +45,7 @@ public actor MultiHostStateMirror {
     public private(set) var rootStates: [HostId: RootState] = [:]
     public private(set) var sessions: [HostedResourceKey: SessionState] = [:]
     public private(set) var chats: [HostedResourceKey: ChatState] = [:]
+    public private(set) var canvases: [HostedResourceKey: CanvasState] = [:]
     public private(set) var terminals: [HostedResourceKey: TerminalState] = [:]
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
@@ -85,6 +86,10 @@ public actor MultiHostStateMirror {
         if channel.hasPrefix("ahp-chat:"), var chat = chats[key] {
             chat = chatReducer(state: chat, action: action)
             chats[key] = chat
+            return
+        }
+        if channel.hasPrefix("ahp-canvas:"), let canvas = canvases[key] {
+            canvases[key] = canvasReducer(state: canvas, action: action)
             return
         }
         if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[key] {
@@ -133,6 +138,8 @@ public actor MultiHostStateMirror {
             sessions[key] = state
         case .chat(let state):
             chats[key] = state
+        case .canvas(let state):
+            canvases[key] = state
         case .terminal(let state):
             terminals[key] = state
         case .changeset(let state):
@@ -153,6 +160,7 @@ public actor MultiHostStateMirror {
         rootStates.removeValue(forKey: host)
         sessions = sessions.filter { $0.key.hostId != host }
         chats = chats.filter { $0.key.hostId != host }
+        canvases = canvases.filter { $0.key.hostId != host }
         terminals = terminals.filter { $0.key.hostId != host }
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
@@ -167,6 +175,7 @@ public actor MultiHostStateMirror {
         rootStates.removeAll()
         sessions.removeAll()
         chats.removeAll()
+        canvases.removeAll()
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()

@@ -1,0 +1,26 @@
+{
+  "name": "canvas-unavailable-snapshot",
+  "group": "A",
+  "description": "A canvas snapshot remains a canvas when no live source URL is available.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-canvas:/preview",
+    "state": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "status": "Reconnecting"
+    },
+    "fromSeq": 6
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-canvas:/preview",
+    "state": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "status": "Reconnecting"
+    },
+    "fromSeq": 6
+  }]
+}

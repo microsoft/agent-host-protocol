@@ -2420,6 +2420,14 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<BackgroundWork>? BackgroundWork { get; set; }
 
+    /// <summary>Live canvases currently exposed by this chat.
+    ///
+    /// Entries intentionally contain only subscribable channel references.
+    /// Clients subscribe to each resource for the experimental presentation
+    /// state, including its current live source URL.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasReference>? Canvases { get; set; }
+
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
 
@@ -2462,6 +2470,54 @@ public sealed class ChatState
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
+/// <summary>Stable reference to a subscribable canvas channel.
+///
+/// Chat state intentionally carries only this reference so the experimental
+/// canvas presentation model can evolve without changing the stable chat
+/// channel shape.</summary>
+public sealed record CanvasReference
+{
+    /// <summary>Canvas channel URI. Subscribe to this resource for the full state.</summary>
+    public required string Resource { get; init; }
+}
+
+/// <summary>Full state for one live canvas, returned when a client subscribes to its
+/// `ahp-canvas:` URI.
+///
+/// The client already knows the subscribed resource, so the state does not
+/// redundantly carry its channel URI.</summary>
+public sealed class CanvasState
+{
+    /// <summary>Stable caller-supplied instance identifier.</summary>
+    public required string InstanceId { get; set; }
+
+    /// <summary>Owning extension/provider identifier.</summary>
+    public required string ExtensionId { get; set; }
+
+    /// <summary>Owning extension display name, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExtensionName { get; set; }
+
+    /// <summary>Provider-local canvas type identifier.</summary>
+    public required string CanvasId { get; set; }
+
+    /// <summary>Provider-supplied title, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; set; }
+
+    /// <summary>Provider-supplied status text, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Status { get; set; }
+
+    /// <summary>Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+    /// Hosts MUST clear this field when the provider becomes unavailable.
+    ///
+    /// Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+    /// from persisted state after a provider or host restart.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Url { get; set; }
 }
 
 /// <summary>A choice in a select-style question.</summary>
@@ -5866,7 +5922,7 @@ public sealed record ErrorInfo
 /// `initialize`, `reconnect`, and `subscribe`.</summary>
 public sealed record Snapshot
 {
-    /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, or `ahp-chat:/&lt;uuid&gt;`)</summary>
+    /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, `ahp-chat:/&lt;uuid&gt;`, or `ahp-canvas:/&lt;uuid&gt;`)</summary>
     public required string Resource { get; init; }
 
     /// <summary>The current state of the resource</summary>
@@ -7726,10 +7782,10 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+  /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// or automation-run state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
@@ -7742,6 +7798,9 @@ public sealed class SnapshotState
 
     /// <summary>Chat state variant, when populated.</summary>
     public ChatState? Chat { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 
     /// <summary>Terminal state variant, when populated.</summary>
     public TerminalState? Terminal { get; set; }
@@ -7791,6 +7850,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
             // session state was flattened.)
             result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
         }
+        else if (root.TryGetProperty("instanceId", out _) &&
+            root.TryGetProperty("extensionId", out _) &&
+            root.TryGetProperty("canvasId", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
         else if (root.TryGetProperty("content", out _))
         {
             result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
@@ -7819,6 +7884,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }

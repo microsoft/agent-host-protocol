@@ -789,6 +789,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'BackgroundShellWork' },
   { name: 'BackgroundSubagentWork' },
   { name: 'ChatState', mutable: true },
+  { name: 'CanvasReference' },
+  { name: 'CanvasState', mutable: true },
   { name: 'ChatInputOption' },
   { name: 'ChatInputTextQuestion' },
   { name: 'ChatInputNumberQuestion' },
@@ -1419,10 +1421,10 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
 function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+  /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// or automation-run state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
@@ -1435,6 +1437,9 @@ public sealed class SnapshotState
 
     /// <summary>Chat state variant, when populated.</summary>
     public ChatState? Chat { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 
     /// <summary>Terminal state variant, when populated.</summary>
     public TerminalState? Terminal { get; set; }
@@ -1484,6 +1489,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
             // session state was flattened.)
             result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
         }
+        else if (root.TryGetProperty("instanceId", out _) &&
+            root.TryGetProperty("extensionId", out _) &&
+            root.TryGetProperty("canvasId", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
         else if (root.TryGetProperty("content", out _))
         {
             result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
@@ -1512,6 +1523,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }
@@ -1659,6 +1671,8 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/backgroundWorkRemoved', variantName: 'ChatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
   { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
+  { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },

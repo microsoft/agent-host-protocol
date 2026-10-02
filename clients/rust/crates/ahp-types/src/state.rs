@@ -1992,6 +1992,13 @@ pub struct ChatState {
     /// chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_work: Option<Vec<BackgroundWork>>,
+    /// Live canvases currently exposed by this chat.
+    ///
+    /// Entries intentionally contain only subscribable channel references.
+    /// Clients subscribe to each resource for the experimental presentation
+    /// state, including its current live source URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasReference>>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -2027,6 +2034,50 @@ pub struct ChatState {
     /// Additional provider-specific metadata for this chat.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// Stable reference to a subscribable canvas channel.
+///
+/// Chat state intentionally carries only this reference so the experimental
+/// canvas presentation model can evolve without changing the stable chat
+/// channel shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasReference {
+    /// Canvas channel URI. Subscribe to this resource for the full state.
+    pub resource: Uri,
+}
+
+/// Full state for one live canvas, returned when a client subscribes to its
+/// `ahp-canvas:` URI.
+///
+/// The client already knows the subscribed resource, so the state does not
+/// redundantly carry its channel URI.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasState {
+    /// Stable caller-supplied instance identifier.
+    pub instance_id: String,
+    /// Owning extension/provider identifier.
+    pub extension_id: String,
+    /// Owning extension display name, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+    /// Provider-supplied title, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Provider-supplied status text, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+    /// Hosts MUST clear this field when the provider becomes unavailable.
+    ///
+    /// Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+    /// from persisted state after a provider or host restart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<Uri>,
 }
 
 /// Lightweight catalog entry for a chat, carried in
@@ -5101,7 +5152,7 @@ pub struct ErrorInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
+    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     pub resource: Uri,
     /// The current state of the resource
     pub state: SnapshotState,
@@ -6501,7 +6552,8 @@ pub enum AutomationRunLifecycle {
 /// The state payload of a snapshot.
 ///
 /// Deserialized by trying session first (has required `lifecycle`), then
-/// chat (has required `turns`), then terminal (has required `content`),
+/// chat (has required `turns`), then canvas (has required instance/provider/type
+/// identifiers), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
@@ -6511,6 +6563,7 @@ pub enum AutomationRunLifecycle {
 pub enum SnapshotState {
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
+    Canvas(Box<CanvasState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),

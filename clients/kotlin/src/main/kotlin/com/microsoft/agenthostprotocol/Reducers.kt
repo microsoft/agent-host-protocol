@@ -19,10 +19,10 @@ import kotlinx.serialization.json.JsonPrimitive
  * A pure state reducer: `reduce(state, action)` returns the next state, with
  * no mutation of [state] and no side effects.
  *
- * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer],
+ * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer], [canvasReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
  * [automationReducer], and [automationRunReducer]) are the canonical implementations.
- * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer],
+ * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer], [CanvasReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
  * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
@@ -47,6 +47,12 @@ public object SessionReducer : Reducer<SessionState, StateAction> {
 public object ChatReducer : Reducer<ChatState, StateAction> {
     override fun reduce(state: ChatState, action: StateAction): ChatState =
         chatReducer(state, action)
+}
+
+/** Pure canvas reducer as a [Reducer] instance. */
+public object CanvasReducer : Reducer<CanvasState, StateAction> {
+    override fun reduce(state: CanvasState, action: StateAction): CanvasState =
+        canvasReducer(state, action)
 }
 
 /** Pure terminal reducer as a [Reducer] instance. Delegates to [terminalReducer]. */
@@ -1046,6 +1052,9 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatChangesetsChanged ->
         state.copy(changesets = action.value.changesets)
 
+    is StateActionChatCanvasesChanged ->
+        state.copy(canvases = action.value.canvases)
+
     is StateActionChatWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
         if (list.contains(action.value.directory)) {
@@ -1637,6 +1646,12 @@ private data class CompleteCtx(
     val fromAuthRequired: Boolean = false,
 )
 
+
+/** Pure reducer for live canvas state. */
+public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
+    is StateActionCanvasStateChanged -> action.value.canvas
+    else -> state
+}
 
 // ─── Terminal Reducer ───────────────────────────────────────────────────────
 

@@ -33,6 +33,7 @@ Until more granular annotations are introduced, a channel's index applies to its
 | [Root](/specification/root-channel) | **2 - Stable** |
 | [Session](/specification/session-channel) | **2 - Stable** |
 | [Chat](/specification/chat-channel) | **2 - Stable** |
+| [Canvas](/reference/canvas) | **1 - Experimental** |
 | [Terminal](/specification/terminal-channel) | **2 - Stable** |
 | [Changeset](/reference/changeset) | **1.2 - Release candidate** |
 | [Annotations](/reference/annotations) | **1.1 - Active development** |

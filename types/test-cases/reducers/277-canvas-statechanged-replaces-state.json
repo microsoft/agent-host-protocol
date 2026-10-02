@@ -1,0 +1,32 @@
+{
+  "description": "canvas/stateChanged supplies the live source when a canvas becomes available",
+  "reducer": "canvas",
+  "initial": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "canvasId": "preview"
+  },
+  "actions": [
+    {
+      "type": "canvas/stateChanged",
+      "canvas": {
+        "instanceId": "preview-1",
+        "extensionId": "project:preview",
+        "extensionName": "Preview",
+        "canvasId": "preview",
+        "title": "Preview",
+        "status": "Ready",
+        "url": "https://example.test/live"
+      }
+    }
+  ],
+  "expected": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "extensionName": "Preview",
+    "canvasId": "preview",
+    "title": "Preview",
+    "status": "Ready",
+    "url": "https://example.test/live"
+  }
+}

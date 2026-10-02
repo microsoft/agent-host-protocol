@@ -85,6 +85,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatChangesetsChanged = new ActionType("chat/changesetsChanged");
 
+    public static readonly ActionType ChatCanvasesChanged = new ActionType("chat/canvasesChanged");
+
+    public static readonly ActionType CanvasStateChanged = new ActionType("canvas/stateChanged");
+
     public static readonly ActionType ChatWorkingDirectorySet = new ActionType("chat/workingDirectorySet");
 
     public static readonly ActionType ChatWorkingDirectoryRemoved = new ActionType("chat/workingDirectoryRemoved");
@@ -1821,6 +1825,32 @@ public sealed record ChatChangesetsChangedAction
     public List<Changeset>? Changesets { get; init; }
 }
 
+/// <summary>The live canvas channels exposed by this chat changed.
+///
+/// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+/// `undefined` to clear the collection.</summary>
+public sealed record ChatCanvasesChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatCanvasesChanged;
+
+    /// <summary>New canvas channel references, or `undefined` to clear the collection.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasReference>? Canvases { get; init; }
+}
+
+/// <summary>The presentation state for this canvas changed.
+///
+/// Replaces the subscribed canvas channel state entirely. Full-replacement
+/// semantics intentionally keep this early-development channel free to evolve
+/// without expanding the stable chat action surface.</summary>
+public sealed record CanvasStateChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasStateChanged;
+
+    /// <summary>New authoritative canvas state.</summary>
+    public required CanvasState Canvas { get; init; }
+}
+
 /// <summary>A working directory was added to this chat's
 /// {@link ChatState.workingDirectories} subset.
 ///
@@ -2801,6 +2831,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/backgroundWorkRemoved"] = typeof(ChatBackgroundWorkRemovedAction),
         ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
+        ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
+        ["canvas/stateChanged"] = typeof(CanvasStateChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
         ["chat/usage"] = typeof(ChatUsageAction),

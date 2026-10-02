@@ -1,0 +1,33 @@
+{
+  "description": "canvas/stateChanged replaces the URL while preserving logical canvas identity and metadata",
+  "reducer": "canvas",
+  "initial": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "canvasId": "preview",
+    "title": "Preview",
+    "status": "Ready",
+    "url": "https://example.test/old"
+  },
+  "actions": [
+    {
+      "type": "canvas/stateChanged",
+      "canvas": {
+        "instanceId": "preview-1",
+        "extensionId": "project:preview",
+        "canvasId": "preview",
+        "title": "Preview",
+        "status": "Ready",
+        "url": "https://example.test/new"
+      }
+    }
+  ],
+  "expected": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "canvasId": "preview",
+    "title": "Preview",
+    "status": "Ready",
+    "url": "https://example.test/new"
+  }
+}

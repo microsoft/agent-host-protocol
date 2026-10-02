@@ -618,6 +618,13 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			state.Changesets = append([]ahptypes.Changeset(nil), a.Changesets...)
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatCanvasesChangedAction:
+		if a.Canvases == nil {
+			state.Canvases = nil
+		} else {
+			state.Canvases = append([]ahptypes.CanvasReference(nil), a.Canvases...)
+		}
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatWorkingDirectorySetAction:
 		for _, d := range state.WorkingDirectories {
 			if d == a.Directory {
@@ -1683,6 +1690,16 @@ func applyInputAnswerChanged(state *ahptypes.ChatState, a *ahptypes.ChatInputAns
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeNoOp
+}
+
+// ApplyActionToCanvas replaces the live canvas state or returns OutOfScope.
+func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateAction) ReduceOutcome {
+	a, ok := action.Value.(*ahptypes.CanvasStateChangedAction)
+	if !ok {
+		return ReduceOutcomeOutOfScope
+	}
+	*state = a.Canvas
+	return ReduceOutcomeApplied
 }
 
 // ─── Terminal Reducer ──────────────────────────────────────────────────

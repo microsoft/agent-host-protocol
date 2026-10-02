@@ -145,6 +145,8 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 				runFixture[ahptypes.SessionState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToSession)
 			case "chat":
 				runFixture[ahptypes.ChatState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToChat)
+			case "canvas":
+				runFixture[ahptypes.CanvasState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToCanvas)
 			case "terminal":
 				runFixture[ahptypes.TerminalState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToTerminal)
 			case "changeset":

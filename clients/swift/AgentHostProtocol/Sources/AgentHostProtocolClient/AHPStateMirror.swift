@@ -14,6 +14,7 @@ public actor AHPStateMirror {
     public private(set) var rootState: RootState = RootState(agents: [])
     public private(set) var sessions: [String: SessionState] = [:]
     public private(set) var chats: [String: ChatState] = [:]
+    public private(set) var canvases: [String: CanvasState] = [:]
     public private(set) var terminals: [String: TerminalState] = [:]
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
@@ -45,6 +46,10 @@ public actor AHPStateMirror {
         if channel.hasPrefix("ahp-chat:"), var chat = chats[channel] {
             chat = chatReducer(state: chat, action: action)
             chats[channel] = chat
+            return
+        }
+        if channel.hasPrefix("ahp-canvas:"), let canvas = canvases[channel] {
+            canvases[channel] = canvasReducer(state: canvas, action: action)
             return
         }
         if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[channel] {
@@ -89,6 +94,8 @@ public actor AHPStateMirror {
             sessions[snapshot.resource] = state
         case .chat(let state):
             chats[snapshot.resource] = state
+        case .canvas(let state):
+            canvases[snapshot.resource] = state
         case .terminal(let state):
             terminals[snapshot.resource] = state
         case .changeset(let state):
@@ -118,6 +125,7 @@ public actor AHPStateMirror {
         rootState = RootState(agents: [])
         sessions.removeAll()
         chats.removeAll()
+        canvases.removeAll()
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()

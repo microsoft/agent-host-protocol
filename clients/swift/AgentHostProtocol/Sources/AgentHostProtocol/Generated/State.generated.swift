@@ -1725,6 +1725,12 @@ public struct ChatState: Codable, Sendable {
     /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
     /// chat channel.
     public var backgroundWork: [BackgroundWork]?
+    /// Live canvases currently exposed by this chat.
+    ///
+    /// Entries intentionally contain only subscribable channel references.
+    /// Clients subscribe to each resource for the experimental presentation
+    /// state, including its current live source URL.
+    public var canvases: [CanvasReference]?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -1768,6 +1774,7 @@ public struct ChatState: Codable, Sendable {
         case workingDirectories
         case changesets
         case backgroundWork
+        case canvases
         case turns
         case turnsNextCursor
         case activeTurn
@@ -1790,6 +1797,7 @@ public struct ChatState: Codable, Sendable {
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
+        canvases: [CanvasReference]? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -1810,6 +1818,7 @@ public struct ChatState: Codable, Sendable {
         self.workingDirectories = workingDirectories
         self.changesets = changesets
         self.backgroundWork = backgroundWork
+        self.canvases = canvases
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
@@ -5917,7 +5926,7 @@ public struct ErrorInfo: Codable, Sendable {
 }
 
 public struct Snapshot: Codable, Sendable {
-    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
+    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     public var resource: String
     /// The current state of the resource
     public var state: SnapshotState
@@ -5932,6 +5941,56 @@ public struct Snapshot: Codable, Sendable {
         self.resource = resource
         self.state = state
         self.fromSeq = fromSeq
+    }
+}
+
+public struct CanvasReference: Codable, Sendable {
+    /// Canvas channel URI. Subscribe to this resource for the full state.
+    public var resource: String
+
+    public init(
+        resource: String
+    ) {
+        self.resource = resource
+    }
+}
+
+public struct CanvasState: Codable, Sendable {
+    /// Stable caller-supplied instance identifier.
+    public var instanceId: String
+    /// Owning extension/provider identifier.
+    public var extensionId: String
+    /// Owning extension display name, when available.
+    public var extensionName: String?
+    /// Provider-local canvas type identifier.
+    public var canvasId: String
+    /// Provider-supplied title, when available.
+    public var title: String?
+    /// Provider-supplied status text, when available.
+    public var status: String?
+    /// Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+    /// Hosts MUST clear this field when the provider becomes unavailable.
+    ///
+    /// Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+    /// from persisted state after a provider or host restart.
+    public var url: String?
+
+    public init(
+        instanceId: String,
+        extensionId: String,
+        extensionName: String? = nil,
+        canvasId: String,
+        title: String? = nil,
+        status: String? = nil,
+        url: String? = nil
+    ) {
+        self.instanceId = instanceId
+        self.extensionId = extensionId
+        self.extensionName = extensionName
+        self.canvasId = canvasId
+        self.title = title
+        self.status = status
+        self.url = url
     }
 }
 
@@ -8216,6 +8275,7 @@ public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
+    case canvas(CanvasState)
     case terminal(TerminalState)
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
@@ -8226,12 +8286,15 @@ public enum SnapshotState: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
         // `lifecycle` / `activeClients` / `chats`; ChatState has required
-        // `turns`; the remaining variants follow, with RootState as the
+        // `turns`; CanvasState has required instance/provider/type identifiers;
+        // the remaining variants follow, with RootState as the
         // catch-all.
         if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
+        } else if let canvas = try? CanvasState(from: decoder) {
+            self = .canvas(canvas)
         } else if let terminal = try? TerminalState(from: decoder) {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {
@@ -8254,6 +8317,7 @@ public enum SnapshotState: Codable, Sendable {
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
+        case .canvas(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)

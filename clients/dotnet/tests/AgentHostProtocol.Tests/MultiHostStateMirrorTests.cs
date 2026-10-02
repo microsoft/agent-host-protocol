@@ -16,6 +16,43 @@ namespace Microsoft.AgentHostProtocol.Tests;
 
 public sealed class MultiHostStateMirrorTests
 {
+    [Fact]
+    public void CanvasState_IsIsolatedAndDroppedWithItsResourceAndHost()
+    {
+        var mirror = new MultiHostStateMirror();
+        const string uri = "ahp-canvas:/preview";
+        CanvasState State() => new()
+        {
+            InstanceId = "preview",
+            ExtensionId = "project:preview",
+            CanvasId = "preview",
+            Url = "https://example.test/original",
+        };
+        mirror.PutCanvas("host-a", uri, State());
+        mirror.PutCanvas("host-b", uri, State());
+        var (target, _) = mirror.Canvas("host-a", uri);
+        Reducers.ApplyToCanvas(target!, new StateAction(new CanvasStateChangedAction
+        {
+            Type = ActionType.CanvasStateChanged,
+            Canvas = new CanvasState
+            {
+                InstanceId = "preview",
+                ExtensionId = "project:preview",
+                CanvasId = "preview",
+            },
+        }));
+        var (retained, _) = mirror.Canvas("host-b", uri);
+        var targeted = new[] { target!.Url, retained!.Url };
+        mirror.DropResource("host-a", uri);
+        var (_, resourceFound) = mirror.Canvas("host-a", uri);
+        mirror.PutCanvas("host-a", uri, State());
+        mirror.DropHost("host-a");
+        var (_, hostFound) = mirror.Canvas("host-a", uri);
+        var (_, otherFound) = mirror.Canvas("host-b", uri);
+        Assert.Equal(new string?[] { null, "https://example.test/original" }, targeted);
+        Assert.Equal(new[] { false, false, true }, new[] { resourceFound, hostFound, otherFound });
+    }
+
     // A minimal-but-valid RootState carrying a distinguishing active-session
     // count so two hosts' roots are observably different snapshots.
     private static RootState Root(long activeSessions) => new()

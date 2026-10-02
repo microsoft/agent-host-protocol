@@ -42,6 +42,8 @@ import type {
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
 import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
+import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import type { Snapshot } from '../src/types/common/state.js';
 
 const ROOT = 'ahp-root://' as const;
 const AUTOMATIONS = 'ahp-automations://' as const;
@@ -154,6 +156,57 @@ test('subscribe attaches before sending the request and fans out an action', asy
   assert.equal(event.params.serverSeq, 7);
 
   await client.shutdown();
+});
+
+test('state mirror replaces and clears live canvas sources', () => {
+  const mirror = new AhpStateMirror();
+  const resource = 'ahp-canvas:/preview';
+  const initial: CanvasState = {
+    instanceId: 'preview',
+    extensionId: 'project:preview',
+    canvasId: 'preview',
+    url: 'https://example.test/old',
+  };
+  mirror.applySnapshot({ resource, state: initial, fromSeq: 1 });
+  const replacement: CanvasState = { ...initial, url: 'https://example.test/new' };
+  mirror.apply({
+    channel: resource,
+    serverSeq: 2,
+    origin: undefined,
+    action: { type: ActionType.CanvasStateChanged, canvas: replacement },
+  });
+  const replaced = mirror.getCanvas(resource);
+  const unavailable: CanvasState = {
+    instanceId: 'preview',
+    extensionId: 'project:preview',
+    canvasId: 'preview',
+    status: 'Reconnecting',
+  };
+  mirror.apply({
+    channel: resource,
+    serverSeq: 3,
+    origin: undefined,
+    action: { type: ActionType.CanvasStateChanged, canvas: unavailable },
+  });
+  assert.deepEqual({ replaced, unavailable: mirror.canvases.get(resource) }, {
+    replaced: replacement,
+    unavailable,
+  });
+});
+
+test('state mirror rejects a non-canvas snapshot on a canvas channel', () => {
+  const mirror = new AhpStateMirror();
+  assert.throws(() => mirror.applySnapshot({
+    resource: 'ahp-canvas:/preview',
+    state: { agents: [] },
+    fromSeq: 1,
+  }), /Invalid canvas snapshot/);
+});
+
+test('state mirror rejects a canvas snapshot with a malformed source field', () => {
+  const mirror = new AhpStateMirror();
+  const malformed: Snapshot = JSON.parse('{"resource":"ahp-canvas:/preview","state":{"instanceId":"preview","extensionId":"project:preview","canvasId":"preview","url":42},"fromSeq":1}');
+  assert.throws(() => mirror.applySnapshot(malformed), /Invalid canvas snapshot/);
 });
 
 test('state mirror applies automation catalogue snapshots and actions', () => {

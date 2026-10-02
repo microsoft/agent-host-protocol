@@ -11,13 +11,13 @@
 use ahp::hosts::{HostId, HostSubscriptionEvent};
 use ahp::{HostedResourceKey, MultiHostStateMirror, SubscriptionEvent};
 use ahp_types::actions::{
-    ActionEnvelope, RootActiveSessionsChangedAction, RootAgentsChangedAction,
-    SessionTitleChangedAction, StateAction,
+    ActionEnvelope, CanvasStateChangedAction, RootActiveSessionsChangedAction,
+    RootAgentsChangedAction, SessionTitleChangedAction, StateAction,
 };
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AgentInfo, RootState, SessionLifecycle, SessionState, SessionStatus, SessionSummary, Snapshot,
-    SnapshotState,
+    AgentInfo, CanvasState, RootState, SessionLifecycle, SessionState, SessionStatus,
+    SessionSummary, Snapshot, SnapshotState,
 };
 
 fn agent(provider: &str) -> AgentInfo {
@@ -128,6 +128,61 @@ fn root_agents_changed_envelope(agents: Vec<AgentInfo>, server_seq: u64) -> Acti
         origin: None,
         rejection_reason: None,
     }
+}
+
+#[test]
+fn canvases_are_reduced_and_reset_per_host() {
+    let mut mirror = MultiHostStateMirror::new();
+    let uri = "ahp-canvas:/preview";
+    let alpha = HostId::new("alpha");
+    let beta = HostId::new("beta");
+    let initial = CanvasState {
+        instance_id: "preview".into(),
+        extension_id: "project:preview".into(),
+        extension_name: None,
+        canvas_id: "preview".into(),
+        title: None,
+        status: None,
+        url: Some("https://example.test/original".into()),
+    };
+    let snapshot = Snapshot {
+        resource: uri.into(),
+        state: SnapshotState::Canvas(Box::new(initial.clone())),
+        from_seq: 1,
+    };
+    mirror.apply_snapshot(&alpha, &snapshot);
+    mirror.apply_snapshot(&beta, &snapshot);
+    mirror.apply_envelope(
+        &alpha,
+        &ActionEnvelope {
+            channel: uri.into(),
+            action: StateAction::CanvasStateChanged(CanvasStateChangedAction {
+                canvas: CanvasState {
+                    url: None,
+                    ..initial.clone()
+                },
+            }),
+            server_seq: 2,
+            origin: None,
+            rejection_reason: None,
+        },
+    );
+    let alpha_key = HostedResourceKey::new(alpha.clone(), uri);
+    let beta_key = HostedResourceKey::new(beta, uri);
+    let targeted = (
+        mirror.canvases()[&alpha_key].url.clone(),
+        mirror.canvases()[&beta_key].url.clone(),
+    );
+    mirror.reset_host(&alpha);
+    let reset = (
+        mirror.canvases().contains_key(&alpha_key),
+        mirror.canvases().contains_key(&beta_key),
+    );
+    mirror.reset();
+    assert_eq!(
+        (targeted, reset, mirror.canvases().is_empty()),
+        ((None, initial.url), (false, true), true),
+    );
 }
 
 #[test]

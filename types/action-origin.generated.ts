@@ -58,6 +58,8 @@ import type {
   ChatBackgroundWorkRemovedAction,
   ChatMovableChangedAction,
   ChatChangesetsChangedAction,
+  ChatCanvasesChangedAction,
+  CanvasStateChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -110,7 +112,7 @@ import type {
 
 import { ActionType } from './actions.js';
 
-// ─── Root vs Session vs Chat vs Terminal vs Changeset Action Unions ─────────────────
+// ─── Per-channel Action Unions ───────────────────────────────────────────────
 
 /** Union of all root-scoped actions. */
 export type RootAction =
@@ -227,6 +229,7 @@ export type ChatAction =
   | ChatBackgroundWorkRemovedAction
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -280,10 +283,26 @@ export type ServerChatAction =
   | ChatBackgroundWorkRemovedAction
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatInputRequestedAction
   | ChatTurnsLoadedAction
+;
+
+/** Union of all canvas-scoped actions. */
+export type CanvasAction =
+  | CanvasStateChangedAction
+;
+
+/** Union of canvas actions that clients may dispatch. */
+export type ClientCanvasAction =
+  never
+;
+
+/** Union of canvas actions that only the server may produce. */
+export type ServerCanvasAction =
+  | CanvasStateChangedAction
 ;
 
 /** Union of all terminal-scoped actions. */
@@ -490,6 +509,8 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatBackgroundWorkRemoved]: false,
   [ActionType.ChatMovableChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
+  [ActionType.ChatCanvasesChanged]: false,
+  [ActionType.CanvasStateChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,
   [ActionType.ChatUsage]: false,

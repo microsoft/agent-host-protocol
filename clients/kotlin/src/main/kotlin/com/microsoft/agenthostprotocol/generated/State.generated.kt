@@ -1716,6 +1716,14 @@ data class ChatState(
      */
     val backgroundWork: List<BackgroundWork>? = null,
     /**
+     * Live canvases currently exposed by this chat.
+     *
+     * Entries intentionally contain only subscribable channel references.
+     * Clients subscribe to each resource for the experimental presentation
+     * state, including its current live source URL.
+     */
+    val canvases: List<CanvasReference>? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,
@@ -2072,6 +2080,50 @@ data class BackgroundSubagentWork(
      * {@link ToolResultSubagentContent.resource} points to.
      */
     val chat: String
+)
+
+@Serializable
+data class CanvasReference(
+    /**
+     * Canvas channel URI. Subscribe to this resource for the full state.
+     */
+    val resource: String
+)
+
+@Serializable
+data class CanvasState(
+    /**
+     * Stable caller-supplied instance identifier.
+     */
+    val instanceId: String,
+    /**
+     * Owning extension/provider identifier.
+     */
+    val extensionId: String,
+    /**
+     * Owning extension display name, when available.
+     */
+    val extensionName: String? = null,
+    /**
+     * Provider-local canvas type identifier.
+     */
+    val canvasId: String,
+    /**
+     * Provider-supplied title, when available.
+     */
+    val title: String? = null,
+    /**
+     * Provider-supplied status text, when available.
+     */
+    val status: String? = null,
+    /**
+     * Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+     * Hosts MUST clear this field when the provider becomes unavailable.
+     *
+     * Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+     * from persisted state after a provider or host restart.
+     */
+    val url: String? = null
 )
 
 @Serializable
@@ -5046,7 +5098,7 @@ data class ErrorInfo(
 @Serializable
 data class Snapshot(
     /**
-     * The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
+     * The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
      */
     val resource: String,
     /**
@@ -7423,6 +7475,7 @@ sealed interface SnapshotState {
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
+    @JvmInline value class Canvas(val value: CanvasState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
@@ -7457,6 +7510,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
+            obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
+                SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
@@ -7476,6 +7531,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
+            is SnapshotState.Canvas -> output.json.encodeToJsonElement(CanvasState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)

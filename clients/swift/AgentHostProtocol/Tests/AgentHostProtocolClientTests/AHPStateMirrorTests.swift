@@ -6,6 +6,38 @@ import AgentHostProtocol
 
 final class AHPStateMirrorTests: XCTestCase {
 
+    func testCanvasSourcesAreReplacedClearedAndReset() async {
+        let mirror = AHPStateMirror()
+        let resource = "ahp-canvas:/preview"
+        let initial = CanvasState(
+            instanceId: "preview", extensionId: "project:preview", canvasId: "preview",
+            url: "https://example.test/old"
+        )
+        await mirror.applySnapshot(Snapshot(resource: resource, state: .canvas(initial), fromSeq: 1))
+        var replacement = initial
+        replacement.url = "https://example.test/new"
+        await mirror.apply(ActionEnvelope(
+            channel: resource,
+            action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: replacement)),
+            serverSeq: 2
+        ))
+        let replaced = await mirror.canvases
+        replacement.url = nil
+        await mirror.apply(ActionEnvelope(
+            channel: resource,
+            action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: replacement)),
+            serverSeq: 3
+        ))
+        let unavailable = await mirror.canvases
+        await mirror.reset()
+        let remaining = await mirror.canvases
+        XCTAssertEqual(
+            [replaced[resource]?.url, unavailable[resource]?.instanceId, unavailable[resource]?.url],
+            ["https://example.test/new", "preview", nil]
+        )
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     func testApplySnapshotSeedsRootState() async {
         let mirror = AHPStateMirror()
         let agents = [

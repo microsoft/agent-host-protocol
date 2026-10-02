@@ -1,0 +1,30 @@
+{
+  "name": "chat-canvas-references",
+  "group": "A",
+  "description": "Chat snapshots carry only minimal references to independent canvas channels.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/main",
+    "state": {
+      "resource": "ahp-chat:/main",
+      "title": "Main",
+      "status": 1,
+      "modifiedAt": "2026-10-02T10:00:00.000Z",
+      "turns": [],
+      "canvases": [{ "resource": "ahp-canvas:/preview" }]
+    },
+    "fromSeq": 7
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-chat:/main",
+    "state": {
+      "resource": "ahp-chat:/main",
+      "title": "Main",
+      "status": 1,
+      "modifiedAt": "2026-10-02T10:00:00.000Z",
+      "turns": [],
+      "canvases": [{ "resource": "ahp-canvas:/preview" }]
+    },
+    "fromSeq": 7
+  }]
+}

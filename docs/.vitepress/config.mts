@@ -90,6 +90,7 @@ export default withMermaid(defineConfig({
             { text: 'Root Channel', link: '/reference/root' },
             { text: 'Session Channel', link: '/reference/session' },
             { text: 'Chat Channel', link: '/reference/chat' },
+            { text: 'Canvas Channel', link: '/reference/canvas' },
             { text: 'Terminal Channel', link: '/reference/terminal' },
             { text: 'Changeset Channel', link: '/reference/changeset' },
             { text: 'Annotations Channel', link: '/reference/annotations' },

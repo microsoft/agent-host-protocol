@@ -67,6 +67,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-root': 'root',
   'channels-session': 'session',
   'channels-chat': 'chat',
+  'channels-canvas': 'canvas',
   'channels-terminal': 'terminal',
   'channels-changeset': 'changeset',
   'channels-annotations': 'annotations',
@@ -997,6 +998,30 @@ function generateChatChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateCanvasChannelPage(project: Project): string {
+  currentPage = 'canvas';
+  const stateSf = findChannelSourceFile(project, 'channels-canvas', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-canvas', 'actions.ts');
+
+  const lines: string[] = [GENERATED_HEADER];
+  lines.push('# Canvas Channel\n');
+  lines.push(stabilityIndex(stateSf));
+  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and HTTP(S) source URL. A missing URL means the source is unavailable. Source URLs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
+  lines.push(schemaLink('state.schema.json'));
+
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
+    lines.push('Replace `CanvasState` through server-authoritative actions scoped to the canvas URI via `ActionEnvelope.channel`.\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  return lines.join('\n');
+}
+
 function generateTerminalChannelPage(project: Project): string {
   currentPage = 'terminal';
   const stateSf = findChannelSourceFile(project, 'channels-terminal', 'state.ts');
@@ -1413,6 +1438,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'root.md', generator: generateRootChannelPage },
     { filename: 'session.md', generator: generateSessionChannelPage },
     { filename: 'chat.md', generator: generateChatChannelPage },
+    { filename: 'canvas.md', generator: generateCanvasChannelPage },
     { filename: 'terminal.md', generator: generateTerminalChannelPage },
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },

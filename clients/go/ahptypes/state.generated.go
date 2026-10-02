@@ -1329,6 +1329,12 @@ type ChatState struct {
 	// absent from {@link ChatSummary}; clients obtain it by subscribing to the
 	// chat channel.
 	BackgroundWork *[]BackgroundWork `json:"backgroundWork,omitempty"`
+	// Live canvases currently exposed by this chat.
+	//
+	// Entries intentionally contain only subscribable channel references.
+	// Clients subscribe to each resource for the experimental presentation
+	// state, including its current live source URL.
+	Canvases []CanvasReference `json:"canvases,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1358,6 +1364,42 @@ type ChatState struct {
 	Draft *Message `json:"draft,omitempty"`
 	// Additional provider-specific metadata for this chat.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Stable reference to a subscribable canvas channel.
+//
+// Chat state intentionally carries only this reference so the experimental
+// canvas presentation model can evolve without changing the stable chat
+// channel shape.
+type CanvasReference struct {
+	// Canvas channel URI. Subscribe to this resource for the full state.
+	Resource URI `json:"resource"`
+}
+
+// Full state for one live canvas, returned when a client subscribes to its
+// `ahp-canvas:` URI.
+//
+// The client already knows the subscribed resource, so the state does not
+// redundantly carry its channel URI.
+type CanvasState struct {
+	// Stable caller-supplied instance identifier.
+	InstanceId string `json:"instanceId"`
+	// Owning extension/provider identifier.
+	ExtensionId string `json:"extensionId"`
+	// Owning extension display name, when available.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Provider-local canvas type identifier.
+	CanvasId string `json:"canvasId"`
+	// Provider-supplied title, when available.
+	Title *string `json:"title,omitempty"`
+	// Provider-supplied status text, when available.
+	Status *string `json:"status,omitempty"`
+	// Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+	// Hosts MUST clear this field when the provider becomes unavailable.
+	//
+	// Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+	// from persisted state after a provider or host restart.
+	Url *URI `json:"url,omitempty"`
 }
 
 // Lightweight catalog entry for a chat, carried in
@@ -3597,7 +3639,7 @@ type ErrorInfo struct {
 // A point-in-time snapshot of a subscribed resource's state, returned by
 // `initialize`, `reconnect`, and `subscribe`.
 type Snapshot struct {
-	// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
+	// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
 	Resource URI `json:"resource"`
 	// The current state of the resource
 	State SnapshotState `json:"state"`
@@ -6260,16 +6302,17 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
 // or automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → terminal → changeset →
+// (automationRun → automations → session → chat → canvas → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
+	Canvas        *CanvasState        `json:"-"`
 	Terminal      *TerminalState      `json:"-"`
 	Changeset     *ChangesetState     `json:"-"`
 	ResourceWatch *ResourceWatchState `json:"-"`
@@ -6289,6 +6332,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Session)
 	case s.Chat != nil:
 		return json.Marshal(s.Chat)
+	case s.Canvas != nil:
+		return json.Marshal(s.Canvas)
 	case s.Terminal != nil:
 		return json.Marshal(s.Terminal)
 	case s.Changeset != nil:
@@ -6337,6 +6382,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Chat = &v
+	case containsAll(probe, "instanceId", "extensionId", "canvasId"):
+		var v CanvasState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Canvas = &v
 	case containsAll(probe, "content"):
 		var v TerminalState
 		if err := json.Unmarshal(data, &v); err != nil {
