@@ -14,10 +14,11 @@ public static class ProtocolVersion
     /// The current protocol version (SemVer MAJOR.MINOR.PATCH) this
     /// generated source speaks.
     /// </summary>
-    public const string Current = "1.0.0";
+    public const string Current = "1.1.0";
 
     private static readonly string[] s_supported =
     {
+        "1.1.0",
         "1.0.0",
         "0.10.0",
         "0.9.0",

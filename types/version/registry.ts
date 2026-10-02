@@ -15,7 +15,7 @@ import type { ServerNotificationMap } from '../messages.js';
  *
  * Formatted as a [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` string.
  */
-export const PROTOCOL_VERSION = '1.0.0';
+export const PROTOCOL_VERSION = '1.1.0';
 
 /**
  * Every protocol version a client built from this source tree is willing
@@ -34,6 +34,7 @@ export const PROTOCOL_VERSION = '1.0.0';
  * `scripts/verify-release-metadata.ts`.
  */
 export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = Object.freeze([
+  '1.1.0',
   '1.0.0',
   '0.10.0',
   '0.9.0',
