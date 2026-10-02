@@ -1154,9 +1154,13 @@
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
         },
-        "status": {
-          "$ref": "#/$defs/SessionStatus",
-          "description": "Current chat status, matching {@link ChatSummary.status}.\n\nIncludes the activity bits and the orthogonal {@link SessionStatus.IsRead}\nand {@link SessionStatus.IsArchived} flags. Generic clients use these bits\nto present read, unread, or archived chats in session lists without\nsubscribing to the session or chat channel."
+        "isRead": {
+          "type": "boolean",
+          "description": "Exact read state for this chat.\n\nGeneric clients use this to present read or unread chats in session lists\nwithout subscribing to the session or chat channel. `true` means read and\n`false` means unread. Absence means unknown for backward compatibility and\nMUST NOT be interpreted as read."
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether this chat has been archived independently of its owning session\n(see `chat/isArchivedChanged`).\n\nGeneric clients use this to group or filter archived chats in session\nlists without subscribing to the session channel. Absence means the\nchat is not archived."
         },
         "changes": {
           "$ref": "#/$defs/ChangesSummary",
@@ -1165,8 +1169,7 @@
       },
       "required": [
         "resource",
-        "title",
-        "status"
+        "title"
       ]
     },
     "ChangesSummary": {

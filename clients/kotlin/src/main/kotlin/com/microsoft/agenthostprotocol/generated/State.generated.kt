@@ -2290,14 +2290,23 @@ data class SessionChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
-     * Current chat status, matching {@link ChatSummary.status}.
+     * Exact read state for this chat.
      *
-     * Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
-     * and {@link SessionStatus.IsArchived} flags. Generic clients use these bits
-     * to present read, unread, or archived chats in session lists without
-     * subscribing to the session or chat channel.
+     * Generic clients use this to present read or unread chats in session lists
+     * without subscribing to the session or chat channel. `true` means read and
+     * `false` means unread. Absence means unknown for backward compatibility and
+     * MUST NOT be interpreted as read.
      */
-    val status: SessionStatus,
+    val isRead: Boolean? = null,
+    /**
+     * Whether this chat has been archived independently of its owning session
+     * (see `chat/isArchivedChanged`).
+     *
+     * Generic clients use this to group or filter archived chats in session
+     * lists without subscribing to the session channel. Absence means the
+     * chat is not archived.
+     */
+    val archived: Boolean? = null,
     /**
      * Aggregate summary of file changes associated with this chat.
      *

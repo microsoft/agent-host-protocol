@@ -2439,13 +2439,20 @@ public struct SessionChatSummary: Codable, Sendable {
     /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
     /// backward compatibility.
     public var interactivity: ChatInteractivity?
-    /// Current chat status, matching {@link ChatSummary.status}.
+    /// Exact read state for this chat.
     ///
-    /// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
-    /// and {@link SessionStatus.IsArchived} flags. Generic clients use these bits
-    /// to present read, unread, or archived chats in session lists without
-    /// subscribing to the session or chat channel.
-    public var status: SessionStatus
+    /// Generic clients use this to present read or unread chats in session lists
+    /// without subscribing to the session or chat channel. `true` means read and
+    /// `false` means unread. Absence means unknown for backward compatibility and
+    /// MUST NOT be interpreted as read.
+    public var isRead: Bool?
+    /// Whether this chat has been archived independently of its owning session
+    /// (see `chat/isArchivedChanged`).
+    ///
+    /// Generic clients use this to group or filter archived chats in session
+    /// lists without subscribing to the session channel. Absence means the
+    /// chat is not archived.
+    public var archived: Bool?
     /// Aggregate summary of file changes associated with this chat.
     ///
     /// Servers may populate this so session lists can show per-chat change
@@ -2458,14 +2465,16 @@ public struct SessionChatSummary: Codable, Sendable {
         title: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
-        status: SessionStatus,
+        isRead: Bool? = nil,
+        archived: Bool? = nil,
         changes: ChangesSummary? = nil
     ) {
         self.resource = resource
         self.title = title
         self.origin = origin
         self.interactivity = interactivity
-        self.status = status
+        self.isRead = isRead
+        self.archived = archived
         self.changes = changes
     }
 }

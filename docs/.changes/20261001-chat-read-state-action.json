@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`chat/isReadChanged` action and `SessionChatSummary.status` projection for independently tracking the status of any known chat, including the default chat; the required status bitset replaces the unreleased `isRead` and `archived` catalog fields."
+  "message": "`chat/isReadChanged` action and `SessionChatSummary.isRead` projection for independently tracking the exact read state of any known chat, including the default chat."
 }

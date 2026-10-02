@@ -311,7 +311,7 @@ public sealed class FixRegressionTests
     }
 
     [Fact]
-    public void ApplySummaryChange_Chats_ReplacesCompactStatusProjection()
+    public void ApplySummaryChange_Chats_ReplacesCompactReadProjection()
     {
         var entry = new HostEntry(
             new HostId("h"),
@@ -334,7 +334,7 @@ public sealed class FixRegressionTests
                 {
                     Resource = "ahp-chat:/default",
                     Title = "Default",
-                    Status = SessionStatus.Idle,
+                    IsRead = false,
                 },
             ],
         });
@@ -347,13 +347,13 @@ public sealed class FixRegressionTests
                 {
                     Resource = "ahp-chat:/default",
                     Title = "Default",
-                    Status = SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived,
+                    IsRead = true,
                 },
             ],
         });
 
         var summary = entry.Snapshot().SessionSummaries.Single(s => s.Resource == "ahp-session:/s1");
-        Assert.Equal(SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived, Assert.Single(summary.Chats!).Status);
+        Assert.True(Assert.Single(summary.Chats!).IsRead);
     }
 
     // ── Upstream drift port (model config widened to JSON primitives; SessionModelInfo

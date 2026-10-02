@@ -776,7 +776,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn summary_changes_replace_compact_chat_status_projection() {
+    fn summary_changes_replace_compact_chat_read_projection() {
         let mut summary: SessionSummary = serde_json::from_value(json!({
             "resource": "ahp-session:/s1",
             "provider": "copilot",
@@ -787,7 +787,7 @@ mod tests {
             "chats": [{
                 "resource": "ahp-chat:/default",
                 "title": "Default",
-                "status": 1
+                "isRead": false
             }]
         }))
         .expect("valid session summary");
@@ -795,7 +795,7 @@ mod tests {
             "chats": [{
                 "resource": "ahp-chat:/default",
                 "title": "Default",
-                "status": 97
+                "isRead": true
             }]
         }))
         .expect("valid session summary changes");
@@ -807,13 +807,8 @@ mod tests {
                 .chats
                 .as_ref()
                 .and_then(|chats| chats.first())
-                .map(|chat| chat.status),
-            Some(
-                (ahp_types::state::SessionStatus::Idle
-                    | ahp_types::state::SessionStatus::IsRead
-                    | ahp_types::state::SessionStatus::IsArchived)
-                    .bits()
-            )
+                .and_then(|chat| chat.is_read),
+            Some(true)
         );
     }
 }
