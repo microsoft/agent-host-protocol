@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`chat/isReadChanged` action for marking an individual chat as read or unread."
+  "message": "`chat/isReadChanged` action for independently marking any known chat, including the default chat, as read or unread."
 }

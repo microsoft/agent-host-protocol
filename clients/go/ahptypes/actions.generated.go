@@ -816,11 +816,11 @@ type ChatDraftChangedAction struct {
 
 // The read state of the chat changed.
 //
-// Dispatched by a client to mark a non-default chat as read (e.g. after
-// viewing it) or unread. This changes only the addressed chat; it does not
-// change the read state of its owning session or sibling chats. The default
-// chat's read state is represented by its session and SHOULD use
-// `session/isReadChanged` instead.
+// Dispatched by a client to mark any known chat, including the owning
+// session's default chat, as read (e.g. after viewing it) or unread. This
+// changes only the addressed chat; it does not change the read state of its
+// owning session or sibling chats. Use `session/isReadChanged` only to change
+// the owning session's independent read state.
 type ChatIsReadChangedAction struct {
 	Type ActionType `json:"type"`
 	// Whether the chat has been read

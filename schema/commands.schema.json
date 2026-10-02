@@ -9312,7 +9312,7 @@
     },
     "ChatIsReadChangedAction": {
       "type": "object",
-      "description": "The read state of the chat changed.\n\nDispatched by a client to mark a non-default chat as read (e.g. after\nviewing it) or unread. This changes only the addressed chat; it does not\nchange the read state of its owning session or sibling chats. The default\nchat's read state is represented by its session and SHOULD use\n`session/isReadChanged` instead.",
+      "description": "The read state of the chat changed.\n\nDispatched by a client to mark any known chat, including the owning\nsession's default chat, as read (e.g. after viewing it) or unread. This\nchanges only the addressed chat; it does not change the read state of its\nowning session or sibling chats. Use `session/isReadChanged` only to change\nthe owning session's independent read state.",
       "properties": {
         "type": {
           "const": "chat/isReadChanged"

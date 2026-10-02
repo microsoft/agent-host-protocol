@@ -1,10 +1,10 @@
 {
-  "description": "chat/isReadChanged marks chat as read",
+  "description": "chat/isReadChanged marks the addressed default chat as read",
   "reducer": "chat",
   "initial": {
     "turns": [],
-    "resource": "ahp-chat://session/peer",
-    "title": "Peer Chat",
+    "resource": "ahp-chat://session/default",
+    "title": "Default Chat",
     "status": 1,
     "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
@@ -16,8 +16,8 @@
   ],
   "expected": {
     "turns": [],
-    "resource": "ahp-chat://session/peer",
-    "title": "Peer Chat",
+    "resource": "ahp-chat://session/default",
+    "title": "Default Chat",
     "status": 33,
     "modifiedAt": "1970-01-01T00:00:01.000Z"
   }

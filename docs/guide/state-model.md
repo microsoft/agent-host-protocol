@@ -137,6 +137,11 @@ The `status` bitset encodes both the session's activity state and metadata flags
 
 Bits 0–4 encode mutually-exclusive **activity** status (exactly one is set at a time). Bits 5+ encode orthogonal **metadata** flags that may be combined with any activity status via bitwise OR.
 
+Read state is scoped to the addressed channel. `chat/isReadChanged` changes any
+known chat, including a default chat, without changing its owning session or
+sibling chats. `session/isReadChanged` changes only the session's independent
+read state.
+
 For example, `(status & SessionStatus.InProgress) !== 0` is true for both `InProgress` and `InputNeeded`. A session that is idle, read, and archived has status `1 | 32 | 64 = 97`.
 
 ## Chat State

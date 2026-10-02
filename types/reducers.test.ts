@@ -34,6 +34,7 @@ import { ActionType } from './actions.js';
 import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
   SessionStatus,
+  SessionLifecycle,
   TurnState,
   MessageKind,
 } from './state.js';
@@ -209,6 +210,49 @@ describe('isClientDispatchable', () => {
   it('returns false for server-only actions', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
     assert.equal(isClientDispatchable(action), false);
+  });
+});
+
+describe('chat read state scoping', () => {
+  it('changes the default chat without changing its owning session or sibling chat', () => {
+    const defaultChat: ChatState = {
+      resource: 'ahp-chat:/default',
+      title: 'Default Chat',
+      status: SessionStatus.Idle,
+      modifiedAt: '2026-10-02T00:00:00.000Z',
+      turns: [],
+    };
+    const siblingChat: ChatState = {
+      resource: 'ahp-chat:/sibling',
+      title: 'Sibling Chat',
+      status: SessionStatus.Idle,
+      modifiedAt: '2026-10-02T00:00:00.000Z',
+      turns: [],
+    };
+    const session: SessionState = {
+      provider: 'copilot',
+      title: 'Session',
+      status: SessionStatus.Idle | SessionStatus.IsRead,
+      lifecycle: SessionLifecycle.Ready,
+      activeClients: [],
+      chats: [defaultChat, siblingChat],
+      defaultChat: defaultChat.resource,
+    };
+
+    const updatedDefaultChat = chatReducer(defaultChat, {
+      type: ActionType.ChatIsReadChanged,
+      isRead: true,
+    });
+
+    assert.deepStrictEqual({
+      defaultChatStatus: updatedDefaultChat.status,
+      owningSessionStatus: session.status,
+      siblingChatStatus: siblingChat.status,
+    }, {
+      defaultChatStatus: SessionStatus.Idle | SessionStatus.IsRead,
+      owningSessionStatus: SessionStatus.Idle | SessionStatus.IsRead,
+      siblingChatStatus: SessionStatus.Idle,
+    });
   });
 });
 
