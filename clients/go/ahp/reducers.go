@@ -25,6 +25,175 @@ const (
 	ReduceOutcomeOutOfScope
 )
 
+// TcpReduceError reports a rejected TCP action. The reducer leaves state unchanged.
+type TcpReduceError struct {
+	Reason string
+}
+
+func (e *TcpReduceError) Error() string {
+	return "Invalid TCP action: " + e.Reason
+}
+
+const tcpMaxSafeInteger int64 = 1<<53 - 1
+
+func requireTCPOffset(value int64) error {
+	if value < 0 || value > tcpMaxSafeInteger {
+		return &TcpReduceError{Reason: "offset must be a nonnegative safe integer"}
+	}
+	return nil
+}
+
+func tcpPayloadLength(data string, maximumChunkSize int64) (int64, error) {
+	// Match JavaScript string length for the size check, including invalid
+	// non-ASCII payloads, before validating the base64 alphabet.
+	encodedLength := 0
+	for _, char := range data {
+		encodedLength++
+		if char > 0xffff {
+			encodedLength++
+		}
+	}
+	if maximumChunkSize < 0 || len(data) == 0 ||
+		uint64(encodedLength) > 4*((uint64(maximumChunkSize)+2)/3) {
+		return 0, &TcpReduceError{Reason: "chunk size"}
+	}
+	padding := 0
+	if data[len(data)-1] == '=' {
+		padding = 1
+		if len(data) > 1 && data[len(data)-2] == '=' {
+			padding = 2
+		}
+	}
+	if len(data)%4 != 0 {
+		return 0, &TcpReduceError{Reason: "base64 encoding"}
+	}
+	var last byte
+	for i := 0; i < len(data)-padding; i++ {
+		switch c := data[i]; {
+		case c >= 'A' && c <= 'Z':
+			last = c - 'A'
+		case c >= 'a' && c <= 'z':
+			last = c - 'a' + 26
+		case c >= '0' && c <= '9':
+			last = c - '0' + 52
+		case c == '+':
+			last = 62
+		case c == '/':
+			last = 63
+		default:
+			return 0, &TcpReduceError{Reason: "base64 encoding"}
+		}
+	}
+	if (padding == 2 && last%16 != 0) || (padding == 1 && last%4 != 0) {
+		return 0, &TcpReduceError{Reason: "noncanonical base64 padding bits"}
+	}
+	length := int64(len(data)/4)*3 - int64(padding)
+	if length > maximumChunkSize {
+		return 0, &TcpReduceError{Reason: "chunk size"}
+	}
+	return length, nil
+}
+
+func receiveTCP(direction *ahptypes.FlowControlledByteDirectionState, offset int64, data string, senderClosed bool) (ReduceOutcome, error) {
+	if err := requireTCPOffset(offset); err != nil {
+		return ReduceOutcomeNoOp, err
+	}
+	length, err := tcpPayloadLength(data, direction.MaximumChunkSize)
+	if err != nil {
+		return ReduceOutcomeNoOp, err
+	}
+	if length > tcpMaxSafeInteger-offset {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "offset must be a nonnegative safe integer"}
+	}
+	end := offset + length
+	if end <= direction.ReceivedBytes {
+		return ReduceOutcomeNoOp, nil
+	}
+	if offset != direction.ReceivedBytes {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "gap or overlapping byte range"}
+	}
+	if senderClosed || direction.EofAtBytes != nil {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "data after EOF or sender close"}
+	}
+	if end-direction.ConsumedBytes > direction.WindowBytes {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "receive window exceeded"}
+	}
+	direction.ReceivedBytes = end
+	return ReduceOutcomeApplied, nil
+}
+
+func consumeTCP(direction *ahptypes.FlowControlledByteDirectionState, consumedBytes int64) (ReduceOutcome, error) {
+	if err := requireTCPOffset(consumedBytes); err != nil {
+		return ReduceOutcomeNoOp, err
+	}
+	if consumedBytes > direction.ReceivedBytes {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "consuming bytes not received"}
+	}
+	if consumedBytes <= direction.ConsumedBytes {
+		return ReduceOutcomeNoOp, nil
+	}
+	direction.ConsumedBytes = consumedBytes
+	return ReduceOutcomeApplied, nil
+}
+
+func eofTCP(direction *ahptypes.FlowControlledByteDirectionState, finalOffset int64, senderClosed bool) (ReduceOutcome, error) {
+	if err := requireTCPOffset(finalOffset); err != nil {
+		return ReduceOutcomeNoOp, err
+	}
+	if finalOffset != direction.ReceivedBytes {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "EOF offset"}
+	}
+	if direction.EofAtBytes != nil && *direction.EofAtBytes == finalOffset {
+		return ReduceOutcomeNoOp, nil
+	}
+	if senderClosed {
+		return ReduceOutcomeNoOp, &TcpReduceError{Reason: "EOF after sender close"}
+	}
+	direction.EofAtBytes = &finalOffset
+	return ReduceOutcomeApplied, nil
+}
+
+// ApplyActionToTCP applies an action without retaining its payload. Invalid
+// actions return a *TcpReduceError and leave state unchanged. Adapters must
+// reset the channel on error and write bytes only when ReceivedBytes advances.
+// This reducer is not a lossless stream subscription or a snapshot mirror.
+func ApplyActionToTCP(state *ahptypes.TcpConnectionState, action ahptypes.StateAction) (ReduceOutcome, error) {
+	if state.Reset != nil {
+		return ReduceOutcomeNoOp, nil
+	}
+	switch a := action.Value.(type) {
+	case *ahptypes.TcpInputAction:
+		return receiveTCP(&state.Input, a.Offset, a.Data, state.ClientClosed)
+	case *ahptypes.TcpDataAction:
+		return receiveTCP(&state.Output, a.Offset, a.Data, state.HostClosed)
+	case *ahptypes.TcpInputConsumedAction:
+		return consumeTCP(&state.Input, a.ConsumedBytes)
+	case *ahptypes.TcpDataConsumedAction:
+		return consumeTCP(&state.Output, a.ConsumedBytes)
+	case *ahptypes.TcpInputEofAction:
+		return eofTCP(&state.Input, a.FinalOffset, state.ClientClosed)
+	case *ahptypes.TcpDataEofAction:
+		return eofTCP(&state.Output, a.FinalOffset, state.HostClosed)
+	case *ahptypes.TcpClientCloseAction:
+		if state.ClientClosed {
+			return ReduceOutcomeNoOp, nil
+		}
+		state.ClientClosed = true
+	case *ahptypes.TcpHostCloseAction:
+		if state.HostClosed {
+			return ReduceOutcomeNoOp, nil
+		}
+		state.HostClosed = true
+	case *ahptypes.TcpClientResetAction:
+		state.Reset = &ahptypes.TcpResetState{Source: ahptypes.TcpEndpointClient, Reason: a.Reason}
+	case *ahptypes.TcpHostResetAction:
+		state.Reset = &ahptypes.TcpResetState{Source: ahptypes.TcpEndpointHost, Reason: a.Reason}
+	default:
+		return ReduceOutcomeOutOfScope, nil
+	}
+	return ReduceOutcomeApplied, nil
+}
+
 func addMillisecondsToTimestamp(timestamp string, duration int64) string {
 	start, err := time.Parse(time.RFC3339Nano, timestamp)
 	if err != nil {

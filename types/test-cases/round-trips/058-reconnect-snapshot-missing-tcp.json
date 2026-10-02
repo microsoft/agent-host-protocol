@@ -1,0 +1,16 @@
+{
+  "name": "reconnect-snapshot-missing-tcp",
+  "group": "A",
+  "description": "Snapshot fallback preserves the TCP channels that cannot be restored without inventing payload snapshots.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": [],
+    "missing": ["ahp-tcp:/t1"]
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": [],
+    "missing": ["ahp-tcp:/t1"]
+  }]
+}

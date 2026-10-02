@@ -1,0 +1,55 @@
+{
+  "description": "TCP: rejects input eof after close",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": true,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/inputEof",
+      "finalOffset": 0
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": true,
+    "hostClosed": false
+  },
+  "expectedError": "Invalid TCP action: EOF after sender close"
+}

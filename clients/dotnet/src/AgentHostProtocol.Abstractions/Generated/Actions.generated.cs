@@ -233,6 +233,26 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType AutomationRunCancelRequested = new ActionType("automationRun/cancelRequested");
 
+    public static readonly ActionType TcpInput = new ActionType("tcp/input");
+
+    public static readonly ActionType TcpData = new ActionType("tcp/data");
+
+    public static readonly ActionType TcpInputConsumed = new ActionType("tcp/inputConsumed");
+
+    public static readonly ActionType TcpDataConsumed = new ActionType("tcp/dataConsumed");
+
+    public static readonly ActionType TcpInputEof = new ActionType("tcp/inputEof");
+
+    public static readonly ActionType TcpDataEof = new ActionType("tcp/dataEof");
+
+    public static readonly ActionType TcpClientClose = new ActionType("tcp/clientClose");
+
+    public static readonly ActionType TcpHostClose = new ActionType("tcp/hostClose");
+
+    public static readonly ActionType TcpClientReset = new ActionType("tcp/clientReset");
+
+    public static readonly ActionType TcpHostReset = new ActionType("tcp/hostReset");
+
     /// <inheritdoc />
     public bool Equals(ActionType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
 
@@ -2422,6 +2442,92 @@ public sealed record ResourceWatchChangedAction
     public JsonElement Changes { get; init; }
 }
 
+/// <summary>Client bytes. Never apply optimistically to the authoritative reducer.
+/// Write to the destination only when accepted input.receivedBytes advances.</summary>
+public sealed record TcpInputAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpInput;
+
+    /// <summary>Absolute decoded-byte offset.</summary>
+    public long Offset { get; init; }
+
+    /// <summary>Nonempty canonical padded RFC 4648 base64; no whitespace.</summary>
+    public required string Data { get; init; }
+}
+
+/// <summary>Host bytes. Deliver once, only when output.receivedBytes advances.</summary>
+public sealed record TcpDataAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpData;
+
+    /// <summary>Absolute decoded-byte offset.</summary>
+    public long Offset { get; init; }
+
+    /// <summary>Nonempty canonical padded RFC 4648 base64; no whitespace.</summary>
+    public required string Data { get; init; }
+}
+
+/// <summary>Cumulative input bytes released from the host's bounded write buffer.
+/// Not an acknowledgment that the destination application processed the bytes.</summary>
+public sealed record TcpInputConsumedAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpInputConsumed;
+
+    public long ConsumedBytes { get; init; }
+}
+
+/// <summary>Cumulative output bytes released by the client's bounded stream consumer.</summary>
+public sealed record TcpDataConsumedAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpDataConsumed;
+
+    public long ConsumedBytes { get; init; }
+}
+
+/// <summary>Half-close client input after all preceding input bytes have been written.</summary>
+public sealed record TcpInputEofAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpInputEof;
+
+    public long FinalOffset { get; init; }
+}
+
+/// <summary>Half-close host output after all preceding output bytes have been delivered.</summary>
+public sealed record TcpDataEofAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpDataEof;
+
+    public long FinalOffset { get; init; }
+}
+
+/// <summary>Client's final close. Respond with hostClose if not already sent.</summary>
+public sealed record TcpClientCloseAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpClientClose;
+}
+
+/// <summary>Host's final close. Respond with clientClose if not already sent.</summary>
+public sealed record TcpHostCloseAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpHostClose;
+}
+
+/// <summary>Abort both directions and discard buffered payload.</summary>
+public sealed record TcpClientResetAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpClientReset;
+
+    public TcpResetReason Reason { get; init; }
+}
+
+/// <summary>Abort both directions and discard buffered payload.</summary>
+public sealed record TcpHostResetAction
+{
+    public ActionType Type { get; init; } = ActionType.TcpHostReset;
+
+    public TcpResetReason Reason { get; init; }
+}
+
 /// <summary>Upsert an {@link Annotation} in the annotations channel — adds a new
 /// annotation, or replaces an existing one identified by
 /// {@link Annotation.id}.
@@ -2859,6 +2965,16 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["terminal/commandExecuted"] = typeof(TerminalCommandExecutedAction),
         ["terminal/commandFinished"] = typeof(TerminalCommandFinishedAction),
         ["resourceWatch/changed"] = typeof(ResourceWatchChangedAction),
+        ["tcp/input"] = typeof(TcpInputAction),
+        ["tcp/data"] = typeof(TcpDataAction),
+        ["tcp/inputConsumed"] = typeof(TcpInputConsumedAction),
+        ["tcp/dataConsumed"] = typeof(TcpDataConsumedAction),
+        ["tcp/inputEof"] = typeof(TcpInputEofAction),
+        ["tcp/dataEof"] = typeof(TcpDataEofAction),
+        ["tcp/clientClose"] = typeof(TcpClientCloseAction),
+        ["tcp/hostClose"] = typeof(TcpHostCloseAction),
+        ["tcp/clientReset"] = typeof(TcpClientResetAction),
+        ["tcp/hostReset"] = typeof(TcpHostResetAction),
         ["annotations/set"] = typeof(AnnotationsSetAction),
         ["annotations/removed"] = typeof(AnnotationsRemovedAction),
         ["annotations/entrySet"] = typeof(AnnotationsEntrySetAction),

@@ -35,6 +35,16 @@ public protocol Reducer {
 
 // MARK: - AnyReducer (Type Erasure)
 
+/// Throwing TCP reducer kept separate from the nonthrowing `Reducer` protocol.
+public struct AHPTcpReducer {
+    public init() {}
+
+    /// Validates before replacing state. An error leaves the caller's state unchanged.
+    public func reduce(into state: inout TcpConnectionState, action: StateAction) throws {
+        state = try tcpReducer(state: state, action: action)
+    }
+}
+
 /// A type-erased reducer that wraps any `Reducer` conforming type.
 ///
 /// Useful for storing reducers in collections or passing them as parameters

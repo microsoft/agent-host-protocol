@@ -39,6 +39,7 @@ public enum AhpErrorCodes {
     public static let permissionDenied = -32009
     /// The target resource already exists and the operation does not allow overwriting
     public static let alreadyExists = -32010
+    public static let tcpConnectionOpenFailed = -32012
 }
 
 // MARK: - Error Detail Payloads

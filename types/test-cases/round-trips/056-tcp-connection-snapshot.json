@@ -1,0 +1,34 @@
+{
+  "name": "tcp-connection-snapshot",
+  "group": "A",
+  "description": "A private TCP snapshot preserves counters above 32 bits, directional EOF and reset details without becoming root state.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-tcp:/t1",
+    "fromSeq": 42,
+    "state": {
+      "session": "ahp-session:/s1",
+      "target": { "host": "::1", "port": 3000 },
+      "encoding": "base64",
+      "input": { "windowBytes": 1024, "maximumChunkSize": 256, "receivedBytes": 4294967297, "consumedBytes": 4294967297, "eofAtBytes": 4294967297 },
+      "output": { "windowBytes": 1024, "maximumChunkSize": 256, "receivedBytes": 0, "consumedBytes": 0 },
+      "clientClosed": true,
+      "hostClosed": false,
+      "reset": { "source": "host", "reason": "replayUnavailable" }
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-tcp:/t1",
+    "fromSeq": 42,
+    "state": {
+      "session": "ahp-session:/s1",
+      "target": { "host": "::1", "port": 3000 },
+      "encoding": "base64",
+      "input": { "windowBytes": 1024, "maximumChunkSize": 256, "receivedBytes": 4294967297, "consumedBytes": 4294967297, "eofAtBytes": 4294967297 },
+      "output": { "windowBytes": 1024, "maximumChunkSize": 256, "receivedBytes": 0, "consumedBytes": 0 },
+      "clientClosed": true,
+      "hostClosed": false,
+      "reset": { "source": "host", "reason": "replayUnavailable" }
+    }
+  }]
+}

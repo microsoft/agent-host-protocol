@@ -164,6 +164,12 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<Implementation>(inputJson));
             case "InitializeResult":
                 return Wrap(Ser.Deserialize<InitializeResult>(inputJson));
+            case "SubscribeParams":
+                return Wrap(Ser.Deserialize<SubscribeParams>(inputJson));
+            case "ReconnectResult":
+                return Wrap(Ser.Deserialize<ReconnectResult>(inputJson));
+            case "TcpConnectionOpenErrorData":
+                return Wrap(Ser.Deserialize<TcpConnectionOpenErrorData>(inputJson));
             case "Snapshot":
                 return Wrap(Ser.Deserialize<Snapshot>(inputJson));
             default:

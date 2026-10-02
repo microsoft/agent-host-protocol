@@ -370,6 +370,8 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Enables atomic creation of session-scoped, replay-only TCP channels.
+    public var tcpConnections: TcpConnectionsCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -382,6 +384,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case tcpConnections
     }
 
     public init(
@@ -394,7 +397,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tcpConnections: TcpConnectionsCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -406,6 +410,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tcpConnections = tcpConnections
     }
 }
 
@@ -581,13 +586,19 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     public var type: ReconnectResultType
     /// Fresh snapshots for each subscription
     public var snapshots: [Snapshot]
+    /// Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+    /// requested TCP channels here and dispose their sockets on snapshot fallback.
+    /// Omitted by older hosts; absence does not authorize snapshot-restoring TCP.
+    public var missing: [String]?
 
     public init(
         type: ReconnectResultType,
-        snapshots: [Snapshot]
+        snapshots: [Snapshot],
+        missing: [String]? = nil
     ) {
         self.type = type
         self.snapshots = snapshots
+        self.missing = missing
     }
 }
 
@@ -608,24 +619,31 @@ public struct SubscribeParams: Codable, Sendable {
     /// Servers that do not understand a requested view ignore it and return their
     /// default snapshot. Clients MUST tolerate receiving more state than requested.
     public var view: SubscribeView?
+    /// Atomically create a private child channel and subscribe to it.
+    /// Requires the advertised tcpConnections capability. channel identifies
+    /// the parent session; snapshot.resource identifies the created TCP channel.
+    public var create: TcpConnectionSubscription?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case delivery
         case view
+        case create
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         delivery: SubscriptionDeliveryOptions? = nil,
-        view: SubscribeView? = nil
+        view: SubscribeView? = nil,
+        create: TcpConnectionSubscription? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.delivery = delivery
         self.view = view
+        self.create = create
     }
 }
 
@@ -669,6 +687,36 @@ public struct SubscribeResult: Codable, Sendable {
         snapshot: Snapshot? = nil
     ) {
         self.snapshot = snapshot
+    }
+}
+
+public struct TcpConnectionSubscription: Codable, Sendable {
+    public var type: String
+    /// DNS name or IP literal, not a URL.
+    public var host: String
+    /// Destination port.
+    public var port: Int
+    /// Selected from InitializeResult.tcpConnections.encodings.
+    public var encoding: TcpDataEncoding
+    /// Client receive window in decoded bytes.
+    public var receiveWindowBytes: Int
+    /// Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.
+    public var maximumChunkSize: Int
+
+    public init(
+        type: String,
+        host: String,
+        port: Int,
+        encoding: TcpDataEncoding,
+        receiveWindowBytes: Int,
+        maximumChunkSize: Int
+    ) {
+        self.type = type
+        self.host = host
+        self.port = port
+        self.encoding = encoding
+        self.receiveWindowBytes = receiveWindowBytes
+        self.maximumChunkSize = maximumChunkSize
     }
 }
 

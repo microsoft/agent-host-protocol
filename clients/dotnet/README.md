@@ -50,8 +50,61 @@ var state = new SessionState { /* ... */ };
 Reducers.ApplyToSession(state, action);   // mutates `state` in place
 ```
 
+For TCP accounting, `Reducers.TcpReducer(state, action)` returns a new state
+and throws `InvalidOperationException` on invalid actions.
+
 See [`examples/`](examples/) for runnable `ConnectWs` and `ReducersDemo`
 console apps.
+
+## TCP streams
+
+After `InitializeAsync` negotiates `TcpConnections`, the concrete `AhpClient`
+provides an integrated adapter:
+
+```csharp
+await using var tcp = await client.OpenTcpConnectionAsync(sessionUri,
+    new TcpConnectionSubscription
+    {
+        Type = "tcpConnection", Host = "localhost", Port = 3000,
+        Encoding = TcpDataEncoding.Base64,
+        ReceiveWindowBytes = 65536, MaximumChunkSize = 16384,
+    }, cancellationToken);
+await tcp.WriteAsync(requestBytes, cancellationToken);
+await tcp.EndAsync(cancellationToken); // input EOF; output remains readable
+while (await tcp.ReadAsync(cancellationToken) is { } bytes)
+    await ConsumeAsync(bytes);
+```
+
+The SDK owns buffering, flow control, and replay. One reader and one writer may
+run concurrently. `ReadAsync` releases receive credit; `DrainAsync` waits for
+destination consumption. `CloseAsync` stops writes but retains crossing output,
+so keep reading during graceful close. Disposal aborts without draining.
+
+Transport loss suspends the same handles. On a fresh `AhpClient`, call
+`ReconnectTcpConnectionsAsync(reconnectParams, handles, token)` with the original
+`ClientId`; apply its returned replay to ordinary subscriptions. For deliberate
+transport replacement, use `ShutdownAsync(preserveTcpConnections: true)` instead
+of normal shutdown, which terminates streams.
+
+With `MultiHostClient`, use `HostClientHandle.OpenTcpConnectionAsync(session, create)`
+for automatic reconnect. Host removal/shutdown terminates retained streams.
+Missing resources and snapshot fallback fail streams rather than creating new
+sockets. TCP streams do not belong in ordinary state mirrors.
+
+Transport policy, connection limits, and native socket bridges remain
+application-owned. See the [TCP channel contract](../../docs/specification/tcp-channel.md).
+
+## Strict events
+
+For custom loss-sensitive consumers, attach
+`client.CreateEventStream(failOnOverflow: true)` before sending requests and
+retain it for `Events.ReadAllAsync`. Overflow throws `SubscriptionLagException`;
+decode loss throws `AhpTransportException` of kind `"protocol"`. Both terminate
+the receiver rather than skipping events. Capacity uses
+`ClientConfig.SubscriptionBufferCapacity`; ordinary receivers are unchanged.
+These raw receivers are global. The owned TCP adapter instead registers a strict
+child-scoped receiver during creation reply processing and reattaches it per
+child on reconnect. Unrelated traffic cannot exhaust a TCP stream's event buffer.
 
 ## Dependency injection
 

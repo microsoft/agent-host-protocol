@@ -226,6 +226,8 @@ impl MultiHostStateMirror {
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
         match &snapshot.state {
+            // TCP belongs to a lossless stream adapter, not a snapshot-restored mirror.
+            SnapshotState::Tcp(_) => {}
             SnapshotState::Root(state) => {
                 self.root_states
                     .insert(host.clone(), state.as_ref().clone());

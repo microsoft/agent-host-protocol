@@ -85,6 +85,121 @@ public object AutomationRunReducer : Reducer<AutomationRunState, StateAction> {
         automationRunReducer(state, action)
 }
 
+/** Pure TCP reducer. Invalid actions throw before changing state; payloads are never retained. */
+public object TcpReducer : Reducer<TcpConnectionState, StateAction> {
+    override fun reduce(state: TcpConnectionState, action: StateAction): TcpConnectionState =
+        tcpReducer(state, action)
+}
+
+private const val TCP_MAX_SAFE_INTEGER = 9007199254740991L
+
+private fun requireTcp(condition: Boolean, message: String) {
+    require(condition) { "Invalid TCP action: $message" }
+}
+
+private fun requireTcpOffset(value: Long) {
+    requireTcp(value in 0..TCP_MAX_SAFE_INTEGER, "offset must be a nonnegative safe integer")
+}
+
+private fun tcpBase64Value(char: Char): Int = when (char) {
+    in 'A'..'Z' -> char - 'A'
+    in 'a'..'z' -> char - 'a' + 26
+    in '0'..'9' -> char - '0' + 52
+    '+' -> 62
+    '/' -> 63
+    else -> -1
+}
+
+private fun tcpPayloadLength(data: String, maximumChunkSize: Long): Long {
+    requireTcp(
+        data.isNotEmpty() && data.length.toLong() <= 4 * (maximumChunkSize / 3 + if (maximumChunkSize % 3 > 0) 1 else 0),
+        "chunk size",
+    )
+    val padding = if (data.endsWith("==")) 2 else if (data.endsWith("=")) 1 else 0
+    requireTcp(data.length % 4 == 0, "base64 encoding")
+    var last = 0
+    for (index in 0 until data.length - padding) {
+        last = tcpBase64Value(data[index])
+        requireTcp(last >= 0, "base64 encoding")
+    }
+    if (padding > 0) {
+        requireTcp(last % (if (padding == 2) 16 else 4) == 0, "noncanonical base64 padding bits")
+    }
+    val length = data.length.toLong() / 4 * 3 - padding
+    requireTcp(length <= maximumChunkSize, "chunk size")
+    return length
+}
+
+private fun tcpReceive(
+    direction: FlowControlledByteDirectionState, offset: Long, data: String, senderClosed: Boolean,
+): FlowControlledByteDirectionState {
+    requireTcpOffset(offset)
+    val end = offset + tcpPayloadLength(data, direction.maximumChunkSize)
+    requireTcpOffset(end)
+    if (end <= direction.receivedBytes) return direction
+    requireTcp(offset == direction.receivedBytes, "gap or overlapping byte range")
+    requireTcp(!senderClosed && direction.eofAtBytes == null, "data after EOF or sender close")
+    requireTcp(end - direction.consumedBytes <= direction.windowBytes, "receive window exceeded")
+    return direction.copy(receivedBytes = end)
+}
+
+private fun tcpConsume(direction: FlowControlledByteDirectionState, consumedBytes: Long): FlowControlledByteDirectionState {
+    requireTcpOffset(consumedBytes)
+    requireTcp(consumedBytes <= direction.receivedBytes, "consuming bytes not received")
+    return if (consumedBytes <= direction.consumedBytes) direction else direction.copy(consumedBytes = consumedBytes)
+}
+
+private fun tcpEof(direction: FlowControlledByteDirectionState, finalOffset: Long, senderClosed: Boolean): FlowControlledByteDirectionState {
+    requireTcpOffset(finalOffset)
+    requireTcp(finalOffset == direction.receivedBytes, "EOF offset")
+    if (direction.eofAtBytes == finalOffset) return direction
+    requireTcp(!senderClosed, "EOF after sender close")
+    return direction.copy(eofAtBytes = finalOffset)
+}
+
+/**
+ * Reduces TCP accounting only, without restoring streams or performing socket I/O.
+ * Callers must reset/close the channel on [IllegalArgumentException] and must not
+ * write rejected or duplicate data (only write when receivedBytes advances).
+ */
+public fun tcpReducer(state: TcpConnectionState, action: StateAction): TcpConnectionState {
+    if (state.reset != null) return state
+    val input: FlowControlledByteDirectionState
+    val output: FlowControlledByteDirectionState
+    when (action) {
+        is StateActionTcpInput -> {
+            input = tcpReceive(state.input, action.value.offset, action.value.data, state.clientClosed)
+            output = state.output
+        }
+        is StateActionTcpData -> {
+            input = state.input
+            output = tcpReceive(state.output, action.value.offset, action.value.data, state.hostClosed)
+        }
+        is StateActionTcpInputConsumed -> {
+            input = tcpConsume(state.input, action.value.consumedBytes)
+            output = state.output
+        }
+        is StateActionTcpDataConsumed -> {
+            input = state.input
+            output = tcpConsume(state.output, action.value.consumedBytes)
+        }
+        is StateActionTcpInputEof -> {
+            input = tcpEof(state.input, action.value.finalOffset, state.clientClosed)
+            output = state.output
+        }
+        is StateActionTcpDataEof -> {
+            input = state.input
+            output = tcpEof(state.output, action.value.finalOffset, state.hostClosed)
+        }
+        is StateActionTcpClientClose -> return if (state.clientClosed) state else state.copy(clientClosed = true)
+        is StateActionTcpHostClose -> return if (state.hostClosed) state else state.copy(hostClosed = true)
+        is StateActionTcpClientReset -> return state.copy(reset = TcpResetState(TcpEndpoint.CLIENT, action.value.reason))
+        is StateActionTcpHostReset -> return state.copy(reset = TcpResetState(TcpEndpoint.HOST, action.value.reason))
+        else -> return state
+    }
+    return if (input === state.input && output === state.output) state else state.copy(input = input, output = output)
+}
+
 private val isoTimestampFormatter = DateTimeFormatterBuilder().appendInstant(3).toFormatter()
 
 private fun addMillisecondsToTimestamp(timestamp: String, duration: Long): String =

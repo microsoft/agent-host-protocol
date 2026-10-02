@@ -20,6 +20,20 @@ public abstract class AhpException : Exception
     protected AhpException(string message, Exception? inner) : base(message, inner) { }
 }
 
+/// <summary>A strict event receiver overflowed and permanently terminated.</summary>
+public sealed class SubscriptionLagException : AhpException
+{
+    /// <summary>The receiver's maximum buffered event count.</summary>
+    public int Capacity { get; }
+
+    /// <summary>Creates a terminal receiver-lag exception.</summary>
+    public SubscriptionLagException(int capacity)
+        : base($"ahp: event receiver exceeded its capacity of {capacity}; the receiver is permanently terminated")
+    {
+        Capacity = capacity;
+    }
+}
+
 /// <summary>
 /// Thrown by <see cref="ITransport"/> implementations when the underlying
 /// connection experiences a transport-level fault.

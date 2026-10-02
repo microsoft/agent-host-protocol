@@ -119,7 +119,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | TcpConnectionState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -670,6 +670,7 @@ function generatePartialStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'TcpDataEncoding', 'TcpEndpoint', 'TcpResetReason', 'TcpConnectionOpenFailureReason',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -746,6 +747,8 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'TcpConnectionState', 'TcpTarget', 'TcpResetState', 'FlowControlledByteDirectionState',
+  'TcpConnectionsCapability', 'TcpConnectionOpenErrorData',
   'AutomationSessionOrigin', 'AutomationSchedule',
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
@@ -1109,6 +1112,7 @@ public enum ToolInput: Codable, Sendable {
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
+    case tcp(TcpConnectionState)
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
@@ -1120,11 +1124,14 @@ public enum SnapshotState: Codable, Sendable {
     case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
-        // Try the most distinctive shapes first. SessionState has required
+        // Try the most distinctive shapes first. TcpConnectionState has required
+        // \`input\`, \`output\`, and \`target\`; SessionState has required
         // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
         // \`turns\`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        if let tcp = try? TcpConnectionState(from: decoder) {
+            self = .tcp(tcp)
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -1147,6 +1154,7 @@ public enum SnapshotState: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .tcp(let state): try state.encode(to: encoder)
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
@@ -1486,6 +1494,16 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'tcp/input', caseName: 'tcpInput', tsInterface: 'TcpInputAction' },
+  { type: 'tcp/data', caseName: 'tcpData', tsInterface: 'TcpDataAction' },
+  { type: 'tcp/inputConsumed', caseName: 'tcpInputConsumed', tsInterface: 'TcpInputConsumedAction' },
+  { type: 'tcp/dataConsumed', caseName: 'tcpDataConsumed', tsInterface: 'TcpDataConsumedAction' },
+  { type: 'tcp/inputEof', caseName: 'tcpInputEof', tsInterface: 'TcpInputEofAction' },
+  { type: 'tcp/dataEof', caseName: 'tcpDataEof', tsInterface: 'TcpDataEofAction' },
+  { type: 'tcp/clientClose', caseName: 'tcpClientClose', tsInterface: 'TcpClientCloseAction' },
+  { type: 'tcp/hostClose', caseName: 'tcpHostClose', tsInterface: 'TcpHostCloseAction' },
+  { type: 'tcp/clientReset', caseName: 'tcpClientReset', tsInterface: 'TcpClientResetAction' },
+  { type: 'tcp/hostReset', caseName: 'tcpHostReset', tsInterface: 'TcpHostResetAction' },
   { type: 'automation/createRequested', caseName: 'automationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', caseName: 'automationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', caseName: 'automationSet', tsInterface: 'AutomationSetAction' },
@@ -1672,6 +1690,7 @@ const COMMAND_STRUCTS = [
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
+  'TcpConnectionSubscription',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
@@ -2030,6 +2049,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
+  lines.push('    public static let tcpConnectionOpenFailed = -32012');
   lines.push('}');
   lines.push('');
 

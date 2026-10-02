@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
@@ -156,6 +157,7 @@ internal sealed class HostEntry : IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         LifetimeCts.Dispose();
+        TcpCreations.Dispose();
         ConnectionGate.Dispose();
         _manualReconnect.Dispose();
         // EndAttempt normally disposes the per-attempt CTS, but a teardown that
@@ -186,6 +188,19 @@ internal sealed class HostEntry : IDisposable
     /// to read one published reference.
     /// </summary>
     public AhpClient? CurrentClient => _client;
+    internal AhpClient? PreviousClient { get; set; }
+    internal ConcurrentDictionary<string, TcpConnection> TcpConnections { get; } = new();
+    internal CancellationTokenSource TcpCreations { get; private set; } = new();
+
+    internal async Task<Exception?> CloseTcpAsync()
+    {
+        try
+        {
+            await Task.WhenAll(TcpConnections.Values.Select(c => c.DisposeAsync().AsTask())).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception error) { return error; }
+    }
 
     public void SetClient(AhpClient? client, string protoVer)
     {
@@ -202,6 +217,8 @@ internal sealed class HostEntry : IDisposable
             }
             else
             {
+                TcpCreations.Dispose();
+                TcpCreations = new CancellationTokenSource();
                 _clientReady.TrySetResult(client);
             }
         }
@@ -660,9 +677,11 @@ public sealed class MultiHostClient : IMultiHostClient
         FinishPerHostListeners(id.ToString());
 
         entry!.LifetimeCts.Cancel();
+        Exception? tcpCleanupError = null;
         await entry.ConnectionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
+            tcpCleanupError = await entry.CloseTcpAsync().ConfigureAwait(false);
             var client = entry.CurrentClient;
             if (client is not null)
             {
@@ -682,6 +701,7 @@ public sealed class MultiHostClient : IMultiHostClient
         // after teardown so a consumer that reacts to the removed event observes
         // a host that is already gone (Host(id) == null).
         BroadcastHostEvent(HostEvent.Removed(id));
+        if (tcpCleanupError is not null) throw tcpCleanupError;
     }
 
     // ── Event channels ────────────────────────────────────────────────────
@@ -726,6 +746,7 @@ public sealed class MultiHostClient : IMultiHostClient
         _rootCts.Cancel();
 
         var entries = new List<HostEntry>(_hosts.Values);
+        var tcpCleanupErrors = new List<Exception>();
         _hosts.Clear();
 
         // Finish per-host listener streams for every host so their consumers'
@@ -743,6 +764,7 @@ public sealed class MultiHostClient : IMultiHostClient
             await entry.ConnectionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
             try
             {
+                if (await entry.CloseTcpAsync().ConfigureAwait(false) is { } error) tcpCleanupErrors.Add(error);
                 var client = entry.CurrentClient;
                 if (client is not null)
                 {
@@ -774,6 +796,7 @@ public sealed class MultiHostClient : IMultiHostClient
         }
 
         _rootCts.Dispose();
+        if (tcpCleanupErrors.Count > 0) throw new AggregateException(tcpCleanupErrors);
     }
 
     /// <inheritdoc />
@@ -842,6 +865,7 @@ public sealed class MultiHostClient : IMultiHostClient
             // Register before the first handshake request so notifications that
             // race initialize/reconnect are buffered rather than discarded.
             var stream = client.CreateEventStream();
+            if (entry.PreviousClient is { } previous) client.InheritTcpClient(previous);
 
             // On a reconnect with a known serverSeq, issue the AHP `reconnect` command
             // (clientId + lastSeenServerSeq) so the host REPLAYS the actions missed
@@ -853,24 +877,38 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 var snap = entry.Snapshot();
                 subscriptions = snap.Subscriptions;
+                var tcpConnections = entry.TcpConnections.Values.ToArray();
                 ReconnectResult? reconnectResult = null;
                 try
                 {
-                    reconnectResult = await client.ReconnectAsync(
-                        snap.ClientId, snap.ServerSeq, subscriptions, cancellationToken)
+                    reconnectResult = tcpConnections.Length == 0
+                        ? await client.ReconnectAsync(snap.ClientId, snap.ServerSeq, subscriptions, cancellationToken).ConfigureAwait(false)
+                        : await client.ReconnectTcpConnectionsAsync(
+                        new ReconnectParams
+                        {
+                            Channel = ProtocolVersion.RootResourceUri,
+                            ClientId = snap.ClientId,
+                            LastSeenServerSeq = snap.ServerSeq,
+                            Subscriptions = subscriptions.ToList(),
+                        }, tcpConnections, cancellationToken)
                         .ConfigureAwait(false);
                 }
-                catch (Exception) when (!cancellationToken.IsCancellationRequested)
+                catch (Exception reconnectError) when (!cancellationToken.IsCancellationRequested
+                    && (tcpConnections.Length == 0 || reconnectError is AhpRpcException))
                 {
                     // Host does not support `reconnect` (or it errored) — fall through
                     // to a fresh `initialize` on the still-live client below. A
                     // cancellation (shutdown/dispose) is NOT swallowed: it propagates
                     // so the supervisor tears down promptly instead of blocking on a
                     // fallback initialize.
+                    if (await entry.CloseTcpAsync().ConfigureAwait(false) is { } error) throw error;
                 }
 
                 if (reconnectResult?.Value is ReconnectReplayResult replay)
                 {
+                    // TCP may need an older checkpoint than the ordinary host mirror.
+                    if (tcpConnections.Length > 0)
+                        replay = replay with { Actions = replay.Actions.Where(action => action.ServerSeq > snap.ServerSeq).ToList() };
                     var summaries = await FetchSessionSummariesAsync(entry, client, cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                     await entry.ConnectionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -916,6 +954,7 @@ public sealed class MultiHostClient : IMultiHostClient
                 }
             }
 
+            subscriptions = subscriptions?.Where(uri => !uri.StartsWith("ahp-tcp:", StringComparison.Ordinal)).ToArray();
             var result = await client.InitializeAsync(
                 entry.ClientId,
                 entry.Config.ProtocolVersions,
@@ -953,7 +992,7 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 if (client is not null)
                 {
-                    try { await client.ShutdownAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+                    try { await client.ShutdownAsync(preserveTcpConnections: true, CancellationToken.None).ConfigureAwait(false); } catch { }
                 }
                 else if (transport is not null)
                 {
@@ -985,6 +1024,7 @@ public sealed class MultiHostClient : IMultiHostClient
         {
             applyHandshake();
             CompleteOpenHost(entry, stream);
+            entry.PreviousClient = null;
         }
         catch
         {
@@ -1239,6 +1279,7 @@ public sealed class MultiHostClient : IMultiHostClient
             // or we're forcing a manual reconnect). Serialize replacement with
             // subscribe/unsubscribe, then drain the old event pump so reconnect
             // snapshots the final sequence observed on that connection.
+            entry.TcpCreations.Cancel();
             try
             {
                 await entry.ConnectionGate.WaitAsync(ct).ConfigureAwait(false);
@@ -1250,12 +1291,13 @@ public sealed class MultiHostClient : IMultiHostClient
             try
             {
                 var oldPump = entry.PumpTask;
+                entry.PreviousClient = client;
                 BeginReconnect(entry, new HostState
                 {
                     Kind = HostStateKind.Reconnecting,
                     Attempt = 1,
                 });
-                try { await client.ShutdownAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+                try { await client.ShutdownAsync(preserveTcpConnections: true, CancellationToken.None).ConfigureAwait(false); } catch { }
                 try { await oldPump.ConfigureAwait(false); } catch (OperationCanceledException) { } catch { }
             }
             finally

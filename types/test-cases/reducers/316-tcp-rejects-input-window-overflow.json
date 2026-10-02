@@ -1,0 +1,56 @@
+{
+  "description": "TCP: rejects input window overflow",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 8,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/input",
+      "offset": 8,
+      "data": "AA=="
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 8,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "expectedError": "Invalid TCP action: receive window exceeded"
+}

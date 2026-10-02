@@ -9,6 +9,9 @@ import com.microsoft.agenthostprotocol.generated.ProtectedResourceMetadata
 import com.microsoft.agenthostprotocol.generated.SessionAddedParams
 import com.microsoft.agenthostprotocol.generated.SessionModelInfo
 import com.microsoft.agenthostprotocol.generated.SessionStatus
+import com.microsoft.agenthostprotocol.generated.SubscribeParams
+import com.microsoft.agenthostprotocol.generated.SubscribeView
+import com.microsoft.agenthostprotocol.generated.SubscriptionDeliveryOptions
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +34,22 @@ import kotlin.test.assertTrue
  */
 class GeneratedStructsTest {
     private val json: Json = Ahp.json
+
+    @Test
+    fun `subscribe preserves existing positional constructor copy and component arguments`() {
+        val delivery = SubscriptionDeliveryOptions(0L)
+        val view = SubscribeView(10L)
+        val params = SubscribeParams("ahp-session:/s1", null, delivery, view)
+        assertEquals(delivery, params.delivery)
+        assertEquals(view, params.view)
+        val copy = params.copy("ahp-session:/s2", null, delivery, view)
+        val (channel, meta, copiedDelivery, copiedView) = copy
+        assertEquals("ahp-session:/s2", channel)
+        assertEquals(null, meta)
+        assertEquals(delivery, copiedDelivery)
+        assertEquals(view, copiedView)
+        assertEquals(null, copy.create)
+    }
 
     @Test
     fun `plain enum encodes wire string and decodes back`() {

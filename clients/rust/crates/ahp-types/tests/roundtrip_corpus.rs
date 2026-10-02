@@ -28,11 +28,17 @@
 
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
-    commands::{ChangesetOperationTarget, ChatSource, Implementation, InitializeResult},
+    commands::{
+        ChangesetOperationTarget, ChatSource, Implementation, InitializeResult, ReconnectResult,
+        SubscribeParams,
+    },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
+    state::{
+        ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot,
+        TcpConnectionOpenErrorData,
+    },
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
@@ -223,6 +229,9 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "PartialSessionSummary" => round_trip!(PartialSessionSummary),
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
+        "SubscribeParams" => round_trip!(SubscribeParams),
+        "ReconnectResult" => round_trip!(ReconnectResult),
+        "TcpConnectionOpenErrorData" => round_trip!(TcpConnectionOpenErrorData),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
         other => Err(format!(

@@ -12,6 +12,7 @@
 
 import { describe, it, before } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { isDeepStrictEqual } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,6 +116,9 @@ function schemaAccepts(
   if ('const' in schema) {
     return value === schema.const;
   }
+  if (Array.isArray(schema.enum) && !schema.enum.some(option => isDeepStrictEqual(option, value))) {
+    return false;
+  }
 
   if (schema.contains && Array.isArray(value)) {
     const matches = value.filter(item => schemaAccepts(root, schema.contains as JsonNode, item)).length;
@@ -149,7 +153,8 @@ function schemaAccepts(
     case 'integer':
       return typeof value === 'number' &&
         (schema.type !== 'integer' || Number.isInteger(value)) &&
-        (typeof schema.minimum !== 'number' || value >= schema.minimum);
+        (typeof schema.minimum !== 'number' || value >= schema.minimum) &&
+        (typeof schema.maximum !== 'number' || value <= schema.maximum);
     case 'boolean':
       return typeof value === 'boolean';
     case 'null':
@@ -163,6 +168,54 @@ function schemaAccepts(
 }
 
 describe('generated JSON schemas', () => {
+  it('preserves TCP creation as an optional typed subscribe payload', () => {
+    const schema = loadSchema('commands.schema.json');
+    const subscribe = { $ref: '#/$defs/SubscribeParams' };
+    const create = {
+      type: 'tcpConnection',
+      host: 'localhost',
+      port: 3000,
+      encoding: 'base64',
+      receiveWindowBytes: 1048576,
+      maximumChunkSize: 32768,
+    };
+    assert.equal(schemaAccepts(schema, subscribe, { channel: 'ahp-session:/s1' }), true);
+    assert.equal(schemaAccepts(schema, subscribe, { channel: 'ahp-session:/s1', create }), true);
+    assert.equal(schemaAccepts(schema, subscribe, {
+      channel: 'ahp-session:/s1', create: { ...create, type: 'unknown' },
+    }), false);
+    const { host: _host, ...withoutHost } = create;
+    assert.equal(schemaAccepts(schema, subscribe, { channel: 'ahp-session:/s1', create: withoutHost }), false);
+    for (const port of [0, 65536, 1.5]) {
+      assert.equal(schemaAccepts(schema, subscribe, { channel: 'ahp-session:/s1', create: { ...create, port } }), false);
+    }
+    for (const receiveWindowBytes of [0, 4294967296, 0.5]) {
+      assert.equal(schemaAccepts(schema, subscribe, {
+        channel: 'ahp-session:/s1', create: { ...create, receiveWindowBytes },
+      }), false);
+    }
+    for (const port of [1, 65535]) {
+      assert.equal(schemaAccepts(schema, subscribe, { channel: 'ahp-session:/s1', create: { ...create, port } }), true);
+    }
+    for (const receiveWindowBytes of [1, 4294967295]) {
+      assert.equal(schemaAccepts(schema, subscribe, {
+        channel: 'ahp-session:/s1', create: { ...create, receiveWindowBytes, maximumChunkSize: 1 },
+      }), true);
+    }
+  });
+
+  it('preserves snapshot reconnect missing channels without making them mandatory for older hosts', () => {
+    const schema = loadSchema('commands.schema.json');
+    const reconnect = { $ref: '#/$defs/ReconnectSnapshotResult' };
+    assert.equal(schemaAccepts(schema, reconnect, { type: 'snapshot', snapshots: [] }), true);
+    assert.equal(schemaAccepts(schema, reconnect, {
+      type: 'snapshot', snapshots: [], missing: ['ahp-tcp:/t1'],
+    }), true);
+    assert.equal(schemaAccepts(schema, reconnect, {
+      type: 'snapshot', snapshots: [], missing: 'ahp-tcp:/t1',
+    }), false);
+  });
+
   for (const file of SCHEMA_FILES) {
     describe(file, () => {
       const schema = loadSchema(file);

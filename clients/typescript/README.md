@@ -14,7 +14,7 @@ The package exposes four subpath exports:
 | Import path | What it gives you |
 |---|---|
 | `@microsoft/agent-host-protocol`        | Wire types, actions, commands, reducers, version constants. No I/O. |
-| `@microsoft/agent-host-protocol/client` | `AhpClient`, `Subscription`, `ManagedSubscriptionManager`, `AhpStateMirror`, the `AhpTransport` interface, `InMemoryTransport`, and the error taxonomy. |
+| `@microsoft/agent-host-protocol/client` | `AhpClient`, `TcpConnection`, `Subscription`, `ManagedSubscriptionManager`, `AhpStateMirror`, the `AhpTransport` interface, `InMemoryTransport`, and the error taxonomy. |
 | `@microsoft/agent-host-protocol/hosts`  | `MultiHostClient`, `HostClientHandle`, `ReconnectPolicy`, `ClientIdStore` (with `InMemoryClientIdStore`), `MultiHostStateMirror`, and the `Host*Error` family. Builds on `/client` to manage one or more host connections with reconnect, generation-checked handles, and fan-in events. |
 | `@microsoft/agent-host-protocol/ws`     | `WebSocketTransport` — an `AhpTransport` implementation backed by the global `WebSocket`. |
 
@@ -140,9 +140,88 @@ state and call the reducers directly.
 | `RpcTimeoutError`    | Client-side timeout fired before the server responded. Carries `method`, `timeoutMs`. Distinct from `RpcError`. |
 | `TransportError`     | Failure of the underlying transport. `kind: 'closed' \| 'io' \| 'protocol'`. |
 | `ClientClosedError`  | Request was in flight when the client was shut down. |
+| `SubscriptionLagError` | An event receiver using `overflow: 'error'` exceeded its bounded buffer. That receiver terminates instead of skipping events. |
+| `TcpConnectionError` | Invalid TCP operation, protocol violation, reset, disposal, or unavailable replay. Carries a protocol reset `reason` where applicable. |
 | `AhpClientError`     | Base class for every error this SDK throws — use `instanceof` to catch them all. |
 
-Malformed inbound frames don't throw — they're logged via `console.warn` and the channel stays alive (matching the Rust client's `tracing::warn!` behavior). Pending requests still time out via `RpcTimeoutError` if the dropped frame would have been their reply.
+Malformed inbound frames are logged via `console.warn` and the connection stays alive. Strict event receivers terminate with `TransportError` rather than silently continuing across the undecodable frame. Pending requests still time out via `RpcTimeoutError` if the dropped frame would have been their reply.
+
+## TCP channels
+
+`AhpClient.openTcpConnection` returns an owned `TcpConnection` byte stream.
+The SDK handles creation, buffering, flow control, and replay:
+
+```ts
+import { TcpDataEncoding } from '@microsoft/agent-host-protocol';
+
+const connection = await client.openTcpConnection(sessionUri, {
+  type: 'tcpConnection',
+  host: 'localhost',
+  port: 3000,
+  encoding: TcpDataEncoding.Base64,
+  receiveWindowBytes: 65536,
+  maximumChunkSize: 32768,
+});
+try {
+  await connection.write(new TextEncoder().encode('hello'));
+  connection.end();
+  await connection.drain();
+  for (let bytes; (bytes = await connection.read()) !== undefined;) {
+    await consumeBytes(bytes); // Your application's native stream or socket.
+  }
+} finally {
+  connection.dispose();
+}
+```
+
+One reader and one writer may run concurrently; overlapping reads or writes are
+rejected. Do not modify a write buffer until `write` resolves. `read` releases
+receive credit, so read only when your destination can accept bytes. `drain`
+waits for destination consumption; `end` half-closes input after the writer
+finishes. `close` begins a graceful handshake; keep reading crossing output.
+Use `abort` or `dispose` to terminate without draining.
+
+Transport loss suspends the original connection rather than interpreting it as
+EOF. For a single-host client, reconnect retained handles on a fresh transport:
+
+```ts
+const retained = oldClient.tcpConnections;
+// For a deliberate transport replacement, preserve the original streams:
+await oldClient.shutdown({ preserveTcpConnections: true });
+
+const replacement = new AhpClient(await openTransport());
+replacement.connect();
+await replacement.reconnectTcpConnections({
+  clientId,
+  lastSeenServerSeq,
+  subscriptions: ordinarySubscriptions,
+}, retained);
+```
+
+Use the original `clientId` and continue using the same stream handles. The helper
+reconciles TCP replay; apply its returned result to ordinary subscriptions.
+Missing channels and snapshot fallback fail streams rather than opening new
+sockets. Dispose a stream to cancel operations waiting through a disconnect.
+
+`HostClientHandle.openTcpConnection` provides the same API through `/hosts`;
+the host runtime automatically retains and resumes streams during reconnect and
+disposes them on host removal or shutdown. Do not put TCP streams in ordinary
+state mirrors or managed snapshot subscriptions.
+
+Embedded protocol clients can reuse the portable adapter with their own transport
+binding. Suspend streams on transport loss and call `beginResume` before the
+reconnect request. Apply its result synchronously with `reconcileTcpConnections`,
+passing the ordinary consumer's original checkpoint and using the returned result
+for ordinary replay, then call `finishResume` when the client's outgoing send
+gate opens.
+
+Consumers choose transport/retry policy, connection-count limits, destination
+approval, and adapters to Node `Duplex`, browser streams, or native sockets.
+For lower-level integrations, `tcpReducer` and `client.events({ overflow: 'error' })`
+are available. Attach the event receiver before requesting creation; overflow
+or decode loss terminates it instead of skipping actions.
+See the [TCP channel contract](../../docs/specification/tcp-channel.md) for wire
+semantics and implementation requirements.
 
 ## Server-initiated requests
 

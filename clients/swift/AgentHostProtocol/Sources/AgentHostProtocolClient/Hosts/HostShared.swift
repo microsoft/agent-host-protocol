@@ -62,6 +62,62 @@ internal struct HostInternal {
 /// without contending against the supervisor's I/O.
 internal actor HostShared {
     private(set) var internalState: HostInternal
+    private(set) var previousClient: AHPClient?
+    private(set) var tcpConnections: [String: TcpConnection] = [:]
+    private var tcpCreations: [UUID: Task<TcpConnection, Error>] = [:]
+
+    func openTcpConnection(generation: UInt64, session: String, create: TcpConnectionSubscription) async throws -> TcpConnection {
+        guard let client = internalState.currentClient else { throw HostError.hostShutDown(internalState.id) }
+        guard generation == internalState.generation else {
+            throw HostError.hostReconnected(host: internalState.id, handleGeneration: generation, currentGeneration: internalState.generation)
+        }
+        let id = UUID()
+        let task = Task { try await self.createTcpConnection(client: client, session: session, create: create) }
+        tcpCreations[id] = task
+        defer { tcpCreations.removeValue(forKey: id) }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private func createTcpConnection(client: AHPClient, session: String, create: TcpConnectionSubscription) async throws -> TcpConnection {
+        let connection = try await client.openTcpConnection(session: session, create: create)
+        guard internalState.currentClient === client, !Task.isCancelled else {
+            try await connection.dispose()
+            throw CancellationError()
+        }
+        tcpConnections[connection.resource] = connection
+        let resource = connection.resource
+        await connection.whenReleased { [weak self] in await self?.removeTcpConnection(resource) }
+        return connection
+    }
+
+    private func removeTcpConnection(_ resource: String) { tcpConnections.removeValue(forKey: resource) }
+
+    func detachClient() async -> AHPClient? {
+        let client = internalState.currentClient
+        internalState.currentClient = nil
+        if let client { previousClient = client }
+        let creations = Array(tcpCreations.values)
+        for creation in creations { creation.cancel() }
+        // The initiating caller receives setup errors; wait for its cleanup before closing transport.
+        for creation in creations { _ = await creation.result }
+        return client
+    }
+
+    func tcpDidReconnect() { previousClient = nil }
+
+    func closeTcpConnections() async -> [String] {
+        let connections = Array(tcpConnections.values)
+        var errors: [String] = []
+        for connection in connections {
+            do { try await connection.dispose() }
+            catch { errors.append(String(describing: error)) }
+        }
+        return errors
+    }
 
     init(_ initial: HostInternal) {
         self.internalState = initial

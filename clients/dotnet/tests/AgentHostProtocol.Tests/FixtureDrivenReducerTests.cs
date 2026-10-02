@@ -49,40 +49,38 @@ public sealed class FixtureDrivenReducerTests
             string reducer = root.GetProperty("reducer").GetString()!;
             JsonElement initial = root.GetProperty("initial");
             JsonElement expected = root.GetProperty("expected");
-            var actions = new List<StateAction>();
-            foreach (JsonElement actionElement in root.GetProperty("actions").EnumerateArray())
-            {
-                actions.Add(actionElement.Deserialize<StateAction>(Options)!);
-            }
+            JsonElement actions = root.GetProperty("actions");
+            string? expectedError = root.TryGetProperty("expectedError", out var error) ? error.GetString() : null;
 
             switch (reducer)
             {
                 case "root":
-                    RunFixture<RootState>(initial, expected, actions, Reducers.ApplyToRoot);
+                    RunFixture<RootState>(initial, expected, actions, expectedError, Reducers.ApplyToRoot);
                     break;
                 case "session":
-                    RunFixture<SessionState>(initial, expected, actions, Reducers.ApplyToSession);
+                    RunFixture<SessionState>(initial, expected, actions, expectedError, Reducers.ApplyToSession);
                     break;
                 case "terminal":
-                    RunFixture<TerminalState>(initial, expected, actions, Reducers.ApplyToTerminal);
+                    RunFixture<TerminalState>(initial, expected, actions, expectedError, Reducers.ApplyToTerminal);
                     break;
                 case "changeset":
-                    RunFixture<ChangesetState>(initial, expected, actions, Reducers.ApplyToChangeset);
+                    RunFixture<ChangesetState>(initial, expected, actions, expectedError, Reducers.ApplyToChangeset);
                     break;
                 case "resourceWatch":
-                    RunFixture<ResourceWatchState>(initial, expected, actions, Reducers.ApplyToResourceWatch);
+                    RunFixture<ResourceWatchState>(initial, expected, actions, expectedError, Reducers.ApplyToResourceWatch);
                     break;
                 case "annotations":
-                    RunFixture<AnnotationsState>(initial, expected, actions, Reducers.ApplyToAnnotations);
+                    RunFixture<AnnotationsState>(initial, expected, actions, expectedError, Reducers.ApplyToAnnotations);
                     break;
                 case "chat":
-                    RunFixture<ChatState>(initial, expected, actions, Reducers.ApplyToChat);
+                    RunFixture<ChatState>(initial, expected, actions, expectedError, Reducers.ApplyToChat);
                     break;
                 case "automation":
                     RunFixture<AutomationState>(
                         initial,
                         expected,
                         actions,
+                        expectedError,
                         Reducers.ApplyToAutomation);
                     break;
                 case "automationRun":
@@ -90,7 +88,11 @@ public sealed class FixtureDrivenReducerTests
                         initial,
                         expected,
                         actions,
+                        expectedError,
                         Reducers.ApplyToAutomationRun);
+                    break;
+                case "tcp":
+                    RunFixture<TcpConnectionState>(initial, expected, actions, expectedError, Reducers.TcpReducer);
                     break;
                 default:
                     throw new Xunit.Sdk.XunitException($"unknown reducer kind '{reducer}'");
@@ -105,8 +107,22 @@ public sealed class FixtureDrivenReducerTests
     private static void RunFixture<T>(
         JsonElement initial,
         JsonElement expected,
-        List<StateAction> actions,
+        JsonElement actions,
+        string? expectedError,
         Func<T, StateAction, ReduceOutcome> apply)
+        where T : class
+        => RunFixture<T>(initial, expected, actions, expectedError, (state, action) =>
+        {
+            apply(state, action);
+            return state;
+        });
+
+    private static void RunFixture<T>(
+        JsonElement initial,
+        JsonElement expected,
+        JsonElement actions,
+        string? expectedError,
+        Func<T, StateAction, T> apply)
         where T : class
     {
         T state = initial.Deserialize<T>(Options)!;
@@ -123,9 +139,33 @@ public sealed class FixtureDrivenReducerTests
                 $"initial state did not survive round-trip:\nre-serialized: {actual}\noriginal:      {original}");
         }
 
-        foreach (StateAction action in actions)
+        if (expectedError is not null) Assert.True(actions.GetArrayLength() > 0, "expectedError requires a final action");
+        int index = 0;
+        foreach (JsonElement raw in actions.EnumerateArray())
         {
-            apply(state, action);
+            bool mustFail = expectedError is not null && index++ == actions.GetArrayLength() - 1;
+            string before = JsonSerializer.Serialize(state, Options);
+            if (mustFail && typeof(T) == typeof(TcpConnectionState)
+                && raw.TryGetProperty("offset", out var offset)
+                && offset.GetDouble() % 1 != 0)
+            {
+                Assert.Equal("Invalid TCP action: offset must be a nonnegative safe integer", expectedError);
+                Assert.Throws<JsonException>(() => raw.Deserialize<StateAction>(Options));
+            }
+            else
+            {
+                StateAction action = raw.Deserialize<StateAction>(Options)!;
+                if (mustFail)
+                {
+                    var failure = Assert.Throws<InvalidOperationException>(() => apply(state, action));
+                    Assert.Equal(expectedError, failure.Message);
+                }
+                else
+                {
+                    state = apply(state, action);
+                }
+            }
+            if (mustFail) Assert.Equal(before, JsonSerializer.Serialize(state, Options));
         }
 
         string got = Canon(JsonSerializer.SerializeToElement(state, Options));

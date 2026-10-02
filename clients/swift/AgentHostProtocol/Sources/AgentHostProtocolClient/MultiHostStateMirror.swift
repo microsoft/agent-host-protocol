@@ -127,6 +127,9 @@ public actor MultiHostStateMirror {
     public func applySnapshot(host: HostId, snapshot: Snapshot) {
         let key = HostedResourceKey(hostId: host, uri: snapshot.resource)
         switch snapshot.state {
+        case .tcp:
+            // TCP belongs to a lossless stream adapter, not this snapshot-restored mirror.
+            break
         case .root(let state):
             rootStates[host] = state
         case .session(let state):

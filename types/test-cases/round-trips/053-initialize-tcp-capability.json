@@ -1,0 +1,18 @@
+{
+  "name": "initialize-tcp-capability",
+  "group": "A",
+  "description": "Optional TCP capability survives initialize across generated clients.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "tcpConnections": { "encodings": ["base64"], "maximumConnectionsPerClient": 64 }
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "tcpConnections": { "encodings": ["base64"], "maximumConnectionsPerClient": 64 }
+  }]
+}

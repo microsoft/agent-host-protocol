@@ -45,6 +45,8 @@ public static class AhpErrorCodes
     public const int AlreadyExists = -32010;
     /// <summary>An optimistic-concurrency precondition failed. Returned when a request carries a precondition token that no longer matches the receiver's current state — for example, `resourceWrite` with an `ifMatch` etag that has been superseded by a concurrent write. Callers SHOULD re-read the resource (e.g. via `resourceResolve`) and decide whether to retry the operation with the fresh token or surface the conflict to the user.</summary>
     public const int Conflict = -32011;
+    /// <summary>TCP creation failed; data MUST contain TcpConnectionOpenErrorData.</summary>
+    public const int TcpConnectionOpenFailed = -32012;
 }
 
 /// <summary>Detail payload of an AuthRequired (-32007) error.</summary>

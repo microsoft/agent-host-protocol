@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+use crate::state::TcpResetReason;
 #[allow(unused_imports)]
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
@@ -134,6 +135,16 @@ pub enum ActionType {
     AutomationRunSessionRemoved,
     AutomationRunPrimarySessionChanged,
     AutomationRunCancelRequested,
+    TcpInput,
+    TcpData,
+    TcpInputConsumed,
+    TcpDataConsumed,
+    TcpInputEof,
+    TcpDataEof,
+    TcpClientClose,
+    TcpHostClose,
+    TcpClientReset,
+    TcpHostReset,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -312,6 +323,16 @@ impl serde::Serialize for ActionType {
             Self::AutomationRunCancelRequested => {
                 serializer.serialize_str("automationRun/cancelRequested")
             }
+            Self::TcpInput => serializer.serialize_str("tcp/input"),
+            Self::TcpData => serializer.serialize_str("tcp/data"),
+            Self::TcpInputConsumed => serializer.serialize_str("tcp/inputConsumed"),
+            Self::TcpDataConsumed => serializer.serialize_str("tcp/dataConsumed"),
+            Self::TcpInputEof => serializer.serialize_str("tcp/inputEof"),
+            Self::TcpDataEof => serializer.serialize_str("tcp/dataEof"),
+            Self::TcpClientClose => serializer.serialize_str("tcp/clientClose"),
+            Self::TcpHostClose => serializer.serialize_str("tcp/hostClose"),
+            Self::TcpClientReset => serializer.serialize_str("tcp/clientReset"),
+            Self::TcpHostReset => serializer.serialize_str("tcp/hostReset"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -428,6 +449,16 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "automationRun/sessionRemoved" => Self::AutomationRunSessionRemoved,
             "automationRun/primarySessionChanged" => Self::AutomationRunPrimarySessionChanged,
             "automationRun/cancelRequested" => Self::AutomationRunCancelRequested,
+            "tcp/input" => Self::TcpInput,
+            "tcp/data" => Self::TcpData,
+            "tcp/inputConsumed" => Self::TcpInputConsumed,
+            "tcp/dataConsumed" => Self::TcpDataConsumed,
+            "tcp/inputEof" => Self::TcpInputEof,
+            "tcp/dataEof" => Self::TcpDataEof,
+            "tcp/clientClose" => Self::TcpClientClose,
+            "tcp/hostClose" => Self::TcpHostClose,
+            "tcp/clientReset" => Self::TcpClientReset,
+            "tcp/hostReset" => Self::TcpHostReset,
             _ => Self::Unknown(raw),
         })
     }
@@ -2168,6 +2199,80 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+/// Client bytes. Never apply optimistically to the authoritative reducer.
+/// Write to the destination only when accepted input.receivedBytes advances.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpInputAction {
+    /// Absolute decoded-byte offset.
+    pub offset: i64,
+    /// Nonempty canonical padded RFC 4648 base64; no whitespace.
+    pub data: String,
+}
+
+/// Host bytes. Deliver once, only when output.receivedBytes advances.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpDataAction {
+    /// Absolute decoded-byte offset.
+    pub offset: i64,
+    /// Nonempty canonical padded RFC 4648 base64; no whitespace.
+    pub data: String,
+}
+
+/// Cumulative input bytes released from the host's bounded write buffer.
+/// Not an acknowledgment that the destination application processed the bytes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpInputConsumedAction {
+    pub consumed_bytes: i64,
+}
+
+/// Cumulative output bytes released by the client's bounded stream consumer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpDataConsumedAction {
+    pub consumed_bytes: i64,
+}
+
+/// Half-close client input after all preceding input bytes have been written.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpInputEofAction {
+    pub final_offset: i64,
+}
+
+/// Half-close host output after all preceding output bytes have been delivered.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpDataEofAction {
+    pub final_offset: i64,
+}
+
+/// Client's final close. Respond with hostClose if not already sent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpClientCloseAction {}
+
+/// Host's final close. Respond with clientClose if not already sent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpHostCloseAction {}
+
+/// Abort both directions and discard buffered payload.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpClientResetAction {
+    pub reason: TcpResetReason,
+}
+
+/// Abort both directions and discard buffered payload.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpHostResetAction {
+    pub reason: TcpResetReason,
+}
+
 /// Ask the host to create a durable automation at a client-chosen resource.
 ///
 /// Clients may dispatch this action only when the host advertises its `create`
@@ -2539,6 +2644,26 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
+    #[serde(rename = "tcp/input")]
+    TcpInput(TcpInputAction),
+    #[serde(rename = "tcp/data")]
+    TcpData(TcpDataAction),
+    #[serde(rename = "tcp/inputConsumed")]
+    TcpInputConsumed(TcpInputConsumedAction),
+    #[serde(rename = "tcp/dataConsumed")]
+    TcpDataConsumed(TcpDataConsumedAction),
+    #[serde(rename = "tcp/inputEof")]
+    TcpInputEof(TcpInputEofAction),
+    #[serde(rename = "tcp/dataEof")]
+    TcpDataEof(TcpDataEofAction),
+    #[serde(rename = "tcp/clientClose")]
+    TcpClientClose(TcpClientCloseAction),
+    #[serde(rename = "tcp/hostClose")]
+    TcpHostClose(TcpHostCloseAction),
+    #[serde(rename = "tcp/clientReset")]
+    TcpClientReset(TcpClientResetAction),
+    #[serde(rename = "tcp/hostReset")]
+    TcpHostReset(TcpHostResetAction),
     #[serde(rename = "automation/createRequested")]
     AutomationCreateRequested(Box<AutomationCreateRequestedAction>),
     #[serde(rename = "automation/updateRequested")]

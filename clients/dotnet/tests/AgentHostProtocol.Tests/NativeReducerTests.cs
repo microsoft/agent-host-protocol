@@ -10,6 +10,7 @@
 // generated union + serializer's [WireValue] mapping, not a hand-typed literal.
 #nullable enable
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AgentHostProtocol;
@@ -19,6 +20,80 @@ namespace Microsoft.AgentHostProtocol.Tests;
 
 public sealed class NativeReducerTests
 {
+    private static TcpConnectionState TcpState(long size = 8) => new()
+    {
+        Session = "ahp-session:/test",
+        Target = new TcpTarget { Host = "localhost", Port = 3000 },
+        Encoding = TcpDataEncoding.Base64,
+        Input = new FlowControlledByteDirectionState { WindowBytes = size, MaximumChunkSize = size },
+        Output = new FlowControlledByteDirectionState { WindowBytes = size, MaximumChunkSize = size },
+    };
+
+    [Fact]
+    public void TcpFourMiBChunkDoesNotAllocateDecodedPayload()
+    {
+        const int size = 4 * 1024 * 1024;
+        string data = new string('A', size / 3 * 4) + "AA==";
+        var before = TcpState(size);
+        var action = new StateAction(new TcpInputAction { Type = ActionType.TcpInput, Offset = 0, Data = data });
+        _ = Reducers.TcpReducer(before, action);
+        long allocated = GC.GetAllocatedBytesForCurrentThread();
+        var after = Reducers.TcpReducer(before, action);
+        allocated = GC.GetAllocatedBytesForCurrentThread() - allocated;
+        Assert.True(allocated < 64 * 1024, $"Reducer allocated {allocated} bytes for a 4 MiB chunk");
+        Assert.Equal(size, after.Input.ReceivedBytes);
+        Assert.Equal(0, before.Input.ReceivedBytes);
+        Assert.Same(after, Reducers.TcpReducer(after, action));
+        Assert.Same(before.Output, after.Output);
+        var error = Assert.Throws<InvalidOperationException>(() => Reducers.TcpReducer(after,
+            new StateAction(new TcpInputAction { Type = ActionType.TcpInput, Offset = size, Data = "AA==" })));
+        Assert.Equal("Invalid TCP action: receive window exceeded", error.Message);
+        Assert.Equal(size, after.Input.ReceivedBytes);
+    }
+
+    [Fact]
+    public void TcpSafeIntegerCounters()
+    {
+        const long max = 9007199254740991L;
+        var before = TcpState();
+        before = before with { Input = before.Input with { ReceivedBytes = max - 1, ConsumedBytes = max - 1 } };
+        var state = Reducers.TcpReducer(before, new StateAction(new TcpInputAction { Type = ActionType.TcpInput, Offset = max - 1, Data = "AA==" }));
+        state = Reducers.TcpReducer(state, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = max }));
+        state = Reducers.TcpReducer(state, new StateAction(new TcpInputEofAction { Type = ActionType.TcpInputEof, FinalOffset = max }));
+        Assert.Equal(max, state.Input.ReceivedBytes);
+        Assert.Equal(max, state.Input.ConsumedBytes);
+        Assert.Equal(max, state.Input.EofAtBytes);
+        foreach (long value in new[] { -1L, max + 1, long.MaxValue })
+        {
+            StateAction[] actions =
+            {
+                new(new TcpInputAction { Type = ActionType.TcpInput, Offset = value, Data = "AA==" }),
+                new(new TcpDataAction { Type = ActionType.TcpData, Offset = value, Data = "AA==" }),
+                new(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = value }),
+                new(new TcpDataConsumedAction { Type = ActionType.TcpDataConsumed, ConsumedBytes = value }),
+                new(new TcpInputEofAction { Type = ActionType.TcpInputEof, FinalOffset = value }),
+                new(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = value }),
+            };
+            foreach (StateAction action in actions)
+            {
+                var error = Assert.Throws<InvalidOperationException>(() => Reducers.TcpReducer(state, action));
+                Assert.Equal("Invalid TCP action: offset must be a nonnegative safe integer", error.Message);
+                Assert.Equal(max, state.Input.ReceivedBytes);
+            }
+        }
+    }
+
+    [Fact]
+    public void TcpRejectsWhitespaceAndUnicodeBase64()
+    {
+        foreach (string data in new[] { "AAA\n", "AAA\r", "AAA\t", "AAA ", "AAA\u00e9", "AA\U0001f600" })
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => Reducers.TcpReducer(TcpState(),
+                new StateAction(new TcpInputAction { Type = ActionType.TcpInput, Offset = 0, Data = data })));
+            Assert.Equal("Invalid TCP action: base64 encoding", error.Message);
+        }
+    }
+
     // #338: an open request is an UNRESOLVED InputRequestResponsePart living in the
     // active turn's response stream — there is no longer a separate live surface, so
     // without an active turn there is nowhere for an open request to exist at all.

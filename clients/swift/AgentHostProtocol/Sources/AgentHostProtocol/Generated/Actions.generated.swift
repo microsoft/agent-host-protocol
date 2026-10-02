@@ -110,6 +110,16 @@ public enum ActionType: Codable, Sendable, Equatable {
     case automationRunSessionRemoved
     case automationRunPrimarySessionChanged
     case automationRunCancelRequested
+    case tcpInput
+    case tcpData
+    case tcpInputConsumed
+    case tcpDataConsumed
+    case tcpInputEof
+    case tcpDataEof
+    case tcpClientClose
+    case tcpHostClose
+    case tcpClientReset
+    case tcpHostReset
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -221,6 +231,16 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "automationRun/sessionRemoved": self = .automationRunSessionRemoved
         case "automationRun/primarySessionChanged": self = .automationRunPrimarySessionChanged
         case "automationRun/cancelRequested": self = .automationRunCancelRequested
+        case "tcp/input": self = .tcpInput
+        case "tcp/data": self = .tcpData
+        case "tcp/inputConsumed": self = .tcpInputConsumed
+        case "tcp/dataConsumed": self = .tcpDataConsumed
+        case "tcp/inputEof": self = .tcpInputEof
+        case "tcp/dataEof": self = .tcpDataEof
+        case "tcp/clientClose": self = .tcpClientClose
+        case "tcp/hostClose": self = .tcpHostClose
+        case "tcp/clientReset": self = .tcpClientReset
+        case "tcp/hostReset": self = .tcpHostReset
         default: self = .unknown(raw)
         }
     }
@@ -332,6 +352,16 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .automationRunSessionRemoved: try container.encode("automationRun/sessionRemoved")
         case .automationRunPrimarySessionChanged: try container.encode("automationRun/primarySessionChanged")
         case .automationRunCancelRequested: try container.encode("automationRun/cancelRequested")
+        case .tcpInput: try container.encode("tcp/input")
+        case .tcpData: try container.encode("tcp/data")
+        case .tcpInputConsumed: try container.encode("tcp/inputConsumed")
+        case .tcpDataConsumed: try container.encode("tcp/dataConsumed")
+        case .tcpInputEof: try container.encode("tcp/inputEof")
+        case .tcpDataEof: try container.encode("tcp/dataEof")
+        case .tcpClientClose: try container.encode("tcp/clientClose")
+        case .tcpHostClose: try container.encode("tcp/hostClose")
+        case .tcpClientReset: try container.encode("tcp/clientReset")
+        case .tcpHostReset: try container.encode("tcp/hostReset")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2350,6 +2380,140 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
     }
 }
 
+public struct TcpInputAction: Codable, Sendable {
+    public var type: ActionType
+    /// Absolute decoded-byte offset.
+    public var offset: Int
+    /// Nonempty canonical padded RFC 4648 base64; no whitespace.
+    public var data: String
+
+    public init(
+        type: ActionType,
+        offset: Int,
+        data: String
+    ) {
+        self.type = type
+        self.offset = offset
+        self.data = data
+    }
+}
+
+public struct TcpDataAction: Codable, Sendable {
+    public var type: ActionType
+    /// Absolute decoded-byte offset.
+    public var offset: Int
+    /// Nonempty canonical padded RFC 4648 base64; no whitespace.
+    public var data: String
+
+    public init(
+        type: ActionType,
+        offset: Int,
+        data: String
+    ) {
+        self.type = type
+        self.offset = offset
+        self.data = data
+    }
+}
+
+public struct TcpInputConsumedAction: Codable, Sendable {
+    public var type: ActionType
+    public var consumedBytes: Int
+
+    public init(
+        type: ActionType,
+        consumedBytes: Int
+    ) {
+        self.type = type
+        self.consumedBytes = consumedBytes
+    }
+}
+
+public struct TcpDataConsumedAction: Codable, Sendable {
+    public var type: ActionType
+    public var consumedBytes: Int
+
+    public init(
+        type: ActionType,
+        consumedBytes: Int
+    ) {
+        self.type = type
+        self.consumedBytes = consumedBytes
+    }
+}
+
+public struct TcpInputEofAction: Codable, Sendable {
+    public var type: ActionType
+    public var finalOffset: Int
+
+    public init(
+        type: ActionType,
+        finalOffset: Int
+    ) {
+        self.type = type
+        self.finalOffset = finalOffset
+    }
+}
+
+public struct TcpDataEofAction: Codable, Sendable {
+    public var type: ActionType
+    public var finalOffset: Int
+
+    public init(
+        type: ActionType,
+        finalOffset: Int
+    ) {
+        self.type = type
+        self.finalOffset = finalOffset
+    }
+}
+
+public struct TcpClientCloseAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
+public struct TcpHostCloseAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
+public struct TcpClientResetAction: Codable, Sendable {
+    public var type: ActionType
+    public var reason: TcpResetReason
+
+    public init(
+        type: ActionType,
+        reason: TcpResetReason
+    ) {
+        self.type = type
+        self.reason = reason
+    }
+}
+
+public struct TcpHostResetAction: Codable, Sendable {
+    public var type: ActionType
+    public var reason: TcpResetReason
+
+    public init(
+        type: ActionType,
+        reason: TcpResetReason
+    ) {
+        self.type = type
+        self.reason = reason
+    }
+}
+
 public struct AutomationCreateRequestedAction: Codable, Sendable {
     public var type: ActionType
     /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
@@ -2638,6 +2802,16 @@ public enum StateAction: Codable, Sendable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
+    case tcpInput(TcpInputAction)
+    case tcpData(TcpDataAction)
+    case tcpInputConsumed(TcpInputConsumedAction)
+    case tcpDataConsumed(TcpDataConsumedAction)
+    case tcpInputEof(TcpInputEofAction)
+    case tcpDataEof(TcpDataEofAction)
+    case tcpClientClose(TcpClientCloseAction)
+    case tcpHostClose(TcpHostCloseAction)
+    case tcpClientReset(TcpClientResetAction)
+    case tcpHostReset(TcpHostResetAction)
     case automationCreateRequested(AutomationCreateRequestedAction)
     case automationUpdateRequested(AutomationUpdateRequestedAction)
     case automationSet(AutomationSetAction)
@@ -2849,6 +3023,26 @@ public enum StateAction: Codable, Sendable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
+        case "tcp/input":
+            self = .tcpInput(try TcpInputAction(from: decoder))
+        case "tcp/data":
+            self = .tcpData(try TcpDataAction(from: decoder))
+        case "tcp/inputConsumed":
+            self = .tcpInputConsumed(try TcpInputConsumedAction(from: decoder))
+        case "tcp/dataConsumed":
+            self = .tcpDataConsumed(try TcpDataConsumedAction(from: decoder))
+        case "tcp/inputEof":
+            self = .tcpInputEof(try TcpInputEofAction(from: decoder))
+        case "tcp/dataEof":
+            self = .tcpDataEof(try TcpDataEofAction(from: decoder))
+        case "tcp/clientClose":
+            self = .tcpClientClose(try TcpClientCloseAction(from: decoder))
+        case "tcp/hostClose":
+            self = .tcpHostClose(try TcpHostCloseAction(from: decoder))
+        case "tcp/clientReset":
+            self = .tcpClientReset(try TcpClientResetAction(from: decoder))
+        case "tcp/hostReset":
+            self = .tcpHostReset(try TcpHostResetAction(from: decoder))
         case "automation/createRequested":
             self = .automationCreateRequested(try AutomationCreateRequestedAction(from: decoder))
         case "automation/updateRequested":
@@ -2969,6 +3163,16 @@ public enum StateAction: Codable, Sendable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
+        case .tcpInput(let v): try v.encode(to: encoder)
+        case .tcpData(let v): try v.encode(to: encoder)
+        case .tcpInputConsumed(let v): try v.encode(to: encoder)
+        case .tcpDataConsumed(let v): try v.encode(to: encoder)
+        case .tcpInputEof(let v): try v.encode(to: encoder)
+        case .tcpDataEof(let v): try v.encode(to: encoder)
+        case .tcpClientClose(let v): try v.encode(to: encoder)
+        case .tcpHostClose(let v): try v.encode(to: encoder)
+        case .tcpClientReset(let v): try v.encode(to: encoder)
+        case .tcpHostReset(let v): try v.encode(to: encoder)
         case .automationCreateRequested(let v): try v.encode(to: encoder)
         case .automationUpdateRequested(let v): try v.encode(to: encoder)
         case .automationSet(let v): try v.encode(to: encoder)

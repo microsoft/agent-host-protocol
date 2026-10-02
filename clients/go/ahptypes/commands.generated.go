@@ -190,6 +190,8 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Enables atomic creation of session-scoped, replay-only TCP channels.
+	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -317,6 +319,8 @@ type ReconnectParams struct {
 //
 // The server MUST include all replayed data in the response.
 type ReconnectReplayResult struct {
+	// Discriminant
+	Type ReconnectResultType `json:"type"`
 	// Missed action envelopes since `lastSeenServerSeq`
 	Actions []ActionEnvelope `json:"actions"`
 	// URIs from `ReconnectParams.subscriptions` that the server cannot resume.
@@ -328,8 +332,14 @@ type ReconnectReplayResult struct {
 
 // Reconnect result when the gap exceeds the replay buffer.
 type ReconnectSnapshotResult struct {
+	// Discriminant
+	Type ReconnectResultType `json:"type"`
 	// Fresh snapshots for each subscription
 	Snapshots []Snapshot `json:"snapshots"`
+	// Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+	// requested TCP channels here and dispose their sockets on snapshot fallback.
+	// Omitted by older hosts; absence does not authorize snapshot-restoring TCP.
+	Missing []URI `json:"missing,omitempty"`
 }
 
 // Subscribe to a URI-identified channel.
@@ -355,6 +365,10 @@ type SubscribeParams struct {
 	// Servers that do not understand a requested view ignore it and return their
 	// default snapshot. Clients MUST tolerate receiving more state than requested.
 	View *SubscribeView `json:"view,omitempty"`
+	// Atomically create a private child channel and subscribe to it.
+	// Requires the advertised tcpConnections capability. channel identifies
+	// the parent session; snapshot.resource identifies the created TCP channel.
+	Create *TcpConnectionSubscription `json:"create,omitempty"`
 }
 
 // Optional client-requested shape for a subscription snapshot.
@@ -386,6 +400,26 @@ type SubscriptionDeliveryOptions struct {
 type SubscribeResult struct {
 	// Snapshot of the subscribed channel's state (omitted for stateless channels)
 	Snapshot *Snapshot `json:"snapshot,omitempty"`
+}
+
+// Creates and exclusively subscribes to one TCP connection.
+//
+// SubscribeParams.channel MUST identify the parent `ahp-session:` channel.
+// The host returns the new `ahp-tcp:` URI in snapshot.resource, not the parent.
+// It installs the subscription and sends the response before any TCP actions.
+// Unknown creation kinds MUST be rejected, never treated as normal subscribe.
+type TcpConnectionSubscription struct {
+	Type string `json:"type"`
+	// DNS name or IP literal, not a URL.
+	Host string `json:"host"`
+	// Destination port.
+	Port int64 `json:"port"`
+	// Selected from InitializeResult.tcpConnections.encodings.
+	Encoding TcpDataEncoding `json:"encoding"`
+	// Client receive window in decoded bytes.
+	ReceiveWindowBytes int64 `json:"receiveWindowBytes"`
+	// Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.
+	MaximumChunkSize int64 `json:"maximumChunkSize"`
 }
 
 // Creates a new session with the specified agent provider.
@@ -1509,6 +1543,62 @@ func (v ChatMoveToNewSessionDestination) MarshalJSON() ([]byte, error) {
 	type wire ChatMoveToNewSessionDestination
 	raw := wire(v)
 	raw.Kind = ChatMoveDestinationKindNewSession
+	return json.Marshal(raw)
+}
+
+func (v *ReconnectReplayResult) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "type")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ReconnectReplayResult", "type")
+	}
+	if disc != "replay" {
+		return unknownDiscriminatorError("ReconnectReplayResult", "type", disc)
+	}
+	type wire ReconnectReplayResult
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ReconnectReplayResult(raw)
+	v.Type = ReconnectResultTypeReplay
+	return nil
+}
+
+func (v ReconnectReplayResult) MarshalJSON() ([]byte, error) {
+	type wire ReconnectReplayResult
+	raw := wire(v)
+	raw.Type = ReconnectResultTypeReplay
+	return json.Marshal(raw)
+}
+
+func (v *ReconnectSnapshotResult) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "type")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ReconnectSnapshotResult", "type")
+	}
+	if disc != "snapshot" {
+		return unknownDiscriminatorError("ReconnectSnapshotResult", "type", disc)
+	}
+	type wire ReconnectSnapshotResult
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ReconnectSnapshotResult(raw)
+	v.Type = ReconnectResultTypeSnapshot
+	return nil
+}
+
+func (v ReconnectSnapshotResult) MarshalJSON() ([]byte, error) {
+	type wire ReconnectSnapshotResult
+	raw := wire(v)
+	raw.Type = ReconnectResultTypeSnapshot
 	return json.Marshal(raw)
 }
 

@@ -15,6 +15,8 @@ import type { CommandMap } from '../../types/common/messages.js';
 import type { StateAction } from '../../types/common/actions.js';
 import type { URI } from '../../types/common/state.js';
 import type { AhpClient, DispatchHandle } from '../client.js';
+import type { TcpConnection } from '../tcp-connection.js';
+import type { TcpConnectionSubscription } from '../../types/channels-tcp/commands.js';
 import {
   HostReconnectedError,
   HostShutDownError,
@@ -81,6 +83,12 @@ export class HostClientHandle {
   dispatch(channel: URI, action: StateAction, clientSeq?: number): DispatchHandle {
     this.checkAlive();
     return this.client.dispatch(channel, action, clientSeq);
+  }
+
+  /** Open an owned byte stream; the host runtime preserves it across replay-capable reconnects. */
+  openTcpConnection(session: URI, create: TcpConnectionSubscription): Promise<TcpConnection> {
+    this.checkAlive();
+    return this.client.openTcpConnection(session, create);
   }
 
   /**

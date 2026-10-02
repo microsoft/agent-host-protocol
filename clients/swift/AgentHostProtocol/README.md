@@ -78,6 +78,60 @@ for snapshot in initialized.snapshots {
 
 `AHPStateMirror` is a convenience for simple consumers. Larger apps can keep their own state store and route snapshots/actions through the generated reducers directly.
 
+## Owned TCP Streams
+
+After `initialize` negotiates `tcpConnections`, open an integrated stream:
+
+```swift
+let tcp = try await client.openTcpConnection(
+    session: sessionURI,
+    create: TcpConnectionSubscription(
+        type: "tcpConnection", host: "localhost", port: 3000, encoding: .base64,
+        receiveWindowBytes: 65536, maximumChunkSize: 16384
+    )
+)
+try await tcp.write(requestBytes)
+try await tcp.end() // input EOF; output remains readable
+while let bytes = try await tcp.read() {
+    try await consume(bytes)
+}
+try await tcp.dispose()
+```
+
+The SDK owns buffering, flow control, and replay. One reader and one writer may
+run concurrently. `read()` releases receive credit; `drain()` waits for destination
+consumption. `close()` stops writes but retains crossing output, so keep reading
+during graceful close. `dispose()` aborts without draining; call it on
+error/cancellation too.
+
+Transport loss suspends the same handles. Connect a fresh `AHPClient` and call
+`reconnectTcpConnections(params:connections:)` with the original `clientId`;
+apply its returned replay to ordinary subscriptions. For deliberate transport
+replacement, use `shutdown(preservingTcpConnections: true)` instead of normal
+shutdown, which terminates streams.
+
+With `MultiHostClient`, use `HostClientHandle.openTcpConnection(session:create:)`
+for automatic reconnect. Host removal/shutdown terminates retained streams.
+Missing resources and snapshot fallback fail streams rather than creating new
+sockets. TCP streams do not belong in ordinary state mirrors.
+
+For lower-level accounting, `try tcpReducer(state:action:)` returns a new state;
+`try AHPTcpReducer().reduce(into:action:)` updates in place after validation.
+Invalid actions throw `TcpReducerError` without changing state.
+Transport policy, connection limits, and native socket bridges remain
+application-owned. See the [TCP channel contract](../../../docs/specification/tcp-channel.md).
+
+## Lower-Level Strict Events
+
+For custom loss-sensitive consumers, attach `await client.strictEvents()` before
+sending requests and retain it for `for try await` consumption. Overflow throws
+`SubscriptionLagError`; decode loss throws `TransportError.protocol`. Both
+terminate the receiver rather than skipping events. Capacity uses
+`AHPClientConfig.subscriptionBufferSize`; ordinary receivers are unchanged.
+These raw receivers are global. The owned TCP adapter instead registers a strict
+child-scoped receiver during creation reply processing and reattaches it per
+child on reconnect. Unrelated traffic cannot exhaust a TCP stream's event buffer.
+
 ## Multi-Host Client
 
 Use `MultiHostClient` when one app talks to more than one AHP host, or when you want the same supervisor model for a single host. It owns per-host transport creation, reconnect backoff, stable `clientId` lookup, event fan-in, session-summary caches, generation-checked client handles, and deterministic aggregated views.

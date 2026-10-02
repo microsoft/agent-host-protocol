@@ -1,0 +1,30 @@
+{
+  "name": "subscribe-create-tcp-connection",
+  "group": "A",
+  "description": "Atomic TCP creation preserves its typed parameters, literal discriminator, zero delivery latency and unsigned 32-bit receive limits.",
+  "type": "SubscribeParams",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "delivery": { "maxLatencyMs": 0 },
+    "create": {
+      "type": "tcpConnection",
+      "host": "::1",
+      "port": 65535,
+      "encoding": "base64",
+      "receiveWindowBytes": 4294967295,
+      "maximumChunkSize": 32768
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/s1",
+    "delivery": { "maxLatencyMs": 0 },
+    "create": {
+      "type": "tcpConnection",
+      "host": "::1",
+      "port": 65535,
+      "encoding": "base64",
+      "receiveWindowBytes": 4294967295,
+      "maximumChunkSize": 32768
+    }
+  }]
+}

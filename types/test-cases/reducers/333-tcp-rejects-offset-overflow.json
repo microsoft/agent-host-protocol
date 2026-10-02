@@ -1,0 +1,56 @@
+{
+  "description": "TCP: rejects offset overflow",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 9007199254740991,
+      "consumedBytes": 9007199254740991
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/input",
+      "offset": 9007199254740991,
+      "data": "AA=="
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 9007199254740991,
+      "consumedBytes": 9007199254740991
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "expectedError": "Invalid TCP action: offset must be a nonnegative safe integer"
+}

@@ -107,6 +107,16 @@ import type {
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
+  TcpInputAction,
+  TcpDataAction,
+  TcpInputConsumedAction,
+  TcpDataConsumedAction,
+  TcpInputEofAction,
+  TcpDataEofAction,
+  TcpClientCloseAction,
+  TcpHostCloseAction,
+  TcpClientResetAction,
+  TcpHostResetAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -431,6 +441,38 @@ export type ServerAutomationRunAction =
   | AutomationRunPrimarySessionChangedAction
 ;
 
+/** Union of all TCP-scoped actions. */
+export type TcpAction =
+  | TcpInputAction
+  | TcpDataAction
+  | TcpInputConsumedAction
+  | TcpDataConsumedAction
+  | TcpInputEofAction
+  | TcpDataEofAction
+  | TcpClientCloseAction
+  | TcpHostCloseAction
+  | TcpClientResetAction
+  | TcpHostResetAction
+;
+
+/** Union of TCP actions that clients may dispatch. */
+export type ClientTcpAction =
+  | TcpInputAction
+  | TcpDataConsumedAction
+  | TcpInputEofAction
+  | TcpClientCloseAction
+  | TcpClientResetAction
+;
+
+/** Union of TCP actions that only the server may produce. */
+export type ServerTcpAction =
+  | TcpDataAction
+  | TcpInputConsumedAction
+  | TcpDataEofAction
+  | TcpHostCloseAction
+  | TcpHostResetAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -542,4 +584,14 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.AutomationRunSessionRemoved]: false,
   [ActionType.AutomationRunPrimarySessionChanged]: false,
   [ActionType.AutomationRunCancelRequested]: true,
+  [ActionType.TcpInput]: true,
+  [ActionType.TcpData]: false,
+  [ActionType.TcpInputConsumed]: false,
+  [ActionType.TcpDataConsumed]: true,
+  [ActionType.TcpInputEof]: true,
+  [ActionType.TcpDataEof]: false,
+  [ActionType.TcpClientClose]: true,
+  [ActionType.TcpHostClose]: false,
+  [ActionType.TcpClientReset]: true,
+  [ActionType.TcpHostReset]: false,
 };

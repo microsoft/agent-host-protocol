@@ -749,6 +749,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'TcpDataEncoding', 'TcpEndpoint', 'TcpResetReason', 'TcpConnectionOpenFailureReason',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
@@ -901,6 +902,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'ChangesetOperation', mutable: true },
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
+  { name: 'TcpConnectionState' }, { name: 'TcpTarget' }, { name: 'TcpResetState' },
+  { name: 'FlowControlledByteDirectionState' }, { name: 'TcpConnectionsCapability' },
+  { name: 'TcpConnectionOpenErrorData' },
   { name: 'ResourceChange' },
   { name: 'AnnotationsSummary' },
   { name: 'AnnotationsState' },
@@ -1419,14 +1423,18 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
 function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+/// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+/// automation-run, or TCP state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (tcp → automationRun → automations → session → chat → terminal → changeset →
+/// resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Private TCP channel state variant, when populated.</summary>
+    public TcpConnectionState? Tcp { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -1463,7 +1471,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("input", out _) &&
+            root.TryGetProperty("output", out _) &&
+            root.TryGetProperty("target", out _))
+        {
+            result.Tcp = root.Deserialize(AhpJsonTypeInfo.Get<TcpConnectionState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1509,6 +1523,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Tcp is not null) { JsonSerializer.Serialize(writer, value.Tcp, AhpJsonTypeInfo.Get<TcpConnectionState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -1695,6 +1710,16 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'tcp/input', variantName: 'TcpInput', tsInterface: 'TcpInputAction' },
+  { type: 'tcp/data', variantName: 'TcpData', tsInterface: 'TcpDataAction' },
+  { type: 'tcp/inputConsumed', variantName: 'TcpInputConsumed', tsInterface: 'TcpInputConsumedAction' },
+  { type: 'tcp/dataConsumed', variantName: 'TcpDataConsumed', tsInterface: 'TcpDataConsumedAction' },
+  { type: 'tcp/inputEof', variantName: 'TcpInputEof', tsInterface: 'TcpInputEofAction' },
+  { type: 'tcp/dataEof', variantName: 'TcpDataEof', tsInterface: 'TcpDataEofAction' },
+  { type: 'tcp/clientClose', variantName: 'TcpClientClose', tsInterface: 'TcpClientCloseAction' },
+  { type: 'tcp/hostClose', variantName: 'TcpHostClose', tsInterface: 'TcpHostCloseAction' },
+  { type: 'tcp/clientReset', variantName: 'TcpClientReset', tsInterface: 'TcpClientResetAction' },
+  { type: 'tcp/hostReset', variantName: 'TcpHostReset', tsInterface: 'TcpHostResetAction' },
   { type: 'annotations/set', variantName: 'AnnotationsSet', tsInterface: 'AnnotationsSetAction' },
   { type: 'annotations/removed', variantName: 'AnnotationsRemoved', tsInterface: 'AnnotationsRemovedAction' },
   { type: 'annotations/entrySet', variantName: 'AnnotationsEntrySet', tsInterface: 'AnnotationsEntrySetAction' },
@@ -2276,6 +2301,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ReconnectReplayResult' },
   { name: 'ReconnectSnapshotResult' },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
+  { name: 'TcpConnectionSubscription' },
   { name: 'SessionForkSource' }, { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   // ChatSource union variants (upstream #334 renamed ChatForkSource ->

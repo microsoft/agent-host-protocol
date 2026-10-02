@@ -74,6 +74,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-otlp': 'otlp',
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
+  'channels-tcp': 'tcp',
 };
 
 /**
@@ -1117,6 +1118,29 @@ function generateResourceWatchChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateTcpChannelPage(project: Project): string {
+  currentPage = 'tcp';
+  const state = findChannelSourceFile(project, 'channels-tcp', 'state.ts');
+  const actions = findChannelSourceFile(project, 'channels-tcp', 'actions.ts');
+  const commands = findChannelSourceFile(project, 'channels-tcp', 'commands.ts');
+  if (!state || !actions || !commands) throw new Error('Missing TCP channel declarations');
+  return [
+    GENERATED_HEADER,
+    '# TCP Channel\n',
+    stabilityIndex(state),
+    'Private session-scoped TCP connections. See the [TCP channel specification](/specification/tcp-channel).\n',
+    '## State Types\n',
+    schemaLink('state.schema.json'),
+    emitStateTypesSection([state]),
+    '## Actions\n',
+    schemaLink('actions.schema.json'),
+    emitActionsSection([actions]),
+    '## Creation\n',
+    schemaLink('commands.schema.json'),
+    emitStateTypesSection([commands]),
+  ].join('\n');
+}
+
 function generateOtlpChannelPage(project: Project): string {
   currentPage = 'otlp';
   const stateSf = findChannelSourceFile(project, 'channels-otlp', 'state.ts');
@@ -1417,6 +1441,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },
     { filename: 'resource-watch.md', generator: generateResourceWatchChannelPage },
+    { filename: 'tcp.md', generator: generateTcpChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },

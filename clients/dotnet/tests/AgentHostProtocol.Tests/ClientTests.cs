@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AgentHostProtocol;
+using Microsoft.AgentHostProtocol.Hosts;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
@@ -20,21 +21,18 @@ namespace Microsoft.AgentHostProtocol.Tests;
 /// Paired in-memory transport. The two ends share linked channels so frames
 /// flow from one's outbox directly into the other's inbox, exactly as the Go
 /// <c>memTransport</c> helper works.
+/// Graceful close rejects new sends but delivers accepted frames before closed.
 /// </summary>
 internal sealed class MemTransport : ITransport
 {
     private readonly Channel<TransportMessage> _inbox;
     private readonly Channel<TransportMessage> _outbox;
-    private readonly CancellationTokenSource _closeCts;
-
     private MemTransport(
         Channel<TransportMessage> inbox,
-        Channel<TransportMessage> outbox,
-        CancellationTokenSource closeCts)
+        Channel<TransportMessage> outbox)
     {
         _inbox = inbox;
         _outbox = outbox;
-        _closeCts = closeCts;
     }
 
     /// <summary>Creates a linked pair. Frames sent to A appear on B's inbox and vice versa.</summary>
@@ -42,29 +40,25 @@ internal sealed class MemTransport : ITransport
     {
         var a2b = Channel.CreateBounded<TransportMessage>(new BoundedChannelOptions(16) { FullMode = BoundedChannelFullMode.Wait });
         var b2a = Channel.CreateBounded<TransportMessage>(new BoundedChannelOptions(16) { FullMode = BoundedChannelFullMode.Wait });
-        var cts = new CancellationTokenSource(); // shared — closing either side closes both.
-        return (new MemTransport(b2a, a2b, cts), new MemTransport(a2b, b2a, cts));
+        return (new MemTransport(b2a, a2b), new MemTransport(a2b, b2a));
     }
 
     public async ValueTask SendAsync(TransportMessage message, CancellationToken cancellationToken = default)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closeCts.Token);
-        try { await _outbox.Writer.WriteAsync(message, linked.Token).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (_closeCts.IsCancellationRequested)
+        try { await _outbox.Writer.WriteAsync(message, cancellationToken).ConfigureAwait(false); }
+        catch (ChannelClosedException)
         { throw new AhpTransportException("closed"); }
     }
 
     public async ValueTask<TransportMessage> ReceiveAsync(CancellationToken cancellationToken = default)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closeCts.Token);
-        try { return await _inbox.Reader.ReadAsync(linked.Token).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (_closeCts.IsCancellationRequested)
+        try { return await _inbox.Reader.ReadAsync(cancellationToken).ConfigureAwait(false); }
+        catch (ChannelClosedException)
         { throw new AhpTransportException("closed"); }
     }
 
     public ValueTask CloseAsync(CancellationToken cancellationToken = default)
     {
-        _closeCts.Cancel();
         _outbox.Writer.TryComplete();
         _inbox.Writer.TryComplete();
         return ValueTask.CompletedTask;
@@ -109,7 +103,1393 @@ public sealed class ClientTests
 {
     private static readonly SystemTextJsonAhpSerializer Ser = SystemTextJsonAhpSerializer.Default;
 
+    private static TcpConnectionSubscription TcpCreation() => new()
+    {
+        Type = "tcpConnection",
+        Host = "localhost",
+        Port = 3000,
+        Encoding = TcpDataEncoding.Base64,
+        ReceiveWindowBytes = 4,
+        MaximumChunkSize = 2,
+    };
+
+    private static Snapshot TcpSnapshot(string resource = "ahp-tcp:/created") => new()
+    {
+        Resource = resource,
+        FromSeq = 0,
+        State = new SnapshotState
+        {
+            Tcp = new TcpConnectionState
+            {
+                Session = "ahp-session:/s1",
+                Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                Encoding = TcpDataEncoding.Base64,
+                Input = new FlowControlledByteDirectionState { WindowBytes = 4, MaximumChunkSize = 2 },
+                Output = new FlowControlledByteDirectionState { WindowBytes = 4, MaximumChunkSize = 2 },
+            },
+        },
+    };
+
+    private static async Task<(MultiHostClient Multi, ChannelReader<MemTransport> Servers, MemTransport Server, TcpConnection Connection)>
+        OpenTcpHost(CancellationToken token, bool autoReconnect = false)
+    {
+        var servers = Channel.CreateUnbounded<MemTransport>();
+        var multi = new MultiHostClient();
+        var add = multi.AddHostAsync(new HostConfig
+        {
+            Id = new HostId("tcp"),
+            ClientId = "owner",
+            ReconnectPolicy = autoReconnect
+                ? new ReconnectPolicy { InitialBackoff = TimeSpan.FromMilliseconds(1), MaxBackoff = TimeSpan.FromMilliseconds(10) }
+                : ReconnectPolicy.Disabled,
+            TransportFactory = (_, _) =>
+            {
+                var (side, server) = MemTransport.CreatePair();
+                servers.Writer.TryWrite(server);
+                return Task.FromResult<ITransport>(side);
+            },
+        }, token);
+        var initial = await servers.Reader.ReadAsync(token);
+        await TcpResponse(initial, await TcpRequest(initial, "initialize", token), new InitializeResult
+        {
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
+            TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
+        }, token);
+        await TcpHostSessions(initial, token);
+        await add;
+        var open = multi.ClientFor(new HostId("tcp"))!.OpenTcpConnectionAsync("ahp-session:/s1", TcpCreation(), token);
+        await TcpResponse(initial, await TcpRequest(initial, "subscribe", token), new SubscribeResult { Snapshot = TcpSnapshot() }, token);
+        return (multi, servers.Reader, initial, await open);
+    }
+
+    private static async Task TcpHostSessions(MemTransport server, CancellationToken token)
+        => await TcpResponse(server, await TcpRequest(server, "listSessions", token), new ListSessionsResult { Items = new() }, token);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpHostReconnectRetainsStreamCreditPayloadAndGlobalSequence(bool spontaneous)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var token = timeout.Token;
+        var (multi, servers, oldServer, connection) = await OpenTcpHost(token, spontaneous);
+        await using var cleanup = multi;
+        var id = new HostId("tcp");
+        var handle = multi.ClientFor(id)!;
+        var write = connection.WriteAsync(new byte[] { 1, 2, 3, 4, 5, 6 }, token);
+        var first = await TcpDispatch(oldServer, token);
+        var second = await TcpDispatch(oldServer, token);
+        await TcpPush(oldServer, 1, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
+        await TcpPush(oldServer, 2, first.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = first.ClientSeq });
+        await handle.DispatchAsync(new StateAction(new SessionTitleChangedAction { Type = ActionType.SessionTitleChanged, Title = "ordinary" }),
+            "ahp-session:/s1", 1000, token);
+        Assert.Equal(1000, (await TcpDispatch(oldServer, token)).ClientSeq);
+        while (connection.AppliedCheckpoint != 2) await Task.Delay(1, token);
+        Assert.False(write.IsCompleted);
+        await FakeHost.SendNotificationAsync(oldServer, "action", new ActionEnvelope
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ServerSeq = 50,
+            Action = new StateAction(new RootActiveSessionsChangedAction { Type = ActionType.RootActiveSessionsChanged, ActiveSessions = 1 }),
+        }, token);
+        while (multi.Host(id)!.ServerSeq != 50) await Task.Delay(1, token);
+
+        if (spontaneous) await oldServer.CloseAsync(token);
+        else await multi.ReconnectAsync(id, token);
+        var server = await servers.ReadAsync(token);
+        var request = await TcpRequest(server, "reconnect", token);
+        var parameters = Ser.Deserialize<ReconnectParams>(request.Params!.Value);
+        Assert.Equal("owner", parameters.ClientId);
+        Assert.Equal(2, parameters.LastSeenServerSeq);
+        Assert.Contains(connection.Resource, parameters.Subscriptions);
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
+            {
+                new ActionEnvelope { Channel = connection.Resource, ServerSeq = 3,
+                    Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }) },
+                new ActionEnvelope { Channel = connection.Resource, ServerSeq = 4,
+                    Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }) },
+                new ActionEnvelope { Channel = ProtocolVersion.RootResourceUri, ServerSeq = 5,
+                    Action = new StateAction(new RootActiveSessionsChangedAction { Type = ActionType.RootActiveSessionsChanged, ActiveSessions = 999 }) },
+            },
+        }), token);
+        var resent = await TcpDispatch(server, token);
+        Assert.Equal(second.ClientSeq, resent.ClientSeq);
+        Assert.Equal(second.Action.Value, resent.Action.Value);
+        DispatchActionParams? tail = null;
+        bool sessions = false;
+        while (tail is null || !sessions)
+        {
+            var frame = Ser.DecodeMessage(await server.ReceiveAsync(token));
+            if (frame.Request is { } list)
+            {
+                Assert.Equal("listSessions", list.Method);
+                await TcpResponse(server, list, new ListSessionsResult { Items = new() }, token);
+                sessions = true;
+            }
+            else
+            {
+                tail = Ser.Deserialize<DispatchActionParams>(Assert.IsType<JsonRpcNotification>(frame.Notification).Params!.Value);
+            }
+        }
+        Assert.Equal(4, Assert.IsType<TcpInputAction>(tail.Action.Value).Offset);
+        Assert.True(tail.ClientSeq > 1000);
+        await write.WaitAsync(token);
+        while (multi.Host(id)!.Generation == handle.Generation) await Task.Delay(1, token);
+        Assert.Equal(1, multi.Host(id)!.ActiveSessions);
+        Assert.Throws<HostNotConnectedException>(() => handle.CheckAliveOrThrow());
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        Assert.IsType<TcpDataConsumedAction>((await TcpDispatch(server, token)).Action.Value);
+
+        var fresh = multi.ClientFor(id)!;
+        var open = fresh.OpenTcpConnectionAsync("ahp-session:/s1", TcpCreation(), token);
+        await TcpResponse(server, await TcpRequest(server, "subscribe", token), new SubscribeResult { Snapshot = TcpSnapshot("ahp-tcp:/second") }, token);
+        var additional = await open;
+        await additional.DisposeAsync();
+        await TcpUnsubscribe(server, additional.Resource, token);
+        var read = connection.ReadAsync(token);
+        Assert.False(read.IsCompleted); // replayed duplicate data was not enqueued twice
+        var remove = multi.RemoveHostAsync(id, token);
+        await remove;
+        await TcpUnsubscribe(server, connection.Resource, token);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => read);
+    }
+
+    [Theory]
+    [InlineData("snapshot")]
+    [InlineData("missing")]
+    [InlineData("initialize")]
+    public async Task TcpHostReconnectFallbackFailsStreamsClosed(string mode)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var token = timeout.Token;
+        var (multi, servers, _, connection) = await OpenTcpHost(token);
+        await using var cleanup = multi;
+        var id = new HostId("tcp");
+        var generation = multi.Host(id)!.Generation;
+        var read = connection.ReadAsync(token);
+        await multi.ReconnectAsync(id, token);
+        var server = await servers.ReadAsync(token);
+        var request = await TcpRequest(server, "reconnect", token);
+        if (mode == "initialize")
+        {
+            await server.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
+            {
+                ErrorResponse = new JsonRpcErrorResponse
+                {
+                    Id = request.Id,
+                    Error = new JsonRpcErrorObject { Code = -32601, Message = "reconnect unavailable" },
+                },
+            }), token);
+        }
+        else
+        {
+            var result = mode == "snapshot"
+                ? new ReconnectResult(new ReconnectSnapshotResult { Type = ReconnectResultType.Snapshot, Snapshots = new() { TcpSnapshot() } })
+                : new ReconnectResult(new ReconnectReplayResult { Type = ReconnectResultType.Replay, Actions = new(), Missing = new() { connection.Resource } });
+            await TcpResponse(server, request, result, token);
+        }
+        await TcpUnsubscribe(server, connection.Resource, token);
+        if (mode == "initialize")
+        {
+            var initialize = await TcpRequest(server, "initialize", token);
+            var parameters = Ser.Deserialize<InitializeParams>(initialize.Params!.Value);
+            Assert.NotNull(parameters.InitialSubscriptions);
+            Assert.DoesNotContain(connection.Resource, parameters.InitialSubscriptions);
+            await TcpResponse(server, initialize, new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() }, token);
+        }
+        await TcpHostSessions(server, token);
+        while (multi.Host(id)!.Generation == generation) await Task.Delay(1, token);
+        await Assert.ThrowsAnyAsync<Exception>(() => read);
+        await connection.DisposeAsync();
+        await multi.ShutdownAsync(token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpHostShutdownTerminatesBlockedOperationsAndPendingCreation(bool disconnected)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var token = timeout.Token;
+        var (multi, _, server, connection) = await OpenTcpHost(token);
+        await using var cleanup = multi;
+        var write = connection.WriteAsync(new byte[6], token);
+        _ = await TcpDispatch(server, token);
+        _ = await TcpDispatch(server, token);
+        var read = connection.ReadAsync(token);
+        var drain = connection.DrainAsync(token);
+        Task<TcpConnection>? creation = null;
+        if (disconnected)
+        {
+            await server.CloseAsync(token);
+            while (!connection.IsSuspended) await Task.Delay(1, token);
+        }
+        else
+        {
+            creation = multi.ClientFor(new HostId("tcp"))!.OpenTcpConnectionAsync("ahp-session:/s1", TcpCreation(), token);
+            _ = await TcpRequest(server, "subscribe", token);
+        }
+        Assert.False(write.IsCompleted);
+        Assert.False(read.IsCompleted);
+        Assert.False(drain.IsCompleted);
+        var shutdown = multi.ShutdownAsync(token);
+        if (!disconnected) await TcpUnsubscribe(server, connection.Resource, token);
+        await shutdown.WaitAsync(token);
+        if (creation is not null) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => creation);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => read);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => write);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => drain);
+    }
+
+    [Fact]
+    public async Task TcpHostShutdownDuringReconnectTerminatesRetainedStream()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (multi, servers, oldServer, connection) = await OpenTcpHost(token, autoReconnect: true);
+        await using var cleanup = multi;
+        var read = connection.ReadAsync(token);
+        await oldServer.CloseAsync(token);
+        var server = await servers.ReadAsync(token);
+        _ = await TcpRequest(server, "reconnect", token);
+        await multi.ShutdownAsync(token).WaitAsync(TimeSpan.FromSeconds(2), token);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => read);
+    }
+
+    private static async Task<JsonRpcRequest> TcpRequest(MemTransport server, string method, CancellationToken token)
+    {
+        var request = Assert.IsType<JsonRpcRequest>(Ser.DecodeMessage(await server.ReceiveAsync(token)).Request);
+        Assert.Equal(method, request.Method);
+        if (method == "subscribe" && request.Params!.Value.TryGetProperty("create", out var create))
+            Assert.Equal("tcpConnection", create.GetProperty("type").GetString());
+        return request;
+    }
+
+    private static async Task TcpResponse<T>(MemTransport server, JsonRpcRequest request, T result, CancellationToken token)
+        => await server.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
+        {
+            SuccessResponse = new JsonRpcSuccessResponse { Id = request.Id, Result = Ser.SerializeToElement(result) },
+        }), token);
+
+    private static async Task<DispatchActionParams> TcpDispatch(MemTransport server, CancellationToken token)
+    {
+        var notification = Assert.IsType<JsonRpcNotification>(Ser.DecodeMessage(await server.ReceiveAsync(token)).Notification);
+        Assert.Equal("dispatchAction", notification.Method);
+        return Ser.Deserialize<DispatchActionParams>(notification.Params!.Value);
+    }
+
+    private static async Task TcpUnsubscribe(MemTransport server, string resource, CancellationToken token)
+    {
+        var notification = Assert.IsType<JsonRpcNotification>(Ser.DecodeMessage(await server.ReceiveAsync(token)).Notification);
+        Assert.Equal("unsubscribe", notification.Method);
+        Assert.Equal(resource, notification.Params!.Value.GetProperty("channel").GetString());
+    }
+
+    private static async Task TcpPush(MemTransport server, long sequence, StateAction action, CancellationToken token, ActionOrigin? origin = null, string? rejectionReason = null, string channel = "ahp-tcp:/created")
+        => await server.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
+        {
+            Notification = new JsonRpcNotification
+            {
+                Method = "action",
+                Params = Ser.SerializeToElement(new ActionEnvelope
+                {
+                    Channel = channel,
+                    ServerSeq = sequence,
+                    Action = action,
+                    Origin = origin,
+                    RejectionReason = rejectionReason,
+                })
+            },
+        }), token);
+
+    private static async Task TcpUnrelatedBurst(AhpClient client, MemTransport server, long firstSequence, CancellationToken token)
+    {
+        using var barrier = client.AttachSubscription("ahp-session:/barrier");
+        for (int i = 0; i < 16; i++)
+        {
+            await TcpPush(server, firstSequence + i * 2, new StateAction(new SessionTitleChangedAction
+            { Type = ActionType.SessionTitleChanged, Title = "busy" }), token, channel: "ahp-session:/other");
+            await TcpPush(server, firstSequence + i * 2 + 1, new StateAction(new TcpDataAction
+            { Type = ActionType.TcpData, Offset = i, Data = "AA==" }), token, channel: "ahp-tcp:/other");
+        }
+        await TcpPush(server, firstSequence + 32, new StateAction(new SessionTitleChangedAction
+        { Type = ActionType.SessionTitleChanged, Title = "barrier" }), token, channel: barrier.Uri);
+        await barrier.Events.ReadAsync(token);
+    }
+
+    [Fact]
+    public async Task TcpScopedCreationAndActiveTraffic()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side, new ClientConfig { SubscriptionBufferCapacity = 2 });
+        var initialize = client.InitializeAsync("owner", cancellationToken: token);
+        await TcpResponse(server, await TcpRequest(server, "initialize", token), new InitializeResult
+        {
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
+            TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
+        }, token);
+        await initialize;
+        var opening = client.OpenTcpConnectionAsync("ahp-session:/s1", TcpCreation(), token);
+        var request = await TcpRequest(server, "subscribe", token);
+        await TcpUnrelatedBurst(client, server, 1, token);
+        await TcpResponse(server, request, new SubscribeResult { Snapshot = TcpSnapshot() with { FromSeq = 33 } }, token);
+        await TcpPush(server, 34, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bw==" }), token);
+        var connection = await opening.WaitAsync(token);
+        await TcpUnrelatedBurst(client, server, 35, token);
+        Assert.Equal(new byte[] { 7 }, await connection.ReadAsync(token));
+        Assert.IsType<TcpDataConsumedAction>((await TcpDispatch(server, token)).Action.Value);
+        await TcpPush(server, 68, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 1, Data = "CA==" }), token);
+        Assert.Equal(new byte[] { 8 }, await connection.ReadAsync(token));
+        Assert.IsType<TcpDataConsumedAction>((await TcpDispatch(server, token)).Action.Value);
+        await CloseTcp(connection, server, token);
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpScopedReconnectIsolatesTrafficAndReportsOwnedOverflow(bool overflow)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var old = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(old, oldServer, token);
+        await old.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        var (side, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(side, new ClientConfig { SubscriptionBufferCapacity = 2 });
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 0,
+            Subscriptions = new(),
+        }, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        await TcpUnrelatedBurst(fresh, server, 2, token);
+        if (overflow)
+        {
+            for (int i = 0; i < 3; i++)
+                await TcpPush(server, 35 + i, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = i, Data = "AA==" }), token);
+            await TcpUnrelatedBurst(fresh, server, 38, token);
+        }
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = overflow ? new() : new()
+            {
+                new ActionEnvelope { Channel = connection.Resource, ServerSeq = 1,
+                    Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bw==" }) },
+            },
+        }), token);
+        if (!overflow)
+            await TcpPush(server, 35, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 1, Data = "CA==" }), token);
+        await reconnect.WaitAsync(token);
+        if (overflow)
+        {
+            Assert.IsType<TcpClientResetAction>((await TcpDispatch(server, token)).Action.Value);
+            await TcpUnsubscribe(server, connection.Resource, token);
+            await Assert.ThrowsAsync<SubscriptionLagException>(() => connection.ReadAsync(token));
+        }
+        else
+        {
+            await TcpUnrelatedBurst(fresh, server, 36, token);
+            Assert.Equal(new byte[] { 7 }, await connection.ReadAsync(token));
+            Assert.Equal(new byte[] { 8 }, await connection.ReadAsync(token));
+            _ = await TcpDispatch(server, token);
+            _ = await TcpDispatch(server, token);
+            await CloseTcp(connection, server, token);
+        }
+        Assert.Equal(0, fresh.EventListenerCount);
+    }
+
+    private static async Task<TcpConnection> OpenTcp(AhpClient client, MemTransport server, CancellationToken token, bool firstAction = false, bool invalidSnapshot = false, int maximumChunkSize = 2)
+    {
+        var initialize = client.InitializeAsync("owner", cancellationToken: token);
+        await TcpResponse(server, await TcpRequest(server, "initialize", token), new InitializeResult
+        {
+            ProtocolVersion = ProtocolVersion.Current,
+            Snapshots = new(),
+            TcpConnections = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } },
+        }, token);
+        await initialize;
+        var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
+        {
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = Math.Max(4, maximumChunkSize),
+            MaximumChunkSize = maximumChunkSize,
+        }, token);
+        var direction = new FlowControlledByteDirectionState { WindowBytes = Math.Max(4, maximumChunkSize), MaximumChunkSize = maximumChunkSize, ReceivedBytes = invalidSnapshot ? 1 : 0 };
+        await TcpResponse(server, await TcpRequest(server, "subscribe", token), new SubscribeResult
+        {
+            Snapshot = new Snapshot
+            {
+                Resource = "ahp-tcp:/created",
+                FromSeq = 0,
+                State = new SnapshotState
+                {
+                    Tcp = new TcpConnectionState
+                    {
+                        Session = "ahp-session:/s1",
+                        Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                        Encoding = TcpDataEncoding.Base64,
+                        Input = direction,
+                        Output = direction,
+                    },
+                }
+            },
+        }, token);
+        if (firstAction)
+            await TcpPush(server, 1, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
+        return await open;
+    }
+
+    private static async Task CloseTcp(TcpConnection connection, MemTransport server, CancellationToken token)
+    {
+        var close = connection.CloseAsync();
+        Assert.IsType<TcpClientCloseAction>((await TcpDispatch(server, token)).Action.Value);
+        await close;
+        await connection.DisposeAsync();
+        await TcpUnsubscribe(server, connection.Resource, token);
+    }
+
+    [Fact]
+    public void TcpCreationRequiresCanonicalDiscriminator()
+    {
+        var create = TcpCreation() with { Type = "tcpConnection" };
+        var capability = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } };
+        TcpProtocol.ValidateRequest("ahp-session:/s1", create, capability);
+        Assert.Equal("tcpConnection", Ser.SerializeToElement(new SubscribeParams
+        {
+            Channel = "ahp-session:/s1",
+            Create = create,
+        }).GetProperty("create").GetProperty("type").GetString());
+        Assert.Throws<InvalidOperationException>(() =>
+            TcpProtocol.ValidateRequest("ahp-session:/s1", create with { Type = "tcp" }, capability));
+    }
+
+    [Theory]
+    [InlineData(1L)]
+    [InlineData(4294967295L)]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(4294967296L)]
+    [InlineData(9007199254740991L)]
+    public void TcpCreationAndSnapshotLimitsUseUInt32Range(long limit)
+    {
+        var capability = new TcpConnectionsCapability { Encodings = new() { TcpDataEncoding.Base64 } };
+        var valid = limit >= 1 && limit <= 4294967295L;
+        foreach (bool chunk in new[] { false, true })
+        {
+            var create = TcpCreation() with { ReceiveWindowBytes = limit, MaximumChunkSize = chunk ? limit : 1 };
+            if (valid) TcpProtocol.ValidateRequest("ahp-session:/s1", create, capability);
+            else Assert.Throws<InvalidOperationException>(() => TcpProtocol.ValidateRequest("ahp-session:/s1", create, capability));
+            var request = TcpCreation() with { ReceiveWindowBytes = 4294967295L, MaximumChunkSize = 4294967295L };
+            foreach (bool input in new[] { false, true })
+            {
+                var snapshot = TcpSnapshot();
+                var direction = new FlowControlledByteDirectionState { WindowBytes = limit, MaximumChunkSize = chunk ? limit : 1 };
+                var state = snapshot.State.Tcp!;
+                snapshot = snapshot with { State = new SnapshotState { Tcp = input ? state with { Input = direction } : state with { Output = direction } } };
+                if (valid) TcpProtocol.ValidateSnapshot("ahp-session:/s1", request, snapshot);
+                else Assert.Throws<InvalidOperationException>(() => TcpProtocol.ValidateSnapshot("ahp-session:/s1", request, snapshot));
+            }
+        }
+    }
+
+    [Fact]
+    public async Task TcpSingleClientReconnectFiltersReturnedReplayAtCallerCheckpoint()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var old = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(old, oldServer, token);
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 10,
+            Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 0 })
+        });
+        await old.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        var (side, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(side);
+        var parameters = new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 100,
+            Subscriptions = new() { "ahp-session:/s1" },
+        };
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(parameters, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        Assert.Equal(10, Ser.Deserialize<ReconnectParams>(request.Params!.Value).LastSeenServerSeq);
+        var actions = new System.Collections.Generic.List<ActionEnvelope>();
+        for (long sequence = 11; sequence <= 101; sequence++)
+            actions.Add(new ActionEnvelope
+            {
+                Channel = sequence == 50 ? connection.Resource : "ahp-session:/s1",
+                ServerSeq = sequence,
+                Action = sequence == 50
+                    ? new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" })
+                    : new StateAction(new SessionTitleChangedAction { Type = ActionType.SessionTitleChanged, Title = $"title-{sequence}" })
+            });
+        actions.Add(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 102,
+            Action = new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 })
+        });
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Actions = actions,
+            Missing = new() { "ahp-session:/missing" },
+        }), token);
+        var returned = Assert.IsType<ReconnectReplayResult>((await reconnect.WaitAsync(token)).Value);
+        Assert.Equal(100, parameters.LastSeenServerSeq);
+        Assert.Equal(102, connection.AppliedCheckpoint);
+        Assert.Equal(2, connection.State.Output.ReceivedBytes);
+        Assert.Equal(2, connection.State.Output.EofAtBytes);
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        Assert.IsType<TcpDataConsumedAction>((await TcpDispatch(server, token)).Action.Value);
+        Assert.Equal(new long[] { 101, 102 }, returned.Actions.ConvertAll(action => action.ServerSeq));
+        Assert.Equal(new[] { "ahp-session:/missing" }, returned.Missing);
+        await connection.DisposeAsync();
+        await TcpUnsubscribe(server, connection.Resource, token);
+    }
+
+    [Fact]
+    public async Task TcpPeerCloseRespondsWithoutWaitingForCreditOrUnreadOutput()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        var write = connection.WriteAsync(new byte[5], token);
+        var first = await TcpDispatch(server, token);
+        var second = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        await TcpPush(server, 1, first.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = first.ClientSeq });
+        await TcpPush(server, 2, second.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = second.ClientSeq });
+        await TcpPush(server, 3, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
+        await TcpPush(server, 4, new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose }), token);
+        var close = await TcpDispatch(server, token);
+        Assert.IsType<TcpClientCloseAction>(close.Action.Value);
+        Assert.False(drain.IsCompleted);
+        Assert.Equal(0, connection.State.Input.ConsumedBytes);
+        Assert.Equal(0, connection.State.Output.ConsumedBytes);
+        Assert.Equal(1, client.EventListenerCount);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => write.WaitAsync(token));
+        await TcpPush(server, 5, close.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = close.ClientSeq });
+        await TcpPush(server, 6, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 4 }), token);
+        await drain.WaitAsync(token);
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        var credit = await TcpDispatch(server, token);
+        Assert.IsType<TcpDataConsumedAction>(credit.Action.Value);
+        await TcpPush(server, 7, credit.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq });
+        await TcpUnsubscribe(server, connection.Resource, token);
+        Assert.Null(await connection.ReadAsync(token));
+    }
+
+    [Fact]
+    public async Task TcpLocalCloseRetainsCrossingTrafficUntilBothDirectionsDrain()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        await connection.WriteAsync(new byte[] { 1, 2 }, token);
+        var input = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        await connection.CloseAsync();
+        var close = await TcpDispatch(server, token);
+        Assert.IsType<TcpClientCloseAction>(close.Action.Value);
+        Assert.False(connection.IsClosed);
+        Assert.Equal(1, client.EventListenerCount);
+        var read = connection.ReadAsync(token);
+        Assert.False(read.IsCompleted);
+        await TcpPush(server, 1, input.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = input.ClientSeq });
+        await TcpPush(server, 2, close.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = close.ClientSeq });
+        await TcpPush(server, 3, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
+        Assert.Equal(new byte[] { 7, 8 }, await read.WaitAsync(token));
+        var credit = await TcpDispatch(server, token);
+        Assert.Equal(2, Assert.IsType<TcpDataConsumedAction>(credit.Action.Value).ConsumedBytes);
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 4,
+            Action = new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose })
+        });
+        Assert.False(connection.IsClosed);
+        Assert.False(drain.IsCompleted);
+        Assert.Equal(1, client.EventListenerCount);
+        await connection.AcceptAsync(new ActionEnvelope
+        {
+            Channel = connection.Resource,
+            ServerSeq = 5,
+            Action = credit.Action,
+            Origin = new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq }
+        });
+        Assert.False(connection.IsClosed);
+        await TcpPush(server, 6, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }), token);
+        await TcpUnsubscribe(server, connection.Resource, token);
+        await drain.WaitAsync(token);
+        Assert.Null(await connection.ReadAsync(token));
+        Assert.True(connection.IsClosed);
+        Assert.Equal(0, client.EventListenerCount);
+        await connection.CloseAsync();
+        await connection.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task TcpAdapterRejectsStaleCreationAndDetachesCancelledSetup()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => OpenTcp(client, server, token, invalidSnapshot: true));
+        await TcpUnsubscribe(server, "ahp-tcp:/created", token);
+        Assert.Equal(0, client.EventListenerCount);
+        using var cancellation = new CancellationTokenSource();
+        var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
+        {
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = 4,
+            MaximumChunkSize = 2,
+        }, cancellation.Token);
+        _ = await TcpRequest(server, "subscribe", token);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => open);
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpResetOrDisposeTerminatesClosingStream(bool reset)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        var write = connection.WriteAsync(new byte[5], token);
+        _ = await TcpDispatch(server, token);
+        _ = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        await connection.CloseAsync();
+        _ = await TcpDispatch(server, token);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => write.WaitAsync(token));
+        Assert.False(drain.IsCompleted);
+        if (reset)
+        {
+            await connection.AcceptAsync(new ActionEnvelope
+            {
+                Channel = connection.Resource,
+                ServerSeq = 1,
+                Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" })
+            });
+            await TcpPush(server, 2, new StateAction(new TcpHostResetAction { Type = ActionType.TcpHostReset, Reason = TcpResetReason.ProtocolError }), token);
+            await TcpUnsubscribe(server, connection.Resource, token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => connection.ReadAsync(token));
+        }
+        else
+        {
+            var read = connection.ReadAsync(token);
+            Assert.False(read.IsCompleted);
+            await connection.DisposeAsync();
+            await TcpUnsubscribe(server, connection.Resource, token);
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => read);
+        }
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => drain.WaitAsync(token));
+        Assert.Equal(0, client.EventListenerCount);
+        await connection.DisposeAsync();
+        await connection.CloseAsync();
+    }
+
+    [Fact]
+    public async Task TcpCloseWhileSuspendedReplaysAndDrainsBeforeRelease()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var old = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(old, oldServer, token);
+        await old.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        await connection.CloseAsync();
+        Assert.False(connection.IsClosed);
+        var read = connection.ReadAsync(token);
+        Assert.False(read.IsCompleted);
+        var (side, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(side);
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 0,
+            Subscriptions = new(),
+        }, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        Assert.Contains(connection.Resource, Ser.Deserialize<ReconnectParams>(request.Params!.Value).Subscriptions);
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
+            {
+                new() { Channel = connection.Resource, ServerSeq = 1, Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }) },
+                new() { Channel = connection.Resource, ServerSeq = 2, Action = new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose }) },
+            },
+        }), token);
+        await reconnect.WaitAsync(token);
+        var close = await TcpDispatch(server, token);
+        Assert.IsType<TcpClientCloseAction>(close.Action.Value);
+        Assert.Equal(new byte[] { 7, 8 }, await read.WaitAsync(token));
+        var credit = await TcpDispatch(server, token);
+        Assert.IsType<TcpDataConsumedAction>(credit.Action.Value);
+        Assert.Equal(1, fresh.EventListenerCount);
+        await TcpPush(server, 3, close.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = close.ClientSeq });
+        await TcpPush(server, 4, credit.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq });
+        await TcpUnsubscribe(server, connection.Resource, token);
+        Assert.Null(await connection.ReadAsync(token));
+        Assert.Equal(0, fresh.EventListenerCount);
+    }
+
+    [Theory]
+    [InlineData(false, "ahp-tcp:/late")]
+    [InlineData(true, "ahp-tcp:/late")]
+    [InlineData(true, "ahp-session:/s1")]
+    public async Task TcpAdapterReleasesLateCreationWithoutUnsubscribingParent(bool cancel, string resource)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var clock = new FakeTimeProvider();
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side, new ClientConfig { TimeProvider = clock, DefaultRequestTimeout = TimeSpan.FromMinutes(1) });
+        var initial = await OpenTcp(client, server, token);
+        await CloseTcp(initial, server, token);
+        using var cancellation = new CancellationTokenSource();
+        var open = client.OpenTcpConnectionAsync("ahp-session:/s1", new TcpConnectionSubscription
+        {
+            Type = "tcpConnection",
+            Host = "localhost",
+            Port = 3000,
+            Encoding = TcpDataEncoding.Base64,
+            ReceiveWindowBytes = 4,
+            MaximumChunkSize = 2,
+        }, cancellation.Token);
+        var request = await TcpRequest(server, "subscribe", token);
+        if (cancel) cancellation.Cancel();
+        else clock.Advance(TimeSpan.FromMinutes(1));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => open.WaitAsync(token));
+        Assert.Equal(0, client.EventListenerCount);
+        Assert.Equal(0, client.PendingRequestCount);
+        await TcpResponse(server, request, new { snapshot = new { resource } }, token);
+        if (resource.StartsWith("ahp-tcp:", StringComparison.Ordinal)) await TcpUnsubscribe(server, resource, token);
+        using var barrier = client.AttachSubscription("ahp-session:/barrier");
+        await TcpResponse(server, request, new { snapshot = new { resource } }, token);
+        await server.SendAsync(BuildActionNotification("ahp-session:/barrier", 99, "barrier"), token);
+        _ = await barrier.Events.ReadAsync(token);
+        var probe = client.RequestAsync<SubscribeParams, SubscribeResult>("probe", new SubscribeParams { Channel = "ahp-session:/s1" }, token);
+        await TcpResponse(server, await TcpRequest(server, "probe", token), new SubscribeResult(), token);
+        await probe.WaitAsync(token);
+        Assert.Equal(ConnectionState.Connected, client.ConnectionState);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task TcpAdapterResetCloseAndDisposeWakeAllBlockedOperations(int terminal)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        var read = connection.ReadAsync(token);
+        var write = connection.WriteAsync(new byte[5], token);
+        _ = await TcpDispatch(server, token);
+        _ = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        if (terminal == 1)
+            await TcpPush(server, 1, new StateAction(new TcpHostResetAction { Type = ActionType.TcpHostReset, Reason = TcpResetReason.ProtocolError }), token);
+        else if (terminal == 2)
+            await CloseTcp(connection, server, token);
+        else
+            await connection.DisposeAsync();
+        if (terminal != 2) await TcpUnsubscribe(server, connection.Resource, token);
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => read.WaitAsync(token));
+        foreach (var operation in new Task[] { write, drain })
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => operation.WaitAsync(token));
+        await connection.DisposeAsync();
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
+    [Fact]
+    public async Task TcpAdapterReconnectContinuesBlockedWriterAfterReplayCredit()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var oldClient = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(oldClient, oldServer, token);
+        var write = connection.WriteAsync(new byte[6], token);
+        var first = await TcpDispatch(oldServer, token);
+        var second = await TcpDispatch(oldServer, token);
+        await TcpPush(oldServer, 1, first.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = first.ClientSeq });
+        await TcpPush(oldServer, 2, second.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = second.ClientSeq });
+        await TcpPush(oldServer, 3, new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 0 }), token);
+        Assert.Null(await connection.ReadAsync(token));
+        Assert.False(write.IsCompleted);
+        await oldClient.DispatchAsync("ahp-session:/s1",
+            new StateAction(new SessionTitleChangedAction { Type = ActionType.SessionTitleChanged, Title = "ordinary action" }), 100, token);
+        Assert.Equal(100, (await TcpDispatch(oldServer, token)).ClientSeq);
+        await oldClient.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        var (side, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(side);
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            Subscriptions = new(),
+            LastSeenServerSeq = 20,
+        }, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        Assert.Equal(3, Ser.Deserialize<ReconnectParams>(request.Params!.Value).LastSeenServerSeq);
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Missing = new(),
+            Actions = new()
+            {
+                new() { Channel = connection.Resource, ServerSeq = 4, Action = new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }) },
+            },
+        }), token);
+        await reconnect.WaitAsync(token);
+        var tail = await TcpDispatch(server, token);
+        Assert.Equal(4, Assert.IsType<TcpInputAction>(tail.Action.Value).Offset);
+        Assert.True(tail.ClientSeq > 100);
+        await write.WaitAsync(token);
+        await CloseTcp(connection, server, token);
+    }
+
+    [Fact]
+    public async Task TcpAdapterReservesCreditChunksReadsDuplicatesAndHalfCloses()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (clientSide, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(clientSide);
+        var connection = await OpenTcp(client, server, token);
+        var write = connection.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }, token);
+        var first = await TcpDispatch(server, token);
+        var second = await TcpDispatch(server, token);
+        Assert.Equal(2, Convert.FromBase64String(Assert.IsType<TcpInputAction>(first.Action.Value).Data).Length);
+        Assert.Equal(2, Assert.IsType<TcpInputAction>(second.Action.Value).Offset);
+        Assert.False(write.IsCompleted);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => connection.WriteAsync(new byte[] { 9 }, token));
+        await TcpPush(server, 1, first.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = first.ClientSeq });
+        await TcpPush(server, 2, second.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = second.ClientSeq });
+        await TcpPush(server, 3, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 2 }), token);
+        var third = await TcpDispatch(server, token);
+        await write.WaitAsync(token);
+        Assert.Equal(4, Assert.IsType<TcpInputAction>(third.Action.Value).Offset);
+        var drain = connection.DrainAsync(token);
+        Assert.False(drain.IsCompleted);
+        await TcpPush(server, 4, third.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = third.ClientSeq });
+        await TcpPush(server, 5, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = 5 }), token);
+        await drain.WaitAsync(token);
+        var data = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" });
+        await TcpPush(server, 6, data, token);
+        await TcpPush(server, 7, data, token);
+        await TcpPush(server, 8, new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 }), token);
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        Assert.Equal(2, Assert.IsType<TcpDataConsumedAction>((await TcpDispatch(server, token)).Action.Value).ConsumedBytes);
+        Assert.Null(await connection.ReadAsync(token));
+        await connection.EndAsync(token);
+        Assert.Equal(5, Assert.IsType<TcpInputEofAction>((await TcpDispatch(server, token)).Action.Value).FinalOffset);
+        await CloseTcp(connection, server, token);
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
+    [Fact]
+    public async Task TcpAdapterPreservesFirstActionAndStrictLossWakesWaiters()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (clientSide, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(clientSide);
+        var connection = await OpenTcp(client, server, token, firstAction: true);
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        _ = await TcpDispatch(server, token);
+        var read = connection.ReadAsync(token);
+        var write = connection.WriteAsync(new byte[5], token);
+        _ = await TcpDispatch(server, token);
+        _ = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        await server.SendAsync(TransportMessage.FromText("{"), token);
+        await Assert.ThrowsAsync<AhpTransportException>(() => read);
+        await Assert.ThrowsAsync<AhpTransportException>(() => write);
+        await Assert.ThrowsAsync<AhpTransportException>(() => drain);
+        Assert.IsType<TcpClientResetAction>((await TcpDispatch(server, token)).Action.Value);
+        await TcpUnsubscribe(server, connection.Resource, token);
+        await connection.DisposeAsync();
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("owner")]
+    [InlineData("negative")]
+    [InlineData("unsafe")]
+    [InlineData("unassigned")]
+    [InlineData("wrong-pending")]
+    [InlineData("reused")]
+    [InlineData("payload")]
+    [InlineData("eof")]
+    [InlineData("credit")]
+    [InlineData("close")]
+    [InlineData("reset")]
+    [InlineData("rejected-empty")]
+    public async Task TcpAdapterRejectsMalformedClientEchoWithoutAdvancingState(string malformed)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        var read = connection.ReadAsync(token);
+        var write = connection.WriteAsync(new byte[] { 1, 2, 3, 4, 5 }, token);
+        var first = await TcpDispatch(server, token);
+        var second = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        StateAction action = first.Action;
+        ActionOrigin? origin = new() { ClientId = "owner", ClientSeq = first.ClientSeq };
+        switch (malformed)
+        {
+            case "missing": origin = null; break;
+            case "owner": origin = origin with { ClientId = "other" }; break;
+            case "negative": origin = origin with { ClientSeq = -1 }; break;
+            case "unsafe": origin = origin with { ClientSeq = 9007199254740992 }; break;
+            case "unassigned": origin = origin with { ClientSeq = second.ClientSeq + 1 }; break;
+            case "wrong-pending": origin = origin with { ClientSeq = second.ClientSeq }; break;
+            case "reused":
+                await TcpPush(server, 1, first.Action, token, origin);
+                action = second.Action;
+                break;
+            case "payload": action = new StateAction(new TcpInputAction { Type = ActionType.TcpInput, Offset = 0, Data = "AgE=" }); break;
+            case "eof": origin = null; action = new StateAction(new TcpInputEofAction { Type = ActionType.TcpInputEof, FinalOffset = 0 }); break;
+            case "credit": origin = null; action = new StateAction(new TcpDataConsumedAction { Type = ActionType.TcpDataConsumed, ConsumedBytes = 0 }); break;
+            case "close": origin = null; action = new StateAction(new TcpClientCloseAction { Type = ActionType.TcpClientClose }); break;
+            case "reset": origin = null; action = new StateAction(new TcpClientResetAction { Type = ActionType.TcpClientReset, Reason = TcpResetReason.ProtocolError }); break;
+        }
+        await TcpPush(server, 2, action, token, origin, malformed == "rejected-empty" ? "" : null);
+        foreach (var pending in new Task[] { read, write, drain })
+            await Assert.ThrowsAsync<InvalidOperationException>(() => pending.WaitAsync(token));
+        Assert.Equal(malformed == "reused" ? 2 : 0, connection.State.Input.ReceivedBytes);
+        Assert.Equal(0, connection.State.Input.ConsumedBytes);
+        Assert.IsType<TcpClientResetAction>((await TcpDispatch(server, token)).Action.Value);
+        await TcpUnsubscribe(server, connection.Resource, token);
+        Assert.Equal(0, client.EventListenerCount);
+        await connection.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpAdapterReconnectRetainsReadersAndResendsOnlyUnacknowledgedActions(bool acknowledged)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var oldClient = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(oldClient, oldServer, token);
+        await connection.WriteAsync(new byte[] { 1, 2 }, token);
+        var original = await TcpDispatch(oldServer, token);
+        var read = connection.ReadAsync(token);
+        await oldClient.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        var (freshSide, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(freshSide);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fresh.ReconnectTcpConnectionsAsync(
+            new ReconnectParams { Channel = ProtocolVersion.RootResourceUri, ClientId = "other", LastSeenServerSeq = 20, Subscriptions = new() },
+            new[] { connection }, token));
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            LastSeenServerSeq = 20,
+            Subscriptions = new() { "ahp-session:/s1" },
+        }, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        var parameters = Ser.Deserialize<ReconnectParams>(request.Params!.Value);
+        Assert.Equal(0, parameters.LastSeenServerSeq);
+        Assert.Contains(connection.Resource, parameters.Subscriptions);
+        var actions = new System.Collections.Generic.List<ActionEnvelope>
+        {
+            new() { Channel = connection.Resource, ServerSeq = 1, Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }),
+                Origin = new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq } },
+        };
+        if (acknowledged)
+            actions.Add(new ActionEnvelope
+            {
+                Channel = connection.Resource,
+                ServerSeq = 2,
+                Action = original.Action,
+                Origin = new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq }
+            });
+        await TcpResponse(server, request, new ReconnectResult(new ReconnectReplayResult
+        {
+            Type = ReconnectResultType.Replay,
+            Actions = actions,
+            Missing = new(),
+        }), token);
+        await TcpPush(server, 3, original.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = original.ClientSeq });
+        await TcpPush(server, 4, new StateAction(new TcpDataEofAction { Type = ActionType.TcpDataEof, FinalOffset = 2 }), token);
+        await reconnect.WaitAsync(token);
+        Assert.Equal(new byte[] { 7, 8 }, await read.WaitAsync(token));
+        if (!acknowledged)
+        {
+            var resent = await TcpDispatch(server, token);
+            Assert.Equal(original.ClientSeq, resent.ClientSeq);
+            Assert.Equal(original.Action.Value, resent.Action.Value);
+        }
+        var credit = await TcpDispatch(server, token);
+        Assert.IsType<TcpDataConsumedAction>(credit.Action.Value);
+        Assert.True(credit.ClientSeq > original.ClientSeq);
+        Assert.Null(await connection.ReadAsync(token));
+        await CloseTcp(connection, server, token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpAdapterReconnectSnapshotOrMissingFailsClosed(bool snapshot)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (oldSide, oldServer) = MemTransport.CreatePair();
+        await using var oldClient = AhpClient.Connect(oldSide);
+        var connection = await OpenTcp(oldClient, oldServer, token);
+        var read = connection.ReadAsync(token);
+        await oldClient.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+        var (freshSide, server) = MemTransport.CreatePair();
+        await using var fresh = AhpClient.Connect(freshSide);
+        var reconnect = fresh.ReconnectTcpConnectionsAsync(new ReconnectParams
+        {
+            Channel = ProtocolVersion.RootResourceUri,
+            ClientId = "owner",
+            Subscriptions = new(),
+            LastSeenServerSeq = 0,
+        }, new[] { connection }, token);
+        var request = await TcpRequest(server, "reconnect", token);
+        var result = snapshot
+            ? new ReconnectResult(new ReconnectSnapshotResult { Type = ReconnectResultType.Snapshot, Snapshots = new() })
+            : new ReconnectResult(new ReconnectReplayResult { Type = ReconnectResultType.Replay, Actions = new(), Missing = new() { connection.Resource } });
+        await TcpResponse(server, request, result, token);
+        await TcpUnsubscribe(server, connection.Resource, token);
+        await reconnect.WaitAsync(token);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => read);
+        Assert.Equal(0, fresh.EventListenerCount);
+        await connection.DisposeAsync();
+        var open = fresh.OpenTcpConnectionAsync("ahp-session:/s1", TcpCreation(), token);
+        await TcpResponse(server, await TcpRequest(server, "subscribe", token),
+            new SubscribeResult { Snapshot = TcpSnapshot("ahp-tcp:/replacement") }, token);
+        var replacement = await open;
+        await replacement.DisposeAsync();
+        await TcpUnsubscribe(server, replacement.Resource, token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpClientDefaultShutdownDisposesEvenAfterPreservedTransportShutdown(bool preserved)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var connection = await OpenTcp(client, server, token);
+        var read = connection.ReadAsync(token);
+        var write = connection.WriteAsync(new byte[6], token);
+        _ = await TcpDispatch(server, token);
+        _ = await TcpDispatch(server, token);
+        var drain = connection.DrainAsync(token);
+        if (preserved)
+        {
+            await client.ShutdownAsync(preserveTcpConnections: true, cancellationToken: token);
+            Assert.False(read.IsCompleted);
+            Assert.False(write.IsCompleted);
+            Assert.False(drain.IsCompleted);
+        }
+        var shutdown = client.ShutdownAsync(token);
+        if (!preserved) await TcpUnsubscribe(server, connection.Resource, token);
+        await shutdown.WaitAsync(token);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => read);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => write);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => drain);
+        Assert.Equal(0, client.EventListenerCount);
+    }
+
     // ── Request round-trip ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TcpAdapterLargeEncodingAndFinalClosePreserveCompletedDrainAndBufferedReads()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var token = timeout.Token;
+        var (side, server) = MemTransport.CreatePair();
+        await using var client = AhpClient.Connect(side);
+        var bytes = new byte[4 * 1024 * 1024];
+        bytes[0] = 1;
+        bytes[bytes.Length - 1] = 255;
+        var connection = await OpenTcp(client, server, token, maximumChunkSize: bytes.Length);
+        await connection.WriteAsync(bytes, token);
+        var sent = await TcpDispatch(server, token);
+        var input = Assert.IsType<TcpInputAction>(sent.Action.Value);
+        Assert.Equal(0, input.Offset);
+        Assert.Equal(bytes, Convert.FromBase64String(input.Data));
+        var drain = connection.DrainAsync(token);
+        Assert.False(drain.IsCompleted);
+        await TcpPush(server, 1, sent.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = sent.ClientSeq });
+        await TcpPush(server, 2, new StateAction(new TcpInputConsumedAction { Type = ActionType.TcpInputConsumed, ConsumedBytes = bytes.Length }), token);
+        await TcpPush(server, 3, new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "Bwg=" }), token);
+        await TcpPush(server, 4, new StateAction(new TcpHostCloseAction { Type = ActionType.TcpHostClose }), token);
+        var close = await TcpDispatch(server, token);
+        Assert.IsType<TcpClientCloseAction>(close.Action.Value);
+        Assert.Equal(1, client.EventListenerCount);
+        await TcpPush(server, 5, close.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = close.ClientSeq });
+        await drain.WaitAsync(token);
+        await connection.DrainAsync(token);
+        Assert.Equal(new byte[] { 7, 8 }, await connection.ReadAsync(token));
+        var credit = await TcpDispatch(server, token);
+        Assert.IsType<TcpDataConsumedAction>(credit.Action.Value);
+        await TcpPush(server, 6, credit.Action, token, new ActionOrigin { ClientId = "owner", ClientSeq = credit.ClientSeq });
+        await TcpUnsubscribe(server, connection.Resource, token);
+        Assert.Null(await connection.ReadAsync(token));
+        await connection.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData("{", false)]
+    [InlineData("{", true)]
+    [InlineData("""{"jsonrpc":"2.0","id":1}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"action"}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"action","params":null}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/child","serverSeq":2,"action":{"type":"tcp/dataEof","finalOffset":0.5}}}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/child","serverSeq":2,"action":{"type":"tcp/inputConsumed","consumedBytes":0.5}}}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"root/sessionAdded","params":[]}""", false)]
+    [InlineData("""{"jsonrpc":"2.0","method":"root/sessionAdded"}""", false)]
+    public async Task StrictEventsFailOnMalformedFramesAndNotificationPayloads(string wire, bool binary)
+    {
+        var (clientSide, serverSide) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var client = AhpClient.Connect(clientSide);
+        using var strict = client.CreateEventStream(failOnOverflow: true);
+        using var ordinary = client.CreateEventStream();
+        using var barrier = client.AttachSubscription("ahp-session:/barrier");
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/s1", 1, "prefix"), cts.Token);
+        await serverSide.SendAsync(binary
+            ? TransportMessage.FromBinary(System.Text.Encoding.UTF8.GetBytes(wire))
+            : TransportMessage.FromText(wire), cts.Token);
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/s1", 2, "later"), cts.Token);
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/barrier", 99, "barrier"), cts.Token);
+        _ = await barrier.Events.ReadAsync(cts.Token);
+        Assert.Equal(1, client.EventListenerCount);
+        var prefix = await strict.Events.ReadAsync(cts.Token);
+        Assert.Equal(1, Assert.IsType<SubscriptionEventAction>(prefix.Event).Envelope.ServerSeq);
+        var error = await Assert.ThrowsAsync<AhpTransportException>(async () =>
+        {
+            await foreach (var item in strict.Events.ReadAllAsync(cts.Token))
+                Assert.Fail($"unexpected event after decode loss: {item.Channel}");
+        });
+        Assert.Equal("protocol", error.Kind);
+        Assert.False(strict.Events.TryRead(out _), "a decode-failed receiver must never resume");
+        foreach (long expected in new[] { 1L, 2L, 99L })
+        {
+            var item = await ordinary.Events.ReadAsync(cts.Token);
+            Assert.Equal(expected, Assert.IsType<SubscriptionEventAction>(item.Event).Envelope.ServerSeq);
+        }
+    }
+
+    [Fact]
+    public async Task StrictEventsAllowUnknownNotificationsAndActions()
+    {
+        var (clientSide, serverSide) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var client = AhpClient.Connect(clientSide);
+        using var events = client.CreateEventStream(failOnOverflow: true);
+        await serverSide.SendAsync(TransportMessage.FromText("""{"jsonrpc":"2.0","method":"future/notification"}"""), cts.Token);
+        await serverSide.SendAsync(TransportMessage.FromText(
+            """{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/child","serverSeq":1,"action":{"type":"tcp/future"}}}"""), cts.Token);
+        var item = await events.Events.ReadAsync(cts.Token);
+        var envelope = Assert.IsType<SubscriptionEventAction>(item.Event).Envelope;
+        Assert.Equal(1, envelope.ServerSeq);
+        Assert.Equal("ahp-tcp:/child", envelope.Channel);
+    }
+
+    [Fact]
+    public async Task StrictDecodeFailureWakesBlockedReaderAndUnregisters()
+    {
+        var (clientSide, serverSide) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var client = AhpClient.Connect(clientSide);
+        using var strict = client.CreateEventStream(failOnOverflow: true);
+        using var ordinary = client.CreateEventStream();
+        var pending = strict.Events.WaitToReadAsync(cts.Token).AsTask();
+        Assert.False(pending.IsCompleted);
+        await serverSide.SendAsync(TransportMessage.FromText("{"), cts.Token);
+        var error = await Assert.ThrowsAsync<AhpTransportException>(async () => await pending);
+        Assert.Equal("protocol", error.Kind);
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/s1", 1, "still connected"), cts.Token);
+        var item = await ordinary.Events.ReadAsync(cts.Token);
+        Assert.Equal(1, Assert.IsType<SubscriptionEventAction>(item.Event).Envelope.ServerSeq);
+        Assert.Equal(1, client.EventListenerCount);
+        Assert.False(strict.Events.TryRead(out _));
+        await Assert.ThrowsAsync<AhpTransportException>(async () => await strict.Events.Completion);
+    }
+
+    [Fact]
+    public async Task StrictEventsPreserveFirstTcpActionBeforeCreateReturns()
+    {
+        var (clientSide, serverSide) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var client = AhpClient.Connect(clientSide);
+        using var events = client.CreateEventStream(failOnOverflow: true);
+        using var barrier = client.AttachSubscription("ahp-session:/barrier");
+        var server = Task.Run(async () =>
+        {
+            var message = Ser.DecodeMessage(await serverSide.ReceiveAsync(cts.Token));
+            var request = Assert.IsType<JsonRpcRequest>(message.Request);
+            Assert.Equal("subscribe", request.Method);
+            Assert.Equal("tcpConnection", request.Params!.Value.GetProperty("create").GetProperty("type").GetString());
+            var parameters = Ser.Deserialize<SubscribeParams>(request.Params!.Value);
+            Assert.Equal("ahp-session:/s1", parameters.Channel);
+            Assert.Equal("localhost", parameters.Create!.Host);
+            var direction = new FlowControlledByteDirectionState { WindowBytes = 8, MaximumChunkSize = 8 };
+            var result = new SubscribeResult
+            {
+                Snapshot = new Snapshot
+                {
+                    Resource = "ahp-tcp:/created",
+                    State = new SnapshotState
+                    {
+                        Tcp = new TcpConnectionState
+                        {
+                            Session = parameters.Channel,
+                            Target = new TcpTarget { Host = "localhost", Port = 3000 },
+                            Encoding = TcpDataEncoding.Base64,
+                            Input = direction,
+                            Output = direction,
+                        }
+                    },
+                    FromSeq = 0,
+                },
+            };
+            await serverSide.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
+            {
+                SuccessResponse = new JsonRpcSuccessResponse { Id = request.Id, Result = Ser.SerializeToElement(result) },
+            }), cts.Token);
+            await serverSide.SendAsync(Ser.EncodeMessage(new JsonRpcMessage
+            {
+                Notification = new JsonRpcNotification
+                {
+                    Method = "action",
+                    Params = Ser.SerializeToElement(new ActionEnvelope
+                    {
+                        Channel = "ahp-tcp:/created",
+                        ServerSeq = 1,
+                        Action = new StateAction(new TcpDataAction { Type = ActionType.TcpData, Offset = 0, Data = "AA==" }),
+                    }),
+                },
+            }), cts.Token);
+            await serverSide.SendAsync(BuildActionNotification("ahp-session:/barrier", 2, "barrier"), cts.Token);
+        }, cts.Token);
+        var result = await client.RequestAsync<SubscribeParams, SubscribeResult>("subscribe", new SubscribeParams
+        {
+            Channel = "ahp-session:/s1",
+            Create = new TcpConnectionSubscription
+            {
+                Type = "tcpConnection",
+                Host = "localhost",
+                Port = 3000,
+                Encoding = TcpDataEncoding.Base64,
+                ReceiveWindowBytes = 8,
+                MaximumChunkSize = 8,
+            },
+        }, cts.Token);
+        await server;
+        _ = await barrier.Events.ReadAsync(cts.Token);
+        var snapshot = Assert.IsType<Snapshot>(result!.Snapshot);
+        var first = await events.Events.ReadAsync(cts.Token);
+        Assert.Equal(snapshot.Resource, first.Channel);
+        var envelope = Assert.IsType<SubscriptionEventAction>(first.Event).Envelope;
+        var initial = Assert.IsType<TcpConnectionState>(snapshot.State.Tcp);
+        Assert.Equal(1, Reducers.TcpReducer(initial, envelope.Action).Output.ReceivedBytes);
+    }
+
+    [Fact]
+    public async Task StrictEventsOverflowIsTerminalAndOrdinaryEventsStillDropOldest()
+    {
+        var (clientSide, serverSide) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var client = AhpClient.Connect(clientSide, new ClientConfig { SubscriptionBufferCapacity = 2 });
+        using var strict = client.CreateEventStream(failOnOverflow: true);
+        using var ordinary = client.CreateEventStream();
+        using var barrier = client.AttachSubscription("ahp-session:/barrier");
+        for (long seq = 1; seq <= 3; seq++)
+            await serverSide.SendAsync(BuildActionNotification("ahp-session:/s1", seq, $"e{seq}"), cts.Token);
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/barrier", 99, "barrier"), cts.Token);
+        _ = await barrier.Events.ReadAsync(cts.Token);
+        Assert.Equal(1, client.EventListenerCount);
+        for (long expected = 1; expected <= 2; expected++)
+        {
+            var item = await strict.Events.ReadAsync(cts.Token);
+            Assert.Equal(expected, Assert.IsType<SubscriptionEventAction>(item.Event).Envelope.ServerSeq);
+        }
+        var error = await Assert.ThrowsAsync<SubscriptionLagException>(async () =>
+        {
+            await foreach (var item in strict.Events.ReadAllAsync(cts.Token))
+                Assert.Fail($"unexpected event after overflow: {item.Channel}");
+        });
+        Assert.Equal(2, error.Capacity);
+        var closed = await Assert.ThrowsAsync<ChannelClosedException>(
+            async () => await strict.Events.ReadAsync(cts.Token));
+        Assert.IsType<SubscriptionLagException>(closed.InnerException);
+        foreach (long expected in new[] { 3L, 99L })
+        {
+            var item = await ordinary.Events.ReadAsync(cts.Token);
+            Assert.Equal(expected, Assert.IsType<SubscriptionEventAction>(item.Event).Envelope.ServerSeq);
+        }
+        using var healthy = client.CreateEventStream(failOnOverflow: true);
+        await serverSide.SendAsync(BuildActionNotification("ahp-session:/barrier", 100, "later"), cts.Token);
+        _ = await barrier.Events.ReadAsync(cts.Token);
+        Assert.False(strict.Events.TryRead(out _), "an overflowed receiver must never resume");
+        await Assert.ThrowsAsync<SubscriptionLagException>(async () => await strict.Events.Completion);
+        var later = await healthy.Events.ReadAsync(cts.Token);
+        Assert.Equal(100, Assert.IsType<SubscriptionEventAction>(later.Event).Envelope.ServerSeq);
+        healthy.Dispose();
+        Assert.False(await healthy.Events.WaitToReadAsync(cts.Token));
+    }
 
     [Fact]
     public async Task RequestRoundTrip_InitializeReturnsProtocolVersion()

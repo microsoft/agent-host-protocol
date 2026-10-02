@@ -242,6 +242,18 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v InitializeResult
 		dec(&v)
 		return enc(&v)
+	case "SubscribeParams":
+		var v SubscribeParams
+		dec(&v)
+		return enc(&v)
+	case "ReconnectResult":
+		var v ReconnectResult
+		dec(&v)
+		return enc(&v)
+	case "TcpConnectionOpenErrorData":
+		var v TcpConnectionOpenErrorData
+		dec(&v)
+		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)

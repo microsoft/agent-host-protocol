@@ -167,7 +167,9 @@ internal final class HostRuntime: Sendable {
     func shutdown() async {
         cmdContinuation.yield(.shutdown)
         cmdContinuation.finish()
+        supervisorTask?.cancel()
         await supervisorTask?.value
+        await closeTcpConnections()
     }
 
     // MARK: - Supervisor loop
@@ -186,7 +188,7 @@ internal final class HostRuntime: Sendable {
         // report `.connected` through the entire backoff sleep.
         await transition(to: .connecting, error: nil)
 
-        outer: while true {
+        outer: while !Task.isCancelled {
             attempt += 1
 
             // Try to connect. On success we run the connection until it ends.
@@ -196,7 +198,8 @@ internal final class HostRuntime: Sendable {
                     attempt = 0
                 }
                 let outcome = await runConnection(streams: streams, iter: &iter)
-                await tearDownClient()
+                if case .shutdown = outcome { await tearDownClient(permanent: true) }
+                else { await tearDownClient() }
                 switch outcome {
                 case .shutdown:
                     return
@@ -314,8 +317,11 @@ internal final class HostRuntime: Sendable {
     ) async throws -> ConnectionStreams {
         // Decide between initialize and reconnect based on prior state.
         let priorSnapshot = await shared.internalState
-        let canReconnect = priorSnapshot.serverSeq > 0 && !priorSnapshot.subscriptions.isEmpty
+        let tcpConnections = Array(await shared.tcpConnections.values)
+        if let previous = await shared.previousClient { await client.inheritTcpClient(previous) }
+        let canReconnect = !tcpConnections.isEmpty || (priorSnapshot.serverSeq > 0 && !priorSnapshot.subscriptions.isEmpty)
         let priorSubscriptions = priorSnapshot.subscriptions
+        let initialSubscriptions = priorSubscriptions.filter { !$0.hasPrefix("ahp-tcp:") }
         let priorSeq = priorSnapshot.serverSeq
 
         var initResult: InitializeResult? = nil
@@ -324,17 +330,23 @@ internal final class HostRuntime: Sendable {
 
         if canReconnect {
             do {
-                reconnectResult = try await client.reconnect(
-                    clientId: clientId,
-                    lastSeenServerSeq: priorSeq,
-                    subscriptions: priorSubscriptions
-                )
+                if tcpConnections.isEmpty {
+                    reconnectResult = try await client.reconnect(clientId: clientId,
+                        lastSeenServerSeq: priorSeq, subscriptions: priorSubscriptions)
+                } else {
+                    reconnectResult = try await client.reconnectTcpConnections(
+                        params: ReconnectParams(channel: RootResourceURI, clientId: clientId,
+                            lastSeenServerSeq: priorSeq, subscriptions: priorSubscriptions),
+                        connections: tcpConnections)
+                }
             } catch let error as AHPClientError {
                 if case .rpc = error {
+                    let errors = await shared.closeTcpConnections()
+                    if !errors.isEmpty { throw TransportError.protocol(errors.joined(separator: "; ")) }
                     let init1 = try await client.initialize(
                         clientId: clientId,
                         protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
-                        initialSubscriptions: priorSubscriptions
+                        initialSubscriptions: initialSubscriptions
                     )
                     initResult = init1
                     newSeq = init1.serverSeq
@@ -346,7 +358,7 @@ internal final class HostRuntime: Sendable {
             let init1 = try await client.initialize(
                 clientId: clientId,
                 protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
-                initialSubscriptions: priorSubscriptions
+                initialSubscriptions: initialSubscriptions
             )
             initResult = init1
             newSeq = init1.serverSeq
@@ -391,10 +403,16 @@ internal final class HostRuntime: Sendable {
             return generation
         }()
 
-        if let reconnectResult {
+        if var reconnectResult {
+            // TCP may need an older checkpoint than the ordinary host mirror.
+            if !tcpConnections.isEmpty, case .replay(var replay) = reconnectResult {
+                replay.actions.removeAll { $0.serverSeq <= priorSeq }
+                reconnectResult = .replay(replay)
+            }
             await applyReconnectResult(reconnectResult, priorSubscriptions: priorSubscriptions)
             await hostEventSink(.reconnectResult(config.id, reconnectResult))
         }
+        await shared.tcpDidReconnect()
 
         await transition(to: .connected, error: nil)
         await hostEventSink(.connected(config.id, generation: newGeneration))
@@ -696,17 +714,19 @@ internal final class HostRuntime: Sendable {
         await hostEventSink(.stateChanged(config.id, state, lastError: error))
     }
 
-    private func tearDownClient() async {
-        let prev: AHPClient? = await {
-            var captured: AHPClient? = nil
-            await shared.update { state in
-                captured = state.currentClient
-                state.currentClient = nil
-            }
-            return captured
-        }()
+    private func tearDownClient(permanent: Bool = false) async {
+        let prev = await shared.detachClient()
+        if permanent { await closeTcpConnections() }
         if let prev {
-            await prev.shutdown()
+            await prev.shutdown(preservingTcpConnections: !permanent)
+        }
+    }
+
+    private func closeTcpConnections() async {
+        let errors = await shared.closeTcpConnections()
+        if !errors.isEmpty {
+            let reason = errors.joined(separator: "; ")
+            await transition(to: .failed(reason: reason), error: reason)
         }
     }
 }
@@ -772,7 +792,7 @@ private func withClientShutdownOnThrow<T: Sendable>(
     do {
         return try await body()
     } catch {
-        await client.shutdown()
+        await client.shutdown(preservingTcpConnections: true)
         throw error
     }
 }

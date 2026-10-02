@@ -156,7 +156,7 @@ public delegate Task<object?> ServerRequestHandler(string method, JsonElement? p
 /// All public methods are safe to call from multiple threads.
 /// </para>
 /// </summary>
-public sealed class AhpClient : IAhpClient
+public sealed partial class AhpClient : IAhpClient
 {
     // ── State that lives for the client lifetime ──────────────────────────
 
@@ -169,11 +169,13 @@ public sealed class AhpClient : IAhpClient
 
     // In-flight request correlation keyed by JSON-RPC id.
     private readonly ConcurrentDictionary<ulong, TaskCompletionSource<JsonElement>> _pending = new();
+    private readonly ConcurrentDictionary<ulong, Action<JsonElement>> _resultHandlers = new();
 
     // Per-URI subscription fan-out.
     private readonly object _subsLock = new();
     private readonly Dictionary<string, List<Subscription>> _subscriptions = new();
     private readonly List<EventStream> _eventListeners = new();
+    private readonly Dictionary<string, List<EventStream>> _resourceEventListeners = new(StringComparer.Ordinal);
 
     // Multicast connection-state fan-out. Guarded by `_subsLock` (same lock as the
     // event listeners — every fan-out path already takes it).
@@ -223,7 +225,18 @@ public sealed class AhpClient : IAhpClient
         }
     }
 
-    internal int EventListenerCount { get { lock (_subsLock) { return _eventListeners.Count; } } }
+    internal int EventListenerCount
+    {
+        get
+        {
+            lock (_subsLock)
+            {
+                int count = _eventListeners.Count;
+                foreach (var list in _resourceEventListeners.Values) count += list.Count;
+                return count;
+            }
+        }
+    }
 
     internal int StateListenerCount { get { lock (_subsLock) { return _stateListeners.Count; } } }
 
@@ -311,7 +324,7 @@ public sealed class AhpClient : IAhpClient
 
     /// <summary>
     /// A <see cref="Task"/> that completes once the client begins teardown (either
-    /// via <see cref="ShutdownAsync"/> or a transport failure).
+    /// via <see cref="ShutdownAsync(CancellationToken)"/> or a transport failure).
     /// </summary>
     public Task Completion => _doneTcs.Task;
 
@@ -327,11 +340,22 @@ public sealed class AhpClient : IAhpClient
     /// closed. The underlying transport is closed too.
     /// Safe to call multiple times.
     /// </summary>
-    public async Task ShutdownAsync(CancellationToken cancellationToken = default)
+    public Task ShutdownAsync(CancellationToken cancellationToken = default)
+        => ShutdownAsync(preserveTcpConnections: false, cancellationToken);
+
+    /// <summary>Shuts down transport, optionally retaining TCP handles for explicit reconnect.</summary>
+    public async Task ShutdownAsync(bool preserveTcpConnections, CancellationToken cancellationToken = default)
     {
-        await ShutdownWithErrorAsync(null).ConfigureAwait(false);
-        // Wait for both background tasks to exit.
-        await Task.WhenAll(_readerTask, _writerTask).WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!preserveTcpConnections) await DisposeTcpConnectionsAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await ShutdownWithErrorAsync(null).ConfigureAwait(false);
+            // Wait for both background tasks to exit.
+            await Task.WhenAll(_readerTask, _writerTask).WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -408,6 +432,8 @@ public sealed class AhpClient : IAhpClient
                 tcs.TrySetException(shutdownEx);
             }
         }
+        foreach (var kv in _tcpCreationResponses)
+            if (_tcpCreationResponses.TryRemove(kv.Key, out var response)) response.TrySetException(shutdownEx);
 
         // Close every subscription and listener.
         List<Subscription> allSubs;
@@ -419,6 +445,8 @@ public sealed class AhpClient : IAhpClient
                 allSubs.AddRange(list);
 
             allListeners = new List<EventStream>(_eventListeners);
+            foreach (var list in _resourceEventListeners.Values) allListeners.AddRange(list);
+            _resourceEventListeners.Clear();
             _eventListeners.Clear();
         }
         // Each Close() runs the subscription's detach hook, which removes it from the
@@ -615,9 +643,10 @@ public sealed class AhpClient : IAhpClient
                 {
                     msg = _serializer.DecodeMessage(frame);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Skip malformed frames; protocol resync is the server's responsibility.
+                    FailStrictEvents("ahp: malformed inbound JSON-RPC frame", ex);
+                    // Ordinary receivers retain their existing skip behavior.
                     AhpTelemetry.MalformedFrames.Add(1);
                     continue;
                 }
@@ -656,16 +685,25 @@ public sealed class AhpClient : IAhpClient
             // requests" limitation; mirrors the TS client's handleServerRequest.)
             _ = HandleServerRequestAsync(msg.Request);
         }
+        else
+        {
+            FailStrictEvents("ahp: inbound frame has no JSON-RPC message");
+        }
     }
 
     private void Deliver(ulong id, JsonElement result, AhpRpcException? rpcError)
     {
-        if (_pending.TryRemove(id, out var tcs))
+        if (_pending.TryRemove(id, out var tcs) || _tcpCreationResponses.TryRemove(id, out tcs))
         {
+            _resultHandlers.TryRemove(id, out var onResult);
             if (rpcError is not null)
                 tcs.TrySetException(rpcError);
             else
+            {
+                try { onResult?.Invoke(result); }
+                catch (Exception ex) { tcs.TrySetException(ex); return; }
                 tcs.TrySetResult(result);
+            }
         }
     }
 
@@ -740,7 +778,13 @@ public sealed class AhpClient : IAhpClient
 
     private void HandleNotification(JsonRpcNotification n)
     {
-        if (n.Params is null) return;
+        if (n.Params is null)
+        {
+            if (n.Method is "action" or "root/sessionAdded" or "root/sessionRemoved"
+                or "root/sessionSummaryChanged" or "root/progress" or "auth/required")
+                FailStrictEvents("ahp: inbound subscription notification is missing params");
+            return;
+        }
         var paramsEl = n.Params.Value;
 
         switch (n.Method)
@@ -749,7 +793,7 @@ public sealed class AhpClient : IAhpClient
                 {
                     ActionEnvelope env;
                     try { env = _serializer.Deserialize<ActionEnvelope>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound action envelope", ex); return; }
                     FanOut(env.Channel, new SubscriptionEventAction(env));
                     break;
                 }
@@ -757,7 +801,7 @@ public sealed class AhpClient : IAhpClient
                 {
                     SessionAddedParams p;
                     try { p = _serializer.Deserialize<SessionAddedParams>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound session-added notification", ex); return; }
                     FanOut(p.Channel, new SubscriptionEventSessionAdded(p));
                     break;
                 }
@@ -765,7 +809,7 @@ public sealed class AhpClient : IAhpClient
                 {
                     SessionRemovedParams p;
                     try { p = _serializer.Deserialize<SessionRemovedParams>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound session-removed notification", ex); return; }
                     FanOut(p.Channel, new SubscriptionEventSessionRemoved(p));
                     break;
                 }
@@ -773,7 +817,7 @@ public sealed class AhpClient : IAhpClient
                 {
                     SessionSummaryChangedParams p;
                     try { p = _serializer.Deserialize<SessionSummaryChangedParams>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound session-summary notification", ex); return; }
                     FanOut(p.Channel, new SubscriptionEventSessionSummaryChanged(p));
                     break;
                 }
@@ -781,7 +825,7 @@ public sealed class AhpClient : IAhpClient
                 {
                     ProgressParams p;
                     try { p = _serializer.Deserialize<ProgressParams>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound progress notification", ex); return; }
                     FanOut(p.Channel, new SubscriptionEventProgress(p));
                     break;
                 }
@@ -789,11 +833,23 @@ public sealed class AhpClient : IAhpClient
                 {
                     AuthRequiredParams p;
                     try { p = _serializer.Deserialize<AuthRequiredParams>(paramsEl); }
-                    catch { return; }
+                    catch (Exception ex) { FailStrictEvents("ahp: failed to decode inbound auth notification", ex); return; }
                     FanOut(p.Channel, new SubscriptionEventAuthRequired(p));
                     break;
                 }
         }
+    }
+
+    private void FailStrictEvents(string message, Exception? inner = null)
+    {
+        List<EventStream> listeners;
+        lock (_subsLock)
+        {
+            listeners = new List<EventStream>(_eventListeners);
+            foreach (var list in _resourceEventListeners.Values) listeners.AddRange(list);
+        }
+        var error = new AhpTransportException("protocol", message, inner);
+        foreach (var listener in listeners) listener.FailIfStrict(error);
     }
 
     private void FanOut(string channel, SubscriptionEvent ev)
@@ -812,6 +868,12 @@ public sealed class AhpClient : IAhpClient
             listeners = _eventListeners.Count > 0
                 ? new List<EventStream>(_eventListeners)
                 : Array.Empty<EventStream>();
+            if (_resourceEventListeners.TryGetValue(channel, out var resourceListeners))
+            {
+                var matching = new List<EventStream>(listeners);
+                matching.AddRange(resourceListeners);
+                listeners = matching;
+            }
         }
 
         for (var i = 0; i < subs.Count; i++) subs[i].TrySend(ev);
@@ -838,10 +900,15 @@ public sealed class AhpClient : IAhpClient
     /// would be non-null.
     /// </para>
     /// </summary>
-    public async Task<TResult?> RequestAsync<TParams, TResult>(
+    public Task<TResult?> RequestAsync<TParams, TResult>(
         string method,
         TParams parameters,
         CancellationToken cancellationToken = default)
+        => RequestCoreAsync<TParams, TResult>(method, parameters, cancellationToken);
+
+    private async Task<TResult?> RequestCoreAsync<TParams, TResult>(
+        string method, TParams parameters, CancellationToken cancellationToken,
+        bool ownsTcpCreation = false, Action<JsonElement>? onResult = null)
     {
         Guard.ThrowIfNull(method, nameof(method));
 
@@ -879,7 +946,11 @@ public sealed class AhpClient : IAhpClient
 
         ulong id = (ulong)(Interlocked.Increment(ref _nextId) - 1);
         var tcs = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (ownsTcpCreation) _tcpCreationResponses[id] = tcs;
+        if (onResult is not null) _resultHandlers[id] = onResult;
         _pending[id] = tcs;
+        bool abandonedTcpCreation = false;
+        bool requestMayHaveBeenSent = false;
         activity?.SetTag(AhpTelemetryNames.AttrRequestId, id);
         AhpTelemetry.InflightRequests.Add(1);
 
@@ -907,6 +978,7 @@ public sealed class AhpClient : IAhpClient
 
             try
             {
+                requestMayHaveBeenSent = true;
                 await SendMessageAsync(req, requestCts.Token).ConfigureAwait(false);
             }
             catch
@@ -936,6 +1008,15 @@ public sealed class AhpClient : IAhpClient
             // Distinguish caller cancellation (the caller's token) from a request
             // timeout (the configured default-timeout fired its linked token) from a
             // genuine error — the metric and the span status differ for each.
+            if (ownsTcpCreation)
+            {
+                _pending.TryRemove(id, out _);
+                if (requestMayHaveBeenSent)
+                {
+                    abandonedTcpCreation = true;
+                    _ = ReleaseAbandonedTcpCreationAsync(id, tcs.Task);
+                }
+            }
             bool callerCancelled = ex is OperationCanceledException && cancellationToken.IsCancellationRequested;
             outcome = ex switch
             {
@@ -949,6 +1030,8 @@ public sealed class AhpClient : IAhpClient
         }
         finally
         {
+            _resultHandlers.TryRemove(id, out _);
+            if (ownsTcpCreation && !abandonedTcpCreation) _tcpCreationResponses.TryRemove(id, out _);
             AhpTelemetry.InflightRequests.Add(-1);
             AhpTelemetry.RequestDuration.Record(
                 Compatibility.GetElapsedTime(startTimestamp).TotalMilliseconds,
@@ -1045,6 +1128,8 @@ public sealed class AhpClient : IAhpClient
                 "protocol",
                 $"ahp: server selected unoffered protocol version '{result.ProtocolVersion}'");
         }
+        _tcpClientId = clientId;
+        _tcpCapability = result.TcpConnections;
         return result;
     }
 
@@ -1399,16 +1484,70 @@ public sealed class AhpClient : IAhpClient
     /// streams may exist concurrently.
     /// </summary>
     public EventStream CreateEventStream()
+        => CreateEventStream(failOnOverflow: false);
+
+    /// <summary>
+    /// Registers a bounded global receiver before returning. With
+    /// <paramref name="failOnOverflow"/> enabled, overflow preserves the buffered
+    /// prefix and permanently faults the receiver with <see cref="SubscriptionLagException"/>.
+    /// Discarded malformed inbound frames or notification payloads instead fault
+    /// strict receivers with <see cref="AhpTransportException"/> of kind <c>protocol</c>.
+    /// Other receivers are unaffected. The caller owns reset/unsubscribe and reconnect handling.
+    /// </summary>
+    public EventStream CreateEventStream(bool failOnOverflow)
     {
-        var stream = new EventStream(_cfg.SubscriptionBufferCapacity);
+        var stream = new EventStream(_cfg.SubscriptionBufferCapacity, failOnOverflow);
+        stream.OnClose(() => { lock (_subsLock) { _eventListeners.Remove(stream); } });
         lock (_subsLock)
         {
             _eventListeners.Add(stream);
         }
-        // Detach on dispose so an abandoned stream is removed from the fan-out
-        // list rather than receiving (dropped) events for the client's lifetime.
-        stream.OnClose(() => { lock (_subsLock) { _eventListeners.Remove(stream); } });
         return stream;
+    }
+
+    private EventStream CreateResourceEventStream(string resource)
+    {
+        var stream = new EventStream(_cfg.SubscriptionBufferCapacity, failOnOverflow: true) { Resource = resource };
+        // Install cleanup before publishing the receiver: it may fail as soon
+        // as the receive loop sees it.
+        stream.OnClose(() => { lock (_subsLock) { RemoveEventStream(stream); } });
+        lock (_subsLock)
+        {
+            if (Volatile.Read(ref _shutdownStarted) == 1) stream.Close();
+            else AddEventStream(stream);
+        }
+        return stream;
+    }
+
+    private void AddEventStream(EventStream stream)
+    {
+        if (stream.Resource is null) _eventListeners.Add(stream);
+        else
+        {
+            if (!_resourceEventListeners.TryGetValue(stream.Resource, out var list))
+                _resourceEventListeners[stream.Resource] = list = new List<EventStream>();
+            list.Add(stream);
+        }
+    }
+
+    private void RemoveEventStream(EventStream stream)
+    {
+        if (stream.Resource is null) _eventListeners.Remove(stream);
+        else if (_resourceEventListeners.TryGetValue(stream.Resource, out var list))
+        {
+            list.Remove(stream);
+            if (list.Count == 0) _resourceEventListeners.Remove(stream.Resource);
+        }
+    }
+
+    private void BindEventStream(EventStream stream, string resource)
+    {
+        lock (_subsLock)
+        {
+            RemoveEventStream(stream);
+            stream.Resource = resource;
+            if (!stream.IsClosed) AddEventStream(stream);
+        }
     }
 }
 

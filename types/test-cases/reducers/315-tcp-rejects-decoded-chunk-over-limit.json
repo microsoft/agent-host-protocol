@@ -1,0 +1,56 @@
+{
+  "description": "TCP: rejects decoded chunk over limit",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 1,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/input",
+      "offset": 0,
+      "data": "AAAA"
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 1,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "expectedError": "Invalid TCP action: chunk size"
+}

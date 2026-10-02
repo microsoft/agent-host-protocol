@@ -1,6 +1,6 @@
 //! Error types used across the SDK.
 //!
-//! Two error families are exposed:
+//! Error types exposed by the SDK:
 //!
 //! - [`TransportError`] — failures of an underlying [`crate::Transport`]
 //!   implementation (closed connection, framing/IO errors).
@@ -8,6 +8,7 @@
 //!   API: transport errors, JSON-RPC error responses, deserialization
 //!   problems, shutdown, cancellation, missing subscriptions, and
 //!   sequence gaps that require resubscribing.
+//! - [`SubscriptionLagError`] — terminal overflow of a strict event receiver.
 //!
 //! `ClientError` implements `From<TransportError>` and
 //! `From<serde_json::Error>` so client code can use `?` freely.
@@ -15,8 +16,16 @@
 use ahp_types::messages::JsonRpcError;
 use thiserror::Error;
 
+/// A strict event receiver lost events and has permanently terminated.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("subscription lag: {skipped} events lost; receiver terminated")]
+pub struct SubscriptionLagError {
+    /// Number of events evicted before the receiver detected the gap.
+    pub skipped: u64,
+}
+
 /// Errors raised by a [`crate::Transport`] implementation.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum TransportError {
     /// The connection was closed by the remote peer or the transport
     /// reached end-of-stream.
@@ -36,9 +45,16 @@ pub enum TransportError {
 /// Errors produced by the SDK client.
 #[derive(Debug, Error)]
 pub enum ClientError {
+    /// An owned TCP operation failed while integrating with a client runtime.
+    #[error(transparent)]
+    Tcp(#[from] crate::tcp::TcpError),
     /// A transport-level error prevented the request from completing.
     #[error("transport error: {0}")]
     Transport(#[from] TransportError),
+
+    /// A strict event receiver overflowed and permanently terminated.
+    #[error(transparent)]
+    SubscriptionLag(#[from] SubscriptionLagError),
 
     /// The server returned a JSON-RPC error response.
     #[error("rpc error {}: {}", .0.code, .0.message)]

@@ -48,13 +48,18 @@ public actor AHPClient {
 
     // ── Sequence numbers ─────────────────────────────────────────────────
     private var nextRequestId: Int = 1
-    private var nextClientSeq: Int = 1
+    internal nonisolated let tcpSequences = TcpClientSequences()
+    internal var tcpIdentity: String?
+    internal var tcpCapability: TcpConnectionsCapability?
+    internal var ownedTcpConnections: [ObjectIdentifier: TcpConnection] = [:]
+    internal var tcpDisposed = false
 
     // ── Pending request continuations ────────────────────────────────────
     /// In-flight JSON-RPC requests keyed by id. Resolves with the raw `result`
     /// AnyCodable on success or fails with `AHPClientError` on error/timeout/
     /// shutdown.
     private var pending: [Int: PendingEntry] = [:]
+    private var abandonedTcpCreations: Set<Int> = []
 
     // ── Subscription registry ────────────────────────────────────────────
     /// Per-URI listeners. Each entry holds one or more `AsyncStream` continuations
@@ -65,6 +70,8 @@ public actor AHPClient {
     // ── Top-level multicast taps ─────────────────────────────────────────
     /// Multicast listeners for `events` (top-level fan-out tagged with resource).
     private var eventListeners: [EventListener] = []
+    private var strictEventListeners: [UInt64: AsyncThrowingStream<ClientEvent, Error>.Continuation] = [:]
+    private var resourceEventListeners: [String: [UInt64: AsyncThrowingStream<ClientEvent, Error>.Continuation]] = [:]
     /// Multicast listeners for `stateChanges`.
     private var stateListeners: [StateListener] = []
 
@@ -156,6 +163,19 @@ public actor AHPClient {
     /// requests with `AHPClientError.shutdown`, and finish all subscription
     /// streams.
     public func shutdown() async {
+        await shutdown(preservingTcpConnections: false)
+    }
+
+    /// Explicitly retains TCP handles only when preparing a replacement transport.
+    public func shutdown(preservingTcpConnections: Bool) async {
+        if !preservingTcpConnections {
+            tcpDisposed = true
+            let connections = Array(ownedTcpConnections.values)
+            for connection in connections {
+                do { try await connection.dispose() }
+                catch { print("[AHPClient] failed to release TCP connection during shutdown: \(error)") }
+            }
+        }
         if didShutdown { return }
         didShutdown = true
 
@@ -232,6 +252,50 @@ public actor AHPClient {
         }
     }
 
+    /// A bounded global receiver for loss-sensitive actions. Attach before the
+    /// request that starts delivery, then retain and consume this same stream.
+    /// Overflow preserves the buffered prefix, throws `SubscriptionLagError`,
+    /// and permanently terminates this receiver. Other receivers are unaffected.
+    /// Discarded malformed inbound frames or notification payloads terminate
+    /// strict receivers with `TransportError.protocol` instead.
+    /// The caller owns channel reset/unsubscribe and reconnect handling.
+    public func strictEvents() -> AsyncThrowingStream<ClientEvent, Error> {
+        tcpEventReceiver().stream
+    }
+
+    internal func tcpEventReceiver(resource: String? = nil) -> TcpEventReceiver {
+        let listenerId = nextListenerId()
+        let stream = AsyncThrowingStream<ClientEvent, Error>(bufferingPolicy: .bufferingOldest(config.subscriptionBufferSize)) { cont in
+            if let resource {
+                self.resourceEventListeners[resource, default: [:]][listenerId] = cont
+            } else {
+                self.strictEventListeners[listenerId] = cont
+            }
+            cont.onTermination = { [weak self] _ in
+                Task { [weak self] in
+                    await self?.removeStrictEventListener(id: listenerId)
+                }
+            }
+        }
+        return TcpEventReceiver(id: listenerId, stream: stream)
+    }
+
+    internal func cancelTcpReceiver(_ id: UInt64) {
+        strictEventListeners.removeValue(forKey: id)?.finish()
+        for resource in Array(resourceEventListeners.keys) {
+            resourceEventListeners[resource]?.removeValue(forKey: id)?.finish()
+            if resourceEventListeners[resource]?.isEmpty == true {
+                resourceEventListeners.removeValue(forKey: resource)
+            }
+        }
+    }
+
+    private func bindTcpReceiver(_ id: UInt64, resource: String) {
+        guard let continuation = resourceEventListeners[""]?.removeValue(forKey: id) else { return }
+        if resourceEventListeners[""]?.isEmpty == true { resourceEventListeners.removeValue(forKey: "") }
+        resourceEventListeners[resource, default: [:]][id] = continuation
+    }
+
     /// A multicast stream of `ConnectionState` transitions.
     ///
     /// Each call returns a *fresh* stream. The current value is available
@@ -267,6 +331,8 @@ public actor AHPClient {
             initialSubscriptions: initialSubscriptions.isEmpty ? nil : initialSubscriptions
         )
         let result: InitializeResult = try await request(method: "initialize", params: params)
+        tcpIdentity = clientId
+        tcpCapability = result.tcpConnections
         if result.serverSeq > lastSeenServerSeq {
             lastSeenServerSeq = result.serverSeq
         }
@@ -404,8 +470,7 @@ public actor AHPClient {
     /// a handle carrying the assigned `clientSeq`.
     @discardableResult
     public func dispatch(_ action: StateAction, channel: String) async throws -> DispatchHandle {
-        let seq = nextClientSeq
-        nextClientSeq += 1
+        let seq = try tcpSequences.reserve()
         return try await dispatch(action, channel: channel, clientSeq: seq)
     }
 
@@ -418,9 +483,7 @@ public actor AHPClient {
     /// remains suitable for simple fire-and-forget clients.
     @discardableResult
     public func dispatch(_ action: StateAction, channel: String, clientSeq: Int) async throws -> DispatchHandle {
-        if clientSeq >= nextClientSeq {
-            nextClientSeq = clientSeq + 1
-        }
+        tcpSequences.advance(past: clientSeq)
         try await notify(
             method: "dispatchAction",
             params: DispatchActionParams(channel: channel, clientSeq: clientSeq, action: action)
@@ -580,6 +643,28 @@ public actor AHPClient {
         method: String,
         params: P
     ) async throws -> R {
+        try await requestImpl(method: method, params: params)
+    }
+
+    internal func requestTcpCreation(_ params: SubscribeParams, receiverId: UInt64) async throws -> SubscribeResult {
+        try await requestImpl(method: "subscribe", params: params, ownsTcpCreation: true, receiverId: receiverId)
+    }
+
+    private func releaseAbandonedTcpCreation(_ result: Data) async {
+        do {
+            guard let object = try JSONSerialization.jsonObject(with: result) as? [String: Any],
+                  let snapshot = object["snapshot"] as? [String: Any],
+                  let resource = snapshot["resource"] as? String,
+                  resource.hasPrefix("ahp-tcp:"), connectionState != .disconnected else { return }
+            try await Task { try await self.unsubscribe(resource) }.value
+        } catch {
+            await handleTransportFailure(error)
+        }
+    }
+
+    private func requestImpl<P: Encodable & Sendable, R: Decodable & Sendable>(
+        method: String, params: P, ownsTcpCreation: Bool = false, receiverId: UInt64? = nil
+    ) async throws -> R {
         if didShutdown { throw AHPClientError.shutdown }
         guard let cont = outboundContinuation else {
             throw AHPClientError.shutdown
@@ -598,7 +683,7 @@ public actor AHPClient {
 
         let resultData: Data = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-                let entry = PendingEntry(continuation: continuation)
+                let entry = PendingEntry(continuation: continuation, ownsTcpCreation: ownsTcpCreation, receiverId: receiverId)
                 pending[id] = entry
 
                 let wireData: Data
@@ -637,6 +722,7 @@ public actor AHPClient {
         do {
             return try decoder.decode(R.self, from: resultData)
         } catch {
+            if ownsTcpCreation { await releaseAbandonedTcpCreation(resultData) }
             throw AHPClientError.decoding(
                 "failed to decode result for \(method): \(error)"
             )
@@ -708,6 +794,7 @@ public actor AHPClient {
     /// wins, so the continuation is never double-resumed.
     private func cancelPending(id: Int) {
         if let entry = pending.removeValue(forKey: id) {
+            if entry.ownsTcpCreation { abandonedTcpCreations.insert(id) }
             entry.timeoutTask?.cancel()
             entry.continuation.resume(throwing: CancellationError())
         }
@@ -805,6 +892,7 @@ public actor AHPClient {
             switch msg {
             case .text(let s):
                 guard let d = s.data(using: .utf8) else {
+                    failStrictEvents("inbound text frame is not valid UTF-8")
                     #if DEBUG
                     print("[AHPClient] dropped malformed text frame")
                     #endif
@@ -821,6 +909,7 @@ public actor AHPClient {
                 // see `TransportMessage` docs and microsoft/agent-host-protocol#123.
                 // Transports SHOULD prefer `.text`/`.binary` for inbound frames.
                 guard let d = try? encoder.encode(parsed) else {
+                    failStrictEvents("inbound parsed frame could not be encoded")
                     #if DEBUG
                     print("[AHPClient] dropped unencodable parsed frame")
                     #endif
@@ -829,6 +918,7 @@ public actor AHPClient {
                 data = d
             }
             guard let frame = parseRawFrame(from: data) else {
+                failStrictEvents("malformed inbound JSON-RPC frame")
                 #if DEBUG
                 print("[AHPClient] dropped malformed frame")
                 #endif
@@ -905,9 +995,24 @@ public actor AHPClient {
         case .successResponse(let id, let resultData):
             if let entry = pending.removeValue(forKey: id) {
                 entry.timeoutTask?.cancel()
+                if let receiverId = entry.receiverId {
+                    do {
+                        let result = try decoder.decode(SubscribeResult.self, from: resultData)
+                        if let snapshot = result.snapshot {
+                            bindTcpReceiver(receiverId, resource: snapshot.resource)
+                        }
+                    } catch {
+                        entry.continuation.resume(throwing: AHPClientError.decoding("failed to decode TCP creation result: \(error)"))
+                        await releaseAbandonedTcpCreation(resultData)
+                        return
+                    }
+                }
                 entry.continuation.resume(returning: resultData)
+            } else if abandonedTcpCreations.remove(id) != nil {
+                await releaseAbandonedTcpCreation(resultData)
             }
         case .errorResponse(let id, let error):
+            abandonedTcpCreations.remove(id)
             if let entry = pending.removeValue(forKey: id) {
                 entry.timeoutTask?.cancel()
                 entry.continuation.resume(throwing: AHPClientError.rpc(
@@ -966,11 +1071,15 @@ public actor AHPClient {
     }
 
     private func handleActionNotification(paramsData: Data?) async {
-        guard let paramsData else { return }
+        guard let paramsData else {
+            failStrictEvents("inbound action notification is missing params")
+            return
+        }
         let envelope: ActionEnvelope
         do {
             envelope = try decoder.decode(ActionEnvelope.self, from: paramsData)
         } catch {
+            failStrictEvents("failed to decode inbound action envelope")
             #if DEBUG
             print("[AHPClient] failed to decode action envelope: \(error)")
             #endif
@@ -996,11 +1105,15 @@ public actor AHPClient {
         wrap: (P) -> SubscriptionEvent,
         channel: (P) -> String
     ) async {
-        guard let paramsData else { return }
+        guard let paramsData else {
+            failStrictEvents("inbound subscription notification is missing params")
+            return
+        }
         let params: P
         do {
             params = try decoder.decode(P.self, from: paramsData)
         } catch {
+            failStrictEvents("failed to decode inbound subscription notification")
             #if DEBUG
             print("[AHPClient] failed to decode notification params: \(error)")
             #endif
@@ -1041,6 +1154,7 @@ public actor AHPClient {
 
         failAllPending(with: clientError)
         finishAllSubscriptions()
+        finishStrictEventListeners()
         // Top-level taps stay alive after a transport drop so consumers can
         // observe later state transitions (in this single-shot client, only
         // `.disconnected` will follow).
@@ -1048,6 +1162,7 @@ public actor AHPClient {
     }
 
     private func failAllPending(with error: AHPClientError) {
+        abandonedTcpCreations.removeAll()
         let entries = pending
         pending.removeAll()
         for (_, entry) in entries {
@@ -1058,6 +1173,7 @@ public actor AHPClient {
 
     private func timeoutPending(id: Int) {
         if let entry = pending.removeValue(forKey: id) {
+            if entry.ownsTcpCreation { abandonedTcpCreations.insert(id) }
             entry.timeoutTask = nil
             entry.continuation.resume(throwing: AHPClientError.requestTimeout)
         }
@@ -1203,6 +1319,31 @@ public actor AHPClient {
     private func finishAllEventListeners() {
         for l in eventListeners { l.continuation.finish() }
         eventListeners.removeAll()
+        finishStrictEventListeners()
+    }
+
+    private func finishStrictEventListeners() {
+        for continuation in strictEventListeners.values { continuation.finish() }
+        strictEventListeners.removeAll()
+        for listeners in resourceEventListeners.values {
+            for continuation in listeners.values { continuation.finish() }
+        }
+        resourceEventListeners.removeAll()
+    }
+
+    private func failStrictEvents(_ message: String) {
+        let listeners = strictEventListeners
+        strictEventListeners.removeAll()
+        for continuation in listeners.values {
+            continuation.finish(throwing: TransportError.protocol(message))
+        }
+        let resources = resourceEventListeners
+        resourceEventListeners.removeAll()
+        for listeners in resources.values {
+            for continuation in listeners.values {
+                continuation.finish(throwing: TransportError.protocol(message))
+            }
+        }
     }
 
     private func finishAllStateListeners() {
@@ -1212,6 +1353,27 @@ public actor AHPClient {
 
     private func broadcast(_ event: ClientEvent) {
         for l in eventListeners { l.continuation.yield(event) }
+        deliverStrict(event, to: strictEventListeners)
+        if let resource = event.resource, let listeners = resourceEventListeners[resource] {
+            deliverStrict(event, to: listeners)
+        }
+    }
+
+    private func deliverStrict(_ event: ClientEvent, to listeners: [UInt64: AsyncThrowingStream<ClientEvent, Error>.Continuation]) {
+        for (id, continuation) in listeners {
+            switch continuation.yield(event) {
+            case .dropped:
+                continuation.finish(throwing: SubscriptionLagError(capacity: config.subscriptionBufferSize))
+                cancelTcpReceiver(id)
+            case .terminated:
+                cancelTcpReceiver(id)
+            case .enqueued:
+                break
+            @unknown default:
+                continuation.finish(throwing: SubscriptionLagError(capacity: config.subscriptionBufferSize))
+                cancelTcpReceiver(id)
+            }
+        }
     }
 
     private func transition(to newState: ConnectionState) async {
@@ -1230,6 +1392,10 @@ public actor AHPClient {
 
     private func removeEventListener(id: UInt64) {
         eventListeners.removeAll { $0.id == id }
+    }
+
+    private func removeStrictEventListener(id: UInt64) {
+        cancelTcpReceiver(id)
     }
 
     private func removeStateListener(id: UInt64) {
@@ -1254,6 +1420,10 @@ public actor AHPClient {
     /// the number of per-URI subscription listeners attached for `uri`.
     internal func _listenerCount(forUri uri: String) -> Int {
         return perUriListeners[uri]?.count ?? 0
+    }
+
+    internal func _strictEventListenerCount() -> Int {
+        strictEventListeners.count + resourceEventListeners.values.reduce(0) { $0 + $1.count }
     }
 
     /// Internal accessor used by tests. Counts the in-flight pending
@@ -1321,10 +1491,14 @@ public struct ResourceRequestHandlers: Sendable {
 
 private final class PendingEntry: @unchecked Sendable {
     let continuation: CheckedContinuation<Data, Error>
+    let ownsTcpCreation: Bool
+    let receiverId: UInt64?
     var timeoutTask: Task<Void, Never>?
 
-    init(continuation: CheckedContinuation<Data, Error>) {
+    init(continuation: CheckedContinuation<Data, Error>, ownsTcpCreation: Bool = false, receiverId: UInt64? = nil) {
         self.continuation = continuation
+        self.ownsTcpCreation = ownsTcpCreation
+        self.receiverId = receiverId
     }
 }
 

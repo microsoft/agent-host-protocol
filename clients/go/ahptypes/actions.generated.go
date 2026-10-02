@@ -123,6 +123,16 @@ const (
 	ActionTypeAutomationRunSessionRemoved         ActionType = "automationRun/sessionRemoved"
 	ActionTypeAutomationRunPrimarySessionChanged  ActionType = "automationRun/primarySessionChanged"
 	ActionTypeAutomationRunCancelRequested        ActionType = "automationRun/cancelRequested"
+	ActionTypeTcpInput                            ActionType = "tcp/input"
+	ActionTypeTcpData                             ActionType = "tcp/data"
+	ActionTypeTcpInputConsumed                    ActionType = "tcp/inputConsumed"
+	ActionTypeTcpDataConsumed                     ActionType = "tcp/dataConsumed"
+	ActionTypeTcpInputEof                         ActionType = "tcp/inputEof"
+	ActionTypeTcpDataEof                          ActionType = "tcp/dataEof"
+	ActionTypeTcpClientClose                      ActionType = "tcp/clientClose"
+	ActionTypeTcpHostClose                        ActionType = "tcp/hostClose"
+	ActionTypeTcpClientReset                      ActionType = "tcp/clientReset"
+	ActionTypeTcpHostReset                        ActionType = "tcp/hostReset"
 )
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1653,6 +1663,72 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
+// Client bytes. Never apply optimistically to the authoritative reducer.
+// Write to the destination only when accepted input.receivedBytes advances.
+type TcpInputAction struct {
+	Type ActionType `json:"type"`
+	// Absolute decoded-byte offset.
+	Offset int64 `json:"offset"`
+	// Nonempty canonical padded RFC 4648 base64; no whitespace.
+	Data string `json:"data"`
+}
+
+// Host bytes. Deliver once, only when output.receivedBytes advances.
+type TcpDataAction struct {
+	Type ActionType `json:"type"`
+	// Absolute decoded-byte offset.
+	Offset int64 `json:"offset"`
+	// Nonempty canonical padded RFC 4648 base64; no whitespace.
+	Data string `json:"data"`
+}
+
+// Cumulative input bytes released from the host's bounded write buffer.
+// Not an acknowledgment that the destination application processed the bytes.
+type TcpInputConsumedAction struct {
+	Type          ActionType `json:"type"`
+	ConsumedBytes int64      `json:"consumedBytes"`
+}
+
+// Cumulative output bytes released by the client's bounded stream consumer.
+type TcpDataConsumedAction struct {
+	Type          ActionType `json:"type"`
+	ConsumedBytes int64      `json:"consumedBytes"`
+}
+
+// Half-close client input after all preceding input bytes have been written.
+type TcpInputEofAction struct {
+	Type        ActionType `json:"type"`
+	FinalOffset int64      `json:"finalOffset"`
+}
+
+// Half-close host output after all preceding output bytes have been delivered.
+type TcpDataEofAction struct {
+	Type        ActionType `json:"type"`
+	FinalOffset int64      `json:"finalOffset"`
+}
+
+// Client's final close. Respond with hostClose if not already sent.
+type TcpClientCloseAction struct {
+	Type ActionType `json:"type"`
+}
+
+// Host's final close. Respond with clientClose if not already sent.
+type TcpHostCloseAction struct {
+	Type ActionType `json:"type"`
+}
+
+// Abort both directions and discard buffered payload.
+type TcpClientResetAction struct {
+	Type   ActionType     `json:"type"`
+	Reason TcpResetReason `json:"reason"`
+}
+
+// Abort both directions and discard buffered payload.
+type TcpHostResetAction struct {
+	Type   ActionType     `json:"type"`
+	Reason TcpResetReason `json:"reason"`
+}
+
 // Ask the host to create a durable automation at a client-chosen resource.
 //
 // Clients may dispatch this action only when the host advertises its `create`
@@ -1877,6 +1953,16 @@ func (*TerminalCommandDetectionAvailableAction) isStateAction()   {}
 func (*TerminalCommandExecutedAction) isStateAction()             {}
 func (*TerminalCommandFinishedAction) isStateAction()             {}
 func (*ResourceWatchChangedAction) isStateAction()                {}
+func (*TcpInputAction) isStateAction()                            {}
+func (*TcpDataAction) isStateAction()                             {}
+func (*TcpInputConsumedAction) isStateAction()                    {}
+func (*TcpDataConsumedAction) isStateAction()                     {}
+func (*TcpInputEofAction) isStateAction()                         {}
+func (*TcpDataEofAction) isStateAction()                          {}
+func (*TcpClientCloseAction) isStateAction()                      {}
+func (*TcpHostCloseAction) isStateAction()                        {}
+func (*TcpClientResetAction) isStateAction()                      {}
+func (*TcpHostResetAction) isStateAction()                        {}
 func (*AutomationCreateRequestedAction) isStateAction()           {}
 func (*AutomationUpdateRequestedAction) isStateAction()           {}
 func (*AutomationSetAction) isStateAction()                       {}
@@ -2467,6 +2553,66 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "resourceWatch/changed":
 		var value ResourceWatchChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/input":
+		var value TcpInputAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/data":
+		var value TcpDataAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/inputConsumed":
+		var value TcpInputConsumedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/dataConsumed":
+		var value TcpDataConsumedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/inputEof":
+		var value TcpInputEofAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/dataEof":
+		var value TcpDataEofAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/clientClose":
+		var value TcpClientCloseAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/hostClose":
+		var value TcpHostCloseAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/clientReset":
+		var value TcpClientResetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tcp/hostReset":
+		var value TcpHostResetAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

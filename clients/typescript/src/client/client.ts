@@ -66,6 +66,9 @@ import type {
   ServerCommandMap,
 } from '../types/common/messages.js';
 import type { ActionEnvelope } from '../types/common/actions.js';
+import type { TcpConnectionSubscription } from '../types/channels-tcp/commands.js';
+import { TcpDataEncoding, TcpResetReason, type TcpConnectionsCapability } from '../types/channels-tcp/state.js';
+import { TcpConnection, TcpConnectionError, reconcileTcpConnections, validateTcpRequest, validateTcpSnapshot, type TcpBinding } from './tcp-connection.js';
 import type {
   SessionAddedParams,
   SessionRemovedParams,
@@ -74,7 +77,7 @@ import type {
 import type { AuthRequiredParams } from '../types/common/notifications.js';
 import type { URI } from '../types/common/state.js';
 import { JsonRpcErrorCodes } from '../types/common/errors.js';
-import { AsyncBroadcastQueue } from './async-queue.js';
+import { AsyncBroadcastQueue, type EventStreamOptions } from './async-queue.js';
 import type { ClientEvent, ConnectionState, SubscriptionEvent } from './events.js';
 import {
   ClientClosedError,
@@ -249,6 +252,19 @@ export class AhpClient {
   private state: ConnectionState = { status: 'idle' };
   private receiveLoop: Promise<void> | null = null;
   private serverRequestHandler: ServerRequestHandler | null = null;
+  private clientId?: string;
+  private tcpCapability?: TcpConnectionsCapability;
+  private readonly ownedTcp = new Map<URI, TcpConnection>();
+
+  /** Owned live or suspended TCP streams, suitable for reconnectTcpConnections. */
+  get tcpConnections(): readonly TcpConnection[] { return [...this.ownedTcp.values()]; }
+
+  /** @internal Preserve negotiated metadata and sequence allocation across a host-runtime reconnect. */
+  inheritHandshake(previous: AhpClient): void {
+    this.clientId = previous.clientId;
+    this.tcpCapability = previous.tcpCapability;
+    this.nextClientSeq = Math.max(this.nextClientSeq, previous.nextClientSeq);
+  }
 
   constructor(transport: AhpTransport, config: AhpClientConfig = {}) {
     this.transport = transport;
@@ -275,9 +291,12 @@ export class AhpClient {
    *
    * Each call returns a fresh independent iterator. Events are also
    * delivered to the matching per-URI {@link Subscription}.
+   * For TCP, attach with `overflow: 'error'` before sending subscribe.create.
+   * A strict receiver terminates on overflow; never resume a byte stream
+   * after a SubscriptionLagError.
    */
-  events(): AsyncIterableIterator<ClientEvent> {
-    return this.allEvents.reader();
+  events(options: EventStreamOptions = {}): AsyncIterableIterator<ClientEvent> {
+    return this.allEvents.reader(options);
   }
 
   /**
@@ -319,7 +338,11 @@ export class AhpClient {
    * pending request with {@link ClientClosedError}, and terminates all
    * subscription and event streams.
    */
-  async shutdown(): Promise<void> {
+  async shutdown(options: { preserveTcpConnections?: boolean } = {}): Promise<void> {
+    for (const connection of this.ownedTcp.values()) {
+      if (options.preserveTcpConnections) connection.suspend();
+      else connection.dispose();
+    }
     if (this.state.status === 'closing' || this.state.status === 'closed') return;
     this.setState({ status: 'closing' });
     // Tear down first so pending requests reject with ClientClosedError
@@ -361,7 +384,10 @@ export class AhpClient {
         : {}),
       ...(args.locale !== undefined ? { locale: args.locale } : {}),
     };
-    return this.request('initialize', params);
+    return this.requestWithHandler('initialize', params, result => {
+      this.clientId = args.clientId;
+      this.tcpCapability = result.tcpConnections;
+    });
   }
 
   /** Re-establish a dropped connection. */
@@ -377,6 +403,119 @@ export class AhpClient {
       subscriptions: [...args.subscriptions],
     };
     return this.request('reconnect', params);
+  }
+
+  /**
+   * Create an owned, flow-controlled TCP stream. The child route is installed
+   * during response processing, before any subsequent action is dispatched.
+   */
+  async openTcpConnection(session: URI, create: TcpConnectionSubscription): Promise<TcpConnection> {
+    this.assertOpen();
+    validateTcpRequest(session, create);
+    if (!this.clientId || !Array.isArray(this.tcpCapability?.encodings) || !this.tcpCapability.encodings.includes(TcpDataEncoding.Base64)) {
+      throw new TcpConnectionError('Initialize with a TCP-capable host before opening a connection');
+    }
+    const clientId = this.clientId;
+    let connection: TcpConnection | undefined;
+    let resource: URI | undefined;
+    try {
+      await this.requestWithHandler('subscribe', { channel: session, create }, result => {
+        const child = result.snapshot?.resource;
+        if (typeof child === 'string' && child.startsWith('ahp-tcp:') && !this.ownedTcp.has(child)) resource = child;
+        if (!result.snapshot) throw new TcpConnectionError('TCP creation requires a snapshot');
+        const state = validateTcpSnapshot(result.snapshot, session, create);
+        if (!resource) throw new TcpConnectionError('Host reused an existing TCP resource');
+        connection = new TcpConnection(resource, state, clientId, result.snapshot.fromSeq, this.tcpBinding(resource));
+        this.ownedTcp.set(resource, connection);
+      }, result => {
+        const child = result.snapshot?.resource;
+        if (typeof child === 'string' && child.startsWith('ahp-tcp:') && !this.ownedTcp.has(child)) {
+          this.notify('unsubscribe', { channel: child });
+        }
+      });
+      if (!connection) throw new TcpConnectionError('TCP creation did not return a connection');
+      return connection;
+    } catch (error) {
+      if (resource !== undefined && !this.isClosed()) this.notify('unsubscribe', { channel: resource });
+      throw error;
+    }
+  }
+
+  /**
+   * Resume original suspended streams on a replacement transport. Replay,
+   * pending writes, sequence allocation and snapshot failure are handled here.
+   * The caller still owns transport selection and reconnection timing.
+   */
+  async reconnectTcpConnections(args: {
+    clientId: string;
+    lastSeenServerSeq: number;
+    subscriptions: readonly URI[];
+  }, connections: readonly TcpConnection[]): Promise<ReconnectResult> {
+    this.assertOpen();
+    if (!Number.isSafeInteger(args.lastSeenServerSeq) || args.lastSeenServerSeq < 0) {
+      throw new TcpConnectionError('Invalid TCP reconnect checkpoint');
+    }
+    const retained = [...connections];
+    const resources = new Set<URI>();
+    const consumerCheckpoint = args.lastSeenServerSeq;
+    let lastSeenServerSeq = consumerCheckpoint;
+    let sequenceFloor = this.nextClientSeq;
+    for (const connection of retained) {
+      if (connection.clientId !== args.clientId || !connection.canResume ||
+          resources.has(connection.resource) || this.ownedTcp.has(connection.resource)) {
+        throw new TcpConnectionError('TCP reconnect requires distinct suspended streams owned by this client');
+      }
+      resources.add(connection.resource);
+      lastSeenServerSeq = Math.min(lastSeenServerSeq, connection.lastServerSeq);
+      sequenceFloor = Math.max(sequenceFloor, connection.sequenceFloor + 1);
+    }
+    this.nextClientSeq = sequenceFloor;
+    this.clientId = args.clientId;
+    this.tcpCapability ??= retained.find(connection => connection.capability)?.capability;
+    for (const connection of retained) {
+      connection.beginResume(args.clientId, this.tcpBinding(connection.resource));
+      this.ownedTcp.set(connection.resource, connection);
+    }
+    try {
+      return await this.requestWithHandler('reconnect', {
+        channel: 'ahp-root://', clientId: args.clientId, lastSeenServerSeq,
+        subscriptions: [...new Set([...args.subscriptions, ...resources])],
+      }, result => {
+        for (const connection of retained) {
+          if (connection.isClosed) {
+            this.notify('unsubscribe', { channel: connection.resource });
+          }
+        }
+        const reconciled = reconcileTcpConnections(retained, result, consumerCheckpoint);
+        if (result.type === 'replay') {
+          for (const connection of retained) connection.finishResume();
+        }
+        return reconciled;
+      }, () => {
+        for (const resource of resources) {
+          if (!this.ownedTcp.has(resource)) this.notify('unsubscribe', { channel: resource });
+        }
+      });
+    } catch (error) {
+      for (const connection of retained) {
+        if (this.isClosed()) connection.suspend();
+        else connection.fail(error instanceof Error ? error : new TcpConnectionError(String(error)));
+      }
+      throw error;
+    }
+  }
+
+  private tcpBinding(resource: URI): TcpBinding {
+    return {
+      capability: this.tcpCapability,
+      nextSeq: () => this.nextClientSeq++,
+      sequenceFloor: () => this.nextClientSeq - 1,
+      send: (seq, action) => { this.dispatch(resource, action, seq); },
+      detach: unsubscribe => {
+        this.ownedTcp.delete(resource);
+        if (unsubscribe && !this.isClosed()) this.notify('unsubscribe', { channel: resource });
+      },
+    };
   }
 
   /**
@@ -429,6 +568,11 @@ export class AhpClient {
    * No-op after the client has been shut down.
    */
   async unsubscribe(uri: URI): Promise<void> {
+    const connection = this.ownedTcp.get(uri);
+    if (connection) {
+      connection.dispose();
+      return;
+    }
     if (this.isClosed()) return;
     const queue = this.subscriptions.get(uri);
     if (queue) {
@@ -594,6 +738,15 @@ export class AhpClient {
     method: M,
     params: CommandMap[M]['params'],
   ): Promise<CommandMap[M]['result']> {
+    return this.requestWithHandler(method, params);
+  }
+
+  private requestWithHandler<M extends keyof CommandMap>(
+    method: M,
+    params: CommandMap[M]['params'],
+    onResult?: (result: CommandMap[M]['result']) => CommandMap[M]['result'] | void,
+    onLateResult?: (result: CommandMap[M]['result']) => void,
+  ): Promise<CommandMap[M]['result']> {
     this.assertOpen();
     const id = this.nextRequestId++;
     const msg: JsonRpcRequest = {
@@ -604,8 +757,24 @@ export class AhpClient {
     };
 
     return new Promise<CommandMap[M]['result']>((resolve, reject) => {
+      let timedOut = false;
       const pending: PendingRequest = {
-        resolve: value => resolve(value as CommandMap[M]['result']),
+        resolve: value => {
+          try {
+            const result = value as CommandMap[M]['result'];
+            if (timedOut) onLateResult?.(result);
+            else {
+              const mapped = onResult?.(result);
+              resolve(mapped === undefined ? result : mapped);
+            }
+          } catch (error) {
+            if (timedOut) {
+              this.tearDown({ type: 'transport', error: new TransportError('protocol', 'Invalid late response', { cause: error }) });
+            } else {
+              reject(error);
+            }
+          }
+        },
         reject,
         method: method as string,
         timer: null,
@@ -614,7 +783,10 @@ export class AhpClient {
 
       if (this.requestTimeoutMs > 0) {
         pending.timer = setTimeout(() => {
-          if (this.pending.delete(id)) {
+          if (this.pending.has(id)) {
+            timedOut = true;
+            if (!onLateResult) this.pending.delete(id);
+            pending.timer = null;
             reject(new RpcTimeoutError(method as string, this.requestTimeoutMs));
           }
         }, this.requestTimeoutMs);
@@ -683,6 +855,7 @@ export class AhpClient {
   private tearDown(reason: { type: 'shutdown' } | { type: 'transport'; error: TransportError }): void {
     if (this.state.status === 'closed') return;
     this.setState({ status: 'closed', reason });
+    for (const connection of this.ownedTcp.values()) connection.suspend();
 
     // Fail every pending request.
     const failure = reason.type === 'shutdown' ? new ClientClosedError() : reason.error;
@@ -737,6 +910,12 @@ export class AhpClient {
         }
       }
     } catch (err) {
+      this.allEvents.failStrictReaders(
+        new TransportError('protocol', 'malformed inbound frame', { cause: err }),
+      );
+      for (const connection of this.ownedTcp.values()) {
+        connection.abort(TcpResetReason.ProtocolError, new TransportError('protocol', 'Malformed TCP transport frame', { cause: err }));
+      }
       // A single malformed frame doesn't tear down the channel — a
       // well-behaved server should not send them, and a transient bad
       // frame from a peer that recovers shouldn't kill in-flight
@@ -829,6 +1008,16 @@ export class AhpClient {
     switch (n.method) {
       case 'action': {
         const env = n.params as ActionEnvelope;
+        if (!env || typeof env.channel !== 'string' || !Number.isSafeInteger(env.serverSeq) || env.serverSeq < 0 ||
+            !env.action || typeof env.action.type !== 'string') {
+          const error = new TransportError('protocol', 'Invalid action envelope');
+          this.allEvents.failStrictReaders(error);
+          for (const connection of this.ownedTcp.values()) connection.abort(TcpResetReason.ProtocolError, error);
+          // eslint-disable-next-line no-console
+          console.warn('AhpClient: invalid action envelope');
+          return;
+        }
+        this.ownedTcp.get(env.channel)?.accept(env);
         this.fanOut(env.channel, { type: 'action', params: env });
         break;
       }

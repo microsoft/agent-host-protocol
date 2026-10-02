@@ -13,6 +13,76 @@ import XCTest
 
 final class NativeReducerTests: XCTestCase {
 
+    private func tcpState(size: Int = 8) -> TcpConnectionState {
+        TcpConnectionState(
+            session: "ahp-session:/test", target: TcpTarget(host: "localhost", port: 3000),
+            encoding: .base64,
+            input: FlowControlledByteDirectionState(windowBytes: size, maximumChunkSize: size, receivedBytes: 0, consumedBytes: 0),
+            output: FlowControlledByteDirectionState(windowBytes: size, maximumChunkSize: size, receivedBytes: 0, consumedBytes: 0),
+            clientClosed: false, hostClosed: false
+        )
+    }
+
+    func testTcpFourMiBChunkAndAtomicNativeWrapper() throws {
+        let size = 4 * 1024 * 1024
+        let data = String(repeating: "AAAA", count: size / 3) + "AA=="
+        let before = tcpState(size: size)
+        let action = StateAction.tcpInput(TcpInputAction(type: .tcpInput, offset: 0, data: data))
+        var state = before
+        try AHPTcpReducer().reduce(into: &state, action: action)
+        XCTAssertEqual(state.input.receivedBytes, size)
+        XCTAssertEqual(before.input.receivedBytes, 0)
+        try AHPTcpReducer().reduce(into: &state, action: action)
+        XCTAssertEqual(state.input.receivedBytes, size)
+        let saved = try JSONEncoder().encode(state)
+        XCTAssertThrowsError(try AHPTcpReducer().reduce(
+            into: &state, action: .tcpInput(TcpInputAction(type: .tcpInput, offset: size, data: "AA=="))
+        )) { error in
+            XCTAssertEqual(String(describing: error), "Invalid TCP action: receive window exceeded")
+        }
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: saved) as? NSDictionary,
+                       try JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? NSDictionary)
+    }
+
+    func testTcpSafeIntegerCounters() throws {
+        let max = 9007199254740991
+        var state = tcpState()
+        state.input.receivedBytes = max - 1
+        state.input.consumedBytes = max - 1
+        state = try tcpReducer(state: state, action: .tcpInput(TcpInputAction(type: .tcpInput, offset: max - 1, data: "AA==")))
+        state = try tcpReducer(state: state, action: .tcpInputConsumed(TcpInputConsumedAction(type: .tcpInputConsumed, consumedBytes: max)))
+        state = try tcpReducer(state: state, action: .tcpInputEof(TcpInputEofAction(type: .tcpInputEof, finalOffset: max)))
+        XCTAssertEqual(state.input.receivedBytes, max)
+        XCTAssertEqual(state.input.consumedBytes, max)
+        XCTAssertEqual(state.input.eofAtBytes, max)
+        for value in [-1, max + 1, Int.max] {
+            let actions: [StateAction] = [
+                .tcpInput(TcpInputAction(type: .tcpInput, offset: value, data: "AA==")),
+                .tcpData(TcpDataAction(type: .tcpData, offset: value, data: "AA==")),
+                .tcpInputConsumed(TcpInputConsumedAction(type: .tcpInputConsumed, consumedBytes: value)),
+                .tcpDataConsumed(TcpDataConsumedAction(type: .tcpDataConsumed, consumedBytes: value)),
+                .tcpInputEof(TcpInputEofAction(type: .tcpInputEof, finalOffset: value)),
+                .tcpDataEof(TcpDataEofAction(type: .tcpDataEof, finalOffset: value)),
+            ]
+            for action in actions {
+                XCTAssertThrowsError(try AHPTcpReducer().reduce(into: &state, action: action)) { error in
+                    XCTAssertEqual(String(describing: error), "Invalid TCP action: offset must be a nonnegative safe integer")
+                }
+                XCTAssertEqual(state.input.receivedBytes, max)
+            }
+        }
+    }
+
+    func testTcpRejectsWhitespaceAndUnicodeBase64() {
+        for data in ["AAA\n", "AAA\r", "AAA\t", "AAA ", "AAA\u{e9}", "AA\u{1f600}"] {
+            XCTAssertThrowsError(try tcpReducer(
+                state: tcpState(), action: .tcpInput(TcpInputAction(type: .tcpInput, offset: 0, data: data))
+            )) { error in
+                XCTAssertEqual(String(describing: error), "Invalid TCP action: base64 encoding")
+            }
+        }
+    }
+
     // MARK: - Constants
 
     private let S = "ahp-session:/test-session"

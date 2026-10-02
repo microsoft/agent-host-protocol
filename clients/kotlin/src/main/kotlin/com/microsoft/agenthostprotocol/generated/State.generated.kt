@@ -73,6 +73,89 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 /**
+ * Payload encodings advertised by the host.
+ */
+@Serializable(with = TcpDataEncodingSerializer::class)
+@JvmInline
+value class TcpDataEncoding(val rawValue: String) {
+    companion object {
+        val BASE64: TcpDataEncoding = TcpDataEncoding("base64")
+    }
+}
+
+internal object TcpDataEncodingSerializer : KSerializer<TcpDataEncoding> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TcpDataEncoding", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TcpDataEncoding) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TcpDataEncoding =
+        TcpDataEncoding(decoder.decodeString())
+}
+
+/**
+ * Endpoint that closes or resets a connection.
+ */
+@Serializable
+enum class TcpEndpoint {
+    @SerialName("client")
+    CLIENT,
+    @SerialName("host")
+    HOST
+}
+
+/**
+ * Why a connection was aborted.
+ */
+@Serializable(with = TcpResetReasonSerializer::class)
+@JvmInline
+value class TcpResetReason(val rawValue: String) {
+    companion object {
+        val CONNECTION_RESET: TcpResetReason = TcpResetReason("connectionReset")
+        val CONNECTION_ABORTED: TcpResetReason = TcpResetReason("connectionAborted")
+        val PROTOCOL_ERROR: TcpResetReason = TcpResetReason("protocolError")
+        val REPLAY_UNAVAILABLE: TcpResetReason = TcpResetReason("replayUnavailable")
+        val POLICY_REVOKED: TcpResetReason = TcpResetReason("policyRevoked")
+        val SESSION_DISPOSED: TcpResetReason = TcpResetReason("sessionDisposed")
+        val INTERNAL_ERROR: TcpResetReason = TcpResetReason("internalError")
+    }
+}
+
+internal object TcpResetReasonSerializer : KSerializer<TcpResetReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TcpResetReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TcpResetReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TcpResetReason =
+        TcpResetReason(decoder.decodeString())
+}
+
+/**
+ * Expected connection establishment failures.
+ */
+@Serializable(with = TcpConnectionOpenFailureReasonSerializer::class)
+@JvmInline
+value class TcpConnectionOpenFailureReason(val rawValue: String) {
+    companion object {
+        val CONNECTION_FAILED: TcpConnectionOpenFailureReason = TcpConnectionOpenFailureReason("connectionFailed")
+        val NAME_RESOLUTION_FAILED: TcpConnectionOpenFailureReason = TcpConnectionOpenFailureReason("nameResolutionFailed")
+        val RESOURCE_SHORTAGE: TcpConnectionOpenFailureReason = TcpConnectionOpenFailureReason("resourceShortage")
+        val SESSION_NOT_READY: TcpConnectionOpenFailureReason = TcpConnectionOpenFailureReason("sessionNotReady")
+    }
+}
+
+internal object TcpConnectionOpenFailureReasonSerializer : KSerializer<TcpConnectionOpenFailureReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TcpConnectionOpenFailureReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TcpConnectionOpenFailureReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TcpConnectionOpenFailureReason =
+        TcpConnectionOpenFailureReason(decoder.decodeString())
+}
+
+/**
  * Policy configuration state for a model.
  */
 @Serializable
@@ -5430,6 +5513,84 @@ data class ResourceChange(
 )
 
 @Serializable
+data class TcpConnectionState(
+    val session: String,
+    val target: TcpTarget,
+    val encoding: TcpDataEncoding,
+    /**
+     * Client to destination socket.
+     */
+    val input: FlowControlledByteDirectionState,
+    /**
+     * Destination socket to client.
+     */
+    val output: FlowControlledByteDirectionState,
+    val clientClosed: Boolean,
+    val hostClosed: Boolean,
+    val reset: TcpResetState? = null
+)
+
+@Serializable
+data class TcpTarget(
+    /**
+     * DNS name or IP literal, resolved and connected in the host endpoint's network.
+     */
+    val host: String,
+    /**
+     * Destination port.
+     */
+    val port: Long
+)
+
+@Serializable
+data class TcpResetState(
+    val source: TcpEndpoint,
+    val reason: TcpResetReason
+)
+
+@Serializable
+data class FlowControlledByteDirectionState(
+    /**
+     * Maximum accepted-but-not-consumed decoded bytes.
+     */
+    val windowBytes: Long,
+    /**
+     * Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.
+     */
+    val maximumChunkSize: Long,
+    /**
+     * Cumulative accepted bytes.
+     */
+    val receivedBytes: Long,
+    /**
+     * Cumulative bytes released by the bounded consumer.
+     */
+    val consumedBytes: Long,
+    /**
+     * Present after EOF; equals receivedBytes permanently.
+     */
+    val eofAtBytes: Long? = null
+)
+
+@Serializable
+data class TcpConnectionsCapability(
+    /**
+     * Supported encodings. The base64 profile MUST be supported.
+     */
+    val encodings: List<TcpDataEncoding>,
+    /**
+     * Informational limit; runtime policy may impose a lower limit.
+     */
+    val maximumConnectionsPerClient: Long? = null
+)
+
+@Serializable
+data class TcpConnectionOpenErrorData(
+    val reason: TcpConnectionOpenFailureReason,
+    val retryable: Boolean? = null
+)
+
+@Serializable
 data class AutomationSessionOrigin(
     val kind: SessionOriginKind,
     /**
@@ -7422,6 +7583,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
+    @JvmInline value class Tcp(val value: TcpConnectionState) : SnapshotState
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
@@ -7443,7 +7605,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. AutomationRunState has required
+        // Try the most distinctive shape first. TcpConnectionState has required
+        // `input`, `output`, and `target`; AutomationRunState has required
         // `automation`, `origin`, and `sessions`; AutomationState has
         // required `entries`; SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
@@ -7453,6 +7616,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
         return when {
+            obj.containsKey("input") && obj.containsKey("output") && obj.containsKey("target") ->
+                SnapshotState.Tcp(input.json.decodeFromJsonElement(TcpConnectionState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -7475,6 +7640,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val output = encoder as? JsonEncoder
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
+            is SnapshotState.Tcp -> output.json.encodeToJsonElement(TcpConnectionState.serializer(), value.value)
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)

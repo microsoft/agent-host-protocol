@@ -16,6 +16,8 @@ namespace Microsoft.AgentHostProtocol.Hosts;
 /// Port of Swift's <c>HostClientHandle</c> (Swift surfaces the reconnect case as
 /// <c>hostReconnected</c>; the .NET typed-error set folds that into "not the
 /// connection you held — reacquire").
+/// Owned TCP streams opened through this handle survive replay reconnects even
+/// though the handle itself becomes stale. Removal/shutdown terminates them.
 /// </summary>
 public sealed class HostClientHandle
 {
@@ -56,6 +58,26 @@ public sealed class HostClientHandle
     /// <see cref="HostNotConnectedException"/>). Mirrors Swift's <c>checkAlive()</c>.
     /// </summary>
     public void CheckAliveOrThrow() => CheckAlive();
+
+    /// <summary>Opens a TCP stream retained and replayed by this host's supervisor.</summary>
+    public async Task<TcpConnection> OpenTcpConnectionAsync(
+        string session, TcpConnectionSubscription create, CancellationToken cancellationToken = default)
+    {
+        CheckAlive();
+        var entry = _owner.TryGetEntry(HostId) ?? throw new HostShutDownException(HostId);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, entry.LifetimeCts.Token);
+        await entry.ConnectionGate.WaitAsync(linked.Token).ConfigureAwait(false);
+        try
+        {
+            var client = CheckAlive();
+            using var creation = CancellationTokenSource.CreateLinkedTokenSource(linked.Token, entry.TcpCreations.Token);
+            var connection = await client.OpenTcpConnectionAsync(session, create, creation.Token).ConfigureAwait(false);
+            entry.TcpConnections[connection.Resource] = connection;
+            connection.OnRelease(() => entry.TcpConnections.TryRemove(connection.Resource, out _));
+            return connection;
+        }
+        finally { entry.ConnectionGate.Release(); }
+    }
 
     /// <summary>
     /// Dispatches an action through this connection on <paramref name="channel"/>,

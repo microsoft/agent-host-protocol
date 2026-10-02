@@ -293,6 +293,7 @@ export class HostRuntime {
   private readonly shutdownController = new AbortController();
   private manualReconnectController = new AbortController();
   private supervisorPromise: Promise<void> | null = null;
+  private previousClient: AhpClient | null = null;
   /**
    * Resolved by {@link reconnect} when the manual-reconnect cycle has
    * actually been observed by the supervisor (state transitions to
@@ -514,6 +515,8 @@ export class HostRuntime {
       // 'disconnected' — fall through to the retry/backoff path.
     }
 
+    for (const connection of this.previousClient?.tcpConnections ?? []) connection.dispose();
+    this.previousClient = null;
     // Final cleanup. The handle source mirrors shared state already.
     this.handleSource.currentClient = null;
     this.handleSource.generation = this.shared.generation;
@@ -553,6 +556,7 @@ export class HostRuntime {
       const transport = transportResult;
 
       const client = new AhpClient(transport, this.config.clientConfig);
+      if (this.previousClient) client.inheritHandshake(this.previousClient);
       client.connect();
       // Attach the events stream BEFORE the handshake so any
       // notifications the server pushes between the handshake response
@@ -566,7 +570,8 @@ export class HostRuntime {
           serverSeq: this.shared.serverSeq,
           subscriptions: [...this.shared.subscriptions],
         };
-        const canReconnect = prior.serverSeq > 0 && prior.subscriptions.length > 0;
+        const tcpConnections = this.previousClient?.tcpConnections ?? [];
+        const canReconnect = tcpConnections.length > 0 || (prior.serverSeq > 0 && prior.subscriptions.length > 0);
 
         let reconnectResult: ReconnectResult | null = null;
         let initSnapshots: Snapshot[] | null = null;
@@ -579,11 +584,11 @@ export class HostRuntime {
         if (canReconnect) {
           try {
             const reconnectRes = await raceWithAbort(
-              client.reconnect({
+              client.reconnectTcpConnections({
                 clientId: this.shared.clientId,
                 lastSeenServerSeq: prior.serverSeq,
                 subscriptions: prior.subscriptions,
-              }),
+              }, tcpConnections),
               cancelSignal,
             );
             if (reconnectRes === ABORTED) throw new Error('reconnect aborted');
@@ -681,6 +686,7 @@ export class HostRuntime {
         // Commit shared state.
         this.shared.generation += 1;
         this.shared.currentClient = client;
+        this.previousClient = null;
         this.shared.lastConnectedAt = Date.now();
         this.shared.lastError = null;
         if (this.shared.serverSeq < initServerSeq) {
@@ -733,7 +739,11 @@ export class HostRuntime {
           // Connect failed mid-flight — shut the half-built client down so
           // we don't leak the transport.
           try {
-            await client.shutdown();
+            const preserveTcpConnections = this.shared.shutdownReason === null;
+            await client.shutdown({ preserveTcpConnections });
+            if (preserveTcpConnections && (client.tcpConnections.length > 0 || !this.previousClient?.tcpConnections.length)) {
+              this.previousClient = client;
+            }
           } catch {
             // best-effort
           }
@@ -790,7 +800,9 @@ export class HostRuntime {
     this.handleSource.currentClient = null;
     if (prev) {
       try {
-        await prev.shutdown();
+        const preserveTcpConnections = this.shared.shutdownReason === null;
+        await prev.shutdown({ preserveTcpConnections });
+        this.previousClient = preserveTcpConnections ? prev : null;
       } catch {
         // best-effort
       }

@@ -151,6 +151,11 @@ type pendingResult struct {
 	err   *ahptypes.JsonRpcError
 }
 
+type pendingRequest struct {
+	result   chan pendingResult
+	onResult func(json.RawMessage)
+}
+
 // outboundMsg is the writer goroutine's input queue payload.
 type outboundMsg struct {
 	msg ahptypes.JsonRpcMessage
@@ -159,36 +164,80 @@ type outboundMsg struct {
 }
 
 // EventStream is a top-level fan-in receiver over every inbound event
-// from a [Client]. Returned by [Client.Events].
+// from a [Client]. Returned by [Client.Events] or [Client.EventsStrict].
 type EventStream struct {
-	events  chan ClientEvent
-	closeMu sync.Mutex
-	closed  bool
+	events   chan ClientEvent
+	closeMu  sync.Mutex
+	closed   bool
+	strict   bool
+	err      error
+	onClose  func()
+	resource *string
 }
 
 // Events returns a receive-only channel of every [ClientEvent].
+// For a strict receiver, check [EventStream.Err] when this channel closes.
 func (s *EventStream) Events() <-chan ClientEvent { return s.events }
+
+// Err returns the terminal error, if any. A strict receiver records a
+// *SubscriptionLagError on overflow or a *TransportError for malformed input.
+// Already-buffered events form a valid prefix and can still be drained,
+// but no events after the gap are delivered.
+func (s *EventStream) Err() error {
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	return s.err
+}
 
 // Close stops the stream. Safe to call multiple times.
 func (s *EventStream) Close() {
 	s.closeMu.Lock()
-	defer s.closeMu.Unlock()
-	if s.closed {
-		return
+	onClose := s.closeLocked(nil)
+	s.closeMu.Unlock()
+	if onClose != nil {
+		onClose()
 	}
+}
+
+func (s *EventStream) closeLocked(err error) func() {
+	if s.closed {
+		return nil
+	}
+	s.err = err
 	s.closed = true
 	close(s.events)
+	onClose := s.onClose
+	s.onClose = nil
+	return onClose
 }
 
 func (s *EventStream) trySend(ev ClientEvent) {
+	var onClose func()
 	s.closeMu.Lock()
-	defer s.closeMu.Unlock()
-	if s.closed {
-		return
+	if !s.closed {
+		select {
+		case s.events <- ev:
+		default:
+			if s.strict {
+				onClose = s.closeLocked(&SubscriptionLagError{Capacity: cap(s.events)})
+			}
+		}
 	}
-	select {
-	case s.events <- ev:
-	default:
+	s.closeMu.Unlock()
+	if onClose != nil {
+		onClose()
+	}
+}
+
+func (s *EventStream) fail(err error) {
+	var onClose func()
+	s.closeMu.Lock()
+	if s.strict {
+		onClose = s.closeLocked(err)
+	}
+	s.closeMu.Unlock()
+	if onClose != nil {
+		onClose()
 	}
 }
 
@@ -229,19 +278,25 @@ type Client struct {
 
 	// pending is the request-correlation map keyed by JSON-RPC id.
 	pendingMu sync.Mutex
-	pending   map[uint64]chan pendingResult
+	pending   map[uint64]pendingRequest
 
 	// subscriptionsMu guards subscriptions and the all-events
 	// fan-out registry.
-	subscriptionsMu sync.Mutex
-	subscriptions   map[string][]*Subscription
-	eventListeners  []*EventStream
+	subscriptionsMu        sync.Mutex
+	subscriptions          map[string][]*Subscription
+	eventListeners         []*EventStream
+	resourceEventListeners map[string][]*EventStream
 
 	serverRequestMu      sync.Mutex
 	serverRequestHandler ServerRequestHandler
 
 	nextID        atomic.Uint64
 	nextClientSeq atomic.Int64
+	tcpMu         sync.Mutex
+	tcpClientID   string
+	tcpCapability *ahptypes.TcpConnectionsCapability
+	tcpStreams    map[*TCPConnection]struct{}
+	tcpDisposed   bool
 
 	// done closes once the client has begun teardown. Subsequent
 	// sends fail with [ErrShutdown].
@@ -268,7 +323,7 @@ func Connect(_ context.Context, transport Transport, cfg Config) (*Client, error
 		cfg:           cfg,
 		transport:     transport,
 		outbound:      make(chan outboundMsg, 64),
-		pending:       make(map[uint64]chan pendingResult),
+		pending:       make(map[uint64]pendingRequest),
 		subscriptions: make(map[string][]*Subscription),
 		done:          make(chan struct{}),
 	}
@@ -302,6 +357,14 @@ func (c *Client) Err() error {
 //
 // Safe to call multiple times.
 func (c *Client) Shutdown(ctx context.Context) error {
+	err := c.disposeTCPStreams(ctx)
+	return errors.Join(err, c.ShutdownPreservingTCP(ctx))
+}
+
+// ShutdownPreservingTCP closes this transport but retains owned TCP handles for
+// ReconnectTCPConnections. Ordinary Shutdown permanently disposes the handles,
+// including when the transport has already failed.
+func (c *Client) ShutdownPreservingTCP(ctx context.Context) error {
 	c.shutdownWithError(nil)
 	doneCh := make(chan struct{})
 	go func() { c.wg.Wait(); close(doneCh) }()
@@ -334,7 +397,8 @@ func (c *Client) shutdownWithError(err error) {
 			failErr.Message = fmt.Sprintf("client shut down: %v", err)
 		}
 		c.pendingMu.Lock()
-		for id, ch := range c.pending {
+		for id, request := range c.pending {
+			ch := request.result
 			select {
 			case ch <- pendingResult{err: failErr}:
 			default:
@@ -348,6 +412,10 @@ func (c *Client) shutdownWithError(err error) {
 		c.subscriptionsMu.Lock()
 		subs := c.subscriptions
 		listeners := c.eventListeners
+		for _, list := range c.resourceEventListeners {
+			listeners = append(listeners, list...)
+		}
+		c.resourceEventListeners = nil
 		c.subscriptions = map[string][]*Subscription{}
 		c.eventListeners = nil
 		c.subscriptionsMu.Unlock()
@@ -412,11 +480,13 @@ func (c *Client) runReader() {
 		msg, err := c.transport.Recv(ctx)
 		cancel()
 		if err != nil {
+			c.failStrictEvents(err)
 			c.shutdownWithError(fmt.Errorf("ahp: transport recv: %w", err))
 			return
 		}
 		parsed, perr := msg.IntoParsed()
 		if perr != nil {
+			c.failStrictEvents(perr)
 			// Skip malformed frames; protocol resync is the server's
 			// responsibility.
 			continue
@@ -461,7 +531,7 @@ func (c *Client) dispatch(msg ahptypes.JsonRpcMessage) {
 
 func (c *Client) deliver(id uint64, r pendingResult) {
 	c.pendingMu.Lock()
-	ch, ok := c.pending[id]
+	request, ok := c.pending[id]
 	if ok {
 		delete(c.pending, id)
 	}
@@ -469,6 +539,10 @@ func (c *Client) deliver(id uint64, r pendingResult) {
 	if !ok {
 		return
 	}
+	if r.err == nil && request.onResult != nil {
+		request.onResult(r.value)
+	}
+	ch := request.result
 	ch <- r
 	close(ch)
 }
@@ -478,33 +552,50 @@ func (c *Client) handleNotification(n ahptypes.JsonRpcNotification) {
 	case "action":
 		var env ahptypes.ActionEnvelope
 		if err := json.Unmarshal(n.Params, &env); err != nil {
+			c.failStrictEvents(&TransportError{Kind: "protocol", Err: err})
 			return
 		}
 		c.fanOut(env.Channel, SubscriptionEventAction{Envelope: env})
 	case "root/sessionAdded":
 		var p ahptypes.SessionAddedParams
 		if err := json.Unmarshal(n.Params, &p); err != nil {
+			c.failStrictEvents(&TransportError{Kind: "protocol", Err: err})
 			return
 		}
 		c.fanOut(p.Channel, SubscriptionEventSessionAdded{Params: p})
 	case "root/sessionRemoved":
 		var p ahptypes.SessionRemovedParams
 		if err := json.Unmarshal(n.Params, &p); err != nil {
+			c.failStrictEvents(&TransportError{Kind: "protocol", Err: err})
 			return
 		}
 		c.fanOut(p.Channel, SubscriptionEventSessionRemoved{Params: p})
 	case "root/sessionSummaryChanged":
 		var p ahptypes.SessionSummaryChangedParams
 		if err := json.Unmarshal(n.Params, &p); err != nil {
+			c.failStrictEvents(&TransportError{Kind: "protocol", Err: err})
 			return
 		}
 		c.fanOut(p.Channel, SubscriptionEventSessionSummaryChanged{Params: p})
 	case "auth/required":
 		var p ahptypes.AuthRequiredParams
 		if err := json.Unmarshal(n.Params, &p); err != nil {
+			c.failStrictEvents(&TransportError{Kind: "protocol", Err: err})
 			return
 		}
 		c.fanOut(p.Channel, SubscriptionEventAuthRequired{Params: p})
+	}
+}
+
+func (c *Client) failStrictEvents(err error) {
+	c.subscriptionsMu.Lock()
+	listeners := append([]*EventStream(nil), c.eventListeners...)
+	for _, list := range c.resourceEventListeners {
+		listeners = append(listeners, list...)
+	}
+	c.subscriptionsMu.Unlock()
+	for _, listener := range listeners {
+		listener.fail(err)
 	}
 }
 
@@ -512,6 +603,7 @@ func (c *Client) fanOut(channel string, ev SubscriptionEvent) {
 	c.subscriptionsMu.Lock()
 	subs := append([]*Subscription(nil), c.subscriptions[channel]...)
 	listeners := append([]*EventStream(nil), c.eventListeners...)
+	listeners = append(listeners, c.resourceEventListeners[channel]...)
 	c.subscriptionsMu.Unlock()
 	for _, s := range subs {
 		s.trySend(ev)
@@ -638,6 +730,10 @@ func (c *Client) handleServerRequest(req ahptypes.JsonRpcRequest) {
 // Request sends a JSON-RPC request and decodes the response into out.
 // If out is nil, the result is discarded.
 func (c *Client) Request(ctx context.Context, method string, params any, out any) error {
+	return c.requestWithLateResult(ctx, method, params, out, nil, nil)
+}
+
+func (c *Client) requestWithLateResult(ctx context.Context, method string, params any, out any, onLate func(json.RawMessage), onResult func(json.RawMessage)) error {
 	select {
 	case <-c.done:
 		return ErrShutdown
@@ -651,7 +747,8 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 	resultCh := make(chan pendingResult, 1)
 
 	c.pendingMu.Lock()
-	c.pending[id] = resultCh
+	request := pendingRequest{result: resultCh, onResult: onResult}
+	c.pending[id] = request
 	c.pendingMu.Unlock()
 
 	req := ahptypes.JsonRpcMessage{Request: &ahptypes.JsonRpcRequest{
@@ -661,9 +758,11 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 		Params:  rawParams,
 	}}
 	if err := c.send(ctx, req); err != nil {
-		c.pendingMu.Lock()
-		delete(c.pending, id)
-		c.pendingMu.Unlock()
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			c.abandonRequest(id, resultCh, onLate)
+		} else {
+			c.abandonRequest(id, resultCh, nil)
+		}
 		return err
 	}
 
@@ -688,13 +787,34 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 		}
 		return nil
 	case <-ctx.Done():
-		c.pendingMu.Lock()
-		delete(c.pending, id)
-		c.pendingMu.Unlock()
+		c.abandonRequest(id, resultCh, onLate)
 		return ctx.Err()
 	case <-c.done:
 		return ErrShutdown
 	}
+}
+
+func (c *Client) abandonRequest(id uint64, resultCh <-chan pendingResult, onLate func(json.RawMessage)) {
+	if onLate == nil {
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		c.pendingMu.Unlock()
+		return
+	}
+	// Send may already have reached the host when its context expires. Retain
+	// correlation until response or shutdown to release any late-created child.
+	go func() {
+		select {
+		case result, ok := <-resultCh:
+			if ok && result.err == nil {
+				onLate(result.value)
+			}
+		case <-c.done:
+			c.pendingMu.Lock()
+			delete(c.pending, id)
+			c.pendingMu.Unlock()
+		}
+	}()
 }
 
 // Notify sends a JSON-RPC notification (fire-and-forget).
@@ -774,6 +894,15 @@ func (c *Client) Initialize(ctx context.Context, clientID string, protocolVersio
 	if err := c.Request(ctx, "initialize", params, &out); err != nil {
 		return nil, err
 	}
+	c.tcpMu.Lock()
+	c.tcpClientID = clientID
+	c.tcpCapability = nil
+	if out.TcpConnections != nil {
+		capability := *out.TcpConnections
+		capability.Encodings = append([]ahptypes.TcpDataEncoding(nil), capability.Encodings...)
+		c.tcpCapability = &capability
+	}
+	c.tcpMu.Unlock()
 	return &out, nil
 }
 
@@ -1003,9 +1132,87 @@ func (c *Client) SessionConfigCompletions(ctx context.Context, params ahptypes.S
 // inbound event from this client, tagged with the channel URI it was
 // scoped to. Multiple streams may exist concurrently.
 func (c *Client) Events() *EventStream {
+	return c.events(false)
+}
+
+// EventsStrict attaches a bounded global receiver that permanently closes on
+// overflow. Check its Err after draining Events; a *SubscriptionLagError means
+// affected TCP channels must be reset/unsubscribed, never resumed past the gap.
+// Malformed input terminates strict receivers with a *TransportError instead
+// of silently dropping the frame or notification.
+//
+// Attach before requesting subscribe(create), then retain the receiver and
+// filter by the returned child URI. Reconnect replay and credits remain the
+// caller's responsibility.
+func (c *Client) EventsStrict() *EventStream {
+	return c.events(true)
+}
+
+func (c *Client) events(strict bool, resource ...string) *EventStream {
 	c.subscriptionsMu.Lock()
 	defer c.subscriptionsMu.Unlock()
-	s := &EventStream{events: make(chan ClientEvent, c.cfg.SubscriptionBuffer)}
-	c.eventListeners = append(c.eventListeners, s)
+	s := &EventStream{events: make(chan ClientEvent, c.cfg.SubscriptionBuffer), strict: strict}
+	if len(resource) != 0 {
+		s.resource = &resource[0]
+	}
+	if strict {
+		select {
+		case <-c.done:
+			s.Close()
+			return s
+		default:
+		}
+		s.onClose = func() {
+			c.subscriptionsMu.Lock()
+			defer c.subscriptionsMu.Unlock()
+			c.removeEventStream(s)
+		}
+	}
+	c.addEventStream(s)
 	return s
+}
+
+func (c *Client) addEventStream(s *EventStream) {
+	if s.resource == nil {
+		c.eventListeners = append(c.eventListeners, s)
+	} else {
+		if c.resourceEventListeners == nil {
+			c.resourceEventListeners = make(map[string][]*EventStream)
+		}
+		c.resourceEventListeners[*s.resource] = append(c.resourceEventListeners[*s.resource], s)
+	}
+}
+
+func (c *Client) removeEventStream(s *EventStream) {
+	list := c.eventListeners
+	if s.resource != nil {
+		list = c.resourceEventListeners[*s.resource]
+	}
+	for i, listener := range list {
+		if listener == s {
+			copy(list[i:], list[i+1:])
+			list[len(list)-1] = nil
+			list = list[:len(list)-1]
+			break
+		}
+	}
+	if s.resource == nil {
+		c.eventListeners = list
+	} else if len(list) == 0 {
+		delete(c.resourceEventListeners, *s.resource)
+	} else {
+		c.resourceEventListeners[*s.resource] = list
+	}
+}
+
+func (c *Client) bindEventStream(s *EventStream, resource string) {
+	c.subscriptionsMu.Lock()
+	defer c.subscriptionsMu.Unlock()
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	c.removeEventStream(s)
+	s.resource = &resource
+	if !s.closed {
+		c.addEventStream(s)
+	}
 }

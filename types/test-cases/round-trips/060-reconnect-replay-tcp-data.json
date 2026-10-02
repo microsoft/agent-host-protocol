@@ -1,0 +1,24 @@
+{
+  "name": "reconnect-replay-tcp-data",
+  "group": "A",
+  "description": "Replay retains the result discriminator, ordered TCP payload and required empty missing list.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay",
+    "actions": [{
+      "channel": "ahp-tcp:/t1",
+      "action": { "type": "tcp/data", "offset": 0, "data": "AA==" },
+      "serverSeq": 43
+    }],
+    "missing": []
+  },
+  "acceptableOutputs": [{
+    "type": "replay",
+    "actions": [{
+      "channel": "ahp-tcp:/t1",
+      "action": { "type": "tcp/data", "offset": 0, "data": "AA==" },
+      "serverSeq": 43
+    }],
+    "missing": []
+  }]
+}

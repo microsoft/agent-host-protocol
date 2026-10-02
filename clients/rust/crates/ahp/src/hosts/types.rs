@@ -374,8 +374,45 @@ impl HostClientHandle {
 
     /// Borrow the underlying [`Client`] for advanced use. The caller is
     /// responsible for not holding it past the next reconnect.
+    ///
+    /// Use [`Self::open_tcp_connection`] for managed TCP ownership rather than
+    /// creating a stream directly through this borrowed client.
     pub fn raw_client(&self) -> &Client {
         &self.client
+    }
+
+    /// Create a byte stream retained across this host's automatic reconnects.
+    /// The stream remains usable after this generation-checked handle goes stale.
+    pub async fn open_tcp_connection(
+        &self,
+        session: String,
+        create: ahp_types::commands::TcpConnectionSubscription,
+    ) -> Result<crate::TcpConnection, HostError> {
+        self.check_alive().await?;
+        let connection = self
+            .client
+            .open_tcp_connection(session, create)
+            .await
+            .map_err(ClientError::from)?;
+        let mut state = self.shared.lock().await;
+        if state.generation != self.generation
+            || !matches!(state.state, HostState::Connected)
+            || !state
+                .current_client
+                .as_ref()
+                .is_some_and(|client| client.tcp_same_transport(&self.client))
+        {
+            drop(state);
+            if let Err(error) = connection.dispose().await {
+                tracing::warn!(?error, "stale managed TCP creation cleanup failed");
+            }
+            return Err(HostError::HostShutDown(self.host_id.clone()));
+        }
+        state
+            .tcp_connections
+            .retain(|connection| connection.upgrade().is_some());
+        state.tcp_connections.push(connection.downgrade());
+        Ok(connection)
     }
 }
 
@@ -554,6 +591,7 @@ pub(super) struct HostInternal {
     pub(super) session_summaries: std::collections::BTreeMap<String, SessionSummary>,
     pub(super) generation: u64,
     pub(super) current_client: Option<Client>,
+    pub(super) tcp_connections: Vec<crate::tcp::WeakTcpConnection>,
 }
 
 impl HostInternal {

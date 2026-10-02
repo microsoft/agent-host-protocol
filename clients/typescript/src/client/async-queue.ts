@@ -9,14 +9,24 @@
  *
  * The buffer is bounded by `bufferLimit` (default 4096). When the buffer
  * fills, the oldest entries are dropped and laggard cursors are
- * fast-forwarded past the gap. Callers who must not drop events should
- * drain promptly or use a larger limit.
+ * fast-forwarded past the gap. Strict readers instead fail with
+ * SubscriptionLagError and terminate, so consumers cannot continue across
+ * an unnoticed gap.
  *
  * @internal
  */
 
+import { SubscriptionLagError } from './error.js';
+
+/** Overflow behavior for an independently buffered event receiver. */
+export interface EventStreamOptions {
+  /** Default `drop-oldest`. Use `error` when skipping an event would corrupt the consumer. */
+  overflow?: 'drop-oldest' | 'error';
+}
+
 interface Waiter<T> {
   resolve(result: IteratorResult<T>): void;
+  reject(error: Error): void;
 }
 
 interface Cursor<T> {
@@ -24,6 +34,8 @@ interface Cursor<T> {
   position: number;
   waiter: Waiter<T> | null;
   detached: boolean;
+  strict: boolean;
+  error?: Error;
 }
 
 export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
@@ -62,7 +74,13 @@ export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
       this.buffer.splice(0, drop);
       this.base += drop;
       for (const cursor of this.cursors) {
-        if (cursor.position < this.base) cursor.position = this.base;
+        if (cursor.position < this.base) {
+          if (cursor.strict) {
+            this.failCursor(cursor, new SubscriptionLagError(this.base - cursor.position));
+          } else {
+            cursor.position = this.base;
+          }
+        }
       }
     }
 
@@ -80,6 +98,25 @@ export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
     }
 
     this.trim();
+  }
+
+  /** Invalidate strict receivers when the producer could not decode an event. */
+  failStrictReaders(error: Error): void {
+    for (const cursor of this.cursors) {
+      if (cursor.strict) this.failCursor(cursor, error);
+    }
+    this.trim();
+  }
+
+  private failCursor(cursor: Cursor<T>, error: Error): void {
+    cursor.detached = true;
+    this.cursors.delete(cursor);
+    if (cursor.waiter) {
+      cursor.waiter.reject(error);
+      cursor.waiter = null;
+    } else {
+      cursor.error = error;
+    }
   }
 
   /**
@@ -103,11 +140,12 @@ export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
   }
 
   /** Create a new independent reader. */
-  reader(): AsyncIterableIterator<T> {
+  reader(options: EventStreamOptions = {}): AsyncIterableIterator<T> {
     const cursor: Cursor<T> = {
       position: this.base + this.buffer.length,
       waiter: null,
       detached: this.closed,
+      strict: options.overflow === 'error',
     };
     if (!this.closed) this.cursors.add(cursor);
 
@@ -125,6 +163,11 @@ export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
         return this;
       },
       next(): Promise<IteratorResult<T>> {
+        if (cursor.error) {
+          const error = cursor.error;
+          cursor.error = undefined;
+          return Promise.reject(error);
+        }
         // Once the iterator has been detached via `return()`, all
         // subsequent `next()` calls resolve `done: true` immediately —
         // even if there are unread buffered values. AsyncIterator
@@ -142,11 +185,12 @@ export class AsyncBroadcastQueue<T> implements AsyncIterable<T> {
         if (queue.closed) {
           return Promise.resolve({ value: undefined as unknown as T, done: true });
         }
-        return new Promise<IteratorResult<T>>(resolve => {
-          cursor.waiter = { resolve };
+        return new Promise<IteratorResult<T>>((resolve, reject) => {
+          cursor.waiter = { resolve, reject };
         });
       },
       return(): Promise<IteratorResult<T>> {
+        cursor.error = undefined;
         detach();
         return Promise.resolve({ value: undefined as unknown as T, done: true });
       },

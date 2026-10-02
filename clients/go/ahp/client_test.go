@@ -680,6 +680,314 @@ func TestClientAutomationCatalogueAction(t *testing.T) {
 	}
 }
 
+func TestStrictEventsCaptureAtomicTCPCreateFirstAction(t *testing.T) {
+	clientSide, serverSide := newMemTransportPair()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown(context.Background())
+	events := client.EventsStrict()
+	defer events.Close()
+	state := tcpTestState()
+	snapshotResult, err := json.Marshal(ahptypes.SubscribeResult{Snapshot: &ahptypes.Snapshot{
+		Resource: "ahp-tcp:/created", State: ahptypes.SnapshotState{Tcp: &state},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- func() error {
+			message, err := serverSide.Recv(ctx)
+			if err != nil {
+				return err
+			}
+			parsed, err := message.IntoParsed()
+			if err != nil {
+				return err
+			}
+			if parsed.Request == nil || parsed.Request.Method != "subscribe" {
+				return errors.New("expected subscribe request")
+			}
+			var params ahptypes.SubscribeParams
+			if err := json.Unmarshal(parsed.Request.Params, &params); err != nil {
+				return err
+			}
+			if params.Channel != "ahp-session:/s1" || params.Create == nil || params.Create.Type != "tcpConnection" {
+				return fmt.Errorf("unexpected create parameters: %+v", params)
+			}
+			if err := serverSide.Send(ctx, NewTextMessage(fmt.Sprintf(
+				`{"jsonrpc":"2.0","id":%d,"result":%s}`, parsed.Request.ID, snapshotResult,
+			))); err != nil {
+				return err
+			}
+			if err := serverSide.Send(ctx, NewTextMessage(`{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/created","serverSeq":1,"origin":null,"action":{"type":"tcp/data","offset":0,"data":"AA=="}}}`)); err != nil {
+				return err
+			}
+			message, err = serverSide.Recv(ctx)
+			if err != nil {
+				return err
+			}
+			parsed, err = message.IntoParsed()
+			if err != nil {
+				return err
+			}
+			if parsed.Request == nil || parsed.Request.Method != "ping" {
+				return errors.New("expected ping barrier")
+			}
+			return serverSide.Send(ctx, NewTextMessage(fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":null}`, parsed.Request.ID)))
+		}()
+	}()
+	var result ahptypes.SubscribeResult
+	err = client.Request(ctx, "subscribe", ahptypes.SubscribeParams{
+		Channel: "ahp-session:/s1",
+		Create: &ahptypes.TcpConnectionSubscription{
+			Type: "tcpConnection", Host: "localhost", Port: 3000,
+			Encoding: ahptypes.TcpDataEncodingBase64, ReceiveWindowBytes: 8, MaximumChunkSize: 6,
+		},
+	}, &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ensure the first action has been processed before draining this receiver.
+	if err := client.Ping(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case event, ok := <-events.Events():
+		if !ok {
+			t.Fatalf("receiver closed: %v", events.Err())
+		}
+		if result.Snapshot == nil || result.Snapshot.State.Tcp == nil || event.Channel != result.Snapshot.Resource {
+			t.Fatalf("event did not match created TCP snapshot: %+v", event)
+		}
+		action, ok := event.Event.(SubscriptionEventAction)
+		if !ok || action.Envelope.ServerSeq != 1 {
+			t.Fatalf("unexpected first action: %+v", event)
+		}
+		outcome, err := ApplyActionToTCP(result.Snapshot.State.Tcp, action.Envelope.Action)
+		if err != nil || outcome != ReduceOutcomeApplied || result.Snapshot.State.Tcp.Output.ReceivedBytes != 1 {
+			t.Fatalf("first action reduction: %v, %v", outcome, err)
+		}
+	case <-ctx.Done():
+		t.Fatal("missing first action")
+	}
+	if err := <-serverErr; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStrictEventsOverflowIsTerminalAndOtherReceiversContinue(t *testing.T) {
+	clientSide, _ := newMemTransportPair()
+	ctx := context.Background()
+	config := DefaultConfig()
+	config.SubscriptionBuffer = 1
+	client, err := Connect(ctx, clientSide, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown(ctx)
+	strict := client.EventsStrict()
+	ordinary := client.Events()
+	send := func(seq int64) {
+		client.fanOut("ahp-tcp:/created", SubscriptionEventAction{Envelope: ahptypes.ActionEnvelope{ServerSeq: seq}})
+	}
+	send(1)
+	send(2)
+	var lag *SubscriptionLagError
+	if !errors.As(strict.Err(), &lag) || lag.Capacity != 1 {
+		t.Fatalf("expected typed overflow error, got %v", strict.Err())
+	}
+	if event := <-strict.Events(); event.Event.(SubscriptionEventAction).Envelope.ServerSeq != 1 {
+		t.Fatal("strict receiver lost its valid buffered prefix")
+	}
+	if event := <-ordinary.Events(); event.Event.(SubscriptionEventAction).Envelope.ServerSeq != 1 {
+		t.Fatal("ordinary receiver's drop-newest behavior changed")
+	}
+	send(3)
+	select {
+	case _, open := <-strict.Events():
+		if open {
+			t.Fatal("strict receiver resumed after overflow")
+		}
+	default:
+		t.Fatal("strict receiver did not terminate")
+	}
+	if event := <-ordinary.Events(); event.Event.(SubscriptionEventAction).Envelope.ServerSeq != 3 {
+		t.Fatal("ordinary receiver did not continue")
+	}
+	strict.Close()
+	if !errors.As(strict.Err(), &lag) {
+		t.Fatal("close erased the lag error")
+	}
+	if err := client.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case _, open := <-client.EventsStrict().Events():
+		if open {
+			t.Fatal("receiver created after shutdown remained open")
+		}
+	default:
+		t.Fatal("receiver created after shutdown did not terminate")
+	}
+}
+
+func TestStrictEventsDecodeLossIsTerminalButFutureActionsAreAllowed(t *testing.T) {
+	for _, test := range []struct {
+		name, wire string
+		fails      bool
+	}{
+		{"malformedJSON", "{", true},
+		{"invalidEnvelope", `{"jsonrpc":"2.0","method":"action","params":{"channel":42,"serverSeq":1,"action":{"type":"tcp/dataEof","finalOffset":0}}}`, true},
+		{"invalidEOF", `{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/created","serverSeq":1,"action":{"type":"tcp/dataEof","finalOffset":"bad"}}}`, true},
+		{"invalidCredit", `{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/created","serverSeq":1,"action":{"type":"tcp/inputConsumed","consumedBytes":"bad"}}}`, true},
+		{"futureAction", `{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/created","serverSeq":1,"action":{"type":"tcp/futureControl"}}}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			clientSide, serverSide := newMemTransportPair()
+			client, err := Connect(ctx, clientSide, DefaultConfig())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Shutdown(context.Background())
+			strict, ordinary := client.EventsStrict(), client.Events()
+			serverErr := make(chan error, 1)
+			go func() {
+				serverErr <- func() error {
+					message, err := serverSide.Recv(ctx)
+					if err != nil {
+						return err
+					}
+					request, err := message.IntoParsed()
+					if err != nil {
+						return err
+					}
+					if request.Request == nil || request.Request.Method != "ping" {
+						return errors.New("expected ping barrier")
+					}
+					for _, wire := range []string{
+						test.wire,
+						`{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-tcp:/created","serverSeq":2,"action":{"type":"tcp/data","offset":0,"data":"AA=="}}}`,
+						fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":null}`, request.Request.ID),
+					} {
+						if err := serverSide.Send(ctx, NewTextMessage(wire)); err != nil {
+							return err
+						}
+					}
+					return nil
+				}()
+			}()
+			if err := client.Ping(ctx); err != nil {
+				t.Fatal(err)
+			}
+			receive := func(stream *EventStream, seq int64) {
+				t.Helper()
+				select {
+				case event, ok := <-stream.Events():
+					action, isAction := event.Event.(SubscriptionEventAction)
+					if !ok || !isAction || action.Envelope.ServerSeq != seq {
+						t.Fatalf("expected action %d, got %+v (error %v)", seq, event, stream.Err())
+					}
+				case <-ctx.Done():
+					t.Fatal("missing event")
+				}
+			}
+			if test.fails {
+				var protocolError *TransportError
+				if !errors.As(strict.Err(), &protocolError) || protocolError.Kind != "protocol" {
+					t.Fatalf("expected typed protocol error, got %v", strict.Err())
+				}
+				select {
+				case _, open := <-strict.Events():
+					if open {
+						t.Fatal("strict receiver resumed after decode loss")
+					}
+				default:
+					t.Fatal("strict receiver did not terminate")
+				}
+			} else {
+				receive(strict, 1)
+				receive(strict, 2)
+				receive(ordinary, 1)
+				if strict.Err() != nil {
+					t.Fatal(strict.Err())
+				}
+			}
+			receive(ordinary, 2)
+			if err := <-serverErr; err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestStrictEventsUnregisterAndWakePendingReceive(t *testing.T) {
+	clientSide, _ := newMemTransportPair()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	config := DefaultConfig()
+	config.SubscriptionBuffer = 1
+	client, err := Connect(ctx, clientSide, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown(context.Background())
+	ordinary := client.Events()
+	assertOnlyOrdinary := func() {
+		t.Helper()
+		client.subscriptionsMu.Lock()
+		defer client.subscriptionsMu.Unlock()
+		if len(client.eventListeners) != 1 || client.eventListeners[0] != ordinary {
+			t.Fatal("strict receiver remained registered or affected another receiver")
+		}
+	}
+	strict := client.EventsStrict()
+	ready := make(chan struct{})
+	received := make(chan bool, 1)
+	go func() {
+		close(ready)
+		_, open := <-strict.Events()
+		received <- open
+	}()
+	<-ready
+	client.failStrictEvents(&TransportError{Kind: "protocol", Err: errors.New("malformed frame")})
+	assertOnlyOrdinary()
+	select {
+	case open := <-received:
+		if open {
+			t.Fatal("failed receiver delivered an event")
+		}
+	case <-ctx.Done():
+		t.Fatal("failure did not wake the pending receive")
+	}
+	var protocolError *TransportError
+	if !errors.As(strict.Err(), &protocolError) || protocolError.Kind != "protocol" {
+		t.Fatalf("missing protocol error: %v", strict.Err())
+	}
+	closed := client.EventsStrict()
+	closed.Close()
+	closed.Close()
+	assertOnlyOrdinary()
+	overflowed := client.EventsStrict()
+	for i := int64(1); i <= 2; i++ {
+		client.fanOut("ahp-tcp:/created", SubscriptionEventAction{Envelope: ahptypes.ActionEnvelope{ServerSeq: i}})
+	}
+	var lag *SubscriptionLagError
+	if !errors.As(overflowed.Err(), &lag) {
+		t.Fatalf("missing overflow error: %v", overflowed.Err())
+	}
+	assertOnlyOrdinary()
+	if event := <-ordinary.Events(); event.Event.(SubscriptionEventAction).Envelope.ServerSeq != 1 {
+		t.Fatal("ordinary receiver was affected")
+	}
+}
+
 // TestClientShutdownFailsInFlightRequest confirms a Shutdown unblocks
 // any pending request with ErrShutdown.
 func TestClientShutdownFailsInFlightRequest(t *testing.T) {

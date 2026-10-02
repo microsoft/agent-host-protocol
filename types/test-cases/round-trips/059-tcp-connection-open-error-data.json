@@ -1,0 +1,14 @@
+{
+  "name": "tcp-connection-open-error-data",
+  "group": "A",
+  "description": "Structured TCP open-error data preserves its reason and an explicitly false retryable flag.",
+  "type": "TcpConnectionOpenErrorData",
+  "input": {
+    "reason": "nameResolutionFailed",
+    "retryable": false
+  },
+  "acceptableOutputs": [{
+    "reason": "nameResolutionFailed",
+    "retryable": false
+  }]
+}

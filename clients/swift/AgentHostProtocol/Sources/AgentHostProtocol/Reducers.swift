@@ -3,6 +3,121 @@
 
 import Foundation
 
+/// Validation failure from the pure TCP reducer. The original state is unchanged.
+public enum TcpReducerError: Error, LocalizedError, CustomStringConvertible {
+    case invalidAction(String)
+
+    public var description: String {
+        switch self {
+        case .invalidAction(let message): return "Invalid TCP action: \(message)"
+        }
+    }
+
+    public var errorDescription: String? { description }
+}
+
+private func requireTcp(_ condition: Bool, _ message: String) throws {
+    if !condition { throw TcpReducerError.invalidAction(message) }
+}
+
+private func requireTcpOffset(_ value: Int) throws {
+    try requireTcp(value >= 0 && value <= 9007199254740991, "offset must be a nonnegative safe integer")
+}
+
+private func tcpBase64Value(_ byte: UInt8) -> Int {
+    switch byte {
+    case 65...90: return Int(byte) - 65
+    case 97...122: return Int(byte) - 97 + 26
+    case 48...57: return Int(byte) - 48 + 52
+    case 43: return 62
+    case 47: return 63
+    default: return -1
+    }
+}
+
+private func tcpPayloadLength(_ data: String, maximumChunkSize: Int) throws -> Int {
+    let count = data.utf16.count
+    try requireTcp(count > 0 && count <= 4 * (maximumChunkSize / 3 + (maximumChunkSize % 3 > 0 ? 1 : 0)), "chunk size")
+    let padding = data.hasSuffix("==") ? 2 : data.hasSuffix("=") ? 1 : 0
+    try requireTcp(count % 4 == 0, "base64 encoding")
+    var last = 0
+    for byte in data.utf8.dropLast(padding) {
+        last = tcpBase64Value(byte)
+        try requireTcp(last >= 0, "base64 encoding")
+    }
+    if padding > 0 {
+        try requireTcp(last % (padding == 2 ? 16 : 4) == 0, "noncanonical base64 padding bits")
+    }
+    let length = count / 4 * 3 - padding
+    try requireTcp(length <= maximumChunkSize, "chunk size")
+    return length
+}
+
+private func tcpReceive(_ direction: FlowControlledByteDirectionState, offset: Int, data: String, senderClosed: Bool) throws -> FlowControlledByteDirectionState {
+    try requireTcpOffset(offset)
+    let end = offset + (try tcpPayloadLength(data, maximumChunkSize: direction.maximumChunkSize))
+    try requireTcpOffset(end)
+    if end <= direction.receivedBytes { return direction }
+    try requireTcp(offset == direction.receivedBytes, "gap or overlapping byte range")
+    try requireTcp(!senderClosed && direction.eofAtBytes == nil, "data after EOF or sender close")
+    try requireTcp(end - direction.consumedBytes <= direction.windowBytes, "receive window exceeded")
+    var next = direction
+    next.receivedBytes = end
+    return next
+}
+
+private func tcpConsume(_ direction: FlowControlledByteDirectionState, consumedBytes: Int) throws -> FlowControlledByteDirectionState {
+    try requireTcpOffset(consumedBytes)
+    try requireTcp(consumedBytes <= direction.receivedBytes, "consuming bytes not received")
+    if consumedBytes <= direction.consumedBytes { return direction }
+    var next = direction
+    next.consumedBytes = consumedBytes
+    return next
+}
+
+private func tcpEof(_ direction: FlowControlledByteDirectionState, finalOffset: Int, senderClosed: Bool) throws -> FlowControlledByteDirectionState {
+    try requireTcpOffset(finalOffset)
+    try requireTcp(finalOffset == direction.receivedBytes, "EOF offset")
+    if direction.eofAtBytes == finalOffset { return direction }
+    try requireTcp(!senderClosed, "EOF after sender close")
+    var next = direction
+    next.eofAtBytes = finalOffset
+    return next
+}
+
+/// Reduces TCP accounting without retaining payloads or restoring streams.
+/// On error, adapters must reset/close the channel and not perform the rejected write.
+/// Only write data when the corresponding receivedBytes counter advances.
+public func tcpReducer(state: TcpConnectionState, action: StateAction) throws -> TcpConnectionState {
+    if state.reset != nil { return state }
+    var next = state
+    switch action {
+    case .tcpInput(let a):
+        next.input = try tcpReceive(state.input, offset: a.offset, data: a.data, senderClosed: state.clientClosed)
+    case .tcpData(let a):
+        next.output = try tcpReceive(state.output, offset: a.offset, data: a.data, senderClosed: state.hostClosed)
+    case .tcpInputConsumed(let a):
+        next.input = try tcpConsume(state.input, consumedBytes: a.consumedBytes)
+    case .tcpDataConsumed(let a):
+        next.output = try tcpConsume(state.output, consumedBytes: a.consumedBytes)
+    case .tcpInputEof(let a):
+        next.input = try tcpEof(state.input, finalOffset: a.finalOffset, senderClosed: state.clientClosed)
+    case .tcpDataEof(let a):
+        next.output = try tcpEof(state.output, finalOffset: a.finalOffset, senderClosed: state.hostClosed)
+    case .tcpClientClose:
+        next.clientClosed = true
+    case .tcpHostClose:
+        next.hostClosed = true
+    case .tcpClientReset(let a):
+        next.reset = TcpResetState(source: .client, reason: a.reason)
+    case .tcpHostReset(let a):
+        next.reset = TcpResetState(source: .host, reason: a.reason)
+    default:
+        break
+    }
+    return next
+}
+
 private let iso8601TimestampFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

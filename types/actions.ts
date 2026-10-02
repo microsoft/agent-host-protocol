@@ -8,6 +8,7 @@
  */
 
 export * from './common/actions.js';
+export * from './channels-tcp/actions.js';
 export * from './channels-root/actions.js';
 export * from './channels-session/actions.js';
 export * from './channels-chat/actions.js';

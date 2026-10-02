@@ -5,6 +5,48 @@
   "title": "AHP State Types",
   "description": "All state types in the Agent Host Protocol.",
   "$defs": {
+    "FlowControlledByteDirectionState": {
+      "type": "object",
+      "description": "Bounded byte credit in one direction of a stream.\nAll counters are nonnegative safe integers (at most 2^53 - 1).\n0 <= consumedBytes <= receivedBytes and\nreceivedBytes - consumedBytes <= windowBytes.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "Maximum accepted-but-not-consumed decoded bytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "maximumChunkSize": {
+          "type": "integer",
+          "description": "Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "receivedBytes": {
+          "type": "integer",
+          "description": "Cumulative accepted bytes.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "description": "Cumulative bytes released by the bounded consumer.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eofAtBytes": {
+          "type": "integer",
+          "description": "Present after EOF; equals receivedBytes permanently.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumChunkSize",
+        "receivedBytes",
+        "consumedBytes"
+      ]
+    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
@@ -446,6 +488,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/TcpConnectionState"
             }
           ],
           "description": "The current state of the resource"
@@ -5834,6 +5879,118 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Host support for private, session-scoped TCP channels.\nPresence on initialize is required before using subscribe.create.",
+      "properties": {
+        "encodings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TcpDataEncoding"
+          },
+          "description": "Supported encodings. The base64 profile MUST be supported."
+        },
+        "maximumConnectionsPerClient": {
+          "type": "integer",
+          "description": "Informational limit; runtime policy may impose a lower limit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "encodings"
+      ]
+    },
+    "TcpTarget": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "DNS name or IP literal, resolved and connected in the host endpoint's network."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ]
+    },
+    "TcpResetState": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/TcpEndpoint"
+        },
+        "reason": {
+          "$ref": "#/$defs/TcpResetReason"
+        }
+      },
+      "required": [
+        "source",
+        "reason"
+      ]
+    },
+    "TcpConnectionOpenErrorData": {
+      "type": "object",
+      "description": "Required detail for TcpConnectionOpenFailed (-32012).\nPolicy denial and malformed requests use PermissionDenied and InvalidParams.",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/TcpConnectionOpenFailureReason"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "TcpConnectionState": {
+      "type": "object",
+      "description": "State of one host-assigned `ahp-tcp:` channel.\n\nPayload is never stored in this state. Only the creating authenticated\nlogical client may observe or dispatch to the channel. Reconnect requires\nthe original sockets, local stream state, and complete action replay;\na snapshot cannot restore this channel.\n\nClose flags record the two-sided handshake. Either flag means closing;\nboth mean closed. A present reset terminates the connection immediately,\nindependently of the close history.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI"
+        },
+        "target": {
+          "$ref": "#/$defs/TcpTarget"
+        },
+        "encoding": {
+          "$ref": "#/$defs/TcpDataEncoding"
+        },
+        "input": {
+          "$ref": "#/$defs/FlowControlledByteDirectionState",
+          "description": "Client to destination socket."
+        },
+        "output": {
+          "$ref": "#/$defs/FlowControlledByteDirectionState",
+          "description": "Destination socket to client."
+        },
+        "clientClosed": {
+          "type": "boolean"
+        },
+        "hostClosed": {
+          "type": "boolean"
+        },
+        "reset": {
+          "$ref": "#/$defs/TcpResetState"
+        }
+      },
+      "required": [
+        "session",
+        "target",
+        "encoding",
+        "input",
+        "output",
+        "clientClosed",
+        "hostClosed"
+      ]
+    },
     "StringOrMarkdown": {
       "oneOf": [
         {
@@ -6569,6 +6726,44 @@
       ],
       "type": "string",
       "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationEntry.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
+    },
+    "TcpDataEncoding": {
+      "enum": [
+        "base64"
+      ],
+      "type": "string",
+      "description": "Payload encodings advertised by the host."
+    },
+    "TcpEndpoint": {
+      "enum": [
+        "client",
+        "host"
+      ],
+      "type": "string",
+      "description": "Endpoint that closes or resets a connection."
+    },
+    "TcpResetReason": {
+      "enum": [
+        "connectionReset",
+        "connectionAborted",
+        "protocolError",
+        "replayUnavailable",
+        "policyRevoked",
+        "sessionDisposed",
+        "internalError"
+      ],
+      "type": "string",
+      "description": "Why a connection was aborted."
+    },
+    "TcpConnectionOpenFailureReason": {
+      "enum": [
+        "connectionFailed",
+        "nameResolutionFailed",
+        "resourceShortage",
+        "sessionNotReady"
+      ],
+      "type": "string",
+      "description": "Expected connection establishment failures."
     }
   }
 }

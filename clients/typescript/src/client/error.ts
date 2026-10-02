@@ -1,7 +1,7 @@
 /**
  * Error taxonomy for {@link AhpClient}.
  *
- * Five error families surface to consumers:
+ * Error families surface to consumers:
  *
  * - {@link TransportError} — failures of the underlying {@link AhpTransport}
  *   (closed connection, I/O, undecodable frames).
@@ -11,13 +11,15 @@
  *   error, the wait just elapsed.
  * - {@link ClientClosedError} — the client was shut down (or the transport
  *   was torn down) while a request was in flight.
+ * - {@link SubscriptionLagError} — a strict event receiver exceeded its
+ *   bounded buffer and cannot safely continue.
  * - {@link AhpClientError} — base class; consumers can use `instanceof` to
  *   catch every error this SDK throws.
  *
- * Malformed inbound frames do not throw — they are logged via
- * `console.warn` and the channel stays alive (matching the Rust client's
- * `tracing::warn!` behavior). Pending requests still time out via
- * {@link RpcTimeoutError} if the bad frame would have been their reply.
+ * Malformed inbound frames are logged via `console.warn` without closing
+ * the connection. Strict event receivers fail with {@link TransportError};
+ * ordinary receivers retain their existing behavior. Pending requests still
+ * time out via {@link RpcTimeoutError} if the bad frame was their reply.
  *
  * @module client/error
  */
@@ -85,5 +87,13 @@ export class ClientClosedError extends AhpClientError {
   constructor(message = 'client shut down') {
     super(message);
     this.name = 'ClientClosedError';
+  }
+}
+
+/** A strict event receiver overflowed. Its stream terminates rather than skipping events. */
+export class SubscriptionLagError extends AhpClientError {
+  constructor(readonly missedEvents: number) {
+    super(`Event receiver lagged by ${missedEvents} event(s); stream terminated`);
+    this.name = 'SubscriptionLagError';
   }
 }

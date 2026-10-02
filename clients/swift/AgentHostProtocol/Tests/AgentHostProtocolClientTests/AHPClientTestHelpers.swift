@@ -84,3 +84,20 @@ struct TimeoutError: Error, LocalizedError {
     var errorDescription: String? { "operation timed out in test" }
 }
 
+func nextWithTimeout<E>(
+    _ iterator: inout AsyncThrowingStream<E, Error>.AsyncIterator,
+    _ timeout: Duration = .seconds(2)
+) async throws -> E? where E: Sendable {
+    try await withThrowingTaskGroup(of: E?.self) { group in
+        group.addTask { [iterator = iterator] in
+            var iter = iterator
+            return try await iter.next()
+        }
+        group.addTask {
+            try await Task.sleep(for: timeout)
+            throw TimeoutError()
+        }
+        defer { group.cancelAll() }
+        return try await group.next()!
+    }
+}

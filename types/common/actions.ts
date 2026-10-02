@@ -7,6 +7,18 @@
  */
 
 import type { URI } from './state.js';
+import type {
+  TcpInputAction,
+  TcpDataAction,
+  TcpInputConsumedAction,
+  TcpDataConsumedAction,
+  TcpInputEofAction,
+  TcpDataEofAction,
+  TcpClientCloseAction,
+  TcpHostCloseAction,
+  TcpClientResetAction,
+  TcpHostResetAction,
+} from '../channels-tcp/actions.js';
 
 import type {
   RootAgentsChangedAction,
@@ -250,6 +262,16 @@ export const enum ActionType {
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
   AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
   AutomationRunCancelRequested = 'automationRun/cancelRequested',
+  TcpInput = 'tcp/input',
+  TcpData = 'tcp/data',
+  TcpInputConsumed = 'tcp/inputConsumed',
+  TcpDataConsumed = 'tcp/dataConsumed',
+  TcpInputEof = 'tcp/inputEof',
+  TcpDataEof = 'tcp/dataEof',
+  TcpClientClose = 'tcp/clientClose',
+  TcpHostClose = 'tcp/hostClose',
+  TcpClientReset = 'tcp/clientReset',
+  TcpHostReset = 'tcp/hostReset',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -389,4 +411,14 @@ export type StateAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunCancelRequestedAction;
+  | AutomationRunCancelRequestedAction
+  | TcpInputAction
+  | TcpDataAction
+  | TcpInputConsumedAction
+  | TcpDataConsumedAction
+  | TcpInputEofAction
+  | TcpDataEofAction
+  | TcpClientCloseAction
+  | TcpHostCloseAction
+  | TcpClientResetAction
+  | TcpHostResetAction;

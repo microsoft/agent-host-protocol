@@ -9,6 +9,181 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// <summary>Payload encodings advertised by the host.</summary>
+[JsonConverter(typeof(TcpDataEncodingConverter))]
+public readonly struct TcpDataEncoding : IEquatable<TcpDataEncoding>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public TcpDataEncoding(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly TcpDataEncoding Base64 = new TcpDataEncoding("base64");
+
+    /// <inheritdoc />
+    public bool Equals(TcpDataEncoding other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is TcpDataEncoding other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(TcpDataEncoding left, TcpDataEncoding right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(TcpDataEncoding left, TcpDataEncoding right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="TcpDataEncoding"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class TcpDataEncodingConverter : JsonConverter<TcpDataEncoding>
+{
+    /// <inheritdoc />
+    public override TcpDataEncoding Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new TcpDataEncoding(reader.GetString() ?? throw new JsonException("TcpDataEncoding expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, TcpDataEncoding value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Endpoint that closes or resets a connection.</summary>
+[JsonConverter(typeof(WireEnumConverter<TcpEndpoint>))]
+public enum TcpEndpoint
+{
+    [WireValue("client")]
+    Client,
+    [WireValue("host")]
+    Host,
+}
+
+/// <summary>Why a connection was aborted.</summary>
+[JsonConverter(typeof(TcpResetReasonConverter))]
+public readonly struct TcpResetReason : IEquatable<TcpResetReason>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public TcpResetReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly TcpResetReason ConnectionReset = new TcpResetReason("connectionReset");
+
+    public static readonly TcpResetReason ConnectionAborted = new TcpResetReason("connectionAborted");
+
+    public static readonly TcpResetReason ProtocolError = new TcpResetReason("protocolError");
+
+    public static readonly TcpResetReason ReplayUnavailable = new TcpResetReason("replayUnavailable");
+
+    public static readonly TcpResetReason PolicyRevoked = new TcpResetReason("policyRevoked");
+
+    public static readonly TcpResetReason SessionDisposed = new TcpResetReason("sessionDisposed");
+
+    public static readonly TcpResetReason InternalError = new TcpResetReason("internalError");
+
+    /// <inheritdoc />
+    public bool Equals(TcpResetReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is TcpResetReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(TcpResetReason left, TcpResetReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(TcpResetReason left, TcpResetReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="TcpResetReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class TcpResetReasonConverter : JsonConverter<TcpResetReason>
+{
+    /// <inheritdoc />
+    public override TcpResetReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new TcpResetReason(reader.GetString() ?? throw new JsonException("TcpResetReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, TcpResetReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Expected connection establishment failures.</summary>
+[JsonConverter(typeof(TcpConnectionOpenFailureReasonConverter))]
+public readonly struct TcpConnectionOpenFailureReason : IEquatable<TcpConnectionOpenFailureReason>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public TcpConnectionOpenFailureReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly TcpConnectionOpenFailureReason ConnectionFailed = new TcpConnectionOpenFailureReason("connectionFailed");
+
+    public static readonly TcpConnectionOpenFailureReason NameResolutionFailed = new TcpConnectionOpenFailureReason("nameResolutionFailed");
+
+    public static readonly TcpConnectionOpenFailureReason ResourceShortage = new TcpConnectionOpenFailureReason("resourceShortage");
+
+    public static readonly TcpConnectionOpenFailureReason SessionNotReady = new TcpConnectionOpenFailureReason("sessionNotReady");
+
+    /// <inheritdoc />
+    public bool Equals(TcpConnectionOpenFailureReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is TcpConnectionOpenFailureReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(TcpConnectionOpenFailureReason left, TcpConnectionOpenFailureReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(TcpConnectionOpenFailureReason left, TcpConnectionOpenFailureReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="TcpConnectionOpenFailureReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class TcpConnectionOpenFailureReasonConverter : JsonConverter<TcpConnectionOpenFailureReason>
+{
+    /// <inheritdoc />
+    public override TcpConnectionOpenFailureReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new TcpConnectionOpenFailureReason(reader.GetString() ?? throw new JsonException("TcpConnectionOpenFailureReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, TcpConnectionOpenFailureReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Policy configuration state for a model.</summary>
 [JsonConverter(typeof(WireEnumConverter<PolicyState>))]
 public enum PolicyState
@@ -6160,6 +6335,99 @@ public sealed record ResourceWatchState
     public JsonElement? Includes { get; init; }
 }
 
+/// <summary>State of one host-assigned `ahp-tcp:` channel.
+///
+/// Payload is never stored in this state. Only the creating authenticated
+/// logical client may observe or dispatch to the channel. Reconnect requires
+/// the original sockets, local stream state, and complete action replay;
+/// a snapshot cannot restore this channel.
+///
+/// Close flags record the two-sided handshake. Either flag means closing;
+/// both mean closed. A present reset terminates the connection immediately,
+/// independently of the close history.</summary>
+public sealed record TcpConnectionState
+{
+    public required string Session { get; init; }
+
+    public required TcpTarget Target { get; init; }
+
+    public TcpDataEncoding Encoding { get; init; }
+
+    /// <summary>Client to destination socket.</summary>
+    public required FlowControlledByteDirectionState Input { get; init; }
+
+    /// <summary>Destination socket to client.</summary>
+    public required FlowControlledByteDirectionState Output { get; init; }
+
+    public bool ClientClosed { get; init; }
+
+    public bool HostClosed { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpResetState? Reset { get; init; }
+}
+
+public sealed record TcpTarget
+{
+    /// <summary>DNS name or IP literal, resolved and connected in the host endpoint's network.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>Destination port.</summary>
+    public long Port { get; init; }
+}
+
+public sealed record TcpResetState
+{
+    public TcpEndpoint Source { get; init; }
+
+    public TcpResetReason Reason { get; init; }
+}
+
+/// <summary>Bounded byte credit in one direction of a stream.
+/// All counters are nonnegative safe integers (at most 2^53 - 1).
+/// 0 &lt;= consumedBytes &lt;= receivedBytes and
+/// receivedBytes - consumedBytes &lt;= windowBytes.</summary>
+public sealed record FlowControlledByteDirectionState
+{
+    /// <summary>Maximum accepted-but-not-consumed decoded bytes.</summary>
+    public long WindowBytes { get; init; }
+
+    /// <summary>Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.</summary>
+    public long MaximumChunkSize { get; init; }
+
+    /// <summary>Cumulative accepted bytes.</summary>
+    public long ReceivedBytes { get; init; }
+
+    /// <summary>Cumulative bytes released by the bounded consumer.</summary>
+    public long ConsumedBytes { get; init; }
+
+    /// <summary>Present after EOF; equals receivedBytes permanently.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? EofAtBytes { get; init; }
+}
+
+/// <summary>Host support for private, session-scoped TCP channels.
+/// Presence on initialize is required before using subscribe.create.</summary>
+public sealed record TcpConnectionsCapability
+{
+    /// <summary>Supported encodings. The base64 profile MUST be supported.</summary>
+    public required List<TcpDataEncoding> Encodings { get; init; }
+
+    /// <summary>Informational limit; runtime policy may impose a lower limit.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MaximumConnectionsPerClient { get; init; }
+}
+
+/// <summary>Required detail for TcpConnectionOpenFailed (-32012).
+/// Policy denial and malformed requests use PermissionDenied and InvalidParams.</summary>
+public sealed record TcpConnectionOpenErrorData
+{
+    public TcpConnectionOpenFailureReason Reason { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Retryable { get; init; }
+}
+
 /// <summary>A single change observed by a resource watcher.</summary>
 public sealed record ResourceChange
 {
@@ -7728,14 +7996,18 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+/// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+/// automation-run, or TCP state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (tcp → automationRun → automations → session → chat → terminal → changeset →
+/// resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Private TCP channel state variant, when populated.</summary>
+    public TcpConnectionState? Tcp { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -7772,7 +8044,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("input", out _) &&
+            root.TryGetProperty("output", out _) &&
+            root.TryGetProperty("target", out _))
+        {
+            result.Tcp = root.Deserialize(AhpJsonTypeInfo.Get<TcpConnectionState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -7818,6 +8096,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Tcp is not null) { JsonSerializer.Serialize(writer, value.Tcp, AhpJsonTypeInfo.Get<TcpConnectionState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }

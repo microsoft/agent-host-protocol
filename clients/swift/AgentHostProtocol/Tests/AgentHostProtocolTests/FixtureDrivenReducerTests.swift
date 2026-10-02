@@ -18,6 +18,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
         let initial: AnyCodable
         let actions: [AnyCodable]
         let expected: AnyCodable
+        let expectedError: String?
     }
 
     // MARK: - Fixture Loading
@@ -77,9 +78,8 @@ final class FixtureDrivenReducerTests: XCTestCase {
     //
     // All six reducer arms are now implemented (root / chat / session / terminal /
     // changeset / annotations / resourceWatch) and every fixture family runs real
-    // assertions. The gap set is empty; any future unimplemented reducer family
-    // would need to add stems here explicitly so the skip is documented and
-    // tripwired rather than silent.
+    // assertions, including TCP validation failures.
+    // Individual gaps in implemented families use the exact-match set below.
     //
     // History of closed gaps:
     // - Representational gap (fixture 103 — delta with unknown `kind`): CLOSED
@@ -114,6 +114,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
             ranRealAssertions, expectedReal,
             "Expected \(expectedReal) fixtures to decode+assert for real; only \(ranRealAssertions) did."
         )
+        print("Fixture results: \(ranRealAssertions) asserted")
 
         // The gap set must be exactly the fixtures that failed to run. If a gap
         // closes, gapHits shrinks → mismatch → update the list. If a new fixture
@@ -141,7 +142,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
         // At least this many fixtures must run for each — pins the coverage jump
         // so the skip cannot silently return. Asserted as a lower bound so the
         // corpus can grow without churning this test.
-        let minFamilyCounts = ["terminal": 19, "changeset": 11, "resourceWatch": 2]
+        let minFamilyCounts = ["terminal": 19, "changeset": 11, "resourceWatch": 2, "tcp": 48]
         var totalRan = 0
         for (family, minCount) in minFamilyCounts {
             let familyFixtures = Self.fixtures.filter { $0.fixture.reducer == family }
@@ -157,53 +158,32 @@ final class FixtureDrivenReducerTests: XCTestCase {
             }
             totalRan += familyFixtures.count
         }
-        print("Previously-skipped reducer fixtures now running: \(totalRan) (terminal/changeset/resourceWatch).")
+        print("Previously-skipped reducer fixtures now running: \(totalRan) (terminal/changeset/resourceWatch/tcp).")
         XCTAssertGreaterThanOrEqual(totalRan, 32)
     }
 
     private func runFixture(file: String, fixture: Fixture) throws {
-        let actions = try {
-            let actionsData = try JSONEncoder().encode(fixture.actions)
-            return try JSONDecoder().decode([StateAction].self, from: actionsData)
-        }()
-
         switch fixture.reducer {
         case "root":
-            try compareFixture(file: file, fixture: fixture, stateType: RootState.self) { state in
-                actions.reduce(state) { rootReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: RootState.self, reduce: rootReducer)
         case "session":
-            try compareFixture(file: file, fixture: fixture, stateType: SessionState.self) { state in
-                actions.reduce(state) { sessionReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: SessionState.self, reduce: sessionReducer)
         case "terminal":
-            try compareFixture(file: file, fixture: fixture, stateType: TerminalState.self) { state in
-                actions.reduce(state) { terminalReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: TerminalState.self, reduce: terminalReducer)
         case "changeset":
-            try compareFixture(file: file, fixture: fixture, stateType: ChangesetState.self) { state in
-                actions.reduce(state) { changesetReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: ChangesetState.self, reduce: changesetReducer)
         case "resourceWatch":
-            try compareFixture(file: file, fixture: fixture, stateType: ResourceWatchState.self) { state in
-                actions.reduce(state) { resourceWatchReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: ResourceWatchState.self, reduce: resourceWatchReducer)
         case "chat":
-            try compareFixture(file: file, fixture: fixture, stateType: ChatState.self) { state in
-                actions.reduce(state) { chatReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: ChatState.self, reduce: chatReducer)
         case "annotations":
-            try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self) { state in
-                actions.reduce(state) { annotationsReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self, reduce: annotationsReducer)
         case "automation":
-            try compareFixture(file: file, fixture: fixture, stateType: AutomationState.self) { state in
-                actions.reduce(state) { automationReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: AutomationState.self, reduce: automationReducer)
         case "automationRun":
-            try compareFixture(file: file, fixture: fixture, stateType: AutomationRunState.self) { state in
-                actions.reduce(state) { automationRunReducer(state: $0, action: $1) }
-            }
+            try compareFixture(file: file, fixture: fixture, stateType: AutomationRunState.self, reduce: automationRunReducer)
+        case "tcp":
+            try compareFixture(file: file, fixture: fixture, stateType: TcpConnectionState.self, reduce: tcpReducer)
         default:
             throw FixtureError.unsupportedReducer(fixture.reducer)
         }
@@ -221,7 +201,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
         file: String,
         fixture: Fixture,
         stateType: S.Type,
-        reduce: (S) -> S
+        reduce: (S, StateAction) throws -> S
     ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -229,7 +209,32 @@ final class FixtureDrivenReducerTests: XCTestCase {
 
         let initialData = try JSONEncoder().encode(fixture.initial)
         let initialState = try decoder.decode(S.self, from: initialData)
-        let finalState = reduce(initialState)
+        var finalState = initialState
+        if fixture.expectedError != nil {
+            XCTAssertFalse(fixture.actions.isEmpty, "expectedError requires a final action")
+        }
+        for (index, raw) in fixture.actions.enumerated() {
+            let data = try encoder.encode(raw)
+            let mustFail = fixture.expectedError != nil && index == fixture.actions.count - 1
+            let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let offset = (object?["offset"] as? NSNumber)?.doubleValue
+            if mustFail && fixture.reducer == "tcp", let offset, offset.rounded(.towardZero) != offset {
+                XCTAssertEqual(fixture.expectedError, "Invalid TCP action: offset must be a nonnegative safe integer")
+                XCTAssertThrowsError(try decoder.decode(StateAction.self, from: data)) { error in
+                    XCTAssertTrue(error is DecodingError, "\(file): \(error)")
+                }
+            } else {
+                let action = try decoder.decode(StateAction.self, from: data)
+                if mustFail {
+                    XCTAssertThrowsError(try reduce(finalState, action)) { error in
+                        XCTAssertTrue(error is TcpReducerError, "\(file): \(error)")
+                        XCTAssertEqual(String(describing: error), fixture.expectedError, file)
+                    }
+                } else {
+                    finalState = try reduce(finalState, action)
+                }
+            }
+        }
 
         // Normalize expected through the same Swift type to drop unknown properties
         let expectedData = try JSONEncoder().encode(fixture.expected)

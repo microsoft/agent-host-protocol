@@ -36,6 +36,7 @@ interface JsonSchema {
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
+  maximum?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -407,14 +408,16 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
       }
       propSchema.type = 'integer';
     }
-    const minimum = getNumericPropertyTag(prop, 'minimum');
-    if (minimum !== undefined) {
-      if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
-        throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
-        );
+    for (const constraint of ['minimum', 'maximum'] as const) {
+      const value = getNumericPropertyTag(prop, constraint);
+      if (value !== undefined) {
+        if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+          throw new Error(
+            `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+          );
+        }
+        propSchema[constraint] = value;
       }
-      propSchema.minimum = minimum;
     }
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {

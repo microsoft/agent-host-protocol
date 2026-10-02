@@ -83,6 +83,9 @@ public actor AHPStateMirror {
     /// Seed the mirror from a `Snapshot`, routing by its `state` discriminator.
     public func applySnapshot(_ snapshot: Snapshot) {
         switch snapshot.state {
+        case .tcp:
+            // TCP belongs to a lossless stream adapter, not this snapshot-restored mirror.
+            break
         case .root(let state):
             rootState = state
         case .session(let state):

@@ -13,6 +13,141 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// Payload encodings advertised by the host.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TcpDataEncoding {
+    Base64,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TcpDataEncoding {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Base64 => serializer.serialize_str("base64"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TcpDataEncoding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "base64" => Self::Base64,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Endpoint that closes or resets a connection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TcpEndpoint {
+    #[serde(rename = "client")]
+    Client,
+    #[serde(rename = "host")]
+    Host,
+}
+
+/// Why a connection was aborted.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TcpResetReason {
+    ConnectionReset,
+    ConnectionAborted,
+    ProtocolError,
+    ReplayUnavailable,
+    PolicyRevoked,
+    SessionDisposed,
+    InternalError,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TcpResetReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ConnectionReset => serializer.serialize_str("connectionReset"),
+            Self::ConnectionAborted => serializer.serialize_str("connectionAborted"),
+            Self::ProtocolError => serializer.serialize_str("protocolError"),
+            Self::ReplayUnavailable => serializer.serialize_str("replayUnavailable"),
+            Self::PolicyRevoked => serializer.serialize_str("policyRevoked"),
+            Self::SessionDisposed => serializer.serialize_str("sessionDisposed"),
+            Self::InternalError => serializer.serialize_str("internalError"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TcpResetReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "connectionReset" => Self::ConnectionReset,
+            "connectionAborted" => Self::ConnectionAborted,
+            "protocolError" => Self::ProtocolError,
+            "replayUnavailable" => Self::ReplayUnavailable,
+            "policyRevoked" => Self::PolicyRevoked,
+            "sessionDisposed" => Self::SessionDisposed,
+            "internalError" => Self::InternalError,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Expected connection establishment failures.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TcpConnectionOpenFailureReason {
+    ConnectionFailed,
+    NameResolutionFailed,
+    ResourceShortage,
+    SessionNotReady,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TcpConnectionOpenFailureReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ConnectionFailed => serializer.serialize_str("connectionFailed"),
+            Self::NameResolutionFailed => serializer.serialize_str("nameResolutionFailed"),
+            Self::ResourceShortage => serializer.serialize_str("resourceShortage"),
+            Self::SessionNotReady => serializer.serialize_str("sessionNotReady"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TcpConnectionOpenFailureReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "connectionFailed" => Self::ConnectionFailed,
+            "nameResolutionFailed" => Self::NameResolutionFailed,
+            "resourceShortage" => Self::ResourceShortage,
+            "sessionNotReady" => Self::SessionNotReady,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Policy configuration state for a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PolicyState {
@@ -5475,6 +5610,90 @@ pub struct ResourceWatchState {
     pub includes: Option<AnyValue>,
 }
 
+/// State of one host-assigned `ahp-tcp:` channel.
+///
+/// Payload is never stored in this state. Only the creating authenticated
+/// logical client may observe or dispatch to the channel. Reconnect requires
+/// the original sockets, local stream state, and complete action replay;
+/// a snapshot cannot restore this channel.
+///
+/// Close flags record the two-sided handshake. Either flag means closing;
+/// both mean closed. A present reset terminates the connection immediately,
+/// independently of the close history.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionState {
+    pub session: Uri,
+    pub target: TcpTarget,
+    pub encoding: TcpDataEncoding,
+    /// Client to destination socket.
+    pub input: FlowControlledByteDirectionState,
+    /// Destination socket to client.
+    pub output: FlowControlledByteDirectionState,
+    pub client_closed: bool,
+    pub host_closed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset: Option<TcpResetState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpTarget {
+    /// DNS name or IP literal, resolved and connected in the host endpoint's network.
+    pub host: String,
+    /// Destination port.
+    pub port: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpResetState {
+    pub source: TcpEndpoint,
+    pub reason: TcpResetReason,
+}
+
+/// Bounded byte credit in one direction of a stream.
+/// All counters are nonnegative safe integers (at most 2^53 - 1).
+/// 0 <= consumedBytes <= receivedBytes and
+/// receivedBytes - consumedBytes <= windowBytes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowControlledByteDirectionState {
+    /// Maximum accepted-but-not-consumed decoded bytes.
+    pub window_bytes: i64,
+    /// Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.
+    pub maximum_chunk_size: i64,
+    /// Cumulative accepted bytes.
+    pub received_bytes: i64,
+    /// Cumulative bytes released by the bounded consumer.
+    pub consumed_bytes: i64,
+    /// Present after EOF; equals receivedBytes permanently.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eof_at_bytes: Option<i64>,
+}
+
+/// Host support for private, session-scoped TCP channels.
+/// Presence on initialize is required before using subscribe.create.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionsCapability {
+    /// Supported encodings. The base64 profile MUST be supported.
+    pub encodings: Vec<TcpDataEncoding>,
+    /// Informational limit; runtime policy may impose a lower limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maximum_connections_per_client: Option<i64>,
+}
+
+/// Required detail for TcpConnectionOpenFailed (-32012).
+/// Policy denial and malformed requests use PermissionDenied and InvalidParams.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionOpenErrorData {
+    pub reason: TcpConnectionOpenFailureReason,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retryable: Option<bool>,
+}
+
 /// A single change observed by a resource watcher.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -6502,7 +6721,8 @@ pub enum AutomationRunLifecycle {
 
 /// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required `lifecycle`), then
+/// Deserialized by trying TCP first (has required `input`, `output`, and
+/// `target`), then session (has required `lifecycle`), then
 /// chat (has required `turns`), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
@@ -6511,6 +6731,7 @@ pub enum AutomationRunLifecycle {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Tcp(Box<TcpConnectionState>),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Terminal(Box<TerminalState>),

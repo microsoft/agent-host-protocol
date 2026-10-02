@@ -18,7 +18,8 @@ use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
     AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
     ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    Snapshot, SnapshotState, TcpConnectionsCapability, TcpDataEncoding, TelemetryCapabilities,
+    TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -330,6 +331,9 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Enables atomic creation of session-scoped, replay-only TCP channels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tcp_connections: Option<TcpConnectionsCapability>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -497,6 +501,11 @@ pub struct ReconnectReplayResult {
 pub struct ReconnectSnapshotResult {
     /// Fresh snapshots for each subscription
     pub snapshots: Vec<Snapshot>,
+    /// Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+    /// requested TCP channels here and dispose their sockets on snapshot fallback.
+    /// Omitted by older hosts; absence does not authorize snapshot-restoring TCP.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub missing: Option<Vec<Uri>>,
 }
 
 /// Subscribe to a URI-identified channel.
@@ -527,6 +536,11 @@ pub struct SubscribeParams {
     /// default snapshot. Clients MUST tolerate receiving more state than requested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<SubscribeView>,
+    /// Atomically create a private child channel and subscribe to it.
+    /// Requires the advertised tcpConnections capability. channel identifies
+    /// the parent session; snapshot.resource identifies the created TCP channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create: Option<TcpConnectionSubscription>,
 }
 
 impl SubscribeParams {
@@ -537,6 +551,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: None,
+            create: None,
         }
     }
 
@@ -547,6 +562,7 @@ impl SubscribeParams {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            create: None,
         }
     }
 
@@ -557,6 +573,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: Some(view),
+            create: None,
         }
     }
 }
@@ -599,6 +616,28 @@ pub struct SubscribeResult {
     /// Snapshot of the subscribed channel's state (omitted for stateless channels)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<Snapshot>,
+}
+
+/// Creates and exclusively subscribes to one TCP connection.
+///
+/// SubscribeParams.channel MUST identify the parent `ahp-session:` channel.
+/// The host returns the new `ahp-tcp:` URI in snapshot.resource, not the parent.
+/// It installs the subscription and sends the response before any TCP actions.
+/// Unknown creation kinds MUST be rejected, never treated as normal subscribe.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionSubscription {
+    pub r#type: String,
+    /// DNS name or IP literal, not a URL.
+    pub host: String,
+    /// Destination port.
+    pub port: i64,
+    /// Selected from InitializeResult.tcpConnections.encodings.
+    pub encoding: TcpDataEncoding,
+    /// Client receive window in decoded bytes.
+    pub receive_window_bytes: i64,
+    /// Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.
+    pub maximum_chunk_size: i64,
 }
 
 /// Creates a new session with the specified agent provider.

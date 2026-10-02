@@ -418,7 +418,11 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Enables atomic creation of session-scoped, replay-only TCP channels.
+     */
+    val tcpConnections: TcpConnectionsCapability? = null
 )
 
 @Serializable
@@ -557,7 +561,13 @@ data class ReconnectSnapshotResult(
     /**
      * Fresh snapshots for each subscription
      */
-    val snapshots: List<Snapshot>
+    val snapshots: List<Snapshot>,
+    /**
+     * Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+     * requested TCP channels here and dispose their sockets on snapshot fallback.
+     * Omitted by older hosts; absence does not authorize snapshot-restoring TCP.
+     */
+    val missing: List<String>? = null
 )
 
 @Serializable
@@ -586,7 +596,13 @@ data class SubscribeParams(
      * Servers that do not understand a requested view ignore it and return their
      * default snapshot. Clients MUST tolerate receiving more state than requested.
      */
-    val view: SubscribeView? = null
+    val view: SubscribeView? = null,
+    /**
+     * Atomically create a private child channel and subscribe to it.
+     * Requires the advertised tcpConnections capability. channel identifies
+     * the parent session; snapshot.resource identifies the created TCP channel.
+     */
+    val create: TcpConnectionSubscription? = null
 )
 
 @Serializable
@@ -621,6 +637,31 @@ data class SubscribeResult(
      * Snapshot of the subscribed channel's state (omitted for stateless channels)
      */
     val snapshot: Snapshot? = null
+)
+
+@Serializable
+data class TcpConnectionSubscription(
+    val type: String,
+    /**
+     * DNS name or IP literal, not a URL.
+     */
+    val host: String,
+    /**
+     * Destination port.
+     */
+    val port: Long,
+    /**
+     * Selected from InitializeResult.tcpConnections.encodings.
+     */
+    val encoding: TcpDataEncoding,
+    /**
+     * Client receive window in decoded bytes.
+     */
+    val receiveWindowBytes: Long,
+    /**
+     * Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.
+     */
+    val maximumChunkSize: Long
 )
 
 @Serializable

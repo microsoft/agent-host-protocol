@@ -1,0 +1,71 @@
+{
+  "description": "TCP: client reset is terminal",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/hostClose"
+    },
+    {
+      "type": "tcp/input",
+      "offset": 0,
+      "data": "AA=="
+    },
+    {
+      "type": "tcp/clientReset",
+      "reason": "connectionReset"
+    },
+    {
+      "type": "tcp/input",
+      "offset": 1,
+      "data": "AA=="
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 1,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": true,
+    "reset": {
+      "source": "client",
+      "reason": "connectionReset"
+    }
+  }
+}

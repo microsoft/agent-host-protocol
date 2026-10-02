@@ -40,6 +40,111 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 
 // MARK: - Enums
 
+/// Payload encodings advertised by the host.
+public enum TcpDataEncoding: Codable, Sendable, Equatable {
+    case base64
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "base64": self = .base64
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .base64: try container.encode("base64")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Endpoint that closes or resets a connection.
+public enum TcpEndpoint: String, Codable, Sendable {
+    case client = "client"
+    case host = "host"
+}
+
+/// Why a connection was aborted.
+public enum TcpResetReason: Codable, Sendable, Equatable {
+    case connectionReset
+    case connectionAborted
+    case protocolError
+    case replayUnavailable
+    case policyRevoked
+    case sessionDisposed
+    case internalError
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "connectionReset": self = .connectionReset
+        case "connectionAborted": self = .connectionAborted
+        case "protocolError": self = .protocolError
+        case "replayUnavailable": self = .replayUnavailable
+        case "policyRevoked": self = .policyRevoked
+        case "sessionDisposed": self = .sessionDisposed
+        case "internalError": self = .internalError
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .connectionReset: try container.encode("connectionReset")
+        case .connectionAborted: try container.encode("connectionAborted")
+        case .protocolError: try container.encode("protocolError")
+        case .replayUnavailable: try container.encode("replayUnavailable")
+        case .policyRevoked: try container.encode("policyRevoked")
+        case .sessionDisposed: try container.encode("sessionDisposed")
+        case .internalError: try container.encode("internalError")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Expected connection establishment failures.
+public enum TcpConnectionOpenFailureReason: Codable, Sendable, Equatable {
+    case connectionFailed
+    case nameResolutionFailed
+    case resourceShortage
+    case sessionNotReady
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "connectionFailed": self = .connectionFailed
+        case "nameResolutionFailed": self = .nameResolutionFailed
+        case "resourceShortage": self = .resourceShortage
+        case "sessionNotReady": self = .sessionNotReady
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .connectionFailed: try container.encode("connectionFailed")
+        case .nameResolutionFailed: try container.encode("nameResolutionFailed")
+        case .resourceShortage: try container.encode("resourceShortage")
+        case .sessionNotReady: try container.encode("sessionNotReady")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Policy configuration state for a model.
 public enum PolicyState: String, Codable, Sendable {
     case enabled = "enabled"
@@ -6364,6 +6469,122 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
+public struct TcpConnectionState: Codable, Sendable {
+    public var session: String
+    public var target: TcpTarget
+    public var encoding: TcpDataEncoding
+    /// Client to destination socket.
+    public var input: FlowControlledByteDirectionState
+    /// Destination socket to client.
+    public var output: FlowControlledByteDirectionState
+    public var clientClosed: Bool
+    public var hostClosed: Bool
+    public var reset: TcpResetState?
+
+    public init(
+        session: String,
+        target: TcpTarget,
+        encoding: TcpDataEncoding,
+        input: FlowControlledByteDirectionState,
+        output: FlowControlledByteDirectionState,
+        clientClosed: Bool,
+        hostClosed: Bool,
+        reset: TcpResetState? = nil
+    ) {
+        self.session = session
+        self.target = target
+        self.encoding = encoding
+        self.input = input
+        self.output = output
+        self.clientClosed = clientClosed
+        self.hostClosed = hostClosed
+        self.reset = reset
+    }
+}
+
+public struct TcpTarget: Codable, Sendable {
+    /// DNS name or IP literal, resolved and connected in the host endpoint's network.
+    public var host: String
+    /// Destination port.
+    public var port: Int
+
+    public init(
+        host: String,
+        port: Int
+    ) {
+        self.host = host
+        self.port = port
+    }
+}
+
+public struct TcpResetState: Codable, Sendable {
+    public var source: TcpEndpoint
+    public var reason: TcpResetReason
+
+    public init(
+        source: TcpEndpoint,
+        reason: TcpResetReason
+    ) {
+        self.source = source
+        self.reason = reason
+    }
+}
+
+public struct FlowControlledByteDirectionState: Codable, Sendable {
+    /// Maximum accepted-but-not-consumed decoded bytes.
+    public var windowBytes: Int
+    /// Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.
+    public var maximumChunkSize: Int
+    /// Cumulative accepted bytes.
+    public var receivedBytes: Int
+    /// Cumulative bytes released by the bounded consumer.
+    public var consumedBytes: Int
+    /// Present after EOF; equals receivedBytes permanently.
+    public var eofAtBytes: Int?
+
+    public init(
+        windowBytes: Int,
+        maximumChunkSize: Int,
+        receivedBytes: Int,
+        consumedBytes: Int,
+        eofAtBytes: Int? = nil
+    ) {
+        self.windowBytes = windowBytes
+        self.maximumChunkSize = maximumChunkSize
+        self.receivedBytes = receivedBytes
+        self.consumedBytes = consumedBytes
+        self.eofAtBytes = eofAtBytes
+    }
+}
+
+public struct TcpConnectionsCapability: Codable, Sendable {
+    /// Supported encodings. The base64 profile MUST be supported.
+    public var encodings: [TcpDataEncoding]
+    /// Informational limit; runtime policy may impose a lower limit.
+    public var maximumConnectionsPerClient: Int?
+
+    public init(
+        encodings: [TcpDataEncoding],
+        maximumConnectionsPerClient: Int? = nil
+    ) {
+        self.encodings = encodings
+        self.maximumConnectionsPerClient = maximumConnectionsPerClient
+    }
+}
+
+public struct TcpConnectionOpenErrorData: Codable, Sendable {
+    public var reason: TcpConnectionOpenFailureReason
+    public var retryable: Bool?
+
+    public init(
+        reason: TcpConnectionOpenFailureReason,
+        retryable: Bool? = nil
+    ) {
+        self.reason = reason
+        self.retryable = retryable
+    }
+}
+
 public struct AutomationSessionOrigin: Codable, Sendable {
     public var kind: SessionOriginKind
     /// Owning {@link AutomationEntry.resource}.
@@ -8215,6 +8436,7 @@ public enum ToolResultContent: Codable, Sendable {
 
 /// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
+    case tcp(TcpConnectionState)
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
@@ -8226,11 +8448,14 @@ public enum SnapshotState: Codable, Sendable {
     case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
-        // Try the most distinctive shapes first. SessionState has required
+        // Try the most distinctive shapes first. TcpConnectionState has required
+        // `input`, `output`, and `target`; SessionState has required
         // `lifecycle` / `activeClients` / `chats`; ChatState has required
         // `turns`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        if let tcp = try? TcpConnectionState(from: decoder) {
+            self = .tcp(tcp)
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -8253,6 +8478,7 @@ public enum SnapshotState: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .tcp(let state): try state.encode(to: encoder)
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)

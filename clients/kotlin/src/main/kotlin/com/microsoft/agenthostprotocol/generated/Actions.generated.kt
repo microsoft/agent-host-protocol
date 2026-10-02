@@ -133,6 +133,16 @@ value class ActionType(val rawValue: String) {
         val AUTOMATION_RUN_SESSION_REMOVED: ActionType = ActionType("automationRun/sessionRemoved")
         val AUTOMATION_RUN_PRIMARY_SESSION_CHANGED: ActionType = ActionType("automationRun/primarySessionChanged")
         val AUTOMATION_RUN_CANCEL_REQUESTED: ActionType = ActionType("automationRun/cancelRequested")
+        val TCP_INPUT: ActionType = ActionType("tcp/input")
+        val TCP_DATA: ActionType = ActionType("tcp/data")
+        val TCP_INPUT_CONSUMED: ActionType = ActionType("tcp/inputConsumed")
+        val TCP_DATA_CONSUMED: ActionType = ActionType("tcp/dataConsumed")
+        val TCP_INPUT_EOF: ActionType = ActionType("tcp/inputEof")
+        val TCP_DATA_EOF: ActionType = ActionType("tcp/dataEof")
+        val TCP_CLIENT_CLOSE: ActionType = ActionType("tcp/clientClose")
+        val TCP_HOST_CLOSE: ActionType = ActionType("tcp/hostClose")
+        val TCP_CLIENT_RESET: ActionType = ActionType("tcp/clientReset")
+        val TCP_HOST_RESET: ActionType = ActionType("tcp/hostReset")
     }
 }
 
@@ -1518,6 +1528,78 @@ data class ResourceWatchChangedAction(
 )
 
 @Serializable
+data class TcpInputAction(
+    val type: ActionType,
+    /**
+     * Absolute decoded-byte offset.
+     */
+    val offset: Long,
+    /**
+     * Nonempty canonical padded RFC 4648 base64; no whitespace.
+     */
+    val data: String
+)
+
+@Serializable
+data class TcpDataAction(
+    val type: ActionType,
+    /**
+     * Absolute decoded-byte offset.
+     */
+    val offset: Long,
+    /**
+     * Nonempty canonical padded RFC 4648 base64; no whitespace.
+     */
+    val data: String
+)
+
+@Serializable
+data class TcpInputConsumedAction(
+    val type: ActionType,
+    val consumedBytes: Long
+)
+
+@Serializable
+data class TcpDataConsumedAction(
+    val type: ActionType,
+    val consumedBytes: Long
+)
+
+@Serializable
+data class TcpInputEofAction(
+    val type: ActionType,
+    val finalOffset: Long
+)
+
+@Serializable
+data class TcpDataEofAction(
+    val type: ActionType,
+    val finalOffset: Long
+)
+
+@Serializable
+data class TcpClientCloseAction(
+    val type: ActionType
+)
+
+@Serializable
+data class TcpHostCloseAction(
+    val type: ActionType
+)
+
+@Serializable
+data class TcpClientResetAction(
+    val type: ActionType,
+    val reason: TcpResetReason
+)
+
+@Serializable
+data class TcpHostResetAction(
+    val type: ActionType,
+    val reason: TcpResetReason
+)
+
+@Serializable
 data class AutomationCreateRequestedAction(
     val type: ActionType,
     /**
@@ -1767,6 +1849,16 @@ sealed interface StateAction
 @JvmInline value class StateActionTerminalCommandExecuted(val value: TerminalCommandExecutedAction) : StateAction
 @JvmInline value class StateActionTerminalCommandFinished(val value: TerminalCommandFinishedAction) : StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
+@JvmInline value class StateActionTcpInput(val value: TcpInputAction) : StateAction
+@JvmInline value class StateActionTcpData(val value: TcpDataAction) : StateAction
+@JvmInline value class StateActionTcpInputConsumed(val value: TcpInputConsumedAction) : StateAction
+@JvmInline value class StateActionTcpDataConsumed(val value: TcpDataConsumedAction) : StateAction
+@JvmInline value class StateActionTcpInputEof(val value: TcpInputEofAction) : StateAction
+@JvmInline value class StateActionTcpDataEof(val value: TcpDataEofAction) : StateAction
+@JvmInline value class StateActionTcpClientClose(val value: TcpClientCloseAction) : StateAction
+@JvmInline value class StateActionTcpHostClose(val value: TcpHostCloseAction) : StateAction
+@JvmInline value class StateActionTcpClientReset(val value: TcpClientResetAction) : StateAction
+@JvmInline value class StateActionTcpHostReset(val value: TcpHostResetAction) : StateAction
 @JvmInline value class StateActionAutomationCreateRequested(val value: AutomationCreateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationUpdateRequested(val value: AutomationUpdateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationSet(val value: AutomationSetAction) : StateAction
@@ -1886,6 +1978,16 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "terminal/commandExecuted" -> StateActionTerminalCommandExecuted(input.json.decodeFromJsonElement(TerminalCommandExecutedAction.serializer(), element))
             "terminal/commandFinished" -> StateActionTerminalCommandFinished(input.json.decodeFromJsonElement(TerminalCommandFinishedAction.serializer(), element))
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
+            "tcp/input" -> StateActionTcpInput(input.json.decodeFromJsonElement(TcpInputAction.serializer(), element))
+            "tcp/data" -> StateActionTcpData(input.json.decodeFromJsonElement(TcpDataAction.serializer(), element))
+            "tcp/inputConsumed" -> StateActionTcpInputConsumed(input.json.decodeFromJsonElement(TcpInputConsumedAction.serializer(), element))
+            "tcp/dataConsumed" -> StateActionTcpDataConsumed(input.json.decodeFromJsonElement(TcpDataConsumedAction.serializer(), element))
+            "tcp/inputEof" -> StateActionTcpInputEof(input.json.decodeFromJsonElement(TcpInputEofAction.serializer(), element))
+            "tcp/dataEof" -> StateActionTcpDataEof(input.json.decodeFromJsonElement(TcpDataEofAction.serializer(), element))
+            "tcp/clientClose" -> StateActionTcpClientClose(input.json.decodeFromJsonElement(TcpClientCloseAction.serializer(), element))
+            "tcp/hostClose" -> StateActionTcpHostClose(input.json.decodeFromJsonElement(TcpHostCloseAction.serializer(), element))
+            "tcp/clientReset" -> StateActionTcpClientReset(input.json.decodeFromJsonElement(TcpClientResetAction.serializer(), element))
+            "tcp/hostReset" -> StateActionTcpHostReset(input.json.decodeFromJsonElement(TcpHostResetAction.serializer(), element))
             "automation/createRequested" -> StateActionAutomationCreateRequested(input.json.decodeFromJsonElement(AutomationCreateRequestedAction.serializer(), element))
             "automation/updateRequested" -> StateActionAutomationUpdateRequested(input.json.decodeFromJsonElement(AutomationUpdateRequestedAction.serializer(), element))
             "automation/set" -> StateActionAutomationSet(input.json.decodeFromJsonElement(AutomationSetAction.serializer(), element))
@@ -1998,6 +2100,16 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionTerminalCommandExecuted -> output.json.encodeToJsonElement(TerminalCommandExecutedAction.serializer(), value.value)
             is StateActionTerminalCommandFinished -> output.json.encodeToJsonElement(TerminalCommandFinishedAction.serializer(), value.value)
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
+            is StateActionTcpInput -> output.json.encodeToJsonElement(TcpInputAction.serializer(), value.value)
+            is StateActionTcpData -> output.json.encodeToJsonElement(TcpDataAction.serializer(), value.value)
+            is StateActionTcpInputConsumed -> output.json.encodeToJsonElement(TcpInputConsumedAction.serializer(), value.value)
+            is StateActionTcpDataConsumed -> output.json.encodeToJsonElement(TcpDataConsumedAction.serializer(), value.value)
+            is StateActionTcpInputEof -> output.json.encodeToJsonElement(TcpInputEofAction.serializer(), value.value)
+            is StateActionTcpDataEof -> output.json.encodeToJsonElement(TcpDataEofAction.serializer(), value.value)
+            is StateActionTcpClientClose -> output.json.encodeToJsonElement(TcpClientCloseAction.serializer(), value.value)
+            is StateActionTcpHostClose -> output.json.encodeToJsonElement(TcpHostCloseAction.serializer(), value.value)
+            is StateActionTcpClientReset -> output.json.encodeToJsonElement(TcpClientResetAction.serializer(), value.value)
+            is StateActionTcpHostReset -> output.json.encodeToJsonElement(TcpHostResetAction.serializer(), value.value)
             is StateActionAutomationCreateRequested -> output.json.encodeToJsonElement(AutomationCreateRequestedAction.serializer(), value.value)
             is StateActionAutomationUpdateRequested -> output.json.encodeToJsonElement(AutomationUpdateRequestedAction.serializer(), value.value)
             is StateActionAutomationSet -> output.json.encodeToJsonElement(AutomationSetAction.serializer(), value.value)

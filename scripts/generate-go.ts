@@ -173,7 +173,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | TcpConnectionState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -716,6 +716,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'TcpDataEncoding', 'TcpEndpoint', 'TcpResetReason', 'TcpConnectionOpenFailureReason',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -873,6 +874,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AnnotationEntry' },
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
+  { name: 'TcpConnectionState' }, { name: 'TcpTarget' }, { name: 'TcpResetState' },
+  { name: 'FlowControlledByteDirectionState' }, { name: 'TcpConnectionsCapability' },
+  { name: 'TcpConnectionOpenErrorData' },
   { name: 'ResourceChange' },
   { name: 'AutomationSessionOrigin' },
   { name: 'AutomationSchedule' },
@@ -1301,12 +1305,13 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or TCP state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → terminal → changeset →
+// (tcp → automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
+\tTcp           *TcpConnectionState \`json:"-"\`
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
@@ -1321,6 +1326,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
+\tcase s.Tcp != nil:
+\t\treturn json.Marshal(s.Tcp)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1353,6 +1360,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
+\tcase containsAll(probe, "input", "output", "target"):
+\t\tvar v TcpConnectionState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Tcp = &v
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1647,6 +1660,16 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'tcp/input', variantName: 'TcpInput', tsInterface: 'TcpInputAction' },
+  { type: 'tcp/data', variantName: 'TcpData', tsInterface: 'TcpDataAction' },
+  { type: 'tcp/inputConsumed', variantName: 'TcpInputConsumed', tsInterface: 'TcpInputConsumedAction' },
+  { type: 'tcp/dataConsumed', variantName: 'TcpDataConsumed', tsInterface: 'TcpDataConsumedAction' },
+  { type: 'tcp/inputEof', variantName: 'TcpInputEof', tsInterface: 'TcpInputEofAction' },
+  { type: 'tcp/dataEof', variantName: 'TcpDataEof', tsInterface: 'TcpDataEofAction' },
+  { type: 'tcp/clientClose', variantName: 'TcpClientClose', tsInterface: 'TcpClientCloseAction' },
+  { type: 'tcp/hostClose', variantName: 'TcpHostClose', tsInterface: 'TcpHostCloseAction' },
+  { type: 'tcp/clientReset', variantName: 'TcpClientReset', tsInterface: 'TcpClientResetAction' },
+  { type: 'tcp/hostReset', variantName: 'TcpHostReset', tsInterface: 'TcpHostResetAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1768,9 +1791,10 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
-  { name: 'ReconnectReplayResult', omitDiscriminants: true },
-  { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
+  { name: 'ReconnectReplayResult' },
+  { name: 'ReconnectSnapshotResult' },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
+  { name: 'TcpConnectionSubscription' },
   { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
@@ -2001,6 +2025,11 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateFixedDiscriminantMethods('ChatMoveToNewSessionDestination', 'kind', 'newSession', 'ChatMoveDestinationKind'));
   lines.push('');
+  lines.push(generateFixedDiscriminantMethods('ReconnectReplayResult', 'type', 'replay', 'ReconnectResultType'));
+  lines.push('');
+  lines.push(generateFixedDiscriminantMethods('ReconnectSnapshotResult', 'type', 'snapshot', 'ReconnectResultType'));
+  lines.push('');
+
   lines.push('// ─── ChatSource Union ─────────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
   lines.push('');
@@ -2115,6 +2144,7 @@ const (
 \tErrorCodeNotFound                    int32 = -32008
 \tErrorCodePermissionDenied            int32 = -32009
 \tErrorCodeAlreadyExists               int32 = -32010
+\tErrorCodeTcpConnectionOpenFailed     int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.

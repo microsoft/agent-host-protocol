@@ -11,7 +11,8 @@ use std::time::SystemTime;
 
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
-    ListSessionsParams, ListSessionsResult, ReconnectResult, SubscribeParams, SubscribeResult,
+    ListSessionsParams, ListSessionsResult, ReconnectParams, ReconnectResult, SubscribeParams,
+    SubscribeResult,
 };
 use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::state::{RootState, SessionSummary, SnapshotState};
@@ -106,6 +107,7 @@ pub(super) fn spawn(
         session_summaries: BTreeMap::new(),
         generation: 0,
         current_client: None,
+        tcp_connections: vec![],
     };
     let shared = HostShared::new(initial);
     let shutdown_signal = Arc::new(Notify::new());
@@ -119,6 +121,8 @@ pub(super) fn spawn(
         fan_out,
         host_events,
         shutdown_signal: shutdown_signal.clone(),
+        connecting_client: None,
+        prior_client: None,
     };
     let join = tokio::spawn(runtime.run());
 
@@ -138,6 +142,8 @@ struct HostRuntime {
     fan_out: broadcast::Sender<HostSubscriptionEvent>,
     host_events: broadcast::Sender<HostEvent>,
     shutdown_signal: Arc<Notify>,
+    connecting_client: Option<Client>,
+    prior_client: Option<Client>,
 }
 
 enum InnerOutcome {
@@ -194,7 +200,10 @@ impl HostRuntime {
                         attempt = 0;
                     }
                     let outcome = self.run_connection(events).await;
-                    self.tear_down_client().await;
+                    if matches!(outcome, InnerOutcome::Shutdown) {
+                        break;
+                    }
+                    self.tear_down_client(true).await;
                     match outcome {
                         InnerOutcome::Shutdown => break,
                         InnerOutcome::ManualReconnect => {
@@ -209,6 +218,10 @@ impl HostRuntime {
                     }
                 }
                 Err(err) => {
+                    if let Some(client) = self.connecting_client.take() {
+                        self.prior_client = Some(client.clone());
+                        client.shutdown_preserving_tcp().await;
+                    }
                     let arc_err = Arc::new(err);
                     tracing::warn!(
                         host_id = %self.config.id,
@@ -251,6 +264,12 @@ impl HostRuntime {
                 break;
             }
         }
+        self.set_state(HostState::Disconnected, None).await;
+        self.dispose_tcp_connections().await;
+        self.tear_down_client(false).await;
+        if let Some(client) = self.connecting_client.take() {
+            client.shutdown().await;
+        }
     }
 
     async fn connect_once(&mut self) -> Result<crate::ClientEventStream, ClientError> {
@@ -261,30 +280,69 @@ impl HostRuntime {
             .await?;
 
         let client = Client::connect(transport, self.config.client_config.clone()).await?;
+        self.connecting_client = Some(client.clone());
+        if let Some(prior) = &self.prior_client {
+            client.tcp_advance_sequence(prior.tcp_sequence_floor());
+            if let Some(identity) = prior.tcp_identity().await {
+                client.tcp_restore_identity(identity).await;
+            }
+        }
 
         // Attach the events receiver BEFORE the initialize/reconnect
         // handshake so any notifications the server pushes between the
         // handshake response and the moment we enter `run_connection`
         // are captured rather than dropped.
         let events = client.events();
+        let tcp_connections = self.tcp_connections().await;
 
         // Decide between initialize and reconnect based on prior state.
         let (subscriptions, server_seq_after, init_result, reconnect_result) = {
             let snapshot = self.shared.lock().await;
-            let can_reconnect = snapshot.server_seq > 0 && !snapshot.subscriptions.is_empty();
-            let subscriptions = snapshot.subscriptions.clone();
+            let can_reconnect = !tcp_connections.is_empty()
+                || (snapshot.server_seq > 0 && !snapshot.subscriptions.is_empty());
+            let subscriptions: Vec<String> = snapshot
+                .subscriptions
+                .iter()
+                .filter(|resource| !resource.starts_with("ahp-tcp:"))
+                .cloned()
+                .collect();
             let server_seq = snapshot.server_seq;
             drop(snapshot);
 
             if can_reconnect {
-                match client
-                    .reconnect(self.client_id.clone(), server_seq, subscriptions.clone())
-                    .await
-                {
+                let reconnect = if tcp_connections.is_empty() {
+                    client
+                        .reconnect(self.client_id.clone(), server_seq, subscriptions.clone())
+                        .await
+                } else {
+                    client
+                        .reconnect_tcp_connections(
+                            ReconnectParams {
+                                channel: ROOT_RESOURCE_URI.into(),
+                                meta: None,
+                                client_id: self.client_id.clone(),
+                                last_seen_server_seq: server_seq,
+                                subscriptions: subscriptions.clone(),
+                            },
+                            &tcp_connections,
+                        )
+                        .await
+                        .map_err(ClientError::from)
+                };
+                match reconnect {
                     Ok(result) => (subscriptions, server_seq, None, Some(result)),
-                    Err(ClientError::Rpc(_)) => {
+                    Err(error)
+                        if !client.tcp_is_closed()
+                            && (matches!(&error, ClientError::Rpc(_))
+                                || matches!(&error, ClientError::Tcp(crate::TcpError::Client(source)) if matches!(source.as_ref(), ClientError::Rpc(_)))) =>
+                    {
                         // Server refused reconnect (likely too much state has
                         // elapsed); fall back to initialize.
+                        for connection in &tcp_connections {
+                            if let Err(error) = connection.dispose().await {
+                                tracing::warn!(?error, "TCP initialize fallback cleanup failed");
+                            }
+                        }
                         let init = client
                             .initialize(
                                 self.client_id.clone(),
@@ -363,6 +421,7 @@ impl HostRuntime {
             }
             state.generation
         };
+        self.connecting_client = None;
 
         // Apply the reconnect response (if this was a reconnect rather
         // than a fresh initialize). Replayed actions must be fanned out
@@ -370,7 +429,8 @@ impl HostRuntime {
         // mirrors and aggregated views stay correct; missing
         // subscriptions must be dropped from the cache.
         if let Some(result) = reconnect_result {
-            self.apply_reconnect_result(result, &subscriptions).await;
+            self.apply_reconnect_result(result, &subscriptions, server_seq_after)
+                .await;
         }
 
         self.set_state(HostState::Connected, None).await;
@@ -404,10 +464,16 @@ impl HostRuntime {
         &self,
         result: ReconnectResult,
         prior_subscriptions: &[String],
+        consumer_checkpoint: i64,
     ) {
         match result {
             ReconnectResult::Replay(replay) => {
                 for envelope in replay.actions {
+                    if !envelope.channel.starts_with("ahp-tcp:")
+                        && envelope.server_seq <= consumer_checkpoint as u64
+                    {
+                        continue;
+                    }
                     let channel = envelope.channel.clone();
                     self.apply_action(&envelope).await;
                     let host_event = HostSubscriptionEvent {
@@ -627,6 +693,7 @@ impl HostRuntime {
                 SubscribeParams {
                     channel: uri.clone(),
                     meta: None,
+                    create: None,
                     delivery: None,
                     view: None,
                 },
@@ -676,13 +743,47 @@ impl HostRuntime {
             .map_err(HostError::Client)
     }
 
-    async fn tear_down_client(&self) {
+    async fn tcp_connections(&self) -> Vec<crate::TcpConnection> {
+        let candidates: Vec<_> = {
+            let mut state = self.shared.lock().await;
+            state
+                .tcp_connections
+                .retain(|connection| connection.upgrade().is_some());
+            state
+                .tcp_connections
+                .iter()
+                .filter_map(|connection| connection.upgrade())
+                .collect()
+        };
+        let mut live = Vec::new();
+        for connection in candidates {
+            if !connection.is_closed().await {
+                live.push(connection);
+            }
+        }
+        live
+    }
+
+    async fn dispose_tcp_connections(&self) {
+        for connection in self.tcp_connections().await {
+            if let Err(error) = connection.dispose().await {
+                tracing::warn!(?error, "managed TCP disposal failed");
+            }
+        }
+    }
+
+    async fn tear_down_client(&mut self, preserve_tcp: bool) {
         let prev = {
             let mut state = self.shared.lock().await;
             state.current_client.take()
         };
         if let Some(client) = prev {
-            client.shutdown().await;
+            self.prior_client = Some(client.clone());
+            if preserve_tcp {
+                client.shutdown_preserving_tcp().await;
+            } else {
+                client.shutdown().await;
+            }
         }
     }
 

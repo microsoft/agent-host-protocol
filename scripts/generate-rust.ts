@@ -163,7 +163,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | TcpConnectionState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -807,6 +807,7 @@ function generateStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'TcpDataEncoding', 'TcpEndpoint', 'TcpResetReason', 'TcpConnectionOpenFailureReason',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -985,6 +986,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AnnotationEntry' },
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
+  { name: 'TcpConnectionState' }, { name: 'TcpTarget' }, { name: 'TcpResetState' },
+  { name: 'FlowControlledByteDirectionState' }, { name: 'TcpConnectionsCapability' },
+  { name: 'TcpConnectionOpenErrorData' },
   { name: 'ResourceChange' },
   { name: 'AutomationSessionOrigin', omitDiscriminants: true },
   { name: 'AutomationSchedule' },
@@ -1365,7 +1369,8 @@ ${unknownVariant}}`;
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required \`lifecycle\`), then
+/// Deserialized by trying TCP first (has required \`input\`, \`output\`, and
+/// \`target\`), then session (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
@@ -1374,6 +1379,7 @@ function generateSnapshotState(): string {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Tcp(Box<TcpConnectionState>),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Terminal(Box<TerminalState>),
@@ -1604,6 +1610,16 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'tcp/input', variantName: 'TcpInput', tsInterface: 'TcpInputAction' },
+  { type: 'tcp/data', variantName: 'TcpData', tsInterface: 'TcpDataAction' },
+  { type: 'tcp/inputConsumed', variantName: 'TcpInputConsumed', tsInterface: 'TcpInputConsumedAction' },
+  { type: 'tcp/dataConsumed', variantName: 'TcpDataConsumed', tsInterface: 'TcpDataConsumedAction' },
+  { type: 'tcp/inputEof', variantName: 'TcpInputEof', tsInterface: 'TcpInputEofAction' },
+  { type: 'tcp/dataEof', variantName: 'TcpDataEof', tsInterface: 'TcpDataEofAction' },
+  { type: 'tcp/clientClose', variantName: 'TcpClientClose', tsInterface: 'TcpClientCloseAction' },
+  { type: 'tcp/hostClose', variantName: 'TcpHostClose', tsInterface: 'TcpHostCloseAction' },
+  { type: 'tcp/clientReset', variantName: 'TcpClientReset', tsInterface: 'TcpClientResetAction' },
+  { type: 'tcp/hostReset', variantName: 'TcpHostReset', tsInterface: 'TcpHostResetAction' },
   { type: 'automation/createRequested', variantName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction', boxed: true },
   { type: 'automation/updateRequested', variantName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction', boxed: true },
   { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction', boxed: true },
@@ -1689,6 +1705,7 @@ impl Serialize for ChatErrorAction {
 
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
+  lines.push('use crate::state::TcpResetReason;');
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   // ActionType enum
@@ -1806,6 +1823,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
+  { name: 'TcpConnectionSubscription' },
   { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource', omitDiscriminants: true }, { name: 'SideChatSource', omitDiscriminants: true }, { name: 'CreateChatParams' },
@@ -1874,7 +1892,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn, TcpConnectionsCapability, TcpDataEncoding};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1960,6 +1978,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: None,
+            create: None,
         }
     }
 
@@ -1970,6 +1989,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            create: None,
         }
     }
 
@@ -1980,6 +2000,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: Some(view),
+            create: None,
         }
     }
 }`;
@@ -2123,6 +2144,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// TCP connection creation failed. Data carries TcpConnectionOpenErrorData.
+    pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.

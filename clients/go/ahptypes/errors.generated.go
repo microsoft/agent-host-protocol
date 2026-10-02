@@ -32,10 +32,11 @@ const (
 	ErrorCodeTurnInProgress             int32 = -32004
 	ErrorCodeUnsupportedProtocolVersion int32 = -32005
 	// -32006 is intentionally reserved and unassigned.
-	ErrorCodeAuthRequired     int32 = -32007
-	ErrorCodeNotFound         int32 = -32008
-	ErrorCodePermissionDenied int32 = -32009
-	ErrorCodeAlreadyExists    int32 = -32010
+	ErrorCodeAuthRequired            int32 = -32007
+	ErrorCodeNotFound                int32 = -32008
+	ErrorCodePermissionDenied        int32 = -32009
+	ErrorCodeAlreadyExists           int32 = -32010
+	ErrorCodeTcpConnectionOpenFailed int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.

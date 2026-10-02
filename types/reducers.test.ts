@@ -1,7 +1,9 @@
 /**
  * Reducer unit tests — driven by JSON fixtures for cross-language parity.
  *
- * Fixture format: { description, reducer, initial, actions, expected }
+ * Fixture format: { description, reducer, initial, actions, expected, expectedError? }
+ * When expectedError is present, only the final action must throw that message;
+ * expected is the state after the preceding actions (the rejected action must not mutate it).
  * Fixtures live in types/test-cases/reducers/*.json and can be consumed by
  * any language implementation to verify reducer parity.
  *
@@ -27,16 +29,20 @@ import {
   resourceWatchReducer,
   automationReducer,
   automationRunReducer,
+  tcpReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
+import type { TcpAction } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState, TcpConnectionState } from './state.js';
 import {
   SessionStatus,
   SessionLifecycle,
   TurnState,
   MessageKind,
+  TcpDataEncoding,
+  TcpResetReason,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -59,6 +65,7 @@ function readChannelSources(baseName: string): string {
     'channels-resource-watch',
     'channels-automation',
     'channels-automation-run',
+    'channels-tcp',
   ];
   return dirs
     .map(dir => {
@@ -74,14 +81,15 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState | TcpConnectionState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun' | 'tcp';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
+  expectedError?: string;
 }
 
 /**
@@ -115,25 +123,39 @@ describe('reducer fixtures', () => {
   for (const fixture of fixtures) {
     it(fixture.description, () => {
       let state = fixture.initial;
-      for (const action of fixture.actions) {
-        if (fixture.reducer === 'root') {
-          state = rootReducer(state as RootState, action as any);
-        } else if (fixture.reducer === 'chat') {
-          state = chatReducer(state as ChatState, action as any);
-        } else if (fixture.reducer === 'terminal') {
-          state = terminalReducer(state as TerminalState, action as any);
-        } else if (fixture.reducer === 'changeset') {
-          state = changesetReducer(state as ChangesetState, action as any);
-        } else if (fixture.reducer === 'annotations') {
-          state = annotationsReducer(state as AnnotationsState, action as any);
-        } else if (fixture.reducer === 'resourceWatch') {
-          state = resourceWatchReducer(state as ResourceWatchState, action as any);
-        } else if (fixture.reducer === 'automation') {
-          state = automationReducer(state as AutomationState, action as any);
-        } else if (fixture.reducer === 'automationRun') {
-          state = automationRunReducer(state as AutomationRunState, action as any);
+      if (fixture.expectedError !== undefined) {
+        assert.ok(fixture.actions.length > 0, 'expectedError requires a final action');
+      }
+      for (const [index, action] of fixture.actions.entries()) {
+        const apply = () => {
+          if (fixture.reducer === 'root') {
+            state = rootReducer(state as RootState, action as any);
+          } else if (fixture.reducer === 'chat') {
+            state = chatReducer(state as ChatState, action as any);
+          } else if (fixture.reducer === 'terminal') {
+            state = terminalReducer(state as TerminalState, action as any);
+          } else if (fixture.reducer === 'changeset') {
+            state = changesetReducer(state as ChangesetState, action as any);
+          } else if (fixture.reducer === 'annotations') {
+            state = annotationsReducer(state as AnnotationsState, action as any);
+          } else if (fixture.reducer === 'resourceWatch') {
+            state = resourceWatchReducer(state as ResourceWatchState, action as any);
+          } else if (fixture.reducer === 'automation') {
+            state = automationReducer(state as AutomationState, action as any);
+          } else if (fixture.reducer === 'automationRun') {
+            state = automationRunReducer(state as AutomationRunState, action as any);
+          } else if (fixture.reducer === 'tcp') {
+            state = tcpReducer(state as TcpConnectionState, action as TcpAction);
+          } else if (fixture.reducer === 'session') {
+            state = sessionReducer(state as SessionState, action as any);
+          } else {
+            assert.fail(`Unknown reducer: ${fixture.reducer}`);
+          }
+        };
+        if (fixture.expectedError !== undefined && index === fixture.actions.length - 1) {
+          assert.throws(apply, { message: fixture.expectedError });
         } else {
-          state = sessionReducer(state as SessionState, action as any);
+          apply();
         }
       }
       assert.deepStrictEqual(state, fixture.expected);
@@ -211,6 +233,22 @@ describe('isClientDispatchable', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
     assert.equal(isClientDispatchable(action), false);
   });
+
+  it('classifies TCP actions by endpoint', () => {
+    const actions: TcpAction[] = [
+      { type: ActionType.TcpInput, offset: 0, data: 'AA==' },
+      { type: ActionType.TcpDataConsumed, consumedBytes: 0 },
+      { type: ActionType.TcpInputEof, finalOffset: 0 },
+      { type: ActionType.TcpClientClose },
+      { type: ActionType.TcpClientReset, reason: TcpResetReason.ProtocolError },
+      { type: ActionType.TcpData, offset: 0, data: 'AA==' },
+      { type: ActionType.TcpInputConsumed, consumedBytes: 0 },
+      { type: ActionType.TcpDataEof, finalOffset: 0 },
+      { type: ActionType.TcpHostClose },
+      { type: ActionType.TcpHostReset, reason: TcpResetReason.ProtocolError },
+    ];
+    assert.deepStrictEqual(actions.map(isClientDispatchable), [true, true, true, true, true, false, false, false, false, false]);
+  });
 });
 
 describe('chat read state scoping', () => {
@@ -280,5 +318,94 @@ describe('reducer immutability', () => {
     const original = [...state.turns];
     chatReducer(state, { type: ActionType.ChatTruncated, turnId: 't1' });
     assert.deepStrictEqual(state.turns, original);
+  });
+});
+
+// ─── TCP Runtime Checks ──────────────────────────────────────────────────────
+//
+// Large generated payloads, non-JSON numbers, identity, and byte side effects
+// stay here; portable TCP state transitions and validation use shared fixtures.
+
+function initialTcpState(): TcpConnectionState {
+  return {
+    session: 'ahp-session:/s1',
+    target: { host: 'localhost', port: 3000 },
+    encoding: TcpDataEncoding.Base64,
+    input: { windowBytes: 8, maximumChunkSize: 6, receivedBytes: 0, consumedBytes: 0 },
+    output: { windowBytes: 8, maximumChunkSize: 6, receivedBytes: 0, consumedBytes: 0 },
+    clientClosed: false,
+    hostClosed: false,
+  };
+}
+
+describe('TCP runtime checks', () => {
+  it('accepts large chunks in both directions with exact decoded accounting', () => {
+    for (const size of [32768, 1048576, 4194304]) {
+      const data = Buffer.alloc(size, 255).toString('base64');
+      for (const [type, direction] of [[ActionType.TcpInput, 'input'], [ActionType.TcpData, 'output']] as const) {
+        const state = initialTcpState();
+        state[direction].windowBytes = size;
+        state[direction].maximumChunkSize = size;
+        const next = tcpReducer(state, { type, offset: 0, data });
+        assert.equal(next[direction].receivedBytes, size);
+        assert.throws(() => tcpReducer(next, { type, offset: size, data: 'AA==' }), /window/);
+      }
+    }
+  });
+
+  it('rejects non-JSON numeric offsets', () => {
+    for (const offset of [NaN, Infinity, -Infinity]) {
+      assert.throws(() => tcpReducer(initialTcpState(), {
+        type: ActionType.TcpInput, offset, data: 'AA==',
+      }), /safe integer/);
+    }
+  });
+
+  it('preserves the original state and reuses unchanged directions and no-op states', () => {
+    const state = initialTcpState();
+    const before = structuredClone(state);
+    const action = { type: ActionType.TcpInput, offset: 0, data: 'AP+A' } as const;
+    const next = tcpReducer(state, action);
+    assert.deepStrictEqual(state, before);
+    assert.equal(next.output, state.output);
+    assert.equal(tcpReducer(next, action), next);
+    const duplex = tcpReducer(next, { ...action, type: ActionType.TcpData });
+    for (const type of [ActionType.TcpInputConsumed, ActionType.TcpDataConsumed] as const) {
+      const consumed = tcpReducer(duplex, { type, consumedBytes: 3 });
+      assert.equal(tcpReducer(consumed, { type, consumedBytes: 2 }), consumed);
+      assert.equal(tcpReducer(consumed, { type, consumedBytes: 3 }), consumed);
+    }
+    for (const type of [ActionType.TcpClientClose, ActionType.TcpHostClose] as const) {
+      const closed = tcpReducer(next, { type });
+      assert.equal(tcpReducer(closed, { type }), closed);
+    }
+    const ended = tcpReducer(next, { type: ActionType.TcpInputEof, finalOffset: 3 });
+    assert.equal(tcpReducer(ended, { type: ActionType.TcpInputEof, finalOffset: 3 }), ended);
+    const reset = tcpReducer(next, { type: ActionType.TcpHostReset, reason: TcpResetReason.ConnectionReset });
+    assert.equal(tcpReducer(reset, action), reset);
+  });
+
+  it('logs unknown future actions rather than silently discarding them', () => {
+    const warnings: string[] = [];
+    const action: TcpAction = JSON.parse('{"type":"tcp/future"}');
+    const state = initialTcpState();
+    assert.equal(tcpReducer(state, action, message => warnings.push(message)), state);
+    assert.match(warnings[0], /tcp\/future/);
+  });
+
+  it('does not duplicate socket writes when unacknowledged input is resent', () => {
+    let state = initialTcpState();
+    const writes: Buffer[] = [];
+    const accept = (action: Extract<TcpAction, { type: ActionType.TcpInput }>) => {
+      const next = tcpReducer(state, action);
+      if (next.input.receivedBytes > state.input.receivedBytes) writes.push(Buffer.from(action.data, 'base64'));
+      state = next;
+    };
+    const first = { type: ActionType.TcpInput, offset: 0, data: 'AP+A' } as const;
+    accept(first);
+    accept(first);
+    accept({ type: ActionType.TcpInput, offset: 3, data: 'AQI=' });
+    assert.deepStrictEqual(Buffer.concat(writes), Buffer.from([0, 255, 128, 1, 2]));
+    assert.equal(writes.length, 2);
   });
 });

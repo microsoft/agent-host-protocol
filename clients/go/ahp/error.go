@@ -54,6 +54,16 @@ var ErrShutdown = errors.New("ahp: client shut down")
 // caller should resubscribe to recover.
 var ErrSequenceGap = errors.New("ahp: sequence gap detected; resubscribe required")
 
+// SubscriptionLagError reports overflow of a strict event receiver.
+// That receiver is permanently closed and will never resume past the gap.
+type SubscriptionLagError struct {
+	Capacity int
+}
+
+func (e *SubscriptionLagError) Error() string {
+	return fmt.Sprintf("ahp: subscription lag: event buffer capacity %d exceeded; receiver terminated", e.Capacity)
+}
+
 // TransportError wraps any error produced by an underlying [Transport]
 // implementation so that callers can distinguish transport faults from
 // protocol-level RPC errors via [errors.As].

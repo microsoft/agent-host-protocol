@@ -32,6 +32,7 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `Changeset.uriTemplate` advertised on a session or chat; the id is server-defined. |
 | `ahp-otlp:` _(authority/path host-defined)_ | _stateless_ | OpenTelemetry signal channels (logs, traces, metrics). Concrete URIs are advertised on `InitializeResult.telemetry`; clients MUST treat them as opaque. See [Telemetry Channel](/specification/telemetry-channel). |
 | `ahp-resource-watch:/<id>` | `ResourceWatchState` | Per-watch channel returned by `createResourceWatch`. Delivers `resourceWatch/changed` actions for file/directory changes under the watched URI. The id is receiver-assigned. |
+| `ahp-tcp:/<id>` | `TcpConnectionState` | Private session-scoped TCP connection, atomically created via `subscribe.create`. Replay-only restoration; never snapshot-restored. See [TCP Channel](/specification/tcp-channel). |
 
 Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes. Clients MUST NOT subscribe to a scheme they do not understand.
 
@@ -81,6 +82,12 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
 
 After subscribing, the client receives all messages scoped to that channel — both action envelopes (for state channels) and any channel-specific notifications.
 
+When the host advertises `tcpConnections`, `subscribe.create` can atomically
+create and subscribe to a private TCP child of the session named by `channel`.
+The result's `snapshot.resource` names the new child, not the parent.
+This does not change ordinary subscribe semantics. See [TCP creation](/specification/tcp-channel#atomic-creation-and-subscription)
+for ordering, ownership, and failure rules.
+
 ### Delivery preferences
 
 Clients MAY include `delivery.maxLatencyMs` on `subscribe` to request an upper
@@ -89,6 +96,9 @@ subscription. Servers MAY use that budget to coalesce high-frequency updates
 while preserving the same reduced state a client would observe from immediate
 delivery. A value of `0` requests immediate delivery with no intentional
 coalescing. Omitting `delivery` uses the server's default delivery behavior.
+
+TCP channels are an exception: payload actions MUST NOT be coalesced or
+dropped, even if the reduced counters would be equivalent.
 
 ### Snapshot views
 

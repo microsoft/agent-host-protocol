@@ -27,6 +27,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 jiff = { workspace = true }
+base64 = "0.22"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

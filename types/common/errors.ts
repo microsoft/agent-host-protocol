@@ -9,6 +9,7 @@
 
 import type { ProtectedResourceMetadata } from './state.js';
 import type { ResourceRequestParams } from './commands.js';
+import type { TcpConnectionOpenErrorData } from '../channels-tcp/state.js';
 
 // ─── Standard JSON-RPC Codes ─────────────────────────────────────────────────
 
@@ -93,6 +94,8 @@ export const AhpErrorCodes = {
    * fresh token or surface the conflict to the user.
    */
   Conflict: -32011,
+  /** TCP creation failed; data MUST contain TcpConnectionOpenErrorData. */
+  TcpConnectionOpenFailed: -32012,
 } as const;
 
 /** Union type of all AHP application error codes. */
@@ -171,6 +174,7 @@ export interface AhpErrorDetailsMap {
   [AhpErrorCodes.AuthRequired]: AuthRequiredErrorData;
   [AhpErrorCodes.PermissionDenied]: PermissionDeniedErrorData;
   [AhpErrorCodes.UnsupportedProtocolVersion]: UnsupportedProtocolVersionErrorData;
+  [AhpErrorCodes.TcpConnectionOpenFailed]: TcpConnectionOpenErrorData;
 }
 
 /** AHP error codes that carry a structured `data` payload. */

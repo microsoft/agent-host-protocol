@@ -1,0 +1,14 @@
+{
+  "name": "reconnect-snapshot-without-missing",
+  "group": "A",
+  "description": "Older hosts' snapshot fallback remains valid without the optional missing field and re-encodes without inventing it.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": []
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": []
+  }]
+}

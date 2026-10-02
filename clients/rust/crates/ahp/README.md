@@ -42,6 +42,81 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+## Owned TCP byte streams
+
+After `initialize` advertises `tcpConnections` with `base64` support, create a
+stream atomically through its parent session:
+
+```rust
+use ahp_types::state::TcpDataEncoding;
+use ahp_types::commands::TcpConnectionSubscription;
+
+let connection = client.open_tcp_connection(session_uri.clone(), TcpConnectionSubscription {
+    r#type: "tcpConnection".into(),
+    host: "localhost".into(),
+    port: 3000,
+    encoding: TcpDataEncoding::Base64,
+    receive_window_bytes: 256 * 1024,
+    maximum_chunk_size: 64 * 1024,
+}).await?;
+connection.write_all(&request_bytes).await?;
+connection.end().await?; // Input EOF; output remains readable.
+while let Some(chunk) = connection.read().await? {
+    // Consume this chunk.
+}
+connection.dispose().await?;
+```
+
+The SDK owns buffering, flow control, and replay. `read` releases receive credit;
+`drain` waits for destination consumption. `write` accepts one chunk and returns
+its byte count; `write_all` loops under one writer permit. Concurrent writers
+are rejected. Cancelling `write_all` can leave an accepted prefix, so do not
+blindly retry the whole buffer.
+
+Finish the writer before calling `close`, and keep reading until EOF while the
+close handshake drains. Cancelling the future stops waiting, not the handshake.
+`dispose` aborts without draining; call it on error/cancellation too. Clones share
+ownership; last-handle drop attempts best-effort cleanup.
+
+Transport loss suspends the same handles. For deliberate transport replacement,
+use `shutdown_preserving_tcp().await`; normal shutdown disposes streams. Create a
+fresh `Client` and resume instead of initializing again:
+
+```rust
+use ahp_types::commands::ReconnectParams;
+
+let result = fresh_client.reconnect_tcp_connections(ReconnectParams {
+    channel: ahp_types::ROOT_RESOURCE_URI.into(),
+    meta: None,
+    client_id: "my-client".into(), // Same ID used by the original initialize.
+    last_seen_server_seq,
+    subscriptions: vec![session_uri],
+}, &[connection.clone()]).await?;
+```
+
+Continue using the same handle; apply the returned result only to non-TCP
+subscriptions. Snapshot fallback or missing resources fail streams rather than
+creating new sockets.
+
+For managed hosts, call `HostClientHandle::open_tcp_connection(session_uri, create)`
+instead of opening through `raw_client()`. The runtime automatically resumes
+streams across reconnects and disposes them on host removal or shutdown.
+Transport/retry policy, connection limits, and native socket bridges remain
+application-owned. See the [TCP channel contract](../../../../docs/specification/tcp-channel.md).
+
+## Loss-sensitive raw events (advanced)
+
+Ordinary `client.events()` skips events when its bounded buffer overflows.
+For loss-sensitive consumers, attach `client.events_strict()` before sending
+requests. Its `recv().await` returns `Result<Option<ClientEvent>, ClientError>`:
+overflow reports `ClientError::SubscriptionLag`, and decode loss reports
+`ClientError::Transport(TransportError::Protocol(...))`. Both terminate the
+receiver rather than skipping events. Capacity uses
+`ClientConfig::subscription_buffer`; ordinary receivers are unchanged.
+These raw receivers are global. The owned TCP adapter instead registers a strict
+child-scoped receiver during creation reply processing and reattaches it per
+child on reconnect. Unrelated traffic cannot exhaust a TCP stream's event buffer.
+
 ## Custom transport
 
 Implement `ahp::Transport` for any framed byte stream:

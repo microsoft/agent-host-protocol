@@ -5,6 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AsyncBroadcastQueue } from '../src/client/async-queue.js';
+import { SubscriptionLagError } from '../src/client/error.js';
 
 test('reader created after publish does not replay history', async () => {
   const q = new AsyncBroadcastQueue<number>();
@@ -77,4 +78,52 @@ test('bounded buffer drops oldest and fast-forwards laggards', async () => {
   q.publish(4); // drops "2"
   assert.equal((await r.next()).value, 3);
   assert.equal((await r.next()).value, 4);
+});
+
+test('strict readers deliver the full buffer, then fail terminally on overflow', async () => {
+  const q = new AsyncBroadcastQueue<number>(2);
+  const strict = q.reader({ overflow: 'error' });
+  const ordinary = q.reader();
+  q.publish(1);
+  q.publish(2);
+  assert.equal((await strict.next()).value, 1);
+  assert.equal((await strict.next()).value, 2);
+  q.publish(3);
+  q.publish(4);
+  q.publish(5);
+  await assert.rejects(strict.next(), error =>
+    error instanceof SubscriptionLagError && error.missedEvents === 1);
+  assert.equal((await strict.next()).done, true);
+  assert.equal((await ordinary.next()).value, 4);
+  assert.equal((await ordinary.next()).value, 5);
+});
+
+test('one lagging strict reader does not terminate a prompt strict reader', async () => {
+  const q = new AsyncBroadcastQueue<number>(1);
+  const slow = q.reader({ overflow: 'error' });
+  const fast = q.reader({ overflow: 'error' });
+  const pending = fast.next();
+  q.publish(1);
+  assert.equal((await pending).value, 1);
+  q.publish(2);
+  assert.equal((await fast.next()).value, 2);
+  await assert.rejects(slow.next(), SubscriptionLagError);
+  q.close();
+  assert.equal((await fast.next()).done, true);
+});
+
+test('closing or returning strict readers preserves normal iterator semantics', async () => {
+  const q = new AsyncBroadcastQueue<number>(1);
+  const reader = q.reader({ overflow: 'error' });
+  q.publish(1);
+  q.close();
+  assert.equal((await reader.next()).value, 1);
+  assert.equal((await reader.next()).done, true);
+  const overflowed = new AsyncBroadcastQueue<number>(1);
+  const detached = overflowed.reader({ overflow: 'error' });
+  overflowed.publish(1);
+  overflowed.publish(2);
+  await detached.return!();
+  assert.equal((await detached.next()).done, true);
+  assert.equal(overflowed.hasReaders, false);
 });

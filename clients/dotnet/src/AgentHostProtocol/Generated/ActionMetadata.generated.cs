@@ -349,6 +349,36 @@ internal static class GeneratedActionMetadata
             case SessionWorkingDirectorySetAction value:
                 actionType = value.Type;
                 return true;
+            case TcpClientCloseAction value:
+                actionType = value.Type;
+                return true;
+            case TcpClientResetAction value:
+                actionType = value.Type;
+                return true;
+            case TcpDataAction value:
+                actionType = value.Type;
+                return true;
+            case TcpDataConsumedAction value:
+                actionType = value.Type;
+                return true;
+            case TcpDataEofAction value:
+                actionType = value.Type;
+                return true;
+            case TcpHostCloseAction value:
+                actionType = value.Type;
+                return true;
+            case TcpHostResetAction value:
+                actionType = value.Type;
+                return true;
+            case TcpInputAction value:
+                actionType = value.Type;
+                return true;
+            case TcpInputConsumedAction value:
+                actionType = value.Type;
+                return true;
+            case TcpInputEofAction value:
+                actionType = value.Type;
+                return true;
             case TerminalClaimedAction value:
                 actionType = value.Type;
                 return true;

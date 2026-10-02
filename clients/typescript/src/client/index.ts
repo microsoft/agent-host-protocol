@@ -5,6 +5,7 @@
  */
 
 export { AhpClient, Subscription } from './client.js';
+export { TcpConnection, TcpConnectionError, reconcileTcpConnections } from './tcp-connection.js';
 export { createResourceRequestHandler } from './client.js';
 export type {
   AhpClientConfig,
@@ -14,11 +15,13 @@ export type {
   SubscribeOptions,
 } from './client.js';
 export type { ClientEvent, ClosedReason, ConnectionState, SubscriptionEvent } from './events.js';
+export type { EventStreamOptions } from './async-queue.js';
 export {
   AhpClientError,
   ClientClosedError,
   RpcError,
   RpcTimeoutError,
+  SubscriptionLagError,
   TransportError,
 } from './error.js';
 export type { TransportErrorKind } from './error.js';

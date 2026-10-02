@@ -1,0 +1,18 @@
+{
+  "name": "action-envelope-tcp-input",
+  "group": "A",
+  "description": "TCP binary input and client origin survive action-envelope round trips.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "action": { "type": "tcp/input", "offset": 4294967297, "data": "AP+A" },
+    "serverSeq": 43,
+    "origin": { "clientId": "c1", "clientSeq": 7 }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-tcp:/t1",
+    "action": { "type": "tcp/input", "offset": 4294967297, "data": "AP+A" },
+    "serverSeq": 43,
+    "origin": { "clientId": "c1", "clientSeq": 7 }
+  }]
+}

@@ -184,6 +184,16 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.AutomationRunSessionRemoved]: '0.8.0',
   [ActionType.AutomationRunPrimarySessionChanged]: '0.8.0',
   [ActionType.AutomationRunCancelRequested]: '0.8.0',
+  [ActionType.TcpInput]: '0.9.0',
+  [ActionType.TcpData]: '0.9.0',
+  [ActionType.TcpInputConsumed]: '0.9.0',
+  [ActionType.TcpDataConsumed]: '0.9.0',
+  [ActionType.TcpInputEof]: '0.9.0',
+  [ActionType.TcpDataEof]: '0.9.0',
+  [ActionType.TcpClientClose]: '0.9.0',
+  [ActionType.TcpHostClose]: '0.9.0',
+  [ActionType.TcpClientReset]: '0.9.0',
+  [ActionType.TcpHostReset]: '0.9.0',
 };
 
 /**

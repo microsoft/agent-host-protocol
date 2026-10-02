@@ -1,0 +1,73 @@
+{
+  "description": "TCP: half close is independent and idempotent",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/inputEof",
+      "finalOffset": 0
+    },
+    {
+      "type": "tcp/inputEof",
+      "finalOffset": 0
+    },
+    {
+      "type": "tcp/data",
+      "offset": 0,
+      "data": "AA=="
+    },
+    {
+      "type": "tcp/dataEof",
+      "finalOffset": 1
+    },
+    {
+      "type": "tcp/dataEof",
+      "finalOffset": 1
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0,
+      "eofAtBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 1,
+      "consumedBytes": 0,
+      "eofAtBytes": 1
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  }
+}

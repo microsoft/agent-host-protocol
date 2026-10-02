@@ -143,6 +143,13 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 
 Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
 
+Private [TCP channels](/specification/tcp-channel) can resume only the original
+live sockets and consumers with complete action replay. On snapshot fallback,
+TCP-capable hosts MUST omit TCP snapshots, dispose those sockets, and include
+their requested URIs in the snapshot result's optional `missing` array.
+Clients MUST NOT restore TCP payload from a snapshot. The field is optional for
+compatibility with older hosts; the TCP capability makes this behavior mandatory.
+
 ## Unexpected Disconnection
 
 If the server process terminates unexpectedly:

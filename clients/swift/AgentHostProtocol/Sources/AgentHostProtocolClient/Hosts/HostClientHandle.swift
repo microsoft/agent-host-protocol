@@ -12,6 +12,9 @@ import AgentHostProtocol
 /// `HostError.hostReconnected` instead of silently writing to the new
 /// connection.
 ///
+/// TCP streams opened through this handle survive replay reconnects even when
+/// this handle becomes stale. Removing the host or shutting it down ends them.
+///
 /// **Race note:** generation is checked once at the start of each call, so
 /// it is possible (but rare) for a reconnect to land between
 /// `checkAlive()` and the actual `dispatch`/`request`. In that race the
@@ -47,6 +50,13 @@ public struct HostClientHandle: Sendable {
                 currentGeneration: current
             )
         }
+
+    }
+
+    /// Opens a TCP stream retained and replayed by this host's supervisor.
+    public func openTcpConnection(session: String, create: TcpConnectionSubscription) async throws -> TcpConnection {
+        try await checkAlive()
+        return try await shared.openTcpConnection(generation: generation, session: session, create: create)
     }
 
     /// Dispatch an action through this connection on `channel`, refusing if

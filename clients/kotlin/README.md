@@ -110,6 +110,12 @@ behavior. This is a client API migration, not a new JSON protocol.
   state from the current state and an applied action. Behavior parity with
   the canonical TypeScript reducers is verified against the shared
   `types/test-cases/reducers/` fixture corpus.
+- **TCP accounting** — `tcpReducer(state, action)` and `TcpReducer.reduce`
+  return the next `TcpConnectionState` without retaining payloads. Invalid
+  actions throw `IllegalArgumentException` and leave the original state unchanged.
+- **Portable TCP streams** — `TcpConnection` owns buffering, flow control, and
+  reconnect replay. It uses JVM
+  `CompletableFuture` operations without adding a coroutine or network runtime.
 - **Channel-scoped notification params** — `SessionAddedParams`,
   `SessionRemovedParams`, `SessionSummaryChangedParams`, `AuthRequiredParams`,
   `OtlpExportLogsParams`, etc. Notifications are routed by their JSON-RPC
@@ -123,6 +129,48 @@ behavior. This is a client API migration, not a new JSON protocol.
 - A WebSocket / network transport — bring your own (e.g. OkHttp, Ktor).
 - An example Android client — see the Swift `AHPClient` example for the architecture
   pattern; a Kotlin/Android equivalent is planned for a follow-up release.
+
+### Portable TCP adapter
+
+Inject `TcpConnectionTransport(clientId, nextSequence, advanceSequencePast, send,
+unsubscribe, lastAssignedSequence)`. The identity must be the one used to initialize/reconnect.
+Callbacks enqueue without blocking; the sequence allocator is shared with all
+actions sent by that logical client. `send` receives the child resource, original
+client sequence, and typed action. A send exception suspends the handle and is
+available as `lastTransportFailure`; retained actions reconcile on resume.
+`lastAssignedSequence` reads the global allocator, including acknowledged and
+non-TCP actions (use -1 if nothing has been assigned). This prevents a replacement
+allocator from reusing identities even when the TCP pending set is empty.
+1. Construct `TcpConnectionCreation(session, create, initialized, transport)`.
+   Set `create.type` to `"tcpConnection"`. Its `parameters` validate the
+   request before the transport sends `subscribe`.
+2. Attach a strict bounded event receiver **before** that request. Buffer events
+   while the child URI is unknown; overflow and decode loss must be explicit.
+3. Forward the definitive subscribe reply to `creation.accept(result)`, and
+   request errors/timeouts to `creation.fail(error)`. Await `creation.completion`
+   for the connection, then forward buffered/live envelopes to its `accept`.
+   The transport must still forward a late reply after cancellation/timeout:
+   the creation helper releases its child once, never the parent. Cleanup
+   failures throw to the transport callback.
+4. Use `write(ByteArray)`, `read()`, `drain()`, and `end()` futures. One reader and
+   one writer may run concurrently; overlapping writers are rejected. Do not
+   mutate write input before completion. Reading releases cumulative credit;
+   `read()` returns null only after buffered EOF drains.
+5. Call `suspend(cause)` on disconnect. Before the replacement transport's
+   reconnect request, call `TcpConnection.reconnectParameters(params, handles)`.
+   Buffer live delivery until `TcpConnection.resume(adjustedParams, result,
+   handles, replacementTransport)` returns. This helper verifies identity,
+   reconciles replay, and resends pending actions. Snapshot/missing resources
+   fail closed.
+6. Forward strict receiver lag/decode loss to `fail(error)`, never `suspend`.
+   `close()` stops new input but retains crossing host data and buffered reads.
+   Keep reading during graceful close; `dispose()` aborts without draining.
+
+The application supplies typed transport/event delivery and chooses reconnect
+timing, connection-count limits, and native socket bridges. It does not implement
+TCP reduction, credit, acknowledgement bookkeeping, or replay. TCP streams do not
+belong in ordinary state mirrors.
+See the [TCP channel contract](../../docs/specification/tcp-channel.md).
 
 ## Protocol version mapping
 

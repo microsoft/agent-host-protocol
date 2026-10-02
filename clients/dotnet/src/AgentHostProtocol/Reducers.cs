@@ -30,6 +30,118 @@ public enum ReduceOutcome
 /// </summary>
 public static class Reducers
 {
+    /// <summary>
+    /// Returns TCP accounting state without retaining payloads or restoring streams.
+    /// Invalid actions throw before changing state. Adapters must reset/close the
+    /// channel on failure and only write data when ReceivedBytes advances.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The TCP action violates the stream contract.</exception>
+    public static TcpConnectionState TcpReducer(TcpConnectionState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+        if (state.Reset is not null) return state;
+        var input = state.Input;
+        var output = state.Output;
+        switch (action.Value)
+        {
+            case TcpInputAction a:
+                input = TcpReceive(input, a.Offset, a.Data, state.ClientClosed);
+                break;
+            case TcpDataAction a:
+                output = TcpReceive(output, a.Offset, a.Data, state.HostClosed);
+                break;
+            case TcpInputConsumedAction a:
+                input = TcpConsume(input, a.ConsumedBytes);
+                break;
+            case TcpDataConsumedAction a:
+                output = TcpConsume(output, a.ConsumedBytes);
+                break;
+            case TcpInputEofAction a:
+                input = TcpEof(input, a.FinalOffset, state.ClientClosed);
+                break;
+            case TcpDataEofAction a:
+                output = TcpEof(output, a.FinalOffset, state.HostClosed);
+                break;
+            case TcpClientCloseAction:
+                return state.ClientClosed ? state : state with { ClientClosed = true };
+            case TcpHostCloseAction:
+                return state.HostClosed ? state : state with { HostClosed = true };
+            case TcpClientResetAction a:
+                return state with { Reset = new TcpResetState { Source = TcpEndpoint.Client, Reason = a.Reason } };
+            case TcpHostResetAction a:
+                return state with { Reset = new TcpResetState { Source = TcpEndpoint.Host, Reason = a.Reason } };
+            default:
+                return state;
+        }
+        return ReferenceEquals(input, state.Input) && ReferenceEquals(output, state.Output)
+            ? state : state with { Input = input, Output = output };
+    }
+
+    private static void RequireTcp(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException($"Invalid TCP action: {message}");
+    }
+
+    private static void RequireTcpOffset(long value) =>
+        RequireTcp(value >= 0 && value <= 9007199254740991L, "offset must be a nonnegative safe integer");
+
+    private static int TcpBase64Value(char c) => c switch
+    {
+        >= 'A' and <= 'Z' => c - 'A',
+        >= 'a' and <= 'z' => c - 'a' + 26,
+        >= '0' and <= '9' => c - '0' + 52,
+        '+' => 62,
+        '/' => 63,
+        _ => -1,
+    };
+
+    private static long TcpPayloadLength(string data, long maximumChunkSize)
+    {
+        RequireTcp(data.Length > 0 && data.Length <= 4 * (maximumChunkSize / 3 + (maximumChunkSize % 3 > 0 ? 1 : 0)), "chunk size");
+        int padding = data.EndsWith("==", StringComparison.Ordinal) ? 2 : data[data.Length - 1] == '=' ? 1 : 0;
+        RequireTcp(data.Length % 4 == 0, "base64 encoding");
+        int last = 0;
+        for (int i = 0; i < data.Length - padding; i++)
+        {
+            last = TcpBase64Value(data[i]);
+            RequireTcp(last >= 0, "base64 encoding");
+        }
+        if (padding > 0)
+            RequireTcp(last % (padding == 2 ? 16 : 4) == 0, "noncanonical base64 padding bits");
+        long length = (long)data.Length / 4 * 3 - padding;
+        RequireTcp(length <= maximumChunkSize, "chunk size");
+        return length;
+    }
+
+    private static FlowControlledByteDirectionState TcpReceive(FlowControlledByteDirectionState direction, long offset, string data, bool senderClosed)
+    {
+        RequireTcpOffset(offset);
+        long end = offset + TcpPayloadLength(data, direction.MaximumChunkSize);
+        RequireTcpOffset(end);
+        if (end <= direction.ReceivedBytes) return direction;
+        RequireTcp(offset == direction.ReceivedBytes, "gap or overlapping byte range");
+        RequireTcp(!senderClosed && direction.EofAtBytes is null, "data after EOF or sender close");
+        RequireTcp(end - direction.ConsumedBytes <= direction.WindowBytes, "receive window exceeded");
+        return direction with { ReceivedBytes = end };
+    }
+
+    private static FlowControlledByteDirectionState TcpConsume(FlowControlledByteDirectionState direction, long consumedBytes)
+    {
+        RequireTcpOffset(consumedBytes);
+        RequireTcp(consumedBytes <= direction.ReceivedBytes, "consuming bytes not received");
+        return consumedBytes <= direction.ConsumedBytes ? direction : direction with { ConsumedBytes = consumedBytes };
+    }
+
+    private static FlowControlledByteDirectionState TcpEof(FlowControlledByteDirectionState direction, long finalOffset, bool senderClosed)
+    {
+        RequireTcpOffset(finalOffset);
+        RequireTcp(finalOffset == direction.ReceivedBytes, "EOF offset");
+        if (direction.EofAtBytes == finalOffset) return direction;
+        RequireTcp(!senderClosed, "EOF after sender close");
+        return direction with { EofAtBytes = finalOffset };
+    }
+
     // ─── Injectable timestamp ──────────────────────────────────────────────
 
     private static volatile Func<long> s_now = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();

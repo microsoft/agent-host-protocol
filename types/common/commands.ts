@@ -19,6 +19,8 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
+import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
+import type { TcpConnectionSubscription } from '../channels-tcp/commands.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -294,6 +296,8 @@ export interface InitializeResult {
    * @see {@link /guide/automations | Automations Guide}
    */
   automations?: AutomationCapabilities;
+  /** Enables atomic creation of session-scoped, replay-only TCP channels. */
+  tcpConnections?: TcpConnectionsCapability;
 }
 
 /**
@@ -463,6 +467,12 @@ export interface ReconnectSnapshotResult {
   type: ReconnectResultType.Snapshot;
   /** Fresh snapshots for each subscription */
   snapshots: Snapshot[];
+  /**
+   * Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+   * requested TCP channels here and dispose their sockets on snapshot fallback.
+   * Omitted by older hosts; absence does not authorize snapshot-restoring TCP.
+   */
+  missing?: URI[];
 }
 
 /** Result of the `reconnect` command. */
@@ -501,6 +511,12 @@ export interface SubscribeParams extends BaseParams {
    * default snapshot. Clients MUST tolerate receiving more state than requested.
    */
   view?: SubscribeView;
+  /**
+   * Atomically create a private child channel and subscribe to it.
+   * Requires the advertised tcpConnections capability. channel identifies
+   * the parent session; snapshot.resource identifies the created TCP channel.
+   */
+  create?: TcpConnectionSubscription;
 }
 
 /**

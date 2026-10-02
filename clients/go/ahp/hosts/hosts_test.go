@@ -3,6 +3,8 @@ package hosts
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -97,6 +99,280 @@ func runFakeServerWithInitializeResult(t *testing.T, serverSide *fakeTransport, 
 			out, _ := ahp.EncodeMessage(resp)
 			_ = serverSide.Send(ctx, out)
 		}
+	}
+}
+
+func TestManagedTCPReconnectAndShutdown(t *testing.T) {
+	for _, mode := range []string{"replay", "retry", "snapshot", "missing", "refused"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			multi := NewMultiHostClient()
+			events := multi.Subscriptions()
+			defer multi.Shutdown(context.Background())
+			servers := make(chan *fakeTransport, 4)
+			reconnects := make(chan ahptypes.ReconnectParams, 4)
+			dispatches := make(chan ahptypes.DispatchActionParams, 32)
+			attempt := 0
+			snapshot := func(resource string) map[string]any {
+				direction := map[string]any{"windowBytes": 4, "maximumChunkSize": 3, "receivedBytes": 0, "consumedBytes": 0, "eofAtBytes": nil}
+				return map[string]any{"snapshot": map[string]any{"resource": resource, "fromSeq": 10,
+					"state": map[string]any{"type": "tcp", "session": "ahp-session:/s1", "target": map[string]any{"host": "localhost", "port": 3000},
+						"encoding": "base64", "input": direction, "output": direction, "clientClosed": false, "hostClosed": false, "reset": nil}}}
+			}
+			cfg := NewHostConfig("tcp", "TCP", func(_ context.Context, _ HostID) (ahp.Transport, error) {
+				attempt++
+				current := attempt
+				client, server := newFakePair()
+				servers <- server
+				go func() {
+					send := func(value any) {
+						data, err := json.Marshal(value)
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						if err := server.Send(ctx, ahp.NewTextMessage(string(data))); err != nil && ctx.Err() == nil {
+							t.Error(err)
+						}
+					}
+					for {
+						frame, err := server.Recv(ctx)
+						if err != nil {
+							return
+						}
+						message, err := frame.IntoParsed()
+						if err != nil {
+							t.Error(err)
+							return
+						}
+						if message.Notification != nil {
+							if message.Notification.Method == "dispatchAction" {
+								var params ahptypes.DispatchActionParams
+								if err := json.Unmarshal(message.Notification.Params, &params); err != nil {
+									t.Error(err)
+									return
+								}
+								dispatches <- params
+							}
+							continue
+						}
+						if message.Request == nil {
+							continue
+						}
+						req := message.Request
+						var result any
+						switch req.Method {
+						case "initialize":
+							var params ahptypes.InitializeParams
+							if err := json.Unmarshal(req.Params, &params); err != nil {
+								t.Error(err)
+								return
+							}
+							for _, resource := range params.InitialSubscriptions {
+								if strings.HasPrefix(resource, "ahp-tcp:") {
+									t.Error("TCP entered initialize fallback")
+								}
+							}
+							result = map[string]any{"protocolVersion": ahptypes.ProtocolVersion, "serverSeq": 10, "snapshots": []any{}, "tcpConnections": map[string]any{"encodings": []string{"base64"}}}
+						case "subscribe":
+							resource := "ahp-tcp:/owned"
+							if current > 1 {
+								resource = "ahp-tcp:/second"
+							}
+							result = snapshot(resource)
+						case "reconnect":
+							var params ahptypes.ReconnectParams
+							if err := json.Unmarshal(req.Params, &params); err != nil {
+								t.Error(err)
+								return
+							}
+							reconnects <- params
+							if mode == "retry" && current == 2 {
+								server.Close(ctx)
+								return
+							}
+							if mode == "refused" {
+								send(map[string]any{"jsonrpc": "2.0", "id": req.ID, "error": map[string]any{"code": -32000, "message": "replay expired"}})
+								continue
+							}
+							result = map[string]any{"type": "replay", "actions": []any{}, "missing": []string{}}
+							if mode == "replay" || mode == "retry" {
+								result = map[string]any{"type": "replay", "missing": []string{}, "actions": []any{
+									map[string]any{"channel": "ahp-terminal:/t", "serverSeq": 20, "action": map[string]any{"type": "terminal/data", "data": "hello"}},
+									map[string]any{"channel": "ahp-terminal:/t", "serverSeq": 21, "action": map[string]any{"type": "terminal/data", "data": "!"}},
+								}}
+							}
+							if mode == "snapshot" {
+								result = map[string]any{"type": "snapshot", "snapshots": []any{}}
+							}
+							if mode == "missing" {
+								result = map[string]any{"type": "replay", "actions": []any{}, "missing": []string{"ahp-tcp:/owned"}}
+							}
+						default:
+							t.Errorf("unexpected request %s", req.Method)
+							return
+						}
+						send(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+						if req.Method == "subscribe" && current == 1 {
+							send(map[string]any{"jsonrpc": "2.0", "method": "action", "params": map[string]any{"channel": "ahp-tcp:/owned", "serverSeq": 11, "action": map[string]any{"type": "tcp/data", "offset": 0, "data": "eA=="}}})
+						}
+						if req.Method == "reconnect" && (mode == "replay" || mode == "retry") {
+							send(map[string]any{"jsonrpc": "2.0", "method": "action", "params": map[string]any{"channel": "ahp-tcp:/owned", "serverSeq": 22, "action": map[string]any{"type": "tcp/dataEof", "finalOffset": 1}}})
+						}
+					}
+				}()
+				return client, nil
+			})
+			cfg.ClientID = "owner"
+			cfg.InitialSubscriptions = []string{ahptypes.RootResourceURI, "ahp-tcp:/must-not-initialize"}
+			cfg.ReconnectPolicy = ReconnectPolicy{MaxAttempts: 2, InitialBackoff: time.Millisecond, MaxBackoff: time.Millisecond, BackoffMultiplier: 1, ResetOnSuccess: true}
+			if _, err := multi.AddHost(ctx, cfg); err != nil {
+				t.Fatal(err)
+			}
+			old, err := multi.ClientHandle(cfg.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			create := ahptypes.TcpConnectionSubscription{Type: "tcpConnection", Host: "localhost", Port: 3000, Encoding: ahptypes.TcpDataEncodingBase64, ReceiveWindowBytes: 4, MaximumChunkSize: 3}
+			connection, err := old.OpenTCPConnection(ctx, "ahp-session:/s1", create)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receive := func() ahptypes.DispatchActionParams {
+				select {
+				case p := <-dispatches:
+					return p
+				case <-ctx.Done():
+					t.Fatal("dispatch timeout")
+					return ahptypes.DispatchActionParams{}
+				}
+			}
+			if data, err := connection.Read(ctx); err != nil || string(data) != "x" {
+				t.Fatalf("first data %q: %v", data, err)
+			}
+			credit := receive()
+			if _, err := connection.Write(ctx, []byte("ab")); err != nil {
+				t.Fatal(err)
+			}
+			input := receive()
+			raw, err := old.Client()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ordinary, err := raw.Dispatch(ctx, "ahp-session:/s1", ahptypes.StateAction{Value: &ahptypes.SessionTitleChangedAction{Type: ahptypes.ActionTypeSessionTitleChanged, Title: "ordinary"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			receive()
+			oldServer := <-servers
+			if err := oldServer.Send(ctx, ahp.NewTextMessage(`{"jsonrpc":"2.0","method":"action","params":{"channel":"ahp-terminal:/t","serverSeq":20,"action":{"type":"terminal/data","data":"hello"}}}`)); err != nil {
+				t.Fatal(err)
+			}
+			for {
+				select {
+				case event := <-events:
+					if event.Channel == "ahp-terminal:/t" {
+						goto ordinaryApplied
+					}
+				case <-ctx.Done():
+					t.Fatal("ordinary event not delivered")
+				}
+			}
+		ordinaryApplied:
+			if err := oldServer.Close(ctx); err != nil {
+				t.Fatal(err)
+			}
+			var reconnect ahptypes.ReconnectParams
+			select {
+			case reconnect = <-reconnects:
+			case <-ctx.Done():
+				t.Fatal("missing TCP reconnect")
+			}
+			found := false
+			for _, resource := range reconnect.Subscriptions {
+				found = found || resource == connection.Resource()
+			}
+			if !found || reconnect.ClientId != "owner" || reconnect.LastSeenServerSeq > 11 {
+				t.Fatalf("unsafe reconnect %+v", reconnect)
+			}
+			var fresh *HostClientHandle
+			for {
+				fresh, err = multi.ClientHandle(cfg.ID)
+				if err == nil && fresh.generation > old.generation && multi.Host(cfg.ID).State.Kind == HostStateConnected {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					t.Fatal("reconnect did not finish")
+				case <-time.After(time.Millisecond):
+				}
+			}
+			if mode == "replay" || mode == "retry" {
+				text := "hello"
+			replayed:
+				for {
+					select {
+					case event := <-events:
+						if action, ok := event.Event.(ahp.SubscriptionEventAction); ok {
+							if data, ok := action.Envelope.Action.Value.(*ahptypes.TerminalDataAction); ok {
+								text += data.Data
+							}
+							if action.Envelope.ServerSeq == 22 {
+								break replayed
+							}
+						}
+					case <-ctx.Done():
+						t.Fatal("replay not delivered")
+					}
+				}
+				if text != "hello!" {
+					t.Fatalf("managed replay duplicated terminal output: %q", text)
+				}
+				if got := receive(); got.ClientSeq != credit.ClientSeq {
+					t.Fatal("credit was renumbered")
+				}
+				if got := receive(); got.ClientSeq != input.ClientSeq {
+					t.Fatal("input was renumbered")
+				}
+				if _, err := connection.Read(ctx); err != io.EOF {
+					t.Fatalf("replayed EOF: %v", err)
+				}
+				if _, err := connection.Write(ctx, []byte("c")); err != nil {
+					t.Fatal(err)
+				}
+				if got := receive(); got.ClientSeq <= ordinary.ClientSeq {
+					t.Fatal("ordinary sequence floor lost")
+				}
+				second, err := fresh.OpenTCPConnection(ctx, "ahp-session:/s1", create)
+				if err != nil {
+					t.Fatal(err)
+				}
+				waiter := make(chan error, 1)
+				go func() { _, err := second.Read(ctx); waiter <- err }()
+				if err := multi.Shutdown(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if !connection.IsClosed() || !second.IsClosed() {
+					t.Fatal("permanent shutdown retained live streams")
+				}
+				select {
+				case err := <-waiter:
+					if err == nil {
+						t.Fatal("shutdown did not fail blocked read")
+					}
+				case <-ctx.Done():
+					t.Fatal("shutdown blocked read")
+				}
+			} else {
+				if !connection.IsClosed() {
+					t.Fatal("snapshot/missing/fallback revived TCP")
+				}
+				if _, err := connection.Read(ctx); err == nil {
+					t.Fatal("terminated stream read succeeded")
+				}
+			}
+		})
 	}
 }
 

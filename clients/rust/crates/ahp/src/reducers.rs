@@ -14,6 +14,9 @@
 //! makes them safe to run inside a UI render loop or a snapshot
 //! reconciler.
 //!
+//! [`apply_action_to_tcp`] validates TCP byte-stream metadata without retaining
+//! payloads. It must be paired with a lossless stream owner, not a snapshot mirror.
+//!
 //! # Example
 //!
 //! ```
@@ -60,15 +63,17 @@ use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork,
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
     ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
-    ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
-    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
-    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
-    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    ErrorResponsePart, FlowControlledByteDirectionState, InputRequestResponsePart,
+    McpServerCustomization, McpServerStartingState, McpServerState, McpServerStoppedState,
+    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
+    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TcpConnectionState,
+    TcpEndpoint, TcpResetState, TerminalCommandPart, TerminalContentPart,
+    TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState, TerminalUnclassifiedPart,
+    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
+    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
+    TurnState,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -91,6 +96,12 @@ pub enum ReduceOutcome {
 /// Why an action could not be reduced safely.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ReduceError {
+    /// A TCP action violated byte ordering, credit, or encoding requirements.
+    #[error("Invalid TCP action: {reason}")]
+    InvalidTcp {
+        /// Canonical protocol validation diagnostic.
+        reason: &'static str,
+    },
     /// A turn carried a start timestamp that was not valid RFC 3339.
     #[error("invalid RFC 3339 timestamp {timestamp:?}: {reason}")]
     InvalidTimestamp {
@@ -110,6 +121,184 @@ pub enum ReduceError {
         /// Arithmetic diagnostic.
         reason: String,
     },
+}
+
+const TCP_MAX_SAFE_INTEGER: i64 = (1 << 53) - 1;
+
+fn require_tcp(condition: bool, reason: &'static str) -> Result<(), ReduceError> {
+    if condition {
+        Ok(())
+    } else {
+        Err(ReduceError::InvalidTcp { reason })
+    }
+}
+
+fn require_tcp_offset(value: i64) -> Result<(), ReduceError> {
+    require_tcp(
+        (0..=TCP_MAX_SAFE_INTEGER).contains(&value),
+        "offset must be a nonnegative safe integer",
+    )
+}
+
+fn tcp_payload_length(data: &str, maximum_chunk_size: i64) -> Result<i64, ReduceError> {
+    // JavaScript measures string length in UTF-16 code units, even for
+    // invalid non-ASCII payloads rejected by the following alphabet check.
+    let encoded_length = data.encode_utf16().count();
+    require_tcp(
+        maximum_chunk_size >= 0
+            && !data.is_empty()
+            && encoded_length as u64 <= 4 * (maximum_chunk_size as u64).div_ceil(3),
+        "chunk size",
+    )?;
+    let padding = if data.ends_with("==") {
+        2
+    } else if data.ends_with('=') {
+        1
+    } else {
+        0
+    };
+    require_tcp(data.len() % 4 == 0, "base64 encoding")?;
+    let mut last = 0;
+    for &byte in &data.as_bytes()[..data.len() - padding] {
+        last = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => {
+                return Err(ReduceError::InvalidTcp {
+                    reason: "base64 encoding",
+                })
+            }
+        };
+    }
+    require_tcp(
+        (padding != 2 || last % 16 == 0) && (padding != 1 || last % 4 == 0),
+        "noncanonical base64 padding bits",
+    )?;
+    let length = (data.len() / 4 * 3 - padding) as i64;
+    require_tcp(length <= maximum_chunk_size, "chunk size")?;
+    Ok(length)
+}
+
+fn receive_tcp(
+    direction: &mut FlowControlledByteDirectionState,
+    offset: i64,
+    data: &str,
+    sender_closed: bool,
+) -> Result<ReduceOutcome, ReduceError> {
+    require_tcp_offset(offset)?;
+    let length = tcp_payload_length(data, direction.maximum_chunk_size)?;
+    require_tcp(
+        length <= TCP_MAX_SAFE_INTEGER - offset,
+        "offset must be a nonnegative safe integer",
+    )?;
+    let end = offset + length;
+    if end <= direction.received_bytes {
+        return Ok(ReduceOutcome::NoOp);
+    }
+    require_tcp(
+        offset == direction.received_bytes,
+        "gap or overlapping byte range",
+    )?;
+    require_tcp(
+        !sender_closed && direction.eof_at_bytes.is_none(),
+        "data after EOF or sender close",
+    )?;
+    require_tcp(
+        end - direction.consumed_bytes <= direction.window_bytes,
+        "receive window exceeded",
+    )?;
+    direction.received_bytes = end;
+    Ok(ReduceOutcome::Applied)
+}
+
+fn consume_tcp(
+    direction: &mut FlowControlledByteDirectionState,
+    consumed_bytes: i64,
+) -> Result<ReduceOutcome, ReduceError> {
+    require_tcp_offset(consumed_bytes)?;
+    require_tcp(
+        consumed_bytes <= direction.received_bytes,
+        "consuming bytes not received",
+    )?;
+    if consumed_bytes <= direction.consumed_bytes {
+        return Ok(ReduceOutcome::NoOp);
+    }
+    direction.consumed_bytes = consumed_bytes;
+    Ok(ReduceOutcome::Applied)
+}
+
+fn eof_tcp(
+    direction: &mut FlowControlledByteDirectionState,
+    final_offset: i64,
+    sender_closed: bool,
+) -> Result<ReduceOutcome, ReduceError> {
+    require_tcp_offset(final_offset)?;
+    require_tcp(final_offset == direction.received_bytes, "EOF offset")?;
+    if direction.eof_at_bytes == Some(final_offset) {
+        return Ok(ReduceOutcome::NoOp);
+    }
+    require_tcp(!sender_closed, "EOF after sender close")?;
+    direction.eof_at_bytes = Some(final_offset);
+    Ok(ReduceOutcome::Applied)
+}
+
+/// Apply a TCP action without retaining its payload.
+///
+/// Invalid actions return [`ReduceOutcome::Invalid`] without mutating state.
+/// Adapters must reset the channel on error and write bytes only when
+/// `received_bytes` advances. This does not provide a lossless subscription
+/// and is intentionally not integrated with snapshot state mirrors.
+pub fn apply_action_to_tcp(state: &mut TcpConnectionState, action: &StateAction) -> ReduceOutcome {
+    if state.reset.is_some() {
+        return ReduceOutcome::NoOp;
+    }
+    let result = match action {
+        StateAction::TcpInput(a) => {
+            receive_tcp(&mut state.input, a.offset, &a.data, state.client_closed)
+        }
+        StateAction::TcpData(a) => {
+            receive_tcp(&mut state.output, a.offset, &a.data, state.host_closed)
+        }
+        StateAction::TcpInputConsumed(a) => consume_tcp(&mut state.input, a.consumed_bytes),
+        StateAction::TcpDataConsumed(a) => consume_tcp(&mut state.output, a.consumed_bytes),
+        StateAction::TcpInputEof(a) => {
+            eof_tcp(&mut state.input, a.final_offset, state.client_closed)
+        }
+        StateAction::TcpDataEof(a) => eof_tcp(&mut state.output, a.final_offset, state.host_closed),
+        StateAction::TcpClientClose(_) => {
+            if state.client_closed {
+                return ReduceOutcome::NoOp;
+            }
+            state.client_closed = true;
+            Ok(ReduceOutcome::Applied)
+        }
+        StateAction::TcpHostClose(_) => {
+            if state.host_closed {
+                return ReduceOutcome::NoOp;
+            }
+            state.host_closed = true;
+            Ok(ReduceOutcome::Applied)
+        }
+        StateAction::TcpClientReset(a) => {
+            state.reset = Some(TcpResetState {
+                source: TcpEndpoint::Client,
+                reason: a.reason.clone(),
+            });
+            Ok(ReduceOutcome::Applied)
+        }
+        StateAction::TcpHostReset(a) => {
+            state.reset = Some(TcpResetState {
+                source: TcpEndpoint::Host,
+                reason: a.reason.clone(),
+            });
+            Ok(ReduceOutcome::Applied)
+        }
+        _ => return ReduceOutcome::OutOfScope,
+    };
+    result.unwrap_or_else(ReduceOutcome::Invalid)
 }
 
 fn add_milliseconds_to_timestamp(timestamp: &str, duration: i64) -> Result<String, ReduceError> {
@@ -2563,6 +2752,142 @@ mod tests {
 
     // ─── Fixture-Driven Tests ─────────────────────────────────────────
 
+    fn tcp_test_state() -> TcpConnectionState {
+        let direction = FlowControlledByteDirectionState {
+            window_bytes: 8,
+            maximum_chunk_size: 6,
+            received_bytes: 0,
+            consumed_bytes: 0,
+            eof_at_bytes: None,
+        };
+        TcpConnectionState {
+            session: "ahp-session:/s1".into(),
+            target: ahp_types::state::TcpTarget {
+                host: "localhost".into(),
+                port: 3000,
+            },
+            encoding: ahp_types::state::TcpDataEncoding::Base64,
+            input: direction.clone(),
+            output: direction,
+            client_closed: false,
+            host_closed: false,
+            reset: None,
+        }
+    }
+
+    #[test]
+    fn tcp_large_payload() {
+        let size: usize = 4 * 1024 * 1024;
+        let data = "A".repeat(4 * size.div_ceil(3) - 2) + "==";
+        for action_type in ["tcp/input", "tcp/data"] {
+            let mut state = tcp_test_state();
+            state.input.window_bytes = size as i64;
+            state.output.window_bytes = size as i64;
+            state.input.maximum_chunk_size = size as i64;
+            state.output.maximum_chunk_size = size as i64;
+            let action = serde_json::from_value(serde_json::json!({
+                "type": action_type, "offset": 0, "data": data,
+            }))
+            .unwrap();
+            assert_eq!(
+                apply_action_to_tcp(&mut state, &action),
+                ReduceOutcome::Applied
+            );
+            let direction = if action_type == "tcp/input" {
+                &state.input
+            } else {
+                &state.output
+            };
+            assert_eq!(direction.received_bytes, size as i64);
+            let before = state.clone();
+            assert_eq!(
+                apply_action_to_tcp(&mut state, &action),
+                ReduceOutcome::NoOp
+            );
+            let invalid = serde_json::from_value(serde_json::json!({
+                "type": action_type, "offset": 0, "data": data[..data.len()-3].to_owned() + "B==",
+            }))
+            .unwrap();
+            assert_eq!(
+                apply_action_to_tcp(&mut state, &invalid),
+                ReduceOutcome::Invalid(ReduceError::InvalidTcp {
+                    reason: "noncanonical base64 padding bits"
+                }),
+            );
+            assert_eq!(state, before);
+        }
+    }
+
+    #[test]
+    fn tcp_native_integer_bounds() {
+        for action_type in [
+            "tcp/input",
+            "tcp/data",
+            "tcp/inputConsumed",
+            "tcp/dataConsumed",
+            "tcp/inputEof",
+            "tcp/dataEof",
+        ] {
+            let field = if action_type.ends_with("Consumed") {
+                "consumedBytes"
+            } else if action_type.ends_with("Eof") {
+                "finalOffset"
+            } else {
+                "offset"
+            };
+            for value in [i64::MIN, -1, TCP_MAX_SAFE_INTEGER + 1, i64::MAX] {
+                let mut state = tcp_test_state();
+                let before = state.clone();
+                let action = serde_json::from_value(serde_json::json!({
+                    "type": action_type, (field): value, "data": "AA==",
+                }))
+                .unwrap();
+                assert_eq!(
+                    apply_action_to_tcp(&mut state, &action),
+                    ReduceOutcome::Invalid(ReduceError::InvalidTcp {
+                        reason: "offset must be a nonnegative safe integer"
+                    }),
+                    "{action_type}: {value}",
+                );
+                assert_eq!(state, before);
+            }
+        }
+        let mut state = tcp_test_state();
+        state.input.received_bytes = TCP_MAX_SAFE_INTEGER - 1;
+        state.input.consumed_bytes = TCP_MAX_SAFE_INTEGER - 1;
+        let action = serde_json::from_value(serde_json::json!({
+            "type": "tcp/input", "offset": TCP_MAX_SAFE_INTEGER - 1, "data": "AA==",
+        }))
+        .unwrap();
+        assert_eq!(
+            apply_action_to_tcp(&mut state, &action),
+            ReduceOutcome::Applied
+        );
+        assert_eq!(state.input.received_bytes, TCP_MAX_SAFE_INTEGER);
+    }
+
+    #[test]
+    fn tcp_non_ascii_payload_errors_match_utf16_size_check() {
+        for (data, reason) in [
+            ("\u{e9}\u{e9}\u{e9}", "base64 encoding"),
+            ("\u{1f600}\u{1f600}", "base64 encoding"),
+            ("\u{1f600}\u{1f600}A", "chunk size"),
+        ] {
+            let mut state = tcp_test_state();
+            state.input.maximum_chunk_size = 1;
+            let before = state.clone();
+            let action = StateAction::TcpInput(ahp_types::actions::TcpInputAction {
+                offset: 0,
+                data: data.into(),
+            });
+            assert_eq!(
+                apply_action_to_tcp(&mut state, &action),
+                ReduceOutcome::Invalid(ReduceError::InvalidTcp { reason }),
+            );
+            assert_eq!(state, before);
+        }
+    }
+
     /// Recursively strip JSON `null` values from objects so that absent
     /// optional fields (which Rust omits via `skip_serializing_if`) match
     /// the fixture expectations that spell them out as `null`.
@@ -2643,15 +2968,7 @@ mod tests {
             let initial = raw["initial"].clone();
             let actions = raw["actions"].as_array().expect("actions must be an array");
             let expected = raw["expected"].clone();
-
-            let parsed_actions: Vec<StateAction> = actions
-                .iter()
-                .map(|v| {
-                    serde_json::from_value::<StateAction>(v.clone()).unwrap_or_else(|e| {
-                        panic!("{file_name} ({description}): failed to deserialize action: {e}")
-                    })
-                })
-                .collect();
+            let expected_error = raw["expectedError"].as_str();
 
             /// Deserialize initial state, apply actions, compare result.
             /// Also checks that initial state round-trips through Rust types,
@@ -2659,10 +2976,11 @@ mod tests {
             fn run_fixture<S>(
                 initial: serde_json::Value,
                 expected: serde_json::Value,
-                actions: &[StateAction],
+                actions: &[serde_json::Value],
                 apply: fn(&mut S, &StateAction) -> ReduceOutcome,
                 file_name: &str,
                 description: &str,
+                expected_error: Option<&str>,
             ) where
                 S: serde::de::DeserializeOwned + serde::Serialize,
             {
@@ -2680,13 +2998,68 @@ mod tests {
                     serde_json::to_string_pretty(&initial_normalized).unwrap(),
                 );
                 let mut state = state;
-                for action in actions {
-                    apply(&mut state, action);
+                assert!(
+                    expected_error.is_none() || !actions.is_empty(),
+                    "{file_name}: expectedError requires a final action"
+                );
+                for (i, raw_action) in actions.iter().enumerate() {
+                    let expect_error = expected_error.filter(|_| i == actions.len() - 1);
+                    let before = serde_json::to_value(&state).unwrap();
+                    // The union's unknown fallback also accepts malformed known
+                    // variants. Decode input directly to expose native i64 rejection.
+                    let decoded = if raw_action["type"] == "tcp/input" {
+                        serde_json::from_value::<ahp_types::actions::TcpInputAction>(
+                            raw_action.clone(),
+                        )
+                        .map(StateAction::TcpInput)
+                    } else {
+                        serde_json::from_value::<StateAction>(raw_action.clone())
+                    };
+                    match decoded {
+                        Ok(action) => match (apply(&mut state, &action), expect_error) {
+                            (ReduceOutcome::Invalid(error), Some(expected)) => {
+                                assert_eq!(error.to_string(), expected, "{file_name}: action {i}");
+                            }
+                            (ReduceOutcome::Invalid(error), None) => {
+                                panic!("{file_name}: action {i}: unexpected error: {error}");
+                            }
+                            (outcome, Some(expected)) => {
+                                panic!(
+                                    "{file_name}: action {i}: expected {expected}, got {outcome:?}"
+                                );
+                            }
+                            (_, None) => {}
+                        },
+                        Err(error) => {
+                            assert!(
+                                expect_error
+                                    == Some(
+                                        "Invalid TCP action: offset must be a nonnegative safe integer"
+                                    )
+                                    && raw_action["type"] == "tcp/input"
+                                    && raw_action["offset"]
+                                        .as_f64()
+                                        .is_some_and(|offset| offset.fract() != 0.0)
+                                    && error.is_data()
+                                    && error.to_string().contains("expected i64"),
+                                "{file_name}: action {i}: unexpected deserialization error: {error}"
+                            );
+                            eprintln!("{file_name}: final fractional action rejected by native i64 deserializer: {error}");
+                        }
+                    }
+                    if expect_error.is_some() {
+                        assert_eq!(
+                            serde_json::to_value(&state).unwrap(),
+                            before,
+                            "{file_name}: rejected action {i} mutated state"
+                        );
+                    }
                 }
                 let actual = strip_nulls(serde_json::to_value(&state).unwrap());
                 let expected = strip_nulls(expected);
                 assert_eq!(
-                    actual, expected,
+                    actual,
+                    expected,
                     "\n=== FIXTURE FAILED: {file_name} ({description}) ===\nactual:   {}\nexpected: {}",
                     serde_json::to_string_pretty(&actual).unwrap(),
                     serde_json::to_string_pretty(&expected).unwrap(),
@@ -2697,74 +3070,92 @@ mod tests {
                 "root" => run_fixture::<RootState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_root,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "session" => run_fixture::<SessionState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_session,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "chat" => run_fixture::<ChatState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_chat,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "terminal" => run_fixture::<TerminalState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_terminal,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "changeset" => run_fixture::<ChangesetState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_changeset,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "annotations" => run_fixture::<AnnotationsState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_annotations,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "resourceWatch" => run_fixture::<ResourceWatchState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_resource_watch,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "automation" => run_fixture::<AutomationState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_automation,
                     &file_name,
                     description,
+                    expected_error,
                 ),
                 "automationRun" => run_fixture::<AutomationRunState>(
                     initial,
                     expected,
-                    &parsed_actions,
+                    actions,
                     apply_action_to_automation_run,
                     &file_name,
                     description,
+                    expected_error,
+                ),
+                "tcp" => run_fixture::<TcpConnectionState>(
+                    initial,
+                    expected,
+                    actions,
+                    apply_action_to_tcp,
+                    &file_name,
+                    description,
+                    expected_error,
                 ),
                 other => {
                     panic!("{file_name}: unknown reducer type '{other}'");

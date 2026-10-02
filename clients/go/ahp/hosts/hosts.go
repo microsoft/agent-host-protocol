@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -366,9 +368,13 @@ func (h *HostClientHandle) HostID() HostID { return h.host.id }
 
 // Client returns the live [ahp.Client] for the current generation, or
 // [ErrHostReconnected] if the connection has since been replaced.
+// For managed TCP ownership use OpenTCPConnection on this handle instead.
 func (h *HostClientHandle) Client() (*ahp.Client, error) {
 	h.host.mu.RLock()
 	defer h.host.mu.RUnlock()
+	if h.host.removed {
+		return nil, ErrUnknownHost
+	}
 	if h.host.generation != h.generation {
 		return nil, ErrHostReconnected
 	}
@@ -376,6 +382,34 @@ func (h *HostClientHandle) Client() (*ahp.Client, error) {
 		return nil, ErrHostNotConnected
 	}
 	return h.host.client, nil
+}
+
+// OpenTCPConnection creates a stream retained across the host's reconnects.
+// The stream remains usable after this generation-checked handle becomes stale.
+func (h *HostClientHandle) OpenTCPConnection(ctx context.Context, session string, create ahptypes.TcpConnectionSubscription) (*ahp.TCPConnection, error) {
+	client, err := h.Client()
+	if err != nil {
+		return nil, err
+	}
+	connection, err := client.OpenTCPConnection(ctx, session, create)
+	if err != nil {
+		return nil, err
+	}
+	h.host.mu.Lock()
+	if h.host.generation != h.generation || h.host.client != client || h.host.state.Kind != HostStateConnected || h.host.removed {
+		h.host.mu.Unlock()
+		return nil, errors.Join(ErrHostReconnected, connection.Dispose(ctx))
+	}
+	live := h.host.tcpConnections[:0]
+	for _, retained := range h.host.tcpConnections {
+		if !retained.IsClosed() {
+			live = append(live, retained)
+		}
+	}
+	clear(h.host.tcpConnections[len(live):])
+	h.host.tcpConnections = append(live, connection)
+	h.host.mu.Unlock()
+	return connection, nil
 }
 
 // ─── Errors ────────────────────────────────────────────────────────────
@@ -401,22 +435,26 @@ var ErrDuplicateHost = errors.New("hosts: host id already registered")
 
 // hostState is the per-host bookkeeping the multi-host runtime owns.
 type hostState struct {
-	id          HostID
-	label       string
-	cfg         HostConfig
-	mu          sync.RWMutex
-	client      *ahp.Client
-	state       HostState
-	clientID    string
-	protoVer    string
-	automations *ahptypes.AutomationCapabilities
-	agents      []ahptypes.AgentInfo
-	sessions    []ahptypes.SessionSummary
-	terminals   []ahptypes.TerminalInfo
-	updatedAt   time.Time
-	generation  uint64
-	cancel      context.CancelFunc
-	supervised  sync.WaitGroup
+	id             HostID
+	label          string
+	cfg            HostConfig
+	mu             sync.RWMutex
+	client         *ahp.Client
+	resumeClient   *ahp.Client
+	state          HostState
+	clientID       string
+	protoVer       string
+	automations    *ahptypes.AutomationCapabilities
+	agents         []ahptypes.AgentInfo
+	sessions       []ahptypes.SessionSummary
+	terminals      []ahptypes.TerminalInfo
+	updatedAt      time.Time
+	generation     uint64
+	cancel         context.CancelFunc
+	supervised     sync.WaitGroup
+	tcpConnections []*ahp.TCPConnection
+	serverSeq      int64
+	removed        bool
 }
 
 // MultiHostClient is the public multi-host registry + reconnect
@@ -565,42 +603,123 @@ func (m *MultiHostClient) openHost(ctx context.Context, hs *hostState) error {
 	if err != nil {
 		return fmt.Errorf("hosts: connect: %w", err)
 	}
+	hs.mu.Lock()
+	previous := hs.resumeClient
+	hs.resumeClient = client
+	hs.mu.Unlock()
+	if previous != nil {
+		if err := client.RestoreReconnectState(previous); err != nil {
+			return errors.Join(err, client.Shutdown(ctx))
+		}
+	}
 
-	result, err := client.Initialize(ctx, hs.clientID, hs.cfg.ProtocolVersions, hs.cfg.InitialSubscriptions)
+	events := client.Events()
+	hs.mu.RLock()
+	retained := append([]*ahp.TCPConnection(nil), hs.tcpConnections...)
+	serverSeq := hs.serverSeq
+	hs.mu.RUnlock()
+	live := retained[:0]
+	for _, connection := range retained {
+		if !connection.IsClosed() {
+			live = append(live, connection)
+		}
+	}
+	subscriptions := make([]string, 0, len(hs.cfg.InitialSubscriptions))
+	for _, resource := range hs.cfg.InitialSubscriptions {
+		if !strings.HasPrefix(resource, "ahp-tcp:") {
+			subscriptions = append(subscriptions, resource)
+		}
+	}
+	var result *ahptypes.InitializeResult
+	var replay *ahptypes.ReconnectResult
+	if len(live) != 0 {
+		replay, err = client.ReconnectTCPConnections(ctx, ahptypes.ReconnectParams{
+			ClientId: hs.clientID, LastSeenServerSeq: serverSeq, Subscriptions: subscriptions,
+		}, live)
+		var rpc *ahp.RPCError
+		transportClosed := false
+		select {
+		case <-client.Done():
+			transportClosed = true
+		default:
+		}
+		if errors.As(err, &rpc) && !transportClosed {
+			for _, connection := range live {
+				if cleanup := connection.Dispose(ctx); cleanup != nil {
+					log.Printf("hosts: TCP fallback cleanup: %v", cleanup)
+				}
+			}
+			result, err = client.Initialize(ctx, hs.clientID, hs.cfg.ProtocolVersions, subscriptions)
+		}
+	} else {
+		result, err = client.Initialize(ctx, hs.clientID, hs.cfg.ProtocolVersions, subscriptions)
+	}
 	if err != nil {
-		_ = client.Shutdown(ctx)
-		return fmt.Errorf("hosts: initialize: %w", err)
+		events.Close()
+		return errors.Join(fmt.Errorf("hosts: handshake: %w", err), client.ShutdownPreservingTCP(ctx))
 	}
 
 	hs.mu.Lock()
+	if hs.removed {
+		hs.mu.Unlock()
+		events.Close()
+		return errors.Join(ErrUnknownHost, client.Shutdown(ctx))
+	}
 	hs.client = client
-	hs.protoVer = result.ProtocolVersion
-	hs.automations = cloneAutomationCapabilities(result.Automations)
+	if result != nil {
+		hs.protoVer = result.ProtocolVersion
+		hs.automations = cloneAutomationCapabilities(result.Automations)
+		hs.serverSeq = result.ServerSeq
+	}
 	hs.generation++
 	hs.mu.Unlock()
 
+	if replay != nil {
+		if actions, ok := replay.Value.(*ahptypes.ReconnectReplayResult); ok {
+			for _, envelope := range actions.Actions {
+				if !strings.HasPrefix(envelope.Channel, "ahp-tcp:") && envelope.ServerSeq <= serverSeq {
+					continue
+				}
+				m.publishHostEvent(hs, ahp.ClientEvent{Channel: envelope.Channel, Event: ahp.SubscriptionEventAction{Envelope: envelope}})
+			}
+		} else if snapshots, ok := replay.Value.(*ahptypes.ReconnectSnapshotResult); ok {
+			hs.mu.Lock()
+			for _, snapshot := range snapshots.Snapshots {
+				hs.serverSeq = max(hs.serverSeq, snapshot.FromSeq)
+			}
+			hs.mu.Unlock()
+		}
+	}
 	m.setHostState(hs, HostState{Kind: HostStateConnected})
 
 	// Fan inbound events out to subscribers.
-	go m.pumpEvents(hs, client)
+	go m.pumpEvents(hs, events)
 	return nil
 }
 
 // pumpEvents drains the per-host [ahp.Client.Events] stream and
 // re-emits each event tagged with the host id.
-func (m *MultiHostClient) pumpEvents(hs *hostState, client *ahp.Client) {
-	stream := client.Events()
+func (m *MultiHostClient) pumpEvents(hs *hostState, stream *ahp.EventStream) {
 	defer stream.Close()
 	for ev := range stream.Events() {
-		m.subMu.Lock()
-		subs := append([]chan HostSubscriptionEvent(nil), m.subs...)
-		m.subMu.Unlock()
-		out := HostSubscriptionEvent{HostID: hs.id, Channel: ev.Channel, Event: ev.Event}
-		for _, ch := range subs {
-			select {
-			case ch <- out:
-			default:
-			}
+		m.publishHostEvent(hs, ev)
+	}
+}
+
+func (m *MultiHostClient) publishHostEvent(hs *hostState, ev ahp.ClientEvent) {
+	if action, ok := ev.Event.(ahp.SubscriptionEventAction); ok {
+		hs.mu.Lock()
+		hs.serverSeq = max(hs.serverSeq, action.Envelope.ServerSeq)
+		hs.mu.Unlock()
+	}
+	m.subMu.Lock()
+	subs := append([]chan HostSubscriptionEvent(nil), m.subs...)
+	m.subMu.Unlock()
+	out := HostSubscriptionEvent{HostID: hs.id, Channel: ev.Channel, Event: ev.Event}
+	for _, ch := range subs {
+		select {
+		case ch <- out:
+		default:
 		}
 	}
 }
@@ -633,6 +752,7 @@ func (m *MultiHostClient) supervise(ctx context.Context, hs *hostState) {
 		default:
 		}
 		if policy.IsDisabled() {
+			m.disposeTCPConnections(ctx, hs)
 			m.setHostState(hs, HostState{Kind: HostStateFailed, Err: errors.New("hosts: transport closed and reconnect disabled")})
 			return
 		}
@@ -640,7 +760,7 @@ func (m *MultiHostClient) supervise(ctx context.Context, hs *hostState) {
 		// Ensure the old client is fully torn down before opening a
 		// replacement (a no-op if Done fired from Shutdown already).
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_ = client.Shutdown(shutdownCtx)
+		_ = client.ShutdownPreservingTCP(shutdownCtx)
 		shutdownCancel()
 
 		var attempt uint32 = 1
@@ -661,9 +781,23 @@ func (m *MultiHostClient) supervise(ctx context.Context, hs *hostState) {
 			}
 			attempt++
 			if policy.MaxAttempts > 0 && attempt > policy.MaxAttempts {
+				m.disposeTCPConnections(ctx, hs)
 				m.setHostState(hs, HostState{Kind: HostStateFailed, Err: fmt.Errorf("hosts: exceeded %d reconnect attempts", policy.MaxAttempts)})
 				return
 			}
+
+		}
+	}
+}
+
+func (m *MultiHostClient) disposeTCPConnections(ctx context.Context, hs *hostState) {
+	hs.mu.Lock()
+	connections := hs.tcpConnections
+	hs.tcpConnections = nil
+	hs.mu.Unlock()
+	for _, connection := range connections {
+		if err := connection.Dispose(ctx); err != nil {
+			log.Printf("hosts: TCP disposal: %v", err)
 		}
 	}
 }
@@ -782,6 +916,10 @@ func (m *MultiHostClient) RemoveHost(ctx context.Context, id HostID) error {
 		return ErrUnknownHost
 	}
 	hs.cancel()
+	hs.mu.Lock()
+	hs.removed = true
+	hs.mu.Unlock()
+	m.disposeTCPConnections(ctx, hs)
 	hs.mu.RLock()
 	client := hs.client
 	hs.mu.RUnlock()
@@ -833,6 +971,10 @@ func (m *MultiHostClient) Shutdown(ctx context.Context) error {
 	m.mu.Unlock()
 	for _, hs := range hosts {
 		hs.cancel()
+		hs.mu.Lock()
+		hs.removed = true
+		hs.mu.Unlock()
+		m.disposeTCPConnections(ctx, hs)
 		hs.mu.RLock()
 		client := hs.client
 		hs.mu.RUnlock()

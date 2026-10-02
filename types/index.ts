@@ -31,5 +31,6 @@ export {
   resourceWatchReducer,
   automationReducer,
   automationRunReducer,
+  tcpReducer,
   isClientDispatchable,
 } from './reducers.js';

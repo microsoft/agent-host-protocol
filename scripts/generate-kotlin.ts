@@ -153,7 +153,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | TcpConnectionState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -835,6 +835,7 @@ function generateSnapshotState(): string {
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
+    @JvmInline value class Tcp(val value: TcpConnectionState) : SnapshotState
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
@@ -856,7 +857,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. AutomationRunState has required
+        // Try the most distinctive shape first. TcpConnectionState has required
+        // \`input\`, \`output\`, and \`target\`; AutomationRunState has required
         // \`automation\`, \`origin\`, and \`sessions\`; AutomationState has
         // required \`entries\`; SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
@@ -866,6 +868,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
         return when {
+            obj.containsKey("input") && obj.containsKey("output") && obj.containsKey("target") ->
+                SnapshotState.Tcp(input.json.decodeFromJsonElement(TcpConnectionState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -888,6 +892,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val output = encoder as? JsonEncoder
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
+            is SnapshotState.Tcp -> output.json.encodeToJsonElement(TcpConnectionState.serializer(), value.value)
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
@@ -965,6 +970,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'TcpDataEncoding', 'TcpEndpoint', 'TcpResetReason', 'TcpConnectionOpenFailureReason',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -1041,6 +1047,8 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'TcpConnectionState', 'TcpTarget', 'TcpResetState', 'FlowControlledByteDirectionState',
+  'TcpConnectionsCapability', 'TcpConnectionOpenErrorData',
   'AutomationSessionOrigin', 'AutomationSchedule',
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
@@ -1588,6 +1596,16 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'tcp/input', caseName: 'TcpInput', tsInterface: 'TcpInputAction' },
+  { type: 'tcp/data', caseName: 'TcpData', tsInterface: 'TcpDataAction' },
+  { type: 'tcp/inputConsumed', caseName: 'TcpInputConsumed', tsInterface: 'TcpInputConsumedAction' },
+  { type: 'tcp/dataConsumed', caseName: 'TcpDataConsumed', tsInterface: 'TcpDataConsumedAction' },
+  { type: 'tcp/inputEof', caseName: 'TcpInputEof', tsInterface: 'TcpInputEofAction' },
+  { type: 'tcp/dataEof', caseName: 'TcpDataEof', tsInterface: 'TcpDataEofAction' },
+  { type: 'tcp/clientClose', caseName: 'TcpClientClose', tsInterface: 'TcpClientCloseAction' },
+  { type: 'tcp/hostClose', caseName: 'TcpHostClose', tsInterface: 'TcpHostCloseAction' },
+  { type: 'tcp/clientReset', caseName: 'TcpClientReset', tsInterface: 'TcpClientResetAction' },
+  { type: 'tcp/hostReset', caseName: 'TcpHostReset', tsInterface: 'TcpHostResetAction' },
   { type: 'automation/createRequested', caseName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', caseName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', caseName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1765,6 +1783,7 @@ const COMMAND_STRUCTS = [
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
+  'TcpConnectionSubscription',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
@@ -2141,6 +2160,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
+  lines.push('    const val TCP_CONNECTION_OPEN_FAILED: Int = -32012');
   lines.push('}');
   lines.push('');
 

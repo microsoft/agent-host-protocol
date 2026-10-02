@@ -93,7 +93,7 @@ public sealed class SubscriptionEventAuthRequired : SubscriptionEvent
 
 /// <summary>
 /// A <see cref="SubscriptionEvent"/> tagged with the channel URI it was
-/// scoped to. Returned by <see cref="AhpClient.CreateEventStream"/>.
+/// scoped to. Returned by <see cref="AhpClient.CreateEventStream()"/>.
 /// </summary>
 public sealed class ClientEvent
 {
@@ -117,19 +117,26 @@ public sealed class ClientEvent
 /// Internal bounded drop-oldest channel shared by the three public stream
 /// wrappers (<see cref="Subscription"/>, <see cref="EventStream"/>, and
 /// <c>StateChangeStream</c>). Encapsulates the <see cref="Channel{T}"/> creation,
-/// the idempotent close lifecycle, and the drop-oldest delivery so each public
+/// the idempotent close lifecycle, and the default drop-oldest delivery so each public
 /// wrapper stays a thin, sealed, domain-named handle.
+/// Strict event receivers opt into terminal overflow instead.
 /// </summary>
 internal sealed class BoundedDropOldestChannel<T>
 {
     private readonly Channel<T> _channel;
+    private readonly object? _strictWriteLock;
+    private readonly int _capacity;
+    private readonly Action<T>? _onDropped;
     private int _closed;
 
-    internal BoundedDropOldestChannel(int bufferCapacity, Action<T>? onDropped = null)
+    internal BoundedDropOldestChannel(int bufferCapacity, Action<T>? onDropped = null, bool failOnOverflow = false)
     {
+        _capacity = bufferCapacity;
+        _onDropped = onDropped;
+        _strictWriteLock = failOnOverflow ? new object() : null;
         var options = new BoundedChannelOptions(bufferCapacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = failOnOverflow ? BoundedChannelFullMode.Wait : BoundedChannelFullMode.DropOldest,
             SingleReader = false,
             SingleWriter = false,
         };
@@ -146,23 +153,55 @@ internal sealed class BoundedDropOldestChannel<T>
     /// <summary>Completes the channel. Safe to call multiple times.</summary>
     internal void Close()
     {
+        if (_strictWriteLock is not null)
+        {
+            lock (_strictWriteLock) { Complete(null); }
+            return;
+        }
+        Complete(null);
+    }
+
+    private void Complete(Exception? error)
+    {
         if (Interlocked.CompareExchange(ref _closed, 1, 0) == 0)
         {
-            _channel.Writer.TryComplete();
+            _channel.Writer.TryComplete(error);
         }
     }
 
+    internal bool FailIfStrict(Exception error)
+    {
+        if (_strictWriteLock is null) return false;
+        lock (_strictWriteLock) { Complete(error); }
+        return true;
+    }
+
     /// <summary>
-    /// Delivers the item, evicting the oldest buffered item if the channel is full
+    /// By default delivers the item, evicting the oldest buffered item if the channel is full
     /// (<see cref="BoundedChannelFullMode.DropOldest"/>) — the newest item is always
     /// accepted, so a slow consumer loses the stalest items rather than the latest.
     /// Each eviction is reported via the <c>onDropped</c> callback supplied at
-    /// construction. Mirrors the Go <c>trySend</c>.
+    /// construction. Strict receivers instead preserve the prefix and fault
+    /// permanently on the first rejected write.
     /// </summary>
-    internal void TrySend(T item)
+    internal bool TrySend(T item)
     {
-        if (Volatile.Read(ref _closed) == 1) return;
-        _channel.Writer.TryWrite(item);
+        if (_strictWriteLock is not null)
+        {
+            lock (_strictWriteLock)
+            {
+                if (Volatile.Read(ref _closed) == 1) return false;
+                if (!_channel.Writer.TryWrite(item))
+                {
+                    Complete(new SubscriptionLagException(_capacity));
+                    _onDropped?.Invoke(item);
+                    return false;
+                }
+                return true;
+            }
+        }
+        if (Volatile.Read(ref _closed) == 1) return false;
+        return _channel.Writer.TryWrite(item);
     }
 }
 
@@ -172,7 +211,7 @@ internal sealed class BoundedDropOldestChannel<T>
 /// Per-URI fan-out handle returned by <see cref="AhpClient.SubscribeAsync"/> and
 /// <see cref="AhpClient.AttachSubscription"/>. Drop the handle by calling
 /// <see cref="Close"/> (or <see cref="Dispose"/>) or let
-/// <see cref="AhpClient.ShutdownAsync"/> tear it down.
+/// <see cref="AhpClient.ShutdownAsync(CancellationToken)"/> tear it down.
 /// </summary>
 public sealed class Subscription : IDisposable
 {
@@ -227,7 +266,7 @@ public sealed class Subscription : IDisposable
 /// <summary>
 /// Top-level fan-in receiver over every inbound event from an <see cref="AhpClient"/>,
 /// tagged with the channel URI. Multiple streams may exist concurrently.
-/// Returned by <see cref="AhpClient.CreateEventStream"/>.
+/// Returned by <see cref="AhpClient.CreateEventStream()"/>.
 /// </summary>
 // CA1711: "Stream" here names the AHP event-stream concept (mirroring Go's
 // EventStream and Swift's AsyncStream usage), not a System.IO.Stream subclass.
@@ -236,6 +275,8 @@ public sealed class Subscription : IDisposable
     Justification = "EventStream names the AHP event-stream abstraction (mirrors Go/Swift API), not a System.IO.Stream subclass.")]
 public sealed class EventStream : IDisposable
 {
+    internal string? Resource { get; set; }
+    internal bool IsClosed => Volatile.Read(ref _closed) != 0;
     private readonly BoundedDropOldestChannel<ClientEvent> _channel;
     private Action? _onClose;
     private int _closed;
@@ -243,10 +284,10 @@ public sealed class EventStream : IDisposable
     private static readonly KeyValuePair<string, object?> DropTag = new(AhpTelemetryNames.AttrStream, AhpTelemetryNames.StreamEvent);
 
     /// <summary>Creates a new event stream.</summary>
-    internal EventStream(int bufferCapacity)
+    internal EventStream(int bufferCapacity, bool failOnOverflow = false)
     {
         _channel = new BoundedDropOldestChannel<ClientEvent>(
-            bufferCapacity, _ => AhpTelemetry.DroppedEvents.Add(1, DropTag));
+            bufferCapacity, _ => AhpTelemetry.DroppedEvents.Add(1, DropTag), failOnOverflow);
     }
 
     /// <summary>
@@ -272,7 +313,15 @@ public sealed class EventStream : IDisposable
     /// <inheritdoc cref="Close"/>
     public void Dispose() => Close();
 
-    internal void TrySend(ClientEvent ev) => _channel.TrySend(ev);
+    internal void TrySend(ClientEvent ev)
+    {
+        if (!_channel.TrySend(ev)) Close();
+    }
+
+    internal void FailIfStrict(Exception error)
+    {
+        if (_channel.FailIfStrict(error)) Close();
+    }
 }
 
 /// <summary>

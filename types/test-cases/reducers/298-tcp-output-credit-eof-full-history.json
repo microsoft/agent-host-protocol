@@ -1,0 +1,69 @@
+{
+  "description": "TCP: output credit eof full history",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/data",
+      "offset": 0,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/dataConsumed",
+      "consumedBytes": 4
+    },
+    {
+      "type": "tcp/data",
+      "offset": 4,
+      "data": "AQI="
+    },
+    {
+      "type": "tcp/dataEof",
+      "finalOffset": 6
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 6,
+      "consumedBytes": 4,
+      "eofAtBytes": 6
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  }
+}

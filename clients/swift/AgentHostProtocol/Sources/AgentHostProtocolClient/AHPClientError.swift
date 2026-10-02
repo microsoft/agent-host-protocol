@@ -3,6 +3,17 @@
 import Foundation
 import AgentHostProtocol
 
+/// A strict event receiver exhausted its buffer and cannot continue across the gap.
+public struct SubscriptionLagError: Error, Sendable, LocalizedError {
+    public let capacity: Int
+
+    public init(capacity: Int) { self.capacity = capacity }
+
+    public var errorDescription: String? {
+        "Event receiver exceeded its capacity of \(capacity); the receiver is permanently terminated."
+    }
+}
+
 /// Errors raised by `AHPClient`.
 public enum AHPClientError: Error, Sendable {
     /// Underlying transport failure.

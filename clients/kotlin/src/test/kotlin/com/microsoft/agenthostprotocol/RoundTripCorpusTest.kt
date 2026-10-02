@@ -39,6 +39,7 @@ import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
 import com.microsoft.agenthostprotocol.generated.JsonRpcSuccessResponse
 import com.microsoft.agenthostprotocol.generated.PartialSessionSummary
+import com.microsoft.agenthostprotocol.generated.ReconnectResult
 import com.microsoft.agenthostprotocol.generated.SessionAddedParams
 import com.microsoft.agenthostprotocol.generated.ChatInputQuestion
 import com.microsoft.agenthostprotocol.generated.SessionStatus
@@ -46,6 +47,8 @@ import com.microsoft.agenthostprotocol.generated.SessionSummary
 import com.microsoft.agenthostprotocol.generated.Snapshot
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.StringOrMarkdown
+import com.microsoft.agenthostprotocol.generated.SubscribeParams
+import com.microsoft.agenthostprotocol.generated.TcpConnectionOpenErrorData
 import java.io.File
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -253,6 +256,9 @@ class RoundTripCorpusTest {
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
+            "SubscribeParams" -> rt(SubscribeParams.serializer())
+            "ReconnectResult" -> rt(ReconnectResult.serializer())
+            "TcpConnectionOpenErrorData" -> rt(TcpConnectionOpenErrorData.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())
             else -> fail(

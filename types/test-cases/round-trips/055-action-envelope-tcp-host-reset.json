@@ -1,0 +1,16 @@
+{
+  "name": "action-envelope-tcp-host-reset",
+  "group": "A",
+  "description": "Host TCP reset is a typed action, preserving its reason.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "action": { "type": "tcp/hostReset", "reason": "policyRevoked" },
+    "serverSeq": 44
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-tcp:/t1",
+    "action": { "type": "tcp/hostReset", "reason": "policyRevoked" },
+    "serverSeq": 44
+  }]
+}

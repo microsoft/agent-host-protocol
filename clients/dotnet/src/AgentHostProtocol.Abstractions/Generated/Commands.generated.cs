@@ -394,6 +394,10 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Enables atomic creation of session-scoped, replay-only TCP channels.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpConnectionsCapability? TcpConnections { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -571,6 +575,12 @@ public sealed record ReconnectSnapshotResult
 
     /// <summary>Fresh snapshots for each subscription</summary>
     public required List<Snapshot> Snapshots { get; init; }
+
+    /// <summary>Subscriptions that cannot be restored. Hosts supporting TCP MUST list all
+    /// requested TCP channels here and dispose their sockets on snapshot fallback.
+    /// Omitted by older hosts; absence does not authorize snapshot-restoring TCP.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Missing { get; init; }
 }
 
 /// <summary>Subscribe to a URI-identified channel.
@@ -604,6 +614,12 @@ public sealed record SubscribeParams
     /// default snapshot. Clients MUST tolerate receiving more state than requested.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscribeView? View { get; init; }
+
+    /// <summary>Atomically create a private child channel and subscribe to it.
+    /// Requires the advertised tcpConnections capability. channel identifies
+    /// the parent session; snapshot.resource identifies the created TCP channel.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpConnectionSubscription? Create { get; init; }
 }
 
 /// <summary>Optional client-requested shape for a subscription snapshot.</summary>
@@ -641,6 +657,32 @@ public sealed record SubscribeResult
     /// <summary>Snapshot of the subscribed channel's state (omitted for stateless channels)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Snapshot? Snapshot { get; init; }
+}
+
+/// <summary>Creates and exclusively subscribes to one TCP connection.
+///
+/// SubscribeParams.channel MUST identify the parent `ahp-session:` channel.
+/// The host returns the new `ahp-tcp:` URI in snapshot.resource, not the parent.
+/// It installs the subscription and sends the response before any TCP actions.
+/// Unknown creation kinds MUST be rejected, never treated as normal subscribe.</summary>
+public sealed record TcpConnectionSubscription
+{
+    public required string Type { get; init; }
+
+    /// <summary>DNS name or IP literal, not a URL.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>Destination port.</summary>
+    public long Port { get; init; }
+
+    /// <summary>Selected from InitializeResult.tcpConnections.encodings.</summary>
+    public TcpDataEncoding Encoding { get; init; }
+
+    /// <summary>Client receive window in decoded bytes.</summary>
+    public long ReceiveWindowBytes { get; init; }
+
+    /// <summary>Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.</summary>
+    public long MaximumChunkSize { get; init; }
 }
 
 // TODO: could not generate SessionForkSource: Error: Interface SessionForkSource not found

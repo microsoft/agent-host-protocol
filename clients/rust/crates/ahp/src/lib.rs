@@ -150,18 +150,22 @@ pub mod error;
 pub mod hosts;
 pub mod multi_host_state_mirror;
 pub mod reducers;
+pub mod tcp;
 pub mod transport;
 
 pub use ahp_types;
 
 pub use client::{
     Client, ClientConfig, ClientEvent, ClientEventStream, DispatchHandle, ResourceRequestHandlers,
-    ServerRequestFuture, ServerRequestHandler, SessionSubscription, SubscriptionEvent,
+    ServerRequestFuture, ServerRequestHandler, SessionSubscription, StrictClientEventStream,
+    SubscriptionEvent,
 };
-pub use error::{ClientError, TransportError};
+pub use error::{ClientError, SubscriptionLagError, TransportError};
 pub use multi_host_state_mirror::{HostedResourceKey, MultiHostStateMirror};
 pub use reducers::{
     apply_action_to_automation, apply_action_to_automation_run, apply_action_to_root,
-    apply_action_to_session, apply_action_to_terminal, ReduceError, ReduceOutcome,
+    apply_action_to_session, apply_action_to_tcp, apply_action_to_terminal, ReduceError,
+    ReduceOutcome,
 };
+pub use tcp::{TcpConnection, TcpError};
 pub use transport::{BoxedTransport, DynTransport, Transport, TransportMessage};

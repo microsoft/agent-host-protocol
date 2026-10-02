@@ -15,6 +15,44 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+// Payload encodings advertised by the host.
+type TcpDataEncoding string
+
+const (
+	TcpDataEncodingBase64 TcpDataEncoding = "base64"
+)
+
+// Endpoint that closes or resets a connection.
+type TcpEndpoint string
+
+const (
+	TcpEndpointClient TcpEndpoint = "client"
+	TcpEndpointHost   TcpEndpoint = "host"
+)
+
+// Why a connection was aborted.
+type TcpResetReason string
+
+const (
+	TcpResetReasonConnectionReset   TcpResetReason = "connectionReset"
+	TcpResetReasonConnectionAborted TcpResetReason = "connectionAborted"
+	TcpResetReasonProtocolError     TcpResetReason = "protocolError"
+	TcpResetReasonReplayUnavailable TcpResetReason = "replayUnavailable"
+	TcpResetReasonPolicyRevoked     TcpResetReason = "policyRevoked"
+	TcpResetReasonSessionDisposed   TcpResetReason = "sessionDisposed"
+	TcpResetReasonInternalError     TcpResetReason = "internalError"
+)
+
+// Expected connection establishment failures.
+type TcpConnectionOpenFailureReason string
+
+const (
+	TcpConnectionOpenFailureReasonConnectionFailed     TcpConnectionOpenFailureReason = "connectionFailed"
+	TcpConnectionOpenFailureReasonNameResolutionFailed TcpConnectionOpenFailureReason = "nameResolutionFailed"
+	TcpConnectionOpenFailureReasonResourceShortage     TcpConnectionOpenFailureReason = "resourceShortage"
+	TcpConnectionOpenFailureReasonSessionNotReady      TcpConnectionOpenFailureReason = "sessionNotReady"
+)
+
 // Policy configuration state for a model.
 type PolicyState string
 
@@ -3925,6 +3963,74 @@ type ResourceWatchState struct {
 	Includes *json.RawMessage `json:"includes,omitempty"`
 }
 
+// State of one host-assigned `ahp-tcp:` channel.
+//
+// Payload is never stored in this state. Only the creating authenticated
+// logical client may observe or dispatch to the channel. Reconnect requires
+// the original sockets, local stream state, and complete action replay;
+// a snapshot cannot restore this channel.
+//
+// Close flags record the two-sided handshake. Either flag means closing;
+// both mean closed. A present reset terminates the connection immediately,
+// independently of the close history.
+type TcpConnectionState struct {
+	Session  URI             `json:"session"`
+	Target   TcpTarget       `json:"target"`
+	Encoding TcpDataEncoding `json:"encoding"`
+	// Client to destination socket.
+	Input FlowControlledByteDirectionState `json:"input"`
+	// Destination socket to client.
+	Output       FlowControlledByteDirectionState `json:"output"`
+	ClientClosed bool                             `json:"clientClosed"`
+	HostClosed   bool                             `json:"hostClosed"`
+	Reset        *TcpResetState                   `json:"reset,omitempty"`
+}
+
+type TcpTarget struct {
+	// DNS name or IP literal, resolved and connected in the host endpoint's network.
+	Host string `json:"host"`
+	// Destination port.
+	Port int64 `json:"port"`
+}
+
+type TcpResetState struct {
+	Source TcpEndpoint    `json:"source"`
+	Reason TcpResetReason `json:"reason"`
+}
+
+// Bounded byte credit in one direction of a stream.
+// All counters are nonnegative safe integers (at most 2^53 - 1).
+// 0 <= consumedBytes <= receivedBytes and
+// receivedBytes - consumedBytes <= windowBytes.
+type FlowControlledByteDirectionState struct {
+	// Maximum accepted-but-not-consumed decoded bytes.
+	WindowBytes int64 `json:"windowBytes"`
+	// Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.
+	MaximumChunkSize int64 `json:"maximumChunkSize"`
+	// Cumulative accepted bytes.
+	ReceivedBytes int64 `json:"receivedBytes"`
+	// Cumulative bytes released by the bounded consumer.
+	ConsumedBytes int64 `json:"consumedBytes"`
+	// Present after EOF; equals receivedBytes permanently.
+	EofAtBytes *int64 `json:"eofAtBytes,omitempty"`
+}
+
+// Host support for private, session-scoped TCP channels.
+// Presence on initialize is required before using subscribe.create.
+type TcpConnectionsCapability struct {
+	// Supported encodings. The base64 profile MUST be supported.
+	Encodings []TcpDataEncoding `json:"encodings"`
+	// Informational limit; runtime policy may impose a lower limit.
+	MaximumConnectionsPerClient *int64 `json:"maximumConnectionsPerClient,omitempty"`
+}
+
+// Required detail for TcpConnectionOpenFailed (-32012).
+// Policy denial and malformed requests use PermissionDenied and InvalidParams.
+type TcpConnectionOpenErrorData struct {
+	Reason    TcpConnectionOpenFailureReason `json:"reason"`
+	Retryable *bool                          `json:"retryable,omitempty"`
+}
+
 // A single change observed by a resource watcher.
 type ResourceChange struct {
 	// The URI of the resource that changed.
@@ -6263,12 +6369,13 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 // SnapshotState is the state payload of a snapshot — root, session,
 // chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or TCP state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → terminal → changeset →
+// (tcp → automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
+	Tcp           *TcpConnectionState `json:"-"`
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
@@ -6283,6 +6390,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
+	case s.Tcp != nil:
+		return json.Marshal(s.Tcp)
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
 	case s.Automations != nil:
@@ -6315,6 +6424,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
+	case containsAll(probe, "input", "output", "target"):
+		var v TcpConnectionState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Tcp = &v
 	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {

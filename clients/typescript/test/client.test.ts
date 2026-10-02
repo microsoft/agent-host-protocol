@@ -17,6 +17,8 @@ import {
   InMemoryTransport,
   RpcError,
   RpcTimeoutError,
+  SubscriptionLagError,
+  TransportError,
   type AhpTransport,
   type SubscriptionEvent,
 } from '../src/client/index.js';
@@ -42,6 +44,8 @@ import type {
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
 import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
+import { TcpDataEncoding, type TcpConnectionState } from '../src/types/channels-tcp/state.js';
+import { tcpReducer } from '../src/types/channels-tcp/reducer.js';
 
 const ROOT = 'ahp-root://' as const;
 const AUTOMATIONS = 'ahp-automations://' as const;
@@ -106,6 +110,141 @@ test('initialize round-trip', async () => {
   assert.equal(got.protocolVersion, '0.2.0');
 
   await client.shutdown();
+});
+
+test('pre-attached strict events retain immediate TCP child actions without replacing the parent', async t => {
+  const [c, s] = InMemoryTransport.pair();
+  const client = new AhpClient(c);
+  client.connect();
+  t.after(() => client.shutdown());
+  const parent = client.attachSubscription('ahp-session:/s1');
+  const events = client.events({ overflow: 'error' });
+  const opening = client.request('subscribe', {
+    channel: parent.uri,
+    create: {
+      type: 'tcpConnection',
+      host: 'localhost',
+      port: 3000,
+      encoding: TcpDataEncoding.Base64,
+      receiveWindowBytes: 8,
+      maximumChunkSize: 6,
+    },
+  });
+  const req = await readRequest(s);
+  assert.equal((req.params as SubscribeParams).create?.type, 'tcpConnection');
+  const state: TcpConnectionState = {
+    session: parent.uri,
+    target: { host: 'localhost', port: 3000 },
+    encoding: TcpDataEncoding.Base64,
+    input: { windowBytes: 8, maximumChunkSize: 6, receivedBytes: 0, consumedBytes: 0 },
+    output: { windowBytes: 8, maximumChunkSize: 6, receivedBytes: 0, consumedBytes: 0 },
+    clientClosed: false,
+    hostClosed: false,
+  };
+  const result: SubscribeResult = {
+    channel: parent.uri,
+    snapshot: { resource: 'ahp-tcp:/t1', fromSeq: 0, state },
+  };
+  reply(s, req.id, result);
+  pushNotification(s, 'action', {
+    channel: result.snapshot.resource, serverSeq: 1,
+    action: { type: ActionType.TcpData, offset: 0, data: 'AQ==' },
+  });
+  pushNotification(s, 'action', {
+    channel: parent.uri, serverSeq: 2,
+    action: { type: ActionType.SessionTitleChanged, title: 'Still subscribed' },
+  });
+  assert.deepEqual(await opening, result);
+  const first = await events.next();
+  assert.equal(first.value.channel, result.snapshot.resource);
+  assert.equal(first.value.event.type, 'action');
+  if (first.value.event.type !== 'action' || first.value.event.params.action.type !== ActionType.TcpData) {
+    assert.fail('expected the first TCP payload');
+  }
+  assert.equal(tcpReducer(state, first.value.event.params.action).output.receivedBytes, 1);
+  assert.equal((await parent.next()).value.type, 'action');
+  await client.unsubscribe(result.snapshot.resource);
+  const closing = await readNotification(s);
+  assert.equal(closing.method, 'unsubscribe');
+  assert.deepEqual(closing.params, { channel: result.snapshot.resource });
+  await events.return!();
+});
+
+test('strict global events report overflow instead of continuing after missing TCP payload', async t => {
+  const [c, s] = InMemoryTransport.pair();
+  const client = new AhpClient(c);
+  client.connect();
+  t.after(() => client.shutdown());
+  const events = client.events({ overflow: 'error' });
+  for (let offset = 0; offset <= 4096; offset++) {
+    pushNotification(s, 'action', {
+      channel: 'ahp-tcp:/t1', serverSeq: offset + 1,
+      action: { type: ActionType.TcpData, offset, data: 'AQ==' },
+    });
+  }
+  const fence = client.request('ping', {});
+  const req = await readRequest(s);
+  reply(s, req.id, {});
+  await fence;
+  await assert.rejects(events.next(), SubscriptionLagError);
+  assert.equal((await events.next()).done, true);
+});
+
+test('malformed frames terminate strict events without changing ordinary receivers', async t => {
+  const [c, s] = InMemoryTransport.pair();
+  const client = new AhpClient(c);
+  client.connect();
+  t.after(() => client.shutdown());
+  const strict = client.events({ overflow: 'error' });
+  const ordinary = client.events();
+  const rejection = assert.rejects(strict.next(), error =>
+    error instanceof TransportError && error.kind === 'protocol');
+  s.send('{');
+  pushNotification(s, 'action', {
+    channel: 'ahp-session:/s1', serverSeq: 1,
+    action: { type: ActionType.SessionTitleChanged, title: 'Still connected' },
+  });
+  await rejection;
+  assert.equal((await strict.next()).done, true);
+  assert.equal((await ordinary.next()).value.channel, 'ahp-session:/s1');
+  assert.equal(client.connectionState.status, 'connected');
+  await ordinary.return!();
+});
+
+test('pre-attached TCP events preserve replay-before-live ordering and expose snapshot failure', async t => {
+  const [c, s] = InMemoryTransport.pair();
+  const client = new AhpClient(c);
+  client.connect();
+  t.after(() => client.shutdown());
+  const events = client.events({ overflow: 'error' });
+  const reconnecting = client.reconnect({
+    clientId: 'owner', lastSeenServerSeq: 0, subscriptions: ['ahp-tcp:/t1'],
+  });
+  const req = await readRequest(s);
+  const replayed = {
+    channel: 'ahp-tcp:/t1', serverSeq: 1,
+    action: { type: ActionType.TcpData, offset: 0, data: 'AQ==' },
+  };
+  reply(s, req.id, { type: 'replay', actions: [replayed], missing: [] });
+  pushNotification(s, 'action', {
+    channel: 'ahp-tcp:/t1', serverSeq: 2,
+    action: { type: ActionType.TcpData, offset: 1, data: 'Ag==' },
+  });
+  const replay = await reconnecting;
+  assert.equal(replay.type, 'replay');
+  if (replay.type !== 'replay') assert.fail('expected replay');
+  assert.deepEqual(replay.actions, [replayed]);
+  const live = await events.next();
+  assert.equal(live.value.event.type, 'action');
+  if (live.value.event.type !== 'action') assert.fail('expected action');
+  assert.equal(live.value.event.params.serverSeq, 2);
+  const fallback = client.reconnect({
+    clientId: 'owner', lastSeenServerSeq: 2, subscriptions: ['ahp-tcp:/t1'],
+  });
+  const next = await readRequest(s);
+  reply(s, next.id, { type: 'snapshot', snapshots: [], missing: ['ahp-tcp:/t1'] });
+  assert.deepEqual(await fallback, { type: 'snapshot', snapshots: [], missing: ['ahp-tcp:/t1'] });
+  await events.return!();
 });
 
 test('subscribe attaches before sending the request and fans out an action', async () => {

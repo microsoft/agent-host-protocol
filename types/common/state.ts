@@ -16,11 +16,58 @@ import type { AnnotationsState } from '../channels-annotations/state.js';
 import type { ChatState } from '../channels-chat/state.js';
 import type { AutomationState } from '../channels-automation/state.js';
 import type { AutomationRunState } from '../channels-automation-run/state.js';
+import type { TcpConnectionState } from '../channels-tcp/state.js';
 
 // ─── Type Aliases ────────────────────────────────────────────────────────────
 
 /** A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`). */
 export type URI = string;
+
+/**
+ * Bounded byte credit in one direction of a stream.
+ * All counters are nonnegative safe integers (at most 2^53 - 1).
+ * 0 <= consumedBytes <= receivedBytes and
+ * receivedBytes - consumedBytes <= windowBytes.
+ *
+ * @category Common Types
+ */
+export interface FlowControlledByteDirectionState {
+  /**
+   * Maximum accepted-but-not-consumed decoded bytes.
+   * @integer
+   * @minimum 1
+   * @maximum 4294967295
+   */
+  windowBytes: number;
+  /**
+   * Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.
+   * @integer
+   * @minimum 1
+   * @maximum 4294967295
+   */
+  maximumChunkSize: number;
+  /**
+   * Cumulative accepted bytes.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  receivedBytes: number;
+  /**
+   * Cumulative bytes released by the bounded consumer.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  consumedBytes: number;
+  /**
+   * Present after EOF; equals receivedBytes permanently.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  eofAtBytes?: number;
+}
 
 /**
  * A string that may optionally be rendered as Markdown.
@@ -352,7 +399,7 @@ export interface Snapshot {
   /** The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`) */
   resource: URI;
   /** The current state of the resource */
-  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState;
+  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | TcpConnectionState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
 }

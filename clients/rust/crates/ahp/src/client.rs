@@ -25,12 +25,12 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use std::time::Duration;
 
-use ahp_types::actions::{ActionEnvelope, StateAction};
+use ahp_types::actions::{ActionEnvelope, ActionType, StateAction};
 use ahp_types::commands::{
     CompletionsParams, CompletionsResult, CreateResourceWatchParams, CreateResourceWatchResult,
     DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
@@ -56,7 +56,7 @@ use serde_json::Value;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 
-use crate::error::ClientError;
+use crate::error::{ClientError, SubscriptionLagError, TransportError};
 use crate::transport::{Transport, TransportMessage};
 
 /// Default size of a per-subscription broadcast channel. Consumers that
@@ -144,6 +144,127 @@ impl ClientEventStream {
     }
 }
 
+/// A bounded global event receiver that terminates on the first delivery gap.
+///
+/// Created by [`Client::events_strict`]. Unlike [`ClientEventStream`], this
+/// receiver reports lag rather than silently continuing past missing events.
+pub struct StrictClientEventStream {
+    rx: Option<broadcast::Receiver<Result<ClientEvent, TransportError>>>,
+    on_drop: Option<Box<dyn FnOnce() + Send + Sync>>,
+}
+
+impl Drop for StrictClientEventStream {
+    fn drop(&mut self) {
+        self.rx.take();
+        if let Some(on_drop) = self.on_drop.take() {
+            on_drop();
+        }
+    }
+}
+
+impl StrictClientEventStream {
+    pub(crate) fn try_recv(&mut self) -> Result<Option<ClientEvent>, ClientError> {
+        let Some(rx) = self.rx.as_mut() else {
+            return Err(ClientError::Shutdown);
+        };
+        match rx.try_recv() {
+            Ok(Ok(event)) => Ok(Some(event)),
+            Ok(Err(error)) => {
+                self.rx = None;
+                Err(error.into())
+            }
+            Err(broadcast::error::TryRecvError::Empty) => Ok(None),
+            Err(broadcast::error::TryRecvError::Closed) => {
+                self.rx = None;
+                Err(ClientError::Shutdown)
+            }
+            Err(broadcast::error::TryRecvError::Lagged(skipped)) => {
+                self.rx = None;
+                Err(SubscriptionLagError { skipped }.into())
+            }
+        }
+    }
+
+    /// Receive an event, or report delivery loss and terminate this receiver.
+    ///
+    /// Overflow returns [`ClientError::SubscriptionLag`]; decoding or transport
+    /// failures return [`ClientError::Transport`]. Subsequent calls return
+    /// `Ok(None)`. Stream owners must reset/unsubscribe on errors, not resume.
+    pub async fn recv(&mut self) -> Result<Option<ClientEvent>, ClientError> {
+        let Some(rx) = self.rx.as_mut() else {
+            return Ok(None);
+        };
+        match rx.recv().await {
+            Ok(Ok(event)) => Ok(Some(event)),
+            Ok(Err(error)) => {
+                self.rx = None;
+                Err(error.into())
+            }
+            Err(broadcast::error::RecvError::Closed) => {
+                self.rx = None;
+                Ok(None)
+            }
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                self.rx = None;
+                Err(SubscriptionLagError { skipped }.into())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod strict_event_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn protocol_failure_wakes_and_unregisters_strict_receiver() {
+        let (sender, rx) = broadcast::channel(1);
+        let mut stream = StrictClientEventStream {
+            rx: Some(rx),
+            on_drop: None,
+        };
+        assert_eq!(sender.receiver_count(), 1);
+        let (result, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(
+                biased;
+                stream.recv(),
+                async {
+                    sender.send(Err(TransportError::Protocol("malformed frame".into()))).unwrap();
+                },
+            )
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            result,
+            Err(ClientError::Transport(TransportError::Protocol(_)))
+        ));
+        assert_eq!(sender.receiver_count(), 0);
+        assert!(stream.recv().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn lag_unregisters_strict_receiver() {
+        let (sender, rx) = broadcast::channel(1);
+        let mut stream = StrictClientEventStream {
+            rx: Some(rx),
+            on_drop: None,
+        };
+        for _ in 0..2 {
+            sender
+                .send(Err(TransportError::Protocol("malformed frame".into())))
+                .unwrap();
+        }
+        assert!(matches!(
+            stream.recv().await,
+            Err(ClientError::SubscriptionLag(_))
+        ));
+        assert_eq!(sender.receiver_count(), 0);
+        assert!(stream.recv().await.unwrap().is_none());
+    }
+}
+
 /// Handle to a single resource subscription. Drop to stop receiving
 /// events. The underlying server subscription is released when the last
 /// handle for that URI is dropped and [`Client::unsubscribe`] is called.
@@ -187,7 +308,14 @@ pub struct DispatchHandle {
 
 // ─── Internal plumbing ───────────────────────────────────────────────────────
 
-type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
+type ResultHandler = Box<dyn FnOnce(&Value) + Send>;
+type PendingMap = HashMap<
+    u64,
+    (
+        oneshot::Sender<Result<Value, JsonRpcError>>,
+        Option<ResultHandler>,
+    ),
+>;
 
 struct Shared {
     pending: Mutex<PendingMap>,
@@ -200,9 +328,16 @@ struct Shared {
     /// after the underlying transport closes (the `Sender` would stay
     /// alive inside the still-`Arc`-held `Shared`).
     all_events: std::sync::Mutex<Option<broadcast::Sender<ClientEvent>>>,
+    strict_events: std::sync::Mutex<Option<broadcast::Sender<Result<ClientEvent, TransportError>>>>,
+    resource_events:
+        std::sync::Mutex<HashMap<String, broadcast::Sender<Result<ClientEvent, TransportError>>>>,
     outbound: mpsc::Sender<Outbound>,
     next_id: AtomicU64,
     next_client_seq: AtomicU64,
+    tcp_identity: Mutex<Option<(String, Option<ahp_types::state::TcpConnectionsCapability>)>>,
+    tcp_closed: AtomicBool,
+    tcp_disposed: AtomicBool,
+    tcp_streams: Mutex<Vec<crate::tcp::WeakTcpConnection>>,
     config: ClientConfig,
     /// Handler for inbound server-initiated requests (the symmetrical
     /// `resource*` family). `None` → the client replies `MethodNotFound`.
@@ -375,13 +510,20 @@ impl Client {
     ) -> Result<Self, ClientError> {
         let (outbound_tx, outbound_rx) = mpsc::channel::<Outbound>(64);
         let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
+        let (strict_events_tx, _) = broadcast::channel(config.subscription_buffer);
         let shared = Arc::new(Shared {
             pending: Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
             all_events: std::sync::Mutex::new(Some(all_events_tx)),
+            strict_events: std::sync::Mutex::new(Some(strict_events_tx)),
+            resource_events: std::sync::Mutex::new(HashMap::new()),
             outbound: outbound_tx,
             next_id: AtomicU64::new(1),
             next_client_seq: AtomicU64::new(1),
+            tcp_identity: Mutex::new(None),
+            tcp_closed: AtomicBool::new(false),
+            tcp_disposed: AtomicBool::new(false),
+            tcp_streams: Mutex::new(Vec::new()),
             config,
             server_request_handler: std::sync::Mutex::new(None),
         });
@@ -398,10 +540,31 @@ impl Client {
     /// Gracefully shut down the client, aborting any in-flight requests
     /// with [`ClientError::Shutdown`].
     pub async fn shutdown(&self) {
+        self.shared.tcp_disposed.store(true, Ordering::Release);
+        let streams: Vec<_> = self
+            .shared
+            .tcp_streams
+            .lock()
+            .await
+            .iter()
+            .filter_map(crate::tcp::WeakTcpConnection::upgrade)
+            .collect();
+        for connection in streams {
+            if let Err(error) = connection.dispose_for_client(self).await {
+                tracing::warn!(?error, "client TCP shutdown cleanup failed");
+            }
+        }
+        self.shutdown_preserving_tcp().await;
+    }
+
+    /// Close this transport while retaining TCP handles for explicit reconnection.
+    /// Ordinary `shutdown` disposes handles even after a transport failure.
+    pub async fn shutdown_preserving_tcp(&self) {
+        self.shared.tcp_closed.store(true, Ordering::Release);
         let _ = self.shared.outbound.send(Outbound::Shutdown).await;
         // Fail any pending in-flight requests.
         let mut pending = self.shared.pending.lock().await;
-        for (_, tx) in pending.drain() {
+        for (_, (tx, _)) in pending.drain() {
             let _ = tx.send(Err(JsonRpcError {
                 code: -32000,
                 message: "client shut down".into(),
@@ -412,6 +575,21 @@ impl Client {
 
     /// Send a JSON-RPC request and await its result.
     pub async fn request<P, R>(&self, method: &str, params: P) -> Result<R, ClientError>
+    where
+        P: Serialize,
+        R: DeserializeOwned,
+    {
+        self.request_with_late_result(method, params, None, None)
+            .await
+    }
+
+    pub(crate) async fn request_with_late_result<P, R>(
+        &self,
+        method: &str,
+        params: P,
+        on_late: Option<Box<dyn FnOnce(Value) + Send>>,
+        on_result: Option<ResultHandler>,
+    ) -> Result<R, ClientError>
     where
         P: Serialize,
         R: DeserializeOwned,
@@ -430,10 +608,10 @@ impl Client {
             params: params_any,
         });
 
-        let (tx, rx) = oneshot::channel();
+        let (tx, mut rx) = oneshot::channel();
         {
             let mut pending = self.shared.pending.lock().await;
-            pending.insert(id, tx);
+            pending.insert(id, (tx, on_result));
         }
 
         if self
@@ -448,10 +626,20 @@ impl Client {
         }
 
         let result = match self.shared.config.default_request_timeout {
-            Some(dur) => match tokio::time::timeout(dur, rx).await {
+            Some(dur) => match tokio::time::timeout(dur, &mut rx).await {
                 Ok(r) => r,
                 Err(_) => {
-                    self.shared.pending.lock().await.remove(&id);
+                    if let Some(on_late) = on_late {
+                        // Retain correlation until reply or shutdown to release
+                        // resources created after this request's deadline.
+                        tokio::spawn(async move {
+                            if let Ok(Ok(value)) = rx.await {
+                                on_late(value);
+                            }
+                        });
+                    } else {
+                        self.shared.pending.lock().await.remove(&id);
+                    }
                     return Err(ClientError::Cancelled);
                 }
             },
@@ -500,7 +688,7 @@ impl Client {
             channel: ROOT_RESOURCE_URI.to_string(),
             meta: None,
             protocol_versions,
-            client_id,
+            client_id: client_id.clone(),
             initial_subscriptions: if initial_subscriptions.is_empty() {
                 None
             } else {
@@ -510,7 +698,9 @@ impl Client {
             capabilities: None,
             client_info: None,
         };
-        self.request("initialize", params).await
+        let result: InitializeResult = self.request("initialize", params).await?;
+        *self.shared.tcp_identity.lock().await = Some((client_id, result.tcp_connections.clone()));
+        Ok(result)
     }
 
     /// Re-establish a dropped connection with `reconnect`.
@@ -528,6 +718,59 @@ impl Client {
             subscriptions,
         };
         self.request("reconnect", params).await
+    }
+
+    pub(crate) async fn tcp_identity(
+        &self,
+    ) -> Option<(String, Option<ahp_types::state::TcpConnectionsCapability>)> {
+        self.shared.tcp_identity.lock().await.clone()
+    }
+
+    pub(crate) async fn tcp_register(&self, connection: &crate::TcpConnection) -> bool {
+        let mut streams = self.shared.tcp_streams.lock().await;
+        if self.shared.tcp_disposed.load(Ordering::Acquire) {
+            return false;
+        }
+        streams.retain(|stream| stream.upgrade().is_some());
+        streams.push(connection.downgrade());
+        true
+    }
+
+    pub(crate) async fn tcp_unregister(&self, connection: &crate::TcpConnection) {
+        self.shared
+            .tcp_streams
+            .lock()
+            .await
+            .retain(|stream| !stream.matches(connection));
+    }
+
+    pub(crate) async fn tcp_restore_identity(
+        &self,
+        identity: (String, Option<ahp_types::state::TcpConnectionsCapability>),
+    ) {
+        *self.shared.tcp_identity.lock().await = Some(identity);
+    }
+
+    pub(crate) fn tcp_next_sequence(&self) -> u64 {
+        self.shared.next_client_seq.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub(crate) fn tcp_sequence_floor(&self) -> u64 {
+        self.shared.next_client_seq.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn tcp_advance_sequence(&self, next: u64) {
+        self.shared
+            .next_client_seq
+            .fetch_max(next, Ordering::Relaxed);
+    }
+
+    pub(crate) fn tcp_is_closed(&self) -> bool {
+        self.shared.tcp_closed.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn tcp_same_transport(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
     }
 
     /// Protocol-level liveness `ping`.
@@ -586,6 +829,7 @@ impl Client {
                 SubscribeParams {
                     channel: uri,
                     meta: None,
+                    create: None,
                     delivery,
                     view,
                 },
@@ -627,6 +871,8 @@ impl Client {
     /// independently. Useful for the multi-host runtime in
     /// [`crate::hosts`], or any consumer that needs a single fan-in feed
     /// rather than per-URI subscriptions.
+    /// This receiver skips gaps on overflow; use [`Client::events_strict`]
+    /// when losing an event must terminate the receiver instead.
     ///
     /// Every event carries its channel URI in [`ClientEvent::channel`] —
     /// action envelopes from the envelope's `channel` field, protocol
@@ -650,6 +896,58 @@ impl Client {
             rx
         });
         ClientEventStream { rx }
+    }
+
+    /// Attach a bounded global receiver that reports overflow as
+    /// [`ClientError::SubscriptionLag`] and never resumes past a gap.
+    /// Malformed inbound frames or notification payloads terminate it with
+    /// [`ClientError::Transport`] instead of silently losing those events.
+    ///
+    /// Attach before an atomic `subscribe(create)` request and retain this
+    /// receiver while awaiting the returned child URI. Reconnect results and
+    /// stream credits remain the caller's responsibility.
+    pub fn events_strict(&self) -> StrictClientEventStream {
+        let rx = match self.shared.strict_events.lock() {
+            Ok(guard) => guard.as_ref().map(|sender| sender.subscribe()),
+            Err(_) => None,
+        };
+        StrictClientEventStream { rx, on_drop: None }
+    }
+
+    pub(crate) fn resource_events_strict(&self, resource: String) -> StrictClientEventStream {
+        let mut routes = self
+            .shared
+            .resource_events
+            .lock()
+            .expect("resource events lock poisoned");
+        if self.shared.tcp_closed.load(Ordering::Acquire) {
+            return StrictClientEventStream {
+                rx: None,
+                on_drop: None,
+            };
+        }
+        let sender = routes
+            .entry(resource.clone())
+            .or_insert_with(|| broadcast::channel(self.shared.config.subscription_buffer).0);
+        let rx = Some(sender.subscribe());
+        let shared = Arc::downgrade(&self.shared);
+        StrictClientEventStream {
+            rx,
+            on_drop: Some(Box::new(move || {
+                if let Some(shared) = shared.upgrade() {
+                    let mut routes = shared
+                        .resource_events
+                        .lock()
+                        .expect("resource events lock poisoned");
+                    if routes
+                        .get(&resource)
+                        .is_some_and(|sender| sender.receiver_count() == 0)
+                    {
+                        routes.remove(&resource);
+                    }
+                }
+            })),
+        }
     }
 
     /// Fire a write-ahead `dispatchAction` notification with a
@@ -850,6 +1148,7 @@ async fn drive_transport<T: Transport>(
                         if let Ok(wire) = TransportMessage::encode(&msg) {
                             if let Err(err) = transport.send(wire).await {
                                 tracing::warn!(?err, "transport send failed");
+                                fan_out_strict(&shared, Err(err));
                                 break;
                             }
                         }
@@ -865,12 +1164,16 @@ async fn drive_transport<T: Transport>(
                     Ok(Some(wire)) => {
                         match wire.into_parsed() {
                             Ok(msg) => dispatch_inbound(&shared, msg).await,
-                            Err(err) => tracing::warn!(?err, "malformed frame"),
+                            Err(err) => {
+                                tracing::warn!(?err, "malformed frame");
+                                fan_out_strict(&shared, Err(err));
+                            },
                         }
                     }
                     Ok(None) => break,
                     Err(err) => {
                         tracing::warn!(?err, "transport recv error");
+                        fan_out_strict(&shared, Err(err));
                         break;
                     }
                 }
@@ -878,9 +1181,10 @@ async fn drive_transport<T: Transport>(
         }
     }
 
+    shared.tcp_closed.store(true, Ordering::Release);
     // Teardown: close everything so waiters see Shutdown.
     let mut pending = shared.pending.lock().await;
-    for (_, tx) in pending.drain() {
+    for (_, (tx, _)) in pending.drain() {
         let _ = tx.send(Err(JsonRpcError {
             code: -32000,
             message: "transport closed".into(),
@@ -896,17 +1200,28 @@ async fn drive_transport<T: Transport>(
     if let Ok(mut guard) = shared.all_events.lock() {
         guard.take();
     }
+    if let Ok(mut guard) = shared.strict_events.lock() {
+        guard.take();
+    }
+    shared
+        .resource_events
+        .lock()
+        .expect("resource events lock poisoned")
+        .clear();
 }
 
 async fn dispatch_inbound(shared: &Arc<Shared>, msg: JsonRpcMessage) {
     match msg {
         JsonRpcMessage::SuccessResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some((tx, on_result)) = shared.pending.lock().await.remove(&r.id) {
+                if let Some(on_result) = on_result {
+                    on_result(&r.result);
+                }
                 let _ = tx.send(Ok(r.result));
             }
         }
         JsonRpcMessage::ErrorResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some((tx, _)) = shared.pending.lock().await.remove(&r.id) {
                 let _ = tx.send(Err(r.error));
             }
         }
@@ -957,30 +1272,44 @@ async fn handle_server_request(shared: &Shared, req: JsonRpcRequest) {
     let _ = shared.outbound.send(Outbound::Message(response)).await;
 }
 
+fn decode_notification<T: DeserializeOwned>(shared: &Shared, value: Value) -> Option<T> {
+    match serde_json::from_value(value) {
+        Ok(decoded) => Some(decoded),
+        Err(error) => {
+            fan_out_strict(shared, Err(TransportError::Protocol(error.to_string())));
+            None
+        }
+    }
+}
+
 async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
     let params_val: Value = n.params.unwrap_or(Value::Null);
 
     match n.method.as_str() {
         "action" => {
-            if let Ok(envelope) = serde_json::from_value::<ActionNotificationParams>(params_val) {
+            if let Some(envelope) =
+                decode_notification::<ActionNotificationParams>(shared, params_val)
+            {
                 let channel = envelope.channel.clone();
                 fan_out(shared, &channel, SubscriptionEvent::Action(envelope)).await;
             }
         }
         "root/sessionAdded" => {
-            if let Ok(params) = serde_json::from_value::<SessionAddedParams>(params_val) {
+            if let Some(params) = decode_notification::<SessionAddedParams>(shared, params_val) {
                 let channel = params.channel.clone();
                 fan_out(shared, &channel, SubscriptionEvent::SessionAdded(params)).await;
             }
         }
         "root/sessionRemoved" => {
-            if let Ok(params) = serde_json::from_value::<SessionRemovedParams>(params_val) {
+            if let Some(params) = decode_notification::<SessionRemovedParams>(shared, params_val) {
                 let channel = params.channel.clone();
                 fan_out(shared, &channel, SubscriptionEvent::SessionRemoved(params)).await;
             }
         }
         "root/sessionSummaryChanged" => {
-            if let Ok(params) = serde_json::from_value::<SessionSummaryChangedParams>(params_val) {
+            if let Some(params) =
+                decode_notification::<SessionSummaryChangedParams>(shared, params_val)
+            {
                 let channel = params.channel.clone();
                 fan_out(
                     shared,
@@ -991,13 +1320,39 @@ async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
             }
         }
         "auth/required" => {
-            if let Ok(params) = serde_json::from_value::<AuthRequiredParams>(params_val) {
+            if let Some(params) = decode_notification::<AuthRequiredParams>(shared, params_val) {
                 let channel = params.channel.clone();
                 fan_out(shared, &channel, SubscriptionEvent::AuthRequired(params)).await;
             }
         }
         other => {
             tracing::debug!(method = %other, "unhandled notification");
+        }
+    }
+}
+
+fn fan_out_strict(shared: &Shared, event: Result<ClientEvent, TransportError>) {
+    {
+        let routes = shared
+            .resource_events
+            .lock()
+            .expect("resource events lock poisoned");
+        match &event {
+            Ok(event) => {
+                if let Some(sender) = routes.get(&event.channel) {
+                    let _ = sender.send(Ok(event.clone()));
+                }
+            }
+            Err(error) => {
+                for sender in routes.values() {
+                    let _ = sender.send(Err(error.clone()));
+                }
+            }
+        }
+    }
+    if let Ok(guard) = shared.strict_events.lock() {
+        if let Some(sender) = guard.as_ref() {
+            let _ = sender.send(event);
         }
     }
 }
@@ -1015,8 +1370,36 @@ async fn fan_out(shared: &Shared, channel: &Uri, event: SubscriptionEvent) {
         if let Some(tx) = guard.as_ref() {
             let _ = tx.send(ClientEvent {
                 channel: channel.clone(),
-                event,
+                event: event.clone(),
             });
         }
     }
+    // The generated union preserves malformed known actions as Unknown, too.
+    // Strict readers may ignore future kinds, but cannot safely ignore those.
+    if let SubscriptionEvent::Action(envelope) = &event {
+        if let Some(error) = strict_action_error(&envelope.action) {
+            fan_out_strict(shared, Err(error));
+            return;
+        }
+    }
+    fan_out_strict(
+        shared,
+        Ok(ClientEvent {
+            channel: channel.clone(),
+            event,
+        }),
+    );
+}
+
+pub(crate) fn strict_action_error(action: &StateAction) -> Option<TransportError> {
+    if let StateAction::Unknown(raw) = action {
+        let action_type = serde_json::from_value::<ActionType>(raw["type"].clone());
+        if !matches!(action_type, Ok(ActionType::Unknown(_))) {
+            return Some(TransportError::Protocol(format!(
+                "malformed action: {}",
+                raw["type"]
+            )));
+        }
+    }
+    None
 }

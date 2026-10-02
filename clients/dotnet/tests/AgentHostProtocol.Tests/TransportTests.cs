@@ -72,6 +72,46 @@ public sealed class TransportTests
             async () => await b.ReceiveAsync(cts.Token));
     }
 
+    // Graceful close preserves frames whose sends have completed, even if the
+    // receiver does not start reading until after close.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InMemoryTransport_Close_DrainsAlreadySentFrames(bool closePeer)
+    {
+        var (a, b) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        for (int i = 0; i < 2; i++)
+        {
+            await a.SendAsync(TransportMessage.FromText($"a-{i}"), cts.Token);
+            await b.SendAsync(TransportMessage.FromText($"b-{i}"), cts.Token);
+        }
+        await (closePeer ? b : a).CloseAsync(cts.Token);
+        for (int i = 0; i < 2; i++)
+        {
+            Assert.Equal($"a-{i}", (await b.ReceiveAsync(cts.Token)).Text);
+            Assert.Equal($"b-{i}", (await a.ReceiveAsync(cts.Token)).Text);
+        }
+        await Assert.ThrowsAsync<AhpTransportException>(async () => await a.ReceiveAsync(cts.Token));
+        await Assert.ThrowsAsync<AhpTransportException>(async () => await b.ReceiveAsync(cts.Token));
+    }
+
+    [Fact]
+    public async Task InMemoryTransport_Close_UnblocksBackpressuredSendWithoutLosingAcceptedFrames()
+    {
+        var (a, b) = MemTransport.CreatePair();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        for (int i = 0; i < 16; i++)
+            await a.SendAsync(TransportMessage.FromText($"frame-{i}"), cts.Token);
+        var blocked = a.SendAsync(TransportMessage.FromText("not-accepted"), cts.Token).AsTask();
+        Assert.False(blocked.IsCompleted);
+        await b.CloseAsync(cts.Token);
+        await Assert.ThrowsAsync<AhpTransportException>(() => blocked);
+        for (int i = 0; i < 16; i++)
+            Assert.Equal($"frame-{i}", (await b.ReceiveAsync(cts.Token)).Text);
+        await Assert.ThrowsAsync<AhpTransportException>(async () => await b.ReceiveAsync(cts.Token));
+    }
+
     // ── E: send after close throws ────────────────────────────────────────
     [Fact]
     public async Task InMemoryTransport_SendAfterClose_Throws()

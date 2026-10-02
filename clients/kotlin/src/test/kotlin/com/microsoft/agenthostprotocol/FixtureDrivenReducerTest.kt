@@ -10,10 +10,14 @@ import com.microsoft.agenthostprotocol.generated.RootState
 import com.microsoft.agenthostprotocol.generated.SessionState
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.TerminalState
+import com.microsoft.agenthostprotocol.generated.TcpConnectionState
 import java.io.File
-import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.Test
@@ -21,6 +25,8 @@ import org.junit.jupiter.api.TestFactory
 import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.fail
 import kotlin.test.assertTrue
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * JSON-fixture-driven reducer tests for cross-language parity.
@@ -110,10 +116,33 @@ class FixtureDrivenReducerTest {
             )
         }
 
-        val actions = Ahp.json.decodeFromJsonElement(
-            ListSerializer(StateAction.serializer()),
-            actionsArr,
-        )
+        val actions = actionsArr.jsonArray
+        val expectedError = fixture["expectedError"]?.jsonPrimitiveContent()
+        if (expectedError != null) assertTrue(actions.isNotEmpty(), "expectedError requires a final action")
+
+        fun <S> runActions(initialState: S, reduce: (S, StateAction) -> S): S {
+            var state = initialState
+            for ((index, raw) in actions.withIndex()) {
+                val mustFail = expectedError != null && index == actions.lastIndex
+                val fractionalOffset = raw.jsonObject["offset"]?.jsonPrimitive?.doubleOrNull
+                    ?.let { it % 1.0 != 0.0 } == true
+                if (mustFail && reducer == "tcp" && fractionalOffset) {
+                    assertEquals("Invalid TCP action: offset must be a nonnegative safe integer", expectedError)
+                    assertFailsWith<SerializationException> {
+                        Ahp.json.decodeFromJsonElement(StateAction.serializer(), raw)
+                    }
+                } else {
+                    val action = Ahp.json.decodeFromJsonElement(StateAction.serializer(), raw)
+                    if (mustFail) {
+                        val error = assertFailsWith<IllegalArgumentException> { reduce(state, action) }
+                        assertEquals(expectedError, error.message, file.name)
+                    } else {
+                        state = reduce(state, action)
+                    }
+                }
+            }
+            return state
+        }
 
         when (reducer) {
             "root" -> compareFixture(
@@ -122,9 +151,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = RootState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = rootReducer(s, action)
-                    s
+                    runActions(state, ::rootReducer)
                 },
             )
 
@@ -134,9 +161,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = SessionState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = sessionReducer(s, action)
-                    s
+                    runActions(state, ::sessionReducer)
                 },
             )
 
@@ -146,9 +171,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = ChatState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = chatReducer(s, action)
-                    s
+                    runActions(state, ::chatReducer)
                 },
             )
 
@@ -158,9 +181,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = TerminalState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = terminalReducer(s, action)
-                    s
+                    runActions(state, ::terminalReducer)
                 },
             )
 
@@ -170,9 +191,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = ChangesetState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = changesetReducer(s, action)
-                    s
+                    runActions(state, ::changesetReducer)
                 },
             )
 
@@ -182,9 +201,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = AnnotationsState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = annotationsReducer(s, action)
-                    s
+                    runActions(state, ::annotationsReducer)
                 },
             )
 
@@ -194,9 +211,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = ResourceWatchState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = resourceWatchReducer(s, action)
-                    s
+                    runActions(state, ::resourceWatchReducer)
                 },
             )
 
@@ -206,9 +221,7 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = AutomationState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = automationReducer(s, action)
-                    s
+                    runActions(state, ::automationReducer)
                 },
             )
 
@@ -218,10 +231,16 @@ class FixtureDrivenReducerTest {
                 expected = expected,
                 serializer = AutomationRunState.serializer(),
                 run = { state ->
-                    var s = state
-                    for (action in actions) s = automationRunReducer(s, action)
-                    s
+                    runActions(state, ::automationRunReducer)
                 },
+            )
+
+            "tcp" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = TcpConnectionState.serializer(),
+                run = { state -> runActions(state, ::tcpReducer) },
             )
 
             else -> fail("${file.name}: unsupported reducer '$reducer'")

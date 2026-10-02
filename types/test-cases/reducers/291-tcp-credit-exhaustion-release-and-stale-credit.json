@@ -1,0 +1,104 @@
+{
+  "description": "TCP: credit exhaustion release and stale credit",
+  "reducer": "tcp",
+  "initial": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 0,
+      "consumedBytes": 0
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  },
+  "actions": [
+    {
+      "type": "tcp/input",
+      "offset": 0,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/input",
+      "offset": 4,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/data",
+      "offset": 0,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/data",
+      "offset": 4,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/inputConsumed",
+      "consumedBytes": 4
+    },
+    {
+      "type": "tcp/inputConsumed",
+      "consumedBytes": 3
+    },
+    {
+      "type": "tcp/inputConsumed",
+      "consumedBytes": 4
+    },
+    {
+      "type": "tcp/dataConsumed",
+      "consumedBytes": 4
+    },
+    {
+      "type": "tcp/dataConsumed",
+      "consumedBytes": 3
+    },
+    {
+      "type": "tcp/dataConsumed",
+      "consumedBytes": 4
+    },
+    {
+      "type": "tcp/input",
+      "offset": 8,
+      "data": "AAAAAA=="
+    },
+    {
+      "type": "tcp/data",
+      "offset": 8,
+      "data": "AAAAAA=="
+    }
+  ],
+  "expected": {
+    "session": "ahp-session:/s1",
+    "target": {
+      "host": "localhost",
+      "port": 3000
+    },
+    "encoding": "base64",
+    "input": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 12,
+      "consumedBytes": 4
+    },
+    "output": {
+      "windowBytes": 8,
+      "maximumChunkSize": 6,
+      "receivedBytes": 12,
+      "consumedBytes": 4
+    },
+    "clientClosed": false,
+    "hostClosed": false
+  }
+}

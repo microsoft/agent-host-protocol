@@ -57,6 +57,7 @@ object AhpErrorCodes {
     const val PERMISSION_DENIED: Int = -32009
     /** The target resource already exists and the operation does not allow overwriting */
     const val ALREADY_EXISTS: Int = -32010
+    const val TCP_CONNECTION_OPEN_FAILED: Int = -32012
 }
 
 // ─── Error Detail Payloads ──────────────────────────────────────────────────

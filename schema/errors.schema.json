@@ -86,12 +86,58 @@
         },
         "[AhpErrorCodes.UnsupportedProtocolVersion]": {
           "$ref": "#/$defs/UnsupportedProtocolVersionErrorData"
+        },
+        "[AhpErrorCodes.TcpConnectionOpenFailed]": {
+          "$ref": "#/$defs/TcpConnectionOpenErrorData"
         }
       },
       "required": [
         "[AhpErrorCodes.AuthRequired]",
         "[AhpErrorCodes.PermissionDenied]",
-        "[AhpErrorCodes.UnsupportedProtocolVersion]"
+        "[AhpErrorCodes.UnsupportedProtocolVersion]",
+        "[AhpErrorCodes.TcpConnectionOpenFailed]"
+      ]
+    },
+    "FlowControlledByteDirectionState": {
+      "type": "object",
+      "description": "Bounded byte credit in one direction of a stream.\nAll counters are nonnegative safe integers (at most 2^53 - 1).\n0 <= consumedBytes <= receivedBytes and\nreceivedBytes - consumedBytes <= windowBytes.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "Maximum accepted-but-not-consumed decoded bytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "maximumChunkSize": {
+          "type": "integer",
+          "description": "Maximum decoded bytes per chunk; MUST NOT exceed windowBytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "receivedBytes": {
+          "type": "integer",
+          "description": "Cumulative accepted bytes.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "description": "Cumulative bytes released by the bounded consumer.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "eofAtBytes": {
+          "type": "integer",
+          "description": "Present after EOF; equals receivedBytes permanently.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumChunkSize",
+        "receivedBytes",
+        "consumedBytes"
       ]
     },
     "Icon": {
@@ -535,6 +581,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/TcpConnectionState"
             }
           ],
           "description": "The current state of the resource"
@@ -5923,6 +5972,118 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Host support for private, session-scoped TCP channels.\nPresence on initialize is required before using subscribe.create.",
+      "properties": {
+        "encodings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TcpDataEncoding"
+          },
+          "description": "Supported encodings. The base64 profile MUST be supported."
+        },
+        "maximumConnectionsPerClient": {
+          "type": "integer",
+          "description": "Informational limit; runtime policy may impose a lower limit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "encodings"
+      ]
+    },
+    "TcpTarget": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "DNS name or IP literal, resolved and connected in the host endpoint's network."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ]
+    },
+    "TcpResetState": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/TcpEndpoint"
+        },
+        "reason": {
+          "$ref": "#/$defs/TcpResetReason"
+        }
+      },
+      "required": [
+        "source",
+        "reason"
+      ]
+    },
+    "TcpConnectionOpenErrorData": {
+      "type": "object",
+      "description": "Required detail for TcpConnectionOpenFailed (-32012).\nPolicy denial and malformed requests use PermissionDenied and InvalidParams.",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/TcpConnectionOpenFailureReason"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "TcpConnectionState": {
+      "type": "object",
+      "description": "State of one host-assigned `ahp-tcp:` channel.\n\nPayload is never stored in this state. Only the creating authenticated\nlogical client may observe or dispatch to the channel. Reconnect requires\nthe original sockets, local stream state, and complete action replay;\na snapshot cannot restore this channel.\n\nClose flags record the two-sided handshake. Either flag means closing;\nboth mean closed. A present reset terminates the connection immediately,\nindependently of the close history.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI"
+        },
+        "target": {
+          "$ref": "#/$defs/TcpTarget"
+        },
+        "encoding": {
+          "$ref": "#/$defs/TcpDataEncoding"
+        },
+        "input": {
+          "$ref": "#/$defs/FlowControlledByteDirectionState",
+          "description": "Client to destination socket."
+        },
+        "output": {
+          "$ref": "#/$defs/FlowControlledByteDirectionState",
+          "description": "Destination socket to client."
+        },
+        "clientClosed": {
+          "type": "boolean"
+        },
+        "hostClosed": {
+          "type": "boolean"
+        },
+        "reset": {
+          "$ref": "#/$defs/TcpResetState"
+        }
+      },
+      "required": [
+        "session",
+        "target",
+        "encoding",
+        "input",
+        "output",
+        "clientClosed",
+        "hostClosed"
+      ]
+    },
     "BaseParams": {
       "type": "object",
       "description": "Base shape every command's params extends.\n\n`channel` identifies the channel the command targets, mirroring the\n`channel` field on every protocol notification. For commands that operate\non a specific channel (a session, terminal, or changeset), `channel` is\nthat channel's URI. For commands that are connection-level rather than\nchannel-scoped (e.g. {@link InitializeParams | `initialize`},\n{@link PingParams | `ping`}, {@link ListSessionsParams | `listSessions`},\nthe `resource*` filesystem commands, and {@link AuthenticateParams |\n`authenticate`}), the params type narrows `channel` to the literal\nroot URI `'ahp-root://'`.\n\nThis invariant lets implementations route every incoming message —\nrequest, response, or notification — by inspecting `params.channel`\nwithout needing to know the per-method param shape.",
@@ -6099,6 +6260,10 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "tcpConnections": {
+          "$ref": "#/$defs/TcpConnectionsCapability",
+          "description": "Enables atomic creation of session-scoped, replay-only TCP channels."
         }
       },
       "required": [
@@ -6259,6 +6424,13 @@
             "$ref": "#/$defs/Snapshot"
           },
           "description": "Fresh snapshots for each subscription"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "Subscriptions that cannot be restored. Hosts supporting TCP MUST list all\nrequested TCP channels here and dispose their sockets on snapshot fallback.\nOmitted by older hosts; absence does not authorize snapshot-restoring TCP."
         }
       },
       "required": [
@@ -6286,6 +6458,10 @@
         "view": {
           "$ref": "#/$defs/SubscribeView",
           "description": "Optional client-requested shape for the returned snapshot.\n\nServers that do not understand a requested view ignore it and return their\ndefault snapshot. Clients MUST tolerate receiving more state than requested."
+        },
+        "create": {
+          "$ref": "#/$defs/TcpConnectionSubscription",
+          "description": "Atomically create a private child channel and subscribe to it.\nRequires the advertised tcpConnections capability. channel identifies\nthe parent session; snapshot.resource identifies the created TCP channel."
         }
       },
       "required": [
@@ -7663,6 +7839,52 @@
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
     },
+    "TcpConnectionSubscription": {
+      "type": "object",
+      "description": "Creates and exclusively subscribes to one TCP connection.\n\nSubscribeParams.channel MUST identify the parent `ahp-session:` channel.\nThe host returns the new `ahp-tcp:` URI in snapshot.resource, not the parent.\nIt installs the subscription and sends the response before any TCP actions.\nUnknown creation kinds MUST be rejected, never treated as normal subscribe.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "tcpConnection"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "description": "DNS name or IP literal, not a URL."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "encoding": {
+          "$ref": "#/$defs/TcpDataEncoding",
+          "description": "Selected from InitializeResult.tcpConnections.encodings."
+        },
+        "receiveWindowBytes": {
+          "type": "integer",
+          "description": "Client receive window in decoded bytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "maximumChunkSize": {
+          "type": "integer",
+          "description": "Maximum decoded bytes per output action; MUST NOT exceed receiveWindowBytes.",
+          "minimum": 1,
+          "maximum": 4294967295
+        }
+      },
+      "required": [
+        "type",
+        "host",
+        "port",
+        "encoding",
+        "receiveWindowBytes",
+        "maximumChunkSize"
+      ]
+    },
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
@@ -8399,6 +8621,44 @@
       ],
       "description": "Discriminated lifecycle of an automation run."
     },
+    "TcpDataEncoding": {
+      "enum": [
+        "base64"
+      ],
+      "type": "string",
+      "description": "Payload encodings advertised by the host."
+    },
+    "TcpEndpoint": {
+      "enum": [
+        "client",
+        "host"
+      ],
+      "type": "string",
+      "description": "Endpoint that closes or resets a connection."
+    },
+    "TcpResetReason": {
+      "enum": [
+        "connectionReset",
+        "connectionAborted",
+        "protocolError",
+        "replayUnavailable",
+        "policyRevoked",
+        "sessionDisposed",
+        "internalError"
+      ],
+      "type": "string",
+      "description": "Why a connection was aborted."
+    },
+    "TcpConnectionOpenFailureReason": {
+      "enum": [
+        "connectionFailed",
+        "nameResolutionFailed",
+        "resourceShortage",
+        "sessionNotReady"
+      ],
+      "type": "string",
+      "description": "Expected connection establishment failures."
+    },
     "ActionEnvelope": {
       "type": "object",
       "description": "Every action is wrapped in an `ActionEnvelope`.\n\nThe envelope identifies the channel the action belongs to (e.g.\n`ahp-root://` for root actions, the session URI for session actions, the\nterminal URI for terminal actions). Individual action payloads carry only\nfields that are intrinsic to the action; the channel comes from the\nenvelope so that any subscribable resource can route its actions uniformly.",
@@ -8739,6 +8999,36 @@
         },
         {
           "$ref": "#/$defs/AutomationRunCancelRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/TcpInputAction"
+        },
+        {
+          "$ref": "#/$defs/TcpDataAction"
+        },
+        {
+          "$ref": "#/$defs/TcpInputConsumedAction"
+        },
+        {
+          "$ref": "#/$defs/TcpDataConsumedAction"
+        },
+        {
+          "$ref": "#/$defs/TcpInputEofAction"
+        },
+        {
+          "$ref": "#/$defs/TcpDataEofAction"
+        },
+        {
+          "$ref": "#/$defs/TcpClientCloseAction"
+        },
+        {
+          "$ref": "#/$defs/TcpHostCloseAction"
+        },
+        {
+          "$ref": "#/$defs/TcpClientResetAction"
+        },
+        {
+          "$ref": "#/$defs/TcpHostResetAction"
         }
       ],
       "description": "Discriminated union of all state actions."
@@ -11126,6 +11416,182 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "TcpInputAction": {
+      "type": "object",
+      "description": "Client bytes. Never apply optimistically to the authoritative reducer.\nWrite to the destination only when accepted input.receivedBytes advances.",
+      "properties": {
+        "type": {
+          "const": "tcp/input"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Absolute decoded-byte offset.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "data": {
+          "type": "string",
+          "description": "Nonempty canonical padded RFC 4648 base64; no whitespace."
+        }
+      },
+      "required": [
+        "type",
+        "offset",
+        "data"
+      ]
+    },
+    "TcpDataAction": {
+      "type": "object",
+      "description": "Host bytes. Deliver once, only when output.receivedBytes advances.",
+      "properties": {
+        "type": {
+          "const": "tcp/data"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Absolute decoded-byte offset.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "data": {
+          "type": "string",
+          "description": "Nonempty canonical padded RFC 4648 base64; no whitespace."
+        }
+      },
+      "required": [
+        "type",
+        "offset",
+        "data"
+      ]
+    },
+    "TcpInputConsumedAction": {
+      "type": "object",
+      "description": "Cumulative input bytes released from the host's bounded write buffer.\nNot an acknowledgment that the destination application processed the bytes.",
+      "properties": {
+        "type": {
+          "const": "tcp/inputConsumed"
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "consumedBytes"
+      ]
+    },
+    "TcpDataConsumedAction": {
+      "type": "object",
+      "description": "Cumulative output bytes released by the client's bounded stream consumer.",
+      "properties": {
+        "type": {
+          "const": "tcp/dataConsumed"
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "consumedBytes"
+      ]
+    },
+    "TcpInputEofAction": {
+      "type": "object",
+      "description": "Half-close client input after all preceding input bytes have been written.",
+      "properties": {
+        "type": {
+          "const": "tcp/inputEof"
+        },
+        "finalOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "finalOffset"
+      ]
+    },
+    "TcpDataEofAction": {
+      "type": "object",
+      "description": "Half-close host output after all preceding output bytes have been delivered.",
+      "properties": {
+        "type": {
+          "const": "tcp/dataEof"
+        },
+        "finalOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "finalOffset"
+      ]
+    },
+    "TcpClientCloseAction": {
+      "type": "object",
+      "description": "Client's final close. Respond with hostClose if not already sent.",
+      "properties": {
+        "type": {
+          "const": "tcp/clientClose"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "TcpHostCloseAction": {
+      "type": "object",
+      "description": "Host's final close. Respond with clientClose if not already sent.",
+      "properties": {
+        "type": {
+          "const": "tcp/hostClose"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "TcpClientResetAction": {
+      "type": "object",
+      "description": "Abort both directions and discard buffered payload.",
+      "properties": {
+        "type": {
+          "const": "tcp/clientReset"
+        },
+        "reason": {
+          "$ref": "#/$defs/TcpResetReason"
+        }
+      },
+      "required": [
+        "type",
+        "reason"
+      ]
+    },
+    "TcpHostResetAction": {
+      "type": "object",
+      "description": "Abort both directions and discard buffered payload.",
+      "properties": {
+        "type": {
+          "const": "tcp/hostReset"
+        },
+        "reason": {
+          "$ref": "#/$defs/TcpResetReason"
+        }
+      },
+      "required": [
+        "type",
+        "reason"
       ]
     },
     "ChatToolCallApprovedAction": {
