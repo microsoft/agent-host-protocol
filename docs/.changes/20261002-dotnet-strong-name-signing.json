@@ -1,5 +1,0 @@
-{
-  "type": "changed",
-  "message": "The .NET assemblies are now strong-name signed with the Microsoft Shared Libraries key.",
-  "targets": ["dotnet"]
-}

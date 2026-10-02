@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "`ChatSummary.changes` and `ChatState.changes` provide aggregate file-change counts without requiring a changeset subscription."
-}

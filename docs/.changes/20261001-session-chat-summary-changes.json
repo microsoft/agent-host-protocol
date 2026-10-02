@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "`SessionChatSummary.changes` exposes per-chat change counts in the lightweight chat catalog without requiring a session subscription."
-}

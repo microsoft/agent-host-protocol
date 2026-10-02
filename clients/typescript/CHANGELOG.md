@@ -20,6 +20,35 @@ hotfix escape hatch.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-10-02
+
+Implements AHP 1.0.0.
+
+### Added
+
+- `ManagedSubscriptionManager` provides typed shared leases, initial event buffering, disposable last-holder unsubscribe, and retry-safe failure cleanup.
+- `AuthenticateParams.expiresIn` carries an OAuth access token's remaining lifetime in seconds.
+- `SessionSummary.chats`, `SessionChatSummary.interactivity`, and `SessionSummary.defaultChat` expose lightweight chat navigation data without requiring a session subscription.
+- `chat/isArchivedChanged` action for archiving a chat independently of its session.
+- `ChatState.changesets` and `chat/changesetsChanged` expose each chat's changeset catalogue through the subscribed chat channel.
+- `AutomationDefinition.disableConditions` supports `afterRuns` (`max`) and `afterDate` (`date`) rules combined with logical OR, with at most one condition per kind. Host-owned `AutomationEntry.runCount` tracks the current scheduled-run allowance. Edit conditions through `automation/updateRequested`: omission leaves them unchanged, an array replaces them, and `[]` removes all conditions without re-enabling the automation.
+- `ChangesetStatus.Recomputing` distinguishes refreshes of a completed result from initial changeset computation.
+- `ConfigPropertySchema.minItems` and `ConfigPropertySchema.maxItems` express array cardinality for `type: "array"` config properties. (#432)
+- `McpServerStartingState.blocking` flag indicating that message processing may be held on the server, and the client-dispatchable `session/mcpServerBackgroundRequested` action asking the host to background such a startup.
+- `AutomationSessionTemplate.customizations` lets automations carry client plugins (skills, agents, prompts, rules) that the host captures when the definition is saved, with the host-owned copies reported in `AutomationEntry.customizations` and support advertised by `AutomationCapabilities.customizations`.
+- Hosts can advertise chat-owned canvas channel references and synchronize live presentation metadata and source URLs on experimental per-canvas channels.
+- Atomic stable-URI `moveChat` transfer and same-session ordering for host-authorized chats, with per-chat `movable` discovery and durable authoritative catalogs.
+- Expose chat-owned background work (background shells and subagents) in chat state, with `chat/backgroundWorkSet` and `chat/backgroundWorkRemoved` actions independent of turn lifetime.
+- `ChatSummary.changes` and `ChatState.changes` provide aggregate file-change counts without requiring a changeset subscription.
+- `SessionChatSummary.status` exposes per-chat archived state via `SessionStatus.IsArchived` in the lightweight chat catalog without requiring a session subscription.
+- `chat/isReadChanged` action and optional `SessionChatSummary.status` projection for independently tracking the status of any known chat, including the default chat; the status bitset replaces the unreleased `isRead` and `archived` catalog fields.
+- `SessionChatSummary.changes` exposes per-chat change counts in the lightweight chat catalog without requiring a session subscription.
+
+### Changed
+
+- Historical `ToolResultTerminalContent.resource` subscriptions return lazily reconstructed exited terminal state with retained output.
+- `FileEdit` and preview `edits` now use named models in generated SDKs. This breaks affected SDK APIs but keeps JSON shapes unchanged.
+
 ## [0.9.0] — 2026-08-28
 
 Implements AHP 0.9.0.

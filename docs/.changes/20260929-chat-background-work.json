@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Expose chat-owned background work (background shells and subagents) in chat state, with `chat/backgroundWorkSet` and `chat/backgroundWorkRemoved` actions independent of turn lifetime."
-}

@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "`SessionChatSummary.status` exposes per-chat archived state via `SessionStatus.IsArchived` in the lightweight chat catalog without requiring a session subscription."
-}
