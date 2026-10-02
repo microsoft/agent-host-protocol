@@ -71,15 +71,15 @@ test('chat/turnResume is available starting in protocol 0.9.0', () => {
   assert.equal(isActionKnownToVersion(action, '0.9.0'), true);
 });
 
-test('chat/isReadChanged is available starting in protocol 0.10.0', () => {
+test('chat/isReadChanged is available starting in protocol 0.9.0', () => {
   const action = {
     type: ActionType.ChatIsReadChanged,
     isRead: true,
   } as const;
 
-  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatIsReadChanged], '0.10.0');
-  assert.equal(isActionKnownToVersion(action, '0.9.0'), false);
-  assert.equal(isActionKnownToVersion(action, '0.10.0'), true);
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatIsReadChanged], '0.9.0');
+  assert.equal(isActionKnownToVersion(action, '0.8.0'), false);
+  assert.equal(isActionKnownToVersion(action, '0.9.0'), true);
 });
 
 test('public package entry re-exports both protocol-version constants', async () => {
