@@ -30,7 +30,7 @@ action toggles `SessionStatus.IsRead` only on the addressed `ChatState`; it
 does not change the read state of the owning session or sibling chats. The host
 echoes the accepted action in server order and keeps the corresponding
 `ChatSummary.status` synchronized through `session/chatUpdated` and the
-matching compact `SessionChatSummary.isRead` projection synchronized through
+matching compact `SessionChatSummary.status` projection synchronized through
 `root/sessionSummaryChanged`.
 `session/isReadChanged` independently changes the owning session's read state;
 neither action implies the other.

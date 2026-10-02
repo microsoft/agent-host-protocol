@@ -18,11 +18,13 @@
     "chats": [
       {
         "resource": "ahp-chat:/lead",
-        "title": "Lead"
+        "title": "Lead",
+        "status": 1
       },
       {
         "resource": "ahp-chat:/worker",
         "title": "Worker",
+        "status": 1,
         "changes": {
           "additions": 12,
           "deletions": 3,
@@ -48,11 +50,13 @@
       "chats": [
         {
           "resource": "ahp-chat:/lead",
-          "title": "Lead"
+          "title": "Lead",
+          "status": 1
         },
         {
           "resource": "ahp-chat:/worker",
           "title": "Worker",
+          "status": 1,
           "changes": {
             "additions": 12,
             "deletions": 3,

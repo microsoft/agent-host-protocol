@@ -1162,8 +1162,8 @@ public sealed record SessionChatRemovedAction
 /// SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
 ///
 /// Mirrors the root-channel `root/sessionSummaryChanged` notification.
-/// When `changes.status` changes the `IsRead` bit, the host MUST project that
-/// exact value into the matching `SessionChatSummary.isRead` field and publish
+/// When `changes.status` changes, the host MUST project that exact value into
+/// the matching `SessionChatSummary.status` field and publish
 /// the updated compact chat catalog through `root/sessionSummaryChanged`.</summary>
 public sealed record SessionChatUpdatedAction
 {
@@ -2028,7 +2028,7 @@ public sealed record ChatDraftChangedAction
 /// owning session or sibling chats. Use `session/isReadChanged` only to change
 /// the owning session's independent read state. After accepting this action,
 /// the host also synchronizes the addressed chat's `ChatSummary.status` and
-/// `SessionChatSummary.isRead` projections.</summary>
+/// `SessionChatSummary.status` projections.</summary>
 public sealed record ChatIsReadChangedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatIsReadChanged;

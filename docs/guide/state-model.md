@@ -112,7 +112,7 @@ SessionSummary {
   workingDirectories?: URI[]   // equal-peer working directories
   annotations?: AnnotationsSummary
   changes?: ChangesSummary
-  chats?: SessionChatSummary[] // compact list presentation, including exact per-chat read state when known
+  chats?: SessionChatSummary[] // compact list presentation, including per-chat status
 }
 
 ProjectInfo {
@@ -121,12 +121,13 @@ ProjectInfo {
 }
 ```
 
-`SessionChatSummary.isRead` is optional for backward compatibility. `true`
-means the chat is read, `false` means it is unread, and absence means unknown;
-clients must not interpret an absent value as read. Hosts update this compact
-projection alongside `ChatSummary.status` when `chat/isReadChanged` is
-accepted, so session lists can restore exact per-chat read state without
-subscribing to every session or chat.
+`SessionChatSummary.status` is the same `SessionStatus` bitset as
+`ChatSummary.status`, including activity, read, and archived state. Hosts keep
+both projections synchronized with the chat's state so session lists can
+render per-chat status without subscribing to every session or chat. Clients
+check `SessionStatus.IsRead` and `SessionStatus.IsArchived` with bitwise
+operations rather than separate boolean fields. The compact `status` field
+is optional to ease adoption; absence means unknown, not unread or unarchived.
 
 The `status` bitset encodes both the session's activity state and metadata flags like read/archived state. See the [Session Status Bitset](#session-status-bitset) table below for details.
 
