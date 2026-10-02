@@ -310,6 +310,52 @@ public sealed class FixRegressionTests
         Assert.False(afterMetaPatch.Meta!["pinned"].GetBoolean());
     }
 
+    [Fact]
+    public void ApplySummaryChange_Chats_ReplacesCompactReadProjection()
+    {
+        var entry = new HostEntry(
+            new HostId("h"),
+            new HostConfig
+            {
+                Id = new HostId("h"),
+                TransportFactory = (_, _) => throw new InvalidOperationException(),
+            },
+            "client-1");
+        entry.PutSessionSummary(new SessionSummary
+        {
+            Resource = "ahp-session:/s1",
+            Provider = "p",
+            Title = "Session",
+            CreatedAt = "2024-01-01T00:00:00.001Z",
+            ModifiedAt = "2024-01-01T00:00:00.001Z",
+            Chats =
+            [
+                new SessionChatSummary
+                {
+                    Resource = "ahp-chat:/default",
+                    Title = "Default",
+                    IsRead = false,
+                },
+            ],
+        });
+
+        entry.ApplySummaryChange("ahp-session:/s1", new PartialSessionSummary
+        {
+            Chats =
+            [
+                new SessionChatSummary
+                {
+                    Resource = "ahp-chat:/default",
+                    Title = "Default",
+                    IsRead = true,
+                },
+            ],
+        });
+
+        var summary = entry.Snapshot().SessionSummaries.Single(s => s.Resource == "ahp-session:/s1");
+        Assert.True(Assert.Single(summary.Chats!).IsRead);
+    }
+
     // ── Upstream drift port (model config widened to JSON primitives; SessionModelInfo
     //    token-limit fields). ModelSelection.Config + ConfigPropertySchema.Enum carry
     //    arbitrary JSON primitives (not just strings), so a numeric/boolean picker value

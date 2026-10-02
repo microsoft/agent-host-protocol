@@ -2571,6 +2571,14 @@ pub struct SessionChatSummary {
     /// backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Exact read state for this chat.
+    ///
+    /// Generic clients use this to present read or unread chats in session lists
+    /// without subscribing to the session or chat channel. `true` means read and
+    /// `false` means unread. Absence means unknown for backward compatibility and
+    /// MUST NOT be interpreted as read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_read: Option<bool>,
     /// Whether this chat has been archived independently of its owning session
     /// (see `chat/isArchivedChanged`).
     ///

@@ -146,7 +146,7 @@
               "description": "Chat that receives input when none is selected, independent of catalog position."
             }
           },
-          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`, `createdAt`) never change and\nMUST be omitted by senders; receivers SHOULD ignore them if present."
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`, `createdAt`) never change and\nMUST be omitted by senders; receivers SHOULD ignore them if present.\nWhen `chats` is present, it replaces the complete compact chat catalog."
         }
       },
       "required": [
@@ -1420,6 +1420,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Exact read state for this chat.\n\nGeneric clients use this to present read or unread chats in session lists\nwithout subscribing to the session or chat channel. `true` means read and\n`false` means unread. Absence means unknown for backward compatibility and\nMUST NOT be interpreted as read."
         },
         "archived": {
           "type": "boolean",

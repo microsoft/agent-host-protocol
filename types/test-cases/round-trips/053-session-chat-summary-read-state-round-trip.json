@@ -1,0 +1,58 @@
+{
+  "name": "session-chat-summary-read-state-round-trip",
+  "group": "A",
+  "description": "SessionSummary chat catalog entries preserve exact read and unread states while allowing older hosts to omit the unknown read state.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Agent team",
+    "status": 1,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "chats": [
+      {
+        "resource": "ahp-chat:/lead",
+        "title": "Lead",
+        "isRead": true
+      },
+      {
+        "resource": "ahp-chat:/worker",
+        "title": "Worker",
+        "isRead": false
+      },
+      {
+        "resource": "ahp-chat:/legacy",
+        "title": "Legacy"
+      }
+    ],
+    "defaultChat": "ahp-chat:/lead"
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Agent team",
+      "status": 1,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "chats": [
+        {
+          "resource": "ahp-chat:/lead",
+          "title": "Lead",
+          "isRead": true
+        },
+        {
+          "resource": "ahp-chat:/worker",
+          "title": "Worker",
+          "isRead": false
+        },
+        {
+          "resource": "ahp-chat:/legacy",
+          "title": "Legacy"
+        }
+      ],
+      "defaultChat": "ahp-chat:/lead"
+    }
+  ]
+}

@@ -2439,6 +2439,13 @@ public struct SessionChatSummary: Codable, Sendable {
     /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
     /// backward compatibility.
     public var interactivity: ChatInteractivity?
+    /// Exact read state for this chat.
+    ///
+    /// Generic clients use this to present read or unread chats in session lists
+    /// without subscribing to the session or chat channel. `true` means read and
+    /// `false` means unread. Absence means unknown for backward compatibility and
+    /// MUST NOT be interpreted as read.
+    public var isRead: Bool?
     /// Whether this chat has been archived independently of its owning session
     /// (see `chat/isArchivedChanged`).
     ///
@@ -2458,6 +2465,7 @@ public struct SessionChatSummary: Codable, Sendable {
         title: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
+        isRead: Bool? = nil,
         archived: Bool? = nil,
         changes: ChangesSummary? = nil
     ) {
@@ -2465,6 +2473,7 @@ public struct SessionChatSummary: Codable, Sendable {
         self.title = title
         self.origin = origin
         self.interactivity = interactivity
+        self.isRead = isRead
         self.archived = archived
         self.changes = changes
     }

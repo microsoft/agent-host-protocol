@@ -843,7 +843,9 @@ export interface ChatDraftChangedAction {
  * session's default chat, as read (e.g. after viewing it) or unread. This
  * changes only the addressed chat; it does not change the read state of its
  * owning session or sibling chats. Use `session/isReadChanged` only to change
- * the owning session's independent read state.
+ * the owning session's independent read state. After accepting this action,
+ * the host also synchronizes the addressed chat's `ChatSummary.status` and
+ * `SessionChatSummary.isRead` projections.
  *
  * @category Chat Actions
  * @version 1

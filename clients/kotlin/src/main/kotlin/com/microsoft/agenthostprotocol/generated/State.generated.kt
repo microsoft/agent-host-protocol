@@ -2290,6 +2290,15 @@ data class SessionChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Exact read state for this chat.
+     *
+     * Generic clients use this to present read or unread chats in session lists
+     * without subscribing to the session or chat channel. `true` means read and
+     * `false` means unread. Absence means unknown for backward compatibility and
+     * MUST NOT be interpreted as read.
+     */
+    val isRead: Boolean? = null,
+    /**
      * Whether this chat has been archived independently of its owning session
      * (see `chat/isArchivedChanged`).
      *

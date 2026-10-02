@@ -375,6 +375,8 @@ internal sealed class HostEntry : IDisposable
                 Changes = changes.Changes ?? existing.Changes,
                 Annotations = existing.Annotations,
                 Meta = changes.Meta ?? existing.Meta,
+                Chats = changes.Chats ?? existing.Chats,
+                DefaultChat = existing.DefaultChat,
             };
         }
     }

@@ -215,7 +215,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `chat/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
 | `session/customizationToggled` | Replaces a customization's explicit enablement decisions by id |
 | `session/isReadChanged` | Marks the session as read or unread |
-| `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats |
+| `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats; refreshes the compact `SessionChatSummary.isRead` projection |
 | `session/isArchivedChanged` | Archives or unarchives the session |
 
 ## Reducers

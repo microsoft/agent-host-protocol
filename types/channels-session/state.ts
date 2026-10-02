@@ -544,6 +544,15 @@ export interface SessionChatSummary {
    */
   interactivity?: ChatInteractivity;
   /**
+   * Exact read state for this chat.
+   *
+   * Generic clients use this to present read or unread chats in session lists
+   * without subscribing to the session or chat channel. `true` means read and
+   * `false` means unread. Absence means unknown for backward compatibility and
+   * MUST NOT be interpreted as read.
+   */
+  isRead?: boolean;
+  /**
    * Whether this chat has been archived independently of its owning session
    * (see `chat/isArchivedChanged`).
    *

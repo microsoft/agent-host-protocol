@@ -65,6 +65,13 @@ per-chat channel stay consistent. Cross-session moves use
 `session/chatRemoved` on the previous owner and `session/chatAdded` on the new
 owner. Same-session moves only change the selected catalog entry's position.
 
+When a chat's `SessionStatus.IsRead` bit changes, the producer MUST project its
+exact value into the matching
+[`SessionChatSummary.isRead`](/reference/session#sessionchatsummary) field and
+publish the complete compact `SessionSummary.chats` catalog through
+`root/sessionSummaryChanged`. `true` means read and `false` means unread.
+Absence means the host did not provide the projection and clients MUST treat
+the state as unknown, not as read.
 
 When `defaultChat` is set, its matching `ChatSummary` MUST NOT advertise
 `movable: true`. If changing `defaultChat` changes either the old or new

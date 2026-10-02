@@ -616,6 +616,55 @@ test('aggregatedSessions sorts by modifiedAt descending and tags hostLabel', asy
   }
 });
 
+test('sessionSummaryChanged replaces the compact chat read projection', async () => {
+  const initial = makeSummary('copilot:/s1', 'Session', 1_000);
+  initial.chats = [
+    { resource: 'ahp-chat:/default', title: 'Default', isRead: false },
+  ];
+  const state: FakeHostState = makeFakeState({
+    sessions: [initial],
+    injectAfterInit: async server => {
+      await new Promise(r => setTimeout(r, 10));
+      const notif: JsonRpcNotification = {
+        jsonrpc: '2.0',
+        method: 'root/sessionSummaryChanged',
+        params: {
+          channel: ROOT,
+          session: initial.resource,
+          changes: {
+            chats: [
+              { resource: 'ahp-chat:/default', title: 'Default', isRead: true },
+            ],
+          },
+        },
+      };
+      try {
+        await server.send(notif);
+      } catch {
+        // best-effort
+      }
+    },
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'read-state',
+      label: 'Read State',
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() =>
+      multi.aggregatedSessions()[0]?.summary.chats?.[0]?.isRead === true
+    );
+
+    assert.deepEqual(multi.aggregatedSessions()[0]?.summary.chats, [
+      { resource: 'ahp-chat:/default', title: 'Default', isRead: true },
+    ]);
+  } finally {
+    await multi.shutdown();
+  }
+});
+
 test('aggregatedAgents tags every agent with its host', async () => {
   const multi = new MultiHostClient();
   try {

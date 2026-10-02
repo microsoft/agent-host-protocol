@@ -126,7 +126,8 @@ public sealed record SessionSummaryChangedParams
     /// <summary>Mutable summary fields that changed; omitted fields are unchanged.
     ///
     /// Identity fields (`resource`, `provider`, `createdAt`) never change and
-    /// MUST be omitted by senders; receivers SHOULD ignore them if present.</summary>
+    /// MUST be omitted by senders; receivers SHOULD ignore them if present.
+    /// When `chats` is present, it replaces the complete compact chat catalog.</summary>
     public required PartialSessionSummary Changes { get; init; }
 }
 

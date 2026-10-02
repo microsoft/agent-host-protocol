@@ -740,6 +740,9 @@ fn apply_summary_changes(
     if let Some(v) = &changes.changes {
         existing.changes = Some(v.clone());
     }
+    if let Some(v) = &changes.chats {
+        existing.chats = Some(v.clone());
+    }
 }
 
 // ─── Random helpers (no external dep on `rand`) ─────────────────────────────
@@ -763,4 +766,45 @@ fn jitter_sample() -> f64 {
     let raw = hasher.finish();
     // Map 64 random bits into [0.0, 1.0).
     (raw as f64) / (u64::MAX as f64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::apply_summary_changes;
+    use ahp_types::notifications::PartialSessionSummary;
+    use ahp_types::state::SessionSummary;
+    use serde_json::json;
+
+    #[test]
+    fn summary_changes_replace_compact_chat_read_projection() {
+        let mut summary: SessionSummary = serde_json::from_value(json!({
+            "resource": "ahp-session:/s1",
+            "provider": "copilot",
+            "title": "Session",
+            "status": 1,
+            "createdAt": "2026-10-02T00:00:00.000Z",
+            "modifiedAt": "2026-10-02T00:00:00.000Z",
+            "chats": [{
+                "resource": "ahp-chat:/default",
+                "title": "Default",
+                "isRead": false
+            }]
+        }))
+        .expect("valid session summary");
+        let changes: PartialSessionSummary = serde_json::from_value(json!({
+            "chats": [{
+                "resource": "ahp-chat:/default",
+                "title": "Default",
+                "isRead": true
+            }]
+        }))
+        .expect("valid session summary changes");
+
+        apply_summary_changes(&mut summary, &changes);
+
+        assert_eq!(
+            summary.chats.as_ref().and_then(|chats| chats.first()).and_then(|chat| chat.is_read),
+            Some(true)
+        );
+    }
 }

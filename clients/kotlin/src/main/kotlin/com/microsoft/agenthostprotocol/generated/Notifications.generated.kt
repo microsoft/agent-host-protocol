@@ -92,6 +92,7 @@ data class SessionSummaryChangedParams(
      *
      * Identity fields (`resource`, `provider`, `createdAt`) never change and
      * MUST be omitted by senders; receivers SHOULD ignore them if present.
+     * When `chats` is present, it replaces the complete compact chat catalog.
      */
     val changes: PartialSessionSummary
 )

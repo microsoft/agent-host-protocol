@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`chat/isReadChanged` action for independently marking any known chat, including the default chat, as read or unread."
+  "message": "`chat/isReadChanged` action and `SessionChatSummary.isRead` projection for independently tracking the exact read state of any known chat, including the default chat."
 }

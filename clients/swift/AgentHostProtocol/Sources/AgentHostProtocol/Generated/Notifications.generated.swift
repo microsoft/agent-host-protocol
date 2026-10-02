@@ -75,6 +75,7 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
     ///
     /// Identity fields (`resource`, `provider`, `createdAt`) never change and
     /// MUST be omitted by senders; receivers SHOULD ignore them if present.
+    /// When `chats` is present, it replaces the complete compact chat catalog.
     public var changes: PartialSessionSummary
 
     public init(
