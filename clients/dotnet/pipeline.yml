@@ -31,7 +31,7 @@ resources:
     - repository: templates
       type: github
       name: microsoft/vscode-engineering
-      ref: refs/heads/strong-name-signing
+      ref: refs/heads/main
       endpoint: Monaco
 
 extends:
