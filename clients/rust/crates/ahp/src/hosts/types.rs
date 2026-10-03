@@ -249,9 +249,10 @@ pub struct HostHandle {
     pub subscriptions: Vec<String>,
     /// Trigger characters from `InitializeResult.completionTriggerCharacters`.
     pub completion_trigger_characters: Vec<String>,
-    /// Cached session summaries keyed by URI. Seeded by `listSessions`
-    /// after each connect and kept fresh by
+    /// Cached session summaries keyed by URI. Refreshed concurrently by
+    /// `listSessions` after handshake readiness and kept fresh by
     /// `root/sessionAdded`/`Removed`/`SummaryChanged` notifications.
+    /// May be empty or retain the prior cache while discovery is pending.
     pub session_summaries: Vec<SessionSummary>,
     /// Generation counter — bumped on every `connect` or `reconnect`.
     /// [`HostClientHandle`]s carry the generation they were issued at,

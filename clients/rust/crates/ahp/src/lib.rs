@@ -138,8 +138,11 @@
 //!
 //! All async client APIs are cancel-safe at await points. The background
 //! driver is owned by the [`Client`] and aborted when the last clone is
-//! dropped, or when [`Client::shutdown`] is called. In-flight requests
-//! resolve with [`ClientError::Shutdown`] in either case.
+//! dropped; [`Client::shutdown`] requests graceful transport closure.
+//! Dropping the last client resolves in-flight requests with
+//! [`ClientError::Shutdown`]. Explicit shutdown and transport closure retain
+//! the normal `-32000` [`ClientError::Rpc`] teardown error. Automatic idle
+//! keepalive is owned by the same driver and ends with it.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -155,8 +158,9 @@ pub mod transport;
 pub use ahp_types;
 
 pub use client::{
-    Client, ClientConfig, ClientEvent, ClientEventStream, DispatchHandle, ResourceRequestHandlers,
-    ServerRequestFuture, ServerRequestHandler, SessionSubscription, SubscriptionEvent,
+    Client, ClientConfig, ClientEvent, ClientEventStream, DispatchHandle, KeepaliveConfig,
+    ResourceRequestHandlers, ServerRequestFuture, ServerRequestHandler, SessionSubscription,
+    SubscriptionEvent,
 };
 pub use error::{ClientError, TransportError};
 pub use multi_host_state_mirror::{HostedResourceKey, MultiHostStateMirror};

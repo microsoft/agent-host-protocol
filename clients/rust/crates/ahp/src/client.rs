@@ -26,7 +26,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Weak,
 };
 use std::time::Duration;
 
@@ -53,10 +53,11 @@ use ahp_types::notifications::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
-use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
-use crate::error::ClientError;
+use crate::error::{ClientError, TransportError};
 use crate::transport::{Transport, TransportMessage};
 
 /// Default size of a per-subscription broadcast channel. Consumers that
@@ -71,6 +72,32 @@ pub struct ClientConfig {
     pub default_request_timeout: Option<Duration>,
     /// Size of each subscription's broadcast ring buffer.
     pub subscription_buffer: usize,
+    /// Automatic connection liveness checks. `None` disables keepalive.
+    ///
+    /// Defaults to a ping after 30 seconds without inbound wire traffic and
+    /// connection failure after 90 seconds of continuous inbound silence.
+    pub keepalive: Option<KeepaliveConfig>,
+}
+
+/// Idle-based keepalive policy owned by the client's transport driver.
+#[derive(Debug, Clone, Copy)]
+pub struct KeepaliveConfig {
+    /// Inbound silence before sending one root-channel `ping`.
+    pub idle_interval: Duration,
+    /// Total inbound silence before declaring the connection failed.
+    ///
+    /// Must exceed [`Self::idle_interval`]. Any received wire message resets
+    /// both deadlines, whether or not it answers the outstanding ping.
+    pub liveness_timeout: Duration,
+}
+
+impl Default for KeepaliveConfig {
+    fn default() -> Self {
+        Self {
+            idle_interval: Duration::from_secs(30),
+            liveness_timeout: Duration::from_secs(90),
+        }
+    }
 }
 
 impl Default for ClientConfig {
@@ -78,6 +105,7 @@ impl Default for ClientConfig {
         Self {
             default_request_timeout: Some(Duration::from_secs(30)),
             subscription_buffer: DEFAULT_SUBSCRIPTION_BUFFER,
+            keepalive: Some(KeepaliveConfig::default()),
         }
     }
 }
@@ -131,6 +159,19 @@ pub struct ClientEventStream {
 }
 
 impl ClientEventStream {
+    pub(crate) fn drain_buffered(&mut self) -> Vec<ClientEvent> {
+        let mut events = Vec::new();
+        // Snapshot the backlog so a continuous producer cannot trap a refresh.
+        for _ in 0..self.rx.len() {
+            match self.rx.try_recv() {
+                Ok(event) => events.push(event),
+                Err(broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+        events
+    }
+
     /// Await the next event. Returns `None` when the client has shut
     /// down (the underlying broadcast channel has closed).
     pub async fn recv(&mut self) -> Option<ClientEvent> {
@@ -188,9 +229,36 @@ pub struct DispatchHandle {
 // ─── Internal plumbing ───────────────────────────────────────────────────────
 
 type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
+type PreparedRequest<'a> = (
+    JsonRpcMessage,
+    PendingRequest<'a>,
+    oneshot::Receiver<Result<Value, JsonRpcError>>,
+);
+
+pub(crate) struct RequestIds {
+    next: std::sync::Mutex<Option<u64>>,
+}
+
+impl RequestIds {
+    pub(crate) fn new() -> Self {
+        Self {
+            next: std::sync::Mutex::new(Some(1)),
+        }
+    }
+
+    fn allocate(&self) -> Result<u64, ClientError> {
+        let mut next = self.next.lock().expect("request IDs mutex poisoned");
+        let id =
+            next.ok_or_else(|| TransportError::Protocol("request ID space exhausted".into()))?;
+        *next = id.checked_add(1);
+        Ok(id)
+    }
+}
 
 struct Shared {
-    pending: Mutex<PendingMap>,
+    // A synchronous lock lets request-future Drop remove entries without an await.
+    pending: std::sync::Mutex<PendingMap>,
+    closed: watch::Sender<bool>,
     subscriptions: Mutex<HashMap<String, broadcast::Sender<SubscriptionEvent>>>,
     /// Top-level all-events broadcast.
     ///
@@ -201,7 +269,7 @@ struct Shared {
     /// alive inside the still-`Arc`-held `Shared`).
     all_events: std::sync::Mutex<Option<broadcast::Sender<ClientEvent>>>,
     outbound: mpsc::Sender<Outbound>,
-    next_id: AtomicU64,
+    request_ids: Arc<RequestIds>,
     next_client_seq: AtomicU64,
     config: ClientConfig,
     /// Handler for inbound server-initiated requests (the symmetrical
@@ -211,7 +279,107 @@ struct Shared {
 
 enum Outbound {
     Message(JsonRpcMessage),
-    Shutdown,
+}
+
+impl Shared {
+    fn stop_requests(&self, message: Option<&str>) {
+        let mut pending = self.pending.lock().expect("pending mutex poisoned");
+        self.closed.send_replace(true);
+        for (_, tx) in pending.drain() {
+            if let Some(message) = message {
+                let _ = tx.send(Err(JsonRpcError {
+                    code: -32000,
+                    message: message.into(),
+                    data: None,
+                }));
+            }
+        }
+    }
+
+    fn prepare_request<P: Serialize>(
+        &self,
+        method: &str,
+        params: P,
+    ) -> Result<PreparedRequest<'_>, ClientError> {
+        if *self.closed.borrow() {
+            return Err(ClientError::Shutdown);
+        }
+        let id = self.request_ids.allocate()?;
+        let params_val = serde_json::to_value(&params)?;
+        let req = JsonRpcMessage::Request(JsonRpcRequest {
+            jsonrpc: JsonRpcVersion::V2,
+            id,
+            method: method.into(),
+            params: if params_val.is_null() {
+                None
+            } else {
+                Some(params_val)
+            },
+        });
+        let (tx, rx) = oneshot::channel();
+        {
+            let mut pending = self.pending.lock().expect("pending mutex poisoned");
+            if *self.closed.borrow() {
+                return Err(ClientError::Shutdown);
+            }
+            pending.insert(id, tx);
+        }
+        Ok((req, PendingRequest { shared: self, id }, rx))
+    }
+
+    async fn request<P, R>(&self, method: &str, params: P) -> Result<R, ClientError>
+    where
+        P: Serialize,
+        R: DeserializeOwned,
+    {
+        let (req, _pending, rx) = self.prepare_request(method, params)?;
+        self.outbound
+            .send(Outbound::Message(req))
+            .await
+            .map_err(|_| ClientError::Shutdown)?;
+
+        let result = match self.config.default_request_timeout {
+            Some(dur) => tokio::time::timeout(dur, rx)
+                .await
+                .map_err(|_| ClientError::Cancelled)?,
+            None => rx.await,
+        };
+        match result {
+            Ok(Ok(value)) => Ok(serde_json::from_value(value)?),
+            Ok(Err(e)) => Err(ClientError::Rpc(e)),
+            Err(_) => Err(ClientError::Shutdown),
+        }
+    }
+
+    async fn ping(&self) -> Result<(), ClientError> {
+        self.request(
+            "ping",
+            PingParams {
+                channel: ROOT_RESOURCE_URI,
+            },
+        )
+        .await
+    }
+}
+
+struct PendingRequest<'a> {
+    shared: &'a Shared,
+    id: u64,
+}
+
+impl Drop for PendingRequest<'_> {
+    fn drop(&mut self) {
+        self.shared
+            .pending
+            .lock()
+            .expect("pending mutex poisoned")
+            .remove(&self.id);
+    }
+}
+
+#[derive(Serialize)]
+struct PingParams {
+    channel: &'static str,
 }
 
 // ─── Server-initiated request handling ───────────────────────────────────────
@@ -354,10 +522,14 @@ pub struct Client {
 
 struct DriveHandle {
     handle: Mutex<Option<JoinHandle<()>>>,
+    shared: Weak<Shared>,
 }
 
 impl Drop for DriveHandle {
     fn drop(&mut self) {
+        if let Some(shared) = self.shared.upgrade() {
+            shared.stop_requests(None);
+        }
         if let Ok(mut guard) = self.handle.try_lock() {
             if let Some(h) = guard.take() {
                 h.abort();
@@ -373,41 +545,58 @@ impl Client {
         transport: T,
         config: ClientConfig,
     ) -> Result<Self, ClientError> {
+        Self::connect_with_request_ids(transport, config, Arc::new(RequestIds::new())).await
+    }
+
+    pub(crate) async fn connect_with_request_ids<T: Transport>(
+        transport: T,
+        config: ClientConfig,
+        request_ids: Arc<RequestIds>,
+    ) -> Result<Self, ClientError> {
+        if let Some(keepalive) = config.keepalive {
+            if keepalive.idle_interval.is_zero()
+                || keepalive.liveness_timeout <= keepalive.idle_interval
+                || Instant::now()
+                    .checked_add(keepalive.liveness_timeout)
+                    .is_none()
+            {
+                return Err(TransportError::Protocol(
+                    "keepalive requires a nonzero idle interval and a representable liveness timeout greater than the idle interval".into()
+                ).into());
+            }
+        }
         let (outbound_tx, outbound_rx) = mpsc::channel::<Outbound>(64);
         let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
+        let (closed, _) = watch::channel(false);
         let shared = Arc::new(Shared {
-            pending: Mutex::new(HashMap::new()),
+            pending: std::sync::Mutex::new(HashMap::new()),
+            closed,
             subscriptions: Mutex::new(HashMap::new()),
             all_events: std::sync::Mutex::new(Some(all_events_tx)),
             outbound: outbound_tx,
-            next_id: AtomicU64::new(1),
+            request_ids,
             next_client_seq: AtomicU64::new(1),
             config,
             server_request_handler: std::sync::Mutex::new(None),
         });
 
         let handle = tokio::spawn(drive_transport(transport, shared.clone(), outbound_rx));
+        let reader = Arc::new(DriveHandle {
+            handle: Mutex::new(Some(handle)),
+            shared: Arc::downgrade(&shared),
+        });
         Ok(Self {
             shared,
-            _reader: Arc::new(DriveHandle {
-                handle: Mutex::new(Some(handle)),
-            }),
+            _reader: reader,
         })
     }
 
-    /// Gracefully shut down the client, aborting any in-flight requests
-    /// with [`ClientError::Shutdown`].
+    /// Gracefully shut down the client.
+    ///
+    /// In-flight requests retain the `-32000` [`ClientError::Rpc`]
+    /// shutdown error. Automatic keepalive ends with the transport driver.
     pub async fn shutdown(&self) {
-        let _ = self.shared.outbound.send(Outbound::Shutdown).await;
-        // Fail any pending in-flight requests.
-        let mut pending = self.shared.pending.lock().await;
-        for (_, tx) in pending.drain() {
-            let _ = tx.send(Err(JsonRpcError {
-                code: -32000,
-                message: "client shut down".into(),
-                data: None,
-            }));
-        }
+        self.shared.stop_requests(Some("client shut down"));
     }
 
     /// Send a JSON-RPC request and await its result.
@@ -416,53 +605,7 @@ impl Client {
         P: Serialize,
         R: DeserializeOwned,
     {
-        let id = self.shared.next_id.fetch_add(1, Ordering::Relaxed);
-        let params_val = serde_json::to_value(&params)?;
-        let params_any = if params_val.is_null() {
-            None
-        } else {
-            Some(ahp_types::common::AnyValue::from(params_val))
-        };
-        let req = JsonRpcMessage::Request(JsonRpcRequest {
-            jsonrpc: JsonRpcVersion::V2,
-            id,
-            method: method.into(),
-            params: params_any,
-        });
-
-        let (tx, rx) = oneshot::channel();
-        {
-            let mut pending = self.shared.pending.lock().await;
-            pending.insert(id, tx);
-        }
-
-        if self
-            .shared
-            .outbound
-            .send(Outbound::Message(req))
-            .await
-            .is_err()
-        {
-            self.shared.pending.lock().await.remove(&id);
-            return Err(ClientError::Shutdown);
-        }
-
-        let result = match self.shared.config.default_request_timeout {
-            Some(dur) => match tokio::time::timeout(dur, rx).await {
-                Ok(r) => r,
-                Err(_) => {
-                    self.shared.pending.lock().await.remove(&id);
-                    return Err(ClientError::Cancelled);
-                }
-            },
-            None => rx.await,
-        };
-
-        match result {
-            Ok(Ok(value)) => Ok(serde_json::from_value(value)?),
-            Ok(Err(e)) => Err(ClientError::Rpc(e)),
-            Err(_) => Err(ClientError::Shutdown),
-        }
+        self.shared.request(method, params).await
     }
 
     /// Send a JSON-RPC notification (fire-and-forget).
@@ -539,17 +682,7 @@ impl Client {
     /// server responds regardless of whether `initialize` has completed or any
     /// subscriptions are held.
     pub async fn ping(&self) -> Result<(), ClientError> {
-        #[derive(Serialize)]
-        struct PingParams {
-            channel: &'static str,
-        }
-        self.request(
-            "ping",
-            PingParams {
-                channel: ROOT_RESOURCE_URI,
-            },
-        )
-        .await
+        self.shared.ping().await
     }
 
     /// Subscribe to a URI and obtain a handle that streams
@@ -842,27 +975,45 @@ async fn drive_transport<T: Transport>(
     shared: Arc<Shared>,
     mut outbound: mpsc::Receiver<Outbound>,
 ) {
+    let _requests = DriverRequests(shared.clone());
+    let mut closed = shared.closed.subscribe();
+    let mut last_received = Instant::now();
+    let mut heartbeat = None;
     loop {
-        tokio::select! {
-            outbound_msg = outbound.recv() => {
-                match outbound_msg {
-                    Some(Outbound::Message(msg)) => {
-                        if let Ok(wire) = TransportMessage::encode(&msg) {
-                            if let Err(err) = transport.send(wire).await {
-                                tracing::warn!(?err, "transport send failed");
-                                break;
-                            }
-                        }
-                    }
-                    Some(Outbound::Shutdown) | None => {
-                        let _ = transport.close().await;
-                        break;
-                    }
+        if *closed.borrow() {
+            break;
+        }
+        let deadline = shared.config.keepalive.map(|policy| {
+            last_received
+                + if heartbeat.is_some() {
+                    policy.liveness_timeout
+                } else {
+                    policy.idle_interval
                 }
+        });
+        let mut event = tokio::select! {
+            _ = async { let _ = closed.wait_for(|closed| *closed).await; } => break,
+            inbound = transport.recv() => DriverEvent::Inbound(inbound),
+            _ = keepalive_deadline(deadline) => DriverEvent::Idle,
+            outbound = outbound.recv() => DriverEvent::Outbound(outbound),
+        };
+        // Preserve receive-first expiry semantics without starving outbound RPCs.
+        if matches!(event, DriverEvent::Idle) {
+            if let Some(inbound) = tokio::select! {
+                biased;
+                inbound = transport.recv() => Some(inbound),
+                _ = async {} => None,
+            } {
+                event = DriverEvent::Inbound(inbound);
             }
-            inbound = transport.recv() => {
+        }
+        match event {
+            DriverEvent::Inbound(inbound) => {
                 match inbound {
                     Ok(Some(wire)) => {
+                        last_received = Instant::now();
+                        // Any inbound traffic proves liveness, not just a ping response.
+                        heartbeat.take();
                         match wire.into_parsed() {
                             Ok(msg) => dispatch_inbound(&shared, msg).await,
                             Err(err) => tracing::warn!(?err, "malformed frame"),
@@ -875,20 +1026,62 @@ async fn drive_transport<T: Transport>(
                     }
                 }
             }
+            DriverEvent::Idle => {
+                if heartbeat.is_some() {
+                    tracing::warn!("connection liveness timeout");
+                    break;
+                }
+                let (request, pending, response) = match shared.prepare_request(
+                    "ping",
+                    PingParams {
+                        channel: ROOT_RESOURCE_URI,
+                    },
+                ) {
+                    Ok(request) => request,
+                    Err(err) => {
+                        tracing::warn!(?err, "keepalive request failed");
+                        break;
+                    }
+                };
+                heartbeat = Some((pending, response));
+                if let Err(err) = send_wire(
+                    &mut transport,
+                    request,
+                    &mut closed,
+                    shared.config.keepalive.map(|p| p.liveness_timeout),
+                )
+                .await
+                {
+                    tracing::warn!(?err, "keepalive transport send failed");
+                    break;
+                }
+            }
+            DriverEvent::Outbound(outbound_msg) => match outbound_msg {
+                Some(Outbound::Message(msg)) => {
+                    if let Err(err) = send_wire(
+                        &mut transport,
+                        msg,
+                        &mut closed,
+                        shared.config.keepalive.map(|p| p.liveness_timeout),
+                    )
+                    .await
+                    {
+                        tracing::warn!(?err, "transport send failed");
+                        break;
+                    }
+                }
+                None => break,
+            },
         }
     }
 
-    // Teardown: close everything so waiters see Shutdown.
-    let mut pending = shared.pending.lock().await;
-    for (_, tx) in pending.drain() {
-        let _ = tx.send(Err(JsonRpcError {
-            code: -32000,
-            message: "transport closed".into(),
-            data: None,
-        }));
-    }
+    drop(heartbeat);
+    drop(outbound);
+    // Teardown: close everything and fail outstanding requests.
+    shared.stop_requests(Some("transport closed"));
     let mut subs = shared.subscriptions.lock().await;
     subs.clear();
+    drop(subs);
     // Drop the top-level fan-out sender so any active
     // `ClientEventStream::recv()` resolves with `None` rather than
     // hanging forever (the `Sender` would otherwise stay alive inside
@@ -896,17 +1089,71 @@ async fn drive_transport<T: Transport>(
     if let Ok(mut guard) = shared.all_events.lock() {
         guard.take();
     }
+    match tokio::time::timeout(Duration::from_secs(5), transport.close()).await {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => tracing::warn!(?err, "transport close failed"),
+        Err(_) => tracing::warn!("transport close timed out"),
+    }
+}
+
+enum DriverEvent {
+    Inbound(Result<Option<TransportMessage>, TransportError>),
+    Outbound(Option<Outbound>),
+    Idle,
+}
+
+async fn keepalive_deadline(deadline: Option<Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending().await,
+    }
+}
+
+async fn send_wire<T: Transport>(
+    transport: &mut T,
+    msg: JsonRpcMessage,
+    closed: &mut watch::Receiver<bool>,
+    write_timeout: Option<Duration>,
+) -> Result<(), TransportError> {
+    let wire = TransportMessage::encode(&msg)?;
+    // Transport's &mut methods cannot read during a send. Bound a stalled write
+    // separately, rather than misreporting queued inbound traffic as silence.
+    let deadline = write_timeout.map(|timeout| Instant::now() + timeout);
+    tokio::select! {
+        biased;
+        _ = closed.wait_for(|closed| *closed) => Err(TransportError::Closed),
+        _ = keepalive_deadline(deadline) => Err(TransportError::Protocol("transport write timed out".into())),
+        result = transport.send(wire) => result,
+    }
+}
+
+struct DriverRequests(Arc<Shared>);
+
+impl Drop for DriverRequests {
+    fn drop(&mut self) {
+        self.0.stop_requests(None);
+    }
 }
 
 async fn dispatch_inbound(shared: &Arc<Shared>, msg: JsonRpcMessage) {
     match msg {
         JsonRpcMessage::SuccessResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some(tx) = shared
+                .pending
+                .lock()
+                .expect("pending mutex poisoned")
+                .remove(&r.id)
+            {
                 let _ = tx.send(Ok(r.result));
             }
         }
         JsonRpcMessage::ErrorResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some(tx) = shared
+                .pending
+                .lock()
+                .expect("pending mutex poisoned")
+                .remove(&r.id)
+            {
                 let _ = tx.send(Err(r.error));
             }
         }
@@ -1020,3 +1267,7 @@ async fn fan_out(shared: &Shared, channel: &Uri, event: SubscriptionEvent) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "client_tests.rs"]
+mod tests;
