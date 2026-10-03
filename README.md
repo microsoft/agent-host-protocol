@@ -35,6 +35,8 @@ Each language client and the spec itself release independently on their own SemV
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidance.
+
 ```bash
 # Install dependencies
 npm install
