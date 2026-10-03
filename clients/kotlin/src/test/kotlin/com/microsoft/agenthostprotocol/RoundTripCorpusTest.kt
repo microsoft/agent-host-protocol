@@ -39,6 +39,8 @@ import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
 import com.microsoft.agenthostprotocol.generated.JsonRpcSuccessResponse
 import com.microsoft.agenthostprotocol.generated.PartialSessionSummary
+import com.microsoft.agenthostprotocol.generated.ReconnectParams
+import com.microsoft.agenthostprotocol.generated.ReconnectResult
 import com.microsoft.agenthostprotocol.generated.SessionAddedParams
 import com.microsoft.agenthostprotocol.generated.ChatInputQuestion
 import com.microsoft.agenthostprotocol.generated.SessionStatus
@@ -253,6 +255,8 @@ class RoundTripCorpusTest {
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
+            "ReconnectParams" -> rt(ReconnectParams.serializer())
+            "ReconnectResult" -> rt(ReconnectResult.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())
             else -> fail(

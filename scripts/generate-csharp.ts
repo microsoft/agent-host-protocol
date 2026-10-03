@@ -2268,7 +2268,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ChannelRecoveryKind', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
@@ -2283,12 +2283,15 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
   { name: 'ReconnectParams' },
-  // Union variants MUST self-carry their `type` discriminator: UnionConverter<T>.Write
+  { name: 'ChannelReplayCursor' },
+  { name: 'ReconnectResult' },
+  // Union variants MUST self-carry their `kind` discriminator: UnionConverter<T>.Write
   // serializes the inner value by its runtime type and relies on that property to
   // emit the discriminator (matching ACTION_VARIANTS' includeDiscriminants). Omitting
-  // it silently drops `type` on write, breaking the reconnect-result round-trip.
-  { name: 'ReconnectReplayResult' },
-  { name: 'ReconnectSnapshotResult' },
+  // it silently drops `kind` on write, breaking the channel-recovery round-trip.
+  { name: 'ChannelReplayRecovery' },
+  { name: 'ChannelSnapshotRecovery' },
+  { name: 'ChannelMissingRecovery' },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
   { name: 'SessionForkSource' }, { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
@@ -2346,13 +2349,14 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-const RECONNECT_RESULT_UNION: UnionConfig = {
-  name: 'ReconnectResult',
-  discriminantField: 'type',
-  doc: 'ReconnectResult is the result of the `reconnect` command.',
+const CHANNEL_RECOVERY_UNION: UnionConfig = {
+  name: 'ChannelRecovery',
+  discriminantField: 'kind',
+  doc: 'ChannelRecovery is the per-channel reconnect recovery outcome.',
   variants: [
-    { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
-    { variantName: 'Snapshot', innerType: 'ReconnectSnapshotResult', wireValue: 'snapshot' },
+    { variantName: 'Replay', innerType: 'ChannelReplayRecovery', wireValue: 'replay' },
+    { variantName: 'Snapshot', innerType: 'ChannelSnapshotRecovery', wireValue: 'snapshot' },
+    { variantName: 'Missing', innerType: 'ChannelMissingRecovery', wireValue: 'missing' },
   ],
 };
 
@@ -2446,8 +2450,8 @@ function generateCommandsFile(project: Project): string {
     }
   }
 
-  lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
+  lines.push('// ─── ChannelRecovery Union ────────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, CHANNEL_RECOVERY_UNION));
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
@@ -2829,7 +2833,7 @@ function checkExhaustiveness(project: Project): void {
     'AutomationDisableCondition',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
-    'ReconnectResult', 'AuthRequiredErrorData',
+    'ChannelRecovery', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',

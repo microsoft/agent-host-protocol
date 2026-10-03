@@ -779,12 +779,19 @@ func (c *Client) Initialize(ctx context.Context, clientID string, protocolVersio
 
 // Reconnect re-establishes a dropped connection with the server's
 // `reconnect` flow.
-func (c *Client) Reconnect(ctx context.Context, clientID string, lastSeenServerSeq int64, subscriptions []string) (*ahptypes.ReconnectResult, error) {
+//
+// subscriptions carries one [ahptypes.ChannelReplayCursor] per channel
+// the caller is still subscribed to, each with its own
+// LastSeenServerSeq checkpoint. The server recovers each channel
+// independently (see [ahptypes.ReconnectResult.Channels]) — callers
+// MUST NOT collapse these into a single connection-wide watermark, or
+// a fast-moving channel's checkpoint can silently cause a slower
+// channel's undelivered actions to be skipped on replay.
+func (c *Client) Reconnect(ctx context.Context, clientID string, subscriptions []ahptypes.ChannelReplayCursor) (*ahptypes.ReconnectResult, error) {
 	params := ahptypes.ReconnectParams{
-		Channel:           ahptypes.RootResourceURI,
-		ClientId:          clientID,
-		LastSeenServerSeq: lastSeenServerSeq,
-		Subscriptions:     subscriptions,
+		Channel:       ahptypes.RootResourceURI,
+		ClientId:      clientID,
+		Subscriptions: subscriptions,
 	}
 	var out ahptypes.ReconnectResult
 	if err := c.Request(ctx, "reconnect", params, &out); err != nil {

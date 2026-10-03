@@ -407,19 +407,113 @@ export interface PingParams extends BaseParams {
 // ─── reconnect ───────────────────────────────────────────────────────────────
 
 /**
- * Discriminant for reconnect result types.
+ * A single subscribed channel's replay checkpoint, carried in
+ * `ReconnectParams.subscriptions`.
+ *
+ * Each subscription recovers independently from its own `lastSeenServerSeq`
+ * instead of one connection-wide watermark. A single shared watermark lets a
+ * fast-moving channel's `serverSeq` silently race ahead of a slower
+ * channel's — if channel A has an undelivered action at `serverSeq=100` and
+ * channel B goes on to deliver `serverSeq=101`, a connection-wide
+ * `lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking
+ * one checkpoint per channel prevents that cross-channel skip without
+ * claiming any ordering *between* channels.
+ *
+ * @category Commands
+ */
+export interface ChannelReplayCursor {
+  /** The subscribed channel URI. */
+  channel: URI;
+  /**
+   * `serverSeq` of the last action the client fully applied or safely
+   * retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+   * last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+   *
+   * `0` means the client has no baseline for `channel` yet — e.g. it
+   * subscribed but the `subscribe`/`initialize` response snapshot (if any)
+   * never arrived before the connection dropped. The server MUST NOT use
+   * another channel's progress to advance this checkpoint, and MUST NOT
+   * use it to seed the connection's global `serverSeq` identity (see
+   * {@link InitializeResult.serverSeq}).
+   */
+  lastSeenServerSeq: number;
+}
+
+/**
+ * Discriminant for per-channel reconnect recovery outcomes.
  *
  * @category Commands
  * @exhaustive
  */
-export const enum ReconnectResultType {
+export const enum ChannelRecoveryKind {
+  /** The server replayed the channel's missed actions. */
   Replay = 'replay',
+  /** The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead. */
   Snapshot = 'snapshot',
+  /** The channel can no longer be resumed (e.g. disposed, or no longer permitted). */
+  Missing = 'missing',
 }
 
 /**
- * Re-establishes a dropped connection. The server replays missed actions or
- * provides fresh snapshots.
+ * Recovery outcome for a channel that replayed cleanly.
+ *
+ * The server MUST include every action the channel missed since the
+ * matching `ChannelReplayCursor.lastSeenServerSeq`, in ascending `serverSeq`
+ * order, and MUST only include actions whose `ActionEnvelope.channel`
+ * equals `channel`.
+ *
+ * @category Commands
+ */
+export interface ChannelReplayRecovery {
+  /** Discriminant */
+  kind: ChannelRecoveryKind.Replay;
+  /** The channel this recovery applies to. */
+  channel: URI;
+  /** Missed action envelopes since the requested `lastSeenServerSeq`. */
+  actions: ActionEnvelope[];
+}
+
+/**
+ * Recovery outcome for a channel whose gap exceeded its replay buffer.
+ *
+ * Absent for stateless channels that have no state to snapshot; the server
+ * MUST instead use {@link ChannelReplayRecovery} with an empty `actions`
+ * list (or {@link ChannelMissingRecovery}, if the channel itself no longer
+ * exists) for those.
+ *
+ * @category Commands
+ */
+export interface ChannelSnapshotRecovery {
+  /** Discriminant */
+  kind: ChannelRecoveryKind.Snapshot;
+  /** The channel this recovery applies to. */
+  channel: URI;
+  /** Fresh snapshot the client MUST use as its new baseline for this channel. */
+  snapshot: Snapshot;
+}
+
+/**
+ * Recovery outcome for a channel the server cannot resume — e.g. a disposed
+ * session or terminal, or a resource the client is no longer permitted to
+ * observe. Clients SHOULD drop `channel` from their local subscription set.
+ *
+ * @category Commands
+ */
+export interface ChannelMissingRecovery {
+  /** Discriminant */
+  kind: ChannelRecoveryKind.Missing;
+  /** The channel this recovery applies to. */
+  channel: URI;
+}
+
+/** Per-channel reconnect recovery outcome. */
+export type ChannelRecovery = ChannelReplayRecovery | ChannelSnapshotRecovery | ChannelMissingRecovery;
+
+/**
+ * Re-establishes a dropped connection. The server recovers each subscribed
+ * channel independently — some channels may replay, others may receive a
+ * fresh snapshot, and others may be reported missing, all in the same
+ * response (see {@link ChannelRecovery}).
  *
  * @category Commands
  * @method reconnect
@@ -432,43 +526,21 @@ export interface ReconnectParams extends BaseParams {
   channel: 'ahp-root://';
   /** Client identifier from the original connection */
   clientId: string;
-  /** Last `serverSeq` the client received */
-  lastSeenServerSeq: number;
-  /** URIs the client was subscribed to */
-  subscriptions: URI[];
+  /** Per-channel replay checkpoints for every channel the client is still subscribed to. */
+  subscriptions: ChannelReplayCursor[];
 }
 
 /**
- * Reconnect result when the server can replay from the requested sequence.
+ * Result of the `reconnect` command.
  *
- * The server MUST include all replayed data in the response.
+ * The server MUST include all replayed and snapshotted data in the response
+ * before returning, and MUST include exactly one {@link ChannelRecovery} per
+ * channel named in `ReconnectParams.subscriptions`.
  */
-export interface ReconnectReplayResult {
-  /** Discriminant */
-  type: ReconnectResultType.Replay;
-  /** Missed action envelopes since `lastSeenServerSeq` */
-  actions: ActionEnvelope[];
-  /**
-   * URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-   * This includes resources that no longer exist (e.g. disposed sessions or
-   * terminals) as well as resources the client is no longer permitted to
-   * observe. Clients SHOULD drop these from their local subscription set.
-   */
-  missing: URI[];
+export interface ReconnectResult {
+  /** One recovery outcome per requested subscription, in any order. */
+  channels: ChannelRecovery[];
 }
-
-/**
- * Reconnect result when the gap exceeds the replay buffer.
- */
-export interface ReconnectSnapshotResult {
-  /** Discriminant */
-  type: ReconnectResultType.Snapshot;
-  /** Fresh snapshots for each subscription */
-  snapshots: Snapshot[];
-}
-
-/** Result of the `reconnect` command. */
-export type ReconnectResult = ReconnectReplayResult | ReconnectSnapshotResult;
 
 // ─── subscribe ───────────────────────────────────────────────────────────────
 

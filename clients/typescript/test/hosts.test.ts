@@ -25,10 +25,10 @@ import type {
 } from '../src/types/common/messages.js';
 import type { SessionSummary } from '../src/types/channels-session/state.js';
 import type { AgentInfo } from '../src/types/channels-root/state.js';
-import type { InitializeResult } from '../src/types/common/commands.js';
+import type { InitializeResult, ChannelRecovery } from '../src/types/common/commands.js';
 import type { ListSessionsResult } from '../src/types/channels-root/commands.js';
-import { ReconnectResultType } from '../src/types/common/commands.js';
-import type { ReconnectResult } from '../src/types/common/commands.js';
+import { ChannelRecoveryKind } from '../src/types/common/commands.js';
+import type { ReconnectResult, ReconnectParams } from '../src/types/common/commands.js';
 
 import {
   ClientIdStoreError,
@@ -68,10 +68,21 @@ interface FakeHostState {
   sessions: SessionSummary[];
   /** Optional callback invoked once after the first request is handled (init or reconnect). */
   injectAfterInit?: (server: AhpTransport) => void | Promise<void>;
+  /**
+   * Optional per-channel-cursor reconnect responder, overriding the
+   * default empty-replay-per-channel behaviour. Every `reconnect` call
+   * is also recorded (in request order) into {@link reconnectRequests}
+   * so tests can assert on the exact per-channel cursors sent.
+   */
+  handleReconnect?: (params: ReconnectParams) => ReconnectResult;
+  /** Snapshot to return from `subscribe` for a given channel, if any (stateless channels get `{}`). */
+  subscribeSnapshots?: Record<string, InitializeResult['snapshots'][number]>;
+  /** Populated by {@link handleRequest} with every `reconnect` request's params, in order. */
+  reconnectRequests: ReconnectParams[];
 }
 
 function makeFakeState(overrides: Partial<FakeHostState> = {}): FakeHostState {
-  return { agents: [], sessions: [], ...overrides };
+  return { agents: [], sessions: [], reconnectRequests: [], ...overrides };
 }
 
 function makeAgent(provider = 'copilot'): AgentInfo {
@@ -91,6 +102,24 @@ function makeSummary(resource: string, title: string, modifiedAt: number): Sessi
     status: SessionStatus.IDLE,
     createdAt: new Date(0).toISOString(),
     modifiedAt: new Date(modifiedAt).toISOString(),
+  };
+}
+
+function makeCanvas(instanceId: string): CanvasState {
+  return { instanceId, extensionId: 'fake', canvasId: 'fake-canvas' };
+}
+
+/** Build an `action` notification envelope for a non-root channel, for reconnect/cursor tests. */
+function makeActionNotif(channel: string, serverSeq: number): JsonRpcNotification {
+  return {
+    jsonrpc: '2.0',
+    method: 'action',
+    params: {
+      channel,
+      action: { type: ActionType.CanvasStateChanged, canvas: makeCanvas(channel) },
+      serverSeq,
+      origin: undefined,
+    },
   };
 }
 
@@ -161,15 +190,27 @@ function handleRequest(req: JsonRpcRequest, state: FakeHostState): unknown {
   switch (req.method) {
     case 'initialize':
       return buildInitResult(state);
-    case 'reconnect':
-      // Default: reply with an empty replay so the supervisor moves on.
-      return { type: ReconnectResultType.Replay, actions: [], missing: [] } satisfies ReconnectResult;
+    case 'reconnect': {
+      const params = req.params as ReconnectParams;
+      state.reconnectRequests.push(params);
+      if (state.handleReconnect) return state.handleReconnect(params);
+      // Default: reply with an empty replay for every requested channel
+      // so the supervisor moves on.
+      const channels: ChannelRecovery[] = params.subscriptions.map(sub => ({
+        kind: ChannelRecoveryKind.Replay,
+        channel: sub.channel,
+        actions: [],
+      }));
+      return { channels } satisfies ReconnectResult;
+    }
     case 'listSessions':
       return buildListResult(state);
     case 'subscribe': {
       // Minimal `SubscribeResult` — snapshot omitted (stateless channels
       // are valid). The fake server doesn't enforce real subscriptions.
-      return {};
+      const params = req.params as { channel: string };
+      const snapshot = state.subscribeSnapshots?.[params.channel];
+      return snapshot ? { snapshot } : {};
     }
     default:
       return {};
@@ -1156,6 +1197,174 @@ test('repeated reconnect cycles do not accumulate abort listeners on the shutdow
     0,
     `expected no MaxListenersExceededWarning; got: ${warnings.join(' / ')}`,
   );
+});
+
+// ─── Per-channel reconnect/replay cursors ───────────────────────────────────
+
+test('reconnect sends independent per-channel cursors — a fast channel never advances a slower one', async () => {
+  const A = 'ahp-canvas:/a';
+  const B = 'ahp-canvas:/b';
+  const state: FakeHostState = makeFakeState({
+    injectAfterInit: async server => {
+      // B races ahead to serverSeq=101 while A never receives anything.
+      // A single connection-wide watermark would send `lastSeenServerSeq:
+      // 101` on the next reconnect and silently skip any of A's
+      // undelivered actions below that value; per-channel cursors must
+      // keep A at its own baseline instead.
+      await new Promise(r => setTimeout(r, 10));
+      try {
+        await server.send(makeActionNotif(B, 101));
+      } catch {
+        // best-effort
+      }
+    },
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'divergent',
+      label: 'divergent',
+      reconnectPolicy: immediateForeverPolicy(),
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() => multi.host('divergent')?.state.status === 'connected');
+    await multi.subscribe('divergent', A);
+    await multi.subscribe('divergent', B);
+    await waitUntil(() => multi.host('divergent')?.serverSeq === 101);
+
+    await multi.reconnectHost('divergent');
+    await waitUntil(() => state.reconnectRequests.length >= 1);
+
+    const req = state.reconnectRequests[0];
+    assert.ok(req);
+    const cursorFor = (ch: string): number | undefined =>
+      req.subscriptions.find(s => s.channel === ch)?.lastSeenServerSeq;
+    assert.equal(cursorFor(B), 101, "B's cursor should reflect its own progress");
+    assert.equal(cursorFor(A), 0, "A's cursor must stay at its own baseline — never advanced by B");
+  } finally {
+    await multi.shutdown();
+  }
+});
+
+test('channel replay recovery advances only that channel\'s cursor, independently of other channels', async () => {
+  const A = 'ahp-canvas:/a';
+  const B = 'ahp-canvas:/b';
+  const state: FakeHostState = makeFakeState({
+    handleReconnect: params => ({
+      channels: params.subscriptions.map(sub =>
+        sub.channel === A
+          ? { kind: ChannelRecoveryKind.Replay, channel: A, actions: [
+              { channel: A, action: { type: ActionType.CanvasStateChanged, canvas: makeCanvas('a') }, serverSeq: 10, origin: undefined },
+              { channel: A, action: { type: ActionType.CanvasStateChanged, canvas: makeCanvas('a') }, serverSeq: 11, origin: undefined },
+            ] }
+          : { kind: ChannelRecoveryKind.Replay, channel: sub.channel, actions: [] },
+      ),
+    }),
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'replay',
+      label: 'replay',
+      reconnectPolicy: immediateForeverPolicy(),
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() => multi.host('replay')?.state.status === 'connected');
+    await multi.subscribe('replay', A);
+    await multi.subscribe('replay', B);
+
+    await multi.reconnectHost('replay');
+    await waitUntil(() => state.reconnectRequests.length >= 1);
+
+    // The *next* reconnect after the replay must report A's advanced
+    // cursor (11) while B — which had an empty replay — stays at 0.
+    await multi.reconnectHost('replay');
+    await waitUntil(() => state.reconnectRequests.length >= 2);
+    const req = state.reconnectRequests[state.reconnectRequests.length - 1];
+    assert.ok(req);
+    const cursorFor = (ch: string): number | undefined =>
+      req.subscriptions.find(s => s.channel === ch)?.lastSeenServerSeq;
+    assert.equal(cursorFor(A), 11, "A's cursor should reflect the exhausted replay");
+    assert.equal(cursorFor(B), 0, "B's cursor must be untouched by A's replay");
+  } finally {
+    await multi.shutdown();
+  }
+});
+
+test('channel snapshot recovery sets that channel\'s cursor from the snapshot fromSeq baseline', async () => {
+  const A = 'ahp-canvas:/a';
+  const state: FakeHostState = makeFakeState({
+    handleReconnect: params => ({
+      channels: params.subscriptions.map(sub => ({
+        kind: ChannelRecoveryKind.Snapshot,
+        channel: sub.channel,
+        snapshot: { resource: sub.channel, state: makeCanvas('a'), fromSeq: 50 },
+      })),
+    }),
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'snap',
+      label: 'snap',
+      reconnectPolicy: immediateForeverPolicy(),
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() => multi.host('snap')?.state.status === 'connected');
+    await multi.subscribe('snap', A);
+
+    await multi.reconnectHost('snap');
+    await waitUntil(() => state.reconnectRequests.length >= 1);
+    await multi.reconnectHost('snap');
+    await waitUntil(() => state.reconnectRequests.length >= 2);
+
+    const req = state.reconnectRequests[state.reconnectRequests.length - 1];
+    assert.equal(req?.subscriptions.find(s => s.channel === A)?.lastSeenServerSeq, 50);
+  } finally {
+    await multi.shutdown();
+  }
+});
+
+test('a channel reported missing on reconnect is dropped from subscriptions and not re-requested', async () => {
+  const A = 'ahp-canvas:/a';
+  const Gone = 'ahp-canvas:/gone';
+  const state: FakeHostState = makeFakeState({
+    handleReconnect: params => ({
+      channels: params.subscriptions.map(sub =>
+        sub.channel === Gone
+          ? { kind: ChannelRecoveryKind.Missing, channel: Gone }
+          : { kind: ChannelRecoveryKind.Replay, channel: sub.channel, actions: [] },
+      ),
+    }),
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'missing',
+      label: 'missing',
+      reconnectPolicy: immediateForeverPolicy(),
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() => multi.host('missing')?.state.status === 'connected');
+    await multi.subscribe('missing', A);
+    await multi.subscribe('missing', Gone);
+
+    await multi.reconnectHost('missing');
+    await waitUntil(() => state.reconnectRequests.length >= 1);
+    await waitUntil(() => !(multi.host('missing')?.subscriptions.includes(Gone) ?? true));
+    assert.ok(multi.host('missing')?.subscriptions.includes(A), 'A should remain subscribed');
+
+    await multi.reconnectHost('missing');
+    await waitUntil(() => state.reconnectRequests.length >= 2);
+    const req = state.reconnectRequests[state.reconnectRequests.length - 1];
+    assert.ok(!req?.subscriptions.some(s => s.channel === Gone), 'missing channel must not be re-requested');
+  } finally {
+    await multi.shutdown();
+  }
 });
 
 // Reference the imported HostId type to avoid 'unused' warnings.

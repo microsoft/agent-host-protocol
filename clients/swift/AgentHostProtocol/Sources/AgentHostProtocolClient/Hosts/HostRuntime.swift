@@ -70,6 +70,7 @@ internal final class HostRuntime: Sendable {
             lastConnectedAt: nil,
             protocolVersion: nil,
             serverSeq: 0,
+            channelCursors: [:],
             defaultDirectory: nil,
             automations: nil,
             rootState: RootState(agents: []),
@@ -313,9 +314,15 @@ internal final class HostRuntime: Sendable {
         stateChanges: AsyncStream<ConnectionState>
     ) async throws -> ConnectionStreams {
         // Decide between initialize and reconnect based on prior state.
+        // Reconnect requires an established protocol version (we've
+        // completed a handshake before) and at least one subscription to
+        // recover. The global `serverSeq` watermark is informational only
+        // and MUST NOT gate this decision — per-channel cursors (below)
+        // drive what gets replayed.
         let priorSnapshot = await shared.internalState
-        let canReconnect = priorSnapshot.serverSeq > 0 && !priorSnapshot.subscriptions.isEmpty
+        let canReconnect = priorSnapshot.protocolVersion != nil && !priorSnapshot.subscriptions.isEmpty
         let priorSubscriptions = priorSnapshot.subscriptions
+        let priorCursors = priorSnapshot.channelCursors
         let priorSeq = priorSnapshot.serverSeq
 
         var initResult: InitializeResult? = nil
@@ -324,10 +331,12 @@ internal final class HostRuntime: Sendable {
 
         if canReconnect {
             do {
+                let cursors = priorSubscriptions.map { uri in
+                    ChannelReplayCursor(channel: uri, lastSeenServerSeq: priorCursors[uri] ?? 0)
+                }
                 reconnectResult = try await client.reconnect(
                     clientId: clientId,
-                    lastSeenServerSeq: priorSeq,
-                    subscriptions: priorSubscriptions
+                    subscriptions: cursors
                 )
             } catch let error as AHPClientError {
                 if case .rpc = error {
@@ -379,6 +388,15 @@ internal final class HostRuntime: Sendable {
                             state.rootState = root
                         }
                     }
+                    // A full (re)initialize discards any prior per-channel
+                    // progress — the server has no continuity guarantee for
+                    // it — and re-baselines every subscribed channel from
+                    // its fresh snapshot (or `0` if stateless/absent).
+                    state.channelCursors.removeAll()
+                    for snap in init1.snapshots {
+                        state.channelCursors[snap.resource] = snap.fromSeq
+                    }
+                    state.subscriptions = priorSubscriptions
                 }
                 if let list = summaries {
                     state.sessionSummaries.removeAll()
@@ -392,7 +410,7 @@ internal final class HostRuntime: Sendable {
         }()
 
         if let reconnectResult {
-            await applyReconnectResult(reconnectResult, priorSubscriptions: priorSubscriptions)
+            await applyReconnectResult(reconnectResult)
             await hostEventSink(.reconnectResult(config.id, reconnectResult))
         }
 
@@ -403,47 +421,51 @@ internal final class HostRuntime: Sendable {
 
     /// Apply the result of a successful `reconnect` call.
     ///
+    /// Each requested channel gets exactly one independent recovery outcome
+    /// — never a single connection-wide result — so a fast channel's
+    /// progress can't cause a slower channel's undelivered actions to be
+    /// skipped (or a missing channel to hide another channel's replay).
     /// Replay envelopes use the same reducer path as live action frames so
     /// host snapshots advance before consumers see fanned-out replay events.
-    /// Snapshot results refresh root mirror state and prune subscriptions the
-    /// server could not resume.
-    private func applyReconnectResult(
-        _ result: ReconnectResult,
-        priorSubscriptions: [String]
-    ) async {
-        switch result {
-        case .replay(let replay):
-            for envelope in replay.actions {
-                await applyAction(envelope)
-                if config.fanOutReconnectReplayActions {
-                    await fanOut(HostSubscriptionEvent(
-                        hostId: config.id,
-                        resource: envelope.channel,
-                        event: .action(envelope)
-                    ))
-                }
-            }
-            if !replay.missing.isEmpty {
-                await shared.update { state in
-                    state.subscriptions.removeAll { replay.missing.contains($0) }
-                }
-            }
-        case .snapshot(let snapshotResult):
-            await shared.update { state in
-                var surviving: [String] = []
-                surviving.reserveCapacity(snapshotResult.snapshots.count)
-                for snapshot in snapshotResult.snapshots {
-                    if snapshot.fromSeq > state.serverSeq {
-                        state.serverSeq = snapshot.fromSeq
+    /// Snapshot recoveries refresh root mirror state and set that channel's
+    /// cursor to the snapshot's `fromSeq` baseline. Missing channels are
+    /// dropped from the subscription set and their cursor entry removed so
+    /// they are not re-requested on a future reconnect.
+    private func applyReconnectResult(_ result: ReconnectResult) async {
+        var missingChannels: Set<String> = []
+        for recovery in result.channels {
+            switch recovery {
+            case .replay(let replay):
+                for envelope in replay.actions {
+                    await applyAction(envelope)
+                    if config.fanOutReconnectReplayActions {
+                        await fanOut(HostSubscriptionEvent(
+                            hostId: config.id,
+                            resource: envelope.channel,
+                            event: .action(envelope)
+                        ))
                     }
-                    if snapshot.resource == RootResourceURI,
-                       case .root(let root) = snapshot.state {
+                }
+            case .snapshot(let snapshotRecovery):
+                await shared.update { state in
+                    if snapshotRecovery.snapshot.fromSeq > state.serverSeq {
+                        state.serverSeq = snapshotRecovery.snapshot.fromSeq
+                    }
+                    state.channelCursors[snapshotRecovery.channel] = snapshotRecovery.snapshot.fromSeq
+                    if snapshotRecovery.channel == RootResourceURI,
+                       case .root(let root) = snapshotRecovery.snapshot.state {
                         state.rootState = root
                     }
-                    surviving.append(snapshot.resource)
                 }
-                state.subscriptions.removeAll { uri in
-                    priorSubscriptions.contains(uri) && !surviving.contains(uri)
+            case .missing(let missing):
+                missingChannels.insert(missing.channel)
+            }
+        }
+        if !missingChannels.isEmpty {
+            await shared.update { state in
+                state.subscriptions.removeAll { missingChannels.contains($0) }
+                for channel in missingChannels {
+                    state.channelCursors.removeValue(forKey: channel)
                 }
             }
         }
@@ -624,6 +646,14 @@ internal final class HostRuntime: Sendable {
             if envelope.serverSeq > state.serverSeq {
                 state.serverSeq = envelope.serverSeq
             }
+            // Advance only the matching channel's cursor — never another
+            // channel's — so a fast channel can never cause a slower
+            // channel's undelivered actions to be skipped on the next
+            // reconnect.
+            let priorCursor = state.channelCursors[envelope.channel] ?? 0
+            if envelope.serverSeq > priorCursor {
+                state.channelCursors[envelope.channel] = envelope.serverSeq
+            }
             // Best-effort root state mirror update via the existing pure
             // reducer. Non-root channels slip through without effect — that's
             // the same posture as the Rust SDK.
@@ -641,7 +671,7 @@ internal final class HostRuntime: Sendable {
         }
         do {
             let (result, _) = try await client.subscribe(uri)
-            await shared.appendSubscription(uri)
+            await shared.appendSubscription(uri, baselineServerSeq: result.snapshot?.fromSeq)
             return .success(result)
         } catch let error as AHPClientError {
             return .failure(.client(error))

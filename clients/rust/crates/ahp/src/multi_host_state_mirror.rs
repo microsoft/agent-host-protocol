@@ -27,7 +27,7 @@
 //! a missed-because-reconnected envelope) will permanently desync the
 //! mirror for that `(host, channel)` until you re-seed it from a fresh
 //! snapshot — either via a new `subscribe` call or by applying a
-//! `Snapshot` from `ReconnectResult::Snapshot` through
+//! `Snapshot` from `ChannelRecovery::Snapshot` through
 //! [`MultiHostStateMirror::apply_snapshot`].
 //!
 //! Consume from this mirror with that understanding: it's the right

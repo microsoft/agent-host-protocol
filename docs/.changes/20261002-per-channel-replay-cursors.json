@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "`reconnect` now recovers each subscribed channel independently via `ReconnectParams.subscriptions: ChannelReplayCursor[]` and `ReconnectResult.channels: ChannelRecovery[]` (replay/snapshot/missing per channel), replacing the single connection-wide `lastSeenServerSeq` watermark that could let a fast channel's progress silently skip a slower channel's undelivered actions."
+}

@@ -57,10 +57,15 @@ public interface IAhpClient : IAsyncDisposable
         CancellationToken cancellationToken = default);
 
     /// <summary>Re-establishes a dropped connection via the <c>reconnect</c> flow.</summary>
+    /// <param name="clientId">Client identifier from the original connection.</param>
+    /// <param name="subscriptions">
+    /// Per-channel replay checkpoints for every channel the client is still
+    /// subscribed to (see <see cref="ChannelReplayCursor"/>).
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     Task<ReconnectResult> ReconnectAsync(
         string clientId,
-        long lastSeenServerSeq,
-        IReadOnlyList<string>? subscriptions = null,
+        IReadOnlyList<ChannelReplayCursor>? subscriptions = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

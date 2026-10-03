@@ -371,8 +371,9 @@ public sealed class TelemetryTests
                     })
                     .OnReconnect((req, side, c) =>
                     {
-                        var replay = new ReconnectReplayResult
+                        var replay = new ChannelReplayRecovery
                         {
+                            Channel = channel,
                             Actions = new List<ActionEnvelope>
                             {
                                 new ActionEnvelope
@@ -386,9 +387,15 @@ public sealed class TelemetryTests
                                     }),
                                 },
                             },
-                            Missing = new List<string>(),
                         };
-                        return FakeHost.RespondResultAsync(side, req.Id, new ReconnectResult(replay), c);
+                        return FakeHost.RespondResultAsync(
+                            side,
+                            req.Id,
+                            new ReconnectResult
+                            {
+                                Channels = new List<ChannelRecovery> { new ChannelRecovery(replay) },
+                            },
+                            c);
                     })
                     .RunAsync(s, ct));
             }

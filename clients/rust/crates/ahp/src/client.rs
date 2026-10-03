@@ -32,9 +32,10 @@ use std::time::Duration;
 
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
-    CompletionsParams, CompletionsResult, CreateResourceWatchParams, CreateResourceWatchResult,
-    DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
-    ResourceCopyParams, ResourceCopyResult, ResourceDeleteParams, ResourceDeleteResult,
+    ChannelReplayCursor, CompletionsParams, CompletionsResult, CreateResourceWatchParams,
+    CreateResourceWatchResult, DispatchActionParams, InitializeParams, InitializeResult,
+    ReconnectParams, ReconnectResult, ResourceCopyParams, ResourceCopyResult,
+    ResourceDeleteParams, ResourceDeleteResult,
     ResourceListParams, ResourceListResult, ResourceMkdirParams, ResourceMkdirResult,
     ResourceMoveParams, ResourceMoveResult, ResourceReadParams, ResourceReadResult,
     ResourceRequestParams, ResourceRequestResult, ResourceResolveParams, ResourceResolveResult,
@@ -514,17 +515,21 @@ impl Client {
     }
 
     /// Re-establish a dropped connection with `reconnect`.
+    ///
+    /// `subscriptions` carries one [`ChannelReplayCursor`] per channel the
+    /// client is still subscribed to, each independently recording the
+    /// highest `serverSeq` that channel has fully applied. Unlike a single
+    /// connection-wide watermark, this means a fast-moving channel can never
+    /// cause a slower channel's undelivered actions to be silently skipped.
     pub async fn reconnect(
         &self,
         client_id: String,
-        last_seen_server_seq: i64,
-        subscriptions: Vec<String>,
+        subscriptions: Vec<ChannelReplayCursor>,
     ) -> Result<ReconnectResult, ClientError> {
         let params = ReconnectParams {
             channel: ROOT_RESOURCE_URI.to_string(),
             meta: None,
             client_id,
-            last_seen_server_seq,
             subscriptions,
         };
         self.request("reconnect", params).await
