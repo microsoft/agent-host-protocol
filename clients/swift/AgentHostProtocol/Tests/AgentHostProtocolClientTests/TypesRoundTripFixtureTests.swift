@@ -188,6 +188,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(Implementation.self, from: inputData))
         case "InitializeResult":
             return try reencode(dec.decode(InitializeResult.self, from: inputData))
+        case "CreateChatParams":
+            return try reencode(dec.decode(CreateChatParams.self, from: inputData))
         case "ChatSource":
             return try reencode(dec.decode(ChatSource.self, from: inputData))
         case "Snapshot":

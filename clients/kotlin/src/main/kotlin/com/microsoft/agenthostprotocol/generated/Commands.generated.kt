@@ -747,7 +747,20 @@ data class CreateChatParams(
      * A client MUST NOT supply this field unless the agent advertises
      * {@link AgentCapabilities.multipleWorkingDirectories}.
      */
-    val workingDirectories: List<String>? = null
+    val workingDirectories: List<String>? = null,
+    /**
+     * Client-selected initial display title for the new chat.
+     *
+     * Clients MUST NOT supply this field unless the selected agent advertises
+     * {@link MultipleChatsCapability.initialTitle}.
+     *
+     * A server honoring this field MUST trim leading and trailing whitespace.
+     * If the result is empty, it MUST treat the field as absent and choose its
+     * normal initial title. Otherwise, it MUST preserve the remaining text
+     * exactly: it MUST NOT collapse internal whitespace, strip quotes or
+     * punctuation, or truncate it. The protocol defines no maximum title length.
+     */
+    val title: String? = null
 )
 
 @Serializable

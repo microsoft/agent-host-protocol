@@ -573,6 +573,10 @@
         "sideChat": {
           "type": "boolean",
           "description": "The agent can create a side chat from a specific turn. When absent or\n`false`, clients MUST NOT pass a {@link ChatSource} with\n`kind: \"sideChat\"` to `createChat`.\n\nA side chat receives the source turn as context without copying the source\ntranscript into its own visible history. The source is identified by a\nstable `turnId`, which the host resolves against the source chat's current\n`activeTurn` or retained history. When it names the current active turn,\nthe host snapshots the available partial assistant response at creation\ntime. Side-chat support always implies multi-chat support."
+        },
+        "initialTitle": {
+          "type": "boolean",
+          "description": "The agent honors {@link CreateChatParams.title} as the chat's first\npublished title and does not replace it through automatic title generation.\nA later explicit rename is still allowed. When absent or `false`, clients\nMUST omit `title` when calling `createChat`."
         }
       }
     },

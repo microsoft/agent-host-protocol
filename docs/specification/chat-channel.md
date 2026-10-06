@@ -96,6 +96,7 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
+- a `title` containing the client-selected initial display title for the target chat,
 - an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatSource`](/reference/chat#chatsource), either
   `{ kind: "fork", chat, turnId }` or `{ kind: "sideChat", chat, turnId }`,
@@ -105,7 +106,21 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 The server allocates the chat URI and adds the chat to the session's catalog (`session/chatAdded` on the session channel) before returning.
 
-Clients MUST gate source-based creation using the selected
+Clients MUST send `title` only when the selected agent advertises
+[`multipleChats.initialTitle`](/reference/root#multiplechatscapability). A
+supporting server MUST trim leading and trailing whitespace. If the result is
+empty, it MUST treat `title` as absent and choose its normal initial title.
+Otherwise, it MUST use the remaining text in the first published chat summary
+and [`ChatState`](/reference/chat#chatstate) and preserve it exactly: it MUST
+NOT collapse internal whitespace, strip quotes or punctuation, or truncate it.
+The protocol defines no maximum title length. The server MUST NOT replace a
+non-empty supplied title through automatic title generation. A later explicit
+rename is still allowed. When the capability is absent or `false`, clients MUST
+omit `title` but MAY continue creating or forking the chat normally, allowing
+the server to choose its initial title. The top-level `title` describes the
+target chat and is independent of source provenance.
+
+Clients MUST also gate source-based creation using the selected
 [`AgentInfo.capabilities.multipleChats`](/reference/root#multiplechatscapability):
 
 - `fork: true` permits `source.kind: "fork"`.

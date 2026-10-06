@@ -802,6 +802,17 @@ public struct CreateChatParams: Codable, Sendable {
     /// A client MUST NOT supply this field unless the agent advertises
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     public var workingDirectories: [String]?
+    /// Client-selected initial display title for the new chat.
+    ///
+    /// Clients MUST NOT supply this field unless the selected agent advertises
+    /// {@link MultipleChatsCapability.initialTitle}.
+    ///
+    /// A server honoring this field MUST trim leading and trailing whitespace.
+    /// If the result is empty, it MUST treat the field as absent and choose its
+    /// normal initial title. Otherwise, it MUST preserve the remaining text
+    /// exactly: it MUST NOT collapse internal whitespace, strip quotes or
+    /// punctuation, or truncate it. The protocol defines no maximum title length.
+    public var title: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -810,6 +821,7 @@ public struct CreateChatParams: Codable, Sendable {
         case initialMessage
         case source
         case workingDirectories
+        case title
     }
 
     public init(
@@ -818,7 +830,8 @@ public struct CreateChatParams: Codable, Sendable {
         chat: String,
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
-        workingDirectories: [String]? = nil
+        workingDirectories: [String]? = nil,
+        title: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -826,6 +839,7 @@ public struct CreateChatParams: Codable, Sendable {
         self.initialMessage = initialMessage
         self.source = source
         self.workingDirectories = workingDirectories
+        self.title = title
     }
 }
 

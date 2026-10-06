@@ -1723,6 +1723,12 @@ pub struct MultipleChatsCapability {
     /// time. Side-chat support always implies multi-chat support.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub side_chat: Option<bool>,
+    /// The agent honors {@link CreateChatParams.title} as the chat's first
+    /// published title and does not replace it through automatic title generation.
+    /// A later explicit rename is still allowed. When absent or `false`, clients
+    /// MUST omit `title` when calling `createChat`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_title: Option<bool>,
 }
 
 /// Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.

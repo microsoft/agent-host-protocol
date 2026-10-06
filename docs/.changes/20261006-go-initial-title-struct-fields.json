@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "Generated `CreateChatParams.Title` and `MultipleChatsCapability.InitialTitle` fields require unkeyed Go composite literals to add trailing `nil` values or migrate to keyed literals.",
+  "targets": ["go"]
+}

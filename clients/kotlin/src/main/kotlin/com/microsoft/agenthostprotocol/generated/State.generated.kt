@@ -1432,7 +1432,14 @@ data class MultipleChatsCapability(
      * the host snapshots the available partial assistant response at creation
      * time. Side-chat support always implies multi-chat support.
      */
-    val sideChat: Boolean? = null
+    val sideChat: Boolean? = null,
+    /**
+     * The agent honors {@link CreateChatParams.title} as the chat's first
+     * published title and does not replace it through automatic title generation.
+     * A later explicit rename is still allowed. When absent or `false`, clients
+     * MUST omit `title` when calling `createChat`.
+     */
+    val initialTitle: Boolean? = null
 )
 
 @Serializable

@@ -2002,6 +2002,13 @@ public sealed record MultipleChatsCapability
     /// time. Side-chat support always implies multi-chat support.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SideChat { get; init; }
+
+    /// <summary>The agent honors {@link CreateChatParams.title} as the chat's first
+    /// published title and does not replace it through automatic title generation.
+    /// A later explicit rename is still allowed. When absent or `false`, clients
+    /// MUST omit `title` when calling `createChat`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? InitialTitle { get; init; }
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.</summary>
