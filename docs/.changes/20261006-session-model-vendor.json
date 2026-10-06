@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional `SessionModelInfo.vendor` for the model vendor as the provider reports it.",
+  "issues": [503]
+}

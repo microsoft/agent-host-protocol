@@ -3249,7 +3249,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Provider this model belongs to"
+          "description": "Agent provider that owns this model. Matches {@link AgentInfo.provider}."
         },
         "name": {
           "type": "string",
@@ -3283,6 +3283,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this model.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `pricing` key may carry model pricing metadata."
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Vendor of this model as the provider reports it, for example `Anthropic`\nor `Azure OpenAI`. This is sometimes the company that serves the model\nrather than the one that built it. Not the same as {@link provider},\nwhich names the agent provider that owns this model. Absent when the\nprovider does not report a vendor. Providers MAY send any value; clients\nSHOULD fall back to a generic presentation for values they do not\nrecognize."
         }
       },
       "required": [
