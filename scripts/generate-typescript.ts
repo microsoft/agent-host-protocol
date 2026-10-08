@@ -2,13 +2,18 @@
  * TypeScript Client Generator — Copies the canonical TypeScript protocol
  * sources under `types/` into the TypeScript client source tree at
  * `clients/typescript/src/types/`, prepending a generated-file banner to
- * each emitted file.
+ * each emitted file and emitting ordinary enums for the public SDK.
  *
  * Unlike the Rust and Swift generators (which translate the TypeScript
- * source into a different language and commit the result), this output is
- * a literal copy and is intentionally **not** committed. The destination
+ * source into a different language and commit the result), this source
+ * mirror is intentionally **not** committed. The destination
  * directory is gitignored in `clients/typescript/.gitignore`; CI and the
  * documented dev flow regenerate it from the canonical sources.
+ *
+ * Canonical const enums become ordinary enums in this mirror so the built
+ * declarations work for isolatedModules and verbatimModuleSyntax consumers.
+ * The SDK already emits runtime enum objects under isolatedModules; the
+ * canonical sources and the enum members' wire values are left unchanged.
  *
  * Before copying, the generator runs `generateActionOrigin` so the
  * derived `action-origin.generated.ts` file in `types/` is current. This
@@ -27,7 +32,7 @@
  * Output: clients/typescript/src/types/**\/*.ts
  */
 
-import { Project, SourceFile } from 'ts-morph';
+import { Project, SourceFile, SyntaxKind } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
 import { generateActionOrigin } from './generate-action-origin.js';
@@ -95,6 +100,8 @@ export function generateTypeScriptClient(project: Project, typesDir: string, out
   generateActionOrigin(project, typesDir);
 
   const sources = project.getSourceFiles().filter(sf => shouldEmit(sf, typesDir));
+  // Keep SDK-only transformations out of the project shared by all generators.
+  const outputProject = new Project({ useInMemoryFileSystem: true });
 
   rmDirContents(outDir);
   ensureDir(outDir);
@@ -105,9 +112,14 @@ export function generateTypeScriptClient(project: Project, typesDir: string, out
     ensureDir(path.dirname(destPath));
 
     const raw = fs.readFileSync(sf.getFilePath(), 'utf-8');
-    const withBanner = raw.startsWith(COPY_BANNER_MARKER)
-      ? raw
-      : `${GENERATED_BANNER}\n${raw}`;
+    const outputSource = outputProject.createSourceFile(rel, raw);
+    for (const declaration of outputSource.getDescendantsOfKind(SyntaxKind.EnumDeclaration)) {
+      declaration.setIsConstEnum(false);
+    }
+    const contents = outputSource.getFullText();
+    const withBanner = contents.startsWith(COPY_BANNER_MARKER)
+      ? contents
+      : `${GENERATED_BANNER}\n${contents}`;
     fs.writeFileSync(destPath, withBanner);
   }
 }

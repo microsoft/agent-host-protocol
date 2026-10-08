@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Public enum declarations now support TypeScript consumers using `isolatedModules` or `verbatimModuleSyntax` without changing runtime enum values.",
+  "targets": ["typescript"]
+}
