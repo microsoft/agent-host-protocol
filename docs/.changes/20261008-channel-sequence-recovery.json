@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Windowed reconnect uses per-channel applied action checkpoints and fresh connection-local credit instead of retaining delivery byte progress."
+}

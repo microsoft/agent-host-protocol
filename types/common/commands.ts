@@ -11,7 +11,6 @@ import type {
   URI,
   Snapshot,
   ChannelReceiveLimits,
-  ChannelReceiveProgress,
   ChannelFlowControl,
   ResumedChannelSubscription,
 } from './state.js';
@@ -26,6 +25,7 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
+import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -303,6 +303,13 @@ export interface InitializeResult {
    * @see {@link /guide/automations | Automations Guide}
    */
   automations?: AutomationCapabilities;
+  /**
+   * Presence advertises support for the createTcpConnection command. Consumers
+   * may call it to create a private TCP channel on the host's network, then use
+   * ordinary subscribe to negotiate shared flow control for that channel.
+   * @stability 1.0
+   */
+  tcpConnections?: TcpConnectionsCapability;
 }
 
 /**
@@ -446,23 +453,25 @@ export interface ReconnectParams extends BaseParams {
   /**
    * Resume information for windowed subscriptions also named in subscriptions.
    * These channels recover independently and MUST NOT appear in inline legacy
-   * actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+   * actions/snapshots. Delivery queues and credit counters restart on the new
+   * transport; channel state recovers from action checkpoints or snapshots.
    * @stability 1.0
    */
   windows?: ChannelDeliveryResumeOptions;
 }
 
 /**
- * Retained receive obligations and a separate per-channel recovery checkpoint.
+ * Per-channel action recovery checkpoint, independent of connection-local credit.
  * @category Commands
  * @stability 1.0
  */
 export interface ChannelDeliveryResumeParams {
   channel: URI;
-  clientReceive: ChannelReceiveProgress;
   /**
-   * Last action safely applied or retained for this channel, not merely parsed.
-   * Required for replay recovery; omitted for live-only channels.
+   * Last serverSeq safely applied to this channel's retained state, not merely
+   * received, parsed, or queued. Replay starts after this checkpoint; discard
+   * partial frames and unapplied delivery messages before reconnecting.
+   * Required for action replay. Omit for snapshot or live-edge recovery.
    * @integer
    * @minimum 0
    * @maximum 9007199254740991
@@ -479,10 +488,9 @@ export interface ChannelDeliveryResumeOptions {
 }
 
 /**
- * Retained windowed subscriptions; omitted requested channels are unavailable.
- * Unread accepted messages remain charged across reconnect; both directions
- * reconcile lost release updates against the same retained journal. Unverified
- * positions or lost accounting MUST fail, never grant a fresh window.
+ * Resumed windowed subscriptions; omitted requested channels are unavailable.
+ * Each returned subscription starts with fresh connection-local credit counters
+ * after old delivery queues are discarded. No byte progress survives reconnect.
  * @category Commands
  * @stability 1.0
  */

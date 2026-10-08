@@ -47,6 +47,16 @@ test('stability supports every documented level without interpreting it as a ver
   }
 });
 
+test('declaration documentation does not pick up a leading module summary', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const iface = project.createSourceFile('module.ts', `
+/** File summary. @module fixture */
+/** Capability description. @stability 1.0 */
+export interface Capability {}
+`).getInterfaceOrThrow('Capability');
+  assert.equal(getDocumentation(iface), `Capability description.\n\n${marker}`);
+});
+
 test('invalid, missing, and repeated stability values fail explicitly', () => {
   for (const annotation of ['@stability', '@stability 1.3', '@stability 1.0.0', '@stability 1.0\n * @stability 2']) {
     assert.throws(() => readStability(fixture(annotation)), /expected one @stability annotation/);
@@ -87,6 +97,8 @@ test('API docs show stability on entrypoint fields and notification methods only
     }
     assert.ok(!common.includes('### `subscribe`\n\n<StabilityIndex'));
     assert.ok(!common.includes('### `reconnect`\n\n<StabilityIndex'));
+    const tcp = readFileSync(join(out, 'tcp.md'), 'utf8');
+    assert.ok(tcp.includes('## `createTcpConnection`\n\n<StabilityIndex level="1.0" />'));
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -101,7 +113,14 @@ test('native client docs preserve declaration and entrypoint stability', () => {
     ['clients/dotnet/src/AgentHostProtocol.Abstractions/Generated', 'Commands.generated.cs', 'Notifications.generated.cs'],
   ];
   for (const [directory, commands, notifications] of clients) {
-    for (const [file, expected] of [[commands, 9], [notifications, 5]] as const) {
+    const state = commands.replace(/commands/i, match => match === 'commands' ? 'state' : 'State');
+    for (const file of [commands, state]) {
+      const content = readFileSync(resolve(root, directory, file), 'utf8');
+      assert.equal(content.includes('ChannelReceiveProgress'), false, `${directory}/${file}`);
+      assert.equal(content.includes('acceptedBytes'), false, `${directory}/${file}`);
+      assert.equal(content.includes('accepted_bytes'), false, `${directory}/${file}`);
+    }
+    for (const [file, expected] of [[commands, 11], [notifications, 7]] as const) {
       const content = readFileSync(resolve(root, directory, file), 'utf8');
       assert.equal(content.split(marker).length - 1, expected, `${directory}/${file}`);
     }

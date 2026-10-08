@@ -29,7 +29,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
-import { getDocumentation, readStability } from './read-stability.js';
+import { getDescription, getDocumentation, readStability } from './read-stability.js';
 
 const GENERATED_HEADER = '<!-- Generated from types/*.ts — do not edit -->\n\n';
 
@@ -76,6 +76,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-otlp': 'otlp',
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
+  'channels-tcp': 'tcp',
 };
 
 /**
@@ -184,9 +185,7 @@ function renderHeading(name: string, node: DocNode, level = 3): string {
 }
 
 function getJsDocDescription(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration): string {
-  const jsDocs = node.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDescription(node);
 }
 
 function getJsDocTag(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration, tagName: string): string | undefined {
@@ -675,7 +674,7 @@ function emitCommandBlock(project: Project, entry: RegistryEntry, paramsIface: I
   const direction = getJsDocTag(paramsIface, 'direction') || 'Client → Server';
   const messageType = getJsDocTag(paramsIface, 'messageType') || 'Request';
 
-  lines.push(`## \`${entry.method}\`\n`);
+  lines.push(renderHeading(entry.method, paramsIface, 2));
   if (desc) lines.push(desc + '\n');
   lines.push('| Property | Value |');
   lines.push('|---|---|');
@@ -1170,6 +1169,30 @@ function generateOtlpChannelPage(project: Project): string {
 }
 
 
+function generateTcpChannelPage(project: Project): string {
+  currentPage = 'tcp';
+  const stateSf = findChannelSourceFile(project, 'channels-tcp', 'state.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-tcp', 'commands.ts');
+  const notificationsSf = findChannelSourceFile(project, 'channels-tcp', 'notifications.ts');
+  const lines: string[] = [GENERATED_HEADER, '# TCP Channel\n', stabilityIndex(stateSf)];
+  lines.push('Private, client-owned forwarding on the host network, using shared subscription flow control. This channel has no reduced resource state. See the [TCP specification](/specification/tcp-channel).\n');
+  if (stateSf) {
+    lines.push('## Capability Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Creation\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  if (notificationsSf) {
+    lines.push('## Notifications\n');
+    lines.push(schemaLink('notifications.schema.json'));
+    lines.push(emitNotificationsSection(project, [notificationsSf]));
+  }
+  return lines.join('\n');
+}
+
 // ─── Error Codes Page ────────────────────────────────────────────────────────
 
 function generateErrorCodesPage(project: Project): string {
@@ -1446,6 +1469,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },
     { filename: 'resource-watch.md', generator: generateResourceWatchChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
+    { filename: 'tcp.md', generator: generateTcpChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
     { filename: 'mcp.md', generator: generateMcpChannelPage },

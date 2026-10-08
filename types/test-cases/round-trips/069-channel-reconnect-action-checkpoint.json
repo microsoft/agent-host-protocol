@@ -1,0 +1,32 @@
+{
+  "name": "channel-reconnect-action-checkpoint",
+  "group": "A",
+  "description": "Windowed channels resume from independent applied serverSeq checkpoints, not the connection-wide cursor or byte counters.",
+  "type": "ReconnectParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "lastSeenServerSeq": 20,
+    "subscriptions": ["ahp-chat:/c1", "ahp-terminal:/t1"],
+    "windows": { "items": [{
+      "channel": "ahp-chat:/c1",
+      "lastAppliedServerSeq": 10
+    }, {
+      "channel": "ahp-terminal:/t1",
+      "lastAppliedServerSeq": 4
+    }] }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "lastSeenServerSeq": 20,
+    "subscriptions": ["ahp-chat:/c1", "ahp-terminal:/t1"],
+    "windows": { "items": [{
+      "channel": "ahp-chat:/c1",
+      "lastAppliedServerSeq": 10
+    }, {
+      "channel": "ahp-terminal:/t1",
+      "lastAppliedServerSeq": 4
+    }] }
+  }]
+}

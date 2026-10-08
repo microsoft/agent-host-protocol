@@ -60,35 +60,10 @@ export interface ChannelReceiveLimits {
 }
 
 /**
- * Accepted/released obligations of the same retained bounded consumer.
- * 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
- * UTF-16 bytes through complete-data-message boundaries, never partial fragments.
- * Boundary bookkeeping is local; no second message sequence is needed.
- * @category Common Types
- * @stability 1.0
- */
-export interface ChannelReceiveProgress {
-  /**
-   * Complete logical data messages safely retained by the bounded consumer.
-   * @integer
-   * @minimum 0
-   * @maximum 9007199254740991
-   */
-  acceptedBytes: number;
-  /**
-   * Messages whose allocations the consumer released. Rejected actions release
-   * allocations too; release does not acknowledge application success.
-   * @integer
-   * @minimum 0
-   * @maximum 9007199254740991
-   */
-  consumedBytes: number;
-}
-
-/**
- * Accepted receive limits for both directions of a subscription. Initial
- * accounting starts at zero. The existing logical client and channel identify
- * the subscription; transport generations are fenced locally, not on the wire.
+ * Accepted receive limits for both directions of a subscription. Accounting
+ * starts at zero on subscription and reconnect, after old delivery queues are
+ * discarded. The existing logical client and channel identify the subscription;
+ * transport generations are fenced locally, not on the wire.
  * @category Common Types
  * @stability 1.0
  */
@@ -110,7 +85,7 @@ export const enum ChannelRecoveryKind {
 }
 
 /**
- * One subscription retained after reconnect. Omission from the returned list
+ * One subscription resumed after reconnect. Omission from the returned list
  * means unavailable, regardless of cause. All such failures share the same
  * consumer behavior: dispose the old subscription, not continue a broken stream.
  * @category Common Types
@@ -118,10 +93,9 @@ export const enum ChannelRecoveryKind {
  */
 export interface ResumedChannelSubscription {
   channel: URI;
+  /** Receive limits for new connection-local windows; all credit counters start at zero. */
   flowControl: ChannelFlowControl;
-  clientReceive: ChannelReceiveProgress;
-  hostReceive: ChannelReceiveProgress;
-  /** Replay retains the same consumer; live recovery resumes at the live edge. */
+  /** Replay retains applied resource state, not old delivery buffers; live resumes at the live edge. */
   recovery: ChannelRecoveryKind;
 }
 

@@ -192,17 +192,15 @@ describe('generated JSON schemas', () => {
       it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
         if (file !== 'notifications.schema.json') return;
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        for (const name of ['ChannelReceiveLimits', 'ChannelReceiveProgress']) {
-          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
-          for (const property of Object.values(properties)) {
-            assert.equal(property.type, 'integer');
-            assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
-            assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
-            assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
-            assert.equal(schemaAccepts(schema, property, 1.5), false);
-            assert.equal(schemaAccepts(schema, property, -1), false);
-            assert.equal(schemaAccepts(schema, property, 0), name === 'ChannelReceiveProgress');
-          }
+        const properties = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
+        for (const property of Object.values(properties)) {
+          assert.equal(property.type, 'integer');
+          assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
+          assert.equal(schemaAccepts(schema, property, 1.5), false);
+          assert.equal(schemaAccepts(schema, property, -1), false);
+          assert.equal(schemaAccepts(schema, property, 0), false);
         }
         const frame = defs.ChannelFrameParams.properties as Record<string, Record<string, unknown>>;
         assert.equal(frame.data.minLength, 1);
@@ -216,6 +214,50 @@ describe('generated JSON schemas', () => {
         assert.equal(schemaAccepts(schema, credit.consumedBytes, 0), true);
         assert.equal(schemaAccepts(schema, credit.consumedBytes, 1.5), false);
         assert.equal(schemaAccepts(schema, credit.consumedBytes, Number.MAX_SAFE_INTEGER + 1), false);
+      });
+
+      it('recovers windowed channels by action checkpoint without byte-progress fields', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        assert.equal('ChannelReceiveProgress' in defs, false);
+        if (file !== 'commands.schema.json') return;
+        const resume = defs.ChannelDeliveryResumeParams;
+        const properties = resume.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual(Object.keys(properties).sort(), ['channel', 'lastAppliedServerSeq']);
+        assert.deepEqual(resume.required, ['channel']);
+        for (const checkpoint of [0, 42, Number.MAX_SAFE_INTEGER]) {
+          assert.equal(schemaAccepts(schema, properties.lastAppliedServerSeq, checkpoint), true);
+        }
+        for (const checkpoint of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+          assert.equal(schemaAccepts(schema, properties.lastAppliedServerSeq, checkpoint), false);
+        }
+        const result = defs.ResumedChannelSubscription;
+        assert.deepEqual(Object.keys(result.properties as Record<string, unknown>).sort(), ['channel', 'flowControl', 'recovery']);
+        assert.deepEqual((result.required as string[]).slice().sort(), ['channel', 'flowControl', 'recovery']);
+      });
+
+      it('keeps TCP payloads minimal and validates the creation target port', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        if (file === 'notifications.schema.json') {
+          const data = defs.TcpDataParams.properties as Record<string, Record<string, unknown>>;
+          const eof = defs.TcpEofParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(data).sort(), ['channel', 'data']);
+          assert.deepEqual(Object.keys(eof), ['channel']);
+          assert.equal(data.data.minLength, 1);
+        }
+        if (file === 'commands.schema.json') {
+          const creation = defs.CreateTcpConnectionParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(creation).sort(), ['_meta', 'channel', 'host', 'port']);
+          const subscribe = defs.SubscribeParams.properties as Record<string, Record<string, unknown>>;
+          const result = defs.SubscribeResult.properties as Record<string, Record<string, unknown>>;
+          assert.equal('create' in subscribe, false);
+          assert.equal('resource' in result, false);
+          for (const port of [1, 65535]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), true);
+          }
+          for (const port of [0, 65536, 1.5]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), false);
+          }
+        }
       });
 
       it('preserves automation schedule restrictions', () => {

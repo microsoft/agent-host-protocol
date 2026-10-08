@@ -29,7 +29,7 @@
     },
     "ChannelFrameParams": {
       "type": "object",
-      "description": "Fragment of a serialized typed channel notification. Reassemble before typed\ndecoding or reducer application; data is a string, not another base64 layer.\nDo not split surrogate pairs. One active data message per direction/subscription;\nfairly interleave bounded frames across subscriptions and reserve UTF-16 bytes\nbefore enqueueing. The ordered transport supplies fragment ordering.\n\nDiscard incomplete messages on disconnect. Reconcile acceptedBytes, then retry\nwhole unaccepted messages from the retained queue without charging twice.\nInner and outer channel URIs MUST match. Delivery controls MUST NOT be framed\nrecursively; payload-bearing action echoes MUST use the bounded data path.\n\nStability: 1.0 - Early development.",
+      "description": "Fragment of a serialized typed channel notification. Reassemble before typed\ndecoding or reducer application; data is a string, not another base64 layer.\nDo not split surrogate pairs. One active data message per direction/subscription;\nfairly interleave bounded frames across subscriptions and reserve UTF-16 bytes\nbefore enqueueing. The ordered transport supplies fragment ordering.\n\nOn resumable subscriptions, discard incomplete frames and unapplied delivery\nmessages on disconnect. Replay whole actions after the last applied serverSeq\nthrough new connection-local windows. Non-resumable subscriptions terminate.\nInner and outer channel URIs MUST match. Delivery controls MUST NOT be framed\nrecursively; payload-bearing action echoes MUST use the bounded data path.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
@@ -51,7 +51,7 @@
     },
     "ChannelCreditParams": {
       "type": "object",
-      "description": "Receiver's cumulative UTF-16 release boundary for the outgoing direction.\nDuplicate/older positions are harmless. A boundary beyond sent data, within\na message, or inconsistent with the journal MUST fail explicitly.\n\nReturn credit after bounded consumption, not JSON parsing or action echo.\nTCP returns it after downstream buffer release. Shared release receipts can\nimplement drain() without TCP-specific consumed-credit actions.\n\nStability: 1.0 - Early development.",
+      "description": "Receiver's cumulative UTF-16 release boundary for the sender's outgoing direction\non this transport. Counters start at zero on subscription and reconnect.\nDuplicate/older positions are harmless. A boundary beyond sent data, within\na message, or inconsistent with local sent-message boundaries MUST fail explicitly.\n\nReturn credit after bounded consumption, not JSON parsing or action echo.\nForwarding endpoints release AHP message allocations through the same bounded\nconsumer contract and backpressure their underlying sockets independently.\nCredit from old transports or subscription callbacks MUST NOT release capacity\nin a new window; implementations fence it using local generations.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
@@ -323,6 +323,36 @@
         "payload"
       ]
     },
+    "TcpDataParams": {
+      "type": "object",
+      "description": "Bytes in the sender's direction: client to destination, or destination to\nclient.\nTransport failure terminates the stream; TCP messages are not replayed.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "data": {
+          "type": "string",
+          "description": "Nonempty canonical padded RFC 4648 base64, without whitespace.",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "channel",
+        "data"
+      ]
+    },
+    "TcpEofParams": {
+      "type": "object",
+      "description": "Ends the sender's logical direction after its preceding data. The opposite\ndirection can continue.   Local bridges decide when queued bytes have drained\nand how to end their sink. Sending more data after EOF is a protocol error\nand resets the channel.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
     "ProtocolNotification": {
       "description": "Discriminated union of all protocol notifications.",
       "oneOf": [
@@ -364,6 +394,12 @@
         },
         {
           "$ref": "#/$defs/OtlpExportMetricsParams"
+        },
+        {
+          "$ref": "#/$defs/TcpDataParams"
+        },
+        {
+          "$ref": "#/$defs/TcpEofParams"
         }
       ]
     },
@@ -396,31 +432,9 @@
         "maximumMessageBytes"
       ]
     },
-    "ChannelReceiveProgress": {
-      "type": "object",
-      "description": "Accepted/released obligations of the same retained bounded consumer.\n0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count\nUTF-16 bytes through complete-data-message boundaries, never partial fragments.\nBoundary bookkeeping is local; no second message sequence is needed.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "acceptedBytes": {
-          "type": "integer",
-          "description": "Complete logical data messages safely retained by the bounded consumer.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "consumedBytes": {
-          "type": "integer",
-          "description": "Messages whose allocations the consumer released. Rejected actions release\nallocations too; release does not acknowledge application success.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": [
-        "acceptedBytes",
-        "consumedBytes"
-      ]
-    },
     "ChannelFlowControl": {
       "type": "object",
-      "description": "Accepted receive limits for both directions of a subscription. Initial\naccounting starts at zero. The existing logical client and channel identify\nthe subscription; transport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
+      "description": "Accepted receive limits for both directions of a subscription. Accounting\nstarts at zero on subscription and reconnect, after old delivery queues are\ndiscarded. The existing logical client and channel identify the subscription;\ntransport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
       "properties": {
         "clientReceive": {
           "$ref": "#/$defs/ChannelReceiveLimits"
@@ -436,30 +450,23 @@
     },
     "ResumedChannelSubscription": {
       "type": "object",
-      "description": "One subscription retained after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
+      "description": "One subscription resumed after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
         },
         "flowControl": {
-          "$ref": "#/$defs/ChannelFlowControl"
-        },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
-        },
-        "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "Receive limits for new connection-local windows; all credit counters start at zero."
         },
         "recovery": {
           "$ref": "#/$defs/ChannelRecoveryKind",
-          "description": "Replay retains the same consumer; live recovery resumes at the live edge."
+          "description": "Replay retains applied resource state, not old delivery buffers; live resumes at the live edge."
         }
       },
       "required": [
         "channel",
         "flowControl",
-        "clientReceive",
-        "hostReceive",
         "recovery"
       ]
     },
@@ -6353,6 +6360,11 @@
         "lifecycle",
         "sessions"
       ]
+    },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Presence enables createTcpConnection followed by ordinary windowed subscribe.\nTCP channels use shared subscription flow control, not reduced resource state.\nBase64 is the fixed payload encoding; socket buffering and destination policy\nare local implementation concerns.\nConnections end when their creating AHP transport disconnects; this revision\ndoes not support resuming TCP channels through reconnect.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "URI": {
       "type": "string",

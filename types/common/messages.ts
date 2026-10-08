@@ -102,6 +102,8 @@ import type {
   OtlpExportMetricsParams,
 } from '../channels-otlp/notifications.js';
 import type { AhpError } from './errors.js';
+import type { TcpDataParams, TcpEofParams } from '../channels-tcp/notifications.js';
+import type { CreateTcpConnectionParams } from '../channels-tcp/commands.js';
 
 // ─── JSON-RPC Base Types ─────────────────────────────────────────────────────
 
@@ -171,6 +173,7 @@ export interface CommandMap {
   'createSession': { params: CreateSessionParams; result: null };
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
+  'createTcpConnection': { params: CreateTcpConnectionParams; result: null };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
@@ -241,6 +244,8 @@ export interface ClientNotificationMap {
   'channel/frame': { params: ChannelFrameParams };
   'channel/credit': { params: ChannelCreditParams };
   'channel/reset': { params: ChannelResetParams };
+  'tcp/data': { params: TcpDataParams };
+  'tcp/eof': { params: TcpEofParams };
 }
 
 /**
@@ -266,6 +271,8 @@ export interface ServerNotificationMap {
   'channel/ready': { params: ChannelReadyParams };
   'channel/reset': { params: ChannelResetParams };
   'channel/snapshot': { params: ChannelSnapshotParams };
+  'tcp/data': { params: TcpDataParams };
+  'tcp/eof': { params: TcpEofParams };
 }
 
 // ─── Typed Requests ──────────────────────────────────────────────────────────

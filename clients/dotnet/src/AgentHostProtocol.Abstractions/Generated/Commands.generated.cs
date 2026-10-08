@@ -272,6 +272,36 @@ public enum ResourceWriteMode
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// <summary>Creates one outbound connection on the host's network, without subscribing.
+/// The channel is the client-chosen TCP URI. The client then uses ordinary
+/// subscribe to negotiate shared flow control. The host MUST NOT deliver AHP
+/// data before that subscription and MUST bound pre-subscription buffering and
+/// the lifetime of abandoned connections. Transport loss closes the connection;
+/// resuming it through reconnect is not supported.
+///
+/// Requires InitializeResult.tcpConnections. Hosts advertising support MUST reject
+/// malformed targets and return AlreadyExists when the connection URI is already
+/// allocated. Repeating creation MUST NOT replace an existing socket.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateTcpConnectionParams
+{
+    /// <summary>Client-chosen private connection URI, e.g. ahp-tcp:/&lt;uuid&gt;.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>DNS name or IP literal, resolved on the host's network. Not a URL.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>Destination port.</summary>
+    public long Port { get; init; }
+}
+
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
 public sealed record InitializeParams
@@ -396,6 +426,14 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Presence advertises support for the createTcpConnection command. Consumers
+    /// may call it to create a private TCP channel on the host's network, then use
+    /// ordinary subscribe to negotiate shared flow control for that channel.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpConnectionsCapability? TcpConnections { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -548,24 +586,25 @@ public sealed record ReconnectParams
 
     /// <summary>Resume information for windowed subscriptions also named in subscriptions.
     /// These channels recover independently and MUST NOT appear in inline legacy
-    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    /// actions/snapshots. Delivery queues and credit counters restart on the new
+    /// transport; channel state recovers from action checkpoints or snapshots.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChannelDeliveryResumeOptions? Windows { get; init; }
 }
 
-/// <summary>Retained receive obligations and a separate per-channel recovery checkpoint.
+/// <summary>Per-channel action recovery checkpoint, independent of connection-local credit.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelDeliveryResumeParams
 {
     public required string Channel { get; init; }
 
-    public required ChannelReceiveProgress ClientReceive { get; init; }
-
-    /// <summary>Last action safely applied or retained for this channel, not merely parsed.
-    /// Required for replay recovery; omitted for live-only channels.</summary>
+    /// <summary>Last serverSeq safely applied to this channel's retained state, not merely
+    /// received, parsed, or queued. Replay starts after this checkpoint; discard
+    /// partial frames and unapplied delivery messages before reconnecting.
+    /// Required for action replay. Omit for snapshot or live-edge recovery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? LastAppliedServerSeq { get; init; }
 }
@@ -576,10 +615,9 @@ public sealed record ChannelDeliveryResumeOptions
     public required List<ChannelDeliveryResumeParams> Items { get; init; }
 }
 
-/// <summary>Retained windowed subscriptions; omitted requested channels are unavailable.
-/// Unread accepted messages remain charged across reconnect; both directions
-/// reconcile lost release updates against the same retained journal. Unverified
-/// positions or lost accounting MUST fail, never grant a fresh window.
+/// <summary>Resumed windowed subscriptions; omitted requested channels are unavailable.
+/// Each returned subscription starts with fresh connection-local credit counters
+/// after old delivery queues are discarded. No byte progress survives reconnect.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelDeliveryResumeResult

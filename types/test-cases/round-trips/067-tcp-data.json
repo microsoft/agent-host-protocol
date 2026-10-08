@@ -1,0 +1,8 @@
+{
+  "name": "tcp-data",
+  "group": "A",
+  "description": "Either direction sends only the channel and base64 data, without TCP offsets or credit counters.",
+  "type": "TcpDataParams",
+  "input": { "channel": "ahp-tcp:/t1", "data": "AAECAw==" },
+  "acceptableOutputs": [{ "channel": "ahp-tcp:/t1", "data": "AAECAw==" }]
+}

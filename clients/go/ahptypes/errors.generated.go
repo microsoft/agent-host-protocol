@@ -36,6 +36,8 @@ const (
 	ErrorCodeNotFound         int32 = -32008
 	ErrorCodePermissionDenied int32 = -32009
 	ErrorCodeAlreadyExists    int32 = -32010
+	// ErrorCodeTcpConnectionOpenFailed indicates failure to establish a forwarding connection.
+	ErrorCodeTcpConnectionOpenFailed int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.

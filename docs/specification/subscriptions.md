@@ -30,6 +30,7 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests, changeset catalogue). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental per-canvas live presentation state. Subscribe to the resource advertised in `ChatState.canvases`; the id is host-defined. See [Canvas Channel](/reference/canvas). |
 | `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |
+| `ahp-tcp:/<id>` | _stateless, non-resumable_ | Experimental client-owned forwarding stream created by `createTcpConnection`, then subscribed normally. See [TCP Forwarding](./tcp-channel.md). |
 | `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `Changeset.uriTemplate` advertised on a session or chat; the id is server-defined. |
 | `ahp-otlp:` _(authority/path host-defined)_ | _stateless_ | OpenTelemetry signal channels (logs, traces, metrics). Concrete URIs are advertised on `InitializeResult.telemetry`; clients MUST treat them as opaque. See [Telemetry Channel](/specification/telemetry-channel). |
 | `ahp-resource-watch:/<id>` | `ResourceWatchState` | Per-watch channel returned by `createResourceWatch`. Delivers `resourceWatch/changed` actions for file/directory changes under the watched URI. The id is receiver-assigned. |
@@ -229,7 +230,7 @@ across reconnection — clients re-subscribe and resume from the live edge.
 This optional contract separates delivery backpressure from reduced channel
 state. It does not change ordinary subscriptions. Negotiation happens on
 `subscribe` itself, without an initialize capability. Generated wire models alone
-do not implement window negotiation, scheduling, or retained delivery queues.
+do not implement window negotiation, scheduling, or connection-local delivery queues.
 
 ### Negotiation and bootstrap
 
@@ -355,7 +356,7 @@ sequenceDiagram
 ```
 
 Duplicate/older credit is harmless. Positions beyond sent data, inside a message,
-or inconsistent with retained queue boundaries are protocol errors. The sender
+or inconsistent with connection-local sent-message boundaries are protocol errors. The sender
 already knows its encoded message lengths; it can recognize boundaries from the
 cumulative byte count without a parallel message sequence. Credit
 counts delivery payload, not TCP decoded-byte offsets.
@@ -369,18 +370,41 @@ A hard limit violation
 MUST fail explicitly, never silently truncate, drop fragments, or continue a
 loss-sensitive stream.
 
-### Reconnect and retained obligations
+### Reconnect from action checkpoints
 
-`reconnect.windows.items` supplies each windowed channel's
-retained `clientReceive` progress and, for replay recovery, its
-`lastAppliedServerSeq`. Every item MUST identify a URI also listed in
-`subscriptions`; entries MUST be unique. The action checkpoint is per-channel
-and means safely applied or retained for the same consumer, not merely parsed.
+Flow control is connection-local; resource recovery still uses existing action
+sequence numbers and snapshots. Consumers do not need to retain byte positions
+across transports.
+
+`reconnect.windows.items` identifies each requested windowed channel and its
+optional `lastAppliedServerSeq`. Every item MUST identify a URI also listed in
+`subscriptions`; entries MUST be unique. Action replay requires the last
+`serverSeq` **safely applied to that channel's retained state**, not merely
+received, parsed, or queued. Advance the checkpoint together with successful
+application so reconnect never treats an unapplied action as complete.
+Omit it for snapshot or live-edge recovery. Non-resumable channels such as
+TCP forwarding MUST NOT be requested here.
+
+```json
+{
+  "windows": {
+    "items": [
+      { "channel": "ahp-chat:/c1", "lastAppliedServerSeq": 42 },
+      { "channel": "ahp-otlp:/logs" }
+    ]
+  }
+}
+```
+
+The per-channel checkpoint lets one channel resume independently of another
+channel that has made more progress. The connection-wide `lastSeenServerSeq`
+continues to govern ordinary subscriptions, not these windowed channels.
 
 The server MUST omit `windows` from either reconnect result variant unless the
 client supplied `ReconnectParams.windows`. When supplied, returned `windows.items`
 MUST contain only channels requested in `ReconnectParams.windows.items`.
-Both result variants use this list to return the retained channels.
+Both result variants use this list to return the resumed channels and their
+receive limits for fresh connection-local windows.
 A requested channel absent from this list is no
 longer available: dispose its old subscription and, for streams, abort the old
 stream. There are no distinct consumer recovery paths for permission changes,
@@ -390,8 +414,18 @@ requests and transport/RPC failures still surface as errors.
 Legacy inline actions/snapshots MUST exclude windowed channels. Each resumed
 subscription selects its
 own recovery, independent of legacy snapshot fallback or another channel's
-progress. `recovery` belongs **only to reconnect**: `snapshot` replaces state,
-`replay` retains the same consumer, and `live` resumes at the live edge.
+progress. `recovery` belongs **only to reconnect**:
+
+- `replay` sends whole action envelopes after the channel's applied checkpoint,
+  retaining the state those earlier actions produced.
+- `snapshot` replaces reduced state when replay is not available or no checkpoint
+  was supplied.
+- `live` resumes notification-only channels at the live edge, without replaying
+  missed notifications.
+
+This revision does not define reconnect replay for arbitrary notification-only
+streams. A channel that cannot use snapshots, action replay, or live-edge recovery
+is unavailable. TCP forwarding terminates instead of restoring a byte stream.
 
 The existing authenticated logical client and channel URI identify the retained
 subscription. A channel has at most one subscription per logical client.
@@ -399,60 +433,56 @@ Reconnect MUST invalidate the old transport before activating the new one;
 both peers MUST fence stale asynchronous producers and consumer callbacks using
 their local connection/subscription generations. No wire-level subscription ID
 or resume token is necessary under this single-active-transport contract.
-An explicit unsubscribe ends the subscription. Before subscribing again, discard
-the old consumer's allocations and invalidate its credit-producing callbacks.
+Before new delivery starts, both peers MUST discard old fragment assemblies and
+unapplied delivery messages, release their allocations, and reset local
+sent/consumed byte counters to zero. The returned receive limits define fresh
+windows. Old credit notifications, pending transport writes, and asynchronous
+consumer callbacks MUST NOT advance state or release capacity in the new
+generation. Quiesce or fence in-progress application before taking the checkpoint.
 
-Retain accepted boundaries, consumed boundaries, and unread allocations.
-`acceptedBytes` tracks complete data messages safely retained by the consumer;
-`consumedBytes` tracks the prefix whose allocations it released:
+Already-applied resource state is retained for replay; it is not an old delivery
+queue. Application-owned unread stream buffers cannot be carried over while
+granting a fresh window. Consumers unable to discard those allocations cannot
+resume through this contract.
 
-```text
-0 <= consumedBytes <= acceptedBytes
-unreadBytes = acceptedBytes - consumedBytes
-```
-
-These two counters measure **receipt versus release**, not two encodings or two
-sequences. The receiver knows receipt; only the downstream consumer knows release.
-Reconcile both directions against retained sender/receiver records, including
-release updates lost before disconnect. A retained unread message remains
-charged: reconnect MUST NOT grant a fresh window over it.
+Lost consumption updates from the previous transport require no reconciliation:
+old allocations and old credit are both gone. An explicit unsubscribe follows
+the same queue cleanup and generation-fencing rules.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant H as Host
-    Note over C,H: Channel A has unread data and channel B cannot be retained
-    C->>H: reconnect (A and B, retained progress per channel)
-    Note over H: Reconcile acceptedBytes and consumedBytes
+    Note over C,H: Action 42 applied, action 43 only partially received
+    Note over C,H: Discard old delivery queues and fence old callbacks
+    C->>H: reconnect (A at serverSeq 42, plus B)
     H->>C: windows.items contains A only
-    Note over C: A keeps its unread-buffer debt, dispose B
-    H->>C: Retry only unaccepted complete data for A
+    Note over C,H: Fresh windows and byte counters start at zero
+    Note over C: Retain A's applied state, dispose B
+    H->>C: Replay the whole action 43 through frames for A
     H->>C: channel/ready for A
 ```
 
-Discard incomplete fragments and retry only whole unaccepted data messages,
-starting at the reconciled receiver `acceptedBytes` boundary. Roll partial-send
-reservations back to that complete-message boundary; previously accepted data
-is not resent or charged again. Sender queues retain the original serialized
-message lengths needed to recognize these boundaries.
-Release updates remain valid at retained boundaries even if notification delivery
-was lost. Repeated reconnect attempts, including after a lost reconnect reply,
-reconcile the same retained subscription. Replay preserves its negotiated limits
-and cumulative positions. Lost accounting or an unverifiable checkpoint makes
-the subscription unavailable, rather than resetting its counters over retained
-data. Snapshot/live recovery may discard old allocations but MUST reconcile their
-release and keep cumulative accounting consistent; neither policy authorizes
-silently restoring a byte stream.
+Retransmitting a partially delivered logical message is harmless: no typed
+message was delivered or action applied from those fragments. A complete but
+unapplied message is also discarded and recovered from the action checkpoint.
+Already-applied actions MUST NOT be applied again. Repeated reconnect attempts,
+including after a lost reply, use the latest safely applied checkpoint and
+fresh transport-local windows each time.
 
-An explicit `channel/reset` aborts the subscription and its retained stream.
-Retained queues and reconnect grace MUST be bounded. Process restart or lost local
-buffers cannot recover a replay-only byte stream; application retry establishes
-a new stream rather than replaying old requests into a replacement socket.
+Client-originated actions keep the existing `clientSeq` and acknowledgment
+reconciliation rules. Discarding transport frames does not erase the client's
+write-ahead action record; resolve accepted/rejected actions before retrying
+pending actions with their original sequences. Hosts MUST suppress repeated
+side effects rather than blindly executing a replayed input.
+
+An explicit `channel/reset` aborts the subscription. Action replay storage and
+reconnect grace remain bounded, independently of live byte-credit bookkeeping.
 
 ### Scope
 
-Windows do not prescribe a channel's loss policy: TCP requires lossless
-continuation or explicit failure, terminals may recover from snapshots, and
+Windows do not prescribe a channel's loss policy: TCP forwarding terminates
+on transport loss in this revision, terminals may recover from snapshots, and
 telemetry can remain live-only. Arbitrary large unrelated RPC results and
 `initialize` snapshots still require separate limits or chunking. Windowed
 subscriptions alone are not connection-wide memory protection.

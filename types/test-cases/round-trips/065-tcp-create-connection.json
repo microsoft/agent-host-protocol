@@ -1,0 +1,16 @@
+{
+  "name": "tcp-create-connection",
+  "group": "A",
+  "description": "TCP creation targets its client-chosen channel directly, without session association or subscription options.",
+  "type": "CreateTcpConnectionParams",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "host": "localhost",
+    "port": 3000
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-tcp:/t1",
+    "host": "localhost",
+    "port": 3000
+  }]
+}

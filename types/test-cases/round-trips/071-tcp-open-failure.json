@@ -1,0 +1,16 @@
+{
+  "name": "tcp-open-failure",
+  "group": "A",
+  "description": "Expected TCP creation failure uses one RPC error code without per-cause recovery variants.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 12,
+    "error": { "code": -32012, "message": "Could not establish the forwarding connection" }
+  },
+  "acceptableOutputs": [{
+    "jsonrpc": "2.0",
+    "id": 12,
+    "error": { "code": -32012, "message": "Could not establish the forwarding connection" }
+  }]
+}

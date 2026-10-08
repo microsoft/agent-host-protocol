@@ -17,10 +17,9 @@ use crate::actions::{ActionEnvelope, StateAction};
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
     AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
-    ChannelReceiveProgress, ContentRef, Message, MessageAttachment, ModelSelection,
-    ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary,
-    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
-    Turn,
+    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
+    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
+    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -225,6 +224,33 @@ pub enum ResourceWriteMode {
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// Creates one outbound connection on the host's network, without subscribing.
+/// The channel is the client-chosen TCP URI. The client then uses ordinary
+/// subscribe to negotiate shared flow control. The host MUST NOT deliver AHP
+/// data before that subscription and MUST bound pre-subscription buffering and
+/// the lifetime of abandoned connections. Transport loss closes the connection;
+/// resuming it through reconnect is not supported.
+///
+/// Requires InitializeResult.tcpConnections. Hosts advertising support MUST reject
+/// malformed targets and return AlreadyExists when the connection URI is already
+/// allocated. Repeating creation MUST NOT replace an existing socket.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTcpConnectionParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// DNS name or IP literal, resolved on the host's network. Not a URL.
+    pub host: String,
+    /// Destination port.
+    pub port: i64,
+}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -334,6 +360,13 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Presence advertises support for the createTcpConnection command. Consumers
+    /// may call it to create a private TCP channel on the host's network, then use
+    /// ordinary subscribe to negotiate shared flow control for that channel.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tcp_connections: Option<TcpConnectionsCapability>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -480,23 +513,25 @@ pub struct ReconnectParams {
     pub subscriptions: Vec<Uri>,
     /// Resume information for windowed subscriptions also named in subscriptions.
     /// These channels recover independently and MUST NOT appear in inline legacy
-    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    /// actions/snapshots. Delivery queues and credit counters restart on the new
+    /// transport; channel state recovers from action checkpoints or snapshots.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub windows: Option<ChannelDeliveryResumeOptions>,
 }
 
-/// Retained receive obligations and a separate per-channel recovery checkpoint.
+/// Per-channel action recovery checkpoint, independent of connection-local credit.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelDeliveryResumeParams {
     pub channel: Uri,
-    pub client_receive: ChannelReceiveProgress,
-    /// Last action safely applied or retained for this channel, not merely parsed.
-    /// Required for replay recovery; omitted for live-only channels.
+    /// Last serverSeq safely applied to this channel's retained state, not merely
+    /// received, parsed, or queued. Replay starts after this checkpoint; discard
+    /// partial frames and unapplied delivery messages before reconnecting.
+    /// Required for action replay. Omit for snapshot or live-edge recovery.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_applied_server_seq: Option<i64>,
 }
@@ -508,10 +543,9 @@ pub struct ChannelDeliveryResumeOptions {
     pub items: Vec<ChannelDeliveryResumeParams>,
 }
 
-/// Retained windowed subscriptions; omitted requested channels are unavailable.
-/// Unread accepted messages remain charged across reconnect; both directions
-/// reconcile lost release updates against the same retained journal. Unverified
-/// positions or lost accounting MUST fail, never grant a fresh window.
+/// Resumed windowed subscriptions; omitted requested channels are unavailable.
+/// Each returned subscription starts with fresh connection-local credit counters
+/// after old delivery queues are discarded. No byte progress survives reconnect.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1158,6 +1158,22 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
 
 // MARK: - State Types
 
+/// Presence enables createTcpConnection followed by ordinary windowed subscribe.
+/// TCP channels use shared subscription flow control, not reduced resource state.
+/// Base64 is the fixed payload encoding; socket buffering and destination policy
+/// are local implementation concerns.
+/// Connections end when their creating AHP transport disconnects; this revision
+/// does not support resuming TCP channels through reconnect.
+///
+/// Stability: 1.0 - Early development.
+public struct TcpConnectionsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
 /// Receive limits for one subscription and direction, not reduced channel state.
 /// All limits are positive safe integers. Receivers MUST separately bound aggregate
 /// subscriptions, decoding overhead, and the underlying transport queue.
@@ -1185,31 +1201,10 @@ public struct ChannelReceiveLimits: Codable, Sendable {
     }
 }
 
-/// Accepted/released obligations of the same retained bounded consumer.
-/// 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
-/// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
-/// Boundary bookkeeping is local; no second message sequence is needed.
-///
-/// Stability: 1.0 - Early development.
-public struct ChannelReceiveProgress: Codable, Sendable {
-    /// Complete logical data messages safely retained by the bounded consumer.
-    public var acceptedBytes: Int
-    /// Messages whose allocations the consumer released. Rejected actions release
-    /// allocations too; release does not acknowledge application success.
-    public var consumedBytes: Int
-
-    public init(
-        acceptedBytes: Int,
-        consumedBytes: Int
-    ) {
-        self.acceptedBytes = acceptedBytes
-        self.consumedBytes = consumedBytes
-    }
-}
-
-/// Accepted receive limits for both directions of a subscription. Initial
-/// accounting starts at zero. The existing logical client and channel identify
-/// the subscription; transport generations are fenced locally, not on the wire.
+/// Accepted receive limits for both directions of a subscription. Accounting
+/// starts at zero on subscription and reconnect, after old delivery queues are
+/// discarded. The existing logical client and channel identify the subscription;
+/// transport generations are fenced locally, not on the wire.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelFlowControl: Codable, Sendable {
@@ -1225,30 +1220,25 @@ public struct ChannelFlowControl: Codable, Sendable {
     }
 }
 
-/// One subscription retained after reconnect. Omission from the returned list
+/// One subscription resumed after reconnect. Omission from the returned list
 /// means unavailable, regardless of cause. All such failures share the same
 /// consumer behavior: dispose the old subscription, not continue a broken stream.
 ///
 /// Stability: 1.0 - Early development.
 public struct ResumedChannelSubscription: Codable, Sendable {
     public var channel: String
+    /// Receive limits for new connection-local windows; all credit counters start at zero.
     public var flowControl: ChannelFlowControl
-    public var clientReceive: ChannelReceiveProgress
-    public var hostReceive: ChannelReceiveProgress
-    /// Replay retains the same consumer; live recovery resumes at the live edge.
+    /// Replay retains applied resource state, not old delivery buffers; live resumes at the live edge.
     public var recovery: ChannelRecoveryKind
 
     public init(
         channel: String,
         flowControl: ChannelFlowControl,
-        clientReceive: ChannelReceiveProgress,
-        hostReceive: ChannelReceiveProgress,
         recovery: ChannelRecoveryKind
     ) {
         self.channel = channel
         self.flowControl = flowControl
-        self.clientReceive = clientReceive
-        self.hostReceive = hostReceive
         self.recovery = recovery
     }
 }

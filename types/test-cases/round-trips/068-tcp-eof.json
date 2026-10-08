@@ -1,0 +1,8 @@
+{
+  "name": "tcp-eof",
+  "group": "A",
+  "description": "EOF has no TCP offset, flags, or separate flow-control state.",
+  "type": "TcpEofParams",
+  "input": { "channel": "ahp-tcp:/t1" },
+  "acceptableOutputs": [{ "channel": "ahp-tcp:/t1" }]
+}
