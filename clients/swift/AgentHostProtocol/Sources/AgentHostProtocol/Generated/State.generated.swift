@@ -1461,7 +1461,7 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
 public struct SessionModelInfo: Codable, Sendable {
     /// Model identifier
     public var id: String
-    /// Provider this model belongs to
+    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     public var provider: String
     /// Human-readable model name
     public var name: String
@@ -1484,6 +1484,14 @@ public struct SessionModelInfo: Codable, Sendable {
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `pricing` key may carry model pricing metadata.
     public var meta: [String: AnyCodable]?
+    /// Vendor of this model as the provider reports it, for example `Anthropic`
+    /// or `Azure OpenAI`. This is sometimes the company that serves the model
+    /// rather than the one that built it. Not the same as {@link provider},
+    /// which names the agent provider that owns this model. Absent when the
+    /// provider does not report a vendor. Providers MAY send any value; clients
+    /// SHOULD fall back to a generic presentation for values they do not
+    /// recognize.
+    public var vendor: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1496,6 +1504,7 @@ public struct SessionModelInfo: Codable, Sendable {
         case policyState
         case configSchema
         case meta = "_meta"
+        case vendor
     }
 
     public init(
@@ -1508,7 +1517,8 @@ public struct SessionModelInfo: Codable, Sendable {
         supportsVision: Bool? = nil,
         policyState: PolicyState? = nil,
         configSchema: ConfigSchema? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        vendor: String? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -1520,6 +1530,7 @@ public struct SessionModelInfo: Codable, Sendable {
         self.policyState = policyState
         self.configSchema = configSchema
         self.meta = meta
+        self.vendor = vendor
     }
 }
 

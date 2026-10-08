@@ -28,13 +28,14 @@ AgentInfo {
 
 SessionModelInfo {
   id: string
-  provider: string
+  provider: string   // agent provider; matches AgentInfo.provider
   name: string
   maxContextWindow?: number
   supportsVision?: boolean
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
   configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
   _meta?: Record<string, unknown>  // intrinsic facts (e.g. pricing); see below
+  vendor?: string   // e.g. 'Anthropic', 'Azure OpenAI'; absent when unknown
 }
 
 ConfigSchema {

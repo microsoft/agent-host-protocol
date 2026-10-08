@@ -2044,7 +2044,7 @@ public sealed record SessionModelInfo
     /// <summary>Model identifier</summary>
     public required string Id { get; init; }
 
-    /// <summary>Provider this model belongs to</summary>
+    /// <summary>Agent provider that owns this model. Matches {@link AgentInfo.provider}.</summary>
     public required string Provider { get; init; }
 
     /// <summary>Human-readable model name</summary>
@@ -2083,6 +2083,16 @@ public sealed record SessionModelInfo
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Vendor of this model as the provider reports it, for example `Anthropic`
+    /// or `Azure OpenAI`. This is sometimes the company that serves the model
+    /// rather than the one that built it. Not the same as {@link provider},
+    /// which names the agent provider that owns this model. Absent when the
+    /// provider does not report a vendor. Providers MAY send any value; clients
+    /// SHOULD fall back to a generic presentation for values they do not
+    /// recognize.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Vendor { get; init; }
 }
 
 /// <summary>A model selection: the chosen model ID together with any model-specific

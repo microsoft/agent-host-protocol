@@ -1,0 +1,54 @@
+{
+  "name": "session-model-vendor",
+  "group": "A",
+  "description": "SessionModelInfo.vendor is an optional open string that names the model vendor as the provider reports it. One model carries a vendor that is not the model builder, the other has none. Pins that a set vendor survives a decode/re-encode cycle unchanged and that an absent vendor stays absent instead of re-encoding as null.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/agentsChanged",
+    "agents": [
+      {
+        "provider": "copilot",
+        "displayName": "Copilot",
+        "description": "An agent with vendor-tagged models.",
+        "models": [
+          {
+            "id": "gpt-5-mini",
+            "provider": "copilot",
+            "name": "GPT-5 mini",
+            "vendor": "Azure OpenAI"
+          },
+          {
+            "id": "model-without-vendor",
+            "provider": "copilot",
+            "name": "Model Without Vendor"
+          }
+        ]
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/agentsChanged",
+      "agents": [
+        {
+          "provider": "copilot",
+          "displayName": "Copilot",
+          "description": "An agent with vendor-tagged models.",
+          "models": [
+            {
+              "id": "gpt-5-mini",
+              "provider": "copilot",
+              "name": "GPT-5 mini",
+              "vendor": "Azure OpenAI"
+            },
+            {
+              "id": "model-without-vendor",
+              "provider": "copilot",
+              "name": "Model Without Vendor"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

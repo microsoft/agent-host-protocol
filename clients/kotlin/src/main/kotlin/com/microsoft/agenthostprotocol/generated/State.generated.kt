@@ -1477,7 +1477,7 @@ data class SessionModelInfo(
      */
     val id: String,
     /**
-     * Provider this model belongs to
+     * Agent provider that owns this model. Matches {@link AgentInfo.provider}.
      */
     val provider: String,
     /**
@@ -1517,7 +1517,17 @@ data class SessionModelInfo(
      * For example, a `pricing` key may carry model pricing metadata.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Vendor of this model as the provider reports it, for example `Anthropic`
+     * or `Azure OpenAI`. This is sometimes the company that serves the model
+     * rather than the one that built it. Not the same as {@link provider},
+     * which names the agent provider that owns this model. Absent when the
+     * provider does not report a vendor. Providers MAY send any value; clients
+     * SHOULD fall back to a generic presentation for values they do not
+     * recognize.
+     */
+    val vendor: String? = null
 )
 
 @Serializable
