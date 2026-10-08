@@ -21,6 +21,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
@@ -235,9 +236,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -379,7 +378,7 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
 function generateRustBitset(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
 
   if (desc) {
     for (const d of desc.split('\n')) lines.push(`/// ${d.trimEnd()}`);
@@ -474,7 +473,7 @@ function generateRustBitset(enumDecl: EnumDeclaration): string {
 function generateRustEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   const values = enumDecl.getMembers().map(m => m.getValue());
   const isNumeric = values.every(v => typeof v === 'number');
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
@@ -801,13 +800,14 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -849,6 +849,8 @@ function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
  * discriminated union have `omitDiscriminants: true` set.
  */
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'ChannelReceiveLimits' }, { name: 'ChannelReceiveProgress' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -1811,6 +1813,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
@@ -1882,7 +1886,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ChannelReceiveProgress, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1968,6 +1972,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1978,6 +1983,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1988,6 +1994,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }`;
@@ -2026,6 +2033,8 @@ ${unknownVariant}}`;
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
+  'ChannelResetParams', 'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2039,7 +2048,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary, Snapshot};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');

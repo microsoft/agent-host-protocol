@@ -313,11 +313,52 @@ type ReconnectParams struct {
 	LastSeenServerSeq int64 `json:"lastSeenServerSeq"`
 	// URIs the client was subscribed to
 	Subscriptions []URI `json:"subscriptions"`
+	// Resume information for windowed subscriptions also named in subscriptions.
+	// These channels recover independently and MUST NOT appear in inline legacy
+	// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
+}
+
+// Retained receive obligations and a separate per-channel recovery checkpoint.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeParams struct {
+	Channel       URI                    `json:"channel"`
+	ClientReceive ChannelReceiveProgress `json:"clientReceive"`
+	// Last action safely applied or retained for this channel, not merely parsed.
+	// Required for replay recovery; omitted for live-only channels.
+	LastAppliedServerSeq *int64 `json:"lastAppliedServerSeq,omitempty"`
+}
+
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeOptions struct {
+	Items []ChannelDeliveryResumeParams `json:"items"`
+}
+
+// Retained windowed subscriptions; omitted requested channels are unavailable.
+// Unread accepted messages remain charged across reconnect; both directions
+// reconcile lost release updates against the same retained journal. Unverified
+// positions or lost accounting MUST fail, never grant a fresh window.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeResult struct {
+	Items []ResumedChannelSubscription `json:"items"`
+}
+
+// Client receive limits. The host may lower, never raise, these limits and
+// advertises its own receive limits in the accepted flowControl result.
+//
+// Stability: 1.0 - Early development.
+type SubscriptionFlowControlOptions struct {
+	Receive ChannelReceiveLimits `json:"receive"`
 }
 
 // Reconnect result when the server can replay from the requested sequence.
 //
-// The server MUST include all replayed data in the response.
+// The server MUST include all non-windowed replayed data in the response.
+// Windowed subscriptions recover separately through bounded frames.
 type ReconnectReplayResult struct {
 	// Missed action envelopes since `lastSeenServerSeq`
 	Actions []ActionEnvelope `json:"actions"`
@@ -326,12 +367,24 @@ type ReconnectReplayResult struct {
 	// terminals) as well as resources the client is no longer permitted to
 	// observe. Clients SHOULD drop these from their local subscription set.
 	Missing []URI `json:"missing"`
+	// Retained windowed subscriptions; content is delivered separately.
+	// The server MUST omit this field unless ReconnectParams.windows was supplied
+	// and MUST return only channels requested in ReconnectParams.windows.items.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Reconnect result when the gap exceeds the replay buffer.
 type ReconnectSnapshotResult struct {
 	// Fresh snapshots for each subscription
 	Snapshots []Snapshot `json:"snapshots"`
+	// Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+	// The server MUST omit this field unless ReconnectParams.windows was supplied
+	// and MUST return only channels requested in ReconnectParams.windows.items.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Subscribe to a URI-identified channel.
@@ -357,6 +410,13 @@ type SubscribeParams struct {
 	// Servers that do not understand a requested view ignore it and return their
 	// default snapshot. Clients MUST tolerate receiving more state than requested.
 	View *SubscribeView `json:"view,omitempty"`
+	// Offer bounded fragmented delivery. The host accepts with result.flowControl;
+	// absence means ordinary delivery, including on hosts that ignore this option.
+	// Neither peer may send frames until the response explicitly accepts them.
+	// Applies to this subscriber, not shared channel state or other viewers.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *SubscriptionFlowControlOptions `json:"flowControl,omitempty"`
 }
 
 // Optional client-requested shape for a subscription snapshot.
@@ -383,11 +443,16 @@ type SubscriptionDeliveryOptions struct {
 
 // Result of the `subscribe` command.
 //
-// `snapshot` is present when the subscribed channel has associated state, and
-// absent for stateless channels.
+// In ordinary mode, snapshot is present for state-bearing channels.
+// In windowed mode, flowControl is present and snapshot MUST be omitted:
+// snapshot/replay content follows through bounded channel/frame delivery.
 type SubscribeResult struct {
 	// Snapshot of the subscribed channel's state (omitted for stateless channels)
 	Snapshot *Snapshot `json:"snapshot,omitempty"`
+	// Accepted receive limits; install the consumer before processing frames.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *ChannelFlowControl `json:"flowControl,omitempty"`
 }
 
 // Creates a new session with the specified agent provider.
@@ -1685,7 +1750,24 @@ func (u ReconnectResult) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(u.Value)
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *ReconnectReplayResult:
+		object["type"] = json.RawMessage("\"replay\"")
+	case *ReconnectSnapshotResult:
+		object["type"] = json.RawMessage("\"snapshot\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────

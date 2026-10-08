@@ -73,6 +73,21 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 /**
+ * Recovery selected independently from windows and whether a channel has state.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+enum class ChannelRecoveryKind {
+    @SerialName("snapshot")
+    SNAPSHOT,
+    @SerialName("replay")
+    REPLAY,
+    @SerialName("live")
+    LIVE
+}
+
+/**
  * Policy configuration state for a model.
  */
 @Serializable
@@ -1196,6 +1211,85 @@ enum class AutomationRunOriginKind {
 }
 
 // ─── State Types ────────────────────────────────────────────────────────────
+
+/**
+ * Receive limits for one subscription and direction, not reduced channel state.
+ * All limits are positive safe integers. Receivers MUST separately bound aggregate
+ * subscriptions, decoding overhead, and the underlying transport queue.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelReceiveLimits(
+    /**
+     * Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
+     * before outer JSON escaping. Starting a data message requires available credit;
+     * one started message may finish beyond the window.
+     */
+    val windowBytes: Long,
+    /**
+     * Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+     */
+    val maximumFrameBytes: Long,
+    /**
+     * Hard logical-payload limit. Outstanding data stays strictly below
+     * windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
+     */
+    val maximumMessageBytes: Long
+)
+
+/**
+ * Accepted/released obligations of the same retained bounded consumer.
+ * 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
+ * UTF-16 bytes through complete-data-message boundaries, never partial fragments.
+ * Boundary bookkeeping is local; no second message sequence is needed.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelReceiveProgress(
+    /**
+     * Complete logical data messages safely retained by the bounded consumer.
+     */
+    val acceptedBytes: Long,
+    /**
+     * Messages whose allocations the consumer released. Rejected actions release
+     * allocations too; release does not acknowledge application success.
+     */
+    val consumedBytes: Long
+)
+
+/**
+ * Accepted receive limits for both directions of a subscription. Initial
+ * accounting starts at zero. The existing logical client and channel identify
+ * the subscription; transport generations are fenced locally, not on the wire.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelFlowControl(
+    val clientReceive: ChannelReceiveLimits,
+    val hostReceive: ChannelReceiveLimits
+)
+
+/**
+ * One subscription retained after reconnect. Omission from the returned list
+ * means unavailable, regardless of cause. All such failures share the same
+ * consumer behavior: dispose the old subscription, not continue a broken stream.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ResumedChannelSubscription(
+    val channel: String,
+    val flowControl: ChannelFlowControl,
+    val clientReceive: ChannelReceiveProgress,
+    val hostReceive: ChannelReceiveProgress,
+    /**
+     * Replay retains the same consumer; live recovery resumes at the live edge.
+     */
+    val recovery: ChannelRecoveryKind
+)
 
 @Serializable
 data class Icon(

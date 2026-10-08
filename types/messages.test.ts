@@ -34,6 +34,7 @@ function readChannelSources(baseName: string): string {
     'channels-changeset',
     'channels-annotations',
     'channels-resource-watch',
+    'channels-otlp',
     'channels-automation',
     'channels-automation-run',
   ];
@@ -54,6 +55,7 @@ function readChannelSources(baseName: string): string {
 interface MethodInfo {
   method: string;
   messageType: 'Request' | 'Notification';
+  direction?: string;
 }
 
 function parseCommandMethods(source: string): MethodInfo[] {
@@ -62,12 +64,13 @@ function parseCommandMethods(source: string): MethodInfo[] {
   const jsdocRe = /\/\*\*[\s\S]*?\*\//g;
   for (const match of source.matchAll(jsdocRe)) {
     const block = match[0];
-    const methodMatch = block.match(/@method\s+(\w+)/);
+    const methodMatch = block.match(/@method\s+([\w/]+)/);
     const typeMatch = block.match(/@messageType\s+(Request|Notification)/);
     if (methodMatch && typeMatch) {
       results.push({
         method: methodMatch[1],
         messageType: typeMatch[1] as 'Request' | 'Notification',
+        direction: block.match(/@direction\s+([^\n]+)/)?.[1].trim(),
       });
     }
   }
@@ -117,12 +120,22 @@ function parseExpectedUnion(source: string, typeName: string): string[] {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 const commandsSrc = readChannelSources('commands.ts');
+const notificationsSrc = readChannelSources('notifications.ts');
 const messagesSrc = readChannelSources('messages.ts');
 const messageChecksSrc = readSource('version/message-checks.ts');
 
 const allMethods = parseCommandMethods(commandsSrc);
 const requests = allMethods.filter(m => m.messageType === 'Request').map(m => m.method);
-const clientNotifications = [...new Set(allMethods.filter(m => m.messageType === 'Notification').map(m => m.method))];
+const notificationMethods = [
+  ...allMethods.filter(m => m.messageType === 'Notification'),
+  ...parseCommandMethods(notificationsSrc).filter(m => m.messageType === 'Notification'),
+];
+const clientNotifications = [...new Set(notificationMethods
+  .filter(m => m.direction === 'Client → Server' || m.direction === 'Both')
+  .map(m => m.method))];
+const serverNotifications = [...new Set(notificationMethods
+  .filter(m => m.direction === 'Server → Client' || m.direction === 'Both')
+  .map(m => m.method))];
 
 describe('CommandMap', () => {
   const mapKeys = parseMapKeys(messagesSrc, 'CommandMap');
@@ -141,12 +154,12 @@ describe('CommandMap', () => {
 describe('ClientNotificationMap', () => {
   const mapKeys = parseMapKeys(messagesSrc, 'ClientNotificationMap');
 
-  it('contains every @messageType Notification method from commands.ts', () => {
+  it('contains every client notification method from canonical sources', () => {
     const missing = clientNotifications.filter(m => !mapKeys.includes(m));
     assert.deepStrictEqual(missing, [], `Missing from ClientNotificationMap: ${missing.join(', ')}`);
   });
 
-  it('contains no extra methods beyond commands.ts', () => {
+  it('contains no extra methods beyond canonical sources', () => {
     const extra = mapKeys.filter(m => !clientNotifications.includes(m));
     assert.deepStrictEqual(extra, [], `Extra in ClientNotificationMap: ${extra.join(', ')}`);
   });
@@ -184,6 +197,13 @@ describe('_ExpectedServerNotifications matches ServerNotificationMap', () => {
 
   it('_ExpectedServerNotifications lists exactly the ServerNotificationMap keys', () => {
     assert.deepStrictEqual(expected.sort(), mapKeys.sort());
+  });
+
+  it('registers every annotated server notification', () => {
+    assert.deepStrictEqual(
+      mapKeys.filter(method => method !== 'action').sort(),
+      serverNotifications.sort(),
+    );
   });
 });
 

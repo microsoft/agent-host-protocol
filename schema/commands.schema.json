@@ -289,6 +289,10 @@
             "$ref": "#/$defs/URI"
           },
           "description": "URIs the client was subscribed to"
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeOptions",
+          "description": "Resume information for windowed subscriptions also named in subscriptions.\nThese channels recover independently and MUST NOT appear in inline legacy\nactions/snapshots. Missing journals fail explicitly, never downgrade delivery.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -298,9 +302,61 @@
         "subscriptions"
       ]
     },
+    "ChannelDeliveryResumeParams": {
+      "type": "object",
+      "description": "Retained receive obligations and a separate per-channel recovery checkpoint.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveProgress"
+        },
+        "lastAppliedServerSeq": {
+          "type": "integer",
+          "description": "Last action safely applied or retained for this channel, not merely parsed.\nRequired for replay recovery; omitted for live-only channels.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "channel",
+        "clientReceive"
+      ]
+    },
+    "ChannelDeliveryResumeOptions": {
+      "type": "object",
+      "description": "Stability: 1.0 - Early development.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChannelDeliveryResumeParams"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "ChannelDeliveryResumeResult": {
+      "type": "object",
+      "description": "Retained windowed subscriptions; omitted requested channels are unavailable.\nUnread accepted messages remain charged across reconnect; both directions\nreconcile lost release updates against the same retained journal. Unverified\npositions or lost accounting MUST fail, never grant a fresh window.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumedChannelSubscription"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
     "ReconnectReplayResult": {
       "type": "object",
-      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all replayed data in the response.",
+      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all non-windowed replayed data in the response.\nWindowed subscriptions recover separately through bounded frames.",
       "properties": {
         "type": {
           "const": "replay",
@@ -319,6 +375,10 @@
             "$ref": "#/$defs/URI"
           },
           "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeResult",
+          "description": "Retained windowed subscriptions; content is delivered separately.\nThe server MUST omit this field unless ReconnectParams.windows was supplied\nand MUST return only channels requested in ReconnectParams.windows.items.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -341,6 +401,10 @@
             "$ref": "#/$defs/Snapshot"
           },
           "description": "Fresh snapshots for each subscription"
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeResult",
+          "description": "Windowed channels select replay/snapshot/live recovery independently of legacy fallback.\nThe server MUST omit this field unless ReconnectParams.windows was supplied\nand MUST return only channels requested in ReconnectParams.windows.items.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -368,10 +432,26 @@
         "view": {
           "$ref": "#/$defs/SubscribeView",
           "description": "Optional client-requested shape for the returned snapshot.\n\nServers that do not understand a requested view ignore it and return their\ndefault snapshot. Clients MUST tolerate receiving more state than requested."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/SubscriptionFlowControlOptions",
+          "description": "Offer bounded fragmented delivery. The host accepts with result.flowControl;\nabsence means ordinary delivery, including on hosts that ignore this option.\nNeither peer may send frames until the response explicitly accepts them.\nApplies to this subscriber, not shared channel state or other viewers.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
         "channel"
+      ]
+    },
+    "SubscriptionFlowControlOptions": {
+      "type": "object",
+      "description": "Client receive limits. The host may lower, never raise, these limits and\nadvertises its own receive limits in the accepted flowControl result.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "receive": {
+          "$ref": "#/$defs/ChannelReceiveLimits"
+        }
+      },
+      "required": [
+        "receive"
       ]
     },
     "SubscribeView": {
@@ -396,11 +476,15 @@
     },
     "SubscribeResult": {
       "type": "object",
-      "description": "Result of the `subscribe` command.\n\n`snapshot` is present when the subscribed channel has associated state, and\nabsent for stateless channels.",
+      "description": "Result of the `subscribe` command.\n\nIn ordinary mode, snapshot is present for state-bearing channels.\nIn windowed mode, flowControl is present and snapshot MUST be omitted:\nsnapshot/replay content follows through bounded channel/frame delivery.",
       "properties": {
         "snapshot": {
           "$ref": "#/$defs/Snapshot",
           "description": "Snapshot of the subscribed channel's state (omitted for stateless channels)"
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "Accepted receive limits; install the consumer before processing frames.\n\nStability: 1.0 - Early development."
         }
       }
     },
@@ -1830,6 +1914,102 @@
         }
       ],
       "description": "Identifies the file or range a {@link ChangesetOperation} should act on.\n\nThe `kind` MUST match one of the operation's declared\n{@link ChangesetOperation.scopes}."
+    },
+    "ChannelReceiveLimits": {
+      "type": "object",
+      "description": "Receive limits for one subscription and direction, not reduced channel state.\nAll limits are positive safe integers. Receivers MUST separately bound aggregate\nsubscriptions, decoding overhead, and the underlying transport queue.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "Target outstanding logical-payload bytes, counted as UTF-16 code units * 2\nbefore outer JSON escaping. Starting a data message requires available credit;\none started message may finish beyond the window.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumFrameBytes": {
+          "type": "integer",
+          "description": "Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumMessageBytes": {
+          "type": "integer",
+          "description": "Hard logical-payload limit. Outstanding data stays strictly below\nwindowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumFrameBytes",
+        "maximumMessageBytes"
+      ]
+    },
+    "ChannelReceiveProgress": {
+      "type": "object",
+      "description": "Accepted/released obligations of the same retained bounded consumer.\n0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count\nUTF-16 bytes through complete-data-message boundaries, never partial fragments.\nBoundary bookkeeping is local; no second message sequence is needed.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "acceptedBytes": {
+          "type": "integer",
+          "description": "Complete logical data messages safely retained by the bounded consumer.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "description": "Messages whose allocations the consumer released. Rejected actions release\nallocations too; release does not acknowledge application success.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "acceptedBytes",
+        "consumedBytes"
+      ]
+    },
+    "ChannelFlowControl": {
+      "type": "object",
+      "description": "Accepted receive limits for both directions of a subscription. Initial\naccounting starts at zero. The existing logical client and channel identify\nthe subscription; transport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits"
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits"
+        }
+      },
+      "required": [
+        "clientReceive",
+        "hostReceive"
+      ]
+    },
+    "ResumedChannelSubscription": {
+      "type": "object",
+      "description": "One subscription retained after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl"
+        },
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveProgress"
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveProgress"
+        },
+        "recovery": {
+          "$ref": "#/$defs/ChannelRecoveryKind",
+          "description": "Replay retains the same consumer; live recovery resumes at the live edge."
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl",
+        "clientReceive",
+        "hostReceive",
+        "recovery"
+      ]
     },
     "Icon": {
       "type": "object",
@@ -10655,6 +10835,15 @@
         }
       ],
       "description": "A string that may optionally be rendered as Markdown.\n\n- A plain `string` is rendered as-is (no Markdown processing).\n- An object with `{ markdown: string }` is rendered with Markdown formatting."
+    },
+    "ChannelRecoveryKind": {
+      "enum": [
+        "snapshot",
+        "replay",
+        "live"
+      ],
+      "type": "string",
+      "description": "Recovery selected independently from windows and whether a channel has state."
     },
     "JsonPrimitive": {
       "oneOf": [

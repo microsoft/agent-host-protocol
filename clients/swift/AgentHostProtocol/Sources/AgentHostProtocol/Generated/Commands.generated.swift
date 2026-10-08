@@ -532,6 +532,12 @@ public struct ReconnectParams: Codable, Sendable {
     public var lastSeenServerSeq: Int
     /// URIs the client was subscribed to
     public var subscriptions: [String]
+    /// Resume information for windowed subscriptions also named in subscriptions.
+    /// These channels recover independently and MUST NOT appear in inline legacy
+    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -539,6 +545,7 @@ public struct ReconnectParams: Codable, Sendable {
         case clientId
         case lastSeenServerSeq
         case subscriptions
+        case windows
     }
 
     public init(
@@ -546,13 +553,15 @@ public struct ReconnectParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         clientId: String,
         lastSeenServerSeq: Int,
-        subscriptions: [String]
+        subscriptions: [String],
+        windows: ChannelDeliveryResumeOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.clientId = clientId
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
+        self.windows = windows
     }
 }
 
@@ -566,15 +575,23 @@ public struct ReconnectReplayResult: Codable, Sendable {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     public var missing: [String]
+    /// Retained windowed subscriptions; content is delivered separately.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
         actions: [ActionEnvelope],
-        missing: [String]
+        missing: [String],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.actions = actions
         self.missing = missing
+        self.windows = windows
     }
 }
 
@@ -583,13 +600,83 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     public var type: ReconnectResultType
     /// Fresh snapshots for each subscription
     public var snapshots: [Snapshot]
+    /// Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
-        snapshots: [Snapshot]
+        snapshots: [Snapshot],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.snapshots = snapshots
+        self.windows = windows
+    }
+}
+
+/// Retained receive obligations and a separate per-channel recovery checkpoint.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeParams: Codable, Sendable {
+    public var channel: String
+    public var clientReceive: ChannelReceiveProgress
+    /// Last action safely applied or retained for this channel, not merely parsed.
+    /// Required for replay recovery; omitted for live-only channels.
+    public var lastAppliedServerSeq: Int?
+
+    public init(
+        channel: String,
+        clientReceive: ChannelReceiveProgress,
+        lastAppliedServerSeq: Int? = nil
+    ) {
+        self.channel = channel
+        self.clientReceive = clientReceive
+        self.lastAppliedServerSeq = lastAppliedServerSeq
+    }
+}
+
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeOptions: Codable, Sendable {
+    public var items: [ChannelDeliveryResumeParams]
+
+    public init(
+        items: [ChannelDeliveryResumeParams]
+    ) {
+        self.items = items
+    }
+}
+
+/// Retained windowed subscriptions; omitted requested channels are unavailable.
+/// Unread accepted messages remain charged across reconnect; both directions
+/// reconcile lost release updates against the same retained journal. Unverified
+/// positions or lost accounting MUST fail, never grant a fresh window.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeResult: Codable, Sendable {
+    public var items: [ResumedChannelSubscription]
+
+    public init(
+        items: [ResumedChannelSubscription]
+    ) {
+        self.items = items
+    }
+}
+
+/// Client receive limits. The host may lower, never raise, these limits and
+/// advertises its own receive limits in the accepted flowControl result.
+///
+/// Stability: 1.0 - Early development.
+public struct SubscriptionFlowControlOptions: Codable, Sendable {
+    public var receive: ChannelReceiveLimits
+
+    public init(
+        receive: ChannelReceiveLimits
+    ) {
+        self.receive = receive
     }
 }
 
@@ -610,24 +697,34 @@ public struct SubscribeParams: Codable, Sendable {
     /// Servers that do not understand a requested view ignore it and return their
     /// default snapshot. Clients MUST tolerate receiving more state than requested.
     public var view: SubscribeView?
+    /// Offer bounded fragmented delivery. The host accepts with result.flowControl;
+    /// absence means ordinary delivery, including on hosts that ignore this option.
+    /// Neither peer may send frames until the response explicitly accepts them.
+    /// Applies to this subscriber, not shared channel state or other viewers.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: SubscriptionFlowControlOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case delivery
         case view
+        case flowControl
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         delivery: SubscriptionDeliveryOptions? = nil,
-        view: SubscribeView? = nil
+        view: SubscribeView? = nil,
+        flowControl: SubscriptionFlowControlOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.delivery = delivery
         self.view = view
+        self.flowControl = flowControl
     }
 }
 
@@ -666,11 +763,17 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
 public struct SubscribeResult: Codable, Sendable {
     /// Snapshot of the subscribed channel's state (omitted for stateless channels)
     public var snapshot: Snapshot?
+    /// Accepted receive limits; install the consumer before processing frames.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: ChannelFlowControl?
 
     public init(
-        snapshot: Snapshot? = nil
+        snapshot: Snapshot? = nil,
+        flowControl: ChannelFlowControl? = nil
     ) {
         self.snapshot = snapshot
+        self.flowControl = flowControl
     }
 }
 

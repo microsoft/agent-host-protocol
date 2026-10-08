@@ -1,0 +1,18 @@
+{
+  "name": "channel-delivery-subscribe-result",
+  "group": "A",
+  "description": "Subscribe accepts only receive limits; channel identity and recovery metadata are not duplicated.",
+  "type": "SubscribeResult",
+  "input": {
+    "flowControl": {
+      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
+      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+    }
+  },
+  "acceptableOutputs": [{
+    "flowControl": {
+      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
+      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+    }
+  }]
+}

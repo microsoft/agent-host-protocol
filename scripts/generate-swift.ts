@@ -21,6 +21,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation, readStability } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
@@ -198,9 +199,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -303,7 +302,7 @@ function emitSwiftDocLine(docLine: string, indent = ''): string {
 function generateSwiftEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   const values = enumDecl.getMembers().map(member => member.getValue());
   const rawType = values.every(value => typeof value === 'number') ? 'Int' : 'String';
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
@@ -583,7 +582,10 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = swiftNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  return generateSwiftStruct(name, props);
+  const declaration = generateSwiftStruct(name, props);
+  if (!readStability(iface)) return declaration;
+  const doc = getDocumentation(iface).split('\n').map(line => emitSwiftDocLine(line)).join('\n');
+  return `${doc}\n${declaration}`;
 }
 
 function generateFixedChatSourceBranchSwift(
@@ -671,6 +673,7 @@ function generatePartialStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -691,6 +694,8 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
+  'ChannelReceiveLimits', 'ChannelReceiveProgress',
+  'ChannelFlowControl', 'ResumedChannelSubscription',
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
@@ -1680,6 +1685,8 @@ const COMMAND_STRUCTS = [
   'AutomationCustomizationsCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
+  'ChannelDeliveryResumeParams', 'ChannelDeliveryResumeOptions',
+  'ChannelDeliveryResumeResult', 'SubscriptionFlowControlOptions',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
@@ -1948,6 +1955,8 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
+  'ChannelResetParams', 'ChannelSnapshotParams',
   'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams',
   'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',

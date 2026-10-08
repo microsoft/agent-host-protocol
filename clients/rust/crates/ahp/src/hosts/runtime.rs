@@ -629,6 +629,7 @@ impl HostRuntime {
                     meta: None,
                     delivery: None,
                     view: None,
+                    flow_control: None,
                 },
             )
             .await

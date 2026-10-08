@@ -23,6 +23,108 @@ import type { AutomationRunState } from '../channels-automation-run/state.js';
 /** A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`). */
 export type URI = string;
 
+// ─── Subscription Delivery ───────────────────────────────────────────────────
+
+/**
+ * Receive limits for one subscription and direction, not reduced channel state.
+ * All limits are positive safe integers. Receivers MUST separately bound aggregate
+ * subscriptions, decoding overhead, and the underlying transport queue.
+ * @category Common Types
+ * @stability 1.0
+ */
+export interface ChannelReceiveLimits {
+  /**
+   * Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
+   * before outer JSON escaping. Starting a data message requires available credit;
+   * one started message may finish beyond the window.
+   * @integer
+   * @minimum 1
+   * @maximum 9007199254740991
+   */
+  windowBytes: number;
+  /**
+   * Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+   * @integer
+   * @minimum 1
+   * @maximum 9007199254740991
+   */
+  maximumFrameBytes: number;
+  /**
+   * Hard logical-payload limit. Outstanding data stays strictly below
+   * windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
+   * @integer
+   * @minimum 1
+   * @maximum 9007199254740991
+   */
+  maximumMessageBytes: number;
+}
+
+/**
+ * Accepted/released obligations of the same retained bounded consumer.
+ * 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
+ * UTF-16 bytes through complete-data-message boundaries, never partial fragments.
+ * Boundary bookkeeping is local; no second message sequence is needed.
+ * @category Common Types
+ * @stability 1.0
+ */
+export interface ChannelReceiveProgress {
+  /**
+   * Complete logical data messages safely retained by the bounded consumer.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  acceptedBytes: number;
+  /**
+   * Messages whose allocations the consumer released. Rejected actions release
+   * allocations too; release does not acknowledge application success.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  consumedBytes: number;
+}
+
+/**
+ * Accepted receive limits for both directions of a subscription. Initial
+ * accounting starts at zero. The existing logical client and channel identify
+ * the subscription; transport generations are fenced locally, not on the wire.
+ * @category Common Types
+ * @stability 1.0
+ */
+export interface ChannelFlowControl {
+  clientReceive: ChannelReceiveLimits;
+  hostReceive: ChannelReceiveLimits;
+}
+
+/**
+ * Recovery selected independently from windows and whether a channel has state.
+ * @category Common Types
+ * @stability 1.0
+ * @exhaustive
+ */
+export const enum ChannelRecoveryKind {
+  Snapshot = 'snapshot',
+  Replay = 'replay',
+  Live = 'live',
+}
+
+/**
+ * One subscription retained after reconnect. Omission from the returned list
+ * means unavailable, regardless of cause. All such failures share the same
+ * consumer behavior: dispose the old subscription, not continue a broken stream.
+ * @category Common Types
+ * @stability 1.0
+ */
+export interface ResumedChannelSubscription {
+  channel: URI;
+  flowControl: ChannelFlowControl;
+  clientReceive: ChannelReceiveProgress;
+  hostReceive: ChannelReceiveProgress;
+  /** Replay retains the same consumer; live recovery resumes at the live edge. */
+  recovery: ChannelRecoveryKind;
+}
+
 /**
  * A string that may optionally be rendered as Markdown.
  *

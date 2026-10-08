@@ -7,7 +7,14 @@
  * @module common/commands
  */
 
-import type { URI, Snapshot } from './state.js';
+import type {
+  URI,
+  Snapshot,
+  ChannelReceiveLimits,
+  ChannelReceiveProgress,
+  ChannelFlowControl,
+  ResumedChannelSubscription,
+} from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
 import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
@@ -436,12 +443,58 @@ export interface ReconnectParams extends BaseParams {
   lastSeenServerSeq: number;
   /** URIs the client was subscribed to */
   subscriptions: URI[];
+  /**
+   * Resume information for windowed subscriptions also named in subscriptions.
+   * These channels recover independently and MUST NOT appear in inline legacy
+   * actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+   * @stability 1.0
+   */
+  windows?: ChannelDeliveryResumeOptions;
+}
+
+/**
+ * Retained receive obligations and a separate per-channel recovery checkpoint.
+ * @category Commands
+ * @stability 1.0
+ */
+export interface ChannelDeliveryResumeParams {
+  channel: URI;
+  clientReceive: ChannelReceiveProgress;
+  /**
+   * Last action safely applied or retained for this channel, not merely parsed.
+   * Required for replay recovery; omitted for live-only channels.
+   * @integer
+   * @minimum 0
+   * @maximum 9007199254740991
+   */
+  lastAppliedServerSeq?: number;
+}
+
+/**
+ * @category Commands
+ * @stability 1.0
+ */
+export interface ChannelDeliveryResumeOptions {
+  items: ChannelDeliveryResumeParams[];
+}
+
+/**
+ * Retained windowed subscriptions; omitted requested channels are unavailable.
+ * Unread accepted messages remain charged across reconnect; both directions
+ * reconcile lost release updates against the same retained journal. Unverified
+ * positions or lost accounting MUST fail, never grant a fresh window.
+ * @category Commands
+ * @stability 1.0
+ */
+export interface ChannelDeliveryResumeResult {
+  items: ResumedChannelSubscription[];
 }
 
 /**
  * Reconnect result when the server can replay from the requested sequence.
  *
- * The server MUST include all replayed data in the response.
+ * The server MUST include all non-windowed replayed data in the response.
+ * Windowed subscriptions recover separately through bounded frames.
  */
 export interface ReconnectReplayResult {
   /** Discriminant */
@@ -455,6 +508,13 @@ export interface ReconnectReplayResult {
    * observe. Clients SHOULD drop these from their local subscription set.
    */
   missing: URI[];
+  /**
+   * Retained windowed subscriptions; content is delivered separately.
+   * The server MUST omit this field unless ReconnectParams.windows was supplied
+   * and MUST return only channels requested in ReconnectParams.windows.items.
+   * @stability 1.0
+   */
+  windows?: ChannelDeliveryResumeResult;
 }
 
 /**
@@ -465,6 +525,13 @@ export interface ReconnectSnapshotResult {
   type: ReconnectResultType.Snapshot;
   /** Fresh snapshots for each subscription */
   snapshots: Snapshot[];
+  /**
+   * Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+   * The server MUST omit this field unless ReconnectParams.windows was supplied
+   * and MUST return only channels requested in ReconnectParams.windows.items.
+   * @stability 1.0
+   */
+  windows?: ChannelDeliveryResumeResult;
 }
 
 /** Result of the `reconnect` command. */
@@ -503,6 +570,24 @@ export interface SubscribeParams extends BaseParams {
    * default snapshot. Clients MUST tolerate receiving more state than requested.
    */
   view?: SubscribeView;
+  /**
+   * Offer bounded fragmented delivery. The host accepts with result.flowControl;
+   * absence means ordinary delivery, including on hosts that ignore this option.
+   * Neither peer may send frames until the response explicitly accepts them.
+   * Applies to this subscriber, not shared channel state or other viewers.
+   * @stability 1.0
+   */
+  flowControl?: SubscriptionFlowControlOptions;
+}
+
+/**
+ * Client receive limits. The host may lower, never raise, these limits and
+ * advertises its own receive limits in the accepted flowControl result.
+ * @category Commands
+ * @stability 1.0
+ */
+export interface SubscriptionFlowControlOptions {
+  receive: ChannelReceiveLimits;
 }
 
 /**
@@ -542,12 +627,18 @@ export interface SubscriptionDeliveryOptions {
 /**
  * Result of the `subscribe` command.
  *
- * `snapshot` is present when the subscribed channel has associated state, and
- * absent for stateless channels.
+ * In ordinary mode, snapshot is present for state-bearing channels.
+ * In windowed mode, flowControl is present and snapshot MUST be omitted:
+ * snapshot/replay content follows through bounded channel/frame delivery.
  */
 export interface SubscribeResult {
   /** Snapshot of the subscribed channel's state (omitted for stateless channels) */
   snapshot?: Snapshot;
+  /**
+   * Accepted receive limits; install the consumer before processing frames.
+   * @stability 1.0
+   */
+  flowControl?: ChannelFlowControl;
 }
 
 // ─── unsubscribe ─────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 
@@ -260,9 +261,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -406,7 +405,7 @@ function emitDocComment(prefix: string, doc: string | undefined, lines: string[]
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} string`);
   lines.push('');
@@ -431,7 +430,7 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} uint32`);
   lines.push('');
@@ -517,7 +516,7 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateGoStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -701,6 +700,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
     lines.push('\tif err != nil { return nil, err }');
     lines.push('\tvar object map[string]json.RawMessage');
     lines.push('\tif err := json.Unmarshal(data, &object); err != nil { return nil, err }');
+    lines.push('\tif object == nil { return data, nil }');
     lines.push('\tswitch u.Value.(type) {');
     for (const v of cfg.variants) {
       lines.push(`\tcase *${v.innerType}: object[${JSON.stringify(cfg.discriminantField)}] = json.RawMessage(${JSON.stringify(JSON.stringify(v.wireValue))})`);
@@ -717,6 +717,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -737,6 +738,8 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+  { name: 'ChannelReceiveLimits' }, { name: 'ChannelReceiveProgress' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -1782,6 +1785,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
@@ -1819,6 +1824,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
   discriminantField: 'type',
+  injectDiscriminantOnMarshal: true,
   doc: 'ReconnectResult is the result of the `reconnect` command.',
   variants: [
     { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
@@ -2037,6 +2043,8 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
+  'ChannelResetParams', 'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',

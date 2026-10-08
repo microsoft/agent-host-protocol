@@ -13,6 +13,19 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// Recovery selected independently from windows and whether a channel has state.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChannelRecoveryKind {
+    #[serde(rename = "snapshot")]
+    Snapshot,
+    #[serde(rename = "replay")]
+    Replay,
+    #[serde(rename = "live")]
+    Live,
+}
+
 /// Policy configuration state for a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PolicyState {
@@ -1482,6 +1495,69 @@ pub enum AutomationRunOriginKind {
 }
 
 // ─── Structs ──────────────────────────────────────────────────────────
+
+/// Receive limits for one subscription and direction, not reduced channel state.
+/// All limits are positive safe integers. Receivers MUST separately bound aggregate
+/// subscriptions, decoding overhead, and the underlying transport queue.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReceiveLimits {
+    /// Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
+    /// before outer JSON escaping. Starting a data message requires available credit;
+    /// one started message may finish beyond the window.
+    pub window_bytes: i64,
+    /// Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+    pub maximum_frame_bytes: i64,
+    /// Hard logical-payload limit. Outstanding data stays strictly below
+    /// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
+    pub maximum_message_bytes: i64,
+}
+
+/// Accepted/released obligations of the same retained bounded consumer.
+/// 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
+/// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
+/// Boundary bookkeeping is local; no second message sequence is needed.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReceiveProgress {
+    /// Complete logical data messages safely retained by the bounded consumer.
+    pub accepted_bytes: i64,
+    /// Messages whose allocations the consumer released. Rejected actions release
+    /// allocations too; release does not acknowledge application success.
+    pub consumed_bytes: i64,
+}
+
+/// Accepted receive limits for both directions of a subscription. Initial
+/// accounting starts at zero. The existing logical client and channel identify
+/// the subscription; transport generations are fenced locally, not on the wire.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelFlowControl {
+    pub client_receive: ChannelReceiveLimits,
+    pub host_receive: ChannelReceiveLimits,
+}
+
+/// One subscription retained after reconnect. Omission from the returned list
+/// means unavailable, regardless of cause. All such failures share the same
+/// consumer behavior: dispose the old subscription, not continue a broken stream.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumedChannelSubscription {
+    pub channel: Uri,
+    pub flow_control: ChannelFlowControl,
+    pub client_receive: ChannelReceiveProgress,
+    pub host_receive: ChannelReceiveProgress,
+    /// Replay retains the same consumer; live recovery resumes at the live edge.
+    pub recovery: ChannelRecoveryKind,
+}
 
 /// An optionally-sized icon that can be displayed in a user interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

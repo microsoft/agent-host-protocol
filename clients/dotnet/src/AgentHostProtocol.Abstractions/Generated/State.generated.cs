@@ -9,6 +9,20 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// <summary>Recovery selected independently from windows and whether a channel has state.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChannelRecoveryKind>))]
+public enum ChannelRecoveryKind
+{
+    [WireValue("snapshot")]
+    Snapshot,
+    [WireValue("replay")]
+    Replay,
+    [WireValue("live")]
+    Live,
+}
+
 /// <summary>Policy configuration state for a model.</summary>
 [JsonConverter(typeof(WireEnumConverter<PolicyState>))]
 public enum PolicyState
@@ -1764,6 +1778,73 @@ public enum AutomationRunOriginKind
 }
 
 // ─── Classes ──────────────────────────────────────────────────────────
+
+/// <summary>Receive limits for one subscription and direction, not reduced channel state.
+/// All limits are positive safe integers. Receivers MUST separately bound aggregate
+/// subscriptions, decoding overhead, and the underlying transport queue.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelReceiveLimits
+{
+    /// <summary>Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
+    /// before outer JSON escaping. Starting a data message requires available credit;
+    /// one started message may finish beyond the window.</summary>
+    public long WindowBytes { get; init; }
+
+    /// <summary>Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.</summary>
+    public long MaximumFrameBytes { get; init; }
+
+    /// <summary>Hard logical-payload limit. Outstanding data stays strictly below
+    /// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.</summary>
+    public long MaximumMessageBytes { get; init; }
+}
+
+/// <summary>Accepted/released obligations of the same retained bounded consumer.
+/// 0 &lt;= consumedBytes &lt;= acceptedBytes. Both counters start at zero and count
+/// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
+/// Boundary bookkeeping is local; no second message sequence is needed.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelReceiveProgress
+{
+    /// <summary>Complete logical data messages safely retained by the bounded consumer.</summary>
+    public long AcceptedBytes { get; init; }
+
+    /// <summary>Messages whose allocations the consumer released. Rejected actions release
+    /// allocations too; release does not acknowledge application success.</summary>
+    public long ConsumedBytes { get; init; }
+}
+
+/// <summary>Accepted receive limits for both directions of a subscription. Initial
+/// accounting starts at zero. The existing logical client and channel identify
+/// the subscription; transport generations are fenced locally, not on the wire.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelFlowControl
+{
+    public required ChannelReceiveLimits ClientReceive { get; init; }
+
+    public required ChannelReceiveLimits HostReceive { get; init; }
+}
+
+/// <summary>One subscription retained after reconnect. Omission from the returned list
+/// means unavailable, regardless of cause. All such failures share the same
+/// consumer behavior: dispose the old subscription, not continue a broken stream.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ResumedChannelSubscription
+{
+    public required string Channel { get; init; }
+
+    public required ChannelFlowControl FlowControl { get; init; }
+
+    public required ChannelReceiveProgress ClientReceive { get; init; }
+
+    public required ChannelReceiveProgress HostReceive { get; init; }
+
+    /// <summary>Replay retains the same consumer; live recovery resumes at the live edge.</summary>
+    public ChannelRecoveryKind Recovery { get; init; }
+}
 
 /// <summary>An optionally-sized icon that can be displayed in a user interface.</summary>
 public sealed record Icon
