@@ -1,0 +1,4 @@
+{
+  "type": "security",
+  "message": "Scope MCP authentication tokens to the named server when multiple servers share a protected resource."
+}
