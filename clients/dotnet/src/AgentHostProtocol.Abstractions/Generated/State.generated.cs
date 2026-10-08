@@ -158,6 +158,114 @@ internal sealed class SessionOriginKindConverter : JsonConverter<SessionOriginKi
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Discriminant for {@link Artifact} variants.</summary>
+[JsonConverter(typeof(ArtifactKindConverter))]
+public readonly struct ArtifactKind : IEquatable<ArtifactKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ArtifactKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>An artifact addressed by URI.</summary>
+    public static readonly ArtifactKind Resource = new ArtifactKind("resource");
+
+    /// <inheritdoc />
+    public bool Equals(ArtifactKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ArtifactKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ArtifactKind left, ArtifactKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ArtifactKind left, ArtifactKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ArtifactKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ArtifactKindConverter : JsonConverter<ArtifactKind>
+{
+    /// <inheritdoc />
+    public override ArtifactKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ArtifactKind(reader.GetString() ?? throw new JsonException("ArtifactKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ArtifactKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Why a session or chat references an {@link Artifact}.</summary>
+[JsonConverter(typeof(ArtifactRelationKindConverter))]
+public readonly struct ArtifactRelationKind : IEquatable<ArtifactRelationKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ArtifactRelationKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The session or chat produced it, for example opened the pull request or
+    /// pushed the commit.</summary>
+    public static readonly ArtifactRelationKind Created = new ArtifactRelationKind("created");
+
+    /// <summary>The agent pointed the user at it as worth returning to.</summary>
+    public static readonly ArtifactRelationKind Referenced = new ArtifactRelationKind("referenced");
+
+    /// <summary>The work is derived from it: for example the issue being fixed, or the
+    /// pull request being reviewed or iterated on.</summary>
+    public static readonly ArtifactRelationKind DerivedFrom = new ArtifactRelationKind("derivedFrom");
+
+    /// <inheritdoc />
+    public bool Equals(ArtifactRelationKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ArtifactRelationKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ArtifactRelationKind left, ArtifactRelationKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ArtifactRelationKind left, ArtifactRelationKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ArtifactRelationKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ArtifactRelationKindConverter : JsonConverter<ArtifactRelationKind>
+{
+    /// <inheritdoc />
+    public override ArtifactRelationKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ArtifactRelationKind(reader.GetString() ?? throw new JsonException("ArtifactRelationKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ArtifactRelationKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Discriminant for {@link ChatOrigin} — how a chat came into existence.</summary>
 [JsonConverter(typeof(ChatOriginKindConverter))]
 public readonly struct ChatOriginKind : IEquatable<ChatOriginKind>
@@ -2310,6 +2418,68 @@ public sealed record BackgroundShellWork
     public string? Terminal { get; init; }
 }
 
+/// <summary>A reason a session references an {@link Artifact}.</summary>
+public sealed record ArtifactRelation
+{
+    /// <summary>The kind of relation.</summary>
+    public ArtifactRelationKind Kind { get; init; }
+
+    /// <summary>The chat that established the relation. Absent means the relation
+    /// belongs to the session as a whole.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Chat { get; init; }
+}
+
+/// <summary>An artifact addressed by URI.
+///
+/// The {@link ContentRef.uri | `uri`} is the artifact's key within
+/// {@link SessionState.artifacts}. Hosts SHOULD canonicalize it so the same
+/// item is listed once. Clients typically open `http` and `https` URIs
+/// externally and read other schemes the host serves through `resourceRead`.</summary>
+public sealed record ResourceArtifact
+{
+    /// <summary>A human-readable label, for example a pull request's title.</summary>
+    public required string Label { get; init; }
+
+    /// <summary>Advisory display hint, with the same semantics as
+    /// {@link MessageAttachmentBase.displayKind}. Implementations MAY use any
+    /// value; clients SHOULD fall back to a reasonable default for values they
+    /// do not recognize.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DisplayKind { get; init; }
+
+    /// <summary>Why the session references this artifact.
+    ///
+    /// MUST NOT be empty: the host removes the artifact with
+    /// `session/artifactRemoved` when its last relation goes away. An artifact
+    /// MAY carry several relations, including relations of the same kind
+    /// established by different chats.</summary>
+    public required List<ArtifactRelation> Relations { get; init; }
+
+    /// <summary>Additional implementation-defined metadata, such as forge state or CI status.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Content URI</summary>
+    public required string Uri { get; init; }
+
+    /// <summary>Approximate size in bytes</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? SizeHint { get; init; }
+
+    /// <summary>Content MIME type</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContentType { get; init; }
+
+    /// <summary>Content nonce</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
+
+    /// <summary>Discriminant</summary>
+    public ArtifactKind Type { get; init; } = ArtifactKind.Resource;
+}
+
 /// <summary>A subagent running in the background. Its own state lives in its chat.</summary>
 public sealed record BackgroundSubagentWork
 {
@@ -2930,6 +3100,18 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SessionInputRequest>? InputNeeded { get; set; }
 
+    /// <summary>Durable items the session produced, references, or derives its work
+    /// from, keyed by {@link ResourceArtifact.uri | `uri`}. Order is
+    /// host-authoritative.
+    ///
+    /// A chat's artifacts are the entries with a
+    /// {@link ArtifactRelation | relation} whose `chat` is that chat's URI.
+    ///
+    /// Host-managed: the host upserts entries with `session/artifactSet` and
+    /// removes them with `session/artifactRemoved`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Artifact>? Artifacts { get; set; }
+
     /// <summary>Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -3195,6 +3377,12 @@ public sealed class SessionSummary
     /// client to subscribe to a changeset.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChangesSummary? Changes { get; set; }
+
+    /// <summary>Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Artifact>? Artifacts { get; set; }
 
     /// <summary>Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
@@ -7507,6 +7695,32 @@ internal sealed class BackgroundWorkConverter : UnionConverter<BackgroundWork>
             {
         ["shell"] = typeof(BackgroundShellWork),
         ["subagent"] = typeof(BackgroundSubagentWork),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>Artifact is a durable item a session produced, references, or derives its work from.</summary>
+[JsonConverter(typeof(ArtifactConverter))]
+public sealed class Artifact : AhpUnion
+{
+    /// <summary>Creates an empty Artifact (no active variant).</summary>
+    public Artifact() { }
+
+    /// <summary>Creates a Artifact wrapping the given variant value.</summary>
+    public Artifact(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the Artifact discriminated union.</summary>
+internal sealed class ArtifactConverter : UnionConverter<Artifact>
+{
+    public ArtifactConverter()
+        : base(
+            discriminator: "type",
+            variants: new Dictionary<string, Type>
+            {
+        ["resource"] = typeof(ResourceArtifact),
             },
             allowUnknown: true)
     {

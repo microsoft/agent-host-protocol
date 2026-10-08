@@ -685,6 +685,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
+  'ArtifactKind', 'ArtifactRelationKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -698,6 +699,7 @@ const STATE_STRUCTS = [
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
+  'ArtifactRelation', 'ResourceArtifact',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'Message',
@@ -1248,6 +1250,16 @@ public enum ChatOrigin: Codable, Sendable {
 }`;
 }
 
+const ARTIFACT_UNION: UnionConfig = {
+  name: 'Artifact',
+  discriminantField: 'type',
+  // Open union: future protocol versions may add new artifact kinds.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'resource', structName: 'ResourceArtifact', discriminantValue: 'resource' },
+  ],
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1376,6 +1388,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, ARTIFACT_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
@@ -1447,6 +1461,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/workingDirectoryRemoved', caseName: 'chatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'sessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', caseName: 'sessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/artifactSet', caseName: 'sessionArtifactSet', tsInterface: 'SessionArtifactSetAction' },
+  { type: 'session/artifactRemoved', caseName: 'sessionArtifactRemoved', tsInterface: 'SessionArtifactRemovedAction' },
   { type: 'chat/pendingMessageSet', caseName: 'chatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', caseName: 'chatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', caseName: 'chatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
@@ -2429,6 +2445,7 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'Artifact',                     // ARTIFACT_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()

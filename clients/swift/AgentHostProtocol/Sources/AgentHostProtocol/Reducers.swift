@@ -82,6 +82,14 @@ private func backgroundWorkID(_ w: BackgroundWork) -> String? {
     }
 }
 
+private func artifactURI(_ a: Artifact) -> String? {
+    switch a {
+    case .resource(let x): return x.uri
+    // Types from newer hosts are still keyed by `uri` when they carry one.
+    case .unknown(let raw): return (raw.value as? [String: Any])?["uri"] as? String
+    }
+}
+
 /// Extracts the stable `id` of a session input request, or `nil` for unknown variants.
 private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
     switch r {
@@ -907,6 +915,28 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         list.remove(at: idx)
         next.inputNeeded = list.isEmpty ? nil : list
         next.status = withInputNeededStatus(next.status, list)
+        return next
+
+    // ── Artifacts ───────────────────────────────────────────────────────
+
+    case .sessionArtifactSet(let a):
+        guard let uri = artifactURI(a.artifact) else { return state }
+        var next = state
+        var list = next.artifacts ?? []
+        if let idx = list.firstIndex(where: { artifactURI($0) == uri }) {
+            list[idx] = a.artifact
+        } else {
+            list.append(a.artifact)
+        }
+        next.artifacts = list
+        return next
+
+    case .sessionArtifactRemoved(let a):
+        guard var list = state.artifacts,
+              let idx = list.firstIndex(where: { artifactURI($0) == a.uri }) else { return state }
+        var next = state
+        list.remove(at: idx)
+        next.artifacts = list.isEmpty ? nil : list
         return next
 
     // ── Customizations ──────────────────────────────────────────────────

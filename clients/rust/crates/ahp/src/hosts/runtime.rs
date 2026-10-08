@@ -740,6 +740,9 @@ fn apply_summary_changes(
     if let Some(v) = &changes.changes {
         existing.changes = Some(v.clone());
     }
+    if let Some(v) = &changes.artifacts {
+        existing.artifacts = Some(v.clone());
+    }
     if let Some(v) = &changes.chats {
         existing.chats = Some(v.clone());
     }

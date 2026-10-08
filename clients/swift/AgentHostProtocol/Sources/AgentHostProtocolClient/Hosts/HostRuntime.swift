@@ -833,5 +833,6 @@ private func applySummaryChanges(
     if let v = changes.project { existing.project = v }
     if let v = changes.annotations { existing.annotations = v }
     if let v = changes.workingDirectories { existing.workingDirectories = v }
+    if let v = changes.artifacts { existing.artifacts = v }
     if let v = changes.chats { existing.chats = v }
 }

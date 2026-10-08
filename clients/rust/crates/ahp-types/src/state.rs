@@ -1337,6 +1337,84 @@ impl<'de> serde::Deserialize<'de> for SessionOriginKind {
     }
 }
 
+/// Discriminant for {@link Artifact} variants.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ArtifactKind {
+    /// An artifact addressed by URI.
+    Resource,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ArtifactKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Resource => serializer.serialize_str("resource"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ArtifactKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "resource" => Self::Resource,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Why a session or chat references an {@link Artifact}.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ArtifactRelationKind {
+    /// The session or chat produced it, for example opened the pull request or
+    /// pushed the commit.
+    Created,
+    /// The agent pointed the user at it as worth returning to.
+    Referenced,
+    /// The work is derived from it: for example the issue being fixed, or the
+    /// pull request being reviewed or iterated on.
+    DerivedFrom,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ArtifactRelationKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Created => serializer.serialize_str("created"),
+            Self::Referenced => serializer.serialize_str("referenced"),
+            Self::DerivedFrom => serializer.serialize_str("derivedFrom"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ArtifactRelationKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "created" => Self::Created,
+            "referenced" => Self::Referenced,
+            "derivedFrom" => Self::DerivedFrom,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -2163,6 +2241,58 @@ pub struct BackgroundShellWork {
     pub terminal: Option<Uri>,
 }
 
+/// A reason a session references an {@link Artifact}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactRelation {
+    /// The kind of relation.
+    pub kind: ArtifactRelationKind,
+    /// The chat that established the relation. Absent means the relation
+    /// belongs to the session as a whole.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<Uri>,
+}
+
+/// An artifact addressed by URI.
+///
+/// The {@link ContentRef.uri | `uri`} is the artifact's key within
+/// {@link SessionState.artifacts}. Hosts SHOULD canonicalize it so the same
+/// item is listed once. Clients typically open `http` and `https` URIs
+/// externally and read other schemes the host serves through `resourceRead`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceArtifact {
+    /// A human-readable label, for example a pull request's title.
+    pub label: String,
+    /// Advisory display hint, with the same semantics as
+    /// {@link MessageAttachmentBase.displayKind}. Implementations MAY use any
+    /// value; clients SHOULD fall back to a reasonable default for values they
+    /// do not recognize.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_kind: Option<String>,
+    /// Why the session references this artifact.
+    ///
+    /// MUST NOT be empty: the host removes the artifact with
+    /// `session/artifactRemoved` when its last relation goes away. An artifact
+    /// MAY carry several relations, including relations of the same kind
+    /// established by different chats.
+    pub relations: Vec<ArtifactRelation>,
+    /// Additional implementation-defined metadata, such as forge state or CI status.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Content URI
+    pub uri: Uri,
+    /// Approximate size in bytes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_hint: Option<i64>,
+    /// Content MIME type
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    /// Content nonce
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+}
+
 /// A subagent running in the background. Its own state lives in its chat.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2326,6 +2456,17 @@ pub struct SessionState {
     /// once the underlying request resolves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_needed: Option<Vec<SessionInputRequest>>,
+    /// Durable items the session produced, references, or derives its work
+    /// from, keyed by {@link ResourceArtifact.uri | `uri`}. Order is
+    /// host-authoritative.
+    ///
+    /// A chat's artifacts are the entries with a
+    /// {@link ArtifactRelation | relation} whose `chat` is that chat's URI.
+    ///
+    /// Host-managed: the host upserts entries with `session/artifactSet` and
+    /// removes them with `session/artifactRemoved`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifacts: Option<Vec<Artifact>>,
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -2599,6 +2740,11 @@ pub struct SessionSummary {
     /// client to subscribe to a changeset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changes: Option<ChangesSummary>,
+    /// Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifacts: Option<Vec<Artifact>>,
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -6496,6 +6642,18 @@ pub enum BackgroundWork {
     Shell(BackgroundShellWork),
     #[serde(rename = "subagent")]
     Subagent(BackgroundSubagentWork),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// A durable item a session produced, references, or derives its work from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Artifact {
+    #[serde(rename = "resource")]
+    Resource(ResourceArtifact),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

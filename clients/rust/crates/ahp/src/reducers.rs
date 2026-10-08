@@ -57,9 +57,9 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
-    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
-    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ActiveTurn, AnnotationsState, Artifact, AutomationRunState, AutomationState, BackgroundWork,
+    CanvasState, ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
     McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
     ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
@@ -488,6 +488,13 @@ fn background_work_id(w: &BackgroundWork) -> Option<&str> {
         BackgroundWork::Shell(x) => Some(x.id.as_str()),
         BackgroundWork::Subagent(x) => Some(x.id.as_str()),
         BackgroundWork::Unknown(v) => v.get("id").and_then(serde_json::Value::as_str),
+    }
+}
+
+fn artifact_uri(a: &Artifact) -> Option<&str> {
+    match a {
+        Artifact::Resource(x) => Some(x.uri.as_str()),
+        Artifact::Unknown(v) => v.get("uri").and_then(serde_json::Value::as_str),
     }
 }
 
@@ -935,6 +942,34 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 state.input_needed.as_deref().unwrap_or(&[]),
             );
             state.status = new_status;
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionArtifactSet(a) => {
+            let Some(uri) = artifact_uri(&a.artifact) else {
+                return ReduceOutcome::NoOp;
+            };
+            let list = state.artifacts.get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|x| artifact_uri(x) == Some(uri)) {
+                list[idx] = a.artifact.clone();
+            } else {
+                list.push(a.artifact.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionArtifactRemoved(a) => {
+            let Some(list) = state.artifacts.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list
+                .iter()
+                .position(|x| artifact_uri(x) == Some(a.uri.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
+            if list.is_empty() {
+                state.artifacts = None;
+            }
             ReduceOutcome::Applied
         }
         StateAction::SessionCustomizationsChanged(a) => {
@@ -2297,6 +2332,7 @@ mod tests {
             customizations: None,
             changesets: None,
             input_needed: None,
+            artifacts: None,
             meta: None,
         }
     }

@@ -363,6 +363,38 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       return next;
     }
 
+    // ── Artifacts ───────────────────────────────────────────────────────
+
+    case ActionType.SessionArtifactSet: {
+      const list = state.artifacts ?? [];
+      const idx = list.findIndex(a => a.uri === action.artifact.uri);
+      const artifacts = idx < 0 ? [...list, action.artifact] : list.slice();
+      if (idx >= 0) {
+        artifacts[idx] = action.artifact;
+      }
+      return { ...state, artifacts };
+    }
+
+    case ActionType.SessionArtifactRemoved: {
+      const list = state.artifacts;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(a => a.uri === action.uri);
+      if (idx < 0) {
+        return state;
+      }
+      const remaining = list.slice();
+      remaining.splice(idx, 1);
+      const next: SessionState = { ...state };
+      if (remaining.length > 0) {
+        next.artifacts = remaining;
+      } else {
+        delete next.artifacts;
+      }
+      return next;
+    }
+
     // ── Customizations ──────────────────────────────────────────────────
 
     case ActionType.SessionCustomizationsChanged:

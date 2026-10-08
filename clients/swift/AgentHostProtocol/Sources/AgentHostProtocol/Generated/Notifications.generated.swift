@@ -234,6 +234,10 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// session's footprint (e.g., for list rendering) without requiring the
     /// client to subscribe to a changeset.
     public var changes: ChangesSummary?
+    /// Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.
+    public var artifacts: [Artifact]?
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -257,6 +261,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         case createdAt
         case modifiedAt
         case changes
+        case artifacts
         case meta = "_meta"
         case chats
         case defaultChat
@@ -275,6 +280,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         createdAt: String? = nil,
         modifiedAt: String? = nil,
         changes: ChangesSummary? = nil,
+        artifacts: [Artifact]? = nil,
         meta: [String: AnyCodable]? = nil,
         chats: [SessionChatSummary]? = nil,
         defaultChat: String? = nil
@@ -291,6 +297,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.changes = changes
+        self.artifacts = artifacts
         self.meta = meta
         self.chats = chats
         self.defaultChat = defaultChat

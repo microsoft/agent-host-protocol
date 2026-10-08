@@ -99,6 +99,13 @@ public static class Reducers
         _ => string.Empty,
     };
 
+    private static string ArtifactUri(Artifact artifact) => artifact.Value switch
+    {
+        ResourceArtifact v => v.Uri,
+        JsonElement e when e.TryGetProperty("uri", out JsonElement uri) => uri.GetString() ?? string.Empty,
+        _ => string.Empty,
+    };
+
     private static string SessionInputRequestId(SessionInputRequest req) => req.Value switch
     {
         SessionChatInputRequest v => v.Id,
@@ -848,6 +855,46 @@ public static class Reducers
                     if (state.InputNeeded.Count == 0)
                     {
                         state.InputNeeded = null;
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case SessionArtifactSetAction a:
+                {
+                    // Upsert keyed by artifact uri. Mirrors the TS reducer.
+                    string uri = ArtifactUri(a.Artifact);
+                    state.Artifacts ??= new List<Artifact>();
+                    int idx = state.Artifacts.FindIndex(x => ArtifactUri(x) == uri);
+                    if (idx < 0)
+                    {
+                        state.Artifacts.Add(a.Artifact);
+                    }
+                    else
+                    {
+                        state.Artifacts[idx] = a.Artifact;
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case SessionArtifactRemovedAction a:
+                {
+                    // Remove the entry matching uri; no-op when absent. Drops the list to
+                    // absent once it empties. Mirrors the TS reducer.
+                    if (state.Artifacts is null)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    int idx = state.Artifacts.FindIndex(x => ArtifactUri(x) == a.Uri);
+                    if (idx < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    state.Artifacts.RemoveAt(idx);
+                    if (state.Artifacts.Count == 0)
+                    {
+                        state.Artifacts = null;
                     }
 
                     return ReduceOutcome.Applied;

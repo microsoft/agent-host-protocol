@@ -1042,6 +1042,64 @@ internal object SessionOriginKindSerializer : KSerializer<SessionOriginKind> {
 }
 
 /**
+ * Discriminant for {@link Artifact} variants.
+ */
+@Serializable(with = ArtifactKindSerializer::class)
+@JvmInline
+value class ArtifactKind(val rawValue: String) {
+    companion object {
+        /**
+         * An artifact addressed by URI.
+         */
+        val RESOURCE: ArtifactKind = ArtifactKind("resource")
+    }
+}
+
+internal object ArtifactKindSerializer : KSerializer<ArtifactKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ArtifactKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ArtifactKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ArtifactKind =
+        ArtifactKind(decoder.decodeString())
+}
+
+/**
+ * Why a session or chat references an {@link Artifact}.
+ */
+@Serializable(with = ArtifactRelationKindSerializer::class)
+@JvmInline
+value class ArtifactRelationKind(val rawValue: String) {
+    companion object {
+        /**
+         * The session or chat produced it, for example opened the pull request or
+         * pushed the commit.
+         */
+        val CREATED: ArtifactRelationKind = ArtifactRelationKind("created")
+        /**
+         * The agent pointed the user at it as worth returning to.
+         */
+        val REFERENCED: ArtifactRelationKind = ArtifactRelationKind("referenced")
+        /**
+         * The work is derived from it: for example the issue being fixed, or the
+         * pull request being reviewed or iterated on.
+         */
+        val DERIVED_FROM: ArtifactRelationKind = ArtifactRelationKind("derivedFrom")
+    }
+}
+
+internal object ArtifactRelationKindSerializer : KSerializer<ArtifactRelationKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ArtifactRelationKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ArtifactRelationKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ArtifactRelationKind =
+        ArtifactRelationKind(decoder.decodeString())
+}
+
+/**
  * Operations the host currently permits for an automation.
  *
  * The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1989,6 +2047,18 @@ data class SessionState(
      */
     val inputNeeded: List<SessionInputRequest>? = null,
     /**
+     * Durable items the session produced, references, or derives its work
+     * from, keyed by {@link ResourceArtifact.uri | `uri`}. Order is
+     * host-authoritative.
+     *
+     * A chat's artifacts are the entries with a
+     * {@link ArtifactRelation | relation} whose `chat` is that chat's URI.
+     *
+     * Host-managed: the host upserts entries with `session/artifactSet` and
+     * removes them with `session/artifactRemoved`.
+     */
+    val artifacts: List<Artifact>? = null,
+    /**
      * Additional provider-specific metadata for this session.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -2090,6 +2160,68 @@ data class BackgroundSubagentWork(
      * {@link ToolResultSubagentContent.resource} points to.
      */
     val chat: String
+)
+
+@Serializable
+data class ArtifactRelation(
+    /**
+     * The kind of relation.
+     */
+    val kind: ArtifactRelationKind,
+    /**
+     * The chat that established the relation. Absent means the relation
+     * belongs to the session as a whole.
+     */
+    val chat: String? = null
+)
+
+@Serializable
+data class ResourceArtifact(
+    /**
+     * A human-readable label, for example a pull request's title.
+     */
+    val label: String,
+    /**
+     * Advisory display hint, with the same semantics as
+     * {@link MessageAttachmentBase.displayKind}. Implementations MAY use any
+     * value; clients SHOULD fall back to a reasonable default for values they
+     * do not recognize.
+     */
+    val displayKind: String? = null,
+    /**
+     * Why the session references this artifact.
+     *
+     * MUST NOT be empty: the host removes the artifact with
+     * `session/artifactRemoved` when its last relation goes away. An artifact
+     * MAY carry several relations, including relations of the same kind
+     * established by different chats.
+     */
+    val relations: List<ArtifactRelation>,
+    /**
+     * Additional implementation-defined metadata, such as forge state or CI status.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Content URI
+     */
+    val uri: String,
+    /**
+     * Approximate size in bytes
+     */
+    val sizeHint: Long? = null,
+    /**
+     * Content MIME type
+     */
+    val contentType: String? = null,
+    /**
+     * Content nonce
+     */
+    val nonce: String? = null,
+    /**
+     * Discriminant
+     */
+    val type: ArtifactKind
 )
 
 @Serializable
@@ -2311,6 +2443,12 @@ data class SessionSummary(
      * client to subscribe to a changeset.
      */
     val changes: ChangesSummary? = null,
+    /**
+     * Artifacts to show with the session in session lists, mirroring
+     * {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+     * omit entries that {@link SessionState.artifacts} carries.
+     */
+    val artifacts: List<Artifact>? = null,
     /**
      * Lightweight server-defined metadata clients may use for the session
      * presentation. The protocol does not interpret these values; producers
@@ -7175,6 +7313,51 @@ internal object BackgroundWorkSerializer : KSerializer<BackgroundWork> {
             is BackgroundWorkShell -> output.json.encodeToJsonElement(BackgroundShellWork.serializer(), value.value)
             is BackgroundWorkSubagent -> output.json.encodeToJsonElement(BackgroundSubagentWork.serializer(), value.value)
             is BackgroundWorkUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = ArtifactSerializer::class)
+sealed interface Artifact
+
+@JvmInline
+value class ArtifactResource(val value: ResourceArtifact) : Artifact
+/**
+ * Forward-compat catch-all for unknown Artifact discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class ArtifactUnknown(val raw: JsonObject) : Artifact
+
+internal object ArtifactSerializer : KSerializer<Artifact> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("Artifact")
+
+    override fun deserialize(decoder: Decoder): Artifact {
+        val input = decoder as? JsonDecoder
+            ?: error("Artifact can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for Artifact")
+        val discriminant = (obj["type"] as? JsonPrimitive)?.content
+            ?: return ArtifactUnknown(obj)
+        return when (discriminant) {
+            "resource" -> ArtifactResource(input.json.decodeFromJsonElement(ResourceArtifact.serializer(), element))
+            else -> ArtifactUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Artifact) {
+        val output = encoder as? JsonEncoder
+            ?: error("Artifact can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ArtifactResource -> output.json.encodeToJsonElement(ResourceArtifact.serializer(), value.value)
+            is ArtifactUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

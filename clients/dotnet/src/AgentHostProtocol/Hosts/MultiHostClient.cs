@@ -360,7 +360,7 @@ internal sealed class HostEntry : IDisposable
             // its immutable view (the prior object is never touched). Identity fields
             // (Resource/Provider/CreatedAt) are preserved per spec; the patch overrides
             // the fields it carries; EVERY other field is carried over verbatim — copy
-            // all 14 so none (e.g. Agent / Annotations, absent from the patch) is dropped.
+            // all 15 so none (e.g. Agent / Annotations, absent from the patch) is dropped.
             _sessionSummaries[uri] = new SessionSummary
             {
                 Resource = existing.Resource,
@@ -373,6 +373,7 @@ internal sealed class HostEntry : IDisposable
                 Project = changes.Project ?? existing.Project,
                 WorkingDirectories = changes.WorkingDirectories ?? existing.WorkingDirectories,
                 Changes = changes.Changes ?? existing.Changes,
+                Artifacts = changes.Artifacts ?? existing.Artifacts,
                 Annotations = existing.Annotations,
                 Meta = changes.Meta ?? existing.Meta,
                 Chats = changes.Chats ?? existing.Chats,

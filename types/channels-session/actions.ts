@@ -10,6 +10,8 @@ import type {
   ToolDefinition,
   SessionActiveClient,
   SessionInputRequest,
+  Artifact,
+  ResourceArtifact,
   Customization,
   CustomizationEnablement,
   McpServerState,
@@ -395,6 +397,47 @@ export interface SessionInputNeededRemovedAction {
   type: ActionType.SessionInputNeededRemoved;
   /** The `id` of the input request to remove. */
   id: string;
+}
+
+// ─── Artifact Actions ────────────────────────────────────────────────────────
+
+/**
+ * A session artifact was added or updated.
+ *
+ * Upsert semantics keyed by {@link ResourceArtifact.uri | `artifact.uri`}: the
+ * host dispatches this with the full {@link Artifact} to append a new entry to
+ * {@link SessionState.artifacts} or replace the existing entry with the same
+ * `uri` in place.
+ *
+ * Server-originated: hosts record artifacts as the session's chats produce or
+ * reference items, or as the host learns what the session's work derives from.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionArtifactSetAction {
+  type: ActionType.SessionArtifactSet;
+  /** The artifact to add or update, matched by `uri`. */
+  artifact: Artifact;
+}
+
+/**
+ * A session artifact was removed.
+ *
+ * Removes the entry identified by `uri` from {@link SessionState.artifacts};
+ * a no-op when no entry matches.
+ *
+ * Hosts dispatch this when an artifact's last relation goes away. Clients MAY
+ * dispatch it to dismiss an artifact; the host decides whether to accept it.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface SessionArtifactRemovedAction {
+  type: ActionType.SessionArtifactRemoved;
+  /** The `uri` of the artifact to remove. */
+  uri: URI;
 }
 
 // ─── Customization Actions ───────────────────────────────────────────────────

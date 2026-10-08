@@ -335,6 +335,12 @@ public sealed record PartialSessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChangesSummary? Changes { get; init; }
 
+    /// <summary>Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Artifact>? Artifacts { get; init; }
+
     /// <summary>Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists

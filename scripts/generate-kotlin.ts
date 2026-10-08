@@ -984,6 +984,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
+  'ArtifactKind', 'ArtifactRelationKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -997,6 +998,7 @@ const STATE_STRUCTS = [
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
+  'ArtifactRelation', 'ResourceArtifact',
   'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
@@ -1342,6 +1344,15 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
   unknown: true,
 };
 
+const ARTIFACT_UNION: UnionConfig = {
+  name: 'Artifact',
+  discriminantField: 'type',
+  variants: [
+    { caseName: 'Resource', structName: 'ResourceArtifact', discriminantValue: 'resource' },
+  ],
+  unknown: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1478,6 +1489,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, ARTIFACT_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
@@ -1548,6 +1561,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/workingDirectoryRemoved', caseName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', caseName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/artifactSet', caseName: 'SessionArtifactSet', tsInterface: 'SessionArtifactSetAction' },
+  { type: 'session/artifactRemoved', caseName: 'SessionArtifactRemoved', tsInterface: 'SessionArtifactRemovedAction' },
   { type: 'chat/pendingMessageSet', caseName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', caseName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', caseName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
@@ -2411,6 +2426,7 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'Artifact',                     // ARTIFACT_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union

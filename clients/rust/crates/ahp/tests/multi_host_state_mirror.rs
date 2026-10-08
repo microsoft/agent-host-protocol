@@ -66,6 +66,7 @@ fn session_state(title: &str, _resource: &str) -> SessionState {
         customizations: None,
         changesets: None,
         input_needed: None,
+        artifacts: None,
         meta: None,
     }
 }
@@ -532,6 +533,7 @@ fn non_action_event_is_ignored() {
                 project: None,
                 working_directories: None,
                 changes: None,
+                artifacts: None,
                 annotations: None,
                 meta: None,
                 chats: None,

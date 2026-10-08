@@ -751,6 +751,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
+  'ArtifactKind', 'ArtifactRelationKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
   'ChatInputQuestionKind', 'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
@@ -787,6 +788,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'PendingMessage' },
   { name: 'ChatSummary', mutable: true },
   { name: 'BackgroundShellWork' },
+  { name: 'ArtifactRelation' },
+  { name: 'ResourceArtifact' },
   { name: 'BackgroundSubagentWork' },
   { name: 'ChatState', mutable: true },
   { name: 'CanvasReference' },
@@ -1312,6 +1315,16 @@ const TERMINAL_LIFECYCLE_STATE_UNION: UnionConfig = {
   ],
 };
 
+const ARTIFACT_UNION: UnionConfig = {
+  name: 'Artifact',
+  discriminantField: 'type',
+  doc: 'Artifact is a durable item a session produced, references, or derives its work from.',
+  variants: [
+    { variantName: 'Resource', innerType: 'ResourceArtifact', wireValue: 'resource' },
+  ],
+  unknown: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1573,7 +1586,7 @@ function generateStateFile(project: Project): string {
     CHAT_INPUT_QUESTION_UNION, CHAT_INPUT_ANSWER_VALUE_UNION, CHAT_INPUT_ANSWER_UNION,
     TOOL_RESULT_CONTENT_UNION, MESSAGE_ATTACHMENT_UNION, CUSTOMIZATION_UNION,
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
-    MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
+    MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION, ARTIFACT_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
@@ -1628,6 +1641,8 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'session/workingDirectoryReplaced', variantName: 'SessionWorkingDirectoryReplaced', tsInterface: 'SessionWorkingDirectoryReplacedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/artifactSet', variantName: 'SessionArtifactSet', tsInterface: 'SessionArtifactSetAction' },
+  { type: 'session/artifactRemoved', variantName: 'SessionArtifactRemoved', tsInterface: 'SessionArtifactRemovedAction' },
   { type: 'session/pendingMessageSet', variantName: 'SessionPendingMessageSet', tsInterface: '_hand_written_session_action_' },
   { type: 'session/pendingMessageRemoved', variantName: 'SessionPendingMessageRemoved', tsInterface: '_hand_written_session_action_' },
   { type: 'session/queuedMessagesReordered', variantName: 'SessionQueuedMessagesReordered', tsInterface: '_hand_written_session_action_' },
@@ -2828,7 +2843,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
-    'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
+    'SessionInputRequest', 'BackgroundWork', 'Artifact', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',

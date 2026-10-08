@@ -13,9 +13,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
-    SessionSummary,
+    AgentSelection, AnnotationsSummary, Artifact, ChangesSummary, Changeset, FileEdit,
+    ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin,
+    SessionStatus, SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -315,6 +315,11 @@ pub struct PartialSessionSummary {
     /// client to subscribe to a changeset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changes: Option<ChangesSummary>,
+    /// Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifacts: Option<Vec<Artifact>>,
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists

@@ -119,6 +119,24 @@ Every entry carries the owning `chat` URI plus the identifiers (`request.id`, or
 
 `toolAuthentication` is the one exception to the "respond via `chat/*` action" pattern: the client resolves it by calling the connection-level `authenticate` command with the resource from `toolCall.auth.resource` (see [Authentication](/specification/authentication)), not by dispatching an action to the chat. The host dispatches `chat/toolCallAuthResolved` once the token is accepted and removes the `session/inputNeeded` entry at that point.
 
+### Artifacts
+
+[`SessionState.artifacts`](/reference/session#sessionstate) lists the durable items a session produced, references, or derives its work from, such as a pull request it opened, an issue it is fixing, or a document the agent pointed the user at. Clients use it to show these items next to the session or a chat without parsing the transcript or provider-specific `_meta`.
+
+Each entry is an [`Artifact`](/reference/session#artifact), a discriminated union over `type`. Today the only variant is `resource`, which addresses the item by `uri` and carries a `label`, an advisory `displayKind` (with the same semantics as attachments' `displayKind`), and optional `_meta`. Artifacts do not model forge-specific shapes: a pull request is a `resource` whose `uri` is the pull request's web URL, and details such as its number or merge state are parsed from the URL, fetched by the client, or carried in `_meta`.
+
+Each artifact carries one or more [`ArtifactRelation`](/reference/session#artifactrelation)s explaining why the session references it:
+
+| `kind` | Meaning |
+|---|---|
+| `created` | The session or chat produced it, e.g. opened the pull request or pushed the commit. |
+| `referenced` | The agent pointed the user at it as worth returning to. |
+| `derivedFrom` | The work is derived from it, e.g. the issue being fixed or the pull request being reviewed or iterated on. |
+
+A relation's optional `chat` names the chat that established it; a relation without `chat` belongs to the session as a whole. The list is keyed by `uri`, so an item related to the session in several ways, or by several chats, is one entry with several relations. A chat's artifacts are the entries with a relation whose `chat` is that chat. Artifacts MUST NOT describe relationships between chats in the same session; that lineage belongs to each chat's [`origin`](/reference/chat#chatorigin).
+
+The host upserts entries with `session/artifactSet` and removes them with `session/artifactRemoved`, which it dispatches when an artifact's last relation goes away. Clients MAY dispatch `session/artifactRemoved` to dismiss an artifact; the host decides whether to accept it. The host MAY also mirror a small subset of the list onto [`SessionSummary.artifacts`](/reference/session#sessionsummary) so session lists can show artifacts without subscribing.
+
 ### Disposal
 
 ```jsonc

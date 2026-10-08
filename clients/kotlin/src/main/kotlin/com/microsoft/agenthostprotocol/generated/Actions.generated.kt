@@ -74,6 +74,8 @@ value class ActionType(val rawValue: String) {
         val SESSION_WORKING_DIRECTORY_REPLACED: ActionType = ActionType("session/workingDirectoryReplaced")
         val SESSION_INPUT_NEEDED_SET: ActionType = ActionType("session/inputNeededSet")
         val SESSION_INPUT_NEEDED_REMOVED: ActionType = ActionType("session/inputNeededRemoved")
+        val SESSION_ARTIFACT_SET: ActionType = ActionType("session/artifactSet")
+        val SESSION_ARTIFACT_REMOVED: ActionType = ActionType("session/artifactRemoved")
         val CHAT_PENDING_MESSAGE_SET: ActionType = ActionType("chat/pendingMessageSet")
         val CHAT_PENDING_MESSAGE_REMOVED: ActionType = ActionType("chat/pendingMessageRemoved")
         val CHAT_QUEUED_MESSAGES_REORDERED: ActionType = ActionType("chat/queuedMessagesReordered")
@@ -991,6 +993,24 @@ data class SessionInputNeededRemovedAction(
 )
 
 @Serializable
+data class SessionArtifactSetAction(
+    val type: ActionType,
+    /**
+     * The artifact to add or update, matched by `uri`.
+     */
+    val artifact: Artifact
+)
+
+@Serializable
+data class SessionArtifactRemovedAction(
+    val type: ActionType,
+    /**
+     * The `uri` of the artifact to remove.
+     */
+    val uri: String
+)
+
+@Serializable
 data class ChatPendingMessageSetAction(
     val type: ActionType,
     /**
@@ -1741,6 +1761,8 @@ sealed interface StateAction
 @JvmInline value class StateActionChatWorkingDirectoryRemoved(val value: ChatWorkingDirectoryRemovedAction) : StateAction
 @JvmInline value class StateActionSessionInputNeededSet(val value: SessionInputNeededSetAction) : StateAction
 @JvmInline value class StateActionSessionInputNeededRemoved(val value: SessionInputNeededRemovedAction) : StateAction
+@JvmInline value class StateActionSessionArtifactSet(val value: SessionArtifactSetAction) : StateAction
+@JvmInline value class StateActionSessionArtifactRemoved(val value: SessionArtifactRemovedAction) : StateAction
 @JvmInline value class StateActionChatPendingMessageSet(val value: ChatPendingMessageSetAction) : StateAction
 @JvmInline value class StateActionChatPendingMessageRemoved(val value: ChatPendingMessageRemovedAction) : StateAction
 @JvmInline value class StateActionChatQueuedMessagesReordered(val value: ChatQueuedMessagesReorderedAction) : StateAction
@@ -1862,6 +1884,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/workingDirectoryRemoved" -> StateActionChatWorkingDirectoryRemoved(input.json.decodeFromJsonElement(ChatWorkingDirectoryRemovedAction.serializer(), element))
             "session/inputNeededSet" -> StateActionSessionInputNeededSet(input.json.decodeFromJsonElement(SessionInputNeededSetAction.serializer(), element))
             "session/inputNeededRemoved" -> StateActionSessionInputNeededRemoved(input.json.decodeFromJsonElement(SessionInputNeededRemovedAction.serializer(), element))
+            "session/artifactSet" -> StateActionSessionArtifactSet(input.json.decodeFromJsonElement(SessionArtifactSetAction.serializer(), element))
+            "session/artifactRemoved" -> StateActionSessionArtifactRemoved(input.json.decodeFromJsonElement(SessionArtifactRemovedAction.serializer(), element))
             "chat/pendingMessageSet" -> StateActionChatPendingMessageSet(input.json.decodeFromJsonElement(ChatPendingMessageSetAction.serializer(), element))
             "chat/pendingMessageRemoved" -> StateActionChatPendingMessageRemoved(input.json.decodeFromJsonElement(ChatPendingMessageRemovedAction.serializer(), element))
             "chat/queuedMessagesReordered" -> StateActionChatQueuedMessagesReordered(input.json.decodeFromJsonElement(ChatQueuedMessagesReorderedAction.serializer(), element))
@@ -1976,6 +2000,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatWorkingDirectoryRemoved -> output.json.encodeToJsonElement(ChatWorkingDirectoryRemovedAction.serializer(), value.value)
             is StateActionSessionInputNeededSet -> output.json.encodeToJsonElement(SessionInputNeededSetAction.serializer(), value.value)
             is StateActionSessionInputNeededRemoved -> output.json.encodeToJsonElement(SessionInputNeededRemovedAction.serializer(), value.value)
+            is StateActionSessionArtifactSet -> output.json.encodeToJsonElement(SessionArtifactSetAction.serializer(), value.value)
+            is StateActionSessionArtifactRemoved -> output.json.encodeToJsonElement(SessionArtifactRemovedAction.serializer(), value.value)
             is StateActionChatPendingMessageSet -> output.json.encodeToJsonElement(ChatPendingMessageSetAction.serializer(), value.value)
             is StateActionChatPendingMessageRemoved -> output.json.encodeToJsonElement(ChatPendingMessageRemovedAction.serializer(), value.value)
             is StateActionChatQueuedMessagesReordered -> output.json.encodeToJsonElement(ChatQueuedMessagesReorderedAction.serializer(), value.value)

@@ -267,6 +267,12 @@ private fun backgroundWorkId(w: BackgroundWork): String? = when (w) {
     is BackgroundWorkUnknown -> (w.raw["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
 }
 
+private fun artifactUri(a: Artifact): String? = when (a) {
+    is ArtifactResource -> a.value.uri
+    // Types from newer hosts are still keyed by `uri` when they carry one.
+    is ArtifactUnknown -> (a.raw["uri"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+}
+
 private fun sessionInputRequestId(r: SessionInputRequest): String? = when (r) {
     is SessionInputRequestChatInput -> r.value.id
     is SessionInputRequestToolConfirmation -> r.value.id
@@ -745,6 +751,33 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                     inputNeeded = if (updated.isEmpty()) null else updated,
                     status = withInputNeededStatus(state.status, updated),
                 )
+            }
+        }
+    }
+
+    is StateActionSessionArtifactSet -> {
+        val artifact = action.value.artifact
+        val uri = artifactUri(artifact)
+        if (uri == null) state else {
+            val list = state.artifacts ?: emptyList()
+            val idx = list.indexOfFirst { artifactUri(it) == uri }
+            val updated = if (idx < 0) {
+                list + artifact
+            } else {
+                list.toMutableList().also { it[idx] = artifact }
+            }
+            state.copy(artifacts = updated)
+        }
+    }
+
+    is StateActionSessionArtifactRemoved -> {
+        val list = state.artifacts
+        if (list == null) state else {
+            val idx = list.indexOfFirst { artifactUri(it) == action.value.uri }
+            if (idx < 0) state else {
+                val updated = list.toMutableList()
+                updated.removeAt(idx)
+                state.copy(artifacts = if (updated.isEmpty()) null else updated)
             }
         }
     }

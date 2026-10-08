@@ -1,0 +1,48 @@
+{
+  "name": "session-artifact-unknown-type-preserved",
+  "group": "A",
+  "description": "ArtifactKind is @nonexhaustive AND the discriminator of the Artifact union, so an artifact whose type a client does not recognize must be preserved verbatim by the union decoder rather than rejected or dropped, letting newer hosts add artifact variants without breaking older clients.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Hello",
+    "status": 0,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "artifacts": [
+      {
+        "type": "future-artifact-xyz",
+        "label": "From a newer host",
+        "relations": [
+          {
+            "kind": "created"
+          }
+        ],
+        "detail": "opaque"
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Hello",
+      "status": 0,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "artifacts": [
+        {
+          "type": "future-artifact-xyz",
+          "label": "From a newer host",
+          "relations": [
+            {
+              "kind": "created"
+            }
+          ],
+          "detail": "opaque"
+        }
+      ]
+    }
+  ]
+}

@@ -115,6 +115,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType SessionInputNeededRemoved = new ActionType("session/inputNeededRemoved");
 
+    public static readonly ActionType SessionArtifactSet = new ActionType("session/artifactSet");
+
+    public static readonly ActionType SessionArtifactRemoved = new ActionType("session/artifactRemoved");
+
     public static readonly ActionType ChatPendingMessageSet = new ActionType("chat/pendingMessageSet");
 
     public static readonly ActionType ChatPendingMessageRemoved = new ActionType("chat/pendingMessageRemoved");
@@ -877,6 +881,38 @@ public sealed record SessionInputNeededRemovedAction
 
     /// <summary>The `id` of the input request to remove.</summary>
     public required string Id { get; init; }
+}
+
+/// <summary>A session artifact was added or updated.
+///
+/// Upsert semantics keyed by {@link ResourceArtifact.uri | `artifact.uri`}: the
+/// host dispatches this with the full {@link Artifact} to append a new entry to
+/// {@link SessionState.artifacts} or replace the existing entry with the same
+/// `uri` in place.
+///
+/// Server-originated: hosts record artifacts as the session's chats produce or
+/// reference items, or as the host learns what the session's work derives from.</summary>
+public sealed record SessionArtifactSetAction
+{
+    public ActionType Type { get; init; } = ActionType.SessionArtifactSet;
+
+    /// <summary>The artifact to add or update, matched by `uri`.</summary>
+    public required Artifact Artifact { get; init; }
+}
+
+/// <summary>A session artifact was removed.
+///
+/// Removes the entry identified by `uri` from {@link SessionState.artifacts};
+/// a no-op when no entry matches.
+///
+/// Hosts dispatch this when an artifact's last relation goes away. Clients MAY
+/// dispatch it to dismiss an artifact; the host decides whether to accept it.</summary>
+public sealed record SessionArtifactRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.SessionArtifactRemoved;
+
+    /// <summary>The `uri` of the artifact to remove.</summary>
+    public required string Uri { get; init; }
 }
 
 /// <summary>The session's customizations have changed.
@@ -2812,6 +2848,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["session/workingDirectoryReplaced"] = typeof(SessionWorkingDirectoryReplacedAction),
         ["session/inputNeededSet"] = typeof(SessionInputNeededSetAction),
         ["session/inputNeededRemoved"] = typeof(SessionInputNeededRemovedAction),
+        ["session/artifactSet"] = typeof(SessionArtifactSetAction),
+        ["session/artifactRemoved"] = typeof(SessionArtifactRemovedAction),
         ["session/pendingMessageSet"] = typeof(SessionPendingMessageSetAction),
         ["session/pendingMessageRemoved"] = typeof(SessionPendingMessageRemovedAction),
         ["session/queuedMessagesReordered"] = typeof(SessionQueuedMessagesReorderedAction),

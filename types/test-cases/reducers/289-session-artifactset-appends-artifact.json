@@ -1,0 +1,49 @@
+{
+  "description": "session/artifactSet appends an artifact whose uri is not yet listed, creating the list when absent",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/artifactSet",
+      "artifact": {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  }
+}

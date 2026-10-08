@@ -1,0 +1,124 @@
+{
+  "name": "session-summary-artifacts",
+  "group": "A",
+  "description": "SessionSummary.artifacts round-trips each artifact's ContentRef fields, optional displayKind and _meta, and relations with and without a chat. ArtifactRelationKind is @nonexhaustive, so an unrecognized relation kind is preserved verbatim, and absent optional fields stay absent instead of re-encoding as null.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Hello",
+    "status": 0,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/pull/7",
+        "label": "Show a session's pull request",
+        "displayKind": "pullRequest",
+        "relations": [
+          {
+            "kind": "created",
+            "chat": "ahp-chat:/s1/main"
+          },
+          {
+            "kind": "referenced",
+            "chat": "ahp-chat:/s1/side"
+          }
+        ],
+        "_meta": {
+          "forge": {
+            "state": "open"
+          }
+        }
+      },
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          },
+          {
+            "kind": "future-relation-xyz",
+            "chat": "ahp-chat:/s1/main"
+          }
+        ]
+      },
+      {
+        "type": "resource",
+        "uri": "ahp-session:/s1/report.md",
+        "label": "report.md",
+        "displayKind": "document",
+        "contentType": "text/markdown",
+        "sizeHint": 2048,
+        "relations": [
+          {
+            "kind": "created"
+          }
+        ]
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Hello",
+      "status": 0,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "artifacts": [
+        {
+          "type": "resource",
+          "uri": "https://github.com/octo/repo/pull/7",
+          "label": "Show a session's pull request",
+          "displayKind": "pullRequest",
+          "relations": [
+            {
+              "kind": "created",
+              "chat": "ahp-chat:/s1/main"
+            },
+            {
+              "kind": "referenced",
+              "chat": "ahp-chat:/s1/side"
+            }
+          ],
+          "_meta": {
+            "forge": {
+              "state": "open"
+            }
+          }
+        },
+        {
+          "type": "resource",
+          "uri": "https://github.com/octo/repo/issues/42",
+          "label": "Sessions don't show their pull request",
+          "relations": [
+            {
+              "kind": "derivedFrom"
+            },
+            {
+              "kind": "future-relation-xyz",
+              "chat": "ahp-chat:/s1/main"
+            }
+          ]
+        },
+        {
+          "type": "resource",
+          "uri": "ahp-session:/s1/report.md",
+          "label": "report.md",
+          "displayKind": "document",
+          "contentType": "text/markdown",
+          "sizeHint": 2048,
+          "relations": [
+            {
+              "kind": "created"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

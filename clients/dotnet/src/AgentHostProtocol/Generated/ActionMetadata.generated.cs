@@ -217,6 +217,12 @@ internal static class GeneratedActionMetadata
             case SessionActivityChangedAction value:
                 actionType = value.Type;
                 return true;
+            case SessionArtifactRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case SessionArtifactSetAction value:
+                actionType = value.Type;
+                return true;
             case SessionChangesetsChangedAction value:
                 actionType = value.Type;
                 return true;
