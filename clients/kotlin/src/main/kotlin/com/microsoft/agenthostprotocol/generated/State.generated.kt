@@ -1751,9 +1751,14 @@ data class ChatState(
      */
     val activeTurn: ActiveTurn? = null,
     /**
-     * Message to inject into the current turn at a convenient point
+     * Legacy replaceable steering slot, independent of {@link steeringMessages}.
      */
     val steeringMessage: PendingMessage? = null,
+    /**
+     * Independently submitted steering messages, in host acceptance order.
+     * Requires negotiated {@link InitializeResult.steeringMessages} support.
+     */
+    val steeringMessages: List<PendingMessage>? = null,
     /**
      * Messages to send automatically as new turns after the current turn finishes
      */

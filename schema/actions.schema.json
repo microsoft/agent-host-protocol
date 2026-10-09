@@ -762,7 +762,7 @@
         },
         "queuedMessageId": {
           "type": "string",
-          "description": "If this turn was auto-started from a queued message, the ID of that message"
+          "description": "If this turn consumes a queued or steering message, the ID of that message."
         },
         "_meta": {
           "type": "object",
@@ -1591,7 +1591,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nIt never changes the independent {@link ChatState.steeringMessages} list.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"
@@ -1635,6 +1635,40 @@
       "required": [
         "type",
         "kind",
+        "id"
+      ]
+    },
+    "ChatSteeringMessageSetAction": {
+      "type": "object",
+      "description": "Upserts one independently submitted steering message without changing the legacy slot.\nRequires negotiated {@link InitializeResult.steeringMessages} support.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "properties": {
+        "type": {
+          "const": "chat/steeringMessageSet"
+        },
+        "steeringMessage": {
+          "$ref": "#/$defs/PendingMessage",
+          "description": "Full entry; a new ID appends and an existing ID is replaced in place."
+        }
+      },
+      "required": [
+        "type",
+        "steeringMessage"
+      ]
+    },
+    "ChatSteeringMessageRemovedAction": {
+      "type": "object",
+      "description": "Removes one message from {@link ChatState.steeringMessages}, leaving other messages and the legacy slot unchanged.\nRequires negotiated {@link InitializeResult.steeringMessages} support.",
+      "properties": {
+        "type": {
+          "const": "chat/steeringMessageRemoved"
+        },
+        "id": {
+          "type": "string",
+          "description": "Identifier of the consumed or cancelled steering message."
+        }
+      },
+      "required": [
+        "type",
         "id"
       ]
     },
@@ -2631,6 +2665,12 @@
         },
         {
           "$ref": "#/$defs/ChatPendingMessageRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatSteeringMessageSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatSteeringMessageRemovedAction"
         },
         {
           "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
@@ -5165,7 +5205,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy replaceable steering slot, independent of {@link steeringMessages}."
+        },
+        "steeringMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PendingMessage"
+          },
+          "description": "Independently submitted steering messages, in host acceptance order.\nRequires negotiated {@link InitializeResult.steeringMessages} support."
         },
         "queuedMessages": {
           "type": "array",
@@ -9311,6 +9358,12 @@
         },
         {
           "$ref": "#/$defs/ChatPendingMessageRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatSteeringMessageSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatSteeringMessageRemovedAction"
         },
         {
           "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"

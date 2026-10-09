@@ -149,6 +149,9 @@ type InitializeParams struct {
 // with required `UnsupportedProtocolVersionErrorData` containing
 // `supportedVersions`, instead of a result.
 type InitializeResult struct {
+	// Host supports the independent steering-message list and its actions.
+	// Advertised only when {@link ClientCapabilities.steeringMessages} was declared.
+	SteeringMessages *map[string]json.RawMessage `json:"steeringMessages,omitempty"`
 	// Protocol version selected by the server. MUST be one of the entries in
 	// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
 	// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -200,6 +203,8 @@ type InitializeResult struct {
 // absence means "not supported". Sub-fields on individual capabilities
 // are reserved for future per-capability options.
 type ClientCapabilities struct {
+	// Client understands the independent {@link ChatState.steeringMessages} list and its actions.
+	SteeringMessages *map[string]json.RawMessage `json:"steeringMessages,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -211,7 +216,7 @@ type ClientCapabilities struct {
 	// {@link McpServerCustomization.channel | `mcp://` channel}) when this
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
-	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
 }
 
 // Automation features supported by this host authority.

@@ -1356,8 +1356,11 @@ type ChatState struct {
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
-	// Message to inject into the current turn at a convenient point
+	// Legacy replaceable steering slot, independent of {@link steeringMessages}.
 	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
+	// Independently submitted steering messages, in host acceptance order.
+	// Requires negotiated {@link InitializeResult.steeringMessages} support.
+	SteeringMessages []PendingMessage `json:"steeringMessages,omitempty"`
 	// Messages to send automatically as new turns after the current turn finishes
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
 	// The user's in-progress draft input for this chat — the message they are
@@ -3315,7 +3318,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 }
@@ -3726,7 +3729,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review map[string]json.RawMessage `json:"review,omitempty"`
+	Review *map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to

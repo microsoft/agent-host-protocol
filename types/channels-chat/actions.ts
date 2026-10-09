@@ -12,6 +12,7 @@ import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   BackgroundWork,
   Message,
+  PendingMessage,
   ResponsePart,
   ToolCallResult,
   ToolResultContent,
@@ -76,7 +77,7 @@ export interface ChatTurnStartedAction {
   startedAt: string;
   /** The new message */
   message: Message;
-  /** If this turn was auto-started from a queued message, the ID of that message */
+  /** If this turn consumes a queued or steering message, the ID of that message. */
   queuedMessageId?: string;
   /**
    * Additional provider-specific metadata for this action.
@@ -768,6 +769,7 @@ export interface ChatTurnsLoadedAction {
  * A pending message was set (upsert semantics: creates or replaces).
  *
  * For steering messages, this always replaces the single steering message.
+ * It never changes the independent {@link ChatState.steeringMessages} list.
  * For queued messages, if a message with the given `id` already exists it is
  * updated in place; otherwise it is appended to the queue. If the chat is
  * idle when a queued message is set, the server SHOULD immediately consume it
@@ -805,6 +807,36 @@ export interface ChatPendingMessageRemovedAction {
   /** Whether this is a steering or queued message */
   kind: PendingMessageKind;
   /** Identifier of the pending message to remove */
+  id: string;
+}
+
+/**
+ * Upserts one independently submitted steering message without changing the legacy slot.
+ * Requires negotiated {@link InitializeResult.steeringMessages} support.
+ *
+ * A client is only allowed to send {@link MessageKind.User} messages.
+ *
+ * @category Chat Actions
+ * @version 1.1.0
+ * @clientDispatchable
+ */
+export interface ChatSteeringMessageSetAction {
+  type: ActionType.ChatSteeringMessageSet;
+  /** Full entry; a new ID appends and an existing ID is replaced in place. */
+  steeringMessage: PendingMessage;
+}
+
+/**
+ * Removes one message from {@link ChatState.steeringMessages}, leaving other messages and the legacy slot unchanged.
+ * Requires negotiated {@link InitializeResult.steeringMessages} support.
+ *
+ * @category Chat Actions
+ * @version 1.1.0
+ * @clientDispatchable
+ */
+export interface ChatSteeringMessageRemovedAction {
+  type: ActionType.ChatSteeringMessageRemoved;
+  /** Identifier of the consumed or cancelled steering message. */
   id: string;
 }
 
@@ -980,6 +1012,8 @@ export type ChatAction =
   | ChatTurnsLoadedAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
+  | ChatSteeringMessageSetAction
+  | ChatSteeringMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
   | ChatIsReadChangedAction

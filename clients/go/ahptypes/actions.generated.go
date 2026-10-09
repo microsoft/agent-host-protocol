@@ -66,6 +66,8 @@ const (
 	ActionTypeSessionInputNeededRemoved           ActionType = "session/inputNeededRemoved"
 	ActionTypeChatPendingMessageSet               ActionType = "chat/pendingMessageSet"
 	ActionTypeChatPendingMessageRemoved           ActionType = "chat/pendingMessageRemoved"
+	ActionTypeChatSteeringMessageSet              ActionType = "chat/steeringMessageSet"
+	ActionTypeChatSteeringMessageRemoved          ActionType = "chat/steeringMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered         ActionType = "chat/queuedMessagesReordered"
 	ActionTypeChatDraftChanged                    ActionType = "chat/draftChanged"
 	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
@@ -259,7 +261,7 @@ type ChatTurnStartedAction struct {
 	StartedAt string `json:"startedAt"`
 	// The new message
 	Message Message `json:"message"`
-	// If this turn was auto-started from a queued message, the ID of that message
+	// If this turn consumes a queued or steering message, the ID of that message.
 	QueuedMessageId *string `json:"queuedMessageId,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
@@ -781,6 +783,7 @@ type ChatReasoningAction struct {
 // A pending message was set (upsert semantics: creates or replaces).
 //
 // For steering messages, this always replaces the single steering message.
+// It never changes the independent {@link ChatState.steeringMessages} list.
 // For queued messages, if a message with the given `id` already exists it is
 // updated in place; otherwise it is appended to the queue. If the chat is
 // idle when a queued message is set, the server SHOULD immediately consume it
@@ -807,6 +810,24 @@ type ChatPendingMessageRemovedAction struct {
 	// Whether this is a steering or queued message
 	Kind PendingMessageKind `json:"kind"`
 	// Identifier of the pending message to remove
+	Id string `json:"id"`
+}
+
+// Upserts one independently submitted steering message without changing the legacy slot.
+// Requires negotiated {@link InitializeResult.steeringMessages} support.
+//
+// A client is only allowed to send {@link MessageKind.User} messages.
+type ChatSteeringMessageSetAction struct {
+	Type ActionType `json:"type"`
+	// Full entry; a new ID appends and an existing ID is replaced in place.
+	SteeringMessage PendingMessage `json:"steeringMessage"`
+}
+
+// Removes one message from {@link ChatState.steeringMessages}, leaving other messages and the legacy slot unchanged.
+// Requires negotiated {@link InitializeResult.steeringMessages} support.
+type ChatSteeringMessageRemovedAction struct {
+	Type ActionType `json:"type"`
+	// Identifier of the consumed or cancelled steering message.
 	Id string `json:"id"`
 }
 
@@ -1843,6 +1864,8 @@ func (*ChatUsageAction) isStateAction()                           {}
 func (*ChatReasoningAction) isStateAction()                       {}
 func (*ChatPendingMessageSetAction) isStateAction()               {}
 func (*ChatPendingMessageRemovedAction) isStateAction()           {}
+func (*ChatSteeringMessageSetAction) isStateAction()              {}
+func (*ChatSteeringMessageRemovedAction) isStateAction()          {}
 func (*ChatQueuedMessagesReorderedAction) isStateAction()         {}
 func (*ChatDraftChangedAction) isStateAction()                    {}
 func (*ChatIsReadChangedAction) isStateAction()                   {}
@@ -2150,6 +2173,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/pendingMessageRemoved":
 		var value ChatPendingMessageRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/steeringMessageSet":
+		var value ChatSteeringMessageSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/steeringMessageRemoved":
+		var value ChatSteeringMessageRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

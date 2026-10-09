@@ -1,0 +1,54 @@
+{
+  "name": "steering-list-capability-and-snapshot",
+  "group": "A",
+  "description": "Independent steering support and snapshots preserve all message identities alongside the legacy slot.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 7,
+    "steeringMessages": {},
+    "snapshots": [
+      {
+        "resource": "ahp-chat:/steering",
+        "fromSeq": 7,
+        "state": {
+          "resource": "ahp-chat:/steering",
+          "title": "Steering",
+          "status": 8,
+          "modifiedAt": "2026-10-08T00:00:00.000Z",
+          "turns": [],
+          "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
+          "steeringMessages": [
+            { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
+            { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+          ]
+        }
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 7,
+      "steeringMessages": {},
+      "snapshots": [
+        {
+          "resource": "ahp-chat:/steering",
+          "fromSeq": 7,
+          "state": {
+            "resource": "ahp-chat:/steering",
+            "title": "Steering",
+            "status": 8,
+            "modifiedAt": "2026-10-08T00:00:00.000Z",
+            "turns": [],
+            "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
+            "steeringMessages": [
+              { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
+              { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

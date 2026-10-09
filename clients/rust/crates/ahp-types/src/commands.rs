@@ -282,6 +282,10 @@ pub struct InitializeParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeResult {
+    /// Host supports the independent steering-message list and its actions.
+    /// Advertised only when {@link ClientCapabilities.steeringMessages} was declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steering_messages: Option<JsonObject>,
     /// Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -342,6 +346,9 @@ pub struct InitializeResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
+    /// Client understands the independent {@link ChatState.steeringMessages} list and its actions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steering_messages: Option<JsonObject>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,

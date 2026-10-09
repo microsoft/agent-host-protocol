@@ -373,12 +373,25 @@ When a queued message is added while the chat is idle (no active turn), the serv
 
 ### Steering Messages
 
-When a turn is active and `steeringMessages` is non-empty, the server MAY consume steering messages at its discretion. To consume a steering message, the server:
+#### Independent steering messages (1.1.0)
 
-1. Dispatches `chat/pendingMessageRemoved` with `kind: 'steering'`.
-2. Injects the message content into the model context (the injection mechanism is opaque to the protocol).
+A client opts in with `initialize.capabilities.steeringMessages: {}`. A supporting host responds with `initialize.steeringMessages: {}`. A version number alone does not establish support. Hosts MUST NOT advertise the capability unless the client opted in, and clients MUST NOT dispatch the new actions unless the host advertised it.
 
-Steering messages added while idle are silently stored and consumed when a turn becomes active.
+`ChatState.steeringMessages` is an ordered list of independently submitted messages. `chat/steeringMessageSet` carries a full `steeringMessage` entry: a new ID appends it and an existing ID replaces it in place. `chat/steeringMessageRemoved` removes only its `id`; an unknown ID is a no-op. Hosts sequence concurrent submissions, and snapshots and replay preserve the resulting order. Clients MUST use IDs unique across the chat's pending steering and queued messages.
+
+When a turn is active, the host MAY inject pending steering at its discretion. A later submission MUST NOT implicitly consume an earlier one. After consumption, the host dispatches `chat/steeringMessageRemoved` for that ID, or `chat/turnStarted` with that `queuedMessageId` when consumption is represented as a new presentation turn. Both remove only the matching entry. Providers MAY batch delivery internally without collapsing submission identities.
+
+Transport or SDK acceptance is not necessarily model consumption. A host MUST NOT report consumption solely because a different steering message arrived. Pending messages are retained while idle and may be consumed when a turn becomes active. If delivery fails terminally, the host SHOULD surface the failure and remove the affected entry rather than leave it pending indefinitely.
+
+An accepted set action is not a promise that subsequently changing or removing the entry can retract provider input. Hosts MUST reject edits or client removals that they can no longer honor after handoff. Repeated identical upserts MUST NOT cause duplicate provider delivery.
+
+#### Legacy coexistence
+
+The legacy `steeringMessage` slot and `chat/pendingMessageSet` / `chat/pendingMessageRemoved` with `kind: 'steering'` retain their original replacement semantics. They operate independently of `steeringMessages`. Hosts MUST NOT mirror list entries into the legacy slot: replacing that slot must not erase independent submissions.
+
+Updated clients render both the list and any legacy-slot entry. There is no implied relative ordering between the legacy slot and the list; a host must not infer user submission order from client clocks. Old clients continue to see their legacy slot and the normal turn output, but cannot display independently submitted pending entries. On connections without negotiated list support, hosts omit the new list from snapshots and do not send its new actions. Snapshot projection and replay filtering MUST use the same negotiated capability, including after reconnect.
+
+When talking to an older host, an updated client can hold further submissions locally until the legacy slot is free. Such locally held input is not host-synchronized and must not be presented as accepted by the host. Clients must not resend already-consumed input when reconciling an acknowledgement.
 
 ## Actions
 

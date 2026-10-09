@@ -150,6 +150,10 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             if next.steeringMessage?.id == queuedId {
                 next.steeringMessage = nil
             }
+            if var steering = next.steeringMessages {
+                steering.removeAll { $0.id == queuedId }
+                next.steeringMessages = steering.isEmpty ? nil : steering
+            }
             if var queued = next.queuedMessages {
                 queued.removeAll { $0.id == queuedId }
                 next.queuedMessages = queued.isEmpty ? nil : queued
@@ -668,6 +672,25 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     // ── Pending Messages ──────────────────────────────────────────────────
 
+    case .chatSteeringMessageSet(let a):
+        var next = state
+        var messages = next.steeringMessages ?? []
+        if let idx = messages.firstIndex(where: { $0.id == a.steeringMessage.id }) {
+            messages[idx] = a.steeringMessage
+        } else {
+            messages.append(a.steeringMessage)
+        }
+        next.steeringMessages = messages
+        return next
+
+    case .chatSteeringMessageRemoved(let a):
+        guard var messages = state.steeringMessages,
+              let idx = messages.firstIndex(where: { $0.id == a.id }) else { return state }
+        messages.remove(at: idx)
+        var next = state
+        next.steeringMessages = messages.isEmpty ? nil : messages
+        return next
+
     case .chatPendingMessageSet(let a):
         let entry = PendingMessage(id: a.id, message: a.message)
         var next = state
@@ -1006,6 +1029,8 @@ public let clientDispatchableActions: Set<String> = [
     "session/activeClientRemoved",
     "chat/pendingMessageSet",
     "chat/pendingMessageRemoved",
+    "chat/steeringMessageSet",
+    "chat/steeringMessageRemoved",
     "chat/queuedMessagesReordered",
     "chat/isReadChanged",
     "chat/isArchivedChanged",
@@ -1030,6 +1055,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionActiveClientRemoved,
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
+         .chatSteeringMessageSet, .chatSteeringMessageRemoved,
          .chatIsReadChanged, .chatIsArchivedChanged,
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,

@@ -1126,6 +1126,10 @@ public static class Reducers
                 return ApplyChatInputCompleted(state, a);
             case ChatPendingMessageSetAction a:
                 return ApplyChatPendingMessageSet(state, a);
+            case ChatSteeringMessageSetAction a:
+                return ApplyChatSteeringMessageSet(state, a);
+            case ChatSteeringMessageRemovedAction a:
+                return ApplyChatSteeringMessageRemoved(state, a);
             case ChatPendingMessageRemovedAction a:
                 return ApplyChatPendingMessageRemoved(state, a);
             case ChatQueuedMessagesReorderedAction a:
@@ -1172,6 +1176,15 @@ public static class Reducers
             if (state.SteeringMessage is not null && state.SteeringMessage.Id == qmid)
             {
                 state.SteeringMessage = null;
+            }
+
+            if (state.SteeringMessages is not null)
+            {
+                state.SteeringMessages.RemoveAll(m => m.Id == qmid);
+                if (state.SteeringMessages.Count == 0)
+                {
+                    state.SteeringMessages = null;
+                }
             }
 
             if (state.QueuedMessages is not null)
@@ -1733,6 +1746,35 @@ public static class Reducers
         activeTurn.ResponseParts[idx] = new ResponsePart(part with { Response = a.Response });
 
         RefreshChatStatus(state);
+        return ReduceOutcome.Applied;
+    }
+
+    private static ReduceOutcome ApplyChatSteeringMessageSet(ChatState state, ChatSteeringMessageSetAction a)
+    {
+        var list = state.SteeringMessages ?? new List<PendingMessage>();
+        int idx = list.FindIndex(m => m.Id == a.SteeringMessage.Id);
+        if (idx < 0)
+        {
+            list.Add(a.SteeringMessage);
+        }
+        else
+        {
+            list[idx] = a.SteeringMessage;
+        }
+        state.SteeringMessages = list;
+        return ReduceOutcome.Applied;
+    }
+
+    private static ReduceOutcome ApplyChatSteeringMessageRemoved(ChatState state, ChatSteeringMessageRemovedAction a)
+    {
+        var list = state.SteeringMessages;
+        int idx = list?.FindIndex(m => m.Id == a.Id) ?? -1;
+        if (list is null || idx < 0)
+        {
+            return ReduceOutcome.NoOp;
+        }
+        list.RemoveAt(idx);
+        state.SteeringMessages = list.Count == 0 ? null : list;
         return ReduceOutcome.Applied;
     }
 

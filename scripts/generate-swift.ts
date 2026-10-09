@@ -1449,6 +1449,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/inputNeededRemoved', caseName: 'sessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
   { type: 'chat/pendingMessageSet', caseName: 'chatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', caseName: 'chatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
+  { type: 'chat/steeringMessageSet', caseName: 'chatSteeringMessageSet', tsInterface: 'ChatSteeringMessageSetAction' },
+  { type: 'chat/steeringMessageRemoved', caseName: 'chatSteeringMessageRemoved', tsInterface: 'ChatSteeringMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', caseName: 'chatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', caseName: 'chatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', caseName: 'chatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },

@@ -1,0 +1,31 @@
+{
+  "description": "steering list removal handles absent, empty and last entries",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    { "type": "chat/steeringMessageRemoved", "id": "unknown" },
+    {
+      "type": "chat/steeringMessageSet",
+      "steeringMessage": {
+        "id": "a",
+        "message": { "text": "A", "origin": { "kind": "user" } }
+      }
+    },
+    { "type": "chat/steeringMessageRemoved", "id": "a" },
+    { "type": "chat/steeringMessageRemoved", "id": "a" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessages": null
+  }
+}

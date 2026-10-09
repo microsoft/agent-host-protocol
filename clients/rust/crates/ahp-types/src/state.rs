@@ -2021,9 +2021,13 @@ pub struct ChatState {
     /// Currently in-progress turn
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_turn: Option<ActiveTurn>,
-    /// Message to inject into the current turn at a convenient point
+    /// Legacy replaceable steering slot, independent of {@link steeringMessages}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steering_message: Option<PendingMessage>,
+    /// Independently submitted steering messages, in host acceptance order.
+    /// Requires negotiated {@link InitializeResult.steeringMessages} support.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steering_messages: Option<Vec<PendingMessage>>,
     /// Messages to send automatically as new turns after the current turn finishes
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_messages: Option<Vec<PendingMessage>>,
