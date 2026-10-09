@@ -64,7 +64,9 @@ native channel URIs. It never guesses a session URI from a platform ID.
 - Exit 0 means the requested local command completed, not that a turn finished.
   A controller mutation may only have recorded intent; wait for its outcome.
   Exit 1 means protocol, transport, capture, or replay failure;
-  exit 2 means invalid usage; SIGINT exits 130 and SIGTERM exits 143.
+  exit 2 means invalid usage; delivered SIGINT exits 130 and SIGTERM exits 143.
+  Windows process-kill APIs forcibly terminate instead of delivering those
+  signals; captures without a completion marker remain incomplete, not successful.
 
 Every JSONL record includes `version: 1` and a `kind`. Results carry `command`
 and `result`. Errors carry `category`, `message`, and, for JSON-RPC failures,

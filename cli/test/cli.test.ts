@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { Capture, frameRecord, inspectFrame, replay } from '../src/capture.js';
 import { redact } from '../src/common.js';
+import { runCli } from '../src/run.js';
 
 const executable = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const SESSION = 'ahp-session:/test';
@@ -22,6 +23,7 @@ interface Message {
 
 interface Execution {
   code: number | null;
+  signal: NodeJS.Signals | null;
   records: Record<string, unknown>[];
   stdout: string;
   stderr: string;
@@ -57,10 +59,11 @@ async function execute(
   child.stdin.end(options.input ?? '');
   const timeout = setTimeout(() => child.kill('SIGKILL'), 8000);
   let code: number | null;
-  try { [code] = await once(child, 'close'); }
+  let signal: NodeJS.Signals | null;
+  try { [code, signal] = await once(child, 'close'); }
   finally { clearTimeout(timeout); }
   return {
-    code, stdout, stderr,
+    code, signal, stdout, stderr,
     records: stdout.trim() ? stdout.trim().split('\n').map(line => JSON.parse(line)) : [],
   };
 }
@@ -105,6 +108,23 @@ function initialize(message: Message, respond: (result: unknown) => void): boole
   if (message.method !== 'initialize') return false;
   respond({ protocolVersion: '1.0.0', serverSeq: 0, snapshots: [] });
   return true;
+}
+
+async function assertSigterm(execution: Execution, path: string): Promise<void> {
+  const forced = process.platform === 'win32';
+  assert.equal(execution.code, forced ? null : 143, execution.stdout + execution.stderr);
+  assert.equal(execution.signal, forced ? 'SIGTERM' : null);
+  const last = JSON.parse((await readFile(path, 'utf8')).trim().split('\n').at(-1)!);
+  if (forced) {
+    assert.equal(last.kind, 'frame');
+    const reviewed = await execute(['replay', path]);
+    assert.equal(reviewed.code, 1, reviewed.stdout + reviewed.stderr);
+    assert.equal(reviewed.records.at(-1)?.category, 'replay');
+  } else {
+    assert.equal(execution.records.at(-1)?.category, 'interrupted');
+    assert.equal(last.state, 'failed');
+    assert.equal(last.category, 'interrupted');
+  }
 }
 
 test('CLI help is on stderr; discovery is versioned JSONL without a connection', async () => {
@@ -381,19 +401,46 @@ test('frame inspection rejects invalid response shapes and unsafe sequence numbe
   for (const frame of invalid) assert.throws(() => inspectFrame(JSON.stringify(frame), 'in'));
 });
 
-test('SIGTERM preserves an interrupted capture without cancelling remote work', async t => {
+test('SIGTERM preserves platform-specific termination evidence without cancelling remote work', async t => {
   const fixture = await host(t);
   const dir = await directory(t);
   const path = join(dir, 'interrupted.jsonl');
   const execution = await execute([
     'watch', SESSION, '--url', fixture.url, '--record', path, '--duration-ms', '60000',
   ], { signalOnSnapshot: 'SIGTERM' });
-  assert.equal(execution.code, 143, execution.stdout + execution.stderr);
-  assert.equal(execution.records.at(-1)?.category, 'interrupted');
-  const last = JSON.parse((await readFile(path, 'utf8')).trim().split('\n').at(-1)!);
-  assert.equal(last.state, 'failed');
-  assert.equal(last.category, 'interrupted');
+  await assertSigterm(execution, path);
   assert.ok(fixture.messages.every(message => message.method !== 'dispatchAction'));
+});
+
+test('AbortSignal interruption finalizes captures and bounds shutdown on every platform', async t => {
+  for (const reason of ['SIGINT', 'SIGTERM']) {
+    for (const stalled of [false, true]) {
+      await t.test(`${reason}, ${stalled ? 'stalled' : 'responsive'} peer`, async t => {
+        const controller = new AbortController();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        t.after(() => clearTimeout(timer));
+        const fixture = await host(t, (socket, message, respond) => {
+          if (initialize(message, respond)) return;
+          if (message.method === 'subscribe') {
+            respond({ snapshot: { resource: message.params.channel, fromSeq: 0, state: {} } });
+            if (stalled) socket.pause();
+            timer = setTimeout(() => controller.abort(reason), 25);
+          }
+        });
+        const path = join(await directory(t), 'interrupted.jsonl');
+        const started = Date.now();
+        const code = await runCli([
+          'watch', SESSION, '--url', fixture.url, '--record', path, '--duration-ms', '60000',
+        ], controller.signal);
+        assert.equal(code, reason === 'SIGTERM' ? 143 : 130);
+        assert.ok(Date.now() - started < 4000, 'Interrupted command remained alive during shutdown');
+        const last = JSON.parse((await readFile(path, 'utf8')).trim().split('\n').at(-1)!);
+        assert.equal(last.state, 'failed');
+        assert.equal(last.category, 'interrupted');
+        assert.ok(fixture.messages.every(message => message.method !== 'dispatchAction'));
+      });
+    }
+  }
 });
 
 test('successful commands exit and finalize captures when the host never acknowledges close', async t => {
@@ -453,13 +500,15 @@ test('request timeouts and interruption still exit and finalize failed captures 
       ? ['watch', SESSION, '--url', fixture.url, '--record', path, '--duration-ms', '60000']
       : ['ping', '--url', fixture.url, '--record', path, '--timeout-ms', '100'],
     interrupt ? { signalOnSnapshot: 'SIGTERM' } : {});
-    assert.equal(execution.code, interrupt ? 143 : 1, execution.stdout + execution.stderr);
     assert.ok(Date.now() - started < 4000, 'Failed command remained alive during shutdown');
-    const category = interrupt ? 'interrupted' : 'timeout';
-    assert.equal(execution.records.at(-1)?.category, category);
-    const captured = (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
-    assert.equal(captured.at(-1).state, 'failed');
-    assert.equal(captured.at(-1).category, category);
+    if (interrupt) await assertSigterm(execution, path);
+    else {
+      assert.equal(execution.code, 1, execution.stdout + execution.stderr);
+      assert.equal(execution.records.at(-1)?.category, 'timeout');
+      const captured = (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(captured.at(-1).state, 'failed');
+      assert.equal(captured.at(-1).category, 'timeout');
+    }
   }
 });
 

@@ -48,6 +48,12 @@ data. A one-shot `snapshot` emits a separate `kind: "snapshot"` record before
 its final result. Help goes to stderr. Exit codes are 0 for completion, 1 for
 failure, 2 for invalid arguments, 130 for SIGINT, and 143 for SIGTERM.
 
+Signal exit codes apply when Node receives the signal. On Windows,
+`child.kill()` and `process.kill()` forcibly terminate the target instead of
+delivering catchable SIGINT/SIGTERM signals, so captures may lack a completion
+marker. Replay reports those captures as incomplete. Use bounded command
+durations/timeouts and `ahp stop --instance NAME` for graceful controller shutdown.
+
 ## Observe, record, and replay
 
 ```bash

@@ -24,6 +24,7 @@ interface Message {
 
 interface Execution {
   code: number | null;
+  signal: NodeJS.Signals | null;
   records: Record<string, unknown>[];
   output: string;
 }
@@ -48,10 +49,10 @@ async function execute(root: string, args: string[], options: { input?: string; 
   child.stderr.on('data', data => { errors += data; });
   child.stdin.end(options.input ?? '');
   const timeout = setTimeout(() => child.kill('SIGKILL'), 15_000);
-  const [code] = await once(child, 'close');
+  const [code, signal] = await once(child, 'close');
   clearTimeout(timeout);
   return {
-    code, output: output + errors,
+    code, signal, output: output + errors,
     records: output.trim() ? output.trim().split('\n').map(line => JSON.parse(line)) : [],
   };
 }
@@ -265,7 +266,8 @@ test('observer-only listeners durably capture across CLI lifetimes, filter curso
   assert.equal((await f.command('observe', 'request', 'extension/mutate', '--params-file', params, '--confirm', '--op-id', 'extension')).code, 1);
   assert.equal(f.dispatches().length, 0);
   const followed = await f.run(['events', '--instance', 'observe', '--follow', '--timeout', '5s'], { interrupt: true });
-  assert.equal(followed.code, 130);
+  assert.equal(followed.code, process.platform === 'win32' ? null : 130, followed.output);
+  assert.equal(followed.signal, process.platform === 'win32' ? 'SIGINT' : null);
   assert.equal(result(await f.command('observe', 'status')).state, 'ready');
   assert.equal(result(await f.command('observe', 'stop')).state, 'stopped');
   assert.equal(result(await f.command('observe', 'events')).state, 'stopped');
