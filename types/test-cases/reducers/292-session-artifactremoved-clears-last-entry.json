@@ -1,0 +1,39 @@
+{
+  "description": "session/artifactRemoved removing the last artifact leaves the list absent",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/artifactRemoved",
+      "uri": "https://github.com/octo/repo/issues/42"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  }
+}

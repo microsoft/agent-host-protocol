@@ -731,6 +731,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
+  'ArtifactKind', 'ArtifactRelationKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -764,6 +765,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'CanvasState' },
   { name: 'ChatSummary' },
   { name: 'BackgroundShellWork' },
+  { name: 'ArtifactRelation' },
+  { name: 'ResourceArtifact' },
   { name: 'BackgroundSubagentWork' },
   { name: 'SideChatSelection' },
   { name: 'PendingMessage' },
@@ -1142,6 +1145,16 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
   variants: [
     { variantName: 'Shell', innerType: 'BackgroundShellWork', wireValue: 'shell' },
     { variantName: 'Subagent', innerType: 'BackgroundSubagentWork', wireValue: 'subagent' },
+  ],
+  unknown: true,
+};
+
+const ARTIFACT_UNION: UnionConfig = {
+  name: 'Artifact',
+  discriminantField: 'type',
+  doc: 'Artifact is a durable item a session produced, references, or derives its work from.',
+  variants: [
+    { variantName: 'Resource', innerType: 'ResourceArtifact', wireValue: 'resource' },
   ],
   unknown: true,
 };
@@ -1539,6 +1552,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, ARTIFACT_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
@@ -1625,6 +1640,8 @@ const ACTION_VARIANTS: {
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/artifactSet', variantName: 'SessionArtifactSet', tsInterface: 'SessionArtifactSetAction' },
+  { type: 'session/artifactRemoved', variantName: 'SessionArtifactRemoved', tsInterface: 'SessionArtifactRemovedAction' },
   { type: 'session/customizationsChanged', variantName: 'SessionCustomizationsChanged', tsInterface: 'SessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', variantName: 'SessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
   { type: 'session/customizationUpdated', variantName: 'SessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction' },
@@ -2452,6 +2469,7 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',
     'SessionInputRequest',
     'BackgroundWork',
+    'Artifact',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',

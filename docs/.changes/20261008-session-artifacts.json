@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`SessionState.artifacts` and `SessionSummary.artifacts` list the durable items a session produced, references, or derives its work from, each with one or more `ArtifactRelation`s, maintained with the `session/artifactSet` and `session/artifactRemoved` actions.",
+  "issues": [507]
+}

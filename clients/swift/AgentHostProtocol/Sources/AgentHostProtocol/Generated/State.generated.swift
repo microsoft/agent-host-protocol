@@ -1036,6 +1036,66 @@ public enum SessionOriginKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Discriminant for {@link Artifact} variants.
+public enum ArtifactKind: Codable, Sendable, Equatable {
+    /// An artifact addressed by URI.
+    case resource
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "resource": self = .resource
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .resource: try container.encode("resource")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Why a session or chat references an {@link Artifact}.
+public enum ArtifactRelationKind: Codable, Sendable, Equatable {
+    /// The session or chat produced it, for example opened the pull request or
+    /// pushed the commit.
+    case created
+    /// The agent pointed the user at it as worth returning to.
+    case referenced
+    /// The work is derived from it: for example the issue being fixed, or the
+    /// pull request being reviewed or iterated on.
+    case derivedFrom
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "created": self = .created
+        case "referenced": self = .referenced
+        case "derivedFrom": self = .derivedFrom
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .created: try container.encode("created")
+        case .referenced: try container.encode("referenced")
+        case .derivedFrom: try container.encode("derivedFrom")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -2018,6 +2078,16 @@ public struct SessionState: Codable, Sendable {
     /// chats raise requests and removes them with `session/inputNeededRemoved`
     /// once the underlying request resolves.
     public var inputNeeded: [SessionInputRequest]?
+    /// Durable items the session produced, references, or derives its work
+    /// from, keyed by {@link ResourceArtifact.uri | `uri`}. Order is
+    /// host-authoritative.
+    ///
+    /// A chat's artifacts are the entries with a
+    /// {@link ArtifactRelation | relation} whose `chat` is that chat's URI.
+    ///
+    /// Host-managed: the host upserts entries with `session/artifactSet` and
+    /// removes them with `session/artifactRemoved`.
+    public var artifacts: [Artifact]?
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -2044,6 +2114,7 @@ public struct SessionState: Codable, Sendable {
         case customizations
         case changesets
         case inputNeeded
+        case artifacts
         case meta = "_meta"
     }
 
@@ -2066,6 +2137,7 @@ public struct SessionState: Codable, Sendable {
         customizations: [Customization]? = nil,
         changesets: [Changeset]? = nil,
         inputNeeded: [SessionInputRequest]? = nil,
+        artifacts: [Artifact]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.provider = provider
@@ -2086,6 +2158,7 @@ public struct SessionState: Codable, Sendable {
         self.customizations = customizations
         self.changesets = changesets
         self.inputNeeded = inputNeeded
+        self.artifacts = artifacts
         self.meta = meta
     }
 }
@@ -2210,6 +2283,85 @@ public struct BackgroundSubagentWork: Codable, Sendable {
         self.meta = meta
         self.kind = kind
         self.chat = chat
+    }
+}
+
+public struct ArtifactRelation: Codable, Sendable {
+    /// The kind of relation.
+    public var kind: ArtifactRelationKind
+    /// The chat that established the relation. Absent means the relation
+    /// belongs to the session as a whole.
+    public var chat: String?
+
+    public init(
+        kind: ArtifactRelationKind,
+        chat: String? = nil
+    ) {
+        self.kind = kind
+        self.chat = chat
+    }
+}
+
+public struct ResourceArtifact: Codable, Sendable {
+    /// A human-readable label, for example a pull request's title.
+    public var label: String
+    /// Advisory display hint, with the same semantics as
+    /// {@link MessageAttachmentBase.displayKind}. Implementations MAY use any
+    /// value; clients SHOULD fall back to a reasonable default for values they
+    /// do not recognize.
+    public var displayKind: String?
+    /// Why the session references this artifact.
+    ///
+    /// MUST NOT be empty: the host removes the artifact with
+    /// `session/artifactRemoved` when its last relation goes away. An artifact
+    /// MAY carry several relations, including relations of the same kind
+    /// established by different chats.
+    public var relations: [ArtifactRelation]
+    /// Additional implementation-defined metadata, such as forge state or CI status.
+    public var meta: [String: AnyCodable]?
+    /// Content URI
+    public var uri: String
+    /// Approximate size in bytes
+    public var sizeHint: Int?
+    /// Content MIME type
+    public var contentType: String?
+    /// Content nonce
+    public var nonce: String?
+    /// Discriminant
+    public var type: ArtifactKind
+
+    enum CodingKeys: String, CodingKey {
+        case label
+        case displayKind
+        case relations
+        case meta = "_meta"
+        case uri
+        case sizeHint
+        case contentType
+        case nonce
+        case type
+    }
+
+    public init(
+        label: String,
+        displayKind: String? = nil,
+        relations: [ArtifactRelation],
+        meta: [String: AnyCodable]? = nil,
+        uri: String,
+        sizeHint: Int? = nil,
+        contentType: String? = nil,
+        nonce: String? = nil,
+        type: ArtifactKind
+    ) {
+        self.label = label
+        self.displayKind = displayKind
+        self.relations = relations
+        self.meta = meta
+        self.uri = uri
+        self.sizeHint = sizeHint
+        self.contentType = contentType
+        self.nonce = nonce
+        self.type = type
     }
 }
 
@@ -2383,6 +2535,10 @@ public struct SessionSummary: Codable, Sendable {
     /// session's footprint (e.g., for list rendering) without requiring the
     /// client to subscribe to a changeset.
     public var changes: ChangesSummary?
+    /// Artifacts to show with the session in session lists, mirroring
+    /// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+    /// omit entries that {@link SessionState.artifacts} carries.
+    public var artifacts: [Artifact]?
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -2406,6 +2562,7 @@ public struct SessionSummary: Codable, Sendable {
         case createdAt
         case modifiedAt
         case changes
+        case artifacts
         case meta = "_meta"
         case chats
         case defaultChat
@@ -2424,6 +2581,7 @@ public struct SessionSummary: Codable, Sendable {
         createdAt: String,
         modifiedAt: String,
         changes: ChangesSummary? = nil,
+        artifacts: [Artifact]? = nil,
         meta: [String: AnyCodable]? = nil,
         chats: [SessionChatSummary]? = nil,
         defaultChat: String? = nil
@@ -2440,6 +2598,7 @@ public struct SessionSummary: Codable, Sendable {
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.changes = changes
+        self.artifacts = artifacts
         self.meta = meta
         self.chats = chats
         self.defaultChat = defaultChat
@@ -8039,6 +8198,38 @@ public enum BackgroundWork: Codable, Sendable {
         switch self {
         case .shell(let value): try value.encode(to: encoder)
         case .subagent(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum Artifact: Codable, Sendable {
+    case resource(ResourceArtifact)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "type"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "resource":
+            self = .resource(try ResourceArtifact(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .resource(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

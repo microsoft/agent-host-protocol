@@ -253,6 +253,12 @@ data class PartialSessionSummary(
      */
     val changes: ChangesSummary? = null,
     /**
+     * Artifacts to show with the session in session lists, mirroring
+     * {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+     * omit entries that {@link SessionState.artifacts} carries.
+     */
+    val artifacts: List<Artifact>? = null,
+    /**
      * Lightweight server-defined metadata clients may use for the session
      * presentation. The protocol does not interpret these values; producers
      * SHOULD keep the payload small because summaries appear in session lists

@@ -341,6 +341,22 @@ func backgroundWorkID(w ahptypes.BackgroundWork) (string, bool) {
 	return "", false
 }
 
+func artifactURI(a ahptypes.Artifact) (ahptypes.URI, bool) {
+	switch v := a.Value.(type) {
+	case *ahptypes.ResourceArtifact:
+		return v.Uri, true
+	case *ahptypes.ArtifactUnknown:
+		// Types from newer hosts are still keyed by `uri` when they carry one.
+		var common struct {
+			URI ahptypes.URI `json:"uri"`
+		}
+		if err := json.Unmarshal(v.Raw, &common); err == nil && common.URI != "" {
+			return common.URI, true
+		}
+	}
+	return "", false
+}
+
 func childCustomizationID(c ahptypes.ChildCustomization) (string, bool) {
 	switch v := c.Value.(type) {
 	case *ahptypes.AgentCustomization:
@@ -1092,6 +1108,30 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 					state.InputNeeded = nil
 				}
 				state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.SessionArtifactSetAction:
+		uri, ok := artifactURI(a.Artifact)
+		if !ok {
+			return ReduceOutcomeNoOp
+		}
+		for i := range state.Artifacts {
+			if got, ok := artifactURI(state.Artifacts[i]); ok && got == uri {
+				state.Artifacts[i] = a.Artifact
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Artifacts = append(state.Artifacts, a.Artifact)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionArtifactRemovedAction:
+		for i := range state.Artifacts {
+			if got, ok := artifactURI(state.Artifacts[i]); ok && got == a.Uri {
+				state.Artifacts = append(state.Artifacts[:i], state.Artifacts[i+1:]...)
+				if len(state.Artifacts) == 0 {
+					state.Artifacts = nil
+				}
 				return ReduceOutcomeApplied
 			}
 		}

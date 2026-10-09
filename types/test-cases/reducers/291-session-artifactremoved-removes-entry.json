@@ -1,0 +1,64 @@
+{
+  "description": "session/artifactRemoved removes the artifact with the matching uri and keeps the rest",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/pull/7",
+        "label": "Show a session's pull request",
+        "displayKind": "pullRequest",
+        "relations": [
+          {
+            "kind": "created",
+            "chat": "ahp-chat:/s1/main"
+          }
+        ]
+      },
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/artifactRemoved",
+      "uri": "https://github.com/octo/repo/pull/7"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -64,6 +64,8 @@ const (
 	ActionTypeSessionWorkingDirectoryReplaced     ActionType = "session/workingDirectoryReplaced"
 	ActionTypeSessionInputNeededSet               ActionType = "session/inputNeededSet"
 	ActionTypeSessionInputNeededRemoved           ActionType = "session/inputNeededRemoved"
+	ActionTypeSessionArtifactSet                  ActionType = "session/artifactSet"
+	ActionTypeSessionArtifactRemoved              ActionType = "session/artifactRemoved"
 	ActionTypeChatPendingMessageSet               ActionType = "chat/pendingMessageSet"
 	ActionTypeChatPendingMessageRemoved           ActionType = "chat/pendingMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered         ActionType = "chat/queuedMessagesReordered"
@@ -1143,6 +1145,34 @@ type SessionInputNeededRemovedAction struct {
 	Id string `json:"id"`
 }
 
+// A session artifact was added or updated.
+//
+// Upsert semantics keyed by {@link ResourceArtifact.uri | `artifact.uri`}: the
+// host dispatches this with the full {@link Artifact} to append a new entry to
+// {@link SessionState.artifacts} or replace the existing entry with the same
+// `uri` in place.
+//
+// Server-originated: hosts record artifacts as the session's chats produce or
+// reference items, or as the host learns what the session's work derives from.
+type SessionArtifactSetAction struct {
+	Type ActionType `json:"type"`
+	// The artifact to add or update, matched by `uri`.
+	Artifact Artifact `json:"artifact"`
+}
+
+// A session artifact was removed.
+//
+// Removes the entry identified by `uri` from {@link SessionState.artifacts};
+// a no-op when no entry matches.
+//
+// Hosts dispatch this when an artifact's last relation goes away. Clients MAY
+// dispatch it to dismiss an artifact; the host decides whether to accept it.
+type SessionArtifactRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The `uri` of the artifact to remove.
+	Uri URI `json:"uri"`
+}
+
 // The session's customizations have changed.
 //
 // Full-replacement semantics: the `customizations` array replaces the
@@ -1866,6 +1896,8 @@ func (*ChatWorkingDirectorySetAction) isStateAction()             {}
 func (*ChatWorkingDirectoryRemovedAction) isStateAction()         {}
 func (*SessionInputNeededSetAction) isStateAction()               {}
 func (*SessionInputNeededRemovedAction) isStateAction()           {}
+func (*SessionArtifactSetAction) isStateAction()                  {}
+func (*SessionArtifactRemovedAction) isStateAction()              {}
 func (*SessionCustomizationsChangedAction) isStateAction()        {}
 func (*SessionCustomizationToggledAction) isStateAction()         {}
 func (*SessionCustomizationUpdatedAction) isStateAction()         {}
@@ -2288,6 +2320,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/inputNeededRemoved":
 		var value SessionInputNeededRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/artifactSet":
+		var value SessionArtifactSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/artifactRemoved":
+		var value SessionArtifactRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

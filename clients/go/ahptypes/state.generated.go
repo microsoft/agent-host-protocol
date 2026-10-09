@@ -488,6 +488,28 @@ const (
 	SessionOriginKindAutomation SessionOriginKind = "automation"
 )
 
+// Discriminant for {@link Artifact} variants.
+type ArtifactKind string
+
+const (
+	// An artifact addressed by URI.
+	ArtifactKindResource ArtifactKind = "resource"
+)
+
+// Why a session or chat references an {@link Artifact}.
+type ArtifactRelationKind string
+
+const (
+	// The session or chat produced it, for example opened the pull request or
+	// pushed the commit.
+	ArtifactRelationKindCreated ArtifactRelationKind = "created"
+	// The agent pointed the user at it as worth returning to.
+	ArtifactRelationKindReferenced ArtifactRelationKind = "referenced"
+	// The work is derived from it: for example the issue being fixed, or the
+	// pull request being reviewed or iterated on.
+	ArtifactRelationKindDerivedFrom ArtifactRelationKind = "derivedFrom"
+)
+
 // Operations the host currently permits for an automation.
 //
 // The list on {@link AutomationEntry.operations} is authoritative and may
@@ -993,6 +1015,16 @@ type SessionState struct {
 	// chats raise requests and removes them with `session/inputNeededRemoved`
 	// once the underlying request resolves.
 	InputNeeded []SessionInputRequest `json:"inputNeeded,omitempty"`
+	// Durable items the session produced, references, or derives its work
+	// from, keyed by {@link ResourceArtifact.uri | `uri`}. Order is
+	// host-authoritative.
+	//
+	// A chat's artifacts are the entries with a
+	// {@link ArtifactRelation | relation} whose `chat` is that chat's URI.
+	//
+	// Host-managed: the host upserts entries with `session/artifactSet` and
+	// removes them with `session/artifactRemoved`.
+	Artifacts []Artifact `json:"artifacts,omitempty"`
 	// Additional provider-specific metadata for this session.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1212,6 +1244,10 @@ type SessionSummary struct {
 	// session's footprint (e.g., for list rendering) without requiring the
 	// client to subscribe to a changeset.
 	Changes *ChangesSummary `json:"changes,omitempty"`
+	// Artifacts to show with the session in session lists, mirroring
+	// {@link SessionState.artifacts}. Producers SHOULD keep this small and MAY
+	// omit entries that {@link SessionState.artifacts} carries.
+	Artifacts []Artifact `json:"artifacts,omitempty"`
 	// Lightweight server-defined metadata clients may use for the session
 	// presentation. The protocol does not interpret these values; producers
 	// SHOULD keep the payload small because summaries appear in session lists
@@ -1473,6 +1509,50 @@ type BackgroundShellWork struct {
 	// {@link ToolResultTerminalContent.resource}; `isPty` on its
 	// {@link TerminalState} says whether the output is plain text.
 	Terminal *URI `json:"terminal,omitempty"`
+}
+
+// A reason a session references an {@link Artifact}.
+type ArtifactRelation struct {
+	// The kind of relation.
+	Kind ArtifactRelationKind `json:"kind"`
+	// The chat that established the relation. Absent means the relation
+	// belongs to the session as a whole.
+	Chat *URI `json:"chat,omitempty"`
+}
+
+// An artifact addressed by URI.
+//
+// The {@link ContentRef.uri | `uri`} is the artifact's key within
+// {@link SessionState.artifacts}. Hosts SHOULD canonicalize it so the same
+// item is listed once. Clients typically open `http` and `https` URIs
+// externally and read other schemes the host serves through `resourceRead`.
+type ResourceArtifact struct {
+	// A human-readable label, for example a pull request's title.
+	Label string `json:"label"`
+	// Advisory display hint, with the same semantics as
+	// {@link MessageAttachmentBase.displayKind}. Implementations MAY use any
+	// value; clients SHOULD fall back to a reasonable default for values they
+	// do not recognize.
+	DisplayKind *string `json:"displayKind,omitempty"`
+	// Why the session references this artifact.
+	//
+	// MUST NOT be empty: the host removes the artifact with
+	// `session/artifactRemoved` when its last relation goes away. An artifact
+	// MAY carry several relations, including relations of the same kind
+	// established by different chats.
+	Relations []ArtifactRelation `json:"relations"`
+	// Additional implementation-defined metadata, such as forge state or CI status.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Content URI
+	Uri URI `json:"uri"`
+	// Approximate size in bytes
+	SizeHint *int64 `json:"sizeHint,omitempty"`
+	// Content MIME type
+	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string `json:"nonce,omitempty"`
+	// Discriminant
+	Type ArtifactKind `json:"type"`
 }
 
 // A subagent running in the background. Its own state lives in its chat.
@@ -5864,6 +5944,59 @@ func (u *BackgroundWork) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u BackgroundWork) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*BackgroundWorkUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// Artifact is a durable item a session produced, references, or derives its work from.
+type Artifact struct {
+	Value isArtifact
+}
+
+// isArtifact is the marker interface implemented by every
+// concrete variant of Artifact.
+type isArtifact interface{ isArtifact() }
+
+func (*ResourceArtifact) isArtifact() {}
+
+// ArtifactUnknown carries an unrecognized Artifact variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ArtifactUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ArtifactUnknown) isArtifact() {}
+
+// UnmarshalJSON decodes the variant indicated by the "type" discriminator.
+func (u *Artifact) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "type")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "resource":
+		var value ResourceArtifact
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ArtifactUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u Artifact) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ArtifactUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

@@ -51,6 +51,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionWorkingDirectoryReplaced
     case sessionInputNeededSet
     case sessionInputNeededRemoved
+    case sessionArtifactSet
+    case sessionArtifactRemoved
     case chatPendingMessageSet
     case chatPendingMessageRemoved
     case chatQueuedMessagesReordered
@@ -164,6 +166,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/workingDirectoryReplaced": self = .sessionWorkingDirectoryReplaced
         case "session/inputNeededSet": self = .sessionInputNeededSet
         case "session/inputNeededRemoved": self = .sessionInputNeededRemoved
+        case "session/artifactSet": self = .sessionArtifactSet
+        case "session/artifactRemoved": self = .sessionArtifactRemoved
         case "chat/pendingMessageSet": self = .chatPendingMessageSet
         case "chat/pendingMessageRemoved": self = .chatPendingMessageRemoved
         case "chat/queuedMessagesReordered": self = .chatQueuedMessagesReordered
@@ -277,6 +281,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionWorkingDirectoryReplaced: try container.encode("session/workingDirectoryReplaced")
         case .sessionInputNeededSet: try container.encode("session/inputNeededSet")
         case .sessionInputNeededRemoved: try container.encode("session/inputNeededRemoved")
+        case .sessionArtifactSet: try container.encode("session/artifactSet")
+        case .sessionArtifactRemoved: try container.encode("session/artifactRemoved")
         case .chatPendingMessageSet: try container.encode("chat/pendingMessageSet")
         case .chatPendingMessageRemoved: try container.encode("chat/pendingMessageRemoved")
         case .chatQueuedMessagesReordered: try container.encode("chat/queuedMessagesReordered")
@@ -1593,6 +1599,34 @@ public struct SessionInputNeededRemovedAction: Codable, Sendable {
     }
 }
 
+public struct SessionArtifactSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// The artifact to add or update, matched by `uri`.
+    public var artifact: Artifact
+
+    public init(
+        type: ActionType,
+        artifact: Artifact
+    ) {
+        self.type = type
+        self.artifact = artifact
+    }
+}
+
+public struct SessionArtifactRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The `uri` of the artifact to remove.
+    public var uri: String
+
+    public init(
+        type: ActionType,
+        uri: String
+    ) {
+        self.type = type
+        self.uri = uri
+    }
+}
+
 public struct ChatPendingMessageSetAction: Codable, Sendable {
     public var type: ActionType
     /// Whether this is a steering or queued message
@@ -2626,6 +2660,8 @@ public enum StateAction: Codable, Sendable {
     case chatWorkingDirectoryRemoved(ChatWorkingDirectoryRemovedAction)
     case sessionInputNeededSet(SessionInputNeededSetAction)
     case sessionInputNeededRemoved(SessionInputNeededRemovedAction)
+    case sessionArtifactSet(SessionArtifactSetAction)
+    case sessionArtifactRemoved(SessionArtifactRemovedAction)
     case chatPendingMessageSet(ChatPendingMessageSetAction)
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
@@ -2793,6 +2829,10 @@ public enum StateAction: Codable, Sendable {
             self = .sessionInputNeededSet(try SessionInputNeededSetAction(from: decoder))
         case "session/inputNeededRemoved":
             self = .sessionInputNeededRemoved(try SessionInputNeededRemovedAction(from: decoder))
+        case "session/artifactSet":
+            self = .sessionArtifactSet(try SessionArtifactSetAction(from: decoder))
+        case "session/artifactRemoved":
+            self = .sessionArtifactRemoved(try SessionArtifactRemovedAction(from: decoder))
         case "chat/pendingMessageSet":
             self = .chatPendingMessageSet(try ChatPendingMessageSetAction(from: decoder))
         case "chat/pendingMessageRemoved":
@@ -2963,6 +3003,8 @@ public enum StateAction: Codable, Sendable {
         case .chatWorkingDirectoryRemoved(let v): try v.encode(to: encoder)
         case .sessionInputNeededSet(let v): try v.encode(to: encoder)
         case .sessionInputNeededRemoved(let v): try v.encode(to: encoder)
+        case .sessionArtifactSet(let v): try v.encode(to: encoder)
+        case .sessionArtifactRemoved(let v): try v.encode(to: encoder)
         case .chatPendingMessageSet(let v): try v.encode(to: encoder)
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)

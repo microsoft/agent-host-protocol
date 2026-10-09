@@ -13,10 +13,10 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
-    AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    BackgroundWork, CanvasReference, CanvasState, ChangesSummary, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, Artifact,
+    AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle,
+    AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, Changeset,
+    ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
@@ -76,6 +76,8 @@ pub enum ActionType {
     SessionWorkingDirectoryReplaced,
     SessionInputNeededSet,
     SessionInputNeededRemoved,
+    SessionArtifactSet,
+    SessionArtifactRemoved,
     ChatPendingMessageSet,
     ChatPendingMessageRemoved,
     ChatQueuedMessagesReordered,
@@ -216,6 +218,8 @@ impl serde::Serialize for ActionType {
             Self::SessionInputNeededRemoved => {
                 serializer.serialize_str("session/inputNeededRemoved")
             }
+            Self::SessionArtifactSet => serializer.serialize_str("session/artifactSet"),
+            Self::SessionArtifactRemoved => serializer.serialize_str("session/artifactRemoved"),
             Self::ChatPendingMessageSet => serializer.serialize_str("chat/pendingMessageSet"),
             Self::ChatPendingMessageRemoved => {
                 serializer.serialize_str("chat/pendingMessageRemoved")
@@ -374,6 +378,8 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/workingDirectoryReplaced" => Self::SessionWorkingDirectoryReplaced,
             "session/inputNeededSet" => Self::SessionInputNeededSet,
             "session/inputNeededRemoved" => Self::SessionInputNeededRemoved,
+            "session/artifactSet" => Self::SessionArtifactSet,
+            "session/artifactRemoved" => Self::SessionArtifactRemoved,
             "chat/pendingMessageSet" => Self::ChatPendingMessageSet,
             "chat/pendingMessageRemoved" => Self::ChatPendingMessageRemoved,
             "chat/queuedMessagesReordered" => Self::ChatQueuedMessagesReordered,
@@ -1446,6 +1452,36 @@ pub struct SessionInputNeededRemovedAction {
     pub id: String,
 }
 
+/// A session artifact was added or updated.
+///
+/// Upsert semantics keyed by {@link ResourceArtifact.uri | `artifact.uri`}: the
+/// host dispatches this with the full {@link Artifact} to append a new entry to
+/// {@link SessionState.artifacts} or replace the existing entry with the same
+/// `uri` in place.
+///
+/// Server-originated: hosts record artifacts as the session's chats produce or
+/// reference items, or as the host learns what the session's work derives from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionArtifactSetAction {
+    /// The artifact to add or update, matched by `uri`.
+    pub artifact: Artifact,
+}
+
+/// A session artifact was removed.
+///
+/// Removes the entry identified by `uri` from {@link SessionState.artifacts};
+/// a no-op when no entry matches.
+///
+/// Hosts dispatch this when an artifact's last relation goes away. Clients MAY
+/// dispatch it to dismiss an artifact; the host decides whether to accept it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionArtifactRemovedAction {
+    /// The `uri` of the artifact to remove.
+    pub uri: Uri,
+}
+
 /// A pending message was set (upsert semantics: creates or replaces).
 ///
 /// For steering messages, this always replaces the single steering message.
@@ -2480,6 +2516,10 @@ pub enum StateAction {
     SessionInputNeededSet(Box<SessionInputNeededSetAction>),
     #[serde(rename = "session/inputNeededRemoved")]
     SessionInputNeededRemoved(SessionInputNeededRemovedAction),
+    #[serde(rename = "session/artifactSet")]
+    SessionArtifactSet(SessionArtifactSetAction),
+    #[serde(rename = "session/artifactRemoved")]
+    SessionArtifactRemoved(SessionArtifactRemovedAction),
     #[serde(rename = "chat/pendingMessageSet")]
     ChatPendingMessageSet(ChatPendingMessageSetAction),
     #[serde(rename = "chat/pendingMessageRemoved")]

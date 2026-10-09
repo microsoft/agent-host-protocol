@@ -938,6 +938,13 @@
           },
           "description": "Outstanding input the session is blocked on, aggregated across every chat\nso a client can discover and answer it from the session channel alone,\nwithout subscribing to individual chats.\n\nEach entry is self-sufficient: it carries the owning chat's URI plus every\nidentifier the client needs to respond. A client answers by dispatching the\nordinary `chat/*` action to that chat's channel — see\n{@link SessionInputRequest} for the per-variant response path. A list\nholding any entry other than\n{@link SessionInputRequestKind.ToolClientExecution} implies\n{@link SessionStatus.InputNeeded} on {@link SessionSummary.status};\nclient-execution entries are work delegated to a client rather than a\nprompt, so they leave the session's activity unchanged.\n\nHost-managed: the host upserts entries with `session/inputNeededSet` as\nchats raise requests and removes them with `session/inputNeededRemoved`\nonce the underlying request resolves."
         },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "description": "Durable items the session produced, references, or derives its work\nfrom, keyed by {@link ResourceArtifact.uri | `uri`}. Order is\nhost-authoritative.\n\nA chat's artifacts are the entries with a\n{@link ArtifactRelation | relation} whose `chat` is that chat's URI.\n\nHost-managed: the host upserts entries with `session/artifactSet` and\nremoves them with `session/artifactRemoved`."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -1131,6 +1138,105 @@
         "toolCall"
       ]
     },
+    "ArtifactRelation": {
+      "type": "object",
+      "description": "A reason a session references an {@link Artifact}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ArtifactRelationKind",
+          "description": "The kind of relation."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat that established the relation. Absent means the relation\nbelongs to the session as a whole."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "ArtifactBase": {
+      "type": "object",
+      "description": "Fields common to every {@link Artifact} variant.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label, for example a pull request's title."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint, with the same semantics as\n{@link MessageAttachmentBase.displayKind}. Implementations MAY use any\nvalue; clients SHOULD fall back to a reasonable default for values they\ndo not recognize."
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRelation"
+          },
+          "description": "Why the session references this artifact.\n\nMUST NOT be empty: the host removes the artifact with\n`session/artifactRemoved` when its last relation goes away. An artifact\nMAY carry several relations, including relations of the same kind\nestablished by different chats."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata, such as forge state or CI status."
+        }
+      },
+      "required": [
+        "label",
+        "relations"
+      ]
+    },
+    "ResourceArtifact": {
+      "type": "object",
+      "description": "An artifact addressed by URI.\n\nThe {@link ContentRef.uri | `uri`} is the artifact's key within\n{@link SessionState.artifacts}. Hosts SHOULD canonicalize it so the same\nitem is listed once. Clients typically open `http` and `https` URIs\nexternally and read other schemes the host serves through `resourceRead`.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label, for example a pull request's title."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint, with the same semantics as\n{@link MessageAttachmentBase.displayKind}. Implementations MAY use any\nvalue; clients SHOULD fall back to a reasonable default for values they\ndo not recognize."
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactRelation"
+          },
+          "description": "Why the session references this artifact.\n\nMUST NOT be empty: the host removes the artifact with\n`session/artifactRemoved` when its last relation goes away. An artifact\nMAY carry several relations, including relations of the same kind\nestablished by different chats."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata, such as forge state or CI status."
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
+        },
+        "type": {
+          "const": "resource",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "label",
+        "relations",
+        "uri",
+        "type"
+      ]
+    },
     "ProjectInfo": {
       "type": "object",
       "description": "Server-owned project metadata for a session.",
@@ -1203,6 +1309,13 @@
         "changes": {
           "$ref": "#/$defs/ChangesSummary",
           "description": "Aggregate summary of file changes associated with this session. Servers\nmay populate this to give clients a quick at-a-glance view of the\nsession's footprint (e.g., for list rendering) without requiring the\nclient to subscribe to a changeset."
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "description": "Artifacts to show with the session in session lists, mirroring\n{@link SessionState.artifacts}. Producers SHOULD keep this small and MAY\nomit entries that {@link SessionState.artifacts} carries."
         },
         "_meta": {
           "type": "object",
@@ -7815,6 +7928,10 @@
       ],
       "description": "One outstanding piece of input a session is blocked on, aggregated across all\nchats in {@link SessionState.inputNeeded}.\n\nEach entry is self-sufficient: it carries the owning\n{@link SessionInputRequestBase.chat | `chat`} URI plus every identifier needed\nto construct the response, so a client can answer by dispatching the ordinary\n`chat/*` action (`chat/inputCompleted`, `chat/toolCallConfirmed`,\n`chat/toolCallComplete`, …) to that chat's channel **without having subscribed\nto the chat** — except {@link SessionToolAuthenticationRequest}, which is\nresolved via the `authenticate` command instead. The host removes the entry\nwith `session/inputNeededRemoved` once the underlying request resolves."
     },
+    "Artifact": {
+      "$ref": "#/$defs/ResourceArtifact",
+      "description": "A durable item a session produced, references, or derives its work from,\nsuch as a pull request, an issue, a commit, or a document.\n\nArtifacts MUST NOT describe relationships between chats in the same\nsession; that lineage belongs to {@link ChatOrigin}."
+    },
     "ToolCallConfirmationState": {
       "oneOf": [
         {
@@ -7825,6 +7942,15 @@
         }
       ],
       "description": "The two tool-call states that block on a client confirmation: parameter\nconfirmation before execution ({@link ToolCallPendingConfirmationState}) and\nresult confirmation after execution\n({@link ToolCallPendingResultConfirmationState}).\n\n{@link ToolCallAuthRequiredState} is intentionally **not** part of this\nunion: it doesn't block on a `chat/toolCallConfirmed`-style client\ndecision, it blocks on the client completing an OAuth flow and calling\n`authenticate`. See {@link SessionToolAuthenticationRequest} for its\nsession-level surfacing.\n\nSurfaced at the session level by {@link SessionToolConfirmationRequest}."
+    },
+    "ArtifactRelationKind": {
+      "enum": [
+        "created",
+        "referenced",
+        "derivedFrom"
+      ],
+      "type": "string",
+      "description": "Why a session or chat references an {@link Artifact}."
     },
     "ChatOrigin": {
       "oneOf": [
@@ -8553,6 +8679,12 @@
         },
         {
           "$ref": "#/$defs/SessionInputNeededRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionArtifactSetAction"
+        },
+        {
+          "$ref": "#/$defs/SessionArtifactRemovedAction"
         },
         {
           "$ref": "#/$defs/SessionCustomizationsChangedAction"
@@ -9343,6 +9475,40 @@
       "required": [
         "type",
         "id"
+      ]
+    },
+    "SessionArtifactSetAction": {
+      "type": "object",
+      "description": "A session artifact was added or updated.\n\nUpsert semantics keyed by {@link ResourceArtifact.uri | `artifact.uri`}: the\nhost dispatches this with the full {@link Artifact} to append a new entry to\n{@link SessionState.artifacts} or replace the existing entry with the same\n`uri` in place.\n\nServer-originated: hosts record artifacts as the session's chats produce or\nreference items, or as the host learns what the session's work derives from.",
+      "properties": {
+        "type": {
+          "const": "session/artifactSet"
+        },
+        "artifact": {
+          "$ref": "#/$defs/Artifact",
+          "description": "The artifact to add or update, matched by `uri`."
+        }
+      },
+      "required": [
+        "type",
+        "artifact"
+      ]
+    },
+    "SessionArtifactRemovedAction": {
+      "type": "object",
+      "description": "A session artifact was removed.\n\nRemoves the entry identified by `uri` from {@link SessionState.artifacts};\na no-op when no entry matches.\n\nHosts dispatch this when an artifact's last relation goes away. Clients MAY\ndispatch it to dismiss an artifact; the host decides whether to accept it.",
+      "properties": {
+        "type": {
+          "const": "session/artifactRemoved"
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "The `uri` of the artifact to remove."
+        }
+      },
+      "required": [
+        "type",
+        "uri"
       ]
     },
     "SessionCustomizationsChangedAction": {

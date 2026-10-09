@@ -1,0 +1,105 @@
+{
+  "description": "session/artifactSet replaces the artifact with the same uri in place, keeping its position",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/pull/7",
+        "label": "Show a session's pull request",
+        "displayKind": "pullRequest",
+        "relations": [
+          {
+            "kind": "created",
+            "chat": "ahp-chat:/s1/main"
+          }
+        ]
+      },
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/artifactSet",
+      "artifact": {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/pull/7",
+        "label": "Show a session's pull request",
+        "displayKind": "pullRequest",
+        "relations": [
+          {
+            "kind": "created",
+            "chat": "ahp-chat:/s1/main"
+          },
+          {
+            "kind": "referenced",
+            "chat": "ahp-chat:/s1/side"
+          }
+        ],
+        "_meta": {
+          "forge": {
+            "state": "open"
+          }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/pull/7",
+        "label": "Show a session's pull request",
+        "displayKind": "pullRequest",
+        "relations": [
+          {
+            "kind": "created",
+            "chat": "ahp-chat:/s1/main"
+          },
+          {
+            "kind": "referenced",
+            "chat": "ahp-chat:/s1/side"
+          }
+        ],
+        "_meta": {
+          "forge": {
+            "state": "open"
+          }
+        }
+      },
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  }
+}

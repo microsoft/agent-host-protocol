@@ -1,0 +1,52 @@
+{
+  "description": "session/artifactRemoved is a no-op when no artifact has the uri",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/artifactRemoved",
+      "uri": "https://github.com/octo/repo/issues/999"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "artifacts": [
+      {
+        "type": "resource",
+        "uri": "https://github.com/octo/repo/issues/42",
+        "label": "Sessions don't show their pull request",
+        "displayKind": "issue",
+        "relations": [
+          {
+            "kind": "derivedFrom"
+          }
+        ]
+      }
+    ]
+  }
+}
