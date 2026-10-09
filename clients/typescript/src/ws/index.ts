@@ -5,4 +5,4 @@
  */
 
 export { WebSocketTransport } from './transport.js';
-export type { WebSocketCloseInfo, WebSocketTransportOptions } from './transport.js';
+export type { WebSocketCloseInfo, WebSocketTransportOptions, WebSocketTransportSocket } from './transport.js';

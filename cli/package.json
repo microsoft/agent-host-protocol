@@ -1,0 +1,45 @@
+{
+  "name": "@microsoft/agent-host-protocol-cli",
+  "version": "0.0.0",
+  "description": "Agent-friendly CLI for inspecting and controlling Agent Host Protocol hosts.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Microsoft Corporation",
+  "homepage": "https://microsoft.github.io/agent-host-protocol/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/agent-host-protocol.git",
+    "directory": "cli"
+  },
+  "bugs": {
+    "url": "https://github.com/microsoft/agent-host-protocol/issues"
+  },
+  "keywords": ["ahp", "agent", "cli", "protocol", "json-rpc", "websocket"],
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "ahp": "./dist/main.js"
+  },
+  "files": ["dist/main.js", "README.md", "CHANGELOG.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "npm run typecheck && esbuild src/main.ts --bundle --external:ws --platform=node --target=node22 --format=esm --outfile=dist/main.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "pretest": "npm run build",
+    "test": "node --test --import tsx test/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -200,6 +200,35 @@ jobs:
         working-directory: clients/typescript
         run: npm run build
 
+  cli:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cli/package-lock.json
+
+      - run: npm ci
+
+      - name: Generate shared TypeScript protocol sources
+        run: npm run generate:typescript
+
+      - name: Install CLI build dependencies
+        working-directory: cli
+        run: npm ci
+
+      - name: Build and test CLI, controllers, and standalone npm artifact
+        working-directory: cli
+        run: npm test
+
   go:
     runs-on: ubuntu-latest
     defaults:

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import {
   applyReleaseToChangelog,
   CHANGELOG_TARGETS,
+  PROTOCOL_CHANGELOG_TARGETS,
   type ChangelogTarget,
   changelogPathForTarget,
   formatFragmentErrors,
@@ -24,7 +25,7 @@ interface Options {
 
 function usage(): never {
   console.error(
-    'Usage: npm run changelog:release -- --version X.Y.Z [--date YYYY-MM-DD] [--targets spec,rust,kotlin,typescript,swift,go,dotnet] [--dry-run]',
+    'Usage: npm run changelog:release -- --version X.Y.Z [--date YYYY-MM-DD] [--targets spec,rust,kotlin,typescript,swift,go,dotnet,cli] [--dry-run]',
   );
   process.exit(1);
 }
@@ -56,7 +57,7 @@ function parseArgs(argv: readonly string[]): Options {
   let version: string | undefined;
   let date: string | undefined = new Date().toISOString().slice(0, 10);
   let dryRun = false;
-  let targets: readonly ChangelogTarget[] = CHANGELOG_TARGETS;
+  let targets: readonly ChangelogTarget[] = PROTOCOL_CHANGELOG_TARGETS;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];

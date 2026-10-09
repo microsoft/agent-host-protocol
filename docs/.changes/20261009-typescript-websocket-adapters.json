@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`WebSocketTransport.fromSocket` accepts a minimal `WebSocketTransportSocket` interface so native and compatible third-party sockets can reuse the SDK transport without DOM-specific casts.",
+  "targets": ["typescript"]
+}

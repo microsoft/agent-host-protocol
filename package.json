@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "ahp": "tsx cli/src/main.ts",
+    "build:cli": "npm run generate:typescript && npm run build --prefix cli",
+    "test:cli": "npm run generate:typescript && npm test --prefix cli",
     "dev": "tsx scripts/dev.ts",
     "generate": "tsx scripts/generate.ts",
     "generate:docs": "tsx scripts/generate.ts --docs",

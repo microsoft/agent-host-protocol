@@ -33,6 +33,20 @@ export interface WebSocketCloseInfo {
   readonly wasClean: boolean;
 }
 
+/** Socket surface required to wrap native or compatible third-party WebSockets. */
+export interface WebSocketTransportSocket {
+  readonly OPEN: number;
+  readonly CONNECTING: number;
+  readonly readyState: number;
+  readonly bufferedAmount: number;
+  binaryType: string;
+  send(data: string): void;
+  close(): void;
+  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+  addEventListener(type: 'error', listener: () => void): void;
+  addEventListener(type: 'close', listener: (event: WebSocketCloseInfo) => void): void;
+}
+
 /**
  * An {@link AhpTransport} backed by the global {@link WebSocket}.
  *
@@ -47,7 +61,7 @@ export interface WebSocketCloseInfo {
  *   query-string parameters for auth.
  */
 export class WebSocketTransport implements AhpTransport {
-  private readonly socket: WebSocket;
+  private readonly socket: WebSocketTransportSocket;
   private readonly inbox: Array<TransportFrame | null> = [];
   private waiters: PendingRead[] = [];
   private closeInfo: WebSocketCloseInfo | null = null;
@@ -108,14 +122,14 @@ export class WebSocketTransport implements AhpTransport {
    *
    * The socket MUST already be in the `OPEN` state.
    */
-  static fromSocket(socket: WebSocket): WebSocketTransport {
+  static fromSocket(socket: WebSocketTransportSocket): WebSocketTransport {
     if (socket.readyState !== socket.OPEN) {
       throw new TransportError('io', 'socket is not OPEN');
     }
     return new WebSocketTransport(socket);
   }
 
-  private constructor(socket: WebSocket) {
+  private constructor(socket: WebSocketTransportSocket) {
     this.socket = socket;
     socket.binaryType = 'arraybuffer';
 

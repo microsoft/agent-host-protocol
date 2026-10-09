@@ -159,6 +159,18 @@ function main(): void {
         'to clients/go/CHANGELOG.md before tagging clients/go/vX.Y.Z.',
     },
     {
+      label: 'cli',
+      version: readTypeScriptPackageVersion(
+        fs.readFileSync(path.join(ROOT, 'cli', 'package.json'), 'utf-8'),
+      ),
+      changelogPath: path.join(ROOT, 'cli', 'CHANGELOG.md'),
+      hint:
+        'CLI 0.0.0 is an unpublished placeholder requiring [Unreleased]. ' +
+        'For a release, bump cli/package.json, refresh its lockfile, and ' +
+        'run changelog:release -- --version X.Y.Z --targets cli. ' +
+        'cli/pipeline.yml rejects the placeholder and requires the release heading.',
+    },
+    {
       label: 'dotnet',
       version: readDotnetPackageVersion(
         fs.readFileSync(path.join(ROOT, 'clients', 'dotnet', 'VERSION'), 'utf-8'),
@@ -172,7 +184,8 @@ function main(): void {
 
   const failures: { target: ChangelogTarget; relative: string; expectedVersion: string }[] = [];
   for (const target of targets) {
-    const expectedVersion = changelogVersionFor(target.version);
+    const expectedVersion = target.label === 'cli' && target.version === '0.0.0'
+      ? 'Unreleased' : changelogVersionFor(target.version);
     if (!fs.existsSync(target.changelogPath)) {
       failures.push({
         target,
