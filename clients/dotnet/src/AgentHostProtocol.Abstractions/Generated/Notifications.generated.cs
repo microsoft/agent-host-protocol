@@ -65,14 +65,39 @@ internal sealed class AuthRequiredReasonConverter : JsonConverter<AuthRequiredRe
 
 // ─── Notification Payloads ────────────────────────────────────────────
 
+/// <summary>Bytes in the sender's direction: client to destination, or destination to
+/// client.
+/// Transport failure terminates the stream; TCP messages are not replayed.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpDataParams
+{
+    public required string Channel { get; init; }
+
+    /// <summary>Nonempty canonical padded RFC 4648 base64, without whitespace.</summary>
+    public required string Data { get; init; }
+}
+
+/// <summary>Ends the sender's logical direction after its preceding data. The opposite
+/// direction can continue.   Local bridges decide when queued bytes have drained
+/// and how to end their sink. Sending more data after EOF is a protocol error
+/// and resets the channel.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpEofParams
+{
+    public required string Channel { get; init; }
+}
+
 /// <summary>Fragment of a serialized typed channel notification. Reassemble before typed
 /// decoding or reducer application; data is a string, not another base64 layer.
 /// Do not split surrogate pairs. One active data message per direction/subscription;
 /// fairly interleave bounded frames across subscriptions and reserve UTF-16 bytes
 /// before enqueueing. The ordered transport supplies fragment ordering.
 ///
-/// Discard incomplete messages on disconnect. Reconcile acceptedBytes, then retry
-/// whole unaccepted messages from the retained queue without charging twice.
+/// On resumable subscriptions, discard incomplete frames and unapplied delivery
+/// messages on disconnect. Replay whole actions after the last applied serverSeq
+/// through new connection-local windows. Non-resumable subscriptions terminate.
 /// Inner and outer channel URIs MUST match. Delivery controls MUST NOT be framed
 /// recursively; payload-bearing action echoes MUST use the bounded data path.
 ///
@@ -89,13 +114,16 @@ public sealed record ChannelFrameParams
     public bool? Final { get; init; }
 }
 
-/// <summary>Receiver's cumulative UTF-16 release boundary for the outgoing direction.
+/// <summary>Receiver's cumulative UTF-16 release boundary for the sender's outgoing direction
+/// on this transport. Counters start at zero on subscription and reconnect.
 /// Duplicate/older positions are harmless. A boundary beyond sent data, within
-/// a message, or inconsistent with the journal MUST fail explicitly.
+/// a message, or inconsistent with local sent-message boundaries MUST fail explicitly.
 ///
 /// Return credit after bounded consumption, not JSON parsing or action echo.
-/// TCP returns it after downstream buffer release. Shared release receipts can
-/// implement drain() without TCP-specific consumed-credit actions.
+/// Forwarding endpoints release AHP message allocations through the same bounded
+/// consumer contract and backpressure their underlying sockets independently.
+/// Credit from old transports or subscription callbacks MUST NOT release capacity
+/// in a new window; implementations fence it using local generations.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelCreditParams

@@ -258,6 +258,49 @@ public struct SideChatSource: Codable, Sendable {
     }
 }
 
+/// Creates one outbound connection on the host's network, without subscribing.
+/// The channel is the client-chosen TCP URI. The client then uses ordinary
+/// subscribe to negotiate shared flow control. The host MUST NOT deliver AHP
+/// data before that subscription and MUST bound pre-subscription buffering and
+/// the lifetime of abandoned connections. Transport loss closes the connection;
+/// resuming it through reconnect is not supported.
+///
+/// Requires InitializeResult.tcpConnections. Hosts advertising support MUST reject
+/// malformed targets and return AlreadyExists when the connection URI is already
+/// allocated. Repeating creation MUST NOT replace an existing socket.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// DNS name or IP literal, resolved on the host's network. Not a URL.
+    public var host: String
+    /// Destination port.
+    public var port: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case host
+        case port
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        host: String,
+        port: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.host = host
+        self.port = port
+    }
+}
+
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -372,6 +415,12 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Presence advertises support for the createTcpConnection command. Consumers
+    /// may call it to create a private TCP channel on the host's network, then use
+    /// ordinary subscribe to negotiate shared flow control for that channel.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var tcpConnections: TcpConnectionsCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -384,6 +433,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case tcpConnections
     }
 
     public init(
@@ -396,7 +446,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tcpConnections: TcpConnectionsCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -408,6 +459,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tcpConnections = tcpConnections
     }
 }
 
@@ -534,7 +586,8 @@ public struct ReconnectParams: Codable, Sendable {
     public var subscriptions: [String]
     /// Resume information for windowed subscriptions also named in subscriptions.
     /// These channels recover independently and MUST NOT appear in inline legacy
-    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    /// actions/snapshots. Delivery queues and credit counters restart on the new
+    /// transport; channel state recovers from action checkpoints or snapshots.
     ///
     /// Stability: 1.0 - Early development.
     public var windows: ChannelDeliveryResumeOptions?
@@ -618,23 +671,22 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     }
 }
 
-/// Retained receive obligations and a separate per-channel recovery checkpoint.
+/// Per-channel action recovery checkpoint, independent of connection-local credit.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeParams: Codable, Sendable {
     public var channel: String
-    public var clientReceive: ChannelReceiveProgress
-    /// Last action safely applied or retained for this channel, not merely parsed.
-    /// Required for replay recovery; omitted for live-only channels.
+    /// Last serverSeq safely applied to this channel's retained state, not merely
+    /// received, parsed, or queued. Replay starts after this checkpoint; discard
+    /// partial frames and unapplied delivery messages before reconnecting.
+    /// Required for action replay. Omit for snapshot or live-edge recovery.
     public var lastAppliedServerSeq: Int?
 
     public init(
         channel: String,
-        clientReceive: ChannelReceiveProgress,
         lastAppliedServerSeq: Int? = nil
     ) {
         self.channel = channel
-        self.clientReceive = clientReceive
         self.lastAppliedServerSeq = lastAppliedServerSeq
     }
 }
@@ -650,10 +702,9 @@ public struct ChannelDeliveryResumeOptions: Codable, Sendable {
     }
 }
 
-/// Retained windowed subscriptions; omitted requested channels are unavailable.
-/// Unread accepted messages remain charged across reconnect; both directions
-/// reconcile lost release updates against the same retained journal. Unverified
-/// positions or lost accounting MUST fail, never grant a fresh window.
+/// Resumed windowed subscriptions; omitted requested channels are unavailable.
+/// Each returned subscription starts with fresh connection-local credit counters
+/// after old delivery queues are discarded. No byte progress survives reconnect.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeResult: Codable, Sendable {

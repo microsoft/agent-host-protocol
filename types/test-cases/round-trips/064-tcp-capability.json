@@ -1,0 +1,10 @@
+{
+  "name": "tcp-capability",
+  "group": "A",
+  "description": "TCP support is a named capability marker, not a second window or encoding negotiation.",
+  "type": "InitializeResult",
+  "input": { "protocolVersion": "1.1.0", "serverSeq": 1, "snapshots": [], "tcpConnections": {} },
+  "acceptableOutputs": [
+    { "protocolVersion": "1.1.0", "serverSeq": 1, "snapshots": [], "tcpConnections": {} }
+  ]
+}

@@ -245,6 +245,8 @@ export const NOTIFICATION_INTRODUCED_IN: { readonly [K in ProtocolNotificationMe
   'channel/ready': '1.1.0',
   'channel/reset': '1.1.0',
   'channel/snapshot': '1.1.0',
+  'tcp/data': '1.1.0',
+  'tcp/eof': '1.1.0',
 };
 
 /**

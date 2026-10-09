@@ -39,6 +39,10 @@ import com.microsoft.agenthostprotocol.generated.SubscribeResult
 import com.microsoft.agenthostprotocol.generated.ReconnectResult
 import com.microsoft.agenthostprotocol.generated.ChannelFrameParams
 import com.microsoft.agenthostprotocol.generated.ChannelCreditParams
+import com.microsoft.agenthostprotocol.generated.TcpDataParams
+import com.microsoft.agenthostprotocol.generated.TcpEofParams
+import com.microsoft.agenthostprotocol.generated.ReconnectParams
+import com.microsoft.agenthostprotocol.generated.CreateTcpConnectionParams
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -265,6 +269,10 @@ class RoundTripCorpusTest {
             "ReconnectResult" -> rt(ReconnectResult.serializer())
             "ChannelFrameParams" -> rt(ChannelFrameParams.serializer())
             "ChannelCreditParams" -> rt(ChannelCreditParams.serializer())
+            "TcpDataParams" -> rt(TcpDataParams.serializer())
+            "TcpEofParams" -> rt(TcpEofParams.serializer())
+            "ReconnectParams" -> rt(ReconnectParams.serializer())
+            "CreateTcpConnectionParams" -> rt(CreateTcpConnectionParams.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +
                     "Add a decode entry to decodeAndReencode.",

@@ -1,0 +1,20 @@
+{
+  "name": "channel-reconnect-live-edge",
+  "group": "A",
+  "description": "A live-edge subscription reconnects without an action cursor or cross-transport byte-progress metadata.",
+  "type": "ReconnectParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "lastSeenServerSeq": 10,
+    "subscriptions": ["ahp-otlp:/logs"],
+    "windows": { "items": [{ "channel": "ahp-otlp:/logs" }] }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "lastSeenServerSeq": 10,
+    "subscriptions": ["ahp-otlp:/logs"],
+    "windows": { "items": [{ "channel": "ahp-otlp:/logs" }] }
+  }]
+}

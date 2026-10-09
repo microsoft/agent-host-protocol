@@ -150,8 +150,10 @@ add `windows` to the reconnect request and either result variant.
 The server MUST omit the result field unless the client requested `windows`,
 and MUST include only requested windowed channels.
 They recover independently through bounded frames, not inline replay arrays or
-snapshots. Their retained consumption obligations and per-channel action
-checkpoints are distinct from the legacy connection-wide `lastSeenServerSeq`.
+snapshots. Their per-channel applied action checkpoints are distinct from the
+legacy connection-wide `lastSeenServerSeq`. Old delivery queues are discarded
+and credit counters restart at zero on the new transport; reconnect does not
+exchange byte-progress metadata.
 
 ## Unexpected Disconnection
 

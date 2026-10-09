@@ -80,8 +80,9 @@ export interface AuthRequiredParams {
  * fairly interleave bounded frames across subscriptions and reserve UTF-16 bytes
  * before enqueueing. The ordered transport supplies fragment ordering.
  *
- * Discard incomplete messages on disconnect. Reconcile acceptedBytes, then retry
- * whole unaccepted messages from the retained queue without charging twice.
+ * On resumable subscriptions, discard incomplete frames and unapplied delivery
+ * messages on disconnect. Replay whole actions after the last applied serverSeq
+ * through new connection-local windows. Non-resumable subscriptions terminate.
  * Inner and outer channel URIs MUST match. Delivery controls MUST NOT be framed
  * recursively; payload-bearing action echoes MUST use the bounded data path.
  *
@@ -104,13 +105,16 @@ export interface ChannelFrameParams {
 }
 
 /**
- * Receiver's cumulative UTF-16 release boundary for the outgoing direction.
+ * Receiver's cumulative UTF-16 release boundary for the sender's outgoing direction
+ * on this transport. Counters start at zero on subscription and reconnect.
  * Duplicate/older positions are harmless. A boundary beyond sent data, within
- * a message, or inconsistent with the journal MUST fail explicitly.
+ * a message, or inconsistent with local sent-message boundaries MUST fail explicitly.
  *
  * Return credit after bounded consumption, not JSON parsing or action echo.
- * TCP returns it after downstream buffer release. Shared release receipts can
- * implement drain() without TCP-specific consumed-credit actions.
+ * Forwarding endpoints release AHP message allocations through the same bounded
+ * consumer contract and backpressure their underlying sockets independently.
+ * Credit from old transports or subscription callbacks MUST NOT release capacity
+ * in a new window; implementations fence it using local generations.
  *
  * @category Protocol Notifications
  * @method channel/credit

@@ -181,6 +181,10 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "tcpConnections": {
+          "$ref": "#/$defs/TcpConnectionsCapability",
+          "description": "Presence advertises support for the createTcpConnection command. Consumers\nmay call it to create a private TCP channel on the host's network, then use\nordinary subscribe to negotiate shared flow control for that channel.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -292,7 +296,7 @@
         },
         "windows": {
           "$ref": "#/$defs/ChannelDeliveryResumeOptions",
-          "description": "Resume information for windowed subscriptions also named in subscriptions.\nThese channels recover independently and MUST NOT appear in inline legacy\nactions/snapshots. Missing journals fail explicitly, never downgrade delivery.\n\nStability: 1.0 - Early development."
+          "description": "Resume information for windowed subscriptions also named in subscriptions.\nThese channels recover independently and MUST NOT appear in inline legacy\nactions/snapshots. Delivery queues and credit counters restart on the new\ntransport; channel state recovers from action checkpoints or snapshots.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -304,24 +308,20 @@
     },
     "ChannelDeliveryResumeParams": {
       "type": "object",
-      "description": "Retained receive obligations and a separate per-channel recovery checkpoint.\n\nStability: 1.0 - Early development.",
+      "description": "Per-channel action recovery checkpoint, independent of connection-local credit.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
         },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
-        },
         "lastAppliedServerSeq": {
           "type": "integer",
-          "description": "Last action safely applied or retained for this channel, not merely parsed.\nRequired for replay recovery; omitted for live-only channels.",
+          "description": "Last serverSeq safely applied to this channel's retained state, not merely\nreceived, parsed, or queued. Replay starts after this checkpoint; discard\npartial frames and unapplied delivery messages before reconnecting.\nRequired for action replay. Omit for snapshot or live-edge recovery.",
           "minimum": 0,
           "maximum": 9007199254740991
         }
       },
       "required": [
-        "channel",
-        "clientReceive"
+        "channel"
       ]
     },
     "ChannelDeliveryResumeOptions": {
@@ -341,7 +341,7 @@
     },
     "ChannelDeliveryResumeResult": {
       "type": "object",
-      "description": "Retained windowed subscriptions; omitted requested channels are unavailable.\nUnread accepted messages remain charged across reconnect; both directions\nreconcile lost release updates against the same retained journal. Unverified\npositions or lost accounting MUST fail, never grant a fresh window.\n\nStability: 1.0 - Early development.",
+      "description": "Resumed windowed subscriptions; omitted requested channels are unavailable.\nEach returned subscription starts with fresh connection-local credit counters\nafter old delivery queues are discarded. No byte progress survives reconnect.\n\nStability: 1.0 - Early development.",
       "properties": {
         "items": {
           "type": "array",
@@ -1829,6 +1829,36 @@
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
     },
+    "CreateTcpConnectionParams": {
+      "type": "object",
+      "description": "Creates one outbound connection on the host's network, without subscribing.\nThe channel is the client-chosen TCP URI. The client then uses ordinary\nsubscribe to negotiate shared flow control. The host MUST NOT deliver AHP\ndata before that subscription and MUST bound pre-subscription buffering and\nthe lifetime of abandoned connections. Transport loss closes the connection;\nresuming it through reconnect is not supported.\n\nRequires InitializeResult.tcpConnections. Hosts advertising support MUST reject\nmalformed targets and return AlreadyExists when the connection URI is already\nallocated. Repeating creation MUST NOT replace an existing socket.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Client-chosen private connection URI, e.g. ahp-tcp:/<uuid>."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "host": {
+          "type": "string",
+          "description": "DNS name or IP literal, resolved on the host's network. Not a URL."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "channel",
+        "host",
+        "port"
+      ]
+    },
     "ReconnectResult": {
       "oneOf": [
         {
@@ -1944,31 +1974,9 @@
         "maximumMessageBytes"
       ]
     },
-    "ChannelReceiveProgress": {
-      "type": "object",
-      "description": "Accepted/released obligations of the same retained bounded consumer.\n0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count\nUTF-16 bytes through complete-data-message boundaries, never partial fragments.\nBoundary bookkeeping is local; no second message sequence is needed.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "acceptedBytes": {
-          "type": "integer",
-          "description": "Complete logical data messages safely retained by the bounded consumer.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "consumedBytes": {
-          "type": "integer",
-          "description": "Messages whose allocations the consumer released. Rejected actions release\nallocations too; release does not acknowledge application success.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": [
-        "acceptedBytes",
-        "consumedBytes"
-      ]
-    },
     "ChannelFlowControl": {
       "type": "object",
-      "description": "Accepted receive limits for both directions of a subscription. Initial\naccounting starts at zero. The existing logical client and channel identify\nthe subscription; transport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
+      "description": "Accepted receive limits for both directions of a subscription. Accounting\nstarts at zero on subscription and reconnect, after old delivery queues are\ndiscarded. The existing logical client and channel identify the subscription;\ntransport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
       "properties": {
         "clientReceive": {
           "$ref": "#/$defs/ChannelReceiveLimits"
@@ -1984,30 +1992,23 @@
     },
     "ResumedChannelSubscription": {
       "type": "object",
-      "description": "One subscription retained after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
+      "description": "One subscription resumed after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
         },
         "flowControl": {
-          "$ref": "#/$defs/ChannelFlowControl"
-        },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
-        },
-        "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "Receive limits for new connection-local windows; all credit counters start at zero."
         },
         "recovery": {
           "$ref": "#/$defs/ChannelRecoveryKind",
-          "description": "Replay retains the same consumer; live recovery resumes at the live edge."
+          "description": "Replay retains applied resource state, not old delivery buffers; live resumes at the live edge."
         }
       },
       "required": [
         "channel",
         "flowControl",
-        "clientReceive",
-        "hostReceive",
         "recovery"
       ]
     },
@@ -7905,6 +7906,11 @@
         "lifecycle",
         "sessions"
       ]
+    },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Presence enables createTcpConnection followed by ordinary windowed subscribe.\nTCP channels use shared subscription flow control, not reduced resource state.\nBase64 is the fixed payload encoding; socket buffering and destination policy\nare local implementation concerns.\nConnections end when their creating AHP transport disconnects; this revision\ndoes not support resuming TCP channels through reconnect.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "ActionOrigin": {
       "type": "object",

@@ -41,6 +41,7 @@ protocol or package version numbers.
 | [Chat](/specification/chat-channel) | **2 - Stable** |
 | [Canvas](/reference/canvas) | **1 - Experimental** |
 | [Terminal](/specification/terminal-channel) | **2 - Stable** |
+| [TCP forwarding](/specification/tcp-channel) | **1.0 - Early development** |
 | [Changeset](/reference/changeset) | **1.2 - Release candidate** |
 | [Annotations](/reference/annotations) | **1.1 - Active development** |
 | [Telemetry](/specification/telemetry-channel) | **2 - Stable** |

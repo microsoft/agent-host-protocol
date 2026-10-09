@@ -57,6 +57,7 @@ type _ExpectedCommands =
   | 'createSession'
   | 'disposeSession'
   | 'createChat'
+  | 'createTcpConnection'
   | 'moveChat'
   | 'disposeChat'
   | 'createTerminal'
@@ -88,7 +89,9 @@ type _ExpectedClientNotifications =
   | 'dispatchAction'
   | 'channel/frame'
   | 'channel/credit'
-  | 'channel/reset';
+  | 'channel/reset'
+  | 'tcp/data'
+  | 'tcp/eof';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =
@@ -105,7 +108,9 @@ type _ExpectedServerNotifications =
   | 'channel/credit'
   | 'channel/ready'
   | 'channel/reset'
-  | 'channel/snapshot';
+  | 'channel/snapshot'
+  | 'tcp/data'
+  | 'tcp/eof';
 
 /** All server → client request methods. */
 type _ExpectedServerCommands =

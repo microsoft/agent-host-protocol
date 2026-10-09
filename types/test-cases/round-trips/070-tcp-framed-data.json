@@ -1,0 +1,16 @@
+{
+  "name": "tcp-framed-data",
+  "group": "A",
+  "description": "A TCP logical notification uses the ordinary string frame without another base64 layer or control exemption.",
+  "type": "ChannelFrameParams",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"tcp/data\",\"params\":{\"channel\":\"ahp-tcp:/t1\",\"data\":\"AAECAw==\"}}",
+    "final": true
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-tcp:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"tcp/data\",\"params\":{\"channel\":\"ahp-tcp:/t1\",\"data\":\"AAECAw==\"}}",
+    "final": true
+  }]
+}

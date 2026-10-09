@@ -55,6 +55,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. `ResourceWriteParams.if_match`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// The host could not establish the requested TCP forwarding connection.
+    pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.

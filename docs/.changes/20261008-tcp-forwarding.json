@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Experimental non-resumable, client-owned TCP forwarding with separate creation and subscription, and symmetric data/EOF notifications using shared UTF-16 flow control.",
+  "issues": [488]
+}
