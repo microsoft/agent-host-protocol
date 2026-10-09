@@ -37,7 +37,7 @@ The host is the boundary between these two concerns.
 | **Multi-client coordination** | Core purpose — N clients see synchronized state | Not addressed — assumes a single client |
 | **State authority** | Host holds the authoritative state tree; clients reconcile | Agent holds session state; client receives updates |
 | **Action sequencing** | Server-sequenced action envelopes with `serverSeq` ordering | Request-response with streaming notifications |
-| **Reconnection / replay** | Built-in — clients reconnect with `lastSeenServerSeq` and replay missed actions | Not specified at the protocol level |
+| **Reconnection / replay** | Built-in — clients reconnect with per-channel `lastSeenServerSeq` checkpoints and replay missed actions | Not specified at the protocol level |
 | **Agent abstraction** | Agent-agnostic by design — clients never see agent-specific details | Agent-specific — defines the agent's interface directly |
 | **Session lifecycle** | Host manages sessions; clients subscribe by URI | Client creates sessions directly with the agent |
 | **Streaming** | Actions (`chat/delta`, `chat/responsePart`) applied through reducers | `session/update` notifications sent over the wire |

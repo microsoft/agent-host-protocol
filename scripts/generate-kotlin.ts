@@ -1761,7 +1761,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ChannelRecoveryKind', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
@@ -1771,7 +1771,8 @@ const COMMAND_STRUCTS = [
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
   'Implementation',
-  'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
+  'ReconnectParams', 'ChannelReplayCursor', 'ReconnectResult',
+  'ChannelReplayRecovery', 'ChannelSnapshotRecovery', 'ChannelMissingRecovery',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
@@ -1803,12 +1804,13 @@ const COMMAND_STRUCTS = [
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
 ];
 
-const RECONNECT_RESULT_UNION: UnionConfig = {
-  name: 'ReconnectResult',
-  discriminantField: 'type',
+const CHANNEL_RECOVERY_UNION: UnionConfig = {
+  name: 'ChannelRecovery',
+  discriminantField: 'kind',
   variants: [
-    { caseName: 'Replay', structName: 'ReconnectReplayResult', discriminantValue: 'replay' },
-    { caseName: 'Snapshot', structName: 'ReconnectSnapshotResult', discriminantValue: 'snapshot' },
+    { caseName: 'Replay', structName: 'ChannelReplayRecovery', discriminantValue: 'replay' },
+    { caseName: 'Snapshot', structName: 'ChannelSnapshotRecovery', discriminantValue: 'snapshot' },
+    { caseName: 'Missing', structName: 'ChannelMissingRecovery', discriminantValue: 'missing' },
   ],
 };
 
@@ -2025,9 +2027,9 @@ function generateCommandsFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
 
-  lines.push('// ─── ReconnectResult Union ──────────────────────────────────────────────────');
+  lines.push('// ─── ChannelRecovery Union ──────────────────────────────────────────────────');
   lines.push('');
-  lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
+  lines.push(generateDiscriminatedUnion(project, CHANNEL_RECOVERY_UNION));
   lines.push('');
 
   lines.push('// ─── Changeset Operation Unions ─────────────────────────────────────────────');
@@ -2422,7 +2424,7 @@ function checkExhaustiveness(project: Project): void {
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum
     'AhpErrorCodeWithData',         // type-level alias; not a Kotlin type
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
-    'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
+    'ChannelRecovery',               // CHANNEL_RECOVERY_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationDisableCondition', // AUTOMATION_DISABLE_CONDITION_UNION discriminated union

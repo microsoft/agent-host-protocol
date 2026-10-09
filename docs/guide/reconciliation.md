@@ -72,13 +72,15 @@ If the transport connection drops:
   "params": {
     "channel": "ahp-root://",
     "clientId": "client-1",
-    "lastSeenServerSeq": 42,
-    "subscriptions": ["ahp-root://", "ahp-session:/<uuid>"]
+    "subscriptions": [
+      { "channel": "ahp-root://", "lastSeenServerSeq": 42 },
+      { "channel": "ahp-session:/<uuid>", "lastSeenServerSeq": 40 }
+    ]
   }
 }
 ```
 
-The server MUST include all replayed data in the response. If the gap is within the replay buffer, the response contains missed action envelopes. If the gap exceeds the buffer, the response contains fresh snapshots instead. In both cases, the client resets `confirmedState` accordingly and clears `pendingActions`.
+Each subscribed channel recovers independently from its own `lastSeenServerSeq` checkpoint — never a single connection-wide watermark, which could let a fast-moving channel's progress mask a slower channel's undelivered action. The server MUST include all replayed and snapshotted data in the response, with one recovery outcome per subscribed channel: a `"replay"` outcome for channels within the replay buffer, a `"snapshot"` outcome for channels whose gap exceeds it, or a `"missing"` outcome for channels the server can no longer resume. The client resets `confirmedState` and clears `pendingActions` for each channel according to its own outcome.
 
 Protocol notifications (like `sessionAdded`/`sessionRemoved`) are **not** replayed — the client should re-fetch the session list.
 

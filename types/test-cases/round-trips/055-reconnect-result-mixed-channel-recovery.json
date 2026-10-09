@@ -1,0 +1,84 @@
+{
+  "name": "reconnect-result-mixed-channel-recovery",
+  "group": "A",
+  "description": "ReconnectResult carries one ChannelRecovery per requested subscription and the three kinds can differ per channel in the same response: channel A replays its missed actions in ascending serverSeq order, channel B's gap exceeded its replay buffer so it gets a fresh snapshot (fromSeq becomes its new baseline), and channel C is reported missing because the server can no longer resume it.",
+  "type": "ReconnectResult",
+  "input": {
+    "channels": [
+      {
+        "kind": "replay",
+        "channel": "ahp-session:/a",
+        "actions": [
+          {
+            "channel": "ahp-session:/a",
+            "action": { "type": "session/titleChanged", "title": "Hello" },
+            "serverSeq": 101
+          },
+          {
+            "channel": "ahp-session:/a",
+            "action": { "type": "session/titleChanged", "title": "Hello again" },
+            "serverSeq": 102
+          }
+        ]
+      },
+      {
+        "kind": "snapshot",
+        "channel": "ahp-canvas:/b",
+        "snapshot": {
+          "resource": "ahp-canvas:/b",
+          "state": {
+            "instanceId": "b",
+            "extensionId": "project:preview",
+            "canvasId": "b",
+            "status": "Reconnecting"
+          },
+          "fromSeq": 50
+        }
+      },
+      {
+        "kind": "missing",
+        "channel": "ahp-terminal:/c"
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "channels": [
+        {
+          "kind": "replay",
+          "channel": "ahp-session:/a",
+          "actions": [
+            {
+              "channel": "ahp-session:/a",
+              "action": { "type": "session/titleChanged", "title": "Hello" },
+              "serverSeq": 101
+            },
+            {
+              "channel": "ahp-session:/a",
+              "action": { "type": "session/titleChanged", "title": "Hello again" },
+              "serverSeq": 102
+            }
+          ]
+        },
+        {
+          "kind": "snapshot",
+          "channel": "ahp-canvas:/b",
+          "snapshot": {
+            "resource": "ahp-canvas:/b",
+            "state": {
+              "instanceId": "b",
+              "extensionId": "project:preview",
+              "canvasId": "b",
+              "status": "Reconnecting"
+            },
+            "fromSeq": 50
+          }
+        },
+        {
+          "kind": "missing",
+          "channel": "ahp-terminal:/c"
+        }
+      ]
+    }
+  ]
+}

@@ -688,16 +688,22 @@ function emitCommandBlock(project: Project, entry: RegistryEntry, paramsIface: I
   }
 
   // Result handling
-  if (entry.method === 'reconnect') {
-    const replay = getInterfaceMaybe(project, 'ReconnectReplayResult');
-    const snapshot = getInterfaceMaybe(project, 'ReconnectSnapshotResult');
-    if (replay) {
-      lines.push('**Result (replay):** When the server can replay from the requested sequence:\n');
-      lines.push(renderInterfaceTable(replay) + '\n');
+  if (entry.method === 'reconnect' && entry.resultType) {
+    const resultIface = getInterfaceMaybe(project, entry.resultType.trim());
+    if (resultIface) {
+      lines.push('**Result:**\n');
+      lines.push(renderInterfaceTable(resultIface) + '\n');
     }
-    if (snapshot) {
-      lines.push('**Result (snapshot):** When the gap exceeds the replay buffer:\n');
-      lines.push(renderInterfaceTable(snapshot) + '\n');
+    for (const [label, kind] of [
+      ['replay', 'ChannelReplayRecovery'],
+      ['snapshot', 'ChannelSnapshotRecovery'],
+      ['missing', 'ChannelMissingRecovery'],
+    ] as const) {
+      const iface = getInterfaceMaybe(project, kind);
+      if (iface) {
+        lines.push(`**\`ChannelRecovery\` (${label}):**\n`);
+        lines.push(renderInterfaceTable(iface) + '\n');
+      }
     }
   } else if (entry.resultType) {
     const t = entry.resultType.trim();
