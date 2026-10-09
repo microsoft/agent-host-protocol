@@ -2444,9 +2444,14 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ActiveTurn? ActiveTurn { get; set; }
 
-    /// <summary>Message to inject into the current turn at a convenient point</summary>
+    /// <summary>Legacy replaceable steering slot, independent of {@link steeringMessages}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PendingMessage? SteeringMessage { get; set; }
+
+    /// <summary>Independently submitted steering messages, in host acceptance order.
+    /// Requires negotiated {@link InitializeResult.steeringMessages} support.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<PendingMessage>? SteeringMessages { get; set; }
 
     /// <summary>Messages to send automatically as new turns after the current turn finishes</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

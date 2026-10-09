@@ -329,6 +329,9 @@ public struct InitializeParams: Codable, Sendable {
 }
 
 public struct InitializeResult: Codable, Sendable {
+    /// Host supports the independent steering-message list and its actions.
+    /// Advertised only when {@link ClientCapabilities.steeringMessages} was declared.
+    public var steeringMessages: [String: AnyCodable]?
     /// Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -374,6 +377,7 @@ public struct InitializeResult: Codable, Sendable {
     public var automations: AutomationCapabilities?
 
     enum CodingKeys: String, CodingKey {
+        case steeringMessages
         case protocolVersion
         case serverSeq
         case serverInfo
@@ -387,6 +391,7 @@ public struct InitializeResult: Codable, Sendable {
     }
 
     public init(
+        steeringMessages: [String: AnyCodable]? = nil,
         protocolVersion: String,
         serverSeq: Int,
         serverInfo: Implementation? = nil,
@@ -398,6 +403,7 @@ public struct InitializeResult: Codable, Sendable {
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil
     ) {
+        self.steeringMessages = steeringMessages
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
         self.serverInfo = serverInfo
@@ -412,6 +418,8 @@ public struct InitializeResult: Codable, Sendable {
 }
 
 public struct ClientCapabilities: Codable, Sendable {
+    /// Client understands the independent {@link ChatState.steeringMessages} list and its actions.
+    public var steeringMessages: [String: AnyCodable]?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -426,8 +434,10 @@ public struct ClientCapabilities: Codable, Sendable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
+        steeringMessages: [String: AnyCodable]? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
+        self.steeringMessages = steeringMessages
         self.mcpApps = mcpApps
     }
 }

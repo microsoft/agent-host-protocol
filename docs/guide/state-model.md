@@ -197,7 +197,8 @@ ChatState {
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
   activeTurn?: ActiveTurn             // the in-progress turn, if any
-  steeringMessage?: PendingMessage
+  steeringMessage?: PendingMessage      // legacy replaceable slot
+  steeringMessages?: PendingMessage[]   // negotiated independent submissions
   queuedMessages?: PendingMessage[]
   draft?: Message                     // user's in-progress input
 }
@@ -549,12 +550,13 @@ Notifications are ephemeral — not processed by reducers, not stored in state, 
 
 ## Pending Messages
 
-Each chat maintains two optional **pending messages** — instructions queued for future delivery to the agent:
+Each chat maintains optional pending input for steering the active turn or starting future turns:
 
 ```typescript
 ChatState {
   // ...existing fields...
-  steeringMessage?: PendingMessage      // inject into current turn
+  steeringMessage?: PendingMessage      // legacy replaceable slot
+  steeringMessages?: PendingMessage[]   // independent mid-turn submissions
   queuedMessages?: PendingMessage[]     // start as new turns
 }
 
@@ -564,9 +566,15 @@ PendingMessage {
 }
 ```
 
-### Steering Message
+### Steering Messages
 
-The steering message is injected into the **current turn** at a convenient point. Clients set a steering message to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one steering message exists at a time; adding a new one replaces any existing one.
+With negotiated `steeringMessages` support, each steering submission has its own entry in an ordered list. Clients use `chat/steeringMessageSet` to append or replace an entry by ID; hosts use `chat/steeringMessageRemoved` to acknowledge consumption of that entry. A later submission does not replace an earlier one. A consuming `chat/turnStarted` can also remove the matching entry via `queuedMessageId`.
+
+Support is declared in `InitializeParams.capabilities.steeringMessages` and acknowledged in `InitializeResult.steeringMessages`. Updated clients display both the list and any legacy-slot message. See [steering consumption and compatibility](../specification/chat-channel.md#steering-messages) for negotiation, handoff, and reconnect rules.
+
+### Legacy Steering Slot
+
+The legacy `steeringMessage` slot is injected into the **current turn** at a convenient point. Clients set it to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one message occupies this slot; replacing it does not modify the independent `steeringMessages` list.
 
 - When the chat has an active turn, the server consumes the steering message at its discretion, dispatching `chat/pendingMessageRemoved` when it does.
 - When set while idle, the steering message is silently stored until a turn starts.

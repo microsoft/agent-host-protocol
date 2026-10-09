@@ -1,0 +1,35 @@
+{
+  "description": "steering list upsert preserves the position of an existing ID",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessages": [
+      { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
+      { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/steeringMessageSet",
+      "steeringMessage": {
+        "id": "a",
+        "message": { "text": "Updated A", "origin": { "kind": "user" } }
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessages": [
+      { "id": "a", "message": { "text": "Updated A", "origin": { "kind": "user" } } },
+      { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  }
+}

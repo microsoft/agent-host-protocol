@@ -139,6 +139,12 @@ internal static class GeneratedActionMetadata
             case ChatResponsePartAction value:
                 actionType = value.Type;
                 return true;
+            case ChatSteeringMessageRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatSteeringMessageSetAction value:
+                actionType = value.Type;
+                return true;
             case ChatToolCallAuthRequiredAction value:
                 actionType = value.Type;
                 return true;

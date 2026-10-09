@@ -2778,7 +2778,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy replaceable steering slot, independent of {@link steeringMessages}."
+        },
+        "steeringMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PendingMessage"
+          },
+          "description": "Independently submitted steering messages, in host acceptance order.\nRequires negotiated {@link InitializeResult.steeringMessages} support."
         },
         "queuedMessages": {
           "type": "array",

@@ -1742,8 +1742,11 @@ public struct ChatState: Codable, Sendable {
     public var turnsNextCursor: String?
     /// Currently in-progress turn
     public var activeTurn: ActiveTurn?
-    /// Message to inject into the current turn at a convenient point
+    /// Legacy replaceable steering slot, independent of {@link steeringMessages}.
     public var steeringMessage: PendingMessage?
+    /// Independently submitted steering messages, in host acceptance order.
+    /// Requires negotiated {@link InitializeResult.steeringMessages} support.
+    public var steeringMessages: [PendingMessage]?
     /// Messages to send automatically as new turns after the current turn finishes
     public var queuedMessages: [PendingMessage]?
     /// The user's in-progress draft input for this chat — the message they are
@@ -1779,6 +1782,7 @@ public struct ChatState: Codable, Sendable {
         case turnsNextCursor
         case activeTurn
         case steeringMessage
+        case steeringMessages
         case queuedMessages
         case draft
         case meta = "_meta"
@@ -1802,6 +1806,7 @@ public struct ChatState: Codable, Sendable {
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
+        steeringMessages: [PendingMessage]? = nil,
         queuedMessages: [PendingMessage]? = nil,
         draft: Message? = nil,
         meta: [String: AnyCodable]? = nil
@@ -1823,6 +1828,7 @@ public struct ChatState: Codable, Sendable {
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
         self.steeringMessage = steeringMessage
+        self.steeringMessages = steeringMessages
         self.queuedMessages = queuedMessages
         self.draft = draft
         self.meta = meta

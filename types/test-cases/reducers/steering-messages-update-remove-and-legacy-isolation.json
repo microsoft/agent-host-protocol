@@ -1,0 +1,55 @@
+{
+  "description": "steering list upserts in place and removes by ID independently of legacy actions",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessages": [
+      { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
+      { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/steeringMessageSet",
+      "steeringMessage": {
+        "id": "a",
+        "message": {
+          "text": "Updated A",
+          "origin": { "kind": "user" },
+          "_meta": { "example": true }
+        }
+      }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "legacy",
+      "message": { "text": "Legacy", "origin": { "kind": "user" } }
+    },
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "legacy" },
+    { "type": "chat/steeringMessageRemoved", "id": "unknown" },
+    { "type": "chat/steeringMessageRemoved", "id": "b" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": null,
+    "steeringMessages": [
+      {
+        "id": "a",
+        "message": {
+          "text": "Updated A",
+          "origin": { "kind": "user" },
+          "_meta": { "example": true }
+        }
+      }
+    ]
+  }
+}

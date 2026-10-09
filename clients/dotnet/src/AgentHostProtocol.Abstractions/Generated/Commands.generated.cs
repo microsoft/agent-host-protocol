@@ -336,6 +336,11 @@ public sealed record InitializeParams
 /// `supportedVersions`, instead of a result.</summary>
 public sealed record InitializeResult
 {
+    /// <summary>Host supports the independent steering-message list and its actions.
+    /// Advertised only when {@link ClientCapabilities.steeringMessages} was declared.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? SteeringMessages { get; init; }
+
     /// <summary>Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).</summary>
@@ -434,6 +439,10 @@ public sealed record Implementation
 /// are reserved for future per-capability options.</summary>
 public sealed record ClientCapabilities
 {
+    /// <summary>Client understands the independent {@link ChatState.steeringMessages} list and its actions.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? SteeringMessages { get; init; }
+
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,

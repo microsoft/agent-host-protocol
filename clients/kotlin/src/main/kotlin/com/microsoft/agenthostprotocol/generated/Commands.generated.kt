@@ -358,6 +358,11 @@ data class InitializeParams(
 @Serializable
 data class InitializeResult(
     /**
+     * Host supports the independent steering-message list and its actions.
+     * Advertised only when {@link ClientCapabilities.steeringMessages} was declared.
+     */
+    val steeringMessages: Map<String, JsonElement>? = null,
+    /**
      * Protocol version selected by the server. MUST be one of the entries in
      * `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
      * `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -425,6 +430,10 @@ data class InitializeResult(
 
 @Serializable
 data class ClientCapabilities(
+    /**
+     * Client understands the independent {@link ChatState.steeringMessages} list and its actions.
+     */
+    val steeringMessages: Map<String, JsonElement>? = null,
     /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.

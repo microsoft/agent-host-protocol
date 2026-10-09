@@ -119,6 +119,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatPendingMessageRemoved = new ActionType("chat/pendingMessageRemoved");
 
+    public static readonly ActionType ChatSteeringMessageSet = new ActionType("chat/steeringMessageSet");
+
+    public static readonly ActionType ChatSteeringMessageRemoved = new ActionType("chat/steeringMessageRemoved");
+
     public static readonly ActionType ChatQueuedMessagesReordered = new ActionType("chat/queuedMessagesReordered");
 
     public static readonly ActionType ChatDraftChanged = new ActionType("chat/draftChanged");
@@ -1224,7 +1228,7 @@ public sealed record ChatTurnStartedAction
     /// <summary>The new message</summary>
     public required Message Message { get; init; }
 
-    /// <summary>If this turn was auto-started from a queued message, the ID of that message</summary>
+    /// <summary>If this turn consumes a queued or steering message, the ID of that message.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? QueuedMessageId { get; init; }
 
@@ -1979,6 +1983,7 @@ public sealed record ChatTurnsLoadedAction
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
 ///
 /// For steering messages, this always replaces the single steering message.
+/// It never changes the independent {@link ChatState.steeringMessages} list.
 /// For queued messages, if a message with the given `id` already exists it is
 /// updated in place; otherwise it is appended to the queue. If the chat is
 /// idle when a queued message is set, the server SHOULD immediately consume it
@@ -2012,6 +2017,28 @@ public sealed record ChatPendingMessageRemovedAction
     public PendingMessageKind Kind { get; init; }
 
     /// <summary>Identifier of the pending message to remove</summary>
+    public required string Id { get; init; }
+}
+
+/// <summary>Upserts one independently submitted steering message without changing the legacy slot.
+/// Requires negotiated {@link InitializeResult.steeringMessages} support.
+///
+/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+public sealed record ChatSteeringMessageSetAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatSteeringMessageSet;
+
+    /// <summary>Full entry; a new ID appends and an existing ID is replaced in place.</summary>
+    public required PendingMessage SteeringMessage { get; init; }
+}
+
+/// <summary>Removes one message from {@link ChatState.steeringMessages}, leaving other messages and the legacy slot unchanged.
+/// Requires negotiated {@link InitializeResult.steeringMessages} support.</summary>
+public sealed record ChatSteeringMessageRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatSteeringMessageRemoved;
+
+    /// <summary>Identifier of the consumed or cancelled steering message.</summary>
     public required string Id { get; init; }
 }
 
@@ -2863,6 +2890,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/turnsLoaded"] = typeof(ChatTurnsLoadedAction),
         ["chat/pendingMessageSet"] = typeof(ChatPendingMessageSetAction),
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
+        ["chat/steeringMessageSet"] = typeof(ChatSteeringMessageSetAction),
+        ["chat/steeringMessageRemoved"] = typeof(ChatSteeringMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),

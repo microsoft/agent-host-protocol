@@ -363,7 +363,8 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
       && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
         && tsName === 'disableConditions')
-      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
+      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState')
+      || /^Record<string,\s*never>$/.test(tsType);
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -1602,6 +1603,8 @@ const ACTION_VARIANTS: {
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
   { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
+  { type: 'chat/steeringMessageSet', variantName: 'ChatSteeringMessageSet', tsInterface: 'ChatSteeringMessageSetAction' },
+  { type: 'chat/steeringMessageRemoved', variantName: 'ChatSteeringMessageRemoved', tsInterface: 'ChatSteeringMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },

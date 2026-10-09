@@ -943,6 +943,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             if (next.steeringMessage?.id == a.queuedMessageId) {
                 next = next.copy(steeringMessage = null)
             }
+            val steering = next.steeringMessages
+            if (steering != null) {
+                next = next.copy(steeringMessages = steering.filter { it.id != a.queuedMessageId }.ifEmpty { null })
+            }
             val queued = next.queuedMessages
             if (queued != null) {
                 val filtered = queued.filter { it.id != a.queuedMessageId }
@@ -1563,6 +1567,31 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     }
 
     // ── Pending Messages ──────────────────────────────────────────────────
+
+    is StateActionChatSteeringMessageSet -> {
+        val entry = action.value.steeringMessage
+        val existing = state.steeringMessages ?: emptyList()
+        val idx = existing.indexOfFirst { it.id == entry.id }
+        val next = existing.toMutableList()
+        if (idx < 0) {
+            next.add(entry)
+        } else {
+            next[idx] = entry
+        }
+        state.copy(steeringMessages = next)
+    }
+
+    is StateActionChatSteeringMessageRemoved -> {
+        val existing = state.steeringMessages ?: return@chatReducer state
+        val idx = existing.indexOfFirst { it.id == action.value.id }
+        if (idx < 0) {
+            state
+        } else {
+            val next = existing.toMutableList()
+            next.removeAt(idx)
+            state.copy(steeringMessages = next.ifEmpty { null })
+        }
+    }
 
     is StateActionChatPendingMessageSet -> {
         val a = action.value

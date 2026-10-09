@@ -76,6 +76,8 @@ value class ActionType(val rawValue: String) {
         val SESSION_INPUT_NEEDED_REMOVED: ActionType = ActionType("session/inputNeededRemoved")
         val CHAT_PENDING_MESSAGE_SET: ActionType = ActionType("chat/pendingMessageSet")
         val CHAT_PENDING_MESSAGE_REMOVED: ActionType = ActionType("chat/pendingMessageRemoved")
+        val CHAT_STEERING_MESSAGE_SET: ActionType = ActionType("chat/steeringMessageSet")
+        val CHAT_STEERING_MESSAGE_REMOVED: ActionType = ActionType("chat/steeringMessageRemoved")
         val CHAT_QUEUED_MESSAGES_REORDERED: ActionType = ActionType("chat/queuedMessagesReordered")
         val CHAT_DRAFT_CHANGED: ActionType = ActionType("chat/draftChanged")
         val CHAT_IS_READ_CHANGED: ActionType = ActionType("chat/isReadChanged")
@@ -270,7 +272,7 @@ data class ChatTurnStartedAction(
      */
     val message: Message,
     /**
-     * If this turn was auto-started from a queued message, the ID of that message
+     * If this turn consumes a queued or steering message, the ID of that message.
      */
     val queuedMessageId: String? = null,
     /**
@@ -1021,6 +1023,24 @@ data class ChatPendingMessageRemovedAction(
 )
 
 @Serializable
+data class ChatSteeringMessageSetAction(
+    val type: ActionType,
+    /**
+     * Full entry; a new ID appends and an existing ID is replaced in place.
+     */
+    val steeringMessage: PendingMessage
+)
+
+@Serializable
+data class ChatSteeringMessageRemovedAction(
+    val type: ActionType,
+    /**
+     * Identifier of the consumed or cancelled steering message.
+     */
+    val id: String
+)
+
+@Serializable
 data class ChatQueuedMessagesReorderedAction(
     val type: ActionType,
     /**
@@ -1743,6 +1763,8 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionInputNeededRemoved(val value: SessionInputNeededRemovedAction) : StateAction
 @JvmInline value class StateActionChatPendingMessageSet(val value: ChatPendingMessageSetAction) : StateAction
 @JvmInline value class StateActionChatPendingMessageRemoved(val value: ChatPendingMessageRemovedAction) : StateAction
+@JvmInline value class StateActionChatSteeringMessageSet(val value: ChatSteeringMessageSetAction) : StateAction
+@JvmInline value class StateActionChatSteeringMessageRemoved(val value: ChatSteeringMessageRemovedAction) : StateAction
 @JvmInline value class StateActionChatQueuedMessagesReordered(val value: ChatQueuedMessagesReorderedAction) : StateAction
 @JvmInline value class StateActionChatDraftChanged(val value: ChatDraftChangedAction) : StateAction
 @JvmInline value class StateActionChatIsReadChanged(val value: ChatIsReadChangedAction) : StateAction
@@ -1864,6 +1886,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/inputNeededRemoved" -> StateActionSessionInputNeededRemoved(input.json.decodeFromJsonElement(SessionInputNeededRemovedAction.serializer(), element))
             "chat/pendingMessageSet" -> StateActionChatPendingMessageSet(input.json.decodeFromJsonElement(ChatPendingMessageSetAction.serializer(), element))
             "chat/pendingMessageRemoved" -> StateActionChatPendingMessageRemoved(input.json.decodeFromJsonElement(ChatPendingMessageRemovedAction.serializer(), element))
+            "chat/steeringMessageSet" -> StateActionChatSteeringMessageSet(input.json.decodeFromJsonElement(ChatSteeringMessageSetAction.serializer(), element))
+            "chat/steeringMessageRemoved" -> StateActionChatSteeringMessageRemoved(input.json.decodeFromJsonElement(ChatSteeringMessageRemovedAction.serializer(), element))
             "chat/queuedMessagesReordered" -> StateActionChatQueuedMessagesReordered(input.json.decodeFromJsonElement(ChatQueuedMessagesReorderedAction.serializer(), element))
             "chat/draftChanged" -> StateActionChatDraftChanged(input.json.decodeFromJsonElement(ChatDraftChangedAction.serializer(), element))
             "chat/isReadChanged" -> StateActionChatIsReadChanged(input.json.decodeFromJsonElement(ChatIsReadChangedAction.serializer(), element))
@@ -1978,6 +2002,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionInputNeededRemoved -> output.json.encodeToJsonElement(SessionInputNeededRemovedAction.serializer(), value.value)
             is StateActionChatPendingMessageSet -> output.json.encodeToJsonElement(ChatPendingMessageSetAction.serializer(), value.value)
             is StateActionChatPendingMessageRemoved -> output.json.encodeToJsonElement(ChatPendingMessageRemovedAction.serializer(), value.value)
+            is StateActionChatSteeringMessageSet -> output.json.encodeToJsonElement(ChatSteeringMessageSetAction.serializer(), value.value)
+            is StateActionChatSteeringMessageRemoved -> output.json.encodeToJsonElement(ChatSteeringMessageRemovedAction.serializer(), value.value)
             is StateActionChatQueuedMessagesReordered -> output.json.encodeToJsonElement(ChatQueuedMessagesReorderedAction.serializer(), value.value)
             is StateActionChatDraftChanged -> output.json.encodeToJsonElement(ChatDraftChangedAction.serializer(), value.value)
             is StateActionChatIsReadChanged -> output.json.encodeToJsonElement(ChatIsReadChangedAction.serializer(), value.value)

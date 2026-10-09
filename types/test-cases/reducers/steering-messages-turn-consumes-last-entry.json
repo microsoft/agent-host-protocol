@@ -1,0 +1,38 @@
+{
+  "description": "turn started consumes the last steering list entry",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessages": [
+      { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-a",
+      "startedAt": "2026-10-08T00:01:00.000Z",
+      "queuedMessageId": "a",
+      "message": { "text": "A", "origin": { "kind": "user" } }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 8,
+    "modifiedAt": "2026-10-08T00:01:00.000Z",
+    "turns": [],
+    "steeringMessages": null,
+    "activeTurn": {
+      "id": "turn-a",
+      "startedAt": "2026-10-08T00:01:00.000Z",
+      "message": { "text": "A", "origin": { "kind": "user" } },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}

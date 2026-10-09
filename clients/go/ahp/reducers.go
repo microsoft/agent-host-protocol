@@ -771,6 +771,29 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			return ReduceOutcomeApplied
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.ChatSteeringMessageSetAction:
+		list := state.SteeringMessages
+		for i := range list {
+			if list[i].Id == a.SteeringMessage.Id {
+				list[i] = a.SteeringMessage
+				return ReduceOutcomeApplied
+			}
+		}
+		state.SteeringMessages = append(list, a.SteeringMessage)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatSteeringMessageRemovedAction:
+		for i, message := range state.SteeringMessages {
+			if message.Id == a.Id {
+				list := state.SteeringMessages
+				list = append(list[:i], list[i+1:]...)
+				if len(list) == 0 {
+					list = nil
+				}
+				state.SteeringMessages = list
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	case *ahptypes.ChatPendingMessageSetAction:
 		entry := ahptypes.PendingMessage{Id: a.Id, Message: a.Message}
 		switch a.Kind {
@@ -1194,6 +1217,18 @@ func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedActi
 		qmid := *a.QueuedMessageId
 		if state.SteeringMessage != nil && state.SteeringMessage.Id == qmid {
 			state.SteeringMessage = nil
+		}
+		if state.SteeringMessages != nil {
+			next := state.SteeringMessages[:0]
+			for _, message := range state.SteeringMessages {
+				if message.Id != qmid {
+					next = append(next, message)
+				}
+			}
+			if len(next) == 0 {
+				next = nil
+			}
+			state.SteeringMessages = next
 		}
 		if state.QueuedMessages != nil {
 			next := state.QueuedMessages[:0]
