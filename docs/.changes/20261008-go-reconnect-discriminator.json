@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "`ReconnectResult` serialization preserves its `type` discriminator, including windowed subscription recovery results, and generated union serializers safely preserve nil variants.",
+  "targets": ["go"]
+}

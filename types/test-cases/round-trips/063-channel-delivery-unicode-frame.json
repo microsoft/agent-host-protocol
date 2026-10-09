@@ -1,0 +1,16 @@
+{
+  "name": "channel-delivery-unicode-frame",
+  "group": "A",
+  "description": "Serialized message text preserves BMP and surrogate-pair content through native string models.",
+  "type": "ChannelFrameParams",
+  "input": {
+    "channel": "ahp-terminal:/t1",
+    "data": "{\"text\":\"A\u00e9\ud83d\ude00\"}",
+    "final": true
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-terminal:/t1",
+    "data": "{\"text\":\"A\u00e9\ud83d\ude00\"}",
+    "final": true
+  }]
+}

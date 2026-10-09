@@ -1,0 +1,8 @@
+{
+  "name": "channel-delivery-ordinary-subscribe-result",
+  "group": "A",
+  "description": "A host can decline framing by omitting flowControl; no initialize capability is required.",
+  "type": "SubscribeResult",
+  "input": {},
+  "acceptableOutputs": [{}]
+}

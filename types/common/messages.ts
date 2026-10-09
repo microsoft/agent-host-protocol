@@ -88,7 +88,14 @@ import type {
   SessionSummaryChangedParams,
   ProgressParams,
 } from '../channels-root/notifications.js';
-import type { AuthRequiredParams } from './notifications.js';
+import type {
+  AuthRequiredParams,
+  ChannelFrameParams,
+  ChannelCreditParams,
+  ChannelReadyParams,
+  ChannelResetParams,
+  ChannelSnapshotParams,
+} from './notifications.js';
 import type {
   OtlpExportLogsParams,
   OtlpExportTracesParams,
@@ -231,6 +238,9 @@ export interface ServerCommandMap {
 export interface ClientNotificationMap {
   'unsubscribe': { params: UnsubscribeParams };
   'dispatchAction': { params: DispatchActionParams };
+  'channel/frame': { params: ChannelFrameParams };
+  'channel/credit': { params: ChannelCreditParams };
+  'channel/reset': { params: ChannelResetParams };
 }
 
 /**
@@ -251,6 +261,11 @@ export interface ServerNotificationMap {
   'otlp/exportLogs': { params: OtlpExportLogsParams };
   'otlp/exportTraces': { params: OtlpExportTracesParams };
   'otlp/exportMetrics': { params: OtlpExportMetricsParams };
+  'channel/frame': { params: ChannelFrameParams };
+  'channel/credit': { params: ChannelCreditParams };
+  'channel/ready': { params: ChannelReadyParams };
+  'channel/reset': { params: ChannelResetParams };
+  'channel/snapshot': { params: ChannelSnapshotParams };
 }
 
 // ─── Typed Requests ──────────────────────────────────────────────────────────

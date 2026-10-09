@@ -28,6 +28,69 @@ const (
 
 // ─── Notification Payloads ────────────────────────────────────────────
 
+// Fragment of a serialized typed channel notification. Reassemble before typed
+// decoding or reducer application; data is a string, not another base64 layer.
+// Do not split surrogate pairs. One active data message per direction/subscription;
+// fairly interleave bounded frames across subscriptions and reserve UTF-16 bytes
+// before enqueueing. The ordered transport supplies fragment ordering.
+//
+// Discard incomplete messages on disconnect. Reconcile acceptedBytes, then retry
+// whole unaccepted messages from the retained queue without charging twice.
+// Inner and outer channel URIs MUST match. Delivery controls MUST NOT be framed
+// recursively; payload-bearing action echoes MUST use the bounded data path.
+//
+// Stability: 1.0 - Early development.
+type ChannelFrameParams struct {
+	Channel URI `json:"channel"`
+	// Nonempty serialized-JSON fragment.
+	Data string `json:"data"`
+	// True completes this logical message; absence/false means more fragments follow.
+	Final *bool `json:"final,omitempty"`
+}
+
+// Receiver's cumulative UTF-16 release boundary for the outgoing direction.
+// Duplicate/older positions are harmless. A boundary beyond sent data, within
+// a message, or inconsistent with the journal MUST fail explicitly.
+//
+// Return credit after bounded consumption, not JSON parsing or action echo.
+// TCP returns it after downstream buffer release. Shared release receipts can
+// implement drain() without TCP-specific consumed-credit actions.
+//
+// Stability: 1.0 - Early development.
+type ChannelCreditParams struct {
+	Channel       URI   `json:"channel"`
+	ConsumedBytes int64 `json:"consumedBytes"`
+}
+
+// Bootstrap boundary after snapshot/replay frames and before live delivery.
+// Consumers MUST run during bootstrap, not wait for this signal before reading.
+// Process this signal in subscription order, after preceding complete messages.
+//
+// Stability: 1.0 - Early development.
+type ChannelReadyParams struct {
+	Channel URI `json:"channel"`
+}
+
+// Abort incomplete delivery and terminate this subscription. Never skip a fragment
+// and continue. Credit, ready, reset, and liveness bypass data credit with
+// separate size/rate bounds. Stream channels MUST abort their retained stream
+// when delivery cannot continue safely.
+//
+// Stability: 1.0 - Early development.
+type ChannelResetParams struct {
+	Channel URI `json:"channel"`
+}
+
+// Typed snapshot payload carried inside windowed channel/frame delivery, never
+// as an unbounded bootstrap result. snapshot.resource MUST equal channel.
+// Not sent on ordinary subscriptions.
+//
+// Stability: 1.0 - Early development.
+type ChannelSnapshotParams struct {
+	Channel  URI      `json:"channel"`
+	Snapshot Snapshot `json:"snapshot"`
+}
+
 // Broadcast to all clients subscribed to the root channel when a new session
 // is created.
 type SessionAddedParams struct {

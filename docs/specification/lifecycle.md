@@ -141,7 +141,17 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 }
 ```
 
-Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
+On ordinary subscriptions, protocol notifications are **not** replayed — the
+client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions).
+Stateless channels are simply re-subscribed; missed messages are dropped.
+
+Negotiated [windowed subscriptions](/specification/subscriptions#experimental-windowed-delivery)
+add `windows` to the reconnect request and either result variant.
+The server MUST omit the result field unless the client requested `windows`,
+and MUST include only requested windowed channels.
+They recover independently through bounded frames, not inline replay arrays or
+snapshots. Their retained consumption obligations and per-channel action
+checkpoints are distinct from the legacy connection-wide `lastSeenServerSeq`.
 
 ## Unexpected Disconnection
 

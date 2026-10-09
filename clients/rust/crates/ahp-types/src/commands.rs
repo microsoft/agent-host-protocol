@@ -16,9 +16,11 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
+    ChannelReceiveProgress, ContentRef, Message, MessageAttachment, ModelSelection,
+    ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
+    Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -476,11 +478,62 @@ pub struct ReconnectParams {
     pub last_seen_server_seq: i64,
     /// URIs the client was subscribed to
     pub subscriptions: Vec<Uri>,
+    /// Resume information for windowed subscriptions also named in subscriptions.
+    /// These channels recover independently and MUST NOT appear in inline legacy
+    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeOptions>,
+}
+
+/// Retained receive obligations and a separate per-channel recovery checkpoint.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeParams {
+    pub channel: Uri,
+    pub client_receive: ChannelReceiveProgress,
+    /// Last action safely applied or retained for this channel, not merely parsed.
+    /// Required for replay recovery; omitted for live-only channels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_applied_server_seq: Option<i64>,
+}
+
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeOptions {
+    pub items: Vec<ChannelDeliveryResumeParams>,
+}
+
+/// Retained windowed subscriptions; omitted requested channels are unavailable.
+/// Unread accepted messages remain charged across reconnect; both directions
+/// reconcile lost release updates against the same retained journal. Unverified
+/// positions or lost accounting MUST fail, never grant a fresh window.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeResult {
+    pub items: Vec<ResumedChannelSubscription>,
+}
+
+/// Client receive limits. The host may lower, never raise, these limits and
+/// advertises its own receive limits in the accepted flowControl result.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionFlowControlOptions {
+    pub receive: ChannelReceiveLimits,
 }
 
 /// Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all replayed data in the response.
+/// The server MUST include all non-windowed replayed data in the response.
+/// Windowed subscriptions recover separately through bounded frames.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectReplayResult {
@@ -491,6 +544,13 @@ pub struct ReconnectReplayResult {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     pub missing: Vec<Uri>,
+    /// Retained windowed subscriptions; content is delivered separately.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Reconnect result when the gap exceeds the replay buffer.
@@ -499,6 +559,13 @@ pub struct ReconnectReplayResult {
 pub struct ReconnectSnapshotResult {
     /// Fresh snapshots for each subscription
     pub snapshots: Vec<Snapshot>,
+    /// Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Subscribe to a URI-identified channel.
@@ -529,6 +596,14 @@ pub struct SubscribeParams {
     /// default snapshot. Clients MUST tolerate receiving more state than requested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<SubscribeView>,
+    /// Offer bounded fragmented delivery. The host accepts with result.flowControl;
+    /// absence means ordinary delivery, including on hosts that ignore this option.
+    /// Neither peer may send frames until the response explicitly accepts them.
+    /// Applies to this subscriber, not shared channel state or other viewers.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<SubscriptionFlowControlOptions>,
 }
 
 impl SubscribeParams {
@@ -539,6 +614,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -549,6 +625,7 @@ impl SubscribeParams {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -559,6 +636,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }
@@ -593,14 +671,20 @@ pub struct SubscriptionDeliveryOptions {
 
 /// Result of the `subscribe` command.
 ///
-/// `snapshot` is present when the subscribed channel has associated state, and
-/// absent for stateless channels.
+/// In ordinary mode, snapshot is present for state-bearing channels.
+/// In windowed mode, flowControl is present and snapshot MUST be omitted:
+/// snapshot/replay content follows through bounded channel/frame delivery.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeResult {
     /// Snapshot of the subscribed channel's state (omitted for stateless channels)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<Snapshot>,
+    /// Accepted receive limits; install the consumer before processing frames.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<ChannelFlowControl>,
 }
 
 /// Creates a new session with the specified agent provider.

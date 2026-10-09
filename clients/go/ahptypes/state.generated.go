@@ -15,6 +15,17 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+// Recovery selected independently from windows and whether a channel has state.
+//
+// Stability: 1.0 - Early development.
+type ChannelRecoveryKind string
+
+const (
+	ChannelRecoveryKindSnapshot ChannelRecoveryKind = "snapshot"
+	ChannelRecoveryKindReplay   ChannelRecoveryKind = "replay"
+	ChannelRecoveryKindLive     ChannelRecoveryKind = "live"
+)
+
 // Policy configuration state for a model.
 type PolicyState string
 
@@ -568,6 +579,61 @@ const (
 )
 
 // ─── Structs ──────────────────────────────────────────────────────────
+
+// Receive limits for one subscription and direction, not reduced channel state.
+// All limits are positive safe integers. Receivers MUST separately bound aggregate
+// subscriptions, decoding overhead, and the underlying transport queue.
+//
+// Stability: 1.0 - Early development.
+type ChannelReceiveLimits struct {
+	// Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
+	// before outer JSON escaping. Starting a data message requires available credit;
+	// one started message may finish beyond the window.
+	WindowBytes int64 `json:"windowBytes"`
+	// Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+	MaximumFrameBytes int64 `json:"maximumFrameBytes"`
+	// Hard logical-payload limit. Outstanding data stays strictly below
+	// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
+	MaximumMessageBytes int64 `json:"maximumMessageBytes"`
+}
+
+// Accepted/released obligations of the same retained bounded consumer.
+// 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
+// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
+// Boundary bookkeeping is local; no second message sequence is needed.
+//
+// Stability: 1.0 - Early development.
+type ChannelReceiveProgress struct {
+	// Complete logical data messages safely retained by the bounded consumer.
+	AcceptedBytes int64 `json:"acceptedBytes"`
+	// Messages whose allocations the consumer released. Rejected actions release
+	// allocations too; release does not acknowledge application success.
+	ConsumedBytes int64 `json:"consumedBytes"`
+}
+
+// Accepted receive limits for both directions of a subscription. Initial
+// accounting starts at zero. The existing logical client and channel identify
+// the subscription; transport generations are fenced locally, not on the wire.
+//
+// Stability: 1.0 - Early development.
+type ChannelFlowControl struct {
+	ClientReceive ChannelReceiveLimits `json:"clientReceive"`
+	HostReceive   ChannelReceiveLimits `json:"hostReceive"`
+}
+
+// One subscription retained after reconnect. Omission from the returned list
+// means unavailable, regardless of cause. All such failures share the same
+// consumer behavior: dispose the old subscription, not continue a broken stream.
+//
+// Stability: 1.0 - Early development.
+type ResumedChannelSubscription struct {
+	Channel       URI                    `json:"channel"`
+	FlowControl   ChannelFlowControl     `json:"flowControl"`
+	ClientReceive ChannelReceiveProgress `json:"clientReceive"`
+	HostReceive   ChannelReceiveProgress `json:"hostReceive"`
+	// Replay retains the same consumer; live recovery resumes at the live edge.
+	Recovery ChannelRecoveryKind `json:"recovery"`
+}
 
 // An optionally-sized icon that can be displayed in a user interface.
 type Icon struct {
@@ -5933,6 +5999,9 @@ func (u SessionOrigin) MarshalJSON() ([]byte, error) {
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
 	}
+	if object == nil {
+		return data, nil
+	}
 	switch u.Value.(type) {
 	case *AutomationSessionOrigin:
 		object["kind"] = json.RawMessage("\"automation\"")
@@ -5992,6 +6061,9 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationScheduleTrigger:
@@ -6055,6 +6127,9 @@ func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
 	}
+	if object == nil {
+		return data, nil
+	}
 	switch u.Value.(type) {
 	case *AutomationAfterRunsCondition:
 		object["kind"] = json.RawMessage("\"afterRuns\"")
@@ -6116,6 +6191,9 @@ func (u AutomationRunOrigin) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationManualRunOrigin:
@@ -6199,6 +6277,9 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationPendingRunLifecycle:

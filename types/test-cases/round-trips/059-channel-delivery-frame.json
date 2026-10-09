@@ -1,0 +1,16 @@
+{
+  "name": "channel-delivery-frame",
+  "group": "A",
+  "description": "Fragments remain strings with JSON escaping and explicit final: false preserved.",
+  "type": "ChannelFrameParams",
+  "input": {
+    "channel": "ahp-terminal:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",",
+    "final": false
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-terminal:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",",
+    "final": false
+  }]
+}

@@ -46,6 +46,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
@@ -254,9 +255,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -432,7 +431,7 @@ function escapeXmlDoc(s: string): string {
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push(`[JsonConverter(typeof(WireEnumConverter<${name}>))]`);
   lines.push(`public enum ${name}`);
   lines.push('{');
@@ -456,7 +455,7 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push('[Flags]');
   lines.push(`public enum ${name} : uint`);
   lines.push('{');
@@ -489,7 +488,7 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
 function generateOpenStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push(`[JsonConverter(typeof(${name}Converter))]`);
   lines.push(`public readonly struct ${name} : IEquatable<${name}>`);
   lines.push('{');
@@ -662,7 +661,7 @@ function generateClassFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -749,6 +748,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
@@ -771,6 +771,8 @@ const STATE_ENUMS = [
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+  { name: 'ChannelReceiveLimits' }, { name: 'ChannelReceiveProgress' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState', mutable: true },
@@ -2283,6 +2285,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   // Union variants MUST self-carry their `type` discriminator: UnionConverter<T>.Write
   // serializes the inner value by its runtime type and relies on that property to
   // emit the discriminator (matching ACTION_VARIANTS' includeDiscriminants). Omitting
@@ -2464,6 +2468,8 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
+  'ChannelResetParams', 'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',

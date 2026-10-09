@@ -29,6 +29,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation, readStability } from './read-stability.js';
 
 const GENERATED_HEADER = '<!-- Generated from types/*.ts — do not edit -->\n\n';
 
@@ -174,9 +175,12 @@ type DocNode =
   | EnumDeclaration
   | VariableDeclaration;
 
-function renderHeading(name: string, _node: DocNode, level = 3): string {
+function renderHeading(name: string, node: DocNode, level = 3): string {
   const hashes = '#'.repeat(level);
-  return `${hashes} \`${name}\`\n`;
+  const heading = `${hashes} \`${name}\`\n`;
+  if (Node.isVariableDeclaration(node)) return heading;
+  const stability = readStability(node);
+  return stability ? `${heading}\n<StabilityIndex level="${stability.level}" />\n` : heading;
 }
 
 function getJsDocDescription(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration): string {
@@ -215,9 +219,7 @@ function getJsDocExamples(node: InterfaceDeclaration | TypeAliasDeclaration): st
 }
 
 function getPropertyDescription(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -773,7 +775,7 @@ function emitNotificationBlock(entry: RegistryEntry, paramsIface: InterfaceDecla
   const direction = getJsDocTag(paramsIface, 'direction') || 'Server → Client';
   const messageType = getJsDocTag(paramsIface, 'messageType') || 'Notification';
 
-  lines.push(`### \`${entry.method}\`\n`);
+  lines.push(renderHeading(entry.method, paramsIface));
   if (desc) lines.push(desc + '\n');
   lines.push('| Property | Value |');
   lines.push('|---|---|');

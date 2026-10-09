@@ -545,11 +545,61 @@ public sealed record ReconnectParams
 
     /// <summary>URIs the client was subscribed to</summary>
     public required List<string> Subscriptions { get; init; }
+
+    /// <summary>Resume information for windowed subscriptions also named in subscriptions.
+    /// These channels recover independently and MUST NOT appear in inline legacy
+    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeOptions? Windows { get; init; }
+}
+
+/// <summary>Retained receive obligations and a separate per-channel recovery checkpoint.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeParams
+{
+    public required string Channel { get; init; }
+
+    public required ChannelReceiveProgress ClientReceive { get; init; }
+
+    /// <summary>Last action safely applied or retained for this channel, not merely parsed.
+    /// Required for replay recovery; omitted for live-only channels.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? LastAppliedServerSeq { get; init; }
+}
+
+/// <summary>Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeOptions
+{
+    public required List<ChannelDeliveryResumeParams> Items { get; init; }
+}
+
+/// <summary>Retained windowed subscriptions; omitted requested channels are unavailable.
+/// Unread accepted messages remain charged across reconnect; both directions
+/// reconcile lost release updates against the same retained journal. Unverified
+/// positions or lost accounting MUST fail, never grant a fresh window.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeResult
+{
+    public required List<ResumedChannelSubscription> Items { get; init; }
+}
+
+/// <summary>Client receive limits. The host may lower, never raise, these limits and
+/// advertises its own receive limits in the accepted flowControl result.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SubscriptionFlowControlOptions
+{
+    public required ChannelReceiveLimits Receive { get; init; }
 }
 
 /// <summary>Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all replayed data in the response.</summary>
+/// The server MUST include all non-windowed replayed data in the response.
+/// Windowed subscriptions recover separately through bounded frames.</summary>
 public sealed record ReconnectReplayResult
 {
     /// <summary>Discriminant</summary>
@@ -563,6 +613,14 @@ public sealed record ReconnectReplayResult
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.</summary>
     public required List<string> Missing { get; init; }
+
+    /// <summary>Retained windowed subscriptions; content is delivered separately.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeResult? Windows { get; init; }
 }
 
 /// <summary>Reconnect result when the gap exceeds the replay buffer.</summary>
@@ -573,6 +631,14 @@ public sealed record ReconnectSnapshotResult
 
     /// <summary>Fresh snapshots for each subscription</summary>
     public required List<Snapshot> Snapshots { get; init; }
+
+    /// <summary>Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+    /// The server MUST omit this field unless ReconnectParams.windows was supplied
+    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeResult? Windows { get; init; }
 }
 
 /// <summary>Subscribe to a URI-identified channel.
@@ -606,6 +672,15 @@ public sealed record SubscribeParams
     /// default snapshot. Clients MUST tolerate receiving more state than requested.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscribeView? View { get; init; }
+
+    /// <summary>Offer bounded fragmented delivery. The host accepts with result.flowControl;
+    /// absence means ordinary delivery, including on hosts that ignore this option.
+    /// Neither peer may send frames until the response explicitly accepts them.
+    /// Applies to this subscriber, not shared channel state or other viewers.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SubscriptionFlowControlOptions? FlowControl { get; init; }
 }
 
 /// <summary>Optional client-requested shape for a subscription snapshot.</summary>
@@ -636,13 +711,20 @@ public sealed record SubscriptionDeliveryOptions
 
 /// <summary>Result of the `subscribe` command.
 ///
-/// `snapshot` is present when the subscribed channel has associated state, and
-/// absent for stateless channels.</summary>
+/// In ordinary mode, snapshot is present for state-bearing channels.
+/// In windowed mode, flowControl is present and snapshot MUST be omitted:
+/// snapshot/replay content follows through bounded channel/frame delivery.</summary>
 public sealed record SubscribeResult
 {
     /// <summary>Snapshot of the subscribed channel's state (omitted for stateless channels)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Snapshot? Snapshot { get; init; }
+
+    /// <summary>Accepted receive limits; install the consumer before processing frames.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelFlowControl? FlowControl { get; init; }
 }
 
 // TODO: could not generate SessionForkSource: Error: Interface SessionForkSource not found

@@ -528,7 +528,15 @@ data class ReconnectParams(
     /**
      * URIs the client was subscribed to
      */
-    val subscriptions: List<String>
+    val subscriptions: List<String>,
+    /**
+     * Resume information for windowed subscriptions also named in subscriptions.
+     * These channels recover independently and MUST NOT appear in inline legacy
+     * actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeOptions? = null
 )
 
 @Serializable
@@ -547,7 +555,15 @@ data class ReconnectReplayResult(
      * terminals) as well as resources the client is no longer permitted to
      * observe. Clients SHOULD drop these from their local subscription set.
      */
-    val missing: List<String>
+    val missing: List<String>,
+    /**
+     * Retained windowed subscriptions; content is delivered separately.
+     * The server MUST omit this field unless ReconnectParams.windows was supplied
+     * and MUST return only channels requested in ReconnectParams.windows.items.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeResult? = null
 )
 
 @Serializable
@@ -559,7 +575,63 @@ data class ReconnectSnapshotResult(
     /**
      * Fresh snapshots for each subscription
      */
-    val snapshots: List<Snapshot>
+    val snapshots: List<Snapshot>,
+    /**
+     * Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
+     * The server MUST omit this field unless ReconnectParams.windows was supplied
+     * and MUST return only channels requested in ReconnectParams.windows.items.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeResult? = null
+)
+
+/**
+ * Retained receive obligations and a separate per-channel recovery checkpoint.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeParams(
+    val channel: String,
+    val clientReceive: ChannelReceiveProgress,
+    /**
+     * Last action safely applied or retained for this channel, not merely parsed.
+     * Required for replay recovery; omitted for live-only channels.
+     */
+    val lastAppliedServerSeq: Long? = null
+)
+
+/**
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeOptions(
+    val items: List<ChannelDeliveryResumeParams>
+)
+
+/**
+ * Retained windowed subscriptions; omitted requested channels are unavailable.
+ * Unread accepted messages remain charged across reconnect; both directions
+ * reconcile lost release updates against the same retained journal. Unverified
+ * positions or lost accounting MUST fail, never grant a fresh window.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeResult(
+    val items: List<ResumedChannelSubscription>
+)
+
+/**
+ * Client receive limits. The host may lower, never raise, these limits and
+ * advertises its own receive limits in the accepted flowControl result.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SubscriptionFlowControlOptions(
+    val receive: ChannelReceiveLimits
 )
 
 @Serializable
@@ -588,7 +660,16 @@ data class SubscribeParams(
      * Servers that do not understand a requested view ignore it and return their
      * default snapshot. Clients MUST tolerate receiving more state than requested.
      */
-    val view: SubscribeView? = null
+    val view: SubscribeView? = null,
+    /**
+     * Offer bounded fragmented delivery. The host accepts with result.flowControl;
+     * absence means ordinary delivery, including on hosts that ignore this option.
+     * Neither peer may send frames until the response explicitly accepts them.
+     * Applies to this subscriber, not shared channel state or other viewers.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val flowControl: SubscriptionFlowControlOptions? = null
 )
 
 @Serializable
@@ -622,7 +703,13 @@ data class SubscribeResult(
     /**
      * Snapshot of the subscribed channel's state (omitted for stateless channels)
      */
-    val snapshot: Snapshot? = null
+    val snapshot: Snapshot? = null,
+    /**
+     * Accepted receive limits; install the consumer before processing frames.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val flowControl: ChannelFlowControl? = null
 )
 
 @Serializable

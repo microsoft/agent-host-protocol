@@ -526,6 +526,7 @@ impl Client {
             client_id,
             last_seen_server_seq,
             subscriptions,
+            windows: None,
         };
         self.request("reconnect", params).await
     }
@@ -588,6 +589,7 @@ impl Client {
                     meta: None,
                     delivery,
                     view,
+                    flow_control: None,
                 },
             )
             .await?;

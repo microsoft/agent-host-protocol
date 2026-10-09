@@ -5,6 +5,102 @@
   "title": "AHP State Types",
   "description": "All state types in the Agent Host Protocol.",
   "$defs": {
+    "ChannelReceiveLimits": {
+      "type": "object",
+      "description": "Receive limits for one subscription and direction, not reduced channel state.\nAll limits are positive safe integers. Receivers MUST separately bound aggregate\nsubscriptions, decoding overhead, and the underlying transport queue.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "Target outstanding logical-payload bytes, counted as UTF-16 code units * 2\nbefore outer JSON escaping. Starting a data message requires available credit;\none started message may finish beyond the window.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumFrameBytes": {
+          "type": "integer",
+          "description": "Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumMessageBytes": {
+          "type": "integer",
+          "description": "Hard logical-payload limit. Outstanding data stays strictly below\nwindowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumFrameBytes",
+        "maximumMessageBytes"
+      ]
+    },
+    "ChannelReceiveProgress": {
+      "type": "object",
+      "description": "Accepted/released obligations of the same retained bounded consumer.\n0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count\nUTF-16 bytes through complete-data-message boundaries, never partial fragments.\nBoundary bookkeeping is local; no second message sequence is needed.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "acceptedBytes": {
+          "type": "integer",
+          "description": "Complete logical data messages safely retained by the bounded consumer.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "consumedBytes": {
+          "type": "integer",
+          "description": "Messages whose allocations the consumer released. Rejected actions release\nallocations too; release does not acknowledge application success.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "acceptedBytes",
+        "consumedBytes"
+      ]
+    },
+    "ChannelFlowControl": {
+      "type": "object",
+      "description": "Accepted receive limits for both directions of a subscription. Initial\naccounting starts at zero. The existing logical client and channel identify\nthe subscription; transport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits"
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits"
+        }
+      },
+      "required": [
+        "clientReceive",
+        "hostReceive"
+      ]
+    },
+    "ResumedChannelSubscription": {
+      "type": "object",
+      "description": "One subscription retained after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl"
+        },
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveProgress"
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveProgress"
+        },
+        "recovery": {
+          "$ref": "#/$defs/ChannelRecoveryKind",
+          "description": "Replay retains the same consumer; live recovery resumes at the live edge."
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl",
+        "clientReceive",
+        "hostReceive",
+        "recovery"
+      ]
+    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
@@ -6470,6 +6566,15 @@
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
+    },
+    "ChannelRecoveryKind": {
+      "enum": [
+        "snapshot",
+        "replay",
+        "live"
+      ],
+      "type": "string",
+      "description": "Recovery selected independently from windows and whether a channel has state."
     },
     "PolicyState": {
       "enum": [

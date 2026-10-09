@@ -36,6 +36,107 @@ public enum AuthRequiredReason: Codable, Sendable, Equatable {
 
 // MARK: - Notification Types
 
+/// Fragment of a serialized typed channel notification. Reassemble before typed
+/// decoding or reducer application; data is a string, not another base64 layer.
+/// Do not split surrogate pairs. One active data message per direction/subscription;
+/// fairly interleave bounded frames across subscriptions and reserve UTF-16 bytes
+/// before enqueueing. The ordered transport supplies fragment ordering.
+///
+/// Discard incomplete messages on disconnect. Reconcile acceptedBytes, then retry
+/// whole unaccepted messages from the retained queue without charging twice.
+/// Inner and outer channel URIs MUST match. Delivery controls MUST NOT be framed
+/// recursively; payload-bearing action echoes MUST use the bounded data path.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelFrameParams: Codable, Sendable {
+    public var channel: String
+    /// Nonempty serialized-JSON fragment.
+    public var data: String
+    /// True completes this logical message; absence/false means more fragments follow.
+    public var final: Bool?
+
+    public init(
+        channel: String,
+        data: String,
+        final: Bool? = nil
+    ) {
+        self.channel = channel
+        self.data = data
+        self.final = final
+    }
+}
+
+/// Receiver's cumulative UTF-16 release boundary for the outgoing direction.
+/// Duplicate/older positions are harmless. A boundary beyond sent data, within
+/// a message, or inconsistent with the journal MUST fail explicitly.
+///
+/// Return credit after bounded consumption, not JSON parsing or action echo.
+/// TCP returns it after downstream buffer release. Shared release receipts can
+/// implement drain() without TCP-specific consumed-credit actions.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelCreditParams: Codable, Sendable {
+    public var channel: String
+    public var consumedBytes: Int
+
+    public init(
+        channel: String,
+        consumedBytes: Int
+    ) {
+        self.channel = channel
+        self.consumedBytes = consumedBytes
+    }
+}
+
+/// Bootstrap boundary after snapshot/replay frames and before live delivery.
+/// Consumers MUST run during bootstrap, not wait for this signal before reading.
+/// Process this signal in subscription order, after preceding complete messages.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelReadyParams: Codable, Sendable {
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
+/// Abort incomplete delivery and terminate this subscription. Never skip a fragment
+/// and continue. Credit, ready, reset, and liveness bypass data credit with
+/// separate size/rate bounds. Stream channels MUST abort their retained stream
+/// when delivery cannot continue safely.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelResetParams: Codable, Sendable {
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
+/// Typed snapshot payload carried inside windowed channel/frame delivery, never
+/// as an unbounded bootstrap result. snapshot.resource MUST equal channel.
+/// Not sent on ordinary subscriptions.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelSnapshotParams: Codable, Sendable {
+    public var channel: String
+    public var snapshot: Snapshot
+
+    public init(
+        channel: String,
+        snapshot: Snapshot
+    ) {
+        self.channel = channel
+        self.snapshot = snapshot
+    }
+}
+
 public struct SessionAddedParams: Codable, Sendable {
     /// Channel URI this notification belongs to (the root channel)
     public var channel: String

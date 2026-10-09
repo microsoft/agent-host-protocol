@@ -1,0 +1,14 @@
+{
+  "name": "channel-delivery-credit",
+  "group": "A",
+  "description": "Cumulative consumed UTF-16 bytes require no parallel message sequence and preserve positions above 32 bits.",
+  "type": "ChannelCreditParams",
+  "input": {
+    "channel": "ahp-terminal:/t1",
+    "consumedBytes": 8589934592
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-terminal:/t1",
+    "consumedBytes": 8589934592
+  }]
+}

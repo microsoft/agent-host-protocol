@@ -85,7 +85,10 @@ type _ExpectedCommands =
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
   | 'unsubscribe'
-  | 'dispatchAction';
+  | 'dispatchAction'
+  | 'channel/frame'
+  | 'channel/credit'
+  | 'channel/reset';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =
@@ -97,7 +100,12 @@ type _ExpectedServerNotifications =
   | 'auth/required'
   | 'otlp/exportLogs'
   | 'otlp/exportTraces'
-  | 'otlp/exportMetrics';
+  | 'otlp/exportMetrics'
+  | 'channel/frame'
+  | 'channel/credit'
+  | 'channel/ready'
+  | 'channel/reset'
+  | 'channel/snapshot';
 
 /** All server → client request methods. */
 type _ExpectedServerCommands =

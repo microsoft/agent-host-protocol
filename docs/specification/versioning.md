@@ -6,7 +6,13 @@ AI is an evolving space. Unlike LSP or DAP — which largely guarantee backwards
 
 AHP uses a channel-level stability index based on the [Node.js stability index](https://nodejs.org/api/documentation.html#stability-index). It communicates how much change implementors should expect within a channel independently of the protocol version negotiated on a connection.
 
-Until more granular annotations are introduced, a channel's index applies to its complete surface: URI shape, state, actions, commands, notifications, and lifecycle.
+A channel's index applies to its surface by default: URI shape, state, actions,
+commands, notifications, and lifecycle. A declaration or field may override that
+default with a JSDoc `@stability` annotation. For example, the flow-control
+entrypoints on `subscribe` and `reconnect` are **1.0 - Early development** without
+making the existing command fields experimental. Generated API documentation and
+native client documentation preserve these annotations. Stability levels are not
+protocol or package version numbers.
 
 <div class="stability-scale">
   <StabilityIndex level="0" compact />

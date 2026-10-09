@@ -1,0 +1,40 @@
+{
+  "name": "channel-delivery-reconnect",
+  "group": "A",
+  "description": "Independent windowed outcomes preserve unread debt and released input alongside legacy replay.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay",
+    "actions": [],
+    "missing": [],
+    "windows": {
+      "items": [{
+        "channel": "ahp-terminal:/t1",
+        "flowControl": {
+          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
+          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+        },
+        "clientReceive": { "acceptedBytes": 65536, "consumedBytes": 0 },
+        "hostReceive": { "acceptedBytes": 131072, "consumedBytes": 131072 },
+        "recovery": "replay"
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "replay",
+    "actions": [],
+    "missing": [],
+    "windows": {
+      "items": [{
+        "channel": "ahp-terminal:/t1",
+        "flowControl": {
+          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
+          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+        },
+        "clientReceive": { "acceptedBytes": 65536, "consumedBytes": 0 },
+        "hostReceive": { "acceptedBytes": 131072, "consumedBytes": 131072 },
+        "recovery": "replay"
+      }]
+    }
+  }]
+}
