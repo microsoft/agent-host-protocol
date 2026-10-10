@@ -79,6 +79,7 @@ empty successful results.
 | Command | Behavior |
 | --- | --- |
 | `ahp describe` | Offline command policy, dispatchable action names, and supported protocol versions. |
+| `ahp describe --url URL` | Standard catalog plus the host's initialization response, preserving advertised capabilities and opaque extension metadata. |
 | `ahp connect` | Initialize and return the host's negotiated version and capabilities. |
 | `ahp ping` | Initialize, then make a protocol-level liveness request. |
 | `ahp sessions` | Return one `listSessions` page, including the host's continuation token. Cursors are connection-scoped, so a subsequent invocation cannot use that token. |
@@ -224,9 +225,22 @@ finalization or local process exit.
 
 ## Follow-ons
 
+Input requests are inspectable as active-turn response parts and explicitly
+answerable through raw `chat/inputAnswerChanged` / `chat/inputCompleted`
+dispatches. Required answers must be submitted, not merely drafted, before
+acceptance. A successful dispatch does not prove runtime resumption; observe
+the turn outcome separately. Observers never answer. Real-host E2E exercises
+request discovery, draft synchronization, required-answer rejection, explicit
+submission, runtime resumption, and retained resolved transcripts.
+
+`describe --url` exposes advertised host metadata without guessing extension
+names. AHP has no universal nonstandard-method enumeration RPC; extensions
+with their own discovery contracts are callable explicitly through `request`
+with confirmation. Their unknown result fields and schemas remain intact.
+
 Follow-ons are generated per-method input schemas, typed convenience
 commands for session creation and turns, state reduction during offline replay,
-host-advertised extension discovery, reconnect reconciliation, safe instance
+normalized extension discovery, reconnect reconciliation, safe instance
 archiving/removal, a foreground command stream, and additional transports. Replaying a
 capture into a live host is deliberately not part of offline replay: mutation
 reproduction must be a separately authorized operation with fresh IDs.

@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`ahp describe --url` returns the standard protocol catalog and host-advertised capabilities and extension metadata without probing unknown methods.",
+  "targets": ["cli"]
+}

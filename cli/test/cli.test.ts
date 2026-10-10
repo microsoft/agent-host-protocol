@@ -37,11 +37,11 @@ async function directory(t: TestContext): Promise<string> {
 
 async function execute(
   args: string[],
-  options: { input?: string; signalOnSnapshot?: NodeJS.Signals } = {},
+  options: { input?: string; signalOnSnapshot?: NodeJS.Signals; env?: Record<string, string> } = {},
 ): Promise<Execution> {
   const child = spawn(process.execPath, [executable, ...args], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, AHP_URL: '' },
+    env: { ...process.env, AHP_URL: '', ...options.env },
   });
   let stdout = '';
   let stderr = '';
@@ -139,6 +139,56 @@ test('CLI help is on stderr; discovery is versioned JSONL without a connection',
   const result = description.records[0].result as { commands: Record<string, string> };
   assert.equal(result.commands.listSessions, 'read');
   assert.equal(result.commands.createSession, 'write');
+});
+
+test('online discovery preserves host capabilities and opaque extension metadata without probing methods', async t => {
+  const metadata = {
+    'example.extensions': { methods: [{ name: 'x-example/capabilities', description: 'Explicit discovery' }] },
+    'example.future': { options: ['unknown'], token: 'private-token' },
+  };
+  const fixture = await host(t, (_socket, message, respond) => {
+    if (message.method === 'initialize') respond({
+      protocolVersion: '1.0.0', serverSeq: 0, snapshots: [],
+      serverInfo: { name: 'extension-host', version: 'test' },
+      telemetry: { logs: 'ahp-otlp:/logs' }, _meta: metadata,
+    });
+  });
+  const offline = await execute(['describe'], { env: { AHP_URL: fixture.url } });
+  assert.equal(offline.code, 0);
+  assert.equal(fixture.messages.length, 0);
+  const execution = await execute(['describe', '--url', fixture.url]);
+  assert.equal(execution.code, 0, execution.stdout + execution.stderr);
+  const output = execution.records[0].result as {
+    protocol: { actions: { type: string; clientDispatchable: boolean }[] };
+    host: { _meta: unknown; telemetry: unknown; serverInfo: unknown };
+  };
+  assert.deepEqual(output.host._meta, {
+    ...metadata, 'example.future': { options: ['unknown'], token: '[REDACTED]' },
+  });
+  assert.deepEqual(output.host.telemetry, { logs: 'ahp-otlp:/logs' });
+  assert.deepEqual(output.host.serverInfo, { name: 'extension-host', version: 'test' });
+  for (const type of ['chat/inputAnswerChanged', 'chat/inputCompleted']) {
+    assert.ok(output.protocol.actions.some(action => action.type === type && action.clientDispatchable));
+  }
+  assert.deepEqual(fixture.messages.map(message => message.method), ['initialize']);
+});
+
+test('explicit extension discovery preserves unknown result shapes and requires confirmation', async t => {
+  const capabilities = { version: 1, operations: [
+    { name: 'inspect', inputSchema: { type: 'object', properties: { detail: { type: 'boolean' } } } },
+  ], extra: { future: true } };
+  const fixture = await host(t, (_socket, message, respond) => {
+    if (initialize(message, respond)) return;
+    if (message.method === 'x-example/capabilities') respond(capabilities);
+  });
+  const args = ['request', 'x-example/capabilities', '--url', fixture.url, '--params-file', '-'];
+  const input = '{"channel":"ahp-root://"}';
+  assert.equal((await execute(args, { input })).code, 2);
+  assert.equal(fixture.messages.length, 0);
+  const execution = await execute([...args, '--confirm'], { input });
+  assert.equal(execution.code, 0, execution.stdout + execution.stderr);
+  assert.deepEqual(execution.records.at(-1)?.result, capabilities);
+  assert.deepEqual(fixture.messages.map(message => message.method), ['initialize', 'x-example/capabilities']);
 });
 
 test('CLI initializes before requests, preserves pagination, and reads snapshots', async t => {

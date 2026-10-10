@@ -54,6 +54,86 @@ delivering catchable SIGINT/SIGTERM signals, so captures may lack a completion
 marker. Replay reports those captures as incomplete. Use bounded command
 durations/timeouts and `ahp stop --instance NAME` for graceful controller shutdown.
 
+## Discover supported operations
+
+```bash
+# Offline catalog: protocol versions, methods, action origins and CLI policy.
+ahp describe | jq .
+ahp describe | jq '.result.actions[] | select(.clientDispatchable)'
+
+# Live host: negotiated capabilities and opaque, namespaced extension metadata.
+ahp describe --url "$AHP_URL" | jq '.result.host'
+ahp describe --url "$AHP_URL" | jq '.result.host._meta'
+```
+
+Offline `describe` never connects, even if `AHP_URL` is set. Specify `--url`
+explicitly for online discovery; its result contains `protocol` (the local
+catalog) and `host` (the complete initialization response, with credentials
+redacted). The catalog describes protocol support, not a promise that a host
+enables every operation. Host capabilities and authoritative responses decide
+what is available.
+
+AHP has no universal RPC for enumerating nonstandard extension methods.
+Host-advertised `_meta` is preserved without hardcoded extension adapters.
+For an extension with its own documented discovery request, invoke it explicitly:
+
+```bash
+ahp request x-example/capabilities --instance work \
+  --params-file extension-discovery.json --confirm | jq .
+```
+
+`x-example/capabilities` is illustrative, not a standard method. Use the actual
+method and parameter shape advertised/documented by your host. Unknown methods
+require confirmation even for discovery; the CLI never probes guessed methods.
+Unknown result fields and schemas are preserved as structured JSON. `jq .`
+pretty-prints records without changing the CLI's machine-readable JSONL output.
+
+## Answer an input request
+
+Hosts can expose `ask_user`/elicitation as `chat/inputRequested`, represented by
+an `inputRequest` response part in the active turn. Inspect its actual question
+IDs, kinds, options, and draft answers before responding:
+
+```bash
+ahp snapshot "$CHAT_URI" --instance work \
+  | jq '.result.snapshot.state.activeTurn.responseParts[]
+        | select(.kind == "inputRequest" and .response == null)'
+```
+
+Explicitly complete it with the real request/question IDs in `answer.json`:
+
+```json
+{
+  "type": "chat/inputCompleted",
+  "requestId": "request-1",
+  "response": "accept",
+  "answers": {
+    "question-1": {
+      "state": "submitted",
+      "value": { "kind": "text", "value": "My answer" }
+    }
+  }
+}
+```
+
+```bash
+ahp dispatch "$CHAT_URI" --instance work --action-file answer.json \
+  --confirm --op-id answer-1
+ahp wait --instance work --op-id answer-1 --until accepted --timeout 30s
+```
+
+Match the answer value kind to the actual question; selected answers use the
+option's ID, not its display label. `chat/inputAnswerChanged` syncs a draft for
+one question; omitting `answer` clears it. Required answers must have
+`state: "submitted"` before accepting, either in synced state or final
+replacements; a draft alone does not satisfy the requirement.
+`chat/inputCompleted` can accept submitted synced answers or provide final
+replacements, or use `response: "decline"` /
+`"cancel"`. The host validates whether the request is still open. Observers
+cannot answer, and the CLI never answers automatically. Input-dispatch
+acceptance is not turn completion; inspect snapshots or wait on the original
+`send` operation to verify that the runtime resumed.
+
 ## Observe, record, and replay
 
 ```bash

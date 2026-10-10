@@ -11,6 +11,14 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { readEvidence } from '../src/controller-store.js';
+import { ActionType } from '../../clients/typescript/src/types/common/actions.js';
+import type {
+  ChatInputAnswerChangedAction, ChatInputCompletedAction,
+} from '../../clients/typescript/src/types/channels-chat/actions.js';
+import {
+  ChatInputAnswerState, ChatInputAnswerValueKind, ChatInputResponseKind,
+  type ChatInputAnswer,
+} from '../../clients/typescript/src/types/channels-chat/state.js';
 
 const executable = fileURLToPath(new URL('../dist/main.js', import.meta.url));
 const SESSION = 'ahp-session:/controller-test';
@@ -120,6 +128,21 @@ async function fixture(t: TestContext) {
           } else if (action.type === 'chat/turnStarted') chat.activeTurn = { id: action.turnId };
           else if (action.type === 'chat/pendingMessageSet') chat.steeringMessage = { id: action.id };
           else if (action.type === 'chat/turnCancelled') delete chat.activeTurn;
+          else if (action.type === 'chat/inputAnswerChanged' || action.type === 'chat/inputCompleted') {
+            const active = chat.activeTurn as { responseParts: {
+              request: { id: string; answers?: Record<string, unknown> }; response?: unknown;
+            }[] };
+            const part = active.responseParts.find(part => part.request.id === action.requestId);
+            assert.ok(part);
+            if (action.type === 'chat/inputAnswerChanged') {
+              part.request.answers ??= {};
+              if (action.answer === undefined) delete part.request.answers[String(action.questionId)];
+              else part.request.answers[String(action.questionId)] = action.answer;
+            } else {
+              part.response = action.response;
+              if (action.answers !== undefined) part.request.answers = action.answers as Record<string, unknown>;
+            }
+          }
         }
         const params = {
           channel: message.params.channel, serverSeq: ++serverSeq, action,
@@ -273,6 +296,82 @@ test('observer-only listeners durably capture across CLI lifetimes, filter curso
   assert.equal(result(await f.command('observe', 'events')).state, 'stopped');
   const replay = await f.run(['replay', join(f.root, 'instances', 'observe', 'events.jsonl')]);
   assert.equal(replay.code, 0, replay.output);
+});
+
+test('input requests are inspectable, explicitly answerable, and retain draft/completion outcomes', async t => {
+  const f = await fixture(t);
+  result(await f.start('work', false, ['--include-content']));
+  result(await f.start('observer', true, ['--include-content']));
+  // Raw input dispatch is allowed without claiming an active-client registration.
+  const answer = { state: ChatInputAnswerState.Draft,
+    value: { kind: ChatInputAnswerValueKind.Text, value: 'AHP_INPUT_OK' } } satisfies ChatInputAnswer;
+  const request = { id: 'request-1', questions: [{ id: 'marker', kind: 'text', message: 'Which marker?' }] };
+  f.chat.activeTurn = { id: 'input-turn', responseParts: [{ kind: 'inputRequest', request }] };
+  f.notify({ type: 'chat/inputRequested', request });
+  const snapshot = result(await f.command('observer', 'snapshot', CHAT)).snapshot as {
+    state: { activeTurn: { responseParts: unknown[] } };
+  };
+  assert.deepEqual(snapshot.state.activeTurn.responseParts, [{ kind: 'inputRequest', request }]);
+  assert.equal(f.dispatches().length, 0);
+  const submit = (name: string, opId: string, action: unknown, confirm = true) =>
+    f.run(['dispatch', CHAT, '--instance', name, '--op-id', opId, '--action-file', '-',
+      ...(confirm ? ['--confirm'] : [])], { input: JSON.stringify(action) });
+  const draft = { type: ActionType.ChatInputAnswerChanged, requestId: request.id,
+    questionId: 'marker', answer } satisfies ChatInputAnswerChangedAction;
+  assert.equal((await submit('observer', 'observer-answer', draft)).code, 1);
+  assert.equal((await submit('work', 'unconfirmed', draft, false)).code, 2);
+  assert.equal(f.dispatches().length, 0);
+  result(await submit('work', 'draft', draft));
+  assert.equal((await f.accept('work', 'draft')).state, 'accepted');
+  const drafted = result(await f.command('observer', 'snapshot', CHAT)).snapshot as {
+    state: { activeTurn: { responseParts: { request: { answers: unknown }; response?: unknown }[] } };
+  };
+  assert.deepEqual(drafted.state.activeTurn.responseParts[0].request.answers, { marker: answer });
+  assert.equal(drafted.state.activeTurn.responseParts[0].response, undefined);
+  const clear = { type: ActionType.ChatInputAnswerChanged, requestId: request.id,
+    questionId: 'marker' } satisfies ChatInputAnswerChangedAction;
+  result(await submit('work', 'clear', clear));
+  await f.accept('work', 'clear');
+  const cleared = result(await f.command('observer', 'snapshot', CHAT)).snapshot as {
+    state: { activeTurn: { responseParts: { request: { answers: unknown } }[] } };
+  };
+  assert.deepEqual(cleared.state.activeTurn.responseParts[0].request.answers, {});
+  const complete = { type: ActionType.ChatInputCompleted, requestId: request.id,
+    response: ChatInputResponseKind.Accept, answers: {
+      marker: { ...answer, state: ChatInputAnswerState.Submitted },
+    } } satisfies ChatInputCompletedAction;
+  result(await submit('work', 'complete', complete));
+  assert.equal((await f.accept('work', 'complete')).state, 'accepted');
+  const resolved = result(await f.command('observer', 'snapshot', CHAT)).snapshot as {
+    state: { activeTurn: { responseParts: { request: { answers: unknown }; response: string }[] } };
+  };
+  assert.equal(resolved.state.activeTurn.responseParts[0].response, 'accept');
+  assert.deepEqual(resolved.state.activeTurn.responseParts[0].request.answers, complete.answers);
+  const dispatches = f.dispatches().length;
+  assert.equal(result(await submit('work', 'complete', complete)).state, 'accepted');
+  assert.equal(f.dispatches().length, dispatches);
+  assert.equal((await submit('work', 'complete', { ...complete, response: 'cancel' })).code, 1);
+  assert.equal((await f.command('work', 'wait', '--op-id', 'complete', '--until', 'completed')).code, 2);
+  f.reject();
+  result(await submit('work', 'late-answer', complete));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'late-answer', '--timeout', '4s')).code, 1);
+  assert.equal(result(await f.command('work', 'status', '--op-id', 'late-answer')).state, 'rejected');
+  f.reject(false);
+  for (const response of [ChatInputResponseKind.Decline, ChatInputResponseKind.Cancel]) {
+    const id = `request-${response}`;
+    f.chat.activeTurn = { id: `turn-${response}`, responseParts: [{ kind: 'inputRequest', request: { ...request, id } }] };
+    result(await submit('work', response, { type: ActionType.ChatInputCompleted, requestId: id, response }));
+    assert.equal((await f.accept('work', response)).state, 'accepted');
+    const completed = result(await f.command('observer', 'snapshot', CHAT)).snapshot as {
+      state: { activeTurn: { responseParts: { response: string }[] } };
+    };
+    assert.equal(completed.state.activeTurn.responseParts[0].response, response);
+  }
+  const events = await f.command('observer', 'events', '--method', 'action', '--limit', '1000');
+  assert.ok(events.records.some(record => (record.message as { params?: { action?: { type?: string } } })
+    ?.params?.action?.type === 'chat/inputRequested'));
+  result(await f.command('work', 'stop'));
+  assert.equal(result(await f.command('work', 'status', '--op-id', 'complete')).state, 'accepted');
 });
 
 test('send requires explicit participation, deduplicates intent and distinguishes acceptance from turn completion', async t => {

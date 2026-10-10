@@ -13,7 +13,7 @@ export const HELP = `Usage: ahp COMMAND [TARGET...] [OPTIONS]
 
 Agent-oriented AHP protocol debugging. JSONL output; no interactive prompts.
 
-  describe                    Offline protocol versions, methods and action policy
+  describe                    Protocol catalog; --url adds advertised host metadata
   connect                     Initialize and inspect host capabilities
   ping                        Protocol liveness request
   sessions                    One listSessions page (--page-size)
@@ -137,7 +137,8 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
       replay: ['after', 'limit', 'method', 'channel', 'direction'],
     };
     if (!Object.hasOwn(extraOptions, command)) throw new CliError('usage', 'Unknown command; run ahp --help');
-    const offline = command === 'describe' || command === 'replay';
+    // Discovery stays offline unless an endpoint is explicitly requested.
+    const offline = command === 'replay' || (command === 'describe' && values.url === undefined);
     const allowed = new Set([...extraOptions[command], ...(offline ? [] : NETWORK_OPTIONS)]);
     for (const key of Object.keys(values)) {
       if (!allowed.has(key)) throw new CliError('usage', `--${key} is not valid for ${command}`);
@@ -148,7 +149,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
       throw new CliError('usage', `Invalid target count for ${command}; run ahp --help`);
     }
     const limit = integer(values.limit, 100, 1, 1_000_000, '--limit');
-    if (command === 'describe') {
+    if (command === 'describe' && offline) {
       await result(describeProtocol());
       return 0;
     }
@@ -288,6 +289,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
         throw new CliError('protocol', 'Host selected a protocol version not offered by this client');
       }
       if (auth) await currentClient.requestRaw('authenticate', auth);
+      if (command === 'describe') return result({ protocol: describeProtocol(), host: init });
       if (command === 'connect') return result(init);
       if (command === 'ping') {
         await currentClient.ping();
