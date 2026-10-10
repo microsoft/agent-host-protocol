@@ -21,6 +21,14 @@ The Agent Host Protocol (AHP) defines how a portable, standalone sessions server
 
 Other clients: [**AHPX**](https://github.com/TylerLeonhardt/ahpx) (CLI + Node.js client), [**VS Code**](https://github.com/microsoft/vscode) (built-in Agent Sessions client), [**ahpc**](https://github.com/softov/ahpc) (terminal client) and [**WeChat AHP**](https://github.com/formulahendry/vscode-wechat-ahp) (VS Code extension connecting WeChat to an existing local Agent Host chat).
 
+The separate [`@microsoft/agent-host-protocol-cli` npm package](cli/README.md)
+provides an agent-oriented `ahp` executable
+for native protocol inspection, explicit RPC requests and dispatch, bounded
+observation, recording, and offline replay. Named controllers add observer-only
+listening and guarded turn control with durable operation tracking. Its
+[design proposal](docs/proposals/agent-cli.md) separates protocol debugging from
+platform-specific session discovery and compute management.
+
 The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two or more hosts at once (single-host consumers use the same API via `MultiHostClient::single` / `.single(...)` / `hosts.Single(...)` / `MultiHostClient.SingleAsync(...)`). See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host).
 
 ## Servers

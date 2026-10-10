@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "CLI commands and controllers now bound graceful WebSocket shutdown and terminate unresponsive local connections, preserving observed outcomes and finalizing evidence without waiting indefinitely for the host.",
+  "targets": ["cli"]
+}

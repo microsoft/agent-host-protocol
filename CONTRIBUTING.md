@@ -27,6 +27,7 @@ against them.
 | `clients/typescript/` | npm package `@microsoft/agent-host-protocol`. |
 | `clients/go/` | Go module (`ahptypes`, `ahp`, `ahpws`). |
 | `clients/dotnet/` | .NET / NuGet packages (`Microsoft.VisualStudioCode.AgentHostProtocol`, `.Abstractions`). |
+| `cli/` | Independently published npm package `@microsoft/agent-host-protocol-cli` (`ahp` executable). |
 | `.github/workflows/` | CI and per-artifact publish pipelines. |
 
 ## Local dev loop
@@ -46,6 +47,8 @@ cd clients/kotlin && ./gradlew build
 swift build && swift test        # Swift uses the root Package.swift
 cd clients/go && go test ./...
 cd clients/dotnet && dotnet test
+# From the repo root:
+npm ci --prefix cli && npm run test:cli
 ```
 
 ## Releases
@@ -57,12 +60,12 @@ see [`docs/specification/versioning.md`](docs/specification/versioning.md).
 
 ## Adding changelog fragments
 
-This repo ships seven independently-versioned artifacts (spec + six clients),
+This repo ships eight independently-versioned artifacts (spec + six clients + CLI),
 each with its own `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 format. The publish workflows refuse to release a tag whose matching
 `## [X.Y.Z]` heading is missing. Normal PRs should not edit those shared
 changelog files directly; add a JSON changelog fragment under `docs/.changes/`
-instead. Release PRs collapse those fragments into the seven changelogs.
+instead. Release PRs collapse those fragments into the selected changelogs.
 
 **Add a one-line fragment** when your change is
 user-visible: a new / removed / renamed / behaviourally-changed action,
@@ -86,7 +89,8 @@ Fragments live directly under `docs/.changes/` and use this shape:
 `issues` is optional.
 
 Omit `targets` when the entry applies to the spec and all clients (the common
-case for protocol additions). Add `targets` to scope the entry to a subset:
+case for protocol additions). The CLI is excluded from that default and uses
+explicit `"targets": ["cli"]`. Add `targets` to scope the entry to a subset:
 
 ```json
 {
@@ -102,6 +106,7 @@ Path → fragment target map:
 | --- | --- |
 | `types/**` (protocol surface) | Omit `targets` (spec + all clients) unless intentionally narrower. |
 | `clients/<lang>/**` (non-generated) | That client only, e.g. `["rust"]`. |
+| `cli/**` | `["cli"]` |
 | `schema/**` | `["spec"]` |
 | `scripts/generate*.ts` that changes any client's generated output | Omit `targets` or list every affected target. |
 

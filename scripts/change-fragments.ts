@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export const CHANGELOG_TARGETS = [
+export const PROTOCOL_CHANGELOG_TARGETS = [
   'spec',
   'rust',
   'kotlin',
@@ -10,6 +10,7 @@ export const CHANGELOG_TARGETS = [
   'go',
   'dotnet',
 ] as const;
+export const CHANGELOG_TARGETS = [...PROTOCOL_CHANGELOG_TARGETS, 'cli'] as const;
 export type ChangelogTarget = (typeof CHANGELOG_TARGETS)[number];
 
 export const CHANGE_TYPES = ['added', 'changed', 'deprecated', 'removed', 'fixed', 'security'] as const;
@@ -43,7 +44,7 @@ interface ParsedMarkdownSection {
 }
 
 const ALLOWED_FRAGMENT_KEYS = new Set(['type', 'message', 'targets', 'issues']);
-const DEFAULT_TARGETS: readonly ChangelogTarget[] = CHANGELOG_TARGETS;
+const DEFAULT_TARGETS: readonly ChangelogTarget[] = PROTOCOL_CHANGELOG_TARGETS;
 
 export function changesDir(rootDir: string): string {
   return path.join(rootDir, 'docs', '.changes');
@@ -65,10 +66,13 @@ export function changelogPathForTarget(target: ChangelogTarget, rootDir: string)
       return path.join(rootDir, 'clients', 'go', 'CHANGELOG.md');
     case 'dotnet':
       return path.join(rootDir, 'clients', 'dotnet', 'CHANGELOG.md');
+    case 'cli':
+      return path.join(rootDir, 'cli', 'CHANGELOG.md');
   }
 }
 
 export function releaseIntroForTarget(target: ChangelogTarget, version: string): string {
+  if (target === 'cli') return `CLI version: \`${version}\``;
   return target === 'spec'
     ? `Spec version: \`${version}\``
     : `Implements AHP ${version}.`;

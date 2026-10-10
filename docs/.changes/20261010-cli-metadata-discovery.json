@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`ahp describe` exposes first-class host metadata and supports explicit channel metadata discovery over one-shot or retained connections.",
+  "targets": ["cli"]
+}

@@ -1,0 +1,105 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    exclude:
+      - "*"
+  tags:
+    include:
+      - cli/v*
+pr: none
+
+resources:
+  repositories:
+    - repository: templates
+      type: github
+      name: microsoft/vscode-engineering
+      ref: main
+      endpoint: Monaco
+
+extends:
+  template: azure-pipelines/npm-package/pipeline.yml@templates
+  parameters:
+    npmPackages:
+      - name: agent-host-protocol-cli
+        workingDirectory: cli
+        ghCreateTag: false
+        publishPackage: true
+        skipAPIScan: true
+
+        buildSteps:
+          - script: npm ci
+            displayName: Install root dependencies
+
+          - bash: |
+              set -euo pipefail
+              REF="$(Build.SourceBranch)"
+              PKG_VERSION=$(node -p "require('./cli/package.json').version")
+              if [ "$PKG_VERSION" = "0.0.0" ]; then
+                echo "##vso[task.logissue type=error]CLI 0.0.0 is an unpublished placeholder. Select a release version before publishing."
+                exit 1
+              fi
+              if ! grep -qE "^## \[$PKG_VERSION\]" cli/CHANGELOG.md; then
+                echo "##vso[task.logissue type=error]cli/CHANGELOG.md is missing the release heading. Run changelog:release with --targets cli before publishing."
+                exit 1
+              fi
+              case "$REF" in
+                refs/tags/cli/v*)
+                  TAG_VERSION="${REF#refs/tags/cli/v}"
+                  if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+                    echo "##vso[task.logissue type=error]Tag version ($TAG_VERSION) does not match cli/package.json version ($PKG_VERSION)."
+                    exit 1
+                  fi
+                  ;;
+                refs/tags/*)
+                  echo "##vso[task.logissue type=error]The CLI pipeline only accepts cli/vX.Y.Z release tags."
+                  exit 1
+                  ;;
+                *)
+                  echo "Manual CLI release of $PKG_VERSION."
+                  ;;
+              esac
+            displayName: Verify independent CLI release version and changelog
+
+          - script: npm run verify:release-metadata
+            displayName: Verify bundled SDK release metadata
+
+          - script: npm run verify:changelog
+            displayName: Verify changelog entries
+
+          - script: npm run verify:change-fragments
+            displayName: Verify changelog fragments
+
+          - script: npm run generate:typescript
+            displayName: Generate shared TypeScript protocol sources
+
+          - script: npm ci
+            workingDirectory: cli
+            displayName: Install CLI build dependencies
+
+          - script: npm run build
+            workingDirectory: cli
+            displayName: Build standalone CLI bundle
+
+        testPlatforms:
+          - name: Linux
+            nodeVersions:
+              - 22.x
+
+        testSteps:
+          - script: npm ci
+            displayName: Install root dependencies
+
+          - script: npm run verify:changelog
+            displayName: Verify changelog entries
+
+          - script: npm run generate:typescript
+            displayName: Generate shared TypeScript protocol sources
+
+          - script: npm ci
+            workingDirectory: cli
+            displayName: Install CLI build dependencies
+
+          - script: npm test
+            workingDirectory: cli
+            displayName: Test CLI, controllers, and standalone npm artifact
