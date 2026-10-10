@@ -162,6 +162,7 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
       } else if (message.method === 'extension/fail') {
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32008, message: 'Test RPC rejection', data: { reason: 'test' } } }));
       } else if (message.method === 'extension/large') respond({ text: 'x'.repeat(2 * 1024 * 1024) });
+      else if (message.method === 'extension/inspect') respond(message.params);
       else if (message.id !== undefined) respond(null);
     });
   });
@@ -619,6 +620,30 @@ test('live raw commands preserve RPC errors and journal confirmed mutations with
   result(await f.command('raw', 'dispatch', SESSION, '--action-file', action, '--confirm', '--op-id', 'rename'));
   assert.equal((await f.accept('raw', 'rename')).state, 'accepted');
   assert.equal((await f.command('raw', 'ping')).code, 0);
+});
+
+test('controller extensions preserve channel-free parameters, journal outcomes and refuse observers', async t => {
+  const f = await fixture(t);
+  result(await f.start('raw'));
+  result(await f.start('observe', true));
+  const params = join(f.root, 'extension.json');
+  const input = { session: SESSION, chat: CHAT };
+  await writeFile(params, JSON.stringify(input));
+  const args = ['extension/inspect', '--params-file', params, '--confirm', '--op-id', 'inspect'];
+  assert.equal((await f.command('raw', 'request', ...args.filter(arg => arg !== '--confirm'))).code, 2);
+  assert.equal((await f.command('observe', 'request', ...args)).code, 1);
+  assert.equal(f.messages.filter(message => message.method === 'extension/inspect').length, 0);
+  result(await f.command('raw', 'request', ...args));
+  const outcome = await f.accept('raw', 'inspect');
+  assert.equal(outcome.state, 'accepted');
+  assert.deepEqual(outcome.result, input);
+  assert.equal(outcome.channel, undefined);
+  result(await f.command('raw', 'request', ...args));
+  assert.equal(f.messages.filter(message => message.method === 'extension/inspect').length, 1);
+  assert.deepEqual(f.messages.find(message => message.method === 'extension/inspect')?.params, input);
+  assert.equal((await f.command('raw', 'request', 'resourceRead', '--params-file', params)).code, 2);
+  result(await f.command('raw', 'stop'));
+  assert.deepEqual(result(await f.command('raw', 'status', '--op-id', 'inspect')).result, input);
 });
 
 test('evidence pagination advances filtered cursors, preserves oversized records, and detects gaps and partial tails', async t => {

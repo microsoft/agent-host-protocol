@@ -2,7 +2,7 @@ import type { CommandMap } from '../../clients/typescript/src/types/common/messa
 import type { InitializeResult } from '../../clients/typescript/src/types/common/commands.js';
 import { IS_CLIENT_DISPATCHABLE } from '../../clients/typescript/src/types/action-origin.generated.js';
 import { ACTION_INTRODUCED_IN, SUPPORTED_PROTOCOL_VERSIONS } from '../../clients/typescript/src/types/version/registry.js';
-import { CliError, object } from './common.js';
+import { channel, CliError, object } from './common.js';
 
 export const COMMAND_POLICY = {
   initialize: 'lifecycle',
@@ -41,6 +41,13 @@ export const COMMAND_POLICY = {
 export function requestPolicy(method: string): 'read' | 'write' | 'lifecycle' | 'extension' {
   if (!Object.hasOwn(COMMAND_POLICY, method)) return 'extension';
   return COMMAND_POLICY[method as keyof typeof COMMAND_POLICY];
+}
+
+export function requestChannel(method: string, params: Record<string, unknown>): string | undefined {
+  if (requestPolicy(method) === 'extension') {
+    return typeof params.channel === 'string' ? params.channel : undefined;
+  }
+  return channel(params.channel);
 }
 
 export function dispatchable(type: string): boolean {

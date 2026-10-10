@@ -4,7 +4,7 @@ import { AhpClient } from '../../clients/typescript/src/client/client.js';
 import { RpcError } from '../../clients/typescript/src/client/error.js';
 import { SUPPORTED_PROTOCOL_VERSIONS, compareProtocolVersions } from '../../clients/typescript/src/types/version/registry.js';
 import { Capture, frameRecord, replay, type Frame } from './capture.js';
-import { describeHost, describeProtocol, describeResource, dispatchable, requestPolicy } from './catalog.js';
+import { describeHost, describeProtocol, describeResource, dispatchable, requestChannel, requestPolicy } from './catalog.js';
 import { channel, CliError, deadline, errorRecord, integer, jsonFile, object, redact, stdout } from './common.js';
 import { ObservedTransport, openTransport } from './connection.js';
 import { controllerInvocation, runControllerCli } from './controller-cli.js';
@@ -214,7 +214,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
       if (policy !== 'read' && !values.confirm) throw new CliError('usage', 'This request requires --confirm');
       if (!values['params-file']) throw new CliError('usage', 'request requires --params-file');
       params = await Promise.race([jsonFile(values['params-file'], signal), abort]);
-      channel(params.channel);
+      requestChannel(targets[0], params);
     }
     if (command === 'dispatch') {
       if (!values.confirm || !values['action-file']) {

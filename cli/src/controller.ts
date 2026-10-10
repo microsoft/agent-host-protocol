@@ -12,7 +12,7 @@ import type { SessionActiveClientSetAction } from '../../clients/typescript/src/
 import { SessionLifecycle } from '../../clients/typescript/src/types/channels-session/state.js';
 import { SUPPORTED_PROTOCOL_VERSIONS, compareProtocolVersions } from '../../clients/typescript/src/types/version/registry.js';
 import { Capture, frameRecord, type Frame } from './capture.js';
-import { describeHost, describeResource, dispatchable, requestPolicy } from './catalog.js';
+import { describeHost, describeResource, dispatchable, requestChannel, requestPolicy } from './catalog.js';
 import { channel, CliError, errorRecord, object, redact } from './common.js';
 import { ObservedTransport, openTransport } from './connection.js';
 import {
@@ -28,7 +28,7 @@ export interface Operation extends Record<string, unknown> {
   command: string;
   fingerprint: string;
   state: OperationState;
-  channel: string;
+  channel?: string;
   turnId?: string;
   messageId?: string;
   clientSeq?: number;
@@ -200,7 +200,7 @@ class Controller {
       if (typeof args.method !== 'string' || !/^\S+$/.test(args.method) || !object(args.params)) {
         throw new CliError('usage', 'request requires a method and JSON parameters');
       }
-      channel(args.params.channel);
+      requestChannel(args.method, args.params);
       const policy = requestPolicy(args.method);
       if (policy === 'lifecycle') throw new CliError('usage', 'Lifecycle methods are owned by the controller');
       if (policy === 'read') return this.client!.requestRaw(args.method, args.params);
@@ -241,7 +241,7 @@ class Controller {
       opId, command, fingerprint, state: 'recorded',
       channel: command === 'participate' ? this.metadata.session
         : command === 'dispatch' ? channel(args.channel)
-          : command === 'request' && object(args.params) ? channel(args.params.channel) : this.metadata.chat!,
+          : command === 'request' && object(args.params) ? requestChannel(String(args.method), args.params) : this.metadata.chat!,
       ...(command === 'send' ? { turnId: args.turn === undefined ? randomUUID() : identifier(args.turn, '--turn') } : {}),
       ...(['steer', 'cancel'].includes(command) ? { turnId: identifier(args.turn, '--turn') } : {}),
       ...(command === 'steer' ? { messageId: randomUUID() } : {}),
@@ -346,7 +346,7 @@ class Controller {
           }
         }
       } else {
-        const snapshot = await this.snapshot(operation.channel);
+        const snapshot = await this.snapshot(channel(operation.channel));
         fence = snapshot.fromSeq;
         if (!object(args.action)) throw new CliError('usage', 'Missing action');
         action = args.action;
@@ -363,7 +363,7 @@ class Controller {
       this.armTimeout(operation);
       await this.transport!.send(JSON.stringify({
         jsonrpc: '2.0', method: 'dispatchAction',
-        params: { channel: operation.channel, clientSeq: seq, action },
+        params: { channel: channel(operation.channel), clientSeq: seq, action },
       }));
       if (operation.state === 'submitted') this.update(operation, { state: 'transport_completed' });
     } catch (error) {

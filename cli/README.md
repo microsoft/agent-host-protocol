@@ -100,6 +100,9 @@ ahp request x-example/capabilities --instance work \
 `x-example/capabilities` is illustrative, not a standard method. Use the actual
 method and parameter shape advertised/documented by your host. Unknown methods
 require confirmation even for discovery; the CLI never probes guessed methods.
+Extension parameters are passed through without requiring an AHP `channel` field;
+standard requests retain their channel validation. A controller's extension
+operation has no `channel` in its journal output when the parameters omit it.
 Unknown result fields and schemas are preserved as structured JSON. `jq .`
 pretty-prints records without changing the CLI's machine-readable JSONL output.
 
@@ -218,6 +221,11 @@ other active clients. Send/steer/cancel require participation, a fresh binding,
 and an interactive chat. Send refuses active turns; steer/cancel require the
 exact active turn. Steering refuses to replace a pending steering message.
 These snapshot guards are not server-side compare-and-swap guarantees.
+
+`join` requires the session to be `ready`. Hosts that defer readiness until the
+first turn need an explicitly dispatched bootstrap turn before joining; the
+controller never sends that turn automatically. Inspect the session's advertised
+`defaultChat`, dispatch explicitly, and verify readiness before joining.
 
 For observation only, create a **separate instance**:
 

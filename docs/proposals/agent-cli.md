@@ -242,7 +242,16 @@ channels from stateful channels with absent metadata. It subscribes only to the
 explicit target and can reuse a retained controller without reinitializing.
 AHP has no universal nonstandard-method enumeration RPC; extensions
 with their own discovery contracts are callable explicitly through `request`
-with confirmation. Their unknown result fields and schemas remain intact.
+with confirmation. Extension parameter objects are passed through without
+requiring the standard AHP `channel` field; standard requests retain channel
+validation. Their unknown result fields and schemas remain intact.
+
+Installed-package E2E also covers the VS Code standalone host: advertised
+extension metadata, channel-free extension requests on one-shot and retained
+connections, controllers, and real Copilot completion and input answers.
+VS Code creates provisional Copilot sessions that become ready on their first
+turn. The test explicitly dispatches that bootstrap turn before joining;
+controllers continue to require ready sessions and never bootstrap implicitly.
 
 Follow-ons are generated per-method input schemas, typed convenience
 commands for session creation and turns, state reduction during offline replay,

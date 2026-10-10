@@ -241,6 +241,25 @@ test('explicit extension discovery preserves unknown result shapes and requires 
   assert.deepEqual(fixture.messages.map(message => message.method), ['initialize', 'x-example/capabilities']);
 });
 
+test('raw extensions preserve implementation-defined parameters without requiring a channel', async t => {
+  const fixture = await host(t, (_socket, message, respond) => {
+    if (initialize(message, respond)) return;
+    if (message.method === 'x-example/inspect') respond(message.params);
+  });
+  const args = ['request', 'x-example/inspect', '--url', fixture.url, '--params-file', '-'];
+  for (const params of [{ session: SESSION, chat: 'ahp-chat:/test' }, {}, { channel: 42 }]) {
+    const input = JSON.stringify(params);
+    assert.equal((await execute(args, { input })).code, 2);
+    const execution = await execute([...args, '--confirm'], { input });
+    assert.equal(execution.code, 0, execution.stdout + execution.stderr);
+    assert.deepEqual(execution.records.at(-1)?.result, params);
+  }
+  const before = fixture.messages.length;
+  assert.equal((await execute(['request', 'resourceRead', '--url', fixture.url,
+    '--params-file', '-'], { input: '{}' })).code, 2);
+  assert.equal(fixture.messages.length, before);
+});
+
 test('CLI initializes before requests, preserves pagination, and reads snapshots', async t => {
   const fixture = await host(t);
   const connected = await execute(['connect', '--url', fixture.url, '--client-id', 'cli-test']);
