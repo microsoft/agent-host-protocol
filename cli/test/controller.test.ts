@@ -72,7 +72,7 @@ function result(execution: Execution): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-async function fixture(t: TestContext) {
+async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
   const root = await mkdtemp(join(process.platform === 'win32' ? tmpdir() : '/tmp', 'ahp-controller-'));
   const names = new Set<string>();
   const messages: Message[] = [];
@@ -107,7 +107,8 @@ async function fixture(t: TestContext) {
       const respond = (value: unknown) => socket.send(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: value }));
       if (message.method === 'initialize') {
         clients.set(socket, String(message.params.clientId));
-        respond({ protocolVersion: '1.0.0', serverSeq, snapshots: [] });
+        respond({ protocolVersion: '1.0.0', serverSeq, snapshots: [],
+          ...(hostMetadata === undefined ? {} : { _meta: hostMetadata }) });
       } else if (message.method === 'authenticate') respond({});
       else if (message.method === 'subscribe') {
         if (malformed) { socket.send('not-json'); return; }
@@ -296,6 +297,37 @@ test('observer-only listeners durably capture across CLI lifetimes, filter curso
   assert.equal(result(await f.command('observe', 'events')).state, 'stopped');
   const replay = await f.run(['replay', join(f.root, 'instances', 'observe', 'events.jsonl')]);
   assert.equal(replay.code, 0, replay.output);
+});
+
+test('retained describe exposes host/session/chat metadata without reinitializing or participating', async t => {
+  const f = await fixture(t, { 'example.host': { features: ['custom'] } });
+  f.session._meta = { 'example.session': { mode: 'test' } };
+  f.chat._meta = { 'example.chat': { token: 'private', extra: true } };
+  result(await f.start('observer', true));
+  const subscriptions = f.messages.filter(message => message.method === 'subscribe').length;
+  const host = result(await f.command('observer', 'describe'));
+  assert.deepEqual(host.metadata, { host: { 'example.host': { features: ['custom'] } } });
+  assert.equal(host.resource, undefined);
+  assert.equal(f.messages.filter(message => message.method === 'subscribe').length, subscriptions);
+  const session = result(await f.command('observer', 'describe', SESSION));
+  assert.deepEqual(session.metadata, {
+    host: { 'example.host': { features: ['custom'] } },
+    resource: { 'example.session': { mode: 'test' } },
+  });
+  const chat = result(await f.command('observer', 'describe', CHAT));
+  assert.deepEqual(chat.metadata, {
+    host: { 'example.host': { features: ['custom'] } },
+    resource: { 'example.chat': { token: '[REDACTED]', extra: true } },
+  });
+  assert.deepEqual(chat.resource, { channel: CHAT, stateful: true, fromSeq: 0 });
+  assert.equal(f.messages.filter(message => message.method === 'initialize').length, 1);
+  assert.equal(f.dispatches().length, 0);
+  assert.deepEqual(f.session.activeClients, []);
+  f.chat._meta = [];
+  const malformed = await f.command('observer', 'describe', CHAT);
+  assert.equal(malformed.code, 1, malformed.output);
+  assert.equal(malformed.records.at(-1)?.category, 'protocol');
+  assert.equal(result(await f.command('observer', 'status')).state, 'ready');
 });
 
 test('input requests are inspectable, explicitly answerable, and retain draft/completion outcomes', async t => {

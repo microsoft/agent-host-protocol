@@ -63,13 +63,28 @@ ahp describe | jq '.result.actions[] | select(.clientDispatchable)'
 
 # Live host: negotiated capabilities and opaque, namespaced extension metadata.
 ahp describe --url "$AHP_URL" | jq '.result.host'
-ahp describe --url "$AHP_URL" | jq '.result.host._meta'
+ahp describe --url "$AHP_URL" | jq '.result.metadata'
+
+# Explicit session/chat metadata, on a new or retained connection.
+ahp describe "$SESSION_URI" --url "$AHP_URL" | jq '.result.metadata'
+ahp describe "$CHAT_URI" --instance work | jq '.result.metadata'
+ahp describe --instance work | jq '.result.metadata.host'
 ```
 
 Offline `describe` never connects, even if `AHP_URL` is set. Specify `--url`
-explicitly for online discovery; its result contains `protocol` (the local
-catalog) and `host` (the complete initialization response, with credentials
-redacted). The catalog describes protocol support, not a promise that a host
+explicitly for online host discovery; `describe URI` also requests online
+discovery and can use `AHP_URL`. Its result contains `protocol` (the local
+catalog), `host` (the complete initialization response), and first-class
+`metadata.host` containing its `_meta`, or `null` when absent. `describe URI`
+adds `metadata.resource` for the channel's state `_meta` and a `resource`
+descriptor with `channel`, `stateful`, and `fromSeq` when stateful. Absent
+resource metadata is `null`; `resource.stateful` distinguishes a stateless
+channel from a stateful channel with no metadata. All metadata is redacted.
+Only the explicit URI is subscribed; no automatic catalog traversal occurs.
+Retained discovery reuses the original handshake and requests a fresh resource
+snapshot without reinitializing or participating.
+
+The catalog describes protocol support, not a promise that a host
 enables every operation. Host capabilities and authoritative responses decide
 what is available.
 

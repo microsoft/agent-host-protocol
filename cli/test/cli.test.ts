@@ -161,16 +161,66 @@ test('online discovery preserves host capabilities and opaque extension metadata
   const output = execution.records[0].result as {
     protocol: { actions: { type: string; clientDispatchable: boolean }[] };
     host: { _meta: unknown; telemetry: unknown; serverInfo: unknown };
+    metadata: { host: unknown };
   };
   assert.deepEqual(output.host._meta, {
     ...metadata, 'example.future': { options: ['unknown'], token: '[REDACTED]' },
   });
+  assert.deepEqual(output.metadata.host, output.host._meta);
   assert.deepEqual(output.host.telemetry, { logs: 'ahp-otlp:/logs' });
   assert.deepEqual(output.host.serverInfo, { name: 'extension-host', version: 'test' });
   for (const type of ['chat/inputAnswerChanged', 'chat/inputCompleted']) {
     assert.ok(output.protocol.actions.some(action => action.type === type && action.clientDispatchable));
   }
   assert.deepEqual(fixture.messages.map(message => message.method), ['initialize']);
+});
+
+test('resource discovery exposes explicit host/channel metadata and distinguishes absent metadata from stateless channels', async t => {
+  const resourceMetadata = { 'example.resource': { nested: { options: ['one', 'two'] }, token: 'secret' } };
+  const fixture = await host(t, (_socket, message, respond) => {
+    if (initialize(message, respond)) return;
+    if (message.method === 'subscribe') {
+      if (message.params.channel === 'ahp-otlp://logs') respond({});
+      else respond({ snapshot: { resource: message.params.channel, fromSeq: 4,
+        state: message.params.channel === SESSION ? { _meta: resourceMetadata } : {} } });
+    }
+  });
+  for (const uri of [SESSION, 'ahp-chat:/no-metadata', 'ahp-otlp://logs']) {
+    const execution = await execute(['describe', uri, '--url', fixture.url]);
+    assert.equal(execution.code, 0, execution.stdout + execution.stderr);
+    assert.equal(execution.records.length, 1);
+    const output = execution.records[0].result as { metadata: unknown; resource: unknown };
+    assert.deepEqual(output.metadata, { host: null, resource: uri === SESSION
+      ? { 'example.resource': { nested: { options: ['one', 'two'] }, token: '[REDACTED]' } } : null });
+    assert.deepEqual(output.resource, {
+      channel: uri, stateful: uri !== 'ahp-otlp://logs',
+      ...(uri !== 'ahp-otlp://logs' ? { fromSeq: 4 } : {}),
+    });
+  }
+  assert.deepEqual(fixture.messages.filter(message => message.method === 'subscribe')
+    .map(message => message.params.channel), [SESSION, 'ahp-chat:/no-metadata', 'ahp-otlp://logs']);
+  assert.ok(fixture.messages.every(message => ['initialize', 'subscribe'].includes(message.method)));
+});
+
+test('resource discovery rejects malformed metadata and mismatched snapshots instead of returning empty success', async t => {
+  for (const snapshot of [
+    { resource: SESSION, fromSeq: 0, state: { _meta: [] } },
+    { resource: SESSION, fromSeq: -1, state: {} },
+    { resource: 'ahp-session:/wrong', fromSeq: 0, state: {} },
+    null,
+  ]) {
+    const fixture = await host(t, (_socket, message, respond) => {
+      if (initialize(message, respond)) return;
+      if (message.method === 'subscribe') respond({ snapshot });
+    });
+    const execution = await execute(['describe', SESSION, '--url', fixture.url]);
+    assert.equal(execution.code, 1, execution.stdout + execution.stderr);
+    assert.equal(execution.records.at(-1)?.category, 'protocol');
+  }
+  const fixture = await host(t);
+  assert.equal((await execute(['describe', SESSION, SESSION, '--url', fixture.url])).code, 2);
+  assert.equal((await execute(['describe', 'not-a-uri', '--url', fixture.url])).code, 2);
+  assert.equal(fixture.messages.length, 0);
 });
 
 test('explicit extension discovery preserves unknown result shapes and requires confirmation', async t => {

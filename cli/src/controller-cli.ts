@@ -36,6 +36,7 @@ No implicit current instance. All results/errors are versioned JSONL.
   ping                         Liveness over retained connection
   sessions                     One page; --page-size N and connection-scoped --cursor
   snapshot URI                 Subscribe/read using retained connection
+  describe [URI]               Host/resource metadata using retained connection
   request METHOD               --params-file FILE; mutations: --confirm --op-id ID
   dispatch URI                 --action-file FILE --confirm --op-id ID
 
@@ -76,7 +77,7 @@ const ALLOWED: Record<string, string[]> = {
   participate: ['op-id'], send: ['op-id', 'message-file', 'turn'],
   steer: ['op-id', 'message-file', 'turn'], cancel: ['op-id', 'turn'],
   wait: ['op-id', 'until', 'timeout'],
-  sessions: ['page-size', 'cursor'], snapshot: [],
+  sessions: ['page-size', 'cursor'], snapshot: [], describe: [],
   request: ['op-id', 'params-file', 'confirm'], dispatch: ['op-id', 'action-file', 'confirm'],
 };
 
@@ -229,7 +230,8 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
     const allowed = new Set(['instance', ...ALLOWED[command]]);
     for (const key of Object.keys(values)) if (!allowed.has(key)) throw new CliError('usage', `--${key} is not valid for ${command}`);
     const targets = positionals.slice(1);
-    if (targets.length !== (['snapshot', 'request', 'dispatch'].includes(command) ? 1 : 0)) {
+    if (command === 'describe' ? targets.length > 1
+      : targets.length !== (['snapshot', 'request', 'dispatch'].includes(command) ? 1 : 0)) {
       throw new CliError('usage', 'Invalid target count for controller command');
     }
     instance = values.instance;
@@ -366,6 +368,7 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
       request.text = await textFile(values['message-file'], signal);
     }
     if (command === 'snapshot' || command === 'dispatch') request.channel = channel(targets[0]);
+    if (command === 'describe' && targets.length) request.channel = channel(targets[0]);
     if (command === 'dispatch') {
       if (!values['action-file']) throw new CliError('usage', 'dispatch requires --action-file');
       request.action = await jsonFile(values['action-file'], signal);

@@ -4,7 +4,7 @@ import { AhpClient } from '../../clients/typescript/src/client/client.js';
 import { RpcError } from '../../clients/typescript/src/client/error.js';
 import { SUPPORTED_PROTOCOL_VERSIONS, compareProtocolVersions } from '../../clients/typescript/src/types/version/registry.js';
 import { Capture, frameRecord, replay, type Frame } from './capture.js';
-import { describeProtocol, dispatchable, requestPolicy } from './catalog.js';
+import { describeHost, describeProtocol, describeResource, dispatchable, requestPolicy } from './catalog.js';
 import { channel, CliError, deadline, errorRecord, integer, jsonFile, object, redact, stdout } from './common.js';
 import { ObservedTransport, openTransport } from './connection.js';
 import { controllerInvocation, runControllerCli } from './controller-cli.js';
@@ -13,7 +13,7 @@ export const HELP = `Usage: ahp COMMAND [TARGET...] [OPTIONS]
 
 Agent-oriented AHP protocol debugging. JSONL output; no interactive prompts.
 
-  describe                    Protocol catalog; --url adds advertised host metadata
+  describe [URI]              Protocol catalog; --url/URI adds host/resource metadata
   connect                     Initialize and inspect host capabilities
   ping                        Protocol liveness request
   sessions                    One listSessions page (--page-size)
@@ -138,13 +138,14 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
     };
     if (!Object.hasOwn(extraOptions, command)) throw new CliError('usage', 'Unknown command; run ahp --help');
     // Discovery stays offline unless an endpoint is explicitly requested.
-    const offline = command === 'replay' || (command === 'describe' && values.url === undefined);
+    const offline = command === 'replay'
+      || (command === 'describe' && values.url === undefined && targets.length === 0);
     const allowed = new Set([...extraOptions[command], ...(offline ? [] : NETWORK_OPTIONS)]);
     for (const key of Object.keys(values)) {
       if (!allowed.has(key)) throw new CliError('usage', `--${key} is not valid for ${command}`);
     }
     const count = targets.length;
-    if (command === 'watch' ? count < 1
+    if (command === 'describe' ? count > 1 : command === 'watch' ? count < 1
       : ['snapshot', 'request', 'dispatch', 'replay'].includes(command) ? count !== 1 : count !== 0) {
       throw new CliError('usage', `Invalid target count for ${command}; run ahp --help`);
     }
@@ -198,7 +199,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
     }
     const clientId = values['client-id'] ?? randomUUID();
     if (!clientId.trim()) throw new CliError('usage', '--client-id must not be empty');
-    const channels = ['watch', 'snapshot', 'dispatch'].includes(command)
+    const channels = ['describe', 'watch', 'snapshot', 'dispatch'].includes(command)
       ? [...new Set(targets.map(channel))] : [];
     let params: Record<string, unknown> | undefined;
     let action: Record<string, unknown> | undefined;
@@ -289,7 +290,12 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
         throw new CliError('protocol', 'Host selected a protocol version not offered by this client');
       }
       if (auth) await currentClient.requestRaw('authenticate', auth);
-      if (command === 'describe') return result({ protocol: describeProtocol(), host: init });
+      if (command === 'describe') {
+        const resource = channels.length
+          ? describeResource(channels[0], await currentClient.request('subscribe', { channel: channels[0] }))
+          : undefined;
+        return result(describeHost(init, resource));
+      }
       if (command === 'connect') return result(init);
       if (command === 'ping') {
         await currentClient.ping();

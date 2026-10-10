@@ -80,6 +80,7 @@ empty successful results.
 | --- | --- |
 | `ahp describe` | Offline command policy, dispatchable action names, and supported protocol versions. |
 | `ahp describe --url URL` | Standard catalog plus the host's initialization response, preserving advertised capabilities and opaque extension metadata. |
+| `ahp describe URI` | Explicit resource subscription and first-class `metadata.host` / `metadata.resource`; uses `--url`, `AHP_URL`, or a retained `--instance`. |
 | `ahp connect` | Initialize and return the host's negotiated version and capabilities. |
 | `ahp ping` | Initialize, then make a protocol-level liveness request. |
 | `ahp sessions` | Return one `listSessions` page, including the host's continuation token. Cursors are connection-scoped, so a subsequent invocation cannot use that token. |
@@ -234,7 +235,12 @@ request discovery, draft synchronization, required-answer rejection, explicit
 submission, runtime resumption, and retained resolved transcripts.
 
 `describe --url` exposes advertised host metadata without guessing extension
-names. AHP has no universal nonstandard-method enumeration RPC; extensions
+names. First-class `metadata.host` mirrors handshake `_meta`, or `null` when
+absent. `describe URI` additionally exposes resource state `_meta` under
+`metadata.resource`, with a `resource` descriptor distinguishing stateless
+channels from stateful channels with absent metadata. It subscribes only to the
+explicit target and can reuse a retained controller without reinitializing.
+AHP has no universal nonstandard-method enumeration RPC; extensions
 with their own discovery contracts are callable explicitly through `request`
 with confirmation. Their unknown result fields and schemas remain intact.
 

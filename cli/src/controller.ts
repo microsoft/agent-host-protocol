@@ -2,6 +2,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type Socket } from 'node:net';
 import { unlinkSync } from 'node:fs';
 import { AhpClient } from '../../clients/typescript/src/client/client.js';
+import type { InitializeResult } from '../../clients/typescript/src/types/common/commands.js';
 import { ActionType } from '../../clients/typescript/src/types/common/actions.js';
 import type {
   ChatPendingMessageSetAction, ChatTurnCancelledAction, ChatTurnStartedAction,
@@ -11,7 +12,7 @@ import type { SessionActiveClientSetAction } from '../../clients/typescript/src/
 import { SessionLifecycle } from '../../clients/typescript/src/types/channels-session/state.js';
 import { SUPPORTED_PROTOCOL_VERSIONS, compareProtocolVersions } from '../../clients/typescript/src/types/version/registry.js';
 import { Capture, frameRecord, type Frame } from './capture.js';
-import { dispatchable, requestPolicy } from './catalog.js';
+import { describeHost, describeResource, dispatchable, requestPolicy } from './catalog.js';
 import { channel, CliError, errorRecord, object, redact } from './common.js';
 import { ObservedTransport, openTransport } from './connection.js';
 import {
@@ -62,6 +63,7 @@ class Controller {
   private readonly journal: OperationJournal;
   private capture?: Capture;
   private client?: AhpClient;
+  private initialization?: InitializeResult;
   private transport?: ObservedTransport;
   private queue = Promise.resolve();
   private clientSeq = 0;
@@ -130,6 +132,7 @@ class Controller {
       if (!object(init) || typeof init.protocolVersion !== 'string' || !versions.includes(init.protocolVersion)) {
         throw new CliError('protocol', 'Host selected an unoffered protocol version');
       }
+      this.initialization = init;
       if (auth !== undefined) await this.client.requestRaw('authenticate', auth);
       const session = await this.snapshot(this.metadata.session);
       this.readySession(session.state);
@@ -180,6 +183,12 @@ class Controller {
     }
     if (command === 'stop') return publicMetadata(this.metadata);
     if (this.metadata.state !== 'ready' || this.ending) throw new CliError('instance', 'Controller is not ready');
+    if (command === 'describe') {
+      const uri = args.channel === undefined ? undefined : channel(args.channel);
+      const resource = uri === undefined ? undefined
+        : describeResource(uri, await this.client!.request('subscribe', { channel: uri }));
+      return describeHost(this.initialization!, resource);
+    }
     if (command === 'ping') { await this.client!.ping(); return null; }
     if (command === 'sessions') return this.client!.requestRaw('listSessions', {
       channel: 'ahp-root://',
