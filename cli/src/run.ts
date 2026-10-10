@@ -100,6 +100,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
   let resolveEcho: ((params: Record<string, unknown>) => void) | undefined;
   let watchingReady = false;
   const buffered: Frame[] = [];
+  let bufferedBytes = 0;
   let watched = 0;
   let minimumEchoSeq = -1;
   let command = '';
@@ -258,8 +259,11 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
           && frame.channel && channels.includes(frame.channel)) {
           if (watchingReady) await emitFrame(frame);
           else {
-            if (buffered.length >= 4096) throw new CliError('protocol', 'Observation buffer overflow before snapshots');
+            if (buffered.length >= 4096 || bufferedBytes + frame.bytes > 16 * 1024 * 1024) {
+              throw new CliError('protocol', 'Observation buffer overflow before snapshots');
+            }
             buffered.push(frame);
+            bufferedBytes += frame.bytes;
           }
         }
       } catch (error) {
@@ -312,7 +316,7 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
         return result(response);
       }
       for (const uri of channels) {
-        const { result: subscription } = await currentClient.subscribe(uri);
+        const subscription = await currentClient.request('subscribe', { channel: uri });
         if (!object(subscription)) throw new CliError('protocol', 'Invalid subscribe result');
         if (subscription.snapshot !== undefined) {
           if (!object(subscription.snapshot) || subscription.snapshot.resource !== uri
@@ -345,7 +349,11 @@ export async function runCli(args: string[], signal: AbortSignal): Promise<numbe
         return result({ outcome: 'accepted', envelope: accepted });
       }
       // Frames received during subscribe remain ordered behind initial snapshots.
-      while (buffered.length) await emitFrame(buffered.shift()!);
+      while (buffered.length) {
+        const frame = buffered.shift()!;
+        bufferedBytes -= frame.bytes;
+        await emitFrame(frame);
+      }
       watchingReady = true;
       let timer: ReturnType<typeof setTimeout>;
       const duration = new Promise<void>(resolve => { timer = setTimeout(resolve, durationMs); });

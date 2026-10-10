@@ -163,6 +163,8 @@ ahp replay capture.jsonl --direction in --method action --after 0 --limit 100
 
 Without `--instance`, `listen` aliases `watch`. Both return initial snapshots
 (or explicitly report stateless channels) before bounded notification metadata.
+Before those snapshots, buffering is capped at 4096 frames and 16 MiB of aggregate
+wire data; exceeding either cap fails explicitly.
 `--include-content` opts into redacted frame bodies. Recording is available on
 every network command, creates a new mode-0600 file on POSIX, never overwrites
 an existing path, and stops explicitly if its byte cap is exceeded. On Windows,
@@ -221,6 +223,9 @@ other active clients. Send/steer/cancel require participation, a fresh binding,
 and an interactive chat. Send refuses active turns; steer/cancel require the
 exact active turn. Steering refuses to replace a pending steering message.
 These snapshot guards are not server-side compare-and-swap guarantees.
+Turn IDs are opaque strings preserved verbatim, without local operation-ID
+restrictions. Local operation IDs must be nonempty, contain no whitespace, and
+have at most 200 characters.
 
 `join` requires the session to be `ready`. Hosts that defer readiness until the
 first turn need an explicitly dispatched bootstrap turn before joining; the

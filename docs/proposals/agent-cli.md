@@ -97,14 +97,15 @@ does not appear on the command line. Authentication runs after initialization.
 Transport-specific OAuth, challenge sealing, custom HTTP headers, stdio, and
 platform endpoint resolution are outside the initial implementation.
 
-Request and action files must contain JSON objects. Requests require an explicit
-`channel`; action types must be known and client-dispatchable. The host validates
-the remaining payload against its negotiated protocol. This intentionally
+Request and action files must contain JSON objects. Standard AHP requests require
+an explicit `channel`; action types must be known and client-dispatchable. The host
+validates the remaining payload against its negotiated protocol. This intentionally
 permits invalid protocol payloads for debugging without casting arbitrary JSON
 to a typed SDK request. Lifecycle methods owned by the CLI cannot be sent through
 `request`.
 
-`watch` has a duration and notification-count bound. Requests and WebSocket
+`watch` has a duration and notification-count bound, and caps pre-snapshot
+buffering at 4096 frames and 16 MiB of aggregate wire data. Requests and WebSocket
 connection establishment have a timeout. A recording has a byte cap. Exceeding
 the cap, a malformed frame, a disconnect, or a disk write failure produces an
 explicit error and retains partial evidence.

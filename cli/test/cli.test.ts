@@ -8,8 +8,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, type WebSocket } from 'ws';
+import { AhpClient } from '../../clients/typescript/src/client/client.js';
 import { Capture, frameRecord, inspectFrame, replay } from '../src/capture.js';
-import { redact } from '../src/common.js';
+import { redact, textFile } from '../src/common.js';
 import { runCli } from '../src/run.js';
 
 const executable = fileURLToPath(new URL('../dist/main.js', import.meta.url));
@@ -319,6 +320,65 @@ test('watch buffers early notifications, records all frames, and replays offline
   const existing = await execute(['connect', '--url', fixture.url, '--record', path]);
   assert.equal(existing.code, 1);
   assert.equal(await readFile(path, 'utf8'), content);
+});
+
+test('watch bounds pre-snapshot notifications by aggregate wire bytes', async t => {
+  const frameBytes = 2 * 1024 * 1024;
+  for (const count of [8, 9]) {
+    const path = join(await directory(t), 'buffered.jsonl');
+    const fixture = await host(t, (socket, message, respond) => {
+      if (initialize(message, respond)) return;
+      if (message.method !== 'subscribe') return;
+      for (let index = 0; index < count; index++) {
+        const notification = {
+          jsonrpc: '2.0', method: 'action',
+          params: { channel: SESSION, serverSeq: index + 1,
+            action: { type: 'session/titleChanged', title: '' } },
+        };
+        notification.params.action.title = 'x'.repeat(frameBytes - Buffer.byteLength(JSON.stringify(notification)));
+        const text = JSON.stringify(notification);
+        assert.equal(Buffer.byteLength(text), frameBytes);
+        socket.send(text);
+      }
+      respond({ snapshot: { resource: SESSION, state: {}, fromSeq: count } });
+    });
+    const execution = await execute([
+      'watch', SESSION, '--url', fixture.url, '--record', path,
+      '--limit', String(count), '--duration-ms', '1000',
+    ]);
+    assert.equal(execution.code, count === 8 ? 0 : 1, execution.stdout + execution.stderr);
+    const captured = (await readFile(path, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    if (count === 8) {
+      assert.equal((execution.records.at(-1)?.result as { notifications: number }).notifications, count);
+      assert.equal(captured.at(-1).state, 'completed');
+    } else {
+      assert.equal(execution.records.at(-1)?.category, 'protocol');
+      assert.equal(execution.records.at(-1)?.message, 'Observation buffer overflow before snapshots');
+      assert.equal(captured.at(-1).state, 'failed');
+      assert.equal(captured.at(-1).category, 'protocol');
+    }
+  }
+});
+
+test('one-shot observation requests snapshots without attaching unread SDK subscription readers', async t => {
+  const fixture = await host(t);
+  const attach = t.mock.method(AhpClient.prototype, 'attachSubscription', () => {
+    throw new Error('One-shot observation must not attach an SDK subscription reader');
+  });
+  const code = await runCli([
+    'watch', SESSION, 'ahp-root://', '--url', fixture.url, '--duration-ms', '1',
+  ], new AbortController().signal);
+  assert.equal(code, 0);
+  assert.equal(attach.mock.callCount(), 0);
+  assert.deepEqual(fixture.messages.map(message => message.method), ['initialize', 'subscribe', 'subscribe']);
+});
+
+test('plaintext input limits are exact and format-neutral', async t => {
+  const path = join(await directory(t), 'message.txt');
+  await writeFile(path, 'x'.repeat(4 * 1024 * 1024));
+  assert.equal((await textFile(path)).length, 4 * 1024 * 1024);
+  await writeFile(path, 'x'.repeat(4 * 1024 * 1024 + 1));
+  await assert.rejects(textFile(path), { category: 'usage', message: 'Input exceeds 4 MiB' });
 });
 
 test('authentication credentials are redacted from captures, results, and errors', async t => {

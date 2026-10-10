@@ -473,6 +473,53 @@ test('steer/cancel require the exact active turn, preserve other clients and rem
   assert.equal(f.dispatches().length, 4);
 });
 
+test('controllers preserve opaque turn IDs while keeping local operation IDs restricted', async t => {
+  const f = await fixture(t);
+  result(await f.start('work'));
+  await f.participate('work');
+  const prompt = join(f.root, 'prompt.txt');
+  await writeFile(prompt, 'Work');
+  for (const [index, turnId] of [' host turn\twith\nwhitespace ', 'x'.repeat(201), ''].entries()) {
+    const sendId = `send-${index}`;
+    const steerId = `steer-${index}`;
+    const cancelId = `cancel-${index}`;
+    assert.equal(result(await f.command('work', 'send', '--op-id', sendId, '--turn', turnId,
+      '--message-file', prompt)).turnId, turnId);
+    assert.equal((await f.accept('work', sendId)).turnId, turnId);
+    const snapshot = result(await f.command('work', 'snapshot', CHAT)).snapshot as {
+      state: { activeTurn: { id: string } };
+    };
+    assert.equal(snapshot.state.activeTurn.id, turnId);
+    delete f.chat.steeringMessage;
+    assert.equal(result(await f.command('work', 'steer', '--op-id', steerId, '--turn', turnId,
+      '--message-file', prompt)).turnId, turnId);
+    assert.equal((await f.accept('work', steerId)).turnId, turnId);
+    assert.equal(result(await f.command('work', 'cancel', '--op-id', cancelId, '--turn', turnId)).turnId, turnId);
+    const cancelled = result(await f.command('work', 'wait', '--op-id', cancelId, '--until', 'completed'));
+    assert.equal(cancelled.completion, 'cancelled');
+    assert.equal(cancelled.turnId, turnId);
+    const action = f.dispatches().at(-1)?.params.action as Record<string, unknown>;
+    assert.equal(action.type, 'chat/turnCancelled');
+    assert.equal(action.turnId, turnId);
+  }
+  const turnId = `raw host turn ${'x'.repeat(201)}\n`;
+  result(await f.run(['dispatch', CHAT, '--instance', 'work', '--op-id', 'raw-turn',
+    '--action-file', '-', '--confirm'], { input: JSON.stringify({
+    type: 'chat/turnStarted', turnId, startedAt: new Date().toISOString(),
+    message: { text: 'Work', origin: { kind: 'user' } },
+  }) }));
+  assert.equal((await f.accept('work', 'raw-turn')).turnId, turnId);
+  result(await f.command('work', 'cancel', '--op-id', 'raw-cancel', '--turn', turnId));
+  assert.equal((await f.accept('work', 'raw-cancel')).turnId, turnId);
+  const count = f.dispatches().length;
+  for (const opId of ['bad op', 'x'.repeat(201)]) {
+    const invalid = await f.command('work', 'cancel', '--op-id', opId, '--turn', turnId);
+    assert.equal(invalid.code, 2, invalid.output);
+    assert.equal(invalid.records.at(-1)?.category, 'usage');
+  }
+  assert.equal(f.dispatches().length, count);
+});
+
 test('rejections and unknown outcomes are durable, never retried, and late echoes resolve uncertainty', async t => {
   const f = await fixture(t);
   result(await f.start('work', false, ['--timeout-ms', '500']));

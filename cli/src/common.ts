@@ -48,7 +48,7 @@ export async function textFile(path: string, signal?: AbortSignal): Promise<stri
     for await (const chunk of input) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
       bytes += buffer.length;
-      if (bytes > 4 * 1024 * 1024) throw new CliError('usage', 'JSON input exceeds 4 MiB');
+      if (bytes > 4 * 1024 * 1024) throw new CliError('usage', 'Input exceeds 4 MiB');
       chunks.push(buffer);
     }
   } finally {

@@ -51,6 +51,11 @@ function identifier(value: unknown, name: string): string {
   return value;
 }
 
+function turnIdentifier(value: unknown, name: string): string {
+  if (typeof value !== 'string') throw new CliError('usage', `${name} must be a string`);
+  return value;
+}
+
 function messageText(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) throw new CliError('usage', 'Message must not be empty');
   return value;
@@ -214,7 +219,7 @@ class Controller {
     }
     const opId = identifier(args.opId, '--op-id');
     if (['send', 'steer'].includes(command)) messageText(args.text);
-    if (['steer', 'cancel'].includes(command)) identifier(args.turn, '--turn');
+    if (['steer', 'cancel'].includes(command)) turnIdentifier(args.turn, '--turn');
     if (command === 'dispatch') {
       channel(args.channel);
       if (!object(args.action) || typeof args.action.type !== 'string' || !dispatchable(args.action.type)) {
@@ -242,8 +247,8 @@ class Controller {
       channel: command === 'participate' ? this.metadata.session
         : command === 'dispatch' ? channel(args.channel)
           : command === 'request' && object(args.params) ? requestChannel(String(args.method), args.params) : this.metadata.chat!,
-      ...(command === 'send' ? { turnId: args.turn === undefined ? randomUUID() : identifier(args.turn, '--turn') } : {}),
-      ...(['steer', 'cancel'].includes(command) ? { turnId: identifier(args.turn, '--turn') } : {}),
+      ...(command === 'send' ? { turnId: args.turn === undefined ? randomUUID() : turnIdentifier(args.turn, '--turn') } : {}),
+      ...(['steer', 'cancel'].includes(command) ? { turnId: turnIdentifier(args.turn, '--turn') } : {}),
       ...(command === 'steer' ? { messageId: randomUUID() } : {}),
     };
     this.update(operation);
@@ -324,7 +329,7 @@ class Controller {
               throw new CliError('precondition', 'Turn ID was already used; refusing another submission');
             }
             action = {
-              type: ActionType.ChatTurnStarted, turnId: identifier(operation.turnId, 'turnId'),
+              type: ActionType.ChatTurnStarted, turnId: turnIdentifier(operation.turnId, 'turnId'),
               startedAt: new Date().toISOString(),
               message: { text: messageText(args.text), origin: { kind: MessageKind.User } },
             } satisfies ChatTurnStartedAction;
@@ -341,7 +346,7 @@ class Controller {
               } satisfies ChatPendingMessageSetAction;
             } else action = {
               type: ActionType.ChatTurnCancelled,
-              turnId: identifier(operation.turnId, 'turnId'), duration: 0,
+              turnId: turnIdentifier(operation.turnId, 'turnId'), duration: 0,
             } satisfies ChatTurnCancelledAction;
           }
         }
@@ -351,7 +356,7 @@ class Controller {
         if (!object(args.action)) throw new CliError('usage', 'Missing action');
         action = args.action;
         if (action.type === ActionType.ChatTurnStarted) {
-          operation.turnId = identifier(action.turnId, 'turnId');
+          operation.turnId = turnIdentifier(action.turnId, 'turnId');
           if (this.usedTurn(operation)) throw new CliError('precondition', 'Turn ID already submitted in this journal');
         }
       }
