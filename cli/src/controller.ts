@@ -9,12 +9,14 @@ import type {
 } from '../../clients/typescript/src/types/channels-chat/actions.js';
 import { ChatInteractivity, MessageKind, PendingMessageKind } from '../../clients/typescript/src/types/channels-chat/state.js';
 import type { SessionActiveClientSetAction } from '../../clients/typescript/src/types/channels-session/actions.js';
+import type { CreateSessionParams } from '../../clients/typescript/src/types/channels-session/commands.js';
 import { SessionLifecycle } from '../../clients/typescript/src/types/channels-session/state.js';
 import { SUPPORTED_PROTOCOL_VERSIONS, compareProtocolVersions } from '../../clients/typescript/src/types/version/registry.js';
 import { Capture, frameRecord, type Frame } from './capture.js';
 import { describeHost, describeResource, dispatchable, requestChannel, requestPolicy } from './catalog.js';
 import { channel, CliError, errorRecord, object, redact } from './common.js';
 import { ObservedTransport, openTransport } from './connection.js';
+import { activeParts, inputAction, pendingInputs, protocolId, toolAction, validateInputCommand } from './inputs.js';
 import {
   instancePaths, operationFingerprint, OperationJournal, publicMetadata, readMetadata,
   saveMetadata, serializeIntent, type InstanceMetadata,
@@ -31,6 +33,8 @@ export interface Operation extends Record<string, unknown> {
   channel?: string;
   turnId?: string;
   messageId?: string;
+  requestId?: string;
+  toolCallId?: string;
   clientSeq?: number;
   actionType?: string;
   minimumSeq?: number;
@@ -75,6 +79,7 @@ class Controller {
   private timeoutMs = 30_000;
   private starting = false;
   private ending = false;
+  private allowProvisional = false;
   private queuedBytes = 0;
   private queuedCount = 0;
   private readonly abort = new AbortController();
@@ -139,8 +144,41 @@ class Controller {
       }
       this.initialization = init;
       if (auth !== undefined) await this.client.requestRaw('authenticate', auth);
+      let creation: Operation | undefined;
+      if (config.creation !== undefined) {
+        if (!object(config.creation) || this.metadata.observer) throw new CliError('usage', 'Invalid creation intent');
+        const args = config.creation;
+        const opId = identifier(args.opId, '--op-id');
+        if (args.confirm !== true || typeof args.provider !== 'string' || !args.provider.trim()
+          || args.channel !== this.metadata.session
+          || (args.workingDirectories !== undefined && (!Array.isArray(args.workingDirectories)
+            || !args.workingDirectories.every((uri): uri is string => typeof uri === 'string')))
+          || (args.config !== undefined && !object(args.config))) throw new CliError('usage', 'Invalid creation parameters');
+        const params: CreateSessionParams = {
+          channel: this.metadata.session, provider: args.provider,
+          ...(Array.isArray(args.workingDirectories) ? { workingDirectories: args.workingDirectories } : {}),
+          ...(object(args.config) ? { config: args.config } : {}),
+        };
+        creation = { opId, command: 'create', channel: this.metadata.session,
+          fingerprint: operationFingerprint('create', args), state: 'recorded' };
+        this.update(creation);
+        try {
+          if (this.ending) throw new CliError('instance', 'Controller is stopping');
+          this.update(creation, { state: 'submitted' });
+          const response = await this.client.request('createSession', params);
+          if (this.ending) throw new CliError('uncertain', 'Controller ended during creation');
+          this.update(creation, { state: 'accepted', result: response });
+        } catch (error) {
+          if (!this.ending) this.update(creation, {
+            state: creation.state === 'recorded' ? 'refused' : errorRecord(error, false).category === 'rpc' ? 'rejected' : 'uncertain',
+            error: errorRecord(error, false),
+          });
+          throw error;
+        }
+        this.allowProvisional = true;
+      }
       const session = await this.snapshot(this.metadata.session);
-      this.readySession(session.state);
+      this.readySession(session.state, this.allowProvisional);
       const chat = channel(session.state.defaultChat);
       if (!chat.startsWith('ahp-chat:/')) throw new CliError('protocol', 'Session defaultChat is not a chat URI');
       if (!this.boundChat(session.state, chat)) throw new CliError('protocol', 'Default chat is absent from the session catalog');
@@ -150,15 +188,16 @@ class Controller {
       this.metadata.protocolVersion = init.protocolVersion;
       this.metadata.state = 'ready';
       saveMetadata(this.metadata);
-      return publicMetadata(this.metadata);
+      return { ...publicMetadata(this.metadata), ...(creation ? { operation: publicOperation(creation) } : {}) };
     } catch (error) {
       await this.end(error);
       throw error;
     }
   }
 
-  private readySession(state: Record<string, unknown>): void {
-    if (state.lifecycle !== SessionLifecycle.Ready || !Array.isArray(state.chats) || !Array.isArray(state.activeClients)) {
+  private readySession(state: Record<string, unknown>, allowProvisional = false): void {
+    if ((state.lifecycle !== SessionLifecycle.Ready && !(allowProvisional && state.lifecycle === SessionLifecycle.Creating))
+      || !Array.isArray(state.chats) || !Array.isArray(state.activeClients)) {
       throw new CliError('protocol', 'Expected a ready session with chats and plural activeClients');
     }
   }
@@ -168,7 +207,7 @@ class Controller {
   }
 
   private async snapshot(uri: string): Promise<{ state: Record<string, unknown>; fromSeq: number }> {
-    const result = await this.client!.request('subscribe', { channel: uri });
+    const result = await this.subscribe(uri);
     if (!object(result)) throw new CliError('protocol', 'Invalid subscription response');
     const snapshot = result.snapshot;
     if (!object(snapshot) || snapshot.resource !== uri || !object(snapshot.state) || typeof snapshot.fromSeq !== 'number'
@@ -178,20 +217,33 @@ class Controller {
     return { state: snapshot.state, fromSeq: snapshot.fromSeq };
   }
 
+  private async subscribe(uri: string) {
+    const result = await this.client!.request('subscribe', { channel: uri });
+    if (uri === this.metadata.session && object(result) && object(result.snapshot) && object(result.snapshot.state)) {
+      const lifecycle = result.snapshot.state.lifecycle;
+      if (lifecycle === SessionLifecycle.Ready) this.allowProvisional = false;
+      if (typeof lifecycle === 'string' && this.metadata.sessionLifecycle !== lifecycle) {
+        this.metadata.sessionLifecycle = lifecycle;
+        saveMetadata(this.metadata);
+      }
+    }
+    return result;
+  }
+
   async execute(command: string, args: Record<string, unknown>): Promise<unknown> {
     if (command === 'status') return publicMetadata(this.metadata);
     if (command === 'operation') {
       const opId = identifier(args.opId, '--op-id');
       const operation = this.operations.get(opId);
       if (!operation) throw new CliError('operation', 'Unknown operation ID');
-      return publicOperation(operation);
+      return { ...publicOperation(operation), ...(args.includeFingerprint === true ? { fingerprint: operation.fingerprint } : {}) };
     }
     if (command === 'stop') return publicMetadata(this.metadata);
     if (this.metadata.state !== 'ready' || this.ending) throw new CliError('instance', 'Controller is not ready');
     if (command === 'describe') {
       const uri = args.channel === undefined ? undefined : channel(args.channel);
       const resource = uri === undefined ? undefined
-        : describeResource(uri, await this.client!.request('subscribe', { channel: uri }));
+        : describeResource(uri, await this.subscribe(uri));
       return describeHost(this.initialization!, resource);
     }
     if (command === 'ping') { await this.client!.ping(); return null; }
@@ -200,7 +252,14 @@ class Controller {
       ...(args.cursor !== undefined ? { cursor: args.cursor } : {}),
       ...(args.pageSize !== undefined ? { limit: args.pageSize } : {}),
     });
-    if (command === 'snapshot') return this.client!.request('subscribe', { channel: channel(args.channel) });
+    if (command === 'snapshot') return this.subscribe(channel(args.channel));
+    if (command === 'pending') {
+      const session = await this.snapshot(this.metadata.session);
+      this.readySession(session.state, this.allowProvisional);
+      if (!this.boundChat(session.state, this.metadata.chat!)) throw new CliError('precondition', 'Retained chat is no longer bound to the session');
+      const chat = await this.snapshot(this.metadata.chat!);
+      return { session: this.metadata.session, channel: this.metadata.chat, fromSeq: chat.fromSeq, ...pendingInputs(chat.state) };
+    }
     if (command === 'request') {
       if (typeof args.method !== 'string' || !/^\S+$/.test(args.method) || !object(args.params)) {
         throw new CliError('usage', 'request requires a method and JSON parameters');
@@ -210,7 +269,7 @@ class Controller {
       if (policy === 'lifecycle') throw new CliError('usage', 'Lifecycle methods are owned by the controller');
       if (policy === 'read') return this.client!.requestRaw(args.method, args.params);
     }
-    if (!['participate', 'send', 'steer', 'cancel', 'dispatch', 'request'].includes(command)) {
+    if (!['participate', 'send', 'steer', 'cancel', 'answer', 'confirm-tool', 'dispatch', 'request'].includes(command)) {
       throw new CliError('usage', 'Unknown controller command');
     }
     if (this.metadata.observer) throw new CliError('observer', 'Observer-only instances cannot submit mutations');
@@ -218,6 +277,7 @@ class Controller {
       throw new CliError('usage', 'Raw mutations require --confirm');
     }
     const opId = identifier(args.opId, '--op-id');
+    if (command === 'answer' || command === 'confirm-tool') validateInputCommand(command, args);
     if (['send', 'steer'].includes(command)) messageText(args.text);
     if (['steer', 'cancel'].includes(command)) turnIdentifier(args.turn, '--turn');
     if (command === 'dispatch') {
@@ -248,7 +308,9 @@ class Controller {
         : command === 'dispatch' ? channel(args.channel)
           : command === 'request' && object(args.params) ? requestChannel(String(args.method), args.params) : this.metadata.chat!,
       ...(command === 'send' ? { turnId: args.turn === undefined ? randomUUID() : turnIdentifier(args.turn, '--turn') } : {}),
-      ...(['steer', 'cancel'].includes(command) ? { turnId: turnIdentifier(args.turn, '--turn') } : {}),
+      ...(['steer', 'cancel', 'answer', 'confirm-tool'].includes(command) ? { turnId: protocolId(args.turn, '--turn') } : {}),
+      ...(command === 'answer' ? { requestId: protocolId(args.requestId, '--request') } : {}),
+      ...(command === 'confirm-tool' ? { toolCallId: protocolId(args.toolCallId, '--tool-call') } : {}),
       ...(command === 'steer' ? { messageId: randomUUID() } : {}),
     };
     this.update(operation);
@@ -299,9 +361,9 @@ class Controller {
         ).catch(error => this.end(error));
         return;
       }
-      if (['participate', 'send', 'steer', 'cancel'].includes(operation.command)) {
+      if (['participate', 'send', 'steer', 'cancel', 'answer', 'confirm-tool'].includes(operation.command)) {
         const session = await this.snapshot(this.metadata.session);
-        this.readySession(session.state);
+        this.readySession(session.state, this.allowProvisional && ['participate', 'send'].includes(operation.command));
         if (operation.command === 'participate') {
           fence = session.fromSeq;
           action = {
@@ -312,8 +374,8 @@ class Controller {
           if (!this.boundChat(session.state, this.metadata.chat!)) {
             throw new CliError('precondition', 'Retained chat is no longer bound to the session');
           }
-          if (!Array.isArray(session.state.activeClients)
-            || !session.state.activeClients.some(item => object(item) && item.clientId === this.metadata.clientId)) {
+          if (['send', 'steer', 'cancel'].includes(operation.command) && (!Array.isArray(session.state.activeClients)
+            || !session.state.activeClients.some(item => object(item) && item.clientId === this.metadata.clientId))) {
             throw new CliError('precondition', 'Register explicitly with participate before sending, steering or cancelling');
           }
           const chat = await this.snapshot(this.metadata.chat!);
@@ -322,7 +384,15 @@ class Controller {
           }
           fence = chat.fromSeq;
           const active = chat.state.activeTurn;
-          if (operation.command === 'send') {
+          if (operation.command === 'answer' || operation.command === 'confirm-tool') {
+            const parts = activeParts(chat.state, operation.turnId);
+            action = operation.command === 'answer' ? { ...inputAction(parts, args) } : { ...toolAction(parts, args) };
+          } else if (operation.command === 'send') {
+            if (session.state.lifecycle === SessionLifecycle.Creating && [...this.operations.values()].some(other =>
+              other.opId !== operation.opId && other.channel === operation.channel
+              && other.actionType === ActionType.ChatTurnStarted && other.state !== 'refused')) {
+              throw new CliError('precondition', 'A provisional bootstrap was already submitted; wait for session readiness');
+            }
             if (active !== undefined) throw new CliError('precondition', 'Chat already has an active turn; use steer with its exact ID');
             if (this.usedTurn(operation) || (Array.isArray(chat.state.turns)
               && chat.state.turns.some(turn => object(turn) && turn.id === operation.turnId))) {

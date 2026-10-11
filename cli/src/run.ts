@@ -25,11 +25,14 @@ Agent-oriented AHP protocol debugging. JSONL output; no interactive prompts.
   replay FILE                 Offline capture review; never resends frames
 
 Persistent controllers (explicit --instance NAME):
+  create --provider ID         Create session and retain (--op-id ID --confirm)
   join --session URI          Retain connection, session and advertised default chat
   listen --session URI        Separate observer-only controller with durable events
   status / events / stop      Inspect, query/follow evidence, or stop locally
   participate / send          Explicit participation or new turn (--op-id)
   steer / cancel              Exact active turn (--turn, --op-id)
+  pending                     Inspect pending inputs and tool confirmations
+  answer / confirm-tool       Explicit decisions (--turn, --op-id, --confirm)
   wait                        Wait on --op-id --until accepted|completed --timeout 30s
   ping/sessions/snapshot      Read using an instance's retained connection
   request/dispatch            Raw mutation requires --confirm and --op-id

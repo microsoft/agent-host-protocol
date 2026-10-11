@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { closeSync, existsSync, openSync } from 'node:fs';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -12,8 +13,9 @@ import {
   reserveInstance, saveMetadata, type InstanceMetadata,
 } from './controller-store.js';
 import { requestPolicy } from './catalog.js';
+import { validateInputCommand } from './inputs.js';
 
-const CONTROLLER_COMMANDS = ['join', 'status', 'events', 'participate', 'send', 'steer', 'cancel', 'wait', 'stop'];
+const CONTROLLER_COMMANDS = ['create', 'join', 'status', 'events', 'participate', 'send', 'steer', 'cancel', 'pending', 'answer', 'confirm-tool', 'wait', 'stop'];
 
 export function controllerInvocation(args: string[]): boolean {
   return CONTROLLER_COMMANDS.includes(args[0]) || args.some(arg => arg === '--instance' || arg.startsWith('--instance='));
@@ -24,6 +26,7 @@ const HELP = `Usage: ahp COMMAND --instance NAME [OPTIONS]
 No implicit current instance. All results/errors are versioned JSONL.
 
   join --session URI           Start a persistent controller; never auto-participate
+  create --provider ID         Create and retain; --op-id ID --confirm required
   listen --session URI         Start a separate observer-only controller
   status [--op-id ID]           Instance status or durable operation outcome
   events [--after N] [--follow] Query retained capture; --limit is page size
@@ -31,6 +34,9 @@ No implicit current instance. All results/errors are versioned JSONL.
   send --op-id ID               New turn from --message-file FILE (- reads stdin)
   steer --turn ID --op-id ID    Steer exact active turn from --message-file
   cancel --turn ID --op-id ID   Cancel exact active turn
+  pending                      Inspect pending input/tool confirmations
+  answer --request ID          --turn ID --op-id ID --confirm; --answers-file FILE
+  confirm-tool --tool-call ID  --turn ID --decision approve|deny --op-id ID --confirm
   wait --op-id ID               --until accepted|completed --timeout 30s
   stop                         Stop locally; keep evidence; never cancel remotely
   ping                         Liveness over retained connection
@@ -44,6 +50,14 @@ Startup: --url URL (or AHP_URL), --auth-file FILE, --client-id ID,
   --protocol-version VERSION (repeatable), --timeout-ms N (default 30000),
   --include-content, --max-record-bytes N (default 67108864).
 Readiness includes session/default-chat snapshots and durable capture.
+Create: optional --session URI (otherwise a new UUID), --cwd URI, --config-file FILE.
+  Never auto-participates or sends a hidden prompt. Creating sessions permit an
+  explicit participate/send bootstrap; join still requires a ready session.
+Answer: --response accept|decline|cancel (default accept). Answers are a flat JSON
+  object keyed by question ID: strings, numbers, booleans or arrays of option IDs.
+  Omit --answers-file to accept synced submitted answers. Never guesses defaults.
+Confirm-tool: --phase execution|result (default execution); --option ID selects
+  an offered execution option. Pending output includes full request/tool details.
 Each controller records privately under AHP_STATE_DIR (default ~/.ahp).
 Names remain occupied after stop; choose new names to retain evidence.
 On Windows, use an AHP_STATE_DIR protected by private current-user ACLs.
@@ -66,16 +80,23 @@ const OPTIONS = {
   follow: { type: 'boolean' }, method: { type: 'string' }, channel: { type: 'string' },
   direction: { type: 'string' }, 'page-size': { type: 'string' }, cursor: { type: 'string' },
   'params-file': { type: 'string' }, 'action-file': { type: 'string' }, confirm: { type: 'boolean' },
+  provider: { type: 'string' }, cwd: { type: 'string' }, 'config-file': { type: 'string' },
+  request: { type: 'string' }, 'answers-file': { type: 'string' }, response: { type: 'string' },
+  'tool-call': { type: 'string' }, decision: { type: 'string' }, option: { type: 'string' }, phase: { type: 'string' },
 } as const;
 const START_OPTIONS = [
   'session', 'url', 'client-id', 'protocol-version', 'timeout-ms', 'auth-file', 'include-content', 'max-record-bytes',
 ];
 const ALLOWED: Record<string, string[]> = {
   join: START_OPTIONS, listen: START_OPTIONS,
+  create: [...START_OPTIONS, 'provider', 'cwd', 'config-file', 'op-id', 'confirm'],
   status: ['op-id'], stop: [], ping: [],
   events: ['after', 'limit', 'follow', 'method', 'channel', 'direction', 'timeout'],
   participate: ['op-id'], send: ['op-id', 'message-file', 'turn'],
   steer: ['op-id', 'message-file', 'turn'], cancel: ['op-id', 'turn'],
+  pending: [],
+  answer: ['op-id', 'turn', 'request', 'answers-file', 'response', 'confirm'],
+  'confirm-tool': ['op-id', 'turn', 'tool-call', 'decision', 'option', 'phase', 'confirm'],
   wait: ['op-id', 'until', 'timeout'],
   sessions: ['page-size', 'cursor'], snapshot: [], describe: [],
   request: ['op-id', 'params-file', 'confirm'], dispatch: ['op-id', 'action-file', 'confirm'],
@@ -185,9 +206,9 @@ async function operationOutcome(
   metadata: InstanceMetadata, opId: string, signal: AbortSignal, includeFingerprint = false,
 ): Promise<Record<string, unknown>> {
   if (!opId.trim()) throw new CliError('usage', '--op-id must not be empty');
-  if (!includeFingerprint && (metadata.state === 'ready' || metadata.state === 'starting')) {
+  if (metadata.state === 'ready' || metadata.state === 'starting') {
     try {
-      const value = await controllerRequest(metadata, 'operation', { opId }, signal, 2000);
+      const value = await controllerRequest(metadata, 'operation', { opId, includeFingerprint }, signal, 2000);
       if (!object(value)) throw new CliError('operation', 'Invalid operation result');
       return value;
     } catch (error) { if (!unreachable(error)) throw error; }
@@ -237,8 +258,16 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
     instance = values.instance;
     if (!instance) throw new CliError('usage', 'Specify an explicit --instance NAME');
     const paths = instancePaths(instance);
-    if (command === 'join' || command === 'listen') {
-      const session = channel(values.session);
+    if (command === 'join' || command === 'listen' || command === 'create') {
+      if (command === 'create' && (!values.confirm || !values.provider?.trim()
+        || !values['op-id'] || /\s/.test(values['op-id']) || values['op-id'].length > 200)) {
+        throw new CliError('usage', 'create requires --provider, --op-id (nonempty, no whitespace, at most 200 characters), and --confirm');
+      }
+      if (values['auth-file'] === '-' && values['config-file'] === '-') throw new CliError('usage', 'Only one input file can read stdin');
+      const config = values['config-file'] ? await jsonFile(values['config-file'], signal) : undefined;
+      const workingDirectories = values.cwd === undefined ? undefined : [channel(values.cwd)];
+      const previous = command === 'create' && existsSync(paths.dir) ? readMetadata(instance) : undefined;
+      const session = channel(values.session ?? (command === 'create' ? previous?.session ?? `ahp-session:/${randomUUID()}` : undefined));
       if (!session.startsWith('ahp-session:/') || session.length > 4096) throw new CliError('usage', '--session must be a native session URI of at most 4096 characters');
       const url = values.url ?? process.env.AHP_URL;
       if (!url) throw new CliError('usage', 'Specify --url or AHP_URL');
@@ -264,6 +293,24 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
       if (values['client-id'] !== undefined && (!values['client-id'].trim() || values['client-id'].length > 200)) {
         throw new CliError('usage', '--client-id must be nonempty and at most 200 characters');
       }
+      const creation = command === 'create' ? {
+        opId: values['op-id'], confirm: true, channel: session, provider: values.provider, url,
+        ...(config !== undefined ? { config } : {}),
+        ...(workingDirectories !== undefined ? { workingDirectories } : {}),
+      } : undefined;
+      if (previous && creation && typeof creation.opId === 'string') {
+        generation = previous.generation;
+        if (values['client-id'] !== undefined && values['client-id'] !== previous.clientId) {
+          throw new CliError('operation', 'Existing creation belongs to a different client identity');
+        }
+        const operation = await operationOutcome(previous, creation.opId, signal, true);
+        if (operation.command !== 'create' || operation.fingerprint !== operationFingerprint('create', creation)) {
+          throw new CliError('operation', 'Operation ID was already used with different inputs');
+        }
+        const { fingerprint: _fingerprint, ...outcome } = operation;
+        await result({ ...await liveStatus(previous, signal), operation: outcome });
+        return 0;
+      }
       const metadata = reserveInstance(instance, session, command === 'listen');
       generation = metadata.generation;
       if (values['client-id'] !== undefined) { metadata.clientId = values['client-id']; saveMetadata(metadata); }
@@ -285,10 +332,15 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
       try {
         await result(await controllerRequest(readMetadata(instance), 'initialize', {
           url, auth, timeoutMs, maxBytes, versions, includeContent: values['include-content'] ?? false,
+          ...(creation ? { creation } : {}),
         }, signal, timeoutMs * 4 + 2000));
       } catch (error) {
         const current = readMetadata(instance);
-        if (current.state === 'failed' && current.error) throw new CliError('instance', 'Controller initialization failed', current.error);
+        if (current.state === 'failed' && current.error) {
+          if (command === 'create' && current.error.category === 'rpc' && typeof current.error.code === 'number'
+            && typeof current.error.message === 'string') throw new RpcError(current.error.code, current.error.message, current.error.data);
+          throw new CliError('instance', 'Controller initialization failed', current.error);
+        }
         throw error;
       }
       return 0;
@@ -367,6 +419,19 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
       if (!values['message-file']) throw new CliError('usage', `${command} requires --message-file`);
       request.text = await textFile(values['message-file'], signal);
     }
+    if (command === 'answer') {
+      request.requestId = values.request;
+      request.response = values.response ?? 'accept';
+      if (values['answers-file']) request.answers = await jsonFile(values['answers-file'], signal);
+      validateInputCommand(command, request);
+    }
+    if (command === 'confirm-tool') {
+      request.toolCallId = values['tool-call'];
+      request.decision = values.decision;
+      request.phase = values.phase ?? 'execution';
+      if (values.option !== undefined) request.option = values.option;
+      validateInputCommand(command, request);
+    }
     if (command === 'snapshot' || command === 'dispatch') request.channel = channel(targets[0]);
     if (command === 'describe' && targets.length) request.channel = channel(targets[0]);
     if (command === 'dispatch') {
@@ -382,7 +447,7 @@ export async function runControllerCli(args: string[], signal: AbortSignal): Pro
       if (values['page-size']) request.pageSize = integer(values['page-size'], 20, 1, 1000, '--page-size');
       if (values.cursor !== undefined) request.cursor = values.cursor;
     }
-    const mutating = ['participate', 'send', 'steer', 'cancel', 'dispatch'].includes(command)
+    const mutating = ['participate', 'send', 'steer', 'cancel', 'answer', 'confirm-tool', 'dispatch'].includes(command)
       || (command === 'request' && typeof request.method === 'string' && requestPolicy(request.method) !== 'read');
     const recover = async () => {
       if (typeof request.opId !== 'string') throw new CliError('usage', 'Mutations require --op-id');

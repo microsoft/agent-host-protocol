@@ -58,7 +58,8 @@ native channel URIs. It never guesses a session URI from a platform ID.
   requests also require confirmation. The command policy is exhaustive over
   the canonical `CommandMap`, so new standard methods need an explicit policy.
   High-level mutation verbs express intent directly and require a durable
-  operation ID instead of an additional confirmation prompt.
+  operation ID. Session creation and input/tool decisions also require
+  `--confirm`; they never create work or approve permissions implicitly.
 - Server-initiated requests use the SDK's default MethodNotFound response. The
   CLI does not grant the host access to the agent's local files or shell.
 - Exit 0 means the requested local command completed, not that a turn finished.
@@ -175,6 +176,30 @@ selection, rather than silently following later default-chat changes.
 `listen` with the same flags creates a separate observer-only instance; its
 remote mutation commands are rejected. Legacy `listen URI...` remains an alias
 for one-shot watch.
+
+`create --provider ID --instance NAME --op-id ID --confirm` creates a session
+and retains the creating connection. Optional `--session`, `--cwd` (host-side URI)
+and `--config-file` make its inputs explicit. Creation is journaled before its
+RPC, with no retries; repeating the command retrieves the same outcome. Creation
+acceptance and attachment are distinct: a successful RPC can be followed by a
+failed subscription. The local controller may be ready while its reported
+`sessionLifecycle` is still `creating`. Only creation controllers permit explicit
+participation and a first `send` in this state; existing `join` readiness checks
+remain unchanged. No hidden bootstrap prompt is sent.
+
+`pending` reports fresh active-turn input requests and execution/result tool
+confirmations with full details, exact IDs and snapshot sequence. It works on
+observer instances without dispatching. `answer --turn ID --request ID` accepts
+a flat `--answers-file` keyed by question ID, constructing submitted answer
+envelopes from the actual question kinds and preserving synced answers.
+It never invents defaults, treats labels as option IDs, or promotes drafts.
+`--response decline|cancel` explicitly resolves without accepting.
+`confirm-tool --turn ID --tool-call ID --decision approve|deny` targets an exact
+pending execution confirmation, including an explicitly selected offered option;
+`--phase result` targets result confirmation. Both decision commands require
+`--confirm` and durable operation IDs, refuse observers and stale targets, and
+retain raw dispatch for richer or future payloads. Acceptance is not runtime
+resumption or turn completion.
 
 `status`, cursor-based `events`, `wait`, and local `stop` operate on explicit
 instances. Protocol read commands and raw request/dispatch can reuse the

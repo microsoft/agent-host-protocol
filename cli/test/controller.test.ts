@@ -2,6 +2,7 @@ import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -88,6 +89,12 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
   let omitEcho = false;
   let malformed = false;
   let holdTurnStart = false;
+  let materializeOnSend = true;
+  let sessionUri = SESSION;
+  let creationFailure: 'rpc' | 'disconnect' | 'snapshot' | undefined;
+  let inspectCreation: (() => void) | undefined;
+  let holdCreation = false;
+  const creationResponses: (() => void)[] = [];
   const held: { socket: WebSocket; params: Record<string, unknown> }[] = [];
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
@@ -110,11 +117,24 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
         respond({ protocolVersion: '1.0.0', serverSeq, snapshots: [],
           ...(hostMetadata === undefined ? {} : { _meta: hostMetadata }) });
       } else if (message.method === 'authenticate') respond({});
+      else if (message.method === 'createSession') {
+        inspectCreation?.();
+        if (creationFailure === 'rpc') {
+          socket.send(JSON.stringify({ jsonrpc: '2.0', id: message.id,
+            error: { code: -32002, message: 'Unknown provider', data: { provider: message.params.provider } } }));
+        } else if (creationFailure === 'disconnect') socket.close();
+        else {
+          sessionUri = String(message.params.channel);
+          if (holdCreation) creationResponses.push(() => respond(null));
+          else respond(null);
+          if (creationFailure === 'snapshot') malformed = true;
+        }
+      }
       else if (message.method === 'subscribe') {
         if (malformed) { socket.send('not-json'); return; }
         respond({ snapshot: {
           resource: message.params.channel, fromSeq: serverSeq,
-          state: message.params.channel === SESSION ? session : chat,
+          state: message.params.channel === sessionUri ? session : chat,
         } });
       } else if (message.method === 'listSessions') respond({
         items: [], nextCursor: message.params.cursor === 'second' ? undefined : 'second',
@@ -126,7 +146,10 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
             const entry = action.activeClient as Record<string, unknown>;
             session.activeClients = [...(session.activeClients as Record<string, unknown>[])
               .filter(item => item.clientId !== entry.clientId), entry];
-          } else if (action.type === 'chat/turnStarted') chat.activeTurn = { id: action.turnId };
+          } else if (action.type === 'chat/turnStarted') {
+            chat.activeTurn = { id: action.turnId, responseParts: [] };
+            if (materializeOnSend && session.lifecycle === 'creating') session.lifecycle = 'ready';
+          }
           else if (action.type === 'chat/pendingMessageSet') chat.steeringMessage = { id: action.id };
           else if (action.type === 'chat/turnCancelled') delete chat.activeTurn;
           else if (action.type === 'chat/inputAnswerChanged' || action.type === 'chat/inputCompleted') {
@@ -143,6 +166,11 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
               part.response = action.response;
               if (action.answers !== undefined) part.request.answers = action.answers as Record<string, unknown>;
             }
+          } else if (action.type === 'chat/toolCallConfirmed' || action.type === 'chat/toolCallResultConfirmed') {
+            const active = chat.activeTurn as { responseParts: { toolCall: Record<string, unknown> }[] };
+            const part = active.responseParts.find(part => part.toolCall?.toolCallId === action.toolCallId);
+            assert.ok(part);
+            part.toolCall.status = action.approved ? action.type === 'chat/toolCallConfirmed' ? 'running' : 'completed' : 'cancelled';
           }
         }
         const params = {
@@ -173,6 +201,11 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
       '--url', `ws://127.0.0.1:${address.port}`, ...extra]);
   };
   const command = (name: string, verb: string, ...args: string[]) => run([verb, '--instance', name, ...args]);
+  const create = async (name: string, extra: string[] = []) => {
+    names.add(name);
+    return run(['create', '--instance', name, '--url', `ws://127.0.0.1:${address.port}`,
+      '--provider', 'test', '--op-id', 'creation', '--confirm', ...extra]);
+  };
   const accept = async (name: string, opId: string) => result(await command(name, 'wait', '--op-id', opId, '--timeout', '4s'));
   const participate = async (name: string) => {
     result(await command(name, 'participate', '--op-id', 'participation'));
@@ -198,11 +231,17 @@ async function fixture(t: TestContext, hostMetadata?: Record<string, unknown>) {
     await rm(root, { recursive: true, force: true });
   });
   return {
-    root, session, chat, messages, server, run, start, command, participate, accept, notify,
+    root, session, chat, messages, server, run, start, create, command, participate, accept, notify,
+    url: `ws://127.0.0.1:${address.port}`,
+    failCreate: (failure: typeof creationFailure) => { creationFailure = failure; },
+    inspectCreate: (inspect: () => void) => { inspectCreation = inspect; },
+    holdCreate: () => { holdCreation = true; },
+    releaseCreate: () => { for (const respond of creationResponses.splice(0)) respond(); },
     delayEcho: (ms: number) => { echoDelay = ms; },
     reject: (value = true) => { rejectActions = value; },
     omitEcho: () => { omitEcho = true; },
     holdTurnStart: () => { holdTurnStart = true; },
+    keepCreating: () => { materializeOnSend = false; },
     releaseEcho: () => {
       for (const entry of held.splice(0)) entry.socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'action', params: entry.params }));
     },
@@ -232,6 +271,125 @@ test('join retains identity/default chat, is responsive across invocations, and 
   }
   assert.equal(result(await f.command('work', 'stop')).state, 'stopped');
   assert.equal(result(await f.command('work', 'status')).state, 'stopped');
+});
+
+test('create journals intent before submission, preserves exact config, and retains without participation', async t => {
+  const f = await fixture(t);
+  const config = join(f.root, 'config.json');
+  await writeFile(config, '{"nested":{"mode":"test"},"enabled":false}');
+  f.inspectCreate(() => {
+    const journal = readFileSync(join(f.root, 'instances', 'created', 'operations.jsonl'), 'utf8')
+      .trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(journal.map(record => record.state), ['recorded', 'submitted']);
+  });
+  const created = result(await f.create('created', ['--cwd', 'file:///workspace', '--config-file', config]));
+  assert.equal(created.state, 'ready');
+  assert.equal(created.sessionLifecycle, 'ready');
+  assert.match(String(created.session), /^ahp-session:\/[a-f0-9-]+$/);
+  assert.equal((created.operation as { state: string }).state, 'accepted');
+  const request = f.messages.find(message => message.method === 'createSession');
+  assert.deepEqual(request?.params, {
+    channel: created.session, provider: 'test', workingDirectories: ['file:///workspace'],
+    config: { nested: { mode: 'test' }, enabled: false },
+  });
+  assert.equal(f.dispatches().length, 0);
+  assert.deepEqual(f.session.activeClients, []);
+  assert.equal(result(await f.create('created', ['--cwd', 'file:///workspace', '--config-file', config])).session, created.session);
+  assert.equal(f.messages.filter(message => message.method === 'initialize').length, 1);
+  assert.equal(f.messages.filter(message => message.method === 'createSession').length, 1);
+  assert.equal((await f.create('created', ['--cwd', 'file:///different', '--config-file', config])).code, 1);
+  assert.equal((await f.command('created', 'wait', '--op-id', 'creation', '--until', 'completed')).code, 2);
+  result(await f.command('created', 'stop'));
+  const recovered = result(await f.create('created', ['--cwd', 'file:///workspace', '--config-file', config]));
+  assert.equal(recovered.state, 'stopped');
+  assert.equal((recovered.operation as { state: string }).state, 'accepted');
+  assert.equal(f.messages.filter(message => message.method === 'createSession').length, 1);
+});
+
+test('creation reports provisional lifecycle and permits only explicit first-turn bootstrap', async t => {
+  const f = await fixture(t);
+  f.session.lifecycle = 'creating';
+  assert.equal((await f.start('join-provisional')).code, 1);
+  const created = result(await f.create('provisional', ['--session', SESSION]));
+  assert.equal(created.sessionLifecycle, 'creating');
+  assert.equal(f.dispatches().length, 0);
+  assert.equal(result(await f.command('provisional', 'pending')).turnId, undefined);
+  await f.participate('provisional');
+  assert.equal(f.session.lifecycle, 'creating');
+  result(await f.run(['send', '--instance', 'provisional', '--op-id', 'bootstrap', '--message-file', '-'], { input: 'Explicit first prompt' }));
+  await f.accept('provisional', 'bootstrap');
+  assert.equal(f.session.lifecycle, 'ready');
+  result(await f.command('provisional', 'pending'));
+  assert.equal(result(await f.command('provisional', 'status')).sessionLifecycle, 'ready');
+  assert.deepEqual(f.dispatches().map(message => (message.params.action as { type: string }).type),
+    ['session/activeClientSet', 'chat/turnStarted']);
+});
+
+test('repeating a live creation reports submitted rather than fabricating uncertainty or resending', async t => {
+  const f = await fixture(t);
+  f.holdCreate();
+  let seen = false;
+  f.inspectCreate(() => { seen = true; });
+  const starting = f.create('inflight');
+  const deadline = Date.now() + 4000;
+  while (!seen) {
+    assert.ok(Date.now() < deadline, 'Creation was not submitted');
+    await delay(20);
+  }
+  const pending = result(await f.create('inflight'));
+  assert.equal(pending.state, 'starting');
+  assert.equal((pending.operation as { state: string }).state, 'submitted');
+  assert.equal(f.messages.filter(message => message.method === 'createSession').length, 1);
+  f.releaseCreate();
+  assert.equal((result(await starting).operation as { state: string }).state, 'accepted');
+});
+
+test('provisional bootstrap does not bypass readiness for subsequent turns', async t => {
+  const f = await fixture(t);
+  f.session.lifecycle = 'creating';
+  f.keepCreating();
+  result(await f.create('provisional'));
+  await f.participate('provisional');
+  const send = (opId: string) => f.run(['send', '--instance', 'provisional', '--op-id', opId, '--message-file', '-'], { input: 'Prompt' });
+  result(await send('bootstrap'));
+  await f.accept('provisional', 'bootstrap');
+  delete f.chat.activeTurn;
+  result(await send('second'));
+  assert.equal((await f.command('provisional', 'wait', '--op-id', 'second')).code, 1);
+  assert.equal(f.dispatches().filter(message => (message.params.action as { type: string }).type === 'chat/turnStarted').length, 1);
+  f.session.lifecycle = 'ready';
+  const session = result(await f.command('provisional', 'status')).session;
+  result(await f.command('provisional', 'snapshot', String(session)));
+  assert.equal(result(await f.command('provisional', 'status')).sessionLifecycle, 'ready');
+  result(await send('ready-turn'));
+  await f.accept('provisional', 'ready-turn');
+});
+
+test('creation rejects invalid usage before connecting or reserving an instance', async t => {
+  const f = await fixture(t);
+  const base = ['create', '--instance', 'invalid', '--url', f.url];
+  for (const extra of [
+    ['--provider', 'test', '--op-id', 'creation'],
+    ['--op-id', 'creation', '--confirm'],
+    ['--provider', 'test', '--op-id', 'bad id', '--confirm'],
+    ['--provider', 'test', '--op-id', 'creation', '--confirm', '--cwd', '/local/path'],
+    ['--provider', 'test', '--op-id', 'creation', '--confirm', '--auth-file', '-', '--config-file', '-'],
+  ]) assert.equal((await f.run([...base, ...extra])).code, 2);
+  assert.equal(f.messages.length, 0);
+});
+
+test('rejected, uncertain, and accepted-but-unbound creations never resubmit', async t => {
+  for (const [failure, expected] of [['rpc', 'rejected'], ['disconnect', 'uncertain'], ['snapshot', 'accepted']] as const) {
+    const f = await fixture(t);
+    f.failCreate(failure);
+    const failed = await f.create(failure);
+    assert.equal(failed.code, 1);
+    if (failure === 'rpc') assert.equal(failed.records.at(-1)?.code, -32002);
+    assert.equal(result(await f.command(failure, 'status', '--op-id', 'creation')).state, expected);
+    const recovered = result(await f.create(failure));
+    assert.equal((recovered.operation as { state: string }).state, expected);
+    assert.equal(f.messages.filter(message => message.method === 'createSession').length, 1);
+  }
 });
 
 test('local stop terminates an unresponsive peer and finalizes metadata, journals, and replay before process exit', async t => {
@@ -405,6 +563,153 @@ test('input requests are inspectable, explicitly answerable, and retain draft/co
     ?.params?.action?.type === 'chat/inputRequested'));
   result(await f.command('work', 'stop'));
   assert.equal(result(await f.command('work', 'status', '--op-id', 'complete')).state, 'accepted');
+});
+
+test('pending is read-only and flat answers preserve exact kinds, option IDs and synced answers', async t => {
+  const f = await fixture(t);
+  result(await f.start('work'));
+  result(await f.start('observer', true));
+  const turnId = 'opaque turn';
+  const request = {
+    id: 'opaque request', message: 'Answer these', _meta: { secret: 'private' },
+    questions: [
+      { id: 'text', kind: 'text', message: 'Text', required: true },
+      { id: 'number', kind: 'number', message: 'Number' },
+      { id: 'integer', kind: 'integer', message: 'Integer' },
+      { id: 'boolean', kind: 'boolean', message: 'Boolean' },
+      { id: 'single', kind: 'single-select', message: 'Single', options: [{ id: 'id-a', label: 'Label A' }] },
+      { id: 'many', kind: 'multi-select', message: 'Many', options: [{ id: 'id-b', label: 'Label B' }] },
+      { id: '__proto__', kind: 'text', message: 'Prototype key' },
+      { id: 'synced', kind: 'text', message: 'Already answered', required: true },
+    ],
+    answers: { synced: { state: 'submitted', value: { kind: 'text', value: 'keep me' } } },
+  };
+  f.chat.activeTurn = { id: turnId, responseParts: [
+    { kind: 'inputRequest', request },
+    { kind: 'inputRequest', request: { id: 'resolved' }, response: 'decline' },
+    { kind: 'toolCall', toolCall: { toolCallId: 'execution', status: 'pending-confirmation', toolName: 'write', toolInput: 'details' } },
+    { kind: 'toolCall', toolCall: { toolCallId: 'result', status: 'pending-result-confirmation', content: [{ text: 'result details' }] } },
+  ] };
+  const pending = result(await f.command('observer', 'pending'));
+  assert.equal(pending.channel, CHAT);
+  assert.equal(pending.turnId, turnId);
+  assert.deepEqual(pending.inputs, [{ ...request, _meta: { secret: '[REDACTED]' } }]);
+  assert.equal((pending.toolCalls as { phase: string }[])[1].phase, 'result');
+  assert.equal(f.dispatches().length, 0);
+  const answers = '{"text":"hello","number":1.5,"integer":2,"boolean":false,"single":"id-a","many":["id-b"],"__proto__":"safe"}';
+  const args = ['answer', '--instance', 'work', '--turn', turnId, '--request', request.id,
+    '--op-id', 'answer', '--confirm', '--answers-file', '-'];
+  result(await f.run(args, { input: answers }));
+  assert.equal((await f.accept('work', 'answer')).requestId, request.id);
+  const action = f.dispatches().at(-1)?.params.action as ChatInputCompletedAction;
+  assert.equal(action.type, 'chat/inputCompleted');
+  assert.equal(action.requestId, request.id);
+  assert.deepEqual(action.answers, {
+    ...JSON.parse('{"__proto__":{"state":"submitted","value":{"kind":"text","value":"safe"}}}'),
+    text: { state: 'submitted', value: { kind: 'text', value: 'hello' } },
+    number: { state: 'submitted', value: { kind: 'number', value: 1.5 } },
+    integer: { state: 'submitted', value: { kind: 'number', value: 2 } },
+    boolean: { state: 'submitted', value: { kind: 'boolean', value: false } },
+    single: { state: 'submitted', value: { kind: 'selected', value: 'id-a' } },
+    many: { state: 'submitted', value: { kind: 'selected-many', value: ['id-b'] } },
+    synced: request.answers.synced,
+  });
+  assert.equal((result(await f.command('observer', 'pending')).inputs as unknown[]).length, 0);
+  assert.equal(result(await f.run(args, { input: answers })).state, 'accepted');
+  assert.equal(f.dispatches().length, 1);
+  assert.equal((await f.command('work', 'wait', '--op-id', 'answer', '--until', 'completed')).code, 2);
+  result(await f.command('work', 'stop'));
+  assert.equal(result(await f.run(args, { input: answers })).state, 'accepted');
+});
+
+test('answers refuse missing, stale, unsupported and invalid decisions without submitting', async t => {
+  const f = await fixture(t);
+  result(await f.start('work'));
+  result(await f.start('observer', true));
+  const request: Record<string, unknown> = {
+    id: 'request', questions: [{ id: 'required', kind: 'integer', message: 'Count', required: true, defaultValue: 1 }],
+    answers: { required: { state: 'draft', value: { kind: 'number', value: 1 } } },
+  };
+  f.chat.activeTurn = { id: 'turn', responseParts: [{ kind: 'inputRequest', request }] };
+  const submit = (opId: string, input?: string, extra: string[] = [], name = 'work') =>
+    f.run(['answer', '--instance', name, '--turn', 'turn', '--request', 'request', '--op-id', opId,
+      '--confirm', ...(input === undefined ? [] : ['--answers-file', '-']), ...extra], { input });
+  for (const [id, answers] of [
+    ['missing', undefined], ['unknown', '{"unknown":1}'], ['fraction', '{"required":1.5}'], ['wrong-kind', '{"required":"1"}'],
+  ]) {
+    result(await submit(id!, answers));
+    assert.equal((await f.command('work', 'wait', '--op-id', id!, '--timeout', '4s')).code, 1);
+    assert.equal(result(await f.command('work', 'status', '--op-id', id!)).state, 'refused');
+  }
+  assert.equal((await submit('observer', '{"required":2}', [], 'observer')).code, 1);
+  assert.equal((await submit('decline-with-answers', '{"required":2}', ['--response', 'decline'])).code, 2);
+  assert.equal((await f.command('work', 'answer', '--turn', 'turn', '--request', 'request', '--op-id', 'no-confirm')).code, 2);
+  result(await submit('stale-turn', '{"required":2}', ['--turn', 'other']));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'stale-turn')).code, 1);
+  assert.equal(f.dispatches().length, 0);
+  for (const response of ['decline', 'cancel']) {
+    f.chat.activeTurn = { id: 'turn', responseParts: [{ kind: 'inputRequest', request }] };
+    result(await submit(response, undefined, ['--response', response]));
+    await f.accept('work', response);
+  }
+  result(await submit('resolved', '{"required":2}'));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'resolved')).code, 1);
+  f.chat.activeTurn = { id: 'turn', responseParts: [{ kind: 'inputRequest', request: {
+    id: 'request', questions: [{ id: 'required', kind: 'future-kind' }],
+  } }] };
+  result(await submit('unsupported', '{"required":2}'));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'unsupported')).code, 1);
+  assert.equal(f.dispatches().length, 2);
+});
+
+test('tool confirmations explicitly target execution/result phases and offered options', async t => {
+  const f = await fixture(t);
+  result(await f.start('work'));
+  result(await f.start('observer', true));
+  const options = [{ id: 'approve-session', kind: 'approve', label: 'Approve session' },
+    { id: 'deny-once', kind: 'deny', label: 'Deny once' }];
+  const tool = { toolCallId: 'opaque tool id', status: 'pending-confirmation', options, toolName: 'edit' };
+  const setTool = (value: Record<string, unknown>) => {
+    f.chat.activeTurn = { id: 'turn', responseParts: [{ kind: 'toolCall', toolCall: { ...value } }] };
+  };
+  setTool(tool);
+  const submit = (opId: string, extra: string[] = [], name = 'work') =>
+    f.command(name, 'confirm-tool', '--turn', 'turn', '--tool-call', tool.toolCallId,
+      '--decision', 'approve', '--op-id', opId, '--confirm', ...extra);
+  for (const [id, extra] of [
+    ['missing-option', []], ['wrong-option', ['--option', 'deny-once']], ['wrong-phase', ['--phase', 'result']],
+    ['stale-turn', ['--turn', 'different']],
+  ] as const) {
+    result(await submit(id, [...extra]));
+    assert.equal((await f.command('work', 'wait', '--op-id', id)).code, 1);
+  }
+  assert.equal((await submit('observer', ['--option', 'approve-session'], 'observer')).code, 1);
+  assert.equal(f.dispatches().length, 0);
+  result(await submit('approve', ['--option', 'approve-session']));
+  await f.accept('work', 'approve');
+  assert.deepEqual(f.dispatches().at(-1)?.params.action, {
+    type: 'chat/toolCallConfirmed', turnId: 'turn', toolCallId: tool.toolCallId,
+    approved: true, confirmed: 'user-action', selectedOptionId: 'approve-session',
+  });
+  assert.equal(result(await submit('approve', ['--option', 'approve-session'])).state, 'accepted');
+  result(await submit('already-running', ['--option', 'approve-session']));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'already-running')).code, 1);
+  setTool(tool);
+  result(await submit('deny', ['--decision', 'deny', '--option', 'deny-once']));
+  await f.accept('work', 'deny');
+  assert.equal((f.dispatches().at(-1)?.params.action as { reason: string }).reason, 'denied');
+  setTool({ ...tool, options: undefined, status: 'pending-result-confirmation' });
+  result(await submit('result', ['--phase', 'result']));
+  await f.accept('work', 'result');
+  assert.deepEqual(f.dispatches().at(-1)?.params.action, {
+    type: 'chat/toolCallResultConfirmed', turnId: 'turn', toolCallId: tool.toolCallId, approved: true,
+  });
+  setTool({ ...tool, options: undefined });
+  f.reject();
+  result(await submit('host-rejection'));
+  assert.equal((await f.command('work', 'wait', '--op-id', 'host-rejection', '--timeout', '4s')).code, 1);
+  assert.equal(result(await f.command('work', 'status', '--op-id', 'host-rejection')).state, 'rejected');
+  assert.equal((await f.command('work', 'wait', '--op-id', 'approve', '--until', 'completed')).code, 2);
 });
 
 test('send requires explicit participation, deduplicates intent and distinguishes acceptance from turn completion', async t => {

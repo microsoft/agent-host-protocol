@@ -106,19 +106,92 @@ operation has no `channel` in its journal output when the parameters omit it.
 Unknown result fields and schemas are preserved as structured JSON. `jq .`
 pretty-prints records without changing the CLI's machine-readable JSONL output.
 
-## Answer an input request
-
-Hosts can expose `ask_user`/elicitation as `chat/inputRequested`, represented by
-an `inputRequest` response part in the active turn. Inspect its actual question
-IDs, kinds, options, and draft answers before responding:
+## Create a session and retain its connection
 
 ```bash
-ahp snapshot "$CHAT_URI" --instance work \
-  | jq '.result.snapshot.state.activeTurn.responseParts[]
-        | select(.kind == "inputRequest" and .response == null)'
+ahp create --url "$AHP_URL" --provider copilot --instance repro \
+  --cwd file:///workspace --config-file session.json --op-id create-1 --confirm
+ahp participate --instance repro --op-id participation-1
+ahp wait --instance repro --op-id participation-1 --until accepted --timeout 30s
+ahp send --instance repro --op-id first-turn --message-file prompt.txt
 ```
 
-Explicitly complete it with the real request/question IDs in `answer.json`:
+`create` requires an explicit provider and instance. It chooses a fresh
+`ahp-session:/<uuid>` unless `--session URI` is supplied. `--cwd` is an explicit
+host-side directory URI, not an inferred local path. `--config-file` is an
+optional JSON object containing provider configuration values directly, not an
+RPC envelope. Use `describe` and the explicit `resolveSessionConfig` request to
+discover providers and configuration; creation does not guess either.
+
+Creation intent is journaled before `createSession`. The command returns instance
+metadata and `operation`, which distinguishes RPC acceptance from successful
+attachment. It subscribes to the session and its advertised default chat without
+registering participation or sending a prompt. `state: "ready"` describes the
+local controller; `sessionLifecycle` reports the last observed session lifecycle.
+A host may return `sessionLifecycle: "creating"`. Only controllers started with
+`create` allow an explicit `participate` and first `send` in this state; `join`
+continues to require a ready session. No bootstrap prompt is sent automatically.
+
+If creation fails or the caller is interrupted, inspect `status --op-id create-1`
+and instance status. RPC acceptance does not prove subsequent subscription worked.
+Repeating `create` with the same instance, operation ID and inputs returns the
+recorded outcome, including while creation is in flight or after the controller
+stops. It never reconnects or recreates the session. Changed inputs fail.
+`stop` preserves the remote session; disposal remains an explicit request.
+
+## Inspect and answer pending requests
+
+Hosts can expose `ask_user`/elicitation as `chat/inputRequested`, represented by
+an `inputRequest` response part in the active turn. `pending` takes a fresh snapshot
+and returns `channel`, `fromSeq`, the active `turnId`, unresolved `inputs`, and
+pending `toolCalls`. Requests include their actual question IDs, kinds, options,
+and draft answers; tool calls include their full details and confirmation phase.
+It never submits an action and is available to observer instances.
+
+```bash
+ahp pending --instance work | jq '.result'
+printf '%s\n' '{"question-1":"My answer","question-2":["option-id"]}' \
+  | ahp answer --instance work --turn "$TURN_ID" --request "$REQUEST_ID" \
+      --answers-file - --op-id answer-1 --confirm
+ahp wait --instance work --op-id answer-1 --until accepted --timeout 30s
+```
+
+The answers file is a flat JSON object keyed by question ID. Text answers are
+strings, number/integer answers are JSON numbers, booleans are JSON booleans,
+single-select answers are option-ID strings, and multi-select answers are arrays
+of option IDs. The CLI constructs submitted protocol answer envelopes from the
+fresh request, preserves other synced answers, and refuses unknown questions,
+wrong value kinds, invalid option IDs, and missing required submitted answers.
+It never substitutes labels, guesses defaults, or promotes drafts automatically.
+The host remains responsible for schema constraints and authoritative validation.
+
+`--response` defaults to `accept`. Omit `--answers-file` to accept already-submitted
+synced answers or a question-free request. Use `--response decline` or
+`--response cancel` without an answers file to resolve without accepting.
+Both `answer` and `confirm-tool` require an exact active `--turn`, `--op-id` and
+`--confirm`; stale requests are refused before dispatch. Snapshot checks are not
+server-side compare-and-swap guarantees. Host rejections and uncertain outcomes
+remain visible in the journal. Neither command claims active-client membership.
+
+```bash
+ahp confirm-tool --instance work --turn "$TURN_ID" --tool-call "$TOOL_CALL_ID" \
+  --decision deny --op-id deny-1 --confirm
+ahp confirm-tool --instance work --turn "$TURN_ID" --tool-call "$TOOL_CALL_ID" \
+  --decision approve --option "$OPTION_ID" --op-id approve-1 --confirm
+ahp confirm-tool --instance work --turn "$TURN_ID" --tool-call "$TOOL_CALL_ID" \
+  --phase result --decision approve --op-id result-1 --confirm
+```
+
+Execution confirmation is the default phase. When the host offers execution
+options, select an explicit `--option` whose approve/deny kind matches the decision.
+`--phase result` sends `chat/toolCallResultConfirmed` for a pending result, not
+execution approval. No automatic approval policy is installed, and observers
+cannot answer or confirm. Acceptance is not tool execution or turn completion;
+wait on the original `send` operation to verify that the runtime resumed.
+
+Raw dispatch remains available for draft synchronization, skipped/freeform
+answers, edited tool input, richer denial details, and unsupported future question
+kinds. For example, explicitly complete an input request with `answer.json`:
 
 ```json
 {
@@ -147,8 +220,7 @@ one question; omitting `answer` clears it. Required answers must have
 replacements; a draft alone does not satisfy the requirement.
 `chat/inputCompleted` can accept submitted synced answers or provide final
 replacements, or use `response: "decline"` /
-`"cancel"`. The host validates whether the request is still open. Observers
-cannot answer, and the CLI never answers automatically. Input-dispatch
+`"cancel"`. The host validates whether the request is still open. Observers cannot answer, and the CLI never answers automatically. Input-dispatch
 acceptance is not turn completion; inspect snapshots or wait on the original
 `send` operation to verify that the runtime resumed.
 
@@ -227,10 +299,11 @@ Turn IDs are opaque strings preserved verbatim, without local operation-ID
 restrictions. Local operation IDs must be nonempty, contain no whitespace, and
 have at most 200 characters.
 
-`join` requires the session to be `ready`. Hosts that defer readiness until the
-first turn need an explicitly dispatched bootstrap turn before joining; the
-controller never sends that turn automatically. Inspect the session's advertised
-`defaultChat`, dispatch explicitly, and verify readiness before joining.
+`join` requires the session to be `ready`. For a new session on a host that defers
+readiness until the first turn, use `create`, explicitly participate, and send the
+first prompt. For an existing provisional session, inspect its advertised
+`defaultChat` and dispatch a bootstrap turn explicitly before joining. No
+controller sends that turn automatically.
 
 For observation only, create a **separate instance**:
 
@@ -250,8 +323,10 @@ is page size (1-1000), with an approximately 1 MiB page bound; an oversized
 record is returned alone. Follow polls stable durable prefixes without dropping
 frames, for 30s by default. `--timeout` accepts `ms`, `s`, or `m`, up to one hour.
 
-Each mutation requires `--op-id`. Submission exit 0 means intent recorded,
-**not** accepted or completed. `wait` and `status --op-id ID` distinguish
+Each mutation requires `--op-id`. Except for initial `create`, submission exit 0
+means intent recorded, **not** accepted or completed. Initial `create` waits for
+its RPC outcome and attachment; its operation still does not track turn completion.
+`wait` and `status --op-id ID` distinguish
 `recorded`, `submitted`, `transport_completed`, `accepted`, `rejected`,
 `refused`, and `uncertain`. Identical operation IDs/inputs retrieve outcomes
 without resubmission, including after stop/crash; changed inputs fail. Operation

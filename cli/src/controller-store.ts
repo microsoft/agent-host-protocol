@@ -21,6 +21,7 @@ export interface InstanceMetadata {
   clientId: string;
   session: string;
   chat?: string;
+  sessionLifecycle?: string;
   protocolVersion?: string;
   error?: Record<string, unknown>;
 }
@@ -122,6 +123,7 @@ export function readMetadata(instance: string): InstanceMetadata {
     || typeof value.observer !== 'boolean' || typeof value.clientId !== 'string'
     || typeof value.session !== 'string'
     || (value.chat !== undefined && typeof value.chat !== 'string')
+    || (value.sessionLifecycle !== undefined && typeof value.sessionLifecycle !== 'string')
     || (value.protocolVersion !== undefined && typeof value.protocolVersion !== 'string')
     || (value.error !== undefined && !object(value.error))) {
     throw new CliError('instance', 'Invalid instance metadata');
@@ -131,6 +133,7 @@ export function readMetadata(instance: string): InstanceMetadata {
     pid: value.pid, state: value.state,
     observer: value.observer, clientId: value.clientId, session: value.session,
     ...(value.chat !== undefined ? { chat: value.chat } : {}),
+    ...(value.sessionLifecycle !== undefined ? { sessionLifecycle: value.sessionLifecycle } : {}),
     ...(value.protocolVersion !== undefined ? { protocolVersion: value.protocolVersion } : {}),
     ...(value.error !== undefined ? { error: value.error } : {}),
   };

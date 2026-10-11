@@ -1,0 +1,6 @@
+{
+  "type": "added",
+  "message": "Explicit `create`, `pending`, `answer`, and `confirm-tool` CLI commands with durable outcomes, provisional-session bootstrap support, and flat input answers.",
+  "targets": ["cli"],
+  "issues": [513]
+}
