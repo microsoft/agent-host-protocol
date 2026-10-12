@@ -5,14 +5,14 @@
   "type": "SubscribeResult",
   "input": {
     "flowControl": {
-      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
-      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384 },
+      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384 }
     }
   },
   "acceptableOutputs": [{
     "flowControl": {
-      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
-      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384 },
+      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384 }
     }
   }]
 }

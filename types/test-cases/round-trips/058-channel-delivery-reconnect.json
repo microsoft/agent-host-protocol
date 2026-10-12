@@ -11,8 +11,8 @@
       "items": [{
         "channel": "ahp-terminal:/t1",
         "flowControl": {
-          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
-          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384 },
+          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384 }
         },
         "clientReceive": { "acceptedBytes": 65536, "consumedBytes": 0 },
         "hostReceive": { "acceptedBytes": 131072, "consumedBytes": 131072 },
@@ -28,8 +28,8 @@
       "items": [{
         "channel": "ahp-terminal:/t1",
         "flowControl": {
-          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 },
-          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384, "maximumMessageBytes": 1048576 }
+          "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384 },
+          "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384 }
         },
         "clientReceive": { "acceptedBytes": 65536, "consumedBytes": 0 },
         "hostReceive": { "acceptedBytes": 131072, "consumedBytes": 131072 },

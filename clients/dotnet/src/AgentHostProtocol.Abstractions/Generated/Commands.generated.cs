@@ -546,40 +546,49 @@ public sealed record ReconnectParams
     /// <summary>URIs the client was subscribed to</summary>
     public required List<string> Subscriptions { get; init; }
 
-    /// <summary>Resume information for windowed subscriptions also named in subscriptions.
-    /// These channels recover independently and MUST NOT appear in inline legacy
-    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    /// <summary>Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChannelDeliveryResumeOptions? Windows { get; init; }
 }
 
-/// <summary>Retained receive obligations and a separate per-channel recovery checkpoint.
+/// <summary>The client's progress on one windowed subscription that it wants to keep.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelDeliveryResumeParams
 {
+    /// <summary>The URI of the windowed subscription.</summary>
     public required string Channel { get; init; }
 
+    /// <summary>The client's progress on data that the server sent.</summary>
     public required ChannelReceiveProgress ClientReceive { get; init; }
 
-    /// <summary>Last action safely applied or retained for this channel, not merely parsed.
-    /// Required for replay recovery; omitted for live-only channels.</summary>
+    /// <summary>The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? LastAppliedServerSeq { get; init; }
 }
 
-/// <summary>Stability: 1.0 - Early development.</summary>
+/// <summary>Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelDeliveryResumeOptions
 {
     public required List<ChannelDeliveryResumeParams> Items { get; init; }
 }
 
-/// <summary>Retained windowed subscriptions; omitted requested channels are unavailable.
-/// Unread accepted messages remain charged across reconnect; both directions
-/// reconcile lost release updates against the same retained journal. Unverified
-/// positions or lost accounting MUST fail, never grant a fresh window.
+/// <summary>Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. The counters are final:
+/// before sending any data message or credit for a subscription, both peers MUST
+/// set their counters to the returned values. Unread data stays counted against
+/// the window. If the server cannot determine the counters, it omits the
+/// subscription instead of starting them again from zero. Sequence numbers, not
+/// these counters, decide what is sent again.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelDeliveryResumeResult
@@ -587,19 +596,20 @@ public sealed record ChannelDeliveryResumeResult
     public required List<ResumedChannelSubscription> Items { get; init; }
 }
 
-/// <summary>Client receive limits. The host may lower, never raise, these limits and
-/// advertises its own receive limits in the accepted flowControl result.
+/// <summary>A client's offer of windowed delivery.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record SubscriptionFlowControlOptions
 {
+    /// <summary>The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.</summary>
     public required ChannelReceiveLimits Receive { get; init; }
 }
 
 /// <summary>Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all non-windowed replayed data in the response.
-/// Windowed subscriptions recover separately through bounded frames.</summary>
+/// The server MUST include all replayed data for ordinary subscriptions in the
+/// response. Windowed subscriptions recover through their own data messages.</summary>
 public sealed record ReconnectReplayResult
 {
     /// <summary>Discriminant</summary>
@@ -614,9 +624,9 @@ public sealed record ReconnectReplayResult
     /// observe. Clients SHOULD drop these from their local subscription set.</summary>
     public required List<string> Missing { get; init; }
 
-    /// <summary>Retained windowed subscriptions; content is delivered separately.
-    /// The server MUST omit this field unless ReconnectParams.windows was supplied
-    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    /// <summary>Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -629,12 +639,15 @@ public sealed record ReconnectSnapshotResult
     /// <summary>Discriminant</summary>
     public ReconnectResultType Type { get; init; } = ReconnectResultType.Snapshot;
 
-    /// <summary>Fresh snapshots for each subscription</summary>
+    /// <summary>Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`.</summary>
     public required List<Snapshot> Snapshots { get; init; }
 
-    /// <summary>Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
-    /// The server MUST omit this field unless ReconnectParams.windows was supplied
-    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    /// <summary>Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -643,10 +656,13 @@ public sealed record ReconnectSnapshotResult
 
 /// <summary>Subscribe to a URI-identified channel.
 ///
-/// A channel MAY have state associated with it (e.g. root, sessions,
-/// terminals) or be stateless (pure pub/sub for streaming data). For
-/// state-bearing channels the result includes a snapshot; for stateless
-/// channels `snapshot` is omitted.</summary>
+/// With ordinary delivery, the result contains a snapshot of the channel's
+/// state. With windowed delivery, the result contains `flowControl` instead,
+/// and the snapshot is sent in a `channel/snapshot` notification.
+///
+/// A client has at most one subscription to each channel. A `subscribe` for a
+/// channel that the client is already subscribed to replaces the old
+/// subscription.</summary>
 public sealed record SubscribeParams
 {
     /// <summary>Channel URI this command targets.</summary>
@@ -658,25 +674,21 @@ public sealed record SubscribeParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.</summary>
+    /// <summary>Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscriptionDeliveryOptions? Delivery { get; init; }
 
-    /// <summary>Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.</summary>
+    /// <summary>Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscribeView? View { get; init; }
 
-    /// <summary>Offer bounded fragmented delivery. The host accepts with result.flowControl;
-    /// absence means ordinary delivery, including on hosts that ignore this option.
-    /// Neither peer may send frames until the response explicitly accepts them.
-    /// Applies to this subscriber, not shared channel state or other viewers.
+    /// <summary>Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery. A client MUST NOT
+    /// offer windowed delivery unless protocol version 1.1.0 or later was
+    /// negotiated.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -698,29 +710,36 @@ public sealed record SubscribeView
     public long? Turns { get; init; }
 }
 
-/// <summary>Advisory delivery preferences for a single subscription.</summary>
+/// <summary>Delivery preferences for one subscription. They do not allow a server to
+/// exceed the limits of a windowed subscription.</summary>
 public sealed record SubscriptionDeliveryOptions
 {
-    /// <summary>Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.</summary>
+    /// <summary>The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? MaxLatencyMs { get; init; }
 }
 
 /// <summary>Result of the `subscribe` command.
 ///
-/// In ordinary mode, snapshot is present for state-bearing channels.
-/// In windowed mode, flowControl is present and snapshot MUST be omitted:
-/// snapshot/replay content follows through bounded channel/frame delivery.</summary>
+/// With ordinary delivery, `snapshot` is present. With windowed delivery,
+/// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+/// snapshot in a `channel/snapshot` notification.</summary>
 public sealed record SubscribeResult
 {
-    /// <summary>Snapshot of the subscribed channel's state (omitted for stateless channels)</summary>
+    /// <summary>Snapshot of the subscribed channel's state. Present with ordinary delivery.
+    /// With windowed delivery, the snapshot is sent in a `channel/snapshot`
+    /// notification instead.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Snapshot? Snapshot { get; init; }
 
-    /// <summary>Accepted receive limits; install the consumer before processing frames.
+    /// <summary>The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1077,7 +1096,10 @@ public sealed record ResourceReadParams
 ///
 /// The server SHOULD honor the `encoding` requested in the params. If the
 /// server cannot provide the requested encoding, it MUST fall back to either
-/// `base64` or `utf-8`.</summary>
+/// `base64` or `utf-8`.
+///
+/// The result contains the whole resource. Windowed delivery does not limit its
+/// size, because it is a response and not part of a subscription.</summary>
 public sealed record ResourceReadResult
 {
     /// <summary>Content encoded as a string</summary>

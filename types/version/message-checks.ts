@@ -87,8 +87,7 @@ type _ExpectedClientNotifications =
   | 'unsubscribe'
   | 'dispatchAction'
   | 'channel/frame'
-  | 'channel/credit'
-  | 'channel/reset';
+  | 'channel/credit';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =
@@ -103,8 +102,6 @@ type _ExpectedServerNotifications =
   | 'otlp/exportMetrics'
   | 'channel/frame'
   | 'channel/credit'
-  | 'channel/ready'
-  | 'channel/reset'
   | 'channel/snapshot';
 
 /** All server → client request methods. */

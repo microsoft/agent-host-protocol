@@ -92,8 +92,6 @@ import type {
   AuthRequiredParams,
   ChannelFrameParams,
   ChannelCreditParams,
-  ChannelReadyParams,
-  ChannelResetParams,
   ChannelSnapshotParams,
 } from './notifications.js';
 import type {
@@ -232,6 +230,8 @@ export interface ServerCommandMap {
  * Every notification's params MUST carry a top-level `channel: URI` so that
  * the server can route the message to the correct subscription. See
  * {@link UnsubscribeParams} for the canonical "base" shape.
+ * On a windowed subscription, `dispatchAction` counts against the window.
+ * `unsubscribe` and `channel/credit` do not.
  *
  * @category Notifications
  */
@@ -240,7 +240,6 @@ export interface ClientNotificationMap {
   'dispatchAction': { params: DispatchActionParams };
   'channel/frame': { params: ChannelFrameParams };
   'channel/credit': { params: ChannelCreditParams };
-  'channel/reset': { params: ChannelResetParams };
 }
 
 /**
@@ -248,6 +247,9 @@ export interface ClientNotificationMap {
  *
  * Every notification's params MUST carry a top-level `channel: URI` so that
  * the client can dispatch the message to the right subscription.
+ * On a windowed subscription, data notifications count against the window,
+ * whether or not they are sent in `channel/frame` fragments.
+ * `channel/credit` does not.
  *
  * @category Notifications
  */
@@ -263,8 +265,6 @@ export interface ServerNotificationMap {
   'otlp/exportMetrics': { params: OtlpExportMetricsParams };
   'channel/frame': { params: ChannelFrameParams };
   'channel/credit': { params: ChannelCreditParams };
-  'channel/ready': { params: ChannelReadyParams };
-  'channel/reset': { params: ChannelResetParams };
   'channel/snapshot': { params: ChannelSnapshotParams };
 }
 

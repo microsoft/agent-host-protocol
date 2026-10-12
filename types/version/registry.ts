@@ -242,8 +242,6 @@ export const NOTIFICATION_INTRODUCED_IN: { readonly [K in ProtocolNotificationMe
   'otlp/exportMetrics': '0.2.0',
   'channel/frame': '1.1.0',
   'channel/credit': '1.1.0',
-  'channel/ready': '1.1.0',
-  'channel/reset': '1.1.0',
   'channel/snapshot': '1.1.0',
 };
 

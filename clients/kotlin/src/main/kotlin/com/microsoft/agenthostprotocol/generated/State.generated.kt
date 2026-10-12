@@ -73,16 +73,26 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 /**
- * Recovery selected independently from windows and whether a channel has state.
+ * How the server resumes sending data on a windowed subscription after
+ * reconnection.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 enum class ChannelRecoveryKind {
+    /**
+     * The server sends a new `channel/snapshot`, and the client replaces its state.
+     */
     @SerialName("snapshot")
     SNAPSHOT,
+    /**
+     * The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+     */
     @SerialName("replay")
     REPLAY,
+    /**
+     * The server sends only data created after reconnection.
+     */
     @SerialName("live")
     LIVE
 }
@@ -1213,80 +1223,112 @@ enum class AutomationRunOriginKind {
 // ─── State Types ────────────────────────────────────────────────────────────
 
 /**
- * Receive limits for one subscription and direction, not reduced channel state.
- * All limits are positive safe integers. Receivers MUST separately bound aggregate
- * subscriptions, decoding overhead, and the underlying transport queue.
+ * Limits on data that one peer receives on a windowed subscription.
+ *
+ * All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+ * message's complete text, as sent. For a `channel/frame` fragment, this
+ * includes its envelope and escape characters. The same size is used for the
+ * window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+ * size of a complete data message. Outstanding data is always less than
+ * `windowBytes + maximumFrameBytes`.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ChannelReceiveLimits(
     /**
-     * Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
-     * before outer JSON escaping. Starting a data message requires available credit;
-     * one started message may finish beyond the window.
+     * The target amount of outstanding data. This is a soft target.
+     * The sender MUST NOT send a data message or fragment while outstanding data
+     * is equal to or greater than this value. The last message or fragment sent
+     * before the window is full can go past it, so a message that fits within
+     * `maximumFrameBytes` can be sent whole even when it is larger than the
+     * remaining credit.
      */
     val windowBytes: Long,
     /**
-     * Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+     * The largest JSON-RPC message that the sender can send for a data message.
+     * This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+     * notification, it includes the envelope and escape characters. A larger data
+     * message MUST be split into smaller messages or sent in fragments.
      */
-    val maximumFrameBytes: Long,
-    /**
-     * Hard logical-payload limit. Outstanding data stays strictly below
-     * windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
-     */
-    val maximumMessageBytes: Long
+    val maximumFrameBytes: Long
 )
 
 /**
- * Accepted/released obligations of the same retained bounded consumer.
- * 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
- * UTF-16 bytes through complete-data-message boundaries, never partial fragments.
- * Boundary bookkeeping is local; no second message sequence is needed.
+ * A receiver's progress on a windowed subscription, used during reconnection.
+ *
+ * Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
+ * ends at a complete data message. `consumedBytes` is never greater than
+ * `acceptedBytes`. The difference is data that the receiver has kept but not
+ * yet released. Credit given for fragments of a message that was not completed
+ * is not included.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ChannelReceiveProgress(
     /**
-     * Complete logical data messages safely retained by the bounded consumer.
+     * Total size of complete data messages, including all of their fragments,
+     * that the receiver has received and kept.
      */
     val acceptedBytes: Long,
     /**
-     * Messages whose allocations the consumer released. Rejected actions release
-     * allocations too; release does not acknowledge application success.
+     * The part of `acceptedBytes` that the receiver has released. A rejected
+     * action counts as released; this value does not mean that an action
+     * succeeded.
      */
     val consumedBytes: Long
 )
 
 /**
- * Accepted receive limits for both directions of a subscription. Initial
- * accounting starts at zero. The existing logical client and channel identify
- * the subscription; transport generations are fenced locally, not on the wire.
+ * The limits that the server accepted for a windowed subscription.
+ *
+ * The client ID and channel URI identify the subscription. All counters start at
+ * zero when the subscription starts.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ChannelFlowControl(
+    /**
+     * Limits for data that the server sends to the client.
+     */
     val clientReceive: ChannelReceiveLimits,
+    /**
+     * Limits for data that the client sends to the server.
+     */
     val hostReceive: ChannelReceiveLimits
 )
 
 /**
- * One subscription retained after reconnect. Omission from the returned list
- * means unavailable, regardless of cause. All such failures share the same
- * consumer behavior: dispose the old subscription, not continue a broken stream.
+ * A windowed subscription that the server kept after reconnection.
+ *
+ * If a channel that the client requested is not in the result, the subscription
+ * was not kept. The client discards the old subscription and, for a byte stream,
+ * closes the stream.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ResumedChannelSubscription(
+    /**
+     * The URI of the windowed subscription.
+     */
     val channel: String,
+    /**
+     * The subscription's limits. These do not change during reconnection.
+     */
     val flowControl: ChannelFlowControl,
+    /**
+     * The counters for data sent to the client. Both peers MUST use these values.
+     */
     val clientReceive: ChannelReceiveProgress,
+    /**
+     * The counters for data sent to the server. Both peers MUST use these values.
+     */
     val hostReceive: ChannelReceiveProgress,
     /**
-     * Replay retains the same consumer; live recovery resumes at the live edge.
+     * How the server resumes sending data.
      */
     val recovery: ChannelRecoveryKind
 )
@@ -5198,7 +5240,7 @@ data class Snapshot(
      */
     val resource: String,
     /**
-     * The current state of the resource
+     * The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
      */
     val state: SnapshotState,
     /**
@@ -5206,6 +5248,19 @@ data class Snapshot(
      */
     val fromSeq: Long
 )
+
+/**
+ * The state of a channel that has no state fields, such as a telemetry
+ * channel. It is always the empty object `{}`.
+ *
+ * Every subscription starts with a snapshot, including subscriptions to these
+ * channels. A channel can therefore gain state fields in a later revision
+ * without changing how subscriptions start.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class EmptyState
 
 @Serializable
 data class Changeset(
@@ -7568,6 +7623,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
+    @JvmInline value class Empty(val value: EmptyState) : SnapshotState
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
@@ -7599,7 +7655,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // (checked after session, whose optional annotations summary reuses the
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
+        // An object with no members is the empty state of a stateless channel.
         return when {
+            obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -7624,6 +7682,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val output = encoder as? JsonEncoder
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
+            is SnapshotState.Empty -> output.json.encodeToJsonElement(EmptyState.serializer(), value.value)
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)

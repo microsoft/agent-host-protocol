@@ -13,15 +13,19 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-/// Recovery selected independently from windows and whether a channel has state.
+/// How the server resumes sending data on a windowed subscription after
+/// reconnection.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChannelRecoveryKind {
+    /// The server sends a new `channel/snapshot`, and the client replaces its state.
     #[serde(rename = "snapshot")]
     Snapshot,
+    /// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
     #[serde(rename = "replay")]
     Replay,
+    /// The server sends only data created after reconnection.
     #[serde(rename = "live")]
     Live,
 }
@@ -1496,66 +1500,88 @@ pub enum AutomationRunOriginKind {
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
-/// Receive limits for one subscription and direction, not reduced channel state.
-/// All limits are positive safe integers. Receivers MUST separately bound aggregate
-/// subscriptions, decoding overhead, and the underlying transport queue.
+/// Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReceiveLimits {
-    /// Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
-    /// before outer JSON escaping. Starting a data message requires available credit;
-    /// one started message may finish beyond the window.
+    /// The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.
     pub window_bytes: i64,
-    /// Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+    /// The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.
     pub maximum_frame_bytes: i64,
-    /// Hard logical-payload limit. Outstanding data stays strictly below
-    /// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
-    pub maximum_message_bytes: i64,
 }
 
-/// Accepted/released obligations of the same retained bounded consumer.
-/// 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
-/// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
-/// Boundary bookkeeping is local; no second message sequence is needed.
+/// A receiver's progress on a windowed subscription, used during reconnection.
+///
+/// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
+/// ends at a complete data message. `consumedBytes` is never greater than
+/// `acceptedBytes`. The difference is data that the receiver has kept but not
+/// yet released. Credit given for fragments of a message that was not completed
+/// is not included.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReceiveProgress {
-    /// Complete logical data messages safely retained by the bounded consumer.
+    /// Total size of complete data messages, including all of their fragments,
+    /// that the receiver has received and kept.
     pub accepted_bytes: i64,
-    /// Messages whose allocations the consumer released. Rejected actions release
-    /// allocations too; release does not acknowledge application success.
+    /// The part of `acceptedBytes` that the receiver has released. A rejected
+    /// action counts as released; this value does not mean that an action
+    /// succeeded.
     pub consumed_bytes: i64,
 }
 
-/// Accepted receive limits for both directions of a subscription. Initial
-/// accounting starts at zero. The existing logical client and channel identify
-/// the subscription; transport generations are fenced locally, not on the wire.
+/// The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelFlowControl {
+    /// Limits for data that the server sends to the client.
     pub client_receive: ChannelReceiveLimits,
+    /// Limits for data that the client sends to the server.
     pub host_receive: ChannelReceiveLimits,
 }
 
-/// One subscription retained after reconnect. Omission from the returned list
-/// means unavailable, regardless of cause. All such failures share the same
-/// consumer behavior: dispose the old subscription, not continue a broken stream.
+/// A windowed subscription that the server kept after reconnection.
+///
+/// If a channel that the client requested is not in the result, the subscription
+/// was not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumedChannelSubscription {
+    /// The URI of the windowed subscription.
     pub channel: Uri,
+    /// The subscription's limits. These do not change during reconnection.
     pub flow_control: ChannelFlowControl,
+    /// The counters for data sent to the client. Both peers MUST use these values.
     pub client_receive: ChannelReceiveProgress,
+    /// The counters for data sent to the server. Both peers MUST use these values.
     pub host_receive: ChannelReceiveProgress,
-    /// Replay retains the same consumer; live recovery resumes at the live edge.
+    /// How the server resumes sending data.
     pub recovery: ChannelRecoveryKind,
 }
 
@@ -5226,17 +5252,30 @@ pub struct ErrorInfo {
 }
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by
-/// `initialize`, `reconnect`, and `subscribe`.
+/// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     pub resource: Uri,
-    /// The current state of the resource
+    /// The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
     pub state: SnapshotState,
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     pub from_seq: i64,
 }
+
+/// The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every subscription starts with a snapshot, including subscriptions to these
+/// channels. A channel can therefore gain state fields in a later revision
+/// without changing how subscriptions start.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct EmptyState {}
 
 /// Catalogue entry describing one changeset the server can produce for a
 /// session or chat.
@@ -6629,7 +6668,8 @@ pub enum AutomationRunLifecycle {
 
 /// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required `lifecycle`), then
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by stateless channels), then session (has required `lifecycle`), then
 /// chat (has required `turns`), then canvas (has required instance/provider/type
 /// identifiers), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
@@ -6639,6 +6679,7 @@ pub enum AutomationRunLifecycle {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),

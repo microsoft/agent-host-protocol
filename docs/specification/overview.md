@@ -78,6 +78,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Transport](/specification/transport)** — How messages are delivered between client and server.
 - **[Lifecycle](/specification/lifecycle)** — Connection handshake, reconnection, and disconnection.
 - **[Channels & Subscriptions](/specification/subscriptions)** — The channel model, the universal `channel: URI` routing key, and the subscription mechanism shared by every channel type.
+- **[Windowed Delivery](/specification/windowed-delivery)** — Optional per-subscription limits on unprocessed data, credit, and fragments.
 - **[Authentication](/specification/authentication)** — RFC 9728 / RFC 6750 authentication flow.
 - **[Root Channel](/specification/root-channel)** — `ahp-root://` — agents, terminals catalogue, host config, session catalogue events.
 - **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.

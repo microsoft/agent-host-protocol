@@ -176,6 +176,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -867,6 +868,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -1307,12 +1309,14 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → canvas → terminal → changeset →
-// resourceWatch → annotations → root).
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
+// is the empty state of a stateless channel.
 type SnapshotState struct {
+\tEmpty         *EmptyState         \`json:"-"\`
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
@@ -1328,6 +1332,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
+\tcase s.Empty != nil:
+\t\treturn json.Marshal(s.Empty)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1362,6 +1368,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
+\tcase len(probe) == 0:
+\t\ts.Empty = &EmptyState{}
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -2043,8 +2051,8 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
-  'ChannelResetParams', 'ChannelSnapshotParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',

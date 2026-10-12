@@ -122,6 +122,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -747,7 +748,7 @@ const STATE_STRUCTS = [
   'TerminalClientClaim', 'TerminalSessionClaim',
   'TerminalRunningLifecycleState', 'TerminalExitedLifecycleState', 'TerminalState',
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
-  'UsageInfo', 'ErrorInfo', 'Snapshot',
+  'UsageInfo', 'ErrorInfo', 'Snapshot', 'EmptyState',
   'CanvasReference', 'CanvasState',
   'Changeset', 'ChangesetCapabilities', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
@@ -1116,6 +1117,7 @@ public enum ToolInput: Codable, Sendable {
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
+    case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
@@ -1127,7 +1129,20 @@ public enum SnapshotState: Codable, Sendable {
     case automations(AutomationState)
     case automationRun(AutomationRunState)
 
+    private struct MemberKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
     public init(from decoder: Decoder) throws {
+        // An object with no members is the empty state of a stateless channel.
+        // EmptyState would decode any object, so check for members explicitly.
+        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
+            self = .empty(EmptyState())
+            return
+        }
         // Try the most distinctive shapes first. SessionState has required
         // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
         // \`turns\`; CanvasState has required instance/provider/type identifiers;
@@ -1158,6 +1173,7 @@ public enum SnapshotState: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .empty(let state): try state.encode(to: encoder)
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
@@ -1955,8 +1971,8 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
-  'ChannelResetParams', 'ChannelSnapshotParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams',
   'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',

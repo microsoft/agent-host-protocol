@@ -898,6 +898,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState', mutable: true },
@@ -1424,13 +1425,17 @@ function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// An object with no members is the empty state of a stateless channel.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Empty state variant of a stateless channel, when populated.</summary>
+    public EmptyState? Empty { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -1470,7 +1475,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        var members = root.EnumerateObject();
+        if (!members.MoveNext())
+        {
+            result.Empty = new EmptyState();
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1522,6 +1532,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -2468,8 +2479,8 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
-  'ChannelResetParams', 'ChannelSnapshotParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',

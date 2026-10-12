@@ -66,7 +66,7 @@ test('API docs show stability on entrypoint fields and notification methods only
     const project = new Project({ tsConfigFilePath: resolve(root, 'types/tsconfig.json') });
     generateMarkdownDocs(project, out);
     const common = readFileSync(join(out, 'common.md'), 'utf8');
-    for (const method of ['channel/frame', 'channel/credit', 'channel/ready', 'channel/reset', 'channel/snapshot']) {
+    for (const method of ['channel/frame', 'channel/credit', 'channel/snapshot']) {
       assert.ok(common.includes(`### \`${method}\`\n\n<StabilityIndex level="1.0" />`));
     }
     const rows = common.split('\n');
@@ -80,8 +80,8 @@ test('API docs show stability on entrypoint fields and notification methods only
         const results = entries.filter(line => line.includes('The server MUST omit this field'));
         assert.equal(results.length, 2);
         for (const result of results) {
-          assert.ok(result.includes('unless ReconnectParams.windows was supplied'));
-          assert.ok(result.includes('only channels requested in ReconnectParams.windows.items'));
+          assert.ok(result.includes('unless the request contained'));
+          assert.ok(result.includes('only channels from the request'));
         }
       }
     }
@@ -101,7 +101,7 @@ test('native client docs preserve declaration and entrypoint stability', () => {
     ['clients/dotnet/src/AgentHostProtocol.Abstractions/Generated', 'Commands.generated.cs', 'Notifications.generated.cs'],
   ];
   for (const [directory, commands, notifications] of clients) {
-    for (const [file, expected] of [[commands, 9], [notifications, 5]] as const) {
+    for (const [file, expected] of [[commands, 9], [notifications, 3]] as const) {
       const content = readFileSync(resolve(root, directory, file), 'utf8');
       assert.equal(content.split(marker).length - 1, expected, `${directory}/${file}`);
     }

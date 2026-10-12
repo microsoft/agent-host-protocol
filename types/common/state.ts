@@ -26,58 +26,70 @@ export type URI = string;
 // ─── Subscription Delivery ───────────────────────────────────────────────────
 
 /**
- * Receive limits for one subscription and direction, not reduced channel state.
- * All limits are positive safe integers. Receivers MUST separately bound aggregate
- * subscriptions, decoding overhead, and the underlying transport queue.
+ * Limits on data that one peer receives on a windowed subscription.
+ *
+ * All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+ * message's complete text, as sent. For a `channel/frame` fragment, this
+ * includes its envelope and escape characters. The same size is used for the
+ * window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+ * size of a complete data message. Outstanding data is always less than
+ * `windowBytes + maximumFrameBytes`.
+ *
  * @category Common Types
  * @stability 1.0
+ * @see {@link /specification/windowed-delivery | Windowed Delivery}
  */
 export interface ChannelReceiveLimits {
   /**
-   * Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
-   * before outer JSON escaping. Starting a data message requires available credit;
-   * one started message may finish beyond the window.
+   * The target amount of outstanding data. This is a soft target.
+   * The sender MUST NOT send a data message or fragment while outstanding data
+   * is equal to or greater than this value. The last message or fragment sent
+   * before the window is full can go past it, so a message that fits within
+   * `maximumFrameBytes` can be sent whole even when it is larger than the
+   * remaining credit.
    * @integer
    * @minimum 1
    * @maximum 9007199254740991
    */
   windowBytes: number;
   /**
-   * Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+   * The largest JSON-RPC message that the sender can send for a data message.
+   * This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+   * notification, it includes the envelope and escape characters. A larger data
+   * message MUST be split into smaller messages or sent in fragments.
    * @integer
-   * @minimum 1
+   * @minimum 1024
    * @maximum 9007199254740991
    */
   maximumFrameBytes: number;
-  /**
-   * Hard logical-payload limit. Outstanding data stays strictly below
-   * windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
-   * @integer
-   * @minimum 1
-   * @maximum 9007199254740991
-   */
-  maximumMessageBytes: number;
 }
 
 /**
- * Accepted/released obligations of the same retained bounded consumer.
- * 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
- * UTF-16 bytes through complete-data-message boundaries, never partial fragments.
- * Boundary bookkeeping is local; no second message sequence is needed.
+ * A receiver's progress on a windowed subscription, used during reconnection.
+ *
+ * Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
+ * ends at a complete data message. `consumedBytes` is never greater than
+ * `acceptedBytes`. The difference is data that the receiver has kept but not
+ * yet released. Credit given for fragments of a message that was not completed
+ * is not included.
+ *
  * @category Common Types
  * @stability 1.0
+ * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
  */
 export interface ChannelReceiveProgress {
   /**
-   * Complete logical data messages safely retained by the bounded consumer.
+   * Total size of complete data messages, including all of their fragments,
+   * that the receiver has received and kept.
    * @integer
    * @minimum 0
    * @maximum 9007199254740991
    */
   acceptedBytes: number;
   /**
-   * Messages whose allocations the consumer released. Rejected actions release
-   * allocations too; release does not acknowledge application success.
+   * The part of `acceptedBytes` that the receiver has released. A rejected
+   * action counts as released; this value does not mean that an action
+   * succeeded.
    * @integer
    * @minimum 0
    * @maximum 9007199254740991
@@ -86,42 +98,61 @@ export interface ChannelReceiveProgress {
 }
 
 /**
- * Accepted receive limits for both directions of a subscription. Initial
- * accounting starts at zero. The existing logical client and channel identify
- * the subscription; transport generations are fenced locally, not on the wire.
+ * The limits that the server accepted for a windowed subscription.
+ *
+ * The client ID and channel URI identify the subscription. All counters start at
+ * zero when the subscription starts.
+ *
  * @category Common Types
  * @stability 1.0
+ * @see {@link /specification/windowed-delivery#negotiation | Windowed Delivery: Negotiation}
  */
 export interface ChannelFlowControl {
+  /** Limits for data that the server sends to the client. */
   clientReceive: ChannelReceiveLimits;
+  /** Limits for data that the client sends to the server. */
   hostReceive: ChannelReceiveLimits;
 }
 
 /**
- * Recovery selected independently from windows and whether a channel has state.
+ * How the server resumes sending data on a windowed subscription after
+ * reconnection.
+ *
  * @category Common Types
  * @stability 1.0
  * @exhaustive
+ * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
  */
 export const enum ChannelRecoveryKind {
+  /** The server sends a new `channel/snapshot`, and the client replaces its state. */
   Snapshot = 'snapshot',
+  /** The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`. */
   Replay = 'replay',
+  /** The server sends only data created after reconnection. */
   Live = 'live',
 }
 
 /**
- * One subscription retained after reconnect. Omission from the returned list
- * means unavailable, regardless of cause. All such failures share the same
- * consumer behavior: dispose the old subscription, not continue a broken stream.
+ * A windowed subscription that the server kept after reconnection.
+ *
+ * If a channel that the client requested is not in the result, the subscription
+ * was not kept. The client discards the old subscription and, for a byte stream,
+ * closes the stream.
+ *
  * @category Common Types
  * @stability 1.0
+ * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
  */
 export interface ResumedChannelSubscription {
+  /** The URI of the windowed subscription. */
   channel: URI;
+  /** The subscription's limits. These do not change during reconnection. */
   flowControl: ChannelFlowControl;
+  /** The counters for data sent to the client. Both peers MUST use these values. */
   clientReceive: ChannelReceiveProgress;
+  /** The counters for data sent to the server. Both peers MUST use these values. */
   hostReceive: ChannelReceiveProgress;
-  /** Replay retains the same consumer; live recovery resumes at the live edge. */
+  /** How the server resumes sending data. */
   recovery: ChannelRecoveryKind;
 }
 
@@ -447,15 +478,31 @@ export interface ErrorInfo {
 
 /**
  * A point-in-time snapshot of a subscribed resource's state, returned by
- * `initialize`, `reconnect`, and `subscribe`.
+ * `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
  *
  * @category Common Types
  */
 export interface Snapshot {
   /** The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`) */
   resource: URI;
-  /** The current state of the resource */
-  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState;
+  /** The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}. */
+  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
+}
+
+/**
+ * The state of a channel that has no state fields, such as a telemetry
+ * channel. It is always the empty object `{}`.
+ *
+ * Every subscription starts with a snapshot, including subscriptions to these
+ * channels. A channel can therefore gain state fields in a later revision
+ * without changing how subscriptions start.
+ *
+ * @category Common Types
+ * @stability 1.0
+ */
+export interface EmptyState {
+  // Rejects every member, so only `{}` matches in TypeScript.
+  [key: string]: never;
 }

@@ -29,19 +29,20 @@
     },
     "ChannelFrameParams": {
       "type": "object",
-      "description": "Fragment of a serialized typed channel notification. Reassemble before typed\ndecoding or reducer application; data is a string, not another base64 layer.\nDo not split surrogate pairs. One active data message per direction/subscription;\nfairly interleave bounded frames across subscriptions and reserve UTF-16 bytes\nbefore enqueueing. The ordered transport supplies fragment ordering.\n\nDiscard incomplete messages on disconnect. Reconcile acceptedBytes, then retry\nwhole unaccepted messages from the retained queue without charging twice.\nInner and outer channel URIs MUST match. Delivery controls MUST NOT be framed\nrecursively; payload-bearing action echoes MUST use the bounded data path.\n\nStability: 1.0 - Early development.",
+      "description": "One fragment of a data message on a windowed subscription.\n\nA sender uses fragments when a data message is larger than\n`maximumFrameBytes`, and to let subscriptions take turns so that one busy\nsubscription does not hold up the whole connection. It serializes the message\nto JSON text, divides the text into pieces, and sends each piece in order. The\nreceiver joins the `data` strings and parses the result only after it receives\nthe fragment with `final: true`.\n\nFragments MUST NOT be empty and MUST NOT divide a UTF-16 surrogate pair. The\nchannel inside the joined message MUST match `channel`. For each subscription\nand direction, only one fragmented message can be in progress. Control\nmessages, requests, and responses MUST NOT be sent in fragments.\n\nEach fragment counts against the window when it is sent, by the size of the\ncomplete `channel/frame` message, including its envelope and escape\ncharacters. If the window becomes full partway through a message, the sender\nwaits for credit before it sends the next fragment.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
-          "$ref": "#/$defs/URI"
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
         },
         "data": {
           "type": "string",
-          "description": "Nonempty serialized-JSON fragment.",
+          "description": "The next piece of the serialized JSON-RPC message.",
           "minLength": 1
         },
         "final": {
           "type": "boolean",
-          "description": "True completes this logical message; absence/false means more fragments follow."
+          "description": "`true` on the last fragment of the message. Absent or `false` on other fragments."
         }
       },
       "required": [
@@ -51,13 +52,15 @@
     },
     "ChannelCreditParams": {
       "type": "object",
-      "description": "Receiver's cumulative UTF-16 release boundary for the outgoing direction.\nDuplicate/older positions are harmless. A boundary beyond sent data, within\na message, or inconsistent with the journal MUST fail explicitly.\n\nReturn credit after bounded consumption, not JSON parsing or action echo.\nTCP returns it after downstream buffer release. Shared release receipts can\nimplement drain() without TCP-specific consumed-credit actions.\n\nStability: 1.0 - Early development.",
+      "description": "Reports how much data the receiver has released.\n\n`consumedBytes` is the total size, in UTF-16 bytes, of the data messages and\nfragments that the receiver has released on this subscription. It is a total,\nnot an increment, and can be any value up to the amount of data sent; it does\nnot need to match the end of a message or fragment. The size of a message or\nfragment is the size of its complete JSON-RPC text as received.\n\nThe receiver decides when to send credit; for example, after it applies an\naction, after stream data leaves its local buffer, or after it stores a\nfragment for reassembly. When outstanding data reaches `windowBytes`, the\nreceiver MUST send credit as soon as it is ready to receive more data.\n\nA sender ignores a value that is not greater than the previous value. The\nprotocol does not define what happens when the value is greater than the data\nsent; an implementation can log the error or close the connection.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
-          "$ref": "#/$defs/URI"
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
         },
         "consumedBytes": {
           "type": "integer",
+          "description": "Total UTF-16 bytes of data messages and fragments that the receiver has released.",
           "minimum": 0,
           "maximum": 9007199254740991
         }
@@ -67,39 +70,17 @@
         "consumedBytes"
       ]
     },
-    "ChannelReadyParams": {
-      "type": "object",
-      "description": "Bootstrap boundary after snapshot/replay frames and before live delivery.\nConsumers MUST run during bootstrap, not wait for this signal before reading.\nProcess this signal in subscription order, after preceding complete messages.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI"
-        }
-      },
-      "required": [
-        "channel"
-      ]
-    },
-    "ChannelResetParams": {
-      "type": "object",
-      "description": "Abort incomplete delivery and terminate this subscription. Never skip a fragment\nand continue. Credit, ready, reset, and liveness bypass data credit with\nseparate size/rate bounds. Stream channels MUST abort their retained stream\nwhen delivery cannot continue safely.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI"
-        }
-      },
-      "required": [
-        "channel"
-      ]
-    },
     "ChannelSnapshotParams": {
       "type": "object",
-      "description": "Typed snapshot payload carried inside windowed channel/frame delivery, never\nas an unbounded bootstrap result. snapshot.resource MUST equal channel.\nNot sent on ordinary subscriptions.\n\nStability: 1.0 - Early development.",
+      "description": "Sends the state of a channel to a windowed subscription.\n\nOn a windowed subscription, the `subscribe` result does not contain a\nsnapshot. The server sends this notification instead. It MUST be the first\ndata message that the server sends on every windowed subscription, and the\nfirst after `snapshot` recovery. If it is sent in fragments, this applies to\nthe joined message. Data messages after it are changes to this state, or new\ndata for the channel. For a channel whose state has no fields,\n`snapshot.state` is an {@link EmptyState} and `snapshot.fromSeq` is the\nserver's current `serverSeq`.\n\nThis is a data message that counts against the window. The server can send it\nin `channel/frame` fragments, and MUST do so if it is larger than\n`maximumFrameBytes`. `snapshot.resource` MUST be the same as `channel`.\n\nThe server does not send this notification on ordinary subscriptions.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
-          "$ref": "#/$defs/URI"
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
         },
         "snapshot": {
-          "$ref": "#/$defs/Snapshot"
+          "$ref": "#/$defs/Snapshot",
+          "description": "The channel's state."
         }
       },
       "required": [
@@ -268,7 +249,7 @@
     },
     "OtlpExportLogsParams": {
       "type": "object",
-      "description": "Delivers a batch of OTLP log records to a client subscribed to the host's\nlogs channel (advertised on `TelemetryCapabilities.logs`).\n\nThe `payload` field is an OTLP/JSON `ExportLogsServiceRequest` value\nverbatim — i.e. an object of shape `{ resourceLogs: ResourceLogs[] }` as\ndefined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).\nAHP does not redeclare the OTLP type system; clients SHOULD use an\nOpenTelemetry SDK or schema to parse it.\n\nLike all stateless-channel notifications, this is ephemeral: it is not\nreplayed on reconnect. Subscribers receive only batches emitted after\ntheir `subscribe` succeeds.",
+      "description": "Delivers a batch of OTLP log records to a client subscribed to the host's\nlogs channel (advertised on `TelemetryCapabilities.logs`).\n\nThe `payload` field is an OTLP/JSON `ExportLogsServiceRequest` value\nverbatim — i.e. an object of shape `{ resourceLogs: ResourceLogs[] }` as\ndefined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).\nAHP does not redeclare the OTLP type system; clients SHOULD use an\nOpenTelemetry SDK or schema to parse it.\n\nLike other protocol notifications, this is not stored in the channel's\nstate and is not replayed on reconnect. Subscribers receive only batches emitted after\ntheir `subscribe` succeeds.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -336,12 +317,6 @@
           "$ref": "#/$defs/ChannelCreditParams"
         },
         {
-          "$ref": "#/$defs/ChannelReadyParams"
-        },
-        {
-          "$ref": "#/$defs/ChannelResetParams"
-        },
-        {
           "$ref": "#/$defs/ChannelSnapshotParams"
         },
         {
@@ -369,46 +344,39 @@
     },
     "ChannelReceiveLimits": {
       "type": "object",
-      "description": "Receive limits for one subscription and direction, not reduced channel state.\nAll limits are positive safe integers. Receivers MUST separately bound aggregate\nsubscriptions, decoding overhead, and the underlying transport queue.\n\nStability: 1.0 - Early development.",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "windowBytes": {
           "type": "integer",
-          "description": "Target outstanding logical-payload bytes, counted as UTF-16 code units * 2\nbefore outer JSON escaping. Starting a data message requires available credit;\none started message may finish beyond the window.",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
           "minimum": 1,
           "maximum": 9007199254740991
         },
         "maximumFrameBytes": {
           "type": "integer",
-          "description": "Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.",
-          "minimum": 1,
-          "maximum": 9007199254740991
-        },
-        "maximumMessageBytes": {
-          "type": "integer",
-          "description": "Hard logical-payload limit. Outstanding data stays strictly below\nwindowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.",
-          "minimum": 1,
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "minimum": 1024,
           "maximum": 9007199254740991
         }
       },
       "required": [
         "windowBytes",
-        "maximumFrameBytes",
-        "maximumMessageBytes"
+        "maximumFrameBytes"
       ]
     },
     "ChannelReceiveProgress": {
       "type": "object",
-      "description": "Accepted/released obligations of the same retained bounded consumer.\n0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count\nUTF-16 bytes through complete-data-message boundaries, never partial fragments.\nBoundary bookkeeping is local; no second message sequence is needed.\n\nStability: 1.0 - Early development.",
+      "description": "A receiver's progress on a windowed subscription, used during reconnection.\n\nBoth values are totals in UTF-16 bytes and start at zero. `acceptedBytes`\nends at a complete data message. `consumedBytes` is never greater than\n`acceptedBytes`. The difference is data that the receiver has kept but not\nyet released. Credit given for fragments of a message that was not completed\nis not included.\n\nStability: 1.0 - Early development.",
       "properties": {
         "acceptedBytes": {
           "type": "integer",
-          "description": "Complete logical data messages safely retained by the bounded consumer.",
+          "description": "Total size of complete data messages, including all of their fragments,\nthat the receiver has received and kept.",
           "minimum": 0,
           "maximum": 9007199254740991
         },
         "consumedBytes": {
           "type": "integer",
-          "description": "Messages whose allocations the consumer released. Rejected actions release\nallocations too; release does not acknowledge application success.",
+          "description": "The part of `acceptedBytes` that the receiver has released. A rejected\naction counts as released; this value does not mean that an action\nsucceeded.",
           "minimum": 0,
           "maximum": 9007199254740991
         }
@@ -420,13 +388,15 @@
     },
     "ChannelFlowControl": {
       "type": "object",
-      "description": "Accepted receive limits for both directions of a subscription. Initial\naccounting starts at zero. The existing logical client and channel identify\nthe subscription; transport generations are fenced locally, not on the wire.\n\nStability: 1.0 - Early development.",
+      "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
       "properties": {
         "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveLimits"
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the server sends to the client."
         },
         "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveLimits"
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the client sends to the server."
         }
       },
       "required": [
@@ -436,23 +406,27 @@
     },
     "ResumedChannelSubscription": {
       "type": "object",
-      "description": "One subscription retained after reconnect. Omission from the returned list\nmeans unavailable, regardless of cause. All such failures share the same\nconsumer behavior: dispose the old subscription, not continue a broken stream.\n\nStability: 1.0 - Early development.",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nIf a channel that the client requested is not in the result, the subscription\nwas not kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
-          "$ref": "#/$defs/URI"
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
         },
         "flowControl": {
-          "$ref": "#/$defs/ChannelFlowControl"
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "The subscription's limits. These do not change during reconnection."
         },
         "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
+          "$ref": "#/$defs/ChannelReceiveProgress",
+          "description": "The counters for data sent to the client. Both peers MUST use these values."
         },
         "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress"
+          "$ref": "#/$defs/ChannelReceiveProgress",
+          "description": "The counters for data sent to the server. Both peers MUST use these values."
         },
         "recovery": {
           "$ref": "#/$defs/ChannelRecoveryKind",
-          "description": "Replay retains the same consumer; live recovery resumes at the live edge."
+          "description": "How the server resumes sending data."
         }
       },
       "required": [
@@ -870,7 +844,7 @@
     },
     "Snapshot": {
       "type": "object",
-      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
+      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -907,9 +881,12 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource"
+          "description": "The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}."
         },
         "fromSeq": {
           "type": "number",
@@ -921,6 +898,11 @@
         "state",
         "fromSeq"
       ]
+    },
+    "EmptyState": {
+      "type": "object",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery subscription starts with a snapshot, including subscriptions to these\nchannels. A channel can therefore gain state fields in a later revision\nwithout changing how subscriptions start.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "RootState": {
       "type": "object",
@@ -6389,7 +6371,7 @@
         "live"
       ],
       "type": "string",
-      "description": "Recovery selected independently from windows and whether a channel has state."
+      "description": "How the server resumes sending data on a windowed subscription after\nreconnection."
     },
     "JsonPrimitive": {
       "oneOf": [

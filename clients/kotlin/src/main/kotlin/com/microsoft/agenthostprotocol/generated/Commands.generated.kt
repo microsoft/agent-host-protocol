@@ -530,9 +530,9 @@ data class ReconnectParams(
      */
     val subscriptions: List<String>,
     /**
-     * Resume information for windowed subscriptions also named in subscriptions.
-     * These channels recover independently and MUST NOT appear in inline legacy
-     * actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+     * Windowed subscriptions that the client wants to keep. Each channel MUST
+     * also be in `subscriptions` and MUST appear only once. These subscriptions
+     * are not included in the result's `actions` or `snapshots`.
      *
      * Stability: 1.0 - Early development.
      */
@@ -557,9 +557,9 @@ data class ReconnectReplayResult(
      */
     val missing: List<String>,
     /**
-     * Retained windowed subscriptions; content is delivered separately.
-     * The server MUST omit this field unless ReconnectParams.windows was supplied
-     * and MUST return only channels requested in ReconnectParams.windows.items.
+     * Windowed subscriptions that the server kept. Their data is sent separately.
+     * The server MUST omit this field unless the request contained `windows`,
+     * and MUST list only channels from the request.
      *
      * Stability: 1.0 - Early development.
      */
@@ -573,13 +573,16 @@ data class ReconnectSnapshotResult(
      */
     val type: ReconnectResultType,
     /**
-     * Fresh snapshots for each subscription
+     * Fresh snapshots for each resumed ordinary subscription. Windowed
+     * subscriptions are not included; they recover through their own data
+     * messages, as described by `windows`.
      */
     val snapshots: List<Snapshot>,
     /**
-     * Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
-     * The server MUST omit this field unless ReconnectParams.windows was supplied
-     * and MUST return only channels requested in ReconnectParams.windows.items.
+     * Windowed subscriptions that the server kept. Each one has its own
+     * `recovery` value, which does not depend on this result's type. The server
+     * MUST omit this field unless the request contained `windows`, and MUST list
+     * only channels from the request.
      *
      * Stability: 1.0 - Early development.
      */
@@ -587,22 +590,31 @@ data class ReconnectSnapshotResult(
 )
 
 /**
- * Retained receive obligations and a separate per-channel recovery checkpoint.
+ * The client's progress on one windowed subscription that it wants to keep.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ChannelDeliveryResumeParams(
+    /**
+     * The URI of the windowed subscription.
+     */
     val channel: String,
+    /**
+     * The client's progress on data that the server sent.
+     */
     val clientReceive: ChannelReceiveProgress,
     /**
-     * Last action safely applied or retained for this channel, not merely parsed.
-     * Required for replay recovery; omitted for live-only channels.
+     * The `serverSeq` of the last action or observed state that the client
+     * applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+     * replay recovery; absent for channels that resume only with new data.
      */
     val lastAppliedServerSeq: Long? = null
 )
 
 /**
+ * Windowed subscriptions that the client wants to keep after reconnection.
+ *
  * Stability: 1.0 - Early development.
  */
 @Serializable
@@ -611,10 +623,14 @@ data class ChannelDeliveryResumeOptions(
 )
 
 /**
- * Retained windowed subscriptions; omitted requested channels are unavailable.
- * Unread accepted messages remain charged across reconnect; both directions
- * reconcile lost release updates against the same retained journal. Unverified
- * positions or lost accounting MUST fail, never grant a fresh window.
+ * Windowed subscriptions that the server kept after reconnection.
+ *
+ * A requested channel that is not listed was not kept. The counters are final:
+ * before sending any data message or credit for a subscription, both peers MUST
+ * set their counters to the returned values. Unread data stays counted against
+ * the window. If the server cannot determine the counters, it omits the
+ * subscription instead of starting them again from zero. Sequence numbers, not
+ * these counters, decide what is sent again.
  *
  * Stability: 1.0 - Early development.
  */
@@ -624,13 +640,16 @@ data class ChannelDeliveryResumeResult(
 )
 
 /**
- * Client receive limits. The host may lower, never raise, these limits and
- * advertises its own receive limits in the accepted flowControl result.
+ * A client's offer of windowed delivery.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class SubscriptionFlowControlOptions(
+    /**
+     * The largest limits that the client accepts for data that it receives. The
+     * server MAY accept lower values, and MUST NOT accept higher values.
+     */
     val receive: ChannelReceiveLimits
 )
 
@@ -647,25 +666,21 @@ data class SubscribeParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Optional delivery preferences for this subscription.
-     *
-     * Servers MAY use these preferences to buffer and coalesce high-frequency
-     * updates while preserving the same reduced state. Omit this field for the
-     * server's default delivery behavior.
+     * Asks the server to limit how long it holds updates. If absent, the server
+     * uses its default behavior.
      */
     val delivery: SubscriptionDeliveryOptions? = null,
     /**
-     * Optional client-requested shape for the returned snapshot.
-     *
-     * Servers that do not understand a requested view ignore it and return their
-     * default snapshot. Clients MUST tolerate receiving more state than requested.
+     * Asks for a smaller snapshot. A server that does not support the requested
+     * view ignores it. Clients MUST accept more state than they requested.
      */
     val view: SubscribeView? = null,
     /**
-     * Offer bounded fragmented delivery. The host accepts with result.flowControl;
-     * absence means ordinary delivery, including on hosts that ignore this option.
-     * Neither peer may send frames until the response explicitly accepts them.
-     * Applies to this subscriber, not shared channel state or other viewers.
+     * Offers windowed delivery for this subscription. The server accepts by
+     * returning `flowControl` in the result. If the result does not contain
+     * `flowControl`, the subscription uses ordinary delivery. A client MUST NOT
+     * offer windowed delivery unless protocol version 1.1.0 or later was
+     * negotiated.
      *
      * Stability: 1.0 - Early development.
      */
@@ -690,10 +705,11 @@ data class SubscribeView(
 @Serializable
 data class SubscriptionDeliveryOptions(
     /**
-     * Maximum time, in milliseconds, that the server may intentionally delay
-     * delivery while buffering/coalescing updates for this subscription.
-     *
-     * A value of `0` requests immediate delivery with no intentional coalescing.
+     * The longest time, in milliseconds, that the server should hold updates for
+     * this subscription in order to combine them. The server MUST NOT combine
+     * updates unless the combined update produces the same state and the client
+     * still receives every event that the channel requires. A value of `0` asks
+     * the server not to delay updates.
      */
     val maxLatencyMs: Long? = null
 )
@@ -701,11 +717,16 @@ data class SubscriptionDeliveryOptions(
 @Serializable
 data class SubscribeResult(
     /**
-     * Snapshot of the subscribed channel's state (omitted for stateless channels)
+     * Snapshot of the subscribed channel's state. Present with ordinary delivery.
+     * With windowed delivery, the snapshot is sent in a `channel/snapshot`
+     * notification instead.
      */
     val snapshot: Snapshot? = null,
     /**
-     * Accepted receive limits; install the consumer before processing frames.
+     * The limits that the server accepted for windowed delivery. The server sends
+     * this result before any data message for the subscription. The client MUST be
+     * ready to process data messages as soon as it receives this result, and can
+     * send data messages without waiting for the snapshot.
      *
      * Stability: 1.0 - Early development.
      */

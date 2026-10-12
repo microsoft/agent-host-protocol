@@ -9,16 +9,20 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-/// <summary>Recovery selected independently from windows and whether a channel has state.
+/// <summary>How the server resumes sending data on a windowed subscription after
+/// reconnection.
 ///
 /// Stability: 1.0 - Early development.</summary>
 [JsonConverter(typeof(WireEnumConverter<ChannelRecoveryKind>))]
 public enum ChannelRecoveryKind
 {
+    /// <summary>The server sends a new `channel/snapshot`, and the client replaces its state.</summary>
     [WireValue("snapshot")]
     Snapshot,
+    /// <summary>The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.</summary>
     [WireValue("replay")]
     Replay,
+    /// <summary>The server sends only data created after reconnection.</summary>
     [WireValue("live")]
     Live,
 }
@@ -1779,70 +1783,91 @@ public enum AutomationRunOriginKind
 
 // ─── Classes ──────────────────────────────────────────────────────────
 
-/// <summary>Receive limits for one subscription and direction, not reduced channel state.
-/// All limits are positive safe integers. Receivers MUST separately bound aggregate
-/// subscriptions, decoding overhead, and the underlying transport queue.
+/// <summary>Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelReceiveLimits
 {
-    /// <summary>Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
-    /// before outer JSON escaping. Starting a data message requires available credit;
-    /// one started message may finish beyond the window.</summary>
+    /// <summary>The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.</summary>
     public long WindowBytes { get; init; }
 
-    /// <summary>Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.</summary>
+    /// <summary>The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.</summary>
     public long MaximumFrameBytes { get; init; }
-
-    /// <summary>Hard logical-payload limit. Outstanding data stays strictly below
-    /// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.</summary>
-    public long MaximumMessageBytes { get; init; }
 }
 
-/// <summary>Accepted/released obligations of the same retained bounded consumer.
-/// 0 &lt;= consumedBytes &lt;= acceptedBytes. Both counters start at zero and count
-/// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
-/// Boundary bookkeeping is local; no second message sequence is needed.
+/// <summary>A receiver's progress on a windowed subscription, used during reconnection.
+///
+/// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
+/// ends at a complete data message. `consumedBytes` is never greater than
+/// `acceptedBytes`. The difference is data that the receiver has kept but not
+/// yet released. Credit given for fragments of a message that was not completed
+/// is not included.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelReceiveProgress
 {
-    /// <summary>Complete logical data messages safely retained by the bounded consumer.</summary>
+    /// <summary>Total size of complete data messages, including all of their fragments,
+    /// that the receiver has received and kept.</summary>
     public long AcceptedBytes { get; init; }
 
-    /// <summary>Messages whose allocations the consumer released. Rejected actions release
-    /// allocations too; release does not acknowledge application success.</summary>
+    /// <summary>The part of `acceptedBytes` that the receiver has released. A rejected
+    /// action counts as released; this value does not mean that an action
+    /// succeeded.</summary>
     public long ConsumedBytes { get; init; }
 }
 
-/// <summary>Accepted receive limits for both directions of a subscription. Initial
-/// accounting starts at zero. The existing logical client and channel identify
-/// the subscription; transport generations are fenced locally, not on the wire.
+/// <summary>The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelFlowControl
 {
+    /// <summary>Limits for data that the server sends to the client.</summary>
     public required ChannelReceiveLimits ClientReceive { get; init; }
 
+    /// <summary>Limits for data that the client sends to the server.</summary>
     public required ChannelReceiveLimits HostReceive { get; init; }
 }
 
-/// <summary>One subscription retained after reconnect. Omission from the returned list
-/// means unavailable, regardless of cause. All such failures share the same
-/// consumer behavior: dispose the old subscription, not continue a broken stream.
+/// <summary>A windowed subscription that the server kept after reconnection.
+///
+/// If a channel that the client requested is not in the result, the subscription
+/// was not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ResumedChannelSubscription
 {
+    /// <summary>The URI of the windowed subscription.</summary>
     public required string Channel { get; init; }
 
+    /// <summary>The subscription's limits. These do not change during reconnection.</summary>
     public required ChannelFlowControl FlowControl { get; init; }
 
+    /// <summary>The counters for data sent to the client. Both peers MUST use these values.</summary>
     public required ChannelReceiveProgress ClientReceive { get; init; }
 
+    /// <summary>The counters for data sent to the server. Both peers MUST use these values.</summary>
     public required ChannelReceiveProgress HostReceive { get; init; }
 
-    /// <summary>Replay retains the same consumer; live recovery resumes at the live edge.</summary>
+    /// <summary>How the server resumes sending data.</summary>
     public ChannelRecoveryKind Recovery { get; init; }
 }
 
@@ -6002,17 +6027,29 @@ public sealed record ErrorInfo
 }
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
-/// `initialize`, `reconnect`, and `subscribe`.</summary>
+/// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.</summary>
 public sealed record Snapshot
 {
     /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, `ahp-chat:/&lt;uuid&gt;`, or `ahp-canvas:/&lt;uuid&gt;`)</summary>
     public required string Resource { get; init; }
 
-    /// <summary>The current state of the resource</summary>
+    /// <summary>The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.</summary>
     public required SnapshotState State { get; init; }
 
     /// <summary>The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq &gt; fromSeq`.</summary>
     public long FromSeq { get; init; }
+}
+
+/// <summary>The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every subscription starts with a snapshot, including subscriptions to these
+/// channels. A channel can therefore gain state fields in a later revision
+/// without changing how subscriptions start.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record EmptyState
+{
 }
 
 /// <summary>Catalogue entry describing one changeset the server can produce for a
@@ -7866,13 +7903,17 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// An object with no members is the empty state of a stateless channel.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Empty state variant of a stateless channel, when populated.</summary>
+    public EmptyState? Empty { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -7912,7 +7953,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        var members = root.EnumerateObject();
+        if (!members.MoveNext())
+        {
+            result.Empty = new EmptyState();
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -7964,6 +8010,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }

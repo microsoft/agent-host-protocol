@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Every `subscribe` result with ordinary delivery now contains a snapshot. Subscribing to a telemetry channel returns a snapshot whose `state` is `{}` instead of an empty result, and `initialize` and snapshot `reconnect` results include these snapshots too. Clients should still accept a missing snapshot from older hosts."
+}

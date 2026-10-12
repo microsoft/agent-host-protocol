@@ -36,23 +36,32 @@ public enum AuthRequiredReason: Codable, Sendable, Equatable {
 
 // MARK: - Notification Types
 
-/// Fragment of a serialized typed channel notification. Reassemble before typed
-/// decoding or reducer application; data is a string, not another base64 layer.
-/// Do not split surrogate pairs. One active data message per direction/subscription;
-/// fairly interleave bounded frames across subscriptions and reserve UTF-16 bytes
-/// before enqueueing. The ordered transport supplies fragment ordering.
+/// One fragment of a data message on a windowed subscription.
 ///
-/// Discard incomplete messages on disconnect. Reconcile acceptedBytes, then retry
-/// whole unaccepted messages from the retained queue without charging twice.
-/// Inner and outer channel URIs MUST match. Delivery controls MUST NOT be framed
-/// recursively; payload-bearing action echoes MUST use the bounded data path.
+/// A sender uses fragments when a data message is larger than
+/// `maximumFrameBytes`, and to let subscriptions take turns so that one busy
+/// subscription does not hold up the whole connection. It serializes the message
+/// to JSON text, divides the text into pieces, and sends each piece in order. The
+/// receiver joins the `data` strings and parses the result only after it receives
+/// the fragment with `final: true`.
+///
+/// Fragments MUST NOT be empty and MUST NOT divide a UTF-16 surrogate pair. The
+/// channel inside the joined message MUST match `channel`. For each subscription
+/// and direction, only one fragmented message can be in progress. Control
+/// messages, requests, and responses MUST NOT be sent in fragments.
+///
+/// Each fragment counts against the window when it is sent, by the size of the
+/// complete `channel/frame` message, including its envelope and escape
+/// characters. If the window becomes full partway through a message, the sender
+/// waits for credit before it sends the next fragment.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelFrameParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
     public var channel: String
-    /// Nonempty serialized-JSON fragment.
+    /// The next piece of the serialized JSON-RPC message.
     public var data: String
-    /// True completes this logical message; absence/false means more fragments follow.
+    /// `true` on the last fragment of the message. Absent or `false` on other fragments.
     public var final: Bool?
 
     public init(
@@ -66,17 +75,28 @@ public struct ChannelFrameParams: Codable, Sendable {
     }
 }
 
-/// Receiver's cumulative UTF-16 release boundary for the outgoing direction.
-/// Duplicate/older positions are harmless. A boundary beyond sent data, within
-/// a message, or inconsistent with the journal MUST fail explicitly.
+/// Reports how much data the receiver has released.
 ///
-/// Return credit after bounded consumption, not JSON parsing or action echo.
-/// TCP returns it after downstream buffer release. Shared release receipts can
-/// implement drain() without TCP-specific consumed-credit actions.
+/// `consumedBytes` is the total size, in UTF-16 bytes, of the data messages and
+/// fragments that the receiver has released on this subscription. It is a total,
+/// not an increment, and can be any value up to the amount of data sent; it does
+/// not need to match the end of a message or fragment. The size of a message or
+/// fragment is the size of its complete JSON-RPC text as received.
+///
+/// The receiver decides when to send credit; for example, after it applies an
+/// action, after stream data leaves its local buffer, or after it stores a
+/// fragment for reassembly. When outstanding data reaches `windowBytes`, the
+/// receiver MUST send credit as soon as it is ready to receive more data.
+///
+/// A sender ignores a value that is not greater than the previous value. The
+/// protocol does not define what happens when the value is greater than the data
+/// sent; an implementation can log the error or close the connection.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelCreditParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
     public var channel: String
+    /// Total UTF-16 bytes of data messages and fragments that the receiver has released.
     public var consumedBytes: Int
 
     public init(
@@ -88,44 +108,28 @@ public struct ChannelCreditParams: Codable, Sendable {
     }
 }
 
-/// Bootstrap boundary after snapshot/replay frames and before live delivery.
-/// Consumers MUST run during bootstrap, not wait for this signal before reading.
-/// Process this signal in subscription order, after preceding complete messages.
+/// Sends the state of a channel to a windowed subscription.
 ///
-/// Stability: 1.0 - Early development.
-public struct ChannelReadyParams: Codable, Sendable {
-    public var channel: String
-
-    public init(
-        channel: String
-    ) {
-        self.channel = channel
-    }
-}
-
-/// Abort incomplete delivery and terminate this subscription. Never skip a fragment
-/// and continue. Credit, ready, reset, and liveness bypass data credit with
-/// separate size/rate bounds. Stream channels MUST abort their retained stream
-/// when delivery cannot continue safely.
+/// On a windowed subscription, the `subscribe` result does not contain a
+/// snapshot. The server sends this notification instead. It MUST be the first
+/// data message that the server sends on every windowed subscription, and the
+/// first after `snapshot` recovery. If it is sent in fragments, this applies to
+/// the joined message. Data messages after it are changes to this state, or new
+/// data for the channel. For a channel whose state has no fields,
+/// `snapshot.state` is an {@link EmptyState} and `snapshot.fromSeq` is the
+/// server's current `serverSeq`.
 ///
-/// Stability: 1.0 - Early development.
-public struct ChannelResetParams: Codable, Sendable {
-    public var channel: String
-
-    public init(
-        channel: String
-    ) {
-        self.channel = channel
-    }
-}
-
-/// Typed snapshot payload carried inside windowed channel/frame delivery, never
-/// as an unbounded bootstrap result. snapshot.resource MUST equal channel.
-/// Not sent on ordinary subscriptions.
+/// This is a data message that counts against the window. The server can send it
+/// in `channel/frame` fragments, and MUST do so if it is larger than
+/// `maximumFrameBytes`. `snapshot.resource` MUST be the same as `channel`.
+///
+/// The server does not send this notification on ordinary subscriptions.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelSnapshotParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
     public var channel: String
+    /// The channel's state.
     public var snapshot: Snapshot
 
     public init(

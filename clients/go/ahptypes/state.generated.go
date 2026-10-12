@@ -15,15 +15,19 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-// Recovery selected independently from windows and whether a channel has state.
+// How the server resumes sending data on a windowed subscription after
+// reconnection.
 //
 // Stability: 1.0 - Early development.
 type ChannelRecoveryKind string
 
 const (
+	// The server sends a new `channel/snapshot`, and the client replaces its state.
 	ChannelRecoveryKindSnapshot ChannelRecoveryKind = "snapshot"
-	ChannelRecoveryKindReplay   ChannelRecoveryKind = "replay"
-	ChannelRecoveryKindLive     ChannelRecoveryKind = "live"
+	// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+	ChannelRecoveryKindReplay ChannelRecoveryKind = "replay"
+	// The server sends only data created after reconnection.
+	ChannelRecoveryKindLive ChannelRecoveryKind = "live"
 )
 
 // Policy configuration state for a model.
@@ -580,58 +584,80 @@ const (
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
-// Receive limits for one subscription and direction, not reduced channel state.
-// All limits are positive safe integers. Receivers MUST separately bound aggregate
-// subscriptions, decoding overhead, and the underlying transport queue.
+// Limits on data that one peer receives on a windowed subscription.
+//
+// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+// message's complete text, as sent. For a `channel/frame` fragment, this
+// includes its envelope and escape characters. The same size is used for the
+// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+// size of a complete data message. Outstanding data is always less than
+// `windowBytes + maximumFrameBytes`.
 //
 // Stability: 1.0 - Early development.
 type ChannelReceiveLimits struct {
-	// Target outstanding logical-payload bytes, counted as UTF-16 code units * 2
-	// before outer JSON escaping. Starting a data message requires available credit;
-	// one started message may finish beyond the window.
+	// The target amount of outstanding data. This is a soft target.
+	// The sender MUST NOT send a data message or fragment while outstanding data
+	// is equal to or greater than this value. The last message or fragment sent
+	// before the window is full can go past it, so a message that fits within
+	// `maximumFrameBytes` can be sent whole even when it is larger than the
+	// remaining credit.
 	WindowBytes int64 `json:"windowBytes"`
-	// Hard UTF-16 byte limit on the serialized outer frame, including JSON escaping.
+	// The largest JSON-RPC message that the sender can send for a data message.
+	// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+	// notification, it includes the envelope and escape characters. A larger data
+	// message MUST be split into smaller messages or sent in fragments.
 	MaximumFrameBytes int64 `json:"maximumFrameBytes"`
-	// Hard logical-payload limit. Outstanding data stays strictly below
-	// windowBytes + maximumMessageBytes; receivers MUST budget for that overshoot.
-	MaximumMessageBytes int64 `json:"maximumMessageBytes"`
 }
 
-// Accepted/released obligations of the same retained bounded consumer.
-// 0 <= consumedBytes <= acceptedBytes. Both counters start at zero and count
-// UTF-16 bytes through complete-data-message boundaries, never partial fragments.
-// Boundary bookkeeping is local; no second message sequence is needed.
+// A receiver's progress on a windowed subscription, used during reconnection.
+//
+// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
+// ends at a complete data message. `consumedBytes` is never greater than
+// `acceptedBytes`. The difference is data that the receiver has kept but not
+// yet released. Credit given for fragments of a message that was not completed
+// is not included.
 //
 // Stability: 1.0 - Early development.
 type ChannelReceiveProgress struct {
-	// Complete logical data messages safely retained by the bounded consumer.
+	// Total size of complete data messages, including all of their fragments,
+	// that the receiver has received and kept.
 	AcceptedBytes int64 `json:"acceptedBytes"`
-	// Messages whose allocations the consumer released. Rejected actions release
-	// allocations too; release does not acknowledge application success.
+	// The part of `acceptedBytes` that the receiver has released. A rejected
+	// action counts as released; this value does not mean that an action
+	// succeeded.
 	ConsumedBytes int64 `json:"consumedBytes"`
 }
 
-// Accepted receive limits for both directions of a subscription. Initial
-// accounting starts at zero. The existing logical client and channel identify
-// the subscription; transport generations are fenced locally, not on the wire.
+// The limits that the server accepted for a windowed subscription.
+//
+// The client ID and channel URI identify the subscription. All counters start at
+// zero when the subscription starts.
 //
 // Stability: 1.0 - Early development.
 type ChannelFlowControl struct {
+	// Limits for data that the server sends to the client.
 	ClientReceive ChannelReceiveLimits `json:"clientReceive"`
-	HostReceive   ChannelReceiveLimits `json:"hostReceive"`
+	// Limits for data that the client sends to the server.
+	HostReceive ChannelReceiveLimits `json:"hostReceive"`
 }
 
-// One subscription retained after reconnect. Omission from the returned list
-// means unavailable, regardless of cause. All such failures share the same
-// consumer behavior: dispose the old subscription, not continue a broken stream.
+// A windowed subscription that the server kept after reconnection.
+//
+// If a channel that the client requested is not in the result, the subscription
+// was not kept. The client discards the old subscription and, for a byte stream,
+// closes the stream.
 //
 // Stability: 1.0 - Early development.
 type ResumedChannelSubscription struct {
-	Channel       URI                    `json:"channel"`
-	FlowControl   ChannelFlowControl     `json:"flowControl"`
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The subscription's limits. These do not change during reconnection.
+	FlowControl ChannelFlowControl `json:"flowControl"`
+	// The counters for data sent to the client. Both peers MUST use these values.
 	ClientReceive ChannelReceiveProgress `json:"clientReceive"`
-	HostReceive   ChannelReceiveProgress `json:"hostReceive"`
-	// Replay retains the same consumer; live recovery resumes at the live edge.
+	// The counters for data sent to the server. Both peers MUST use these values.
+	HostReceive ChannelReceiveProgress `json:"hostReceive"`
+	// How the server resumes sending data.
 	Recovery ChannelRecoveryKind `json:"recovery"`
 }
 
@@ -3705,14 +3731,25 @@ type ErrorInfo struct {
 }
 
 // A point-in-time snapshot of a subscribed resource's state, returned by
-// `initialize`, `reconnect`, and `subscribe`.
+// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
 type Snapshot struct {
 	// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
 	Resource URI `json:"resource"`
-	// The current state of the resource
+	// The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
 	State SnapshotState `json:"state"`
 	// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
 	FromSeq int64 `json:"fromSeq"`
+}
+
+// The state of a channel that has no state fields, such as a telemetry
+// channel. It is always the empty object `{}`.
+//
+// Every subscription starts with a snapshot, including subscriptions to these
+// channels. A channel can therefore gain state fields in a later revision
+// without changing how subscriptions start.
+//
+// Stability: 1.0 - Early development.
+type EmptyState struct {
 }
 
 // Catalogue entry describing one changeset the server can produce for a
@@ -6386,12 +6423,14 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 // SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → canvas → terminal → changeset →
-// resourceWatch → annotations → root).
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
+// is the empty state of a stateless channel.
 type SnapshotState struct {
+	Empty         *EmptyState         `json:"-"`
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
@@ -6407,6 +6446,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
+	case s.Empty != nil:
+		return json.Marshal(s.Empty)
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
 	case s.Automations != nil:
@@ -6441,6 +6482,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
+	case len(probe) == 0:
+		s.Empty = &EmptyState{}
 	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {

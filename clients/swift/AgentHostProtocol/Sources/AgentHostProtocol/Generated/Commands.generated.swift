@@ -532,9 +532,9 @@ public struct ReconnectParams: Codable, Sendable {
     public var lastSeenServerSeq: Int
     /// URIs the client was subscribed to
     public var subscriptions: [String]
-    /// Resume information for windowed subscriptions also named in subscriptions.
-    /// These channels recover independently and MUST NOT appear in inline legacy
-    /// actions/snapshots. Missing journals fail explicitly, never downgrade delivery.
+    /// Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
     ///
     /// Stability: 1.0 - Early development.
     public var windows: ChannelDeliveryResumeOptions?
@@ -575,9 +575,9 @@ public struct ReconnectReplayResult: Codable, Sendable {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     public var missing: [String]
-    /// Retained windowed subscriptions; content is delivered separately.
-    /// The server MUST omit this field unless ReconnectParams.windows was supplied
-    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    /// Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
     ///
     /// Stability: 1.0 - Early development.
     public var windows: ChannelDeliveryResumeResult?
@@ -598,11 +598,14 @@ public struct ReconnectReplayResult: Codable, Sendable {
 public struct ReconnectSnapshotResult: Codable, Sendable {
     /// Discriminant
     public var type: ReconnectResultType
-    /// Fresh snapshots for each subscription
+    /// Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`.
     public var snapshots: [Snapshot]
-    /// Windowed channels select replay/snapshot/live recovery independently of legacy fallback.
-    /// The server MUST omit this field unless ReconnectParams.windows was supplied
-    /// and MUST return only channels requested in ReconnectParams.windows.items.
+    /// Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
     ///
     /// Stability: 1.0 - Early development.
     public var windows: ChannelDeliveryResumeResult?
@@ -618,14 +621,17 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     }
 }
 
-/// Retained receive obligations and a separate per-channel recovery checkpoint.
+/// The client's progress on one windowed subscription that it wants to keep.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
     public var channel: String
+    /// The client's progress on data that the server sent.
     public var clientReceive: ChannelReceiveProgress
-    /// Last action safely applied or retained for this channel, not merely parsed.
-    /// Required for replay recovery; omitted for live-only channels.
+    /// The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.
     public var lastAppliedServerSeq: Int?
 
     public init(
@@ -639,6 +645,8 @@ public struct ChannelDeliveryResumeParams: Codable, Sendable {
     }
 }
 
+/// Windowed subscriptions that the client wants to keep after reconnection.
+///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeOptions: Codable, Sendable {
     public var items: [ChannelDeliveryResumeParams]
@@ -650,10 +658,14 @@ public struct ChannelDeliveryResumeOptions: Codable, Sendable {
     }
 }
 
-/// Retained windowed subscriptions; omitted requested channels are unavailable.
-/// Unread accepted messages remain charged across reconnect; both directions
-/// reconcile lost release updates against the same retained journal. Unverified
-/// positions or lost accounting MUST fail, never grant a fresh window.
+/// Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. The counters are final:
+/// before sending any data message or credit for a subscription, both peers MUST
+/// set their counters to the returned values. Unread data stays counted against
+/// the window. If the server cannot determine the counters, it omits the
+/// subscription instead of starting them again from zero. Sequence numbers, not
+/// these counters, decide what is sent again.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeResult: Codable, Sendable {
@@ -666,11 +678,12 @@ public struct ChannelDeliveryResumeResult: Codable, Sendable {
     }
 }
 
-/// Client receive limits. The host may lower, never raise, these limits and
-/// advertises its own receive limits in the accepted flowControl result.
+/// A client's offer of windowed delivery.
 ///
 /// Stability: 1.0 - Early development.
 public struct SubscriptionFlowControlOptions: Codable, Sendable {
+    /// The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.
     public var receive: ChannelReceiveLimits
 
     public init(
@@ -686,21 +699,17 @@ public struct SubscribeParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.
+    /// Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.
     public var delivery: SubscriptionDeliveryOptions?
-    /// Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.
+    /// Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.
     public var view: SubscribeView?
-    /// Offer bounded fragmented delivery. The host accepts with result.flowControl;
-    /// absence means ordinary delivery, including on hosts that ignore this option.
-    /// Neither peer may send frames until the response explicitly accepts them.
-    /// Applies to this subscriber, not shared channel state or other viewers.
+    /// Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery. A client MUST NOT
+    /// offer windowed delivery unless protocol version 1.1.0 or later was
+    /// negotiated.
     ///
     /// Stability: 1.0 - Early development.
     public var flowControl: SubscriptionFlowControlOptions?
@@ -747,10 +756,11 @@ public struct SubscribeView: Codable, Sendable {
 }
 
 public struct SubscriptionDeliveryOptions: Codable, Sendable {
-    /// Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    /// The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.
     public var maxLatencyMs: Int?
 
     public init(
@@ -761,9 +771,14 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
 }
 
 public struct SubscribeResult: Codable, Sendable {
-    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery.
+    /// With windowed delivery, the snapshot is sent in a `channel/snapshot`
+    /// notification instead.
     public var snapshot: Snapshot?
-    /// Accepted receive limits; install the consumer before processing frames.
+    /// The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
     ///
     /// Stability: 1.0 - Early development.
     public var flowControl: ChannelFlowControl?

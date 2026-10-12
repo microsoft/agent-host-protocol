@@ -166,6 +166,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -978,6 +979,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -1370,7 +1372,8 @@ ${unknownVariant}}`;
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required \`lifecycle\`), then
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by stateless channels), then session (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then canvas (has required instance/provider/type
 /// identifiers), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
@@ -1380,6 +1383,7 @@ function generateSnapshotState(): string {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),
@@ -1421,9 +1425,14 @@ function generateStateFile(project: Project): string {
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
-      lines.push(generateStructFromInterface(project, entry.name, entry.rustName, {
+      const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
-      }));
+      });
+      // EmptyState must match only `{}`, so the untagged SnapshotState does not
+      // decode an unknown state shape as empty.
+      lines.push(entry.name === 'EmptyState'
+        ? struct.replace('pub struct EmptyState', '#[serde(deny_unknown_fields)]\npub struct EmptyState')
+        : struct);
       if (entry.name === 'SessionToolClientExecutionRequest') {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
@@ -2033,8 +2042,8 @@ ${unknownVariant}}`;
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'ChannelFrameParams', 'ChannelCreditParams', 'ChannelReadyParams',
-  'ChannelResetParams', 'ChannelSnapshotParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',

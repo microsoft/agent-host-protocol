@@ -106,7 +106,7 @@ If the transport connection drops, the client reconnects and sends a `reconnect`
 }
 ```
 
-The server MUST include all replayed data in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
+The server MUST include all replayed actions for ordinary subscriptions in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
 
 ```json
 {
@@ -143,15 +143,16 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 
 On ordinary subscriptions, protocol notifications are **not** replayed — the
 client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions).
-Stateless channels are simply re-subscribed; missed messages are dropped.
+Other missed notifications, such as telemetry batches, are dropped as well; the
+subscription continues with notifications sent after reconnection.
 
-Negotiated [windowed subscriptions](/specification/subscriptions#experimental-windowed-delivery)
-add `windows` to the reconnect request and either result variant.
-The server MUST omit the result field unless the client requested `windows`,
-and MUST include only requested windowed channels.
-They recover independently through bounded frames, not inline replay arrays or
-snapshots. Their retained consumption obligations and per-channel action
-checkpoints are distinct from the legacy connection-wide `lastSeenServerSeq`.
+A client with [windowed subscriptions](/specification/windowed-delivery#reconnection)
+can add `windows` to the `reconnect` request. The server includes `windows` in
+the result only if the request contained it, and lists only channels from the
+request. Windowed subscriptions are not included in the result's `actions` or
+`snapshots`. Each one recovers through its own data messages, using its own
+counters and `lastAppliedServerSeq` instead of the connection-wide
+`lastSeenServerSeq`.
 
 ## Unexpected Disconnection
 

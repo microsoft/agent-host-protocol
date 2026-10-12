@@ -25,11 +25,11 @@ When WebSocket is used:
 - Messages are sent as WebSocket **text** frames.
 - Each text frame contains exactly one complete JSON-RPC message.
 
-Optional [windowed delivery](/specification/subscriptions#experimental-windowed-delivery)
-fragments a logical typed notification across multiple complete `channel/frame`
-JSON-RPC messages. This is protocol-level multiplexing, not transport-level
-partial message delivery. Receivers reassemble the logical notification before
-normal decoding; the transport still delivers each outer JSON-RPC message whole.
+[Windowed delivery](/specification/windowed-delivery) does not change this
+requirement. A data message that is too large for one JSON-RPC message can be
+sent in several `channel/frame` notifications. Each `channel/frame` is a
+complete JSON-RPC message, and the receiver joins the fragments after the
+transport has delivered them.
 
 ## Keep-Alive
 

@@ -6,13 +6,13 @@
   "input": {
     "channel": "ahp-terminal:/t1",
     "flowControl": {
-      "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 }
+      "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
     }
   },
   "acceptableOutputs": [{
     "channel": "ahp-terminal:/t1",
     "flowControl": {
-      "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384, "maximumMessageBytes": 4194304 }
+      "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
     }
   }]
 }

@@ -56,6 +56,7 @@ export default withMermaid(defineConfig({
             { text: 'Transport', link: '/specification/transport' },
             { text: 'Lifecycle', link: '/specification/lifecycle' },
             { text: 'Channels & Subscriptions', link: '/specification/subscriptions' },
+            { text: 'Windowed Delivery', link: '/specification/windowed-delivery' },
             { text: 'Authentication', link: '/specification/authentication' },
             { text: 'MCP Channel', link: '/specification/mcp-channel' },
             { text: 'Versioning', link: '/specification/versioning' },
