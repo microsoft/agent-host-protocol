@@ -1067,6 +1067,46 @@ internal object SessionOriginKindSerializer : KSerializer<SessionOriginKind> {
 }
 
 /**
+ * Where the runtime discovered an extension that declares a canvas type.
+ */
+@Serializable(with = CanvasExtensionSourceSerializer::class)
+@JvmInline
+value class CanvasExtensionSource(val rawValue: String) {
+    companion object {
+        /**
+         * Extension installed for the current user.
+         */
+        val USER: CanvasExtensionSource = CanvasExtensionSource("user")
+        /**
+         * Extension discovered in the current project.
+         */
+        val PROJECT: CanvasExtensionSource = CanvasExtensionSource("project")
+        /**
+         * Extension installed only for the current session.
+         */
+        val SESSION: CanvasExtensionSource = CanvasExtensionSource("session")
+        /**
+         * Extension contributed by an installed plugin.
+         */
+        val PLUGIN: CanvasExtensionSource = CanvasExtensionSource("plugin")
+        /**
+         * Extension source is unavailable or not recognized by this protocol version.
+         */
+        val UNSPECIFIED: CanvasExtensionSource = CanvasExtensionSource("unknown")
+    }
+}
+
+internal object CanvasExtensionSourceSerializer : KSerializer<CanvasExtensionSource> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasExtensionSource", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasExtensionSource) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasExtensionSource =
+        CanvasExtensionSource(decoder.decodeString())
+}
+
+/**
  * Operations the host currently permits for an automation.
  *
  * The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1507,6 +1547,12 @@ data class AgentInfo(
 
 @Serializable
 data class AgentCapabilities(
+    /**
+     * The agent can list canvas types for an exact chat with `listCanvasTypes`
+     * and open them with `openCanvas`. Live instances are published through the
+     * chat's canvas references and their `ahp-canvas:` state channels.
+     */
+    val canvases: Map<String, JsonElement>? = null,
     /**
      * The agent can host more than one concurrent chat per session. When absent,
      * clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -2214,6 +2260,42 @@ data class BackgroundSubagentWork(
      * {@link ToolResultSubagentContent.resource} points to.
      */
     val chat: String
+)
+
+@Serializable
+data class CanvasTypeDeclaration(
+    /**
+     * Provider-local canvas type identifier.
+     */
+    val canvasId: String,
+    /**
+     * Stable identifier of the extension that declares the canvas.
+     */
+    val extensionId: String,
+    /**
+     * Where the runtime discovered the declaring extension.
+     */
+    val extensionSource: CanvasExtensionSource,
+    /**
+     * Human-readable extension name, when available.
+     */
+    val extensionName: String? = null,
+    /**
+     * Human-readable canvas type name.
+     */
+    val displayName: String,
+    /**
+     * Description of what the canvas type does.
+     */
+    val description: String,
+    /**
+     * Whether opening this canvas requires an input flow.
+     */
+    val requiresInput: Boolean,
+    /**
+     * Number of actions the canvas declares.
+     */
+    val actionCount: Long
 )
 
 @Serializable

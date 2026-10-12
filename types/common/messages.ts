@@ -61,6 +61,11 @@ import type {
   DisposeChatParams,
 } from '../channels-chat/commands.js';
 import type {
+  ListCanvasTypesParams,
+  ListCanvasTypesResult,
+  OpenCanvasParams,
+} from '../channels-canvas/commands.js';
+import type {
   CreateTerminalParams,
   DisposeTerminalParams,
 } from '../channels-terminal/commands.js';
@@ -174,6 +179,8 @@ export interface CommandMap {
   'createTcpConnection': { params: CreateTcpConnectionParams; result: null };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
+  'listCanvasTypes': { params: ListCanvasTypesParams; result: ListCanvasTypesResult };
+  'openCanvas': { params: OpenCanvasParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };

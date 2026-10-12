@@ -1053,6 +1053,63 @@ public sealed record MoveChatResult
     public required string Session { get; init; }
 }
 
+/// <summary>Lists canvas types currently available to open for one exact chat.
+///
+/// This read MAY lazily resume an existing persisted chat so its extension
+/// registry can be reconstructed. It MUST NOT create a backing runtime for a
+/// brand-new chat, send a user message, or invoke a model.
+///
+/// Clients MUST NOT call this command unless the selected agent advertises
+/// {@link AgentCapabilities.canvases}.</summary>
+public sealed record ListCanvasTypesParams
+{
+    /// <summary>Exact chat URI whose extension registry should be queried.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Canvas types available to open for the requested chat.</summary>
+public sealed record ListCanvasTypesResult
+{
+    /// <summary>Available canvas types and their declaring extensions.</summary>
+    public required List<CanvasTypeDeclaration> Items { get; init; }
+}
+
+/// <summary>Opens or focuses one stable canvas instance in an exact chat.
+///
+/// The resulting live instance is published through the chat's
+/// {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+/// Repeating this command with the same `instanceId` focuses or refreshes that
+/// logical instance rather than creating a duplicate.
+///
+/// Clients MUST NOT call this command unless the selected agent advertises
+/// {@link AgentCapabilities.canvases}.</summary>
+public sealed record OpenCanvasParams
+{
+    /// <summary>Exact chat URI that owns the canvas instance.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Stable identifier of the extension that declares the canvas.</summary>
+    public required string ExtensionId { get; init; }
+
+    /// <summary>Provider-local canvas type identifier.</summary>
+    public required string CanvasId { get; init; }
+
+    /// <summary>Caller-chosen stable instance identifier.</summary>
+    public required string InstanceId { get; init; }
+}
+
 /// <summary>Returns a list of session summaries. Used to populate session lists and sidebars.
 ///
 /// The session list is **not** part of the state tree because it can be arbitrarily

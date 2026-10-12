@@ -3298,6 +3298,11 @@
       "type": "object",
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
+        "canvases": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The agent can list canvas types for an exact chat with `listCanvasTypes`\nand open them with `openCanvas`. Live instances are published through the\nchat's canvas references and their `ahp-canvas:` state channels."
+        },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding\ncreation mode."
@@ -7387,6 +7392,53 @@
         "title"
       ]
     },
+    "CanvasTypeDeclaration": {
+      "type": "object",
+      "description": "One canvas type currently available to open for an exact chat.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.",
+      "properties": {
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas type identifier."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Stable identifier of the extension that declares the canvas."
+        },
+        "extensionSource": {
+          "$ref": "#/$defs/CanvasExtensionSource",
+          "description": "Where the runtime discovered the declaring extension."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Human-readable extension name, when available."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable canvas type name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what the canvas type does."
+        },
+        "requiresInput": {
+          "type": "boolean",
+          "description": "Whether opening this canvas requires an input flow."
+        },
+        "actionCount": {
+          "type": "number",
+          "description": "Number of actions the canvas declares."
+        }
+      },
+      "required": [
+        "canvasId",
+        "extensionId",
+        "extensionSource",
+        "displayName",
+        "description",
+        "requiresInput",
+        "actionCount"
+      ]
+    },
     "CanvasReference": {
       "type": "object",
       "description": "Stable reference to a subscribable canvas channel.\n\nChat state intentionally carries only this reference so the experimental\ncanvas presentation model can evolve without changing the stable chat\nchannel shape.",
@@ -9719,6 +9771,17 @@
       ],
       "type": "string",
       "description": "Why a tool call was cancelled."
+    },
+    "CanvasExtensionSource": {
+      "enum": [
+        "user",
+        "project",
+        "session",
+        "plugin",
+        "unknown"
+      ],
+      "type": "string",
+      "description": "Where the runtime discovered an extension that declares a canvas type."
     },
     "ChangesetOperationScope": {
       "enum": [

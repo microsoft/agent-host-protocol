@@ -16,10 +16,11 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
-    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
-    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
-    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, CanvasTypeDeclaration, ChannelFlowControl,
+    ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection,
+    ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities,
+    TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -978,6 +979,59 @@ pub struct MoveChatParams {
 pub struct MoveChatResult {
     /// Authoritative owning session URI after the move.
     pub session: Uri,
+}
+
+/// Lists canvas types currently available to open for one exact chat.
+///
+/// This read MAY lazily resume an existing persisted chat so its extension
+/// registry can be reconstructed. It MUST NOT create a backing runtime for a
+/// brand-new chat, send a user message, or invoke a model.
+///
+/// Clients MUST NOT call this command unless the selected agent advertises
+/// {@link AgentCapabilities.canvases}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListCanvasTypesParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// Canvas types available to open for the requested chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListCanvasTypesResult {
+    /// Available canvas types and their declaring extensions.
+    pub items: Vec<CanvasTypeDeclaration>,
+}
+
+/// Opens or focuses one stable canvas instance in an exact chat.
+///
+/// The resulting live instance is published through the chat's
+/// {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+/// Repeating this command with the same `instanceId` focuses or refreshes that
+/// logical instance rather than creating a duplicate.
+///
+/// Clients MUST NOT call this command unless the selected agent advertises
+/// {@link AgentCapabilities.canvases}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCanvasParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Stable identifier of the extension that declares the canvas.
+    pub extension_id: String,
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+    /// Caller-chosen stable instance identifier.
+    pub instance_id: String,
 }
 
 /// Returns a list of session summaries. Used to populate session lists and sidebars.

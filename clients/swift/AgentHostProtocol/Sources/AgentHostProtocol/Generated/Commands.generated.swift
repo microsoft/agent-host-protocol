@@ -1091,6 +1091,74 @@ public struct MoveChatResult: Codable, Sendable {
     }
 }
 
+public struct ListCanvasTypesParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
+public struct ListCanvasTypesResult: Codable, Sendable {
+    /// Available canvas types and their declaring extensions.
+    public var items: [CanvasTypeDeclaration]
+
+    public init(
+        items: [CanvasTypeDeclaration]
+    ) {
+        self.items = items
+    }
+}
+
+public struct OpenCanvasParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Stable identifier of the extension that declares the canvas.
+    public var extensionId: String
+    /// Provider-local canvas type identifier.
+    public var canvasId: String
+    /// Caller-chosen stable instance identifier.
+    public var instanceId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case extensionId
+        case canvasId
+        case instanceId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        extensionId: String,
+        canvasId: String,
+        instanceId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.extensionId = extensionId
+        self.canvasId = canvasId
+        self.instanceId = instanceId
+    }
+}
+
 public struct ListSessionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String

@@ -1049,6 +1049,47 @@ public enum SessionOriginKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Where the runtime discovered an extension that declares a canvas type.
+public enum CanvasExtensionSource: Codable, Sendable, Equatable {
+    /// Extension installed for the current user.
+    case user
+    /// Extension discovered in the current project.
+    case project
+    /// Extension installed only for the current session.
+    case session
+    /// Extension contributed by an installed plugin.
+    case plugin
+    /// Extension source is unavailable or not recognized by this protocol version.
+    case unspecified
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "user": self = .user
+        case "project": self = .project
+        case "session": self = .session
+        case "plugin": self = .plugin
+        case "unknown": self = .unspecified
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .user: try container.encode("user")
+        case .project: try container.encode("project")
+        case .session: try container.encode("session")
+        case .plugin: try container.encode("plugin")
+        case .unspecified: try container.encode("unknown")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1479,6 +1520,10 @@ public struct AgentInfo: Codable, Sendable {
 }
 
 public struct AgentCapabilities: Codable, Sendable {
+    /// The agent can list canvas types for an exact chat with `listCanvasTypes`
+    /// and open them with `openCanvas`. Live instances are published through the
+    /// chat's canvas references and their `ahp-canvas:` state channels.
+    public var canvases: [String: AnyCodable]?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1497,9 +1542,11 @@ public struct AgentCapabilities: Codable, Sendable {
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
 
     public init(
+        canvases: [String: AnyCodable]? = nil,
         multipleChats: MultipleChatsCapability? = nil,
         multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
     ) {
+        self.canvases = canvases
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
     }
@@ -6104,6 +6151,45 @@ public struct EmptyState: Codable, Sendable {
     public init(
 
     ) {
+    }
+}
+
+public struct CanvasTypeDeclaration: Codable, Sendable {
+    /// Provider-local canvas type identifier.
+    public var canvasId: String
+    /// Stable identifier of the extension that declares the canvas.
+    public var extensionId: String
+    /// Where the runtime discovered the declaring extension.
+    public var extensionSource: CanvasExtensionSource
+    /// Human-readable extension name, when available.
+    public var extensionName: String?
+    /// Human-readable canvas type name.
+    public var displayName: String
+    /// Description of what the canvas type does.
+    public var description: String
+    /// Whether opening this canvas requires an input flow.
+    public var requiresInput: Bool
+    /// Number of actions the canvas declares.
+    public var actionCount: Int
+
+    public init(
+        canvasId: String,
+        extensionId: String,
+        extensionSource: CanvasExtensionSource,
+        extensionName: String? = nil,
+        displayName: String,
+        description: String,
+        requiresInput: Bool,
+        actionCount: Int
+    ) {
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+        self.extensionSource = extensionSource
+        self.extensionName = extensionName
+        self.displayName = displayName
+        self.description = description
+        self.requiresInput = requiresInput
+        self.actionCount = actionCount
     }
 }
 

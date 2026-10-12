@@ -503,6 +503,22 @@ const (
 	SessionOriginKindAutomation SessionOriginKind = "automation"
 )
 
+// Where the runtime discovered an extension that declares a canvas type.
+type CanvasExtensionSource string
+
+const (
+	// Extension installed for the current user.
+	CanvasExtensionSourceUser CanvasExtensionSource = "user"
+	// Extension discovered in the current project.
+	CanvasExtensionSourceProject CanvasExtensionSource = "project"
+	// Extension installed only for the current session.
+	CanvasExtensionSourceSession CanvasExtensionSource = "session"
+	// Extension contributed by an installed plugin.
+	CanvasExtensionSourcePlugin CanvasExtensionSource = "plugin"
+	// Extension source is unavailable or not recognized by this protocol version.
+	CanvasExtensionSourceUnspecified CanvasExtensionSource = "unknown"
+)
+
 // Operations the host currently permits for an automation.
 //
 // The list on {@link AutomationEntry.operations} is authoritative and may
@@ -786,6 +802,10 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// The agent can list canvas types for an exact chat with `listCanvasTypes`
+	// and open them with `openCanvas`. Live instances are published through the
+	// chat's canvas references and their `ahp-canvas:` state channels.
+	Canvases map[string]json.RawMessage `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -1461,6 +1481,30 @@ type ChatState struct {
 	Draft *Message `json:"draft,omitempty"`
 	// Additional provider-specific metadata for this chat.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// One canvas type currently available to open for an exact chat.
+//
+// This is discovery metadata, not a live canvas instance. Live instances are
+// represented by {@link CanvasReference} entries on chat state and their
+// corresponding {@link CanvasState} channels.
+type CanvasTypeDeclaration struct {
+	// Provider-local canvas type identifier.
+	CanvasId string `json:"canvasId"`
+	// Stable identifier of the extension that declares the canvas.
+	ExtensionId string `json:"extensionId"`
+	// Where the runtime discovered the declaring extension.
+	ExtensionSource CanvasExtensionSource `json:"extensionSource"`
+	// Human-readable extension name, when available.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Human-readable canvas type name.
+	DisplayName string `json:"displayName"`
+	// Description of what the canvas type does.
+	Description string `json:"description"`
+	// Whether opening this canvas requires an input flow.
+	RequiresInput bool `json:"requiresInput"`
+	// Number of actions the canvas declares.
+	ActionCount int64 `json:"actionCount"`
 }
 
 // Stable reference to a subscribable canvas channel.
