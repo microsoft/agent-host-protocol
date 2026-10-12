@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Capability-gated `listCanvasTypes` and `openCanvas` commands for discovering extension canvases and opening them in an exact chat."
+}

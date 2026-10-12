@@ -1354,6 +1354,56 @@ impl<'de> serde::Deserialize<'de> for SessionOriginKind {
     }
 }
 
+/// Where the runtime discovered an extension that declares a canvas type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasExtensionSource {
+    /// Extension installed for the current user.
+    User,
+    /// Extension discovered in the current project.
+    Project,
+    /// Extension installed only for the current session.
+    Session,
+    /// Extension contributed by an installed plugin.
+    Plugin,
+    /// Extension source is unavailable or not recognized by this protocol version.
+    Unspecified,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasExtensionSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::User => serializer.serialize_str("user"),
+            Self::Project => serializer.serialize_str("project"),
+            Self::Session => serializer.serialize_str("session"),
+            Self::Plugin => serializer.serialize_str("plugin"),
+            Self::Unspecified => serializer.serialize_str("unknown"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasExtensionSource {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "user" => Self::User,
+            "project" => Self::Project,
+            "session" => Self::Session,
+            "plugin" => Self::Plugin,
+            "unknown" => Self::Unspecified,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1773,6 +1823,11 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// The agent can list canvas types for an exact chat with `listCanvasTypes`
+    /// and open them with `openCanvas`. Live instances are published through the
+    /// chat's canvas references and their `ahp-canvas:` state channels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<JsonObject>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -2148,6 +2203,33 @@ pub struct ChatState {
     /// Additional provider-specific metadata for this chat.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// One canvas type currently available to open for an exact chat.
+///
+/// This is discovery metadata, not a live canvas instance. Live instances are
+/// represented by {@link CanvasReference} entries on chat state and their
+/// corresponding {@link CanvasState} channels.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTypeDeclaration {
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+    /// Stable identifier of the extension that declares the canvas.
+    pub extension_id: String,
+    /// Where the runtime discovered the declaring extension.
+    pub extension_source: CanvasExtensionSource,
+    /// Human-readable extension name, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Human-readable canvas type name.
+    pub display_name: String,
+    /// Description of what the canvas type does.
+    pub description: String,
+    /// Whether opening this canvas requires an input flow.
+    pub requires_input: bool,
+    /// Number of actions the canvas declares.
+    pub action_count: i64,
 }
 
 /// Stable reference to a subscribable canvas channel.

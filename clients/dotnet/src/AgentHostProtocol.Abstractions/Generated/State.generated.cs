@@ -176,6 +176,68 @@ internal sealed class SessionOriginKindConverter : JsonConverter<SessionOriginKi
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Where the runtime discovered an extension that declares a canvas type.</summary>
+[JsonConverter(typeof(CanvasExtensionSourceConverter))]
+public readonly struct CanvasExtensionSource : IEquatable<CanvasExtensionSource>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CanvasExtensionSource(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Extension installed for the current user.</summary>
+    public static readonly CanvasExtensionSource User = new CanvasExtensionSource("user");
+
+    /// <summary>Extension discovered in the current project.</summary>
+    public static readonly CanvasExtensionSource Project = new CanvasExtensionSource("project");
+
+    /// <summary>Extension installed only for the current session.</summary>
+    public static readonly CanvasExtensionSource Session = new CanvasExtensionSource("session");
+
+    /// <summary>Extension contributed by an installed plugin.</summary>
+    public static readonly CanvasExtensionSource Plugin = new CanvasExtensionSource("plugin");
+
+    /// <summary>Extension source is unavailable or not recognized by this protocol version.</summary>
+    public static readonly CanvasExtensionSource Unspecified = new CanvasExtensionSource("unknown");
+
+    /// <inheritdoc />
+    public bool Equals(CanvasExtensionSource other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CanvasExtensionSource other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CanvasExtensionSource left, CanvasExtensionSource right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CanvasExtensionSource left, CanvasExtensionSource right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CanvasExtensionSource"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CanvasExtensionSourceConverter : JsonConverter<CanvasExtensionSource>
+{
+    /// <inheritdoc />
+    public override CanvasExtensionSource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CanvasExtensionSource(reader.GetString() ?? throw new JsonException("CanvasExtensionSource expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CanvasExtensionSource value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Discriminant for {@link ChatOrigin} — how a chat came into existence.</summary>
 [JsonConverter(typeof(ChatOriginKindConverter))]
 public readonly struct ChatOriginKind : IEquatable<ChatOriginKind>
@@ -2053,6 +2115,12 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
+    /// <summary>The agent can list canvas types for an exact chat with `listCanvasTypes`
+    /// and open them with `openCanvas`. Live instances are published through the
+    /// chat's canvas references and their `ahp-canvas:` state channels.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Canvases { get; init; }
+
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -2589,6 +2657,39 @@ public sealed class ChatState
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
+/// <summary>One canvas type currently available to open for an exact chat.
+///
+/// This is discovery metadata, not a live canvas instance. Live instances are
+/// represented by {@link CanvasReference} entries on chat state and their
+/// corresponding {@link CanvasState} channels.</summary>
+public sealed record CanvasTypeDeclaration
+{
+    /// <summary>Provider-local canvas type identifier.</summary>
+    public required string CanvasId { get; init; }
+
+    /// <summary>Stable identifier of the extension that declares the canvas.</summary>
+    public required string ExtensionId { get; init; }
+
+    /// <summary>Where the runtime discovered the declaring extension.</summary>
+    public CanvasExtensionSource ExtensionSource { get; init; }
+
+    /// <summary>Human-readable extension name, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExtensionName { get; init; }
+
+    /// <summary>Human-readable canvas type name.</summary>
+    public required string DisplayName { get; init; }
+
+    /// <summary>Description of what the canvas type does.</summary>
+    public required string Description { get; init; }
+
+    /// <summary>Whether opening this canvas requires an input flow.</summary>
+    public bool RequiresInput { get; init; }
+
+    /// <summary>Number of actions the canvas declares.</summary>
+    public long ActionCount { get; init; }
 }
 
 /// <summary>Stable reference to a subscribable canvas channel.

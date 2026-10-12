@@ -107,6 +107,12 @@ export interface AgentInfo {
  */
 export interface AgentCapabilities {
   /**
+   * The agent can list canvas types for an exact chat with `listCanvasTypes`
+   * and open them with `openCanvas`. Live instances are published through the
+   * chat's canvas references and their `ahp-canvas:` state channels.
+   */
+  canvases?: Record<string, never>;
+  /**
    * The agent can host more than one concurrent chat per session. When absent,
    * clients MUST NOT call `createChat` to open chats beyond the default one the
    * session starts with. An empty object `{}` advertises multi-chat without
