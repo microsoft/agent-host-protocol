@@ -5,6 +5,10 @@ export default withMermaid(defineConfig({
   title: 'Agent Host Protocol',
   description: 'Documentation for the Agent Host Protocol — a synchronized, multi-client state protocol for AI agent sessions',
   base: '/agent-host-protocol/',
+  mermaid: {
+    theme: 'neutral',
+    fontFamily: '"Helvetica Neue", Arial, Helvetica, sans-serif',
+  },
 
   head: [
     ['link', { rel: 'stylesheet', href: 'https://unpkg.com/@vscode/codicons/dist/codicon.css' }],

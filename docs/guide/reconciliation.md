@@ -33,6 +33,23 @@ When the client receives an `ActionEnvelope` from the server:
 
 ## Example
 
+The [homepage](/) is a short notebook that walks through this flow in seven
+notes. It is a local, scripted simulation: the "host" and every client mirror
+run in your browser through the canonical reducers, the agent and terminal
+output are scripted, and no network requests are made. Each note holds its
+state until you scroll on or press **Next**. An optimistic message renders
+faded until its own echo arrives. The phone then approves a tool call and loses
+its transport while the host advances. It sends one `reconnect` request with
+`lastSeenServerSeq` and its subscriptions, and the missed envelopes arrive in
+order inside the **response**. The client drops its pending queue and applies
+them to its confirmed state to converge. An opt-in detail shows the snapshot
+fallback for a gap too old to replay. Later notes reduce automation catalogue
+and run actions, terminal claims and output, and show channels turning on only
+when the negotiated host advertises them. With reduced motion enabled, the steps
+are identical, but devices swap in place without sliding or zooming.
+The navigation's theme switch applies to the notebook, device screens and the
+rest of the documentation; your light or dark preference persists between pages.
+
 ```
 Time  Server                          Client A                        Client B
 ─────────────────────────────────────────────────────────────────────────────────
