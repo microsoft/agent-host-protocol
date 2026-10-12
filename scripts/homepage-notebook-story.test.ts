@@ -2,17 +2,18 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { converged, deviceIds, optimisticState, pickActiveStep, stateDigest } from '../docs/.vitepress/theme/notebook.js'
 import {
-  baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, deviceSeq, features, hostSeq, insetFor,
+  baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, deviceSeq, features, finalChapter, hostSeq, insetFor,
   lastStop, planeSize, sceneBoxes, stopDiff, stops, stopWire, visibleDevices,
 } from '../docs/.vitepress/theme/notebook-story.js'
 import type { Layout } from '../docs/.vitepress/theme/notebook-story.js'
 import { ReconnectResultType } from '../types/common/commands.js'
 
-test('seven short chapters map onto a cover plus a bounded list of stops', () => {
-  assert.equal(chapters.length, 7)
-  assert.deepEqual(chapters.map(chapter => chapter.number), [1, 2, 3, 4, 5, 6, 7])
+test('four short chapters map onto a cover plus a bounded list of stops', () => {
+  assert.equal(chapters.length, 4)
+  assert.deepEqual(chapters.map(chapter => chapter.number), [1, 2, 3, 4])
+  assert.equal(finalChapter, 4)
   assert.equal(stops[0].chapter, 0)
-  assert.ok(stops.length <= 20)
+  assert.ok(stops.length <= 12)
   assert.equal(lastStop, stops.length - 1)
   // Chapters are contiguous and each starts at sub-step 0.
   for (const chapter of chapters) {
@@ -23,10 +24,12 @@ test('seven short chapters map onto a cover plus a bounded list of stops', () =>
     assert.deepEqual(own.map(stop => stop.index), own.map((_, index) => own[0].index + index))
     assert.equal(chapterBySlug(chapter.slug), chapter)
   }
-  assert.deepEqual([...new Set(stops.map(stop => stop.chapter))], [0, 1, 2, 3, 4, 5, 6, 7])
+  assert.deepEqual([...new Set(stops.map(stop => stop.chapter))], [0, 1, 2, 3, 4])
   assert.equal(new Set(stops.map(stop => stop.slug)).size, stops.length)
   // Reconnection is one chapter, not a run of separate ones.
-  assert.deepEqual(chapterStops(3).map(stop => stop.slug), ['link-drops', 'host-advances', 'reconnect-request', 'replay'])
+  assert.deepEqual(chapterStops(2).map(stop => stop.slug), ['link-drops', 'host-advances', 'replay'])
+  // Extensibility shows one screen per channel family.
+  assert.deepEqual(chapterStops(3).map(stop => stop.slug), ['run-running', 'take-over', 'host-offers-less'])
   assert.throws(() => chapterStart(9))
   assert.equal(chapterBySlug('nope'), undefined)
 })
@@ -41,7 +44,7 @@ test('prev, next and direct jumps clamp and land on the same derived state in an
     return JSON.stringify({ stop, inset: insetFor(stop), wire: stopWire(stop), diff: stopDiff(stop), host: hostSeq(stop), seqs: deviceIds.map(id => deviceSeq(stop, id)), features: features(stop) })
   }
   const reference = stops.map(stop => derive(stop.index))
-  const path = [chapterStart(7), chapterStart(3) + 3, 0, chapterStart(5), chapterStart(5) - 1, chapterStart(5), lastStop, 2]
+  const path = [chapterStart(4), chapterStart(2) + 2, 0, chapterStart(3), chapterStart(3) - 1, chapterStart(3), lastStop, 2]
   for (const index of path) assert.equal(derive(index), reference[index])
   let cursor = 0
   for (let index = 0; index < lastStop; index++) cursor = clampStop(cursor + 1)
@@ -56,11 +59,10 @@ test('devices enter and exit by chapter: one desktop for single-screen points, t
   const shown = (slug: string) => visibleDevices(stops.find(stop => stop.slug === slug)!)
   assert.deepEqual(shown('cover'), ['desktop', 'tablet', 'phone'])
   assert.deepEqual(shown('optimistic'), ['desktop'])
-  assert.deepEqual(shown('echo'), ['desktop', 'tablet', 'phone'])
-  for (const stop of chapterStops(3)) assert.deepEqual(visibleDevices(stop), ['desktop', 'phone'])
-  assert.deepEqual(shown('catalogue'), ['desktop'])
+  for (const stop of chapterStops(2)) assert.deepEqual(visibleDevices(stop), ['desktop', 'phone'])
   assert.deepEqual(shown('run-running'), ['desktop', 'tablet'])
-  for (const stop of [...chapterStops(5), ...chapterStops(6)]) assert.deepEqual(visibleDevices(stop), ['desktop'])
+  assert.deepEqual(shown('take-over'), ['desktop'])
+  assert.deepEqual(shown('host-offers-less'), ['desktop'])
   assert.deepEqual(shown('any-client'), ['desktop', 'tablet', 'phone'])
   for (const stop of stops) assert.ok(visibleDevices(stop).includes(stop.focus), stop.slug)
 })
@@ -92,7 +94,10 @@ test('every scene fits inside the plane without devices overlapping each other o
 })
 
 test('the reconnect chapter really replays the missed actions in order and converges the phone', () => {
-  const replay = chatFrame(stops.find(stop => stop.slug === 'replay')!)
+  const replayStop = stops.find(stop => stop.slug === 'replay')!
+  const replay = chatFrame(replayStop)
+  // The merged stop shows the reconnect request alongside its response.
+  assert.deepEqual(stopWire(replayStop).map(record => (record.message as { method?: string }).method ?? 'result'), ['reconnect', 'result'])
   const reply = replay.wire.find(record => record.label.includes('result'))!.message as { result: { type: string; actions: { serverSeq: number }[] } }
   assert.equal(reply.result.type, ReconnectResultType.Replay)
   assert.deepEqual(reply.result.actions.map(action => action.serverSeq), [46, 47, 48, 49])
@@ -118,7 +123,7 @@ test('each stop carries one small inset and opt-in wire details', () => {
     const inset = insetFor(stop)
     assert.ok(inset.label.length > 0, stop.slug)
     assert.ok(inset.lines.length >= 1 && inset.lines.length <= 6, `${stop.slug} has ${inset.lines.length} inset lines`)
-    if (stop.chapter > 0 && stop.chapter < 7) assert.ok(stopWire(stop).length >= 1, stop.slug)
+    if (stop.chapter > 0 && stop.chapter < finalChapter) assert.ok(stopWire(stop).length >= 1, stop.slug)
   }
   const negotiation = features(stops.find(stop => stop.slug === 'host-offers-less')!)!
   assert.equal(negotiation.protocolVersion, '1.0.0')

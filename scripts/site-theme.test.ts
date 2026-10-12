@@ -50,7 +50,7 @@ test('all notebook surfaces inherit the shared palette instead of pinning a colo
     assert.ok(styles, `${component} has scoped styles`)
     assert.doesNotMatch(styles, /#[\da-f]{3,8}\b|rgba?\(/i, `${component} must use shared color tokens`)
     for (const match of styles.matchAll(/var\((--nb-[\w-]+)/g)) {
-      assert.ok(light[match[1]] || match[1] === '--nb-top', `${component}: undefined theme token ${match[1]}`)
+      assert.ok(light[match[1]] || ['--nb-top', '--nb-stage-h', '--nb-peek'].includes(match[1]), `${component}: undefined theme token ${match[1]}`)
     }
   }
   assert.doesNotMatch(css, /\.switchyard-home\s*\{[^}]*--vp-c-/s, 'homepage must not override the selected theme')

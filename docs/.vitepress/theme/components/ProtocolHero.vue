@@ -10,8 +10,8 @@ import TerminalView from './TerminalView.vue'
 import { checkpoints, clientIds, deviceIds, pickActiveStep, stateDigest } from '../notebook.js'
 import type { DeviceId, Subject } from '../notebook.js'
 import {
-  automationFrame, baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, desktopApps,
-  deviceSeq, features, hostSeq, insetFor, lastStop, planeSize, receivedBy, sceneBoxes, stopDiff, stops, stopWire,
+  automationFrame, baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, desktopApps, finalChapter,
+  deviceSeq, features, hostSeq, insetFor, planeSize, receivedBy, sceneBoxes, stopDiff, stops, stopWire,
   subjectLabel, terminalFrame, visibleDevices,
 } from '../notebook-story.js'
 import type { Layout, Stop } from '../notebook-story.js'
@@ -24,78 +24,65 @@ const reveal = ref(0)
 const reducedMotion = ref(false)
 const wide = ref(true)
 const fit = ref(1)
+/** Space left below the cover so the first chapter peeks above the fold. */
+const peek = computed(() => wide.value ? 150 : 104)
+/** Spare vertical space in the wide figure, split evenly so the devices sit centred. */
+const slack = ref(0)
 const layout = computed<Layout>(() => wide.value ? 'full' : 'compact')
 
 const pad = (value: number) => String(value).padStart(2, '0')
-const json = (value: unknown) => JSON.stringify(value, null, 2)
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const jsonToken = /("(?:\\.|[^\\"])*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g
+/** Pretty-printed JSON as escaped HTML with token classes for highlighting. */
+const json = (value: unknown) => escapeHtml(JSON.stringify(value, null, 2)).replace(jsonToken, (token, string?: string, colon?: string) => {
+  if (string) return colon ? `<span class="j-key">${string}</span>${colon}` : `<span class="j-str">${string}</span>`
+  return `<span class="${/^-?\d/.test(token) ? 'j-num' : 'j-lit'}">${token}</span>`
+})
+const messageCount = (count: number) => `${count} ${count === 1 ? 'message' : 'messages'}`
 
 // ─── Copy ──────────────────────────────────────────────────────────────────
 
-interface StepCopy { body: string; aside?: string }
+/** `wire` explains the messages shown when the step's message list is expanded. */
+interface StepCopy { body: string; aside?: string; wire?: string }
 const copy: Record<string, StepCopy> = {
   optimistic: {
-    body: 'You type into the desktop app. It sends <code>chat/turnStarted</code> as a <code>dispatchAction</code> with <code>clientSeq: 7</code> and shows it straight away, faded, because it sits in <code>pending</code> on top of the confirmed snapshot from <code>#40</code>. What you see is <code>pending.reduce(chatReducer, confirmed)</code>.',
-  },
-  echo: {
-    body: 'The host runs the same <code>chatReducer</code>, stamps the action <code>serverSeq: 41</code> with <code>origin: { clientId, clientSeq: 7 }</code> and sends it to every subscriber. The desktop recognises its own write and drops it from pending; the tablet and phone just apply it.',
-  },
-  'tool-waits': {
-    body: 'The agent streams a reply and asks to run a tool. <code>chat/toolCallReady</code> arrives without <code>confirmed</code>, so every mirror parks the call in <code>pending-confirmation</code>. Same actions, same order: any screen can approve.',
+    body: 'AHP drives the UI by applying actions to state through pure reducers. A client sends a message by issuing <code>chat/turnStarted</code> as a <code>dispatchAction</code>, and can naturally show it in a pending state until the server acknowledges it.\n\nOther clients stay in sync by seeing the stream of actions echoed and broadcast by the agent host. The host is the arbiter of state and can choose to reject or reconcile concurrent conflicting actions.',
+    wire: 'The client numbers each write with its own <code>clientSeq</code> and keeps it in <code>pending</code>, drawing the confirmed state with pending actions applied on top. When the host broadcasts the action back with an <code>origin</code> naming this client and <code>clientSeq</code>, it moves from pending into confirmed state.',
   },
   'link-drops': {
-    body: 'You approve on the phone just as it loses signal. The host accepts the approval as <code>#46</code>, but the echo never arrives. The phone keeps <code>lastSeenServerSeq: 45</code> and one pending write.',
+    body: 'Because actions are pure, sequenced envelopes, AHP behaves well under network interruptions. Clients can keep letting the user work and reconcile their pending actions when the network reconnects. Here, the phone approves a tool call just as it loses signal.',
+    wire: 'The host accepted the approval, stamped it <code>#46</code> and broadcast it with the phone’s <code>origin</code>. Only the desktop and tablet were still connected to receive it, so the phone keeps the approval pending. It isn’t lost, just not yet confirmed.',
   },
   'host-advances': {
-    body: 'The host does not wait. The tool finishes and the turn completes, <code>#47</code> to <code>#49</code>, on the desktop. The phone stays at <code>#45</code>.',
-  },
-  'reconnect-request': {
-    body: 'On a new transport the phone sends one <code>reconnect</code> <em>request</em>: its <code>clientId</code>, <code>lastSeenServerSeq: 45</code> and the subscriptions it held.',
+    body: 'The host can keep working too. When a client reconnects, the host sends either the actions it missed or simply a snapshot of the current state.',
+    wire: 'These actions carry no <code>origin</code>: they come from the host itself as the agent makes progress. Each takes the next <code>serverSeq</code>, which is how a client that falls behind knows exactly what it missed.',
   },
   replay: {
-    body: 'The <em>response</em> carries the missed envelopes, <code>#46</code> to <code>#49</code>; they are not re-sent as notifications. The phone clears pending, since its approval comes back as <code>#46</code> with its own origin, and applies them in order. Its state now matches the host.',
-    aside: 'Protocol notifications such as <code>sessionAdded</code> are not replayed; re-fetch with <code>listSessions</code>.',
-  },
-  catalogue: {
-    body: 'A nightly check lives on the host. The desktop subscribes to the <code>ahp-automations://</code> catalogue; the entry’s <code>ahp-automation:/…</code> URI names it but is not a channel you subscribe to. Triggers, <code>nextRunAt</code> and run claims are the host’s job. Clients never run a fallback scheduler.',
-  },
-  'run-requested': {
-    body: '<b>Run now</b> sends <code>runAutomation</code> with a <code>requestId</code>. The host persists a pending run before any session exists, publishes <code>automation/set</code> (<code>#50</code>) and returns the run URI. Retrying with the same <code>requestId</code> returns the same run.',
+    body: 'The client then reconciles its pending actions with the current state. Each one is applied, or rejected if it would conflict. The phone’s approval already reached the host before the link dropped, so it’s simply confirmed, and the phone matches every other screen.',
+    wire: 'The phone tells the host the last <code>serverSeq</code> it saw, and the host answers with every action after it, in order, inside the response. The first replayed action carries the phone’s own <code>origin</code>, so the phone treats it as the echo of its pending approval.',
   },
   'run-running': {
-    body: 'The tablet opens the run. The host creates a fresh session for it, records it (<code>#51</code>, <code>#52</code>) and marks the run <code>running</code> (<code>#53</code>). The session’s <code>origin</code> points back to the automation and the run.',
-  },
-  'agent-runs': {
-    body: 'The run’s agent needs a shell. The host lists the terminal in root state (<code>#55</code>), claimed by the session with the <code>turnId</code> and <code>toolCallId</code> that started it. Command detection marks <code>npm test -- chat</code>; output streams as <code>terminal/data</code>.',
-    aside: 'The output on this page is scripted. No shell runs.',
-  },
-  backgrounded: {
-    body: 'The command exits 0 and the tool call ends, so the host narrows the claim to the session and chat (<code>#59</code>). A terminal always has exactly one owner.',
+    body: 'Chat is just one channel, and AHP is designed to be extended with more. Automations, for example, are scheduled tasks that live on the host. Any client can start a run and follow it into the session it creates.',
+    wire: 'Subscribing to the run returns a snapshot of its current state, and later changes stream in as actions on the same channel. The desktop’s catalogue updates separately on <code>ahp-automations://</code>. Each client only receives actions for the channels it subscribes to.',
   },
   'take-over': {
-    body: 'You take over on the desktop: claim the terminal for your client, then type. <code>terminal/input</code> changes no state. Text appears only when the host’s pty answers with <code>terminal/data</code>.',
-  },
-  'chat-first': {
-    body: 'You don’t need every channel on day one. <code>initialize</code> offers the versions your client speaks and the host picks one, here <code>1.0.0</code>. This build only implements chat, so it shows one app.',
-  },
-  'add-channels': {
-    body: 'Add terminals, then automations. Each one turns on only where this host advertises it: terminals through <code>RootState.terminals</code>, automations through <code>InitializeResult.automations</code>, with limits such as <code>runCancellation</code>.',
+    body: 'Terminals are another optional capability. The agent can run a command, and you can take over the same terminal from any client. The host tracks who’s in control, and output always comes from the host, so every screen sees the same thing.',
+    wire: 'Claiming the terminal and typing into it are ordinary dispatched actions, echoed back like any other. The echoed <code>terminal/input</code> changes no state; the output only appears once the host’s shell answers with <code>terminal/data</code>.',
   },
   'host-offers-less': {
-    body: 'Another host leaves out <code>automations</code>, so the client hides that feature instead of assuming it. Check the negotiated version, the advertised capabilities and the channels each host supports, and ignore action types you don’t know.',
+    body: 'It’s important that AHP be expressive enough to implement powerful, featureful agent hosts. But it’s just as important that it’s easy to build a simple, useful integration that runs wherever developers want it.\n\nFeatures beyond basic conversations are optionally implemented and negotiated by clients and hosts when they connect, so you can start with just chat and add more as you go. This host doesn’t offer automations, so the client simply leaves them out.',
+    wire: 'The client lists the protocol versions it speaks, and the host picks one. Capabilities come back with the result: terminals are listed in the root state’s <code>terminals</code>, and automations would appear as an <code>automations</code> field on the result. This host leaves that field out, so the client hides the feature.',
   },
   'any-client': {
-    body: 'Nothing here is specific to this page. A client that speaks AHP to a compatible host receives the same envelopes and folds them through the same reducers. You build only the channels you need, gate them on what the host supports, and your screen joins in step. The language tags on the devices are illustrative.',
+    body: 'There are ready-to-use clients in several languages, so it’s easy to build AHP-compatible clients and hosts. If you’d rather implement your own, there are language-independent test suites too. We’ve found that most agents can build fully functional clients and hosts with these packages and minimal prompting.',
   },
 }
 
 const chapterLinks: Record<number, [string, string][]> = {
-  1: [['Client-side state', '/guide/reconciliation#client-side-state'], ['Actions', '/guide/actions']],
-  2: [['Reconciliation', '/guide/reconciliation#reconciliation-algorithm'], ['Chat channel', '/specification/chat-channel']],
-  3: [['Reconnection', '/specification/lifecycle#reconnection'], ['Reconciliation · reconnect', '/guide/reconciliation#reconnection']],
-  4: [['Automations guide', '/guide/automations'], ['Automation channel', '/specification/automation-channel'], ['Run channel', '/specification/automation-run-channel']],
-  5: [['Terminals guide', '/guide/terminals'], ['Terminal channel', '/specification/terminal-channel']],
-  6: [['Versioning', '/specification/versioning'], ['Connection handshake', '/specification/lifecycle#connection-handshake']],
-  7: [['Choosing a client', '/guide/clients'], ['Specification', '/specification/overview']],
+  1: [['Actions', '/guide/actions'], ['Client-side state', '/guide/reconciliation#client-side-state']],
+  2: [['Reconciliation', '/guide/reconciliation#reconnection'], ['Reconnection', '/specification/lifecycle#reconnection']],
+  3: [['Automations', '/guide/automations'], ['Terminals', '/guide/terminals'], ['Connection handshake', '/specification/lifecycle#connection-handshake']],
+  4: [['Choosing a client', '/guide/clients'], ['Test suites', 'https://github.com/microsoft/agent-host-protocol/tree/main/types/test-cases'], ['Specification', '/specification/overview']],
 }
 
 const libraries = [['TypeScript', 'typescript'], ['Rust', 'rust'], ['Kotlin', 'kotlin'], ['Swift', 'swift'], ['Go', 'go'], ['.NET', 'dotnet']] as const
@@ -166,11 +153,11 @@ const wires = computed(() => {
 })
 
 function linkOf(screen: Screen) {
-  return screen.view === 'chat' && screen.stop.chapter !== 7 ? chatFrame(screen.stop).devices[screen.id].link : 'connected'
+  return screen.view === 'chat' && screen.stop.chapter !== finalChapter ? chatFrame(screen.stop).devices[screen.id].link : 'connected'
 }
 
 function bannerOf(screen: Screen): string | undefined {
-  if (screen.view !== 'chat' || screen.stop.chapter === 7) return undefined
+  if (screen.view !== 'chat' || screen.stop.chapter === finalChapter) return undefined
   const mirror = chatFrame(screen.stop).devices[screen.id]
   if (mirror.link === 'offline') return `Transport closed · last seen #${mirror.lastSeenServerSeq}`
   if (mirror.link === 'reconnecting') return `reconnect → last seen #${mirror.lastSeenServerSeq}`
@@ -190,7 +177,7 @@ const heroZoom = 0.06
 const planeStyle = computed(() => {
   const zoom = wide.value && !reducedMotion.value ? 1 + heroZoom * (1 - reveal.value) : 1
   const lift = wide.value && !reducedMotion.value ? (1 - reveal.value) * 14 : 0
-  return { width: `${plane.value.width}px`, height: `${plane.value.height}px`, transform: `translate3d(-50%, ${lift}px, 0) scale(${(fit.value * zoom).toFixed(4)})` }
+  return { width: `${plane.value.width}px`, height: `${plane.value.height}px`, transform: `translate3d(-50%, ${Math.round(slack.value + lift)}px, 0) scale(${(fit.value * zoom).toFixed(4)})` }
 })
 const figureStyle = computed(() => wide.value ? undefined : { height: `${Math.round(plane.value.height * fit.value)}px` })
 
@@ -211,6 +198,7 @@ const snapshotFallback = () => {
 
 const runEl = ref<HTMLElement>()
 const stageEl = ref<HTMLElement>()
+const stageHeight = ref(0)
 const figureEl = ref<HTMLElement>()
 const coverEl = ref<HTMLElement>()
 const markers: HTMLElement[] = []
@@ -224,11 +212,9 @@ let motionQuery: MediaQueryList | undefined
 let resizeObserver: ResizeObserver | undefined
 
 function readingLine(): number {
-  const style = stageEl.value && getComputedStyle(stageEl.value)
-  if (!wide.value && stageEl.value && style && style.position === 'sticky') {
-    // Measure against the stage's stuck position so jumps from the cover land correctly.
-    const bottom = (parseFloat(style.top) || 0) + stageEl.value.getBoundingClientRect().height
-    return bottom + (window.innerHeight - bottom) * 0.3
+  if (!wide.value && stageEl.value) {
+    // The stacked stage is pinned to the bottom; read in the space above it.
+    return (window.innerHeight - stageEl.value.getBoundingClientRect().height) * 0.45
   }
   return window.innerHeight * 0.42
 }
@@ -250,12 +236,14 @@ function schedule(): void {
 
 function resize(): void {
   wide.value = window.innerWidth >= 1024 && window.innerHeight >= 620
+  stageHeight.value = stageEl.value?.offsetHeight ?? 0
   const box = figureEl.value
   const size = planeSize[wide.value ? 'full' : 'compact']
   if (box) {
     fit.value = wide.value
       ? Math.max(0.4, Math.min(box.clientWidth / size.width, box.clientHeight / size.height) / (1 + heroZoom))
       : Math.max(0.4, Math.min(box.parentElement!.clientWidth / size.width, (window.innerHeight * 0.36) / size.height, 1.15))
+    slack.value = wide.value ? Math.max(0, (box.clientHeight - size.height * fit.value) / 2) : 0
   }
   schedule()
 }
@@ -304,6 +292,7 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(resize)
   if (figureEl.value) resizeObserver.observe(figureEl.value)
   if (runEl.value) resizeObserver.observe(runEl.value)
+  if (stageEl.value) resizeObserver.observe(stageEl.value)
   resize()
   // Let the router's own hash scroll land first, then align the linked chapter to the reading line.
   hashTimer = setTimeout(syncHash, 120)
@@ -325,43 +314,19 @@ const variantOf = (id: DeviceId): Variant => id
 </script>
 
 <template>
-  <div class="nb" :class="{ 'is-reduced': reducedMotion, 'is-wide': wide }">
-    <div class="nb-masthead">
-      <span>AHP · Agent Host Protocol</span>
-      <span>Notebook 01 · one host, seven short notes</span>
-      <span>Local scripted simulation · canonical reducers · no backend</span>
-    </div>
-
+  <div class="nb" :class="{ 'is-reduced': reducedMotion, 'is-wide': wide }" :style="{ '--nb-stage-h': `${stageHeight}px`, '--nb-peek': `${peek}px` }">
     <div ref="runEl" class="nb-run">
       <header ref="coverEl" class="nb-cover">
-        <p class="nb-eyebrow">An open protocol for agent sessions</p>
-        <h1>One session.<br>Every screen<br>in step.</h1>
-        <p class="nb-intro">The host owns the state. Clients write ahead, the host decides the order, and every screen folds the same actions through the same pure reducer. Seven short notes follow one developer’s day: a chat, a dropped link, an automation, a terminal and a client of your own.</p>
+        <h1>A protocol for synchronizing agent state across UIs</h1>
+        <p class="nb-intro">AHP is a display protocol built to let many interfaces operate on shared session state. It’s an extensible, bidirectional, state-based protocol that works well across a variety of modalities and network conditions.</p>
         <div class="nb-cta">
           <a class="nb-primary" :href="withBase('/guide/what-is-ahp')">Read the guide</a>
           <a :href="withBase('/specification/overview')">Specification ↗</a>
         </div>
-        <p class="nb-fine">JSON-RPC 2.0 over WebSocket · clients in TypeScript, Rust, Kotlin, Swift, Go and .NET</p>
       </header>
 
       <div class="nb-stage-col">
         <section ref="stageEl" class="nb-stage" aria-label="Protocol notebook stage" :style="{ '--reveal': reveal }">
-          <div class="nb-stage-head">
-            <p class="nb-stage-title">
-              <template v-if="chapter"><span>§{{ pad(chapter.number) }}</span> {{ chapter.title }}<i v-if="chapterStops(chapter.number).length > 1"> · {{ stop.sub + 1 }}/{{ chapterStops(chapter.number).length }}</i></template>
-              <template v-else><span>§00</span> One turn, three screens</template>
-            </p>
-            <nav class="nb-nav" aria-label="Notebook chapters">
-              <button type="button" class="nb-nav-step" aria-label="Previous step" :disabled="step === 0" @click="goto(step - 1)"><span aria-hidden="true">←<span class="nb-nav-word"> Prev</span></span></button>
-              <ol>
-                <li v-for="entry in chapters" :key="entry.slug">
-                  <button type="button" :aria-current="entry.number === stop.chapter ? 'step' : undefined" :aria-label="`Chapter ${entry.number}: ${entry.title}`" :title="entry.title" @click="goto(chapterStart(entry.number))">{{ pad(entry.number) }}</button>
-                </li>
-              </ol>
-              <button type="button" class="nb-nav-step" aria-label="Next step" :disabled="step === lastStop" @click="goto(step + 1)"><span aria-hidden="true"><span class="nb-nav-word">Next </span>→</span></button>
-            </nav>
-          </div>
-
           <figure ref="figureEl" class="nb-figure" :style="figureStyle">
             <div class="nb-plane" :class="`is-${layout}`" :style="planeStyle" aria-hidden="true">
               <svg class="nb-wires" :viewBox="`0 0 ${plane.width} ${plane.height}`" focusable="false">
@@ -398,7 +363,7 @@ const variantOf = (id: DeviceId): Variant => id
             <figcaption class="nb-sr">{{ deviceSummary }}</figcaption>
           </figure>
 
-          <div class="nb-foot">
+          <div class="nb-foot" :class="{ 'is-cover': stop.chapter === 0 }" :aria-hidden="stop.chapter === 0 || undefined">
             <Transition name="nb-fade" mode="out-in">
               <div :key="stop.slug" class="nb-foot-inner">
                 <p class="nb-caption">{{ stop.caption }}</p>
@@ -408,7 +373,6 @@ const variantOf = (id: DeviceId): Variant => id
                 </div>
               </div>
             </Transition>
-            <p class="nb-local">Scripted in your browser. No host, no network, no model.</p>
           </div>
           <p class="nb-sr" aria-live="polite">{{ announcement }}</p>
         </section>
@@ -426,18 +390,19 @@ const variantOf = (id: DeviceId): Variant => id
                 class="nb-step" :class="{ 'is-active': item.index === step, 'is-sub': item.sub > 0 }"
               >
                 <h3 v-if="chapterStops(entry.number).length > 1"><span>{{ item.sub + 1 }}</span> {{ item.title }}</h3>
-                <p v-html="copy[item.slug].body"></p>
+                <p v-for="(paragraph, index) in copy[item.slug].body.split('\n\n')" :key="index" v-html="paragraph"></p>
                 <p v-if="copy[item.slug].aside" class="nb-aside" v-html="copy[item.slug].aside"></p>
                 <div class="nb-inset nb-narrow-only">
                   <p class="nb-label">{{ insetFor(item).label }}</p>
                   <ul><li v-for="(line, index) in insetFor(item).lines" :key="index" :class="`op-${line.op === '+' ? 'add' : line.op === '-' ? 'del' : line.op === '~' ? 'mod' : line.op === '>' ? 'msg' : 'eq'}`"><b>{{ line.op }}</b>{{ line.text }}</li></ul>
                 </div>
                 <details v-if="stopWire(item).length" class="nb-glass" @toggle="onToggle(item.slug, $event)">
-                  <summary><span>Under the glass</span><i>{{ stopWire(item).length }} messages{{ stopDiff(item) ? ' · view diff' : '' }}</i></summary>
+                  <summary><span>{{ messageCount(stopWire(item).length) }}</span><i v-if="stopDiff(item)">view diff</i></summary>
                   <template v-if="open.has(item.slug)">
+                    <p v-if="copy[item.slug].wire" class="nb-glass-text" v-html="copy[item.slug].wire"></p>
                     <section v-for="(record, index) in stopWire(item)" :key="index" class="nb-wire">
                       <p><b>{{ record.label }}</b><i>{{ routeLabel(record.from, record.to) }}</i></p>
-                      <pre>{{ json(record.message) }}</pre>
+                      <pre v-html="json(record.message)"></pre>
                     </section>
                     <section v-if="stopDiff(item)?.entries.length" class="nb-wire">
                       <p><b>View diff</b><i>previous step → this step</i></p>
@@ -456,13 +421,13 @@ const variantOf = (id: DeviceId): Variant => id
                     <p class="nb-glass-text">Had the host trimmed its replay buffer to <code>#{{ snapshotFallback().replayFrom }}</code>, it could not replay <code>#46</code>. It would answer the same request with <code>type: "snapshot"</code> and fresh state for every subscription at <code>fromSeq: {{ snapshotFallback().seq }}</code>. The phone replaces its confirmed state, clears pending and lands on the same digest, <code>{{ snapshotFallback().digest }}</code> ≡ <code>{{ snapshotFallback().host }}</code>.</p>
                     <section class="nb-wire">
                       <p><b>{{ snapshotFallback().record.label }}</b><i>{{ routeLabel(snapshotFallback().record.from, snapshotFallback().record.to) }}</i></p>
-                      <pre>{{ json(snapshotFallback().record.message) }}</pre>
+                      <pre v-html="json(snapshotFallback().record.message)"></pre>
                     </section>
                   </template>
                 </details>
               </li>
             </ol>
-            <ul v-if="entry.number === 7" class="nb-libraries" aria-label="Client libraries">
+            <ul v-if="entry.number === finalChapter" class="nb-libraries" aria-label="Client libraries">
               <li v-for="[name, directory] in libraries" :key="directory"><a :href="`https://github.com/microsoft/agent-host-protocol/tree/main/clients/${directory}`"><span>{{ name }}</span><code>clients/{{ directory }}</code></a></li>
             </ul>
             <p class="nb-more">Read more <a v-for="[label, link] in chapterLinks[entry.number]" :key="link" :href="withBase(link)">{{ label }} ↗</a></p>
@@ -475,8 +440,8 @@ const variantOf = (id: DeviceId): Variant => id
       <div class="nb-section-margin" aria-hidden="true">→</div>
       <div>
         <p class="nb-kicker">Keep reading</p>
-        <h2 id="nb-routes-title">From idea to wire format.</h2>
-        <p>The notebook skips most details on purpose. The guide explains the model; the specification is the contract.</p>
+        <h2 id="nb-routes-title">Learn more</h2>
+        <p>The guide walks through the concepts, and the specification has the full details.</p>
       </div>
       <nav class="nb-route-list" aria-label="Documentation">
         <a :href="withBase('/guide/what-is-ahp')"><b>Guide</b><span>Concepts, state model and write-ahead reconciliation.</span></a>
@@ -500,33 +465,17 @@ const variantOf = (id: DeviceId): Variant => id
 .nb code { font-family:var(--nb-mono); font-size:.88em; }
 .nb-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 
-.nb-masthead { display:flex; justify-content:space-between; gap:24px; padding:14px 0 10px; border-bottom:1px solid var(--nb-ink); font:500 11px/1.3 var(--nb-mono); letter-spacing:.04em; color:var(--nb-muted); }
-.nb-masthead span:first-child { color:var(--nb-ink); font-weight:700; }
-
 .nb-run { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr); grid-template-areas:"stage cover" "stage notes"; column-gap:48px; }
-.nb-cover { grid-area:cover; padding:44px 0 36px; border-bottom:1px solid var(--nb-line); }
-.nb-eyebrow, .nb-kicker, .nb-label { margin:0; font:600 10.5px/1.3 var(--nb-mono); letter-spacing:.1em; text-transform:uppercase; color:var(--nb-muted); }
-.nb-cover h1 { margin:14px 0 18px; font:700 clamp(40px,4.2vw,60px)/.98 var(--nb-sans); letter-spacing:-.035em; }
+.nb-cover { grid-area:cover; display:flex; flex-direction:column; justify-content:center; min-height:calc(100vh - var(--vp-nav-height, 64px) - var(--nb-peek, 0px)); padding:44px 0; border-bottom:1px solid var(--nb-line); }
+.nb-kicker, .nb-label { margin:0; font:600 10.5px/1.3 var(--nb-mono); letter-spacing:.1em; text-transform:uppercase; color:var(--nb-muted); }
+.nb-cover h1 { margin:0 0 18px; font:700 clamp(32px,3vw,44px)/1.08 var(--nb-sans); letter-spacing:-.03em; text-wrap:balance; }
 .nb-intro { margin:0; max-width:34em; font-size:16px; line-height:1.55; color:var(--nb-body); }
 .nb-cta { display:flex; flex-wrap:wrap; align-items:center; gap:22px; margin:22px 0 16px; font-weight:600; font-size:14px; }
 .nb-primary { padding:10px 16px; background:var(--nb-ink); color:var(--nb-paper) !important; border-radius:2px; }
 .nb-primary:hover { background:var(--nb-red); }
-.nb-fine { margin:0; font:11px/1.4 var(--nb-mono); color:var(--nb-faint); }
 
 .nb-stage-col { grid-area:stage; position:relative; }
 .nb-stage { position:sticky; top:var(--nb-top); height:calc(100vh - var(--nb-top) - 12px); display:flex; flex-direction:column; gap:10px; padding-top:14px; }
-.nb-stage-head { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:8px; border-bottom:1px solid var(--nb-line); }
-.nb-stage-title { margin:0; min-width:0; font:600 13px/1.3 var(--nb-sans); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.nb-stage-title span { font-family:var(--nb-mono); color:var(--nb-red); margin-right:6px; }
-.nb-stage-title i { font:400 11px/1 var(--nb-mono); font-style:normal; color:var(--nb-faint); }
-.nb-nav { display:flex; align-items:center; gap:6px; flex:none; }
-.nb-nav ol { display:flex; gap:2px; margin:0; padding:0; list-style:none; }
-.nb-nav ol button { width:28px; height:26px; padding:0; border:1px solid transparent; border-radius:2px; background:none; font:500 10.5px/1 var(--nb-mono); color:var(--nb-faint); }
-.nb-nav ol button:hover { color:var(--nb-ink); border-color:var(--nb-line); }
-.nb-nav ol button[aria-current] { background:var(--nb-ink); color:var(--nb-paper); }
-.nb-nav-step { height:26px; padding:0 9px; border:1px solid var(--nb-ink); border-radius:2px; background:transparent; font:600 11.5px/1 var(--nb-sans) !important; }
-.nb-nav-step:hover:not(:disabled) { background:var(--nb-ink); color:var(--nb-paper); }
-.nb-nav-step:disabled { opacity:.35; cursor:default; }
 
 .nb-figure { position:relative; flex:1 1 auto; min-height:0; margin:0; z-index:1; }
 .nb-plane { position:absolute; top:0; left:50%; transform-origin:50% 0; will-change:transform; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
@@ -545,7 +494,8 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-swap-enter-active, .nb-swap-leave-active { transition:opacity .22s ease; }
 .nb-swap-enter-from, .nb-swap-leave-to { opacity:0; }
 
-.nb-foot { flex:none; display:flex; flex-direction:column; gap:6px; min-height:150px; padding-top:10px; border-top:1px solid var(--nb-ink); position:relative; z-index:2; background:var(--nb-paper); }
+.nb-foot { flex:none; min-height:150px; padding-top:10px; border-top:1px solid var(--nb-ink); position:relative; z-index:2; background:var(--nb-paper); transition:opacity .3s ease, visibility 0s linear 0s; }
+.nb-foot.is-cover { opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s linear .3s; }
 .nb-foot-inner { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; align-items:start; }
 .nb-caption { margin:0; font:500 15px/1.45 var(--nb-sans); color:var(--nb-ink); }
 .nb-inset { min-width:0; padding:8px 12px; border:1px solid var(--nb-line); border-left:3px solid var(--nb-ink); background:var(--nb-surface); }
@@ -557,7 +507,6 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-inset .op-mod b { color:var(--nb-blue); }
 .nb-inset .op-msg b { color:var(--nb-faint); }
 .nb-inset .op-eq b { color:var(--nb-faint); }
-.nb-local { margin:auto 0 0; font:10.5px/1.3 var(--nb-mono); color:var(--nb-faint); }
 .nb-fade-enter-active, .nb-fade-leave-active { transition:opacity .2s ease; }
 .nb-fade-enter-from, .nb-fade-leave-to { opacity:0; }
 
@@ -581,14 +530,23 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-step > p { margin:0 0 12px; }
 .nb-step :deep(code) { padding:0 3px; background:var(--nb-code-bg); border-radius:2px; font-size:.86em; color:var(--nb-ink); }
 .nb-aside { padding-left:12px; border-left:2px solid var(--nb-line); font-size:13.5px; }
-.nb-glass { margin:0 0 6px; border:1px solid var(--nb-line); background:var(--nb-surface); border-radius:2px; }
-.nb-glass summary { display:flex; gap:10px; justify-content:space-between; padding:6px 10px; cursor:pointer; font:600 11.5px/1.35 var(--nb-mono); color:var(--nb-ink); list-style-position:inside; }
+.nb-glass { margin:0 -11px 2px; border:1px solid transparent; border-radius:2px; transition:background-color .2s ease, border-color .2s ease; }
+.nb-glass[open] { margin-bottom:8px; border-color:var(--nb-line); background:var(--nb-surface); }
+.nb-glass summary { display:flex; gap:10px; justify-content:space-between; padding:5px 10px; cursor:pointer; font:500 11.5px/1.35 var(--nb-mono); color:var(--nb-muted); list-style:none; }
+.nb-glass summary::-webkit-details-marker { display:none; }
+.nb-glass summary > span::before { content:"▸"; display:inline-block; width:1em; margin-right:.25em; text-align:center; transition:transform .15s ease; }
+.nb-glass[open] summary > span::before { transform:rotate(90deg); }
+.nb-glass summary:hover, .nb-glass[open] summary { color:var(--nb-ink); }
 .nb-glass summary i { font-style:normal; font-weight:400; color:var(--nb-faint); white-space:nowrap; }
 .nb-glass-text { margin:0; padding:8px 10px; border-top:1px solid var(--nb-line); font-size:13.5px; line-height:1.55; }
 .nb-wire { border-top:1px solid var(--nb-line); }
 .nb-wire > p { display:flex; justify-content:space-between; gap:10px; margin:0; padding:6px 10px 0; font:600 11px/1.35 var(--nb-mono); }
 .nb-wire > p i { font-style:normal; font-weight:400; color:var(--nb-faint); }
-.nb-wire pre { margin:0; padding:6px 10px 10px; max-height:260px; overflow:auto; background:transparent; font:11px/1.45 var(--nb-mono); color:var(--nb-ink); }
+.nb-wire pre { margin:0; padding:6px 10px 10px; max-height:260px; overflow:auto; background:transparent; font:11px/1.45 var(--nb-mono); color:var(--nb-faint); }
+.nb-wire pre :deep(.j-key) { color:var(--nb-blue); }
+.nb-wire pre :deep(.j-str) { color:var(--nb-green); }
+.nb-wire pre :deep(.j-num) { color:var(--nb-amber); }
+.nb-wire pre :deep(.j-lit) { color:var(--nb-red); }
 .nb-diff { margin:0; padding:6px 10px 10px; list-style:none; font:11px/1.35 var(--nb-mono); }
 .nb-diff li { display:grid; grid-template-columns:12px 1fr; column-gap:4px; padding:2px 0; }
 .nb-diff li > span { overflow-wrap:anywhere; }
@@ -617,55 +575,44 @@ const variantOf = (id: DeviceId): Variant => id
 /* Reduced motion: state changes are instant; nothing moves or scales. */
 .is-reduced .nb-plane, .is-reduced .nb-device, .is-reduced .nb-host-rail, .is-reduced .nb-chapter, .is-reduced .nb-step h3 { transition:none !important; }
 .is-reduced .nb-wires line { animation:none; }
-.is-reduced :deep(.nb-swap-enter-active), .is-reduced :deep(.nb-swap-leave-active), .is-reduced .nb-fade-enter-active, .is-reduced .nb-fade-leave-active { transition:none !important; }
+.is-reduced :deep(.nb-swap-enter-active), .is-reduced :deep(.nb-swap-leave-active), .is-reduced .nb-foot, .is-reduced .nb-fade-enter-active, .is-reduced .nb-fade-leave-active { transition:none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .nb-plane, .nb-device, .nb-host-rail, .nb-chapter, .nb-step h3, .nb-swap-enter-active, .nb-swap-leave-active, .nb-fade-enter-active, .nb-fade-leave-active { transition:none !important; }
+  .nb-plane, .nb-device, .nb-host-rail, .nb-chapter, .nb-step h3, .nb-swap-enter-active, .nb-swap-leave-active, .nb-foot, .nb-fade-enter-active, .nb-fade-leave-active { transition:none !important; }
   .nb-wires line { animation:none; }
 }
 
 @media (max-width:1279px) {
-  .nb-run { grid-template-columns:minmax(0,1.4fr) minmax(330px,1fr); column-gap:32px; }
-  .nb-nav-word { display:none; }
   .nb-foot-inner { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .nb-run { grid-template-columns:minmax(0,1.4fr) minmax(330px,1fr); column-gap:32px; }
 }
 
-/* Stacked layout: compact sticky stage holds only the nav and the devices; insets and details live in each note. */
+/* Stacked layout: the compact stage holds only the devices and sticks to the bottom; insets and details live in each note. */
 @media (max-width:1023px), (max-height:619px) {
   .nb { padding:0 24px; }
-  .nb-masthead span:nth-child(2) { display:none; }
-  .nb-run { grid-template-columns:minmax(0,1fr); grid-template-areas:"cover" "stage" "notes"; }
-  .nb-cover { padding:28px 0 22px; border-bottom:0; }
-  .nb-cover h1 { font-size:clamp(34px,8vw,48px); }
+  .nb-run { grid-template-columns:minmax(0,1fr); grid-template-areas:"cover" "notes" "stage"; }
+  .nb-cover { min-height:calc(100svh - var(--vp-nav-height, 64px) - var(--nb-stage-h, 0px) - var(--nb-peek, 0px)); padding:28px 0; border-bottom:0; }
+  .nb-cover h1 { font-size:clamp(28px,6.5vw,40px); }
   .nb-stage-col { display:contents; }
-  .nb-stage { grid-area:stage; align-self:start; top:0; height:auto; z-index:5; gap:6px; padding:8px 0 6px; background:var(--nb-paper); border-bottom:1px solid var(--nb-ink); box-shadow:0 10px 18px -16px var(--nb-shadow); }
-  .nb-stage-head { padding-bottom:6px; }
-  .nb-stage-title { font-size:12px; }
+  .nb-stage { grid-area:stage; align-self:end; top:auto; bottom:0; height:auto; z-index:5; gap:6px; padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); background:var(--nb-paper); border-top:1px solid var(--nb-ink); box-shadow:0 -10px 18px -16px var(--nb-shadow); }
   .nb-figure { flex:none; }
-  .nb-plane { transition:none; }
   .nb-foot { display:none; }
-  .nb-notes { padding-bottom:40vh; background-image:none; }
-  .nb-chapter { grid-template-columns:30px minmax(0,1fr); column-gap:10px; scroll-margin-top:55vh; }
+  .nb-plane { transition:none; }
+  .nb-notes { padding-bottom:24px; background-image:none; }
+  .nb-chapter:last-child { border-bottom:0; }
+  .nb-chapter { grid-template-columns:30px minmax(0,1fr); column-gap:10px; scroll-margin-top:16px; }
   .nb-note-margin { padding-right:0; text-align:left; font-size:11px; }
   .nb-step { min-height:40vh; }
   .nb-narrow-only { display:block; margin:0 0 10px; }
   .nb-section { grid-template-columns:minmax(0,1fr); row-gap:20px; padding:40px 0; }
   .nb-section-margin { text-align:left; padding:0; }
 }
-@media (min-width:960px) and (max-width:1023px) and (min-height:620px) { .nb-stage { top:var(--vp-nav-height, 64px); } }
-@media (max-height:619px) { .nb-stage { position:relative; } }
-@media (max-width:640px) {
-  .nb-stage-head { flex-direction:column; align-items:stretch; gap:6px; }
-  .nb-nav { justify-content:space-between; }
-}
 @media (max-width:520px) {
   .nb { padding:0 16px; }
-  .nb-masthead { flex-direction:column; gap:2px; }
-  .nb-nav-step { padding:0 8px; }
-  .nb-nav ol button { width:30px; height:26px; font-size:10px; }
   .nb-chapter-body { font-size:14.5px; }
   .nb-chapter h2 { font-size:21px; }
   .nb-inset li { white-space:pre-wrap; overflow-wrap:anywhere; }
-  .nb-glass summary, .nb-wire > p { flex-direction:column; gap:2px; }
+  .nb-glass summary { flex-wrap:wrap; row-gap:2px; }
+  .nb-wire > p { flex-direction:column; gap:2px; }
   .nb-libraries { grid-template-columns:1fr; }
   .nb-libraries li a { border-right:0 !important; padding:12px 0 !important; }
   .nb-route-list a { grid-template-columns:1fr; gap:4px; }

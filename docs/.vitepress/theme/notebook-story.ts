@@ -12,7 +12,7 @@ import { checkpoints, deviceIds, diffJson, optimisticState, stateDigest } from '
 import type { Checkpoint, DeviceId, Subject } from './notebook.js'
 
 /**
- * The homepage story: seven chapters, each made of one or more stops. A stop
+ * The homepage story: a cover and four chapters, each made of one or more stops. A stop
  * is a deterministic scene — which devices are on the desk, what each one
  * shows, and which model frame it reads from. Scrolling, Prev/Next and
  * chapter jumps only ever select a stop index; nothing is accumulated.
@@ -54,17 +54,16 @@ export interface Chapter {
 }
 
 export const chapters: readonly Chapter[] = [
-  { number: 1, slug: 'write-ahead', title: 'Write ahead, without guessing', kicker: 'dispatchAction · pending' },
-  { number: 2, slug: 'one-order', title: 'One order, every screen', kicker: 'serverSeq · echo' },
-  { number: 3, slug: 'reconnect', title: 'Drop the link, catch up', kicker: 'reconnect · replay' },
-  { number: 4, slug: 'automations', title: 'Automations run on the host', kicker: 'ahp-automations://' },
-  { number: 5, slug: 'terminals', title: 'A terminal always has an owner', kicker: 'ahp-terminal:/…' },
-  { number: 6, slug: 'one-channel-at-a-time', title: 'Grow one channel at a time', kicker: 'initialize · capabilities' },
-  { number: 7, slug: 'any-client', title: 'Any client, six languages', kicker: 'interoperability' },
+  { number: 1, slug: 'actions-and-state', title: 'actions + state = ui', kicker: 'dispatchAction · reducers' },
+  { number: 2, slug: 'reconnect', title: 'Reconnect and replay', kicker: 'reconnect · replay' },
+  { number: 3, slug: 'extensibility', title: 'Built to be extended', kicker: 'channels · capabilities' },
+  { number: 4, slug: 'clients', title: 'Shovel-ready in your language', kicker: 'client libraries · test suites' },
 ]
 
+/** The closing chapter, where each device runs a different client. */
+export const finalChapter = chapters.at(-1)!.number
+
 const allBuilt = implemented
-const chatOnly: Record<ChannelFamily, boolean> = { chat: true, terminals: false, automations: false }
 const finalTags: Partial<Record<DeviceId, string>> = { desktop: 'TypeScript', tablet: 'Swift', phone: 'Kotlin' }
 
 type StopSpec = Omit<Stop, 'index' | 'sub'>
@@ -76,87 +75,42 @@ const specs: StopSpec[] = [
     caption: 'One chat on three screens, all waiting on the same approval.',
   },
   {
-    chapter: 1, slug: 'optimistic', title: 'Write ahead', scene: 'solo', focus: 'desktop',
+    chapter: 1, slug: 'optimistic', title: 'Pending until acknowledged', scene: 'solo', focus: 'desktop',
     views: { desktop: 'chat' }, chat: 'optimistic',
-    caption: 'Your message shows at once, faded until the host confirms it.',
+    caption: 'Your message shows right away, faded until the host acknowledges it.',
   },
   {
-    chapter: 2, slug: 'echo', title: 'The host picks the order', scene: 'trio', focus: 'desktop',
-    views: { desktop: 'chat', tablet: 'chat', phone: 'chat' }, chat: 'echo',
-    caption: 'One envelope, #41, folds into all three mirrors.',
-  },
-  {
-    chapter: 2, slug: 'tool-waits', title: 'A tool waits for approval', scene: 'trio', focus: 'tablet',
-    views: { desktop: 'chat', tablet: 'chat', phone: 'chat' }, chat: 'tool-waits',
-    caption: 'Same actions, same order: every screen offers the same approval.',
-  },
-  {
-    chapter: 3, slug: 'link-drops', title: 'Approve, then lose the link', scene: 'phone', focus: 'phone',
+    chapter: 2, slug: 'link-drops', title: 'Approve, then lose the link', scene: 'phone', focus: 'phone',
     views: { desktop: 'chat', phone: 'chat' }, chat: 'link-drops',
-    caption: 'The phone approves, then its socket closes before the echo lands.',
+    caption: 'The phone approves a tool call just as it loses its connection.',
   },
   {
-    chapter: 3, slug: 'host-advances', title: 'The host keeps going', scene: 'phone', focus: 'desktop',
+    chapter: 2, slug: 'host-advances', title: 'The host keeps going', scene: 'phone', focus: 'desktop',
     views: { desktop: 'chat', phone: 'chat' }, chat: 'host-advances',
-    caption: 'Desktop sees the turn finish; the phone is frozen at #45.',
+    caption: 'The turn finishes on the desktop while the phone is offline.',
   },
   {
-    chapter: 3, slug: 'reconnect-request', title: 'Reconnect with a bookmark', scene: 'phone', focus: 'phone',
-    views: { desktop: 'chat', phone: 'chat' }, chat: 'reconnect-request',
-    caption: 'One request: client id, last seen #45, the same subscriptions.',
-  },
-  {
-    chapter: 3, slug: 'replay', title: 'Replay in the response', scene: 'phone', focus: 'phone',
+    chapter: 2, slug: 'replay', title: 'Catch up and reconcile', scene: 'phone', focus: 'phone',
     views: { desktop: 'chat', phone: 'chat' }, chat: 'replay',
-    caption: 'The response holds #46 – #49; applied in order, the phone matches.',
+    caption: 'The phone reconnects, catches up and matches the other screens.',
   },
   {
-    chapter: 4, slug: 'catalogue', title: 'The catalogue', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'automations' }, chat: 'replay', automation: 'catalogue',
-    caption: 'A schedule the host owns, mirrored from ahp-automations://.',
-  },
-  {
-    chapter: 4, slug: 'run-requested', title: 'Run now', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'automations' }, chat: 'replay', automation: 'run-requested',
-    caption: 'runAutomation returns a run URI; the run is persisted as pending.',
-  },
-  {
-    chapter: 4, slug: 'run-running', title: 'A fresh session runs it', scene: 'pair', focus: 'tablet',
+    chapter: 3, slug: 'run-running', title: 'Automations', scene: 'pair', focus: 'tablet',
     views: { desktop: 'automations', tablet: 'run' }, chat: 'replay', automation: 'run-running',
-    caption: 'The tablet follows the run into its own new session.',
+    caption: 'An automation run, followed into the session it created.',
   },
   {
-    chapter: 5, slug: 'agent-runs', title: 'The agent runs a command', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'terminal' }, chat: 'replay', terminal: 'agent-runs',
-    caption: 'A tool call owns the terminal; output streams in (scripted, not a shell).',
-  },
-  {
-    chapter: 5, slug: 'backgrounded', title: 'The tool lets go', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'terminal' }, chat: 'replay', terminal: 'backgrounded',
-    caption: 'The command exits 0 and the claim narrows to the session.',
-  },
-  {
-    chapter: 5, slug: 'take-over', title: 'You take over', scene: 'solo', focus: 'desktop',
+    chapter: 3, slug: 'take-over', title: 'Terminals', scene: 'solo', focus: 'desktop',
     views: { desktop: 'terminal' }, chat: 'replay', terminal: 'take-over',
-    caption: 'Desktop claims the terminal; typed input returns only as host output.',
+    caption: 'You take over a terminal the agent was using.',
   },
   {
-    chapter: 6, slug: 'chat-first', title: 'Start with chat', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'channels' }, chat: 'replay', features: { built: chatOnly, offers: { automations: true, terminals: true } },
-    caption: 'This build implements chat only, so it shows one app.',
-  },
-  {
-    chapter: 6, slug: 'add-channels', title: 'Add terminals and automations', scene: 'solo', focus: 'desktop',
-    views: { desktop: 'channels' }, chat: 'replay', features: { built: allBuilt, offers: { automations: true, terminals: true } },
-    caption: 'New channels light up only where the host advertises them.',
-  },
-  {
-    chapter: 6, slug: 'host-offers-less', title: 'A host that offers less', scene: 'solo', focus: 'desktop',
+    chapter: 3, slug: 'host-offers-less', title: 'Capabilities', scene: 'solo', focus: 'desktop',
     views: { desktop: 'channels' }, chat: 'replay', features: { built: allBuilt, offers: { automations: false, terminals: true } },
-    caption: 'No automations capability advertised, so none shown.',
+    caption: 'This host doesn’t offer automations, so the client leaves them out.',
   },
   {
-    chapter: 7, slug: 'any-client', title: 'Three clients, one host', scene: 'trio', focus: 'desktop',
+    chapter: 4, slug: 'any-client', title: 'Three clients, one host', scene: 'trio', focus: 'desktop',
     views: { desktop: 'chat', tablet: 'run', phone: 'terminal' }, chat: 'replay', automation: 'run-running', terminal: 'take-over', tags: finalTags,
     caption: 'Different apps, different languages, one ordered stream.',
   },
@@ -260,7 +214,7 @@ export function features(stop: Stop): { rows: FeatureRow[]; protocolVersion: str
 }
 
 export type AppId = 'chat' | 'automations' | 'terminals'
-/** Apps in the desktop's navigation rail; in chapter 6 they follow the negotiated features. */
+/** Apps in the desktop's navigation rail; on a capabilities stop they follow the negotiated features. */
 export function desktopApps(stop: Stop): { id: AppId; label: string; active: boolean }[] {
   const view = stop.views.desktop
   const active: AppId = view === 'automations' || view === 'run' ? 'automations' : view === 'terminal' ? 'terminals' : 'chat'
@@ -281,7 +235,7 @@ export function hostSeq(stop: Stop): number | undefined {
 export function deviceSeq(stop: Stop, id: DeviceId): number | undefined {
   const view = stop.views[id]
   // In the final scene the desktop has followed every channel; the others keep their own bookmarks.
-  if (stop.chapter === 7 && view === 'chat') return hostSeq(stop)
+  if (stop.chapter === finalChapter && view === 'chat') return hostSeq(stop)
   switch (view) {
     case 'chat': return chatFrame(stop).devices[id].lastSeenServerSeq
     case 'automations': return automationFrame(stop)!.desktop.lastSeenServerSeq
@@ -299,14 +253,14 @@ function wireFor(stop: Stop): ChannelWire[] {
       { label: 'initialize (result)', from: 'host', to: [stop.focus], message: { jsonrpc: '2.0', id: 1, result: initializeResult(params, stop.features.offers) } },
     ]
   }
-  if (stop.chapter === 7) return []
+  if (stop.chapter === finalChapter) return []
   if (stop.terminal) return terminalFrame(stop)!.wire
   if (stop.automation) return automationFrame(stop)!.wire
   const frame = chatFrame(stop)
-  // The echo stop folds in the host's reduction step, so its dispatch is visible too.
-  if (stop.slug === 'echo') {
-    const accepted = chatFrames().find(candidate => candidate.slug === 'host-reduces')!
-    return [...accepted.wire, ...frame.wire]
+  // The replay stop folds in the reconnect request, so both halves of the exchange are visible.
+  if (stop.slug === 'replay') {
+    const request = chatFrames().find(candidate => candidate.slug === 'reconnect-request')!
+    return [...request.wire, ...frame.wire]
   }
   return frame.wire
 }
@@ -318,7 +272,7 @@ export function stopWire(stop: Stop): ChannelWire[] {
 /** Devices that received host traffic at this stop (they flash their seq badge). */
 export function receivedBy(stop: Stop): Set<DeviceId> {
   const set = new Set<DeviceId>()
-  if (stop.chapter === 0 || stop.chapter === 7) return set
+  if (stop.chapter === 0 || stop.chapter === finalChapter) return set
   for (const record of wireFor(stop)) {
     if (record.from !== 'host') continue
     for (const target of record.to) if (target !== 'host' && stop.views[target as DeviceId]) set.add(target as DeviceId)
@@ -368,22 +322,6 @@ function chatInset(stop: Stop): Inset {
         ],
       }
     }
-    case 'echo': {
-      const echoed = frame.applied.desktop?.find(entry => entry.via === 'notification')
-      return {
-        label: 'echo · reconcile',
-        lines: [
-          { op: '>', text: `#${echoed?.serverSeq} ${echoed?.type}` },
-          { op: '~', text: `origin ${echoed?.origin?.clientId} · clientSeq ${echoed?.origin?.clientSeq}` },
-          { op: '-', text: `desktop.pending #${echoed?.origin?.clientSeq}` },
-          { op: '=', text: `digest ${stateDigest(frame.host)} ×3` },
-        ],
-      }
-    }
-    case 'tool-waits': return {
-      label: 'host actions',
-      lines: [...hostApplied(frame), { op: '~', text: `toolCall.status "${toolStatus(frame.host)}"` }],
-    }
     case 'link-drops': return {
       label: 'phone · offline',
       lines: [
@@ -396,26 +334,17 @@ function chatInset(stop: Stop): Inset {
       label: 'host · keeps the order',
       lines: [...hostApplied(frame), { op: '-', text: `phone behind by ${frame.serverSeq - d.phone.lastSeenServerSeq}` }],
     }
-    case 'reconnect-request': {
-      const request = frame.wire.find(record => 'method' in record.message && record.message.method === 'reconnect')
-      const params = request && 'params' in request.message ? request.message.params as ReconnectParams : undefined
-      return {
-        label: 'phone → host · request',
-        lines: [
-          { op: '>', text: 'reconnect {' },
-          { op: '=', text: `  clientId: "${params?.clientId}",` },
-          { op: '=', text: `  lastSeenServerSeq: ${params?.lastSeenServerSeq},` },
-          { op: '=', text: `  subscriptions: [${params?.subscriptions.length} URIs] }` },
-        ],
-      }
-    }
     case 'replay': {
+      const asked = chatFrames().find(candidate => candidate.slug === 'reconnect-request')!
+      const request = asked.wire.find(record => 'method' in record.message && record.message.method === 'reconnect')
+      const params = request && 'params' in request.message ? request.message.params as ReconnectParams : undefined
       const response = frame.wire.find(record => 'result' in record.message)
       const result = response && 'result' in response.message ? response.message.result as ReconnectResult : undefined
       const actions = result && result.type === 'replay' ? result.actions : []
       return {
-        label: 'reconnect (result)',
+        label: 'reconnect → result',
         lines: [
+          { op: '>', text: `reconnect { lastSeenServerSeq: ${params?.lastSeenServerSeq} }` },
           { op: '>', text: `type "${result?.type}" · actions #${actions[0]?.serverSeq} – #${actions.at(-1)?.serverSeq}` },
           { op: '-', text: 'pending → []' },
           { op: '+', text: `confirmed = actions.reduce(chatReducer, confirmed)` },
@@ -525,7 +454,7 @@ function finalInset(stop: Stop): Inset {
 
 export function insetFor(stop: Stop): Inset {
   if (stop.features) return featureInset(stop)
-  if (stop.chapter === 7) return finalInset(stop)
+  if (stop.chapter === finalChapter) return finalInset(stop)
   if (stop.terminal) {
     const frames = terminalFrames()
     const index = frames.findIndex(frame => frame.slug === stop.terminal)
@@ -538,7 +467,7 @@ export function insetFor(stop: Stop): Inset {
 
 /** Bounded diff of the focused device's view against the previous stop in the chapter. */
 export function stopDiff(stop: Stop): ReturnType<typeof diffJson> | undefined {
-  if (stop.chapter === 0 || stop.chapter === 7 || stop.features) return undefined
+  if (stop.chapter === 0 || stop.chapter === finalChapter || stop.features) return undefined
   if (stop.terminal) {
     const frames = terminalFrames()
     const index = frames.findIndex(frame => frame.slug === stop.terminal)
@@ -551,7 +480,8 @@ export function stopDiff(stop: Stop): ReturnType<typeof diffJson> | undefined {
     return index > 0 ? diffJson(frames[index - 1].desktop.catalogue, automation.desktop.catalogue, 8) : undefined
   }
   const frame = chatFrame(stop)
-  const base = chatFrames()[frame.base]
+  const previous = stops[stop.index - 1]
+  const base = previous?.chapter === stop.chapter ? chatFrame(previous) : chatFrames()[frame.base]
   const focus = stop.focus
   return diffJson(optimisticState(base.devices[focus]), optimisticState(frame.devices[focus]), 8)
 }
