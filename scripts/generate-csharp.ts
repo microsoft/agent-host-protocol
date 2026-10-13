@@ -51,6 +51,7 @@ import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown } from './enum-com
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -2545,7 +2546,36 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptCSharp(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptCSharp(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `        ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// <summary>Which notifications count against the window on a windowed subscription.</summary>
+public static class WindowedDelivery
+{
+    private static readonly HashSet<string> s_exemptMethods = new(StringComparer.Ordinal)
+    {
+${methods}
+    };
+
+    /// <summary>
+    /// Notification methods that do not count against the window on a windowed
+    /// subscription. Every other notification for a subscription counts.
+    /// </summary>
+    public static IReadOnlyCollection<string> ExemptMethods => s_exemptMethods;
+
+    /// <summary>
+    /// Whether a notification with this method counts against the window on a
+    /// windowed subscription. Methods that are not recognized count.
+    /// </summary>
+    public static bool CountsAgainstWindow(string method) => !s_exemptMethods.Contains(method);
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

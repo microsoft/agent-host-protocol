@@ -464,3 +464,19 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.defaultChat = defaultChat
     }
 }
+
+// MARK: - Windowed Delivery
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+public let windowExemptMethods: Set<String> = [
+    "channel/credit",
+    "tcp/reset",
+    "unsubscribe",
+]
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+public func countsAgainstWindow(_ method: String) -> Bool {
+    !windowExemptMethods.contains(method)
+}

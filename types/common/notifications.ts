@@ -133,6 +133,7 @@ export interface ChannelFrameParams {
  *
  * @category Protocol Notifications
  * @method channel/credit
+ * @windowExempt
  * @stability 1.0
  * @direction Both
  * @messageType Notification

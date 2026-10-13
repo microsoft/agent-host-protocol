@@ -381,3 +381,26 @@ type PartialSessionSummary struct {
 	// Chat that receives input when none is selected, independent of catalog position.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
 }
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+// WindowExemptMethods lists the notification methods that do not count against
+// the window on a windowed subscription. Every other notification for a
+// subscription counts.
+var WindowExemptMethods = []string{
+	"channel/credit",
+	"tcp/reset",
+	"unsubscribe",
+}
+
+// CountsAgainstWindow reports whether a notification with this method counts
+// against the window on a windowed subscription. Methods that are not
+// recognized count.
+func CountsAgainstWindow(method string) bool {
+	for _, exempt := range WindowExemptMethods {
+		if method == exempt {
+			return false
+		}
+	}
+	return true
+}

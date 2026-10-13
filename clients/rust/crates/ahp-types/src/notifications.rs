@@ -463,3 +463,15 @@ pub struct PartialSessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
 }
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+pub const WINDOW_EXEMPT_METHODS: &[&str] = &["channel/credit", "tcp/reset", "unsubscribe"];
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+pub fn counts_against_window(method: &str) -> bool {
+    !WINDOW_EXEMPT_METHODS.contains(&method)
+}

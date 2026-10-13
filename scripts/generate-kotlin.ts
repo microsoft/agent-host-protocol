@@ -40,6 +40,7 @@ import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
 } from './enum-compatibility.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const GENERATED_HEADER =
   '// Generated from types/*.ts — do not edit\n\n' +
@@ -2124,7 +2125,29 @@ function generateNotificationsFile(project: Project): string {
   // consumers dispatch on the JSON-RPC method themselves and decode the
   // matching `*Params` data class.
 
+  lines.push(generateWindowExemptKotlin(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptKotlin(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/**
+ * Notification methods that do not count against the window on a windowed
+ * subscription. Every other notification for a subscription counts.
+ */
+public val WINDOW_EXEMPT_METHODS: Set<String> = setOf(
+${methods}
+)
+
+/**
+ * Whether a notification with this method counts against the window on a
+ * windowed subscription. Methods that are not recognized count.
+ */
+public fun countsAgainstWindow(method: String): Boolean = method !in WINDOW_EXEMPT_METHODS
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

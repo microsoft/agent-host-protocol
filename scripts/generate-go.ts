@@ -42,6 +42,7 @@ import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
@@ -2117,7 +2118,34 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptGo(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptGo(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `\t${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+// WindowExemptMethods lists the notification methods that do not count against
+// the window on a windowed subscription. Every other notification for a
+// subscription counts.
+var WindowExemptMethods = []string{
+${methods}
+}
+
+// CountsAgainstWindow reports whether a notification with this method counts
+// against the window on a windowed subscription. Methods that are not
+// recognized count.
+func CountsAgainstWindow(method string) bool {
+\tfor _, exempt := range WindowExemptMethods {
+\t\tif method == exempt {
+\t\t\treturn false
+\t\t}
+\t}
+\treturn true
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

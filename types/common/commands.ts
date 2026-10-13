@@ -688,6 +688,7 @@ export interface SubscribeResult {
  *
  * @category Commands
  * @method unsubscribe
+ * @windowExempt
  * @direction Client → Server
  * @messageType Notification
  * @version 1

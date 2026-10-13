@@ -27,6 +27,7 @@ import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
 } from './enum-compatibility.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -2030,7 +2031,27 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptSwift(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptSwift(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// MARK: - Windowed Delivery
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+public let windowExemptMethods: Set<String> = [
+${methods}
+]
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+public func countsAgainstWindow(_ method: String) -> Bool {
+    !windowExemptMethods.contains(method)
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

@@ -431,3 +431,21 @@ data class PartialSessionSummary(
      */
     val defaultChat: String? = null
 )
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/**
+ * Notification methods that do not count against the window on a windowed
+ * subscription. Every other notification for a subscription counts.
+ */
+public val WINDOW_EXEMPT_METHODS: Set<String> = setOf(
+    "channel/credit",
+    "tcp/reset",
+    "unsubscribe",
+)
+
+/**
+ * Whether a notification with this method counts against the window on a
+ * windowed subscription. Methods that are not recognized count.
+ */
+public fun countsAgainstWindow(method: String): Boolean = method !in WINDOW_EXEMPT_METHODS

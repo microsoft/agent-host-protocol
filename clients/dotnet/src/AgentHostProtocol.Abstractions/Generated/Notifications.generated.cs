@@ -485,3 +485,28 @@ public sealed record PartialSessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; init; }
 }
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// <summary>Which notifications count against the window on a windowed subscription.</summary>
+public static class WindowedDelivery
+{
+    private static readonly HashSet<string> s_exemptMethods = new(StringComparer.Ordinal)
+    {
+        "channel/credit",
+        "tcp/reset",
+        "unsubscribe",
+    };
+
+    /// <summary>
+    /// Notification methods that do not count against the window on a windowed
+    /// subscription. Every other notification for a subscription counts.
+    /// </summary>
+    public static IReadOnlyCollection<string> ExemptMethods => s_exemptMethods;
+
+    /// <summary>
+    /// Whether a notification with this method counts against the window on a
+    /// windowed subscription. Methods that are not recognized count.
+    /// </summary>
+    public static bool CountsAgainstWindow(string method) => !s_exemptMethods.Contains(method);
+}

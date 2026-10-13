@@ -462,6 +462,16 @@ A channel can define its own control messages. For example, the
 [TCP channel](/specification/tcp-channel) defines `tcp/reset`, which aborts a
 connection.
 
+The protocol types mark every control message with the `@windowExempt`
+annotation, and the reference pages show "Counts against the window: No" for
+them. Each generated client includes the same list, for example
+`WINDOW_EXEMPT_METHODS` and `countsAgainstWindow` in TypeScript.
+
+Both peers must agree on which messages are control messages; otherwise their
+counters differ. A peer MUST NOT send a control message that the negotiated
+protocol version does not include. A peer counts a notification whose method it
+does not recognize as a data message.
+
 Control messages do not count against the window, and a peer can send them
 when the window is full. Implementations MUST limit the size, rate, and queue
 of control messages separately.

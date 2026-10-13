@@ -188,6 +188,16 @@ function getJsDocDescription(node: InterfaceDeclaration | TypeAliasDeclaration |
   return getDescription(node);
 }
 
+/**
+ * Table row saying whether a notification counts against the window on a
+ * windowed subscription. Only notifications get the row.
+ */
+function windowRow(node: InterfaceDeclaration, messageType: string): string[] {
+  if (messageType !== 'Notification') return [];
+  const exempt = node.getJsDocs().some(doc => doc.getTags().some(tag => tag.getTagName() === 'windowExempt'));
+  return [`| Counts against the window | ${exempt ? 'No' : 'Yes'} |`];
+}
+
 function getJsDocTag(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration, tagName: string): string | undefined {
   const jsDocs = node.getJsDocs();
   for (const doc of jsDocs) {
@@ -679,7 +689,9 @@ function emitCommandBlock(project: Project, entry: RegistryEntry, paramsIface: I
   lines.push('| Property | Value |');
   lines.push('|---|---|');
   lines.push(`| Direction | ${direction} |`);
-  lines.push(`| Type | ${messageType} |\n`);
+  lines.push(`| Type | ${messageType} |`);
+  lines.push(...windowRow(paramsIface, messageType));
+  lines.push('');
 
   lines.push('**Parameters:**\n');
   if (paramsIface.getProperties().length > 0) {
@@ -779,7 +791,9 @@ function emitNotificationBlock(entry: RegistryEntry, paramsIface: InterfaceDecla
   lines.push('| Property | Value |');
   lines.push('|---|---|');
   lines.push(`| Direction | ${direction} |`);
-  lines.push(`| Type | ${messageType} |\n`);
+  lines.push(`| Type | ${messageType} |`);
+  lines.push(...windowRow(paramsIface, messageType));
+  lines.push('');
 
   if (paramsIface.getProperties().length > 0) {
     lines.push('**Parameters:**\n');

@@ -23,6 +23,7 @@ import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
@@ -2106,7 +2107,27 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptRust(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptRust(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+pub const WINDOW_EXEMPT_METHODS: &[&str] = &[
+${methods}
+];
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+pub fn counts_against_window(method: &str) -> bool {
+    !WINDOW_EXEMPT_METHODS.contains(&method)
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

@@ -65,6 +65,7 @@ export interface TcpEofParams {
  *
  * @category TCP Notifications
  * @method tcp/reset
+ * @windowExempt
  * @direction Both
  * @messageType Notification
  * @version 1
