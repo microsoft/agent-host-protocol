@@ -1252,7 +1252,7 @@ function generateErrorCodesPage(project: Project): string {
   // Typed error-data shapes
   lines.push('## Typed Error Data\n');
   lines.push('A handful of error codes carry a typed `data` payload. The mapping is captured by `AhpErrorDetailsMap`; the typed `AhpError<C>` union narrows `data` based on the code.\n');
-  for (const name of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'AhpErrorDetailsMap']) {
+  for (const name of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'InitialMessageRejectedErrorData', 'InitialMessageRejectedCause', 'AhpErrorDetailsMap']) {
     const iface = errorsFile.getInterface(name);
     if (iface) lines.push(renderInterfaceBlock(iface));
   }

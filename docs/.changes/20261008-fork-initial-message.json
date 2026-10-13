@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Capability-gated initial messages for forked chats, including a typed rejection that preserves the created chat and underlying cause."
+}

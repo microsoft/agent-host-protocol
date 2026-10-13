@@ -1729,6 +1729,18 @@ pub struct MultipleChatsCapability {
     /// MUST omit `title` when calling `createChat`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_title: Option<bool>,
+    /// The agent supports the stronger composed fork-and-initial-message
+    /// operation. Clients relying on its preserved client context, definite
+    /// acceptance or rejection result, and prompt-aware naming context MUST
+    /// require this and {@link MultipleChatsCapability.fork} to be `true`.
+    /// The naming context is available to the host's normal strategy at its
+    /// normal time; it does not guarantee title generation.
+    ///
+    /// This attestation applies only to the stronger combined operation. It does
+    /// not reject or otherwise change existing ungated `initialMessage` requests,
+    /// including legacy fork requests on third-party hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_with_initial_message: Option<bool>,
 }
 
 /// Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.

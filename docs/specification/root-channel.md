@@ -47,6 +47,15 @@ When `initialTitle` is absent or `false`, clients MUST omit `title` from
 multi-chat capabilities permit it; the host then chooses the initial title
 normally.
 
+`forkWithInitialMessage: true`, together with `fork: true`, attests the
+stronger composed operation that combines a fork source with
+[`CreateChatParams.initialMessage`](/reference/chat#createchatparams). Clients
+that rely on its preserved context, acceptance/rejection, and prompt-aware
+naming timing MUST require both capabilities before issuing it; this does not
+guarantee title generation. This capability is deliberately narrow: it does
+not gate the long-standing `initialMessage` field, including legacy fork uses
+on third-party hosts.
+
 ### Paginating the catalogue
 
 A large catalogue can be fetched incrementally. [`listSessions`](/reference/root#listsessions) accepts an optional `limit` (the maximum number of entries the client wants in the page — the server SHOULD respect it, but MAY return fewer and MAY impose its own upper cap) and an optional opaque `cursor`. The result carries the page in `items` plus an optional `nextCursor`:

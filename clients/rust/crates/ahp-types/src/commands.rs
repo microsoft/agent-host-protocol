@@ -728,6 +728,16 @@ pub struct CreateChatParams {
     /// Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
     pub chat: Uri,
     /// Optional initial message for the new chat.
+    ///
+    /// This existing field remains ungated, including for legacy fork requests.
+    /// A client that needs the stronger composed fork-and-message guarantees MUST
+    /// require both {@link MultipleChatsCapability.fork} and
+    /// {@link MultipleChatsCapability.forkWithInitialMessage}. For that
+    /// capability-backed operation, a host that has created the fork but can
+    /// definitely not accept this message MUST return `InitialMessageRejected`
+    /// (-32012) with the created chat URI and underlying rejection cause. A
+    /// successful `null` result confirms message acceptance, not completion of
+    /// the message's model turn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_message: Option<Message>,
     /// Optional source chat and source turn.

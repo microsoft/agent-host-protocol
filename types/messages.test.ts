@@ -10,6 +10,9 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AhpErrorCodes, type AhpError } from './common/errors.js';
+import type { CreateChatParams } from './channels-chat/commands.js';
+import type { MultipleChatsCapability } from './channels-root/state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
 
@@ -212,4 +215,58 @@ describe('command params/result naming conventions', () => {
       );
     });
   }
+});
+
+describe('fork initial-message contract', () => {
+  it('models the additive capability-backed fork and initial-message operation', () => {
+    const capability: MultipleChatsCapability = {
+      fork: true,
+      forkWithInitialMessage: true,
+    };
+    const params: CreateChatParams = {
+      channel: 'ahp-session:/session',
+      chat: 'ahp-chat:/fork',
+      source: {
+        kind: 'fork',
+        chat: 'ahp-chat:/source',
+        turnId: 'turn-1',
+      },
+      initialMessage: {
+        text: 'Continue from this point.',
+        origin: { kind: 'user' },
+      },
+    };
+
+    assert.equal(capability.forkWithInitialMessage, true);
+    assert.equal(params.source?.kind, 'fork');
+    assert.equal(params.initialMessage?.text, 'Continue from this point.');
+  });
+
+  it('preserves the created chat and structured underlying cause on rejection', () => {
+    const error: AhpError<typeof AhpErrorCodes.InitialMessageRejected> = {
+      code: AhpErrorCodes.InitialMessageRejected,
+      message: 'The fork was created, but the initial message was rejected.',
+      data: {
+        chat: 'ahp-chat:/fork',
+        cause: {
+          code: AhpErrorCodes.AuthRequired,
+          message: 'Authentication required for the selected model.',
+          data: {
+            resources: [{ resource: 'https://example.test/models' }],
+          },
+        },
+      },
+    };
+
+    assert.deepStrictEqual(error.data, {
+      chat: 'ahp-chat:/fork',
+      cause: {
+        code: AhpErrorCodes.AuthRequired,
+        message: 'Authentication required for the selected model.',
+        data: {
+          resources: [{ resource: 'https://example.test/models' }],
+        },
+      },
+    });
+  });
 });

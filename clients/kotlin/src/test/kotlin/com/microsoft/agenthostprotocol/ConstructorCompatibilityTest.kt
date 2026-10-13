@@ -31,5 +31,6 @@ class ConstructorCompatibilityTest {
         assertTrue(multipleChats.fork == true)
         assertTrue(multipleChats.sideChat == true)
         assertNull(multipleChats.initialTitle)
+        assertNull(multipleChats.forkWithInitialMessage)
     }
 }

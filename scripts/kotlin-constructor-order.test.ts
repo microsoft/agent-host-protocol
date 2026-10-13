@@ -20,13 +20,13 @@ describe('generated Kotlin constructor order', () => {
     );
   });
 
-  it('appends MultipleChatsCapability.initialTitle after the existing constructor properties', () => {
+  it('appends MultipleChatsCapability capability fields after the existing constructor properties', () => {
     assert.deepEqual(
       getConstructorPropertyOrder(
         new URL('../clients/kotlin/src/main/kotlin/com/microsoft/agenthostprotocol/generated/State.generated.kt', import.meta.url),
         'MultipleChatsCapability',
       ),
-      ['fork', 'sideChat', 'initialTitle'],
+      ['fork', 'sideChat', 'initialTitle', 'forkWithInitialMessage'],
     );
   });
 });

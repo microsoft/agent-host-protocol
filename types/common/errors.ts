@@ -8,6 +8,7 @@
  */
 
 import type { ProtectedResourceMetadata } from './state.js';
+import type { URI } from './state.js';
 import type { ResourceRequestParams } from './commands.js';
 
 // ─── Standard JSON-RPC Codes ─────────────────────────────────────────────────
@@ -93,6 +94,11 @@ export const AhpErrorCodes = {
    * fresh token or surface the conflict to the user.
    */
   Conflict: -32011,
+  /**
+   * A fork chat was created, but its requested initial message was definitely
+   * rejected before it could be accepted for processing.
+   */
+  InitialMessageRejected: -32012,
 } as const;
 
 /** Union type of all AHP application error codes. */
@@ -158,6 +164,39 @@ export interface UnsupportedProtocolVersionErrorData {
 }
 
 /**
+ * Details carried in the `data` field of an `InitialMessageRejected` (-32012)
+ * error.
+ *
+ * The fork chat identified by `chat` was created successfully. `cause`
+ * preserves the underlying rejection, including structured details such as an
+ * authentication challenge, so clients can inspect or surface it.
+ *
+ * @category Error Details
+ * @version 1
+ */
+export interface InitialMessageRejectedErrorData {
+  /** URI of the successfully created fork chat. */
+  chat: URI;
+  /** Underlying reason the initial message could not be accepted. */
+  cause: InitialMessageRejectedCause;
+}
+
+/**
+ * The preserved underlying error for an `InitialMessageRejected` error.
+ *
+ * @category Error Details
+ * @version 1
+ */
+export interface InitialMessageRejectedCause {
+  /** Underlying JSON-RPC or application error code. */
+  code: number;
+  /** Underlying human-readable error message. */
+  message: string;
+  /** Underlying structured error detail, when supplied. */
+  data?: unknown;
+}
+
+/**
  * Maps each AHP error code that carries structured `data` to the type of
  * that data.
  *
@@ -171,6 +210,7 @@ export interface AhpErrorDetailsMap {
   [AhpErrorCodes.AuthRequired]: AuthRequiredErrorData;
   [AhpErrorCodes.PermissionDenied]: PermissionDeniedErrorData;
   [AhpErrorCodes.UnsupportedProtocolVersion]: UnsupportedProtocolVersionErrorData;
+  [AhpErrorCodes.InitialMessageRejected]: InitialMessageRejectedErrorData;
 }
 
 /** AHP error codes that carry a structured `data` payload. */

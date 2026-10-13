@@ -2562,6 +2562,22 @@ public sealed record UnsupportedProtocolVersionErrorData
 {
     public required List<string> SupportedVersions { get; init; }
 }
+
+/// <summary>Detail payload of an InitialMessageRejected (-32012) error.</summary>
+public sealed record InitialMessageRejectedErrorData
+{
+    public required string Chat { get; init; }
+    public required InitialMessageRejectedCause Cause { get; init; }
+}
+
+/// <summary>The preserved underlying error for an InitialMessageRejected error.</summary>
+public sealed record InitialMessageRejectedCause
+{
+    public required int Code { get; init; }
+    public required string Message { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? Data { get; init; }
+}
 `;
 }
 
@@ -2831,6 +2847,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
+    'InitialMessageRejectedErrorData', 'InitialMessageRejectedCause',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',
     'ChatOrigin', 'ChatInputQuestion', 'ChatInputAnswerValue', 'ChatInputAnswer',

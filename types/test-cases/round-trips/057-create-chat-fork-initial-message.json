@@ -1,0 +1,50 @@
+{
+  "name": "create-chat-fork-initial-message",
+  "group": "A",
+  "description": "CreateChatParams preserves an initial user message, including its model and agent selections, when it is combined with a fork source.",
+  "type": "CreateChatParams",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "chat": "ahp-chat:/fork",
+    "source": {
+      "kind": "fork",
+      "chat": "ahp-chat:/source",
+      "turnId": "turn-12"
+    },
+    "initialMessage": {
+      "text": "Continue by extracting the parser.",
+      "origin": {
+        "kind": "user"
+      },
+      "model": {
+        "id": "model-2"
+      },
+      "agent": {
+        "uri": "ahp-agent:/agent-2"
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-session:/s1",
+      "chat": "ahp-chat:/fork",
+      "source": {
+        "kind": "fork",
+        "chat": "ahp-chat:/source",
+        "turnId": "turn-12"
+      },
+      "initialMessage": {
+        "text": "Continue by extracting the parser.",
+        "origin": {
+          "kind": "user"
+        },
+        "model": {
+          "id": "model-2"
+        },
+        "agent": {
+          "uri": "ahp-agent:/agent-2"
+        }
+      }
+    }
+  ]
+}

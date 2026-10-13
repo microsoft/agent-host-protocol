@@ -1319,7 +1319,7 @@
         },
         "initialMessage": {
           "$ref": "#/$defs/Message",
-          "description": "Optional initial message for the new chat."
+          "description": "Optional initial message for the new chat.\n\nThis existing field remains ungated, including for legacy fork requests.\nA client that needs the stronger composed fork-and-message guarantees MUST\nrequire both {@link MultipleChatsCapability.fork} and\n{@link MultipleChatsCapability.forkWithInitialMessage}. For that\ncapability-backed operation, a host that has created the fork but can\ndefinitely not accept this message MUST return `InitialMessageRejected`\n(-32012) with the created chat URI and underlying rejection cause. A\nsuccessful `null` result confirms message acceptance, not completion of\nthe message's model turn."
         },
         "source": {
           "$ref": "#/$defs/ChatSource",
@@ -2407,6 +2407,10 @@
         "initialTitle": {
           "type": "boolean",
           "description": "The agent honors {@link CreateChatParams.title} as the chat's first\npublished title and does not replace it through automatic title generation.\nA later explicit rename is still allowed. When absent or `false`, clients\nMUST omit `title` when calling `createChat`."
+        },
+        "forkWithInitialMessage": {
+          "type": "boolean",
+          "description": "The agent supports the stronger composed fork-and-initial-message\noperation. Clients relying on its preserved client context, definite\nacceptance or rejection result, and prompt-aware naming context MUST\nrequire this and {@link MultipleChatsCapability.fork} to be `true`.\nThe naming context is available to the host's normal strategy at its\nnormal time; it does not guarantee title generation.\n\nThis attestation applies only to the stronger combined operation. It does\nnot reject or otherwise change existing ungated `initialMessage` requests,\nincluding legacy fork requests on third-party hosts."
         }
       }
     },

@@ -844,6 +844,10 @@
         "initialTitle": {
           "type": "boolean",
           "description": "The agent honors {@link CreateChatParams.title} as the chat's first\npublished title and does not replace it through automatic title generation.\nA later explicit rename is still allowed. When absent or `false`, clients\nMUST omit `title` when calling `createChat`."
+        },
+        "forkWithInitialMessage": {
+          "type": "boolean",
+          "description": "The agent supports the stronger composed fork-and-initial-message\noperation. Clients relying on its preserved client context, definite\nacceptance or rejection result, and prompt-aware naming context MUST\nrequire this and {@link MultipleChatsCapability.fork} to be `true`.\nThe naming context is available to the host's normal strategy at its\nnormal time; it does not guarantee title generation.\n\nThis attestation applies only to the stronger combined operation. It does\nnot reject or otherwise change existing ungated `initialMessage` requests,\nincluding legacy fork requests on third-party hosts."
         }
       }
     },

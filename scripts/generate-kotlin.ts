@@ -2149,12 +2149,16 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
+  lines.push('    /** An optimistic-concurrency precondition failed */');
+  lines.push('    const val CONFLICT: Int = -32011');
+  lines.push('    /** A fork chat was created, but its initial message was rejected */');
+  lines.push('    const val INITIAL_MESSAGE_REJECTED: Int = -32012');
   lines.push('}');
   lines.push('');
 
   lines.push('// ─── Error Detail Payloads ──────────────────────────────────────────────────');
   lines.push('');
-  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'InitialMessageRejectedErrorData', 'InitialMessageRejectedCause']) {
     try {
       lines.push(generateDataClassFromInterface(project, ifaceName));
       lines.push('');
@@ -2417,6 +2421,8 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
+    'InitialMessageRejectedErrorData', // emitted by generateErrorsFile()
+    'InitialMessageRejectedCause',  // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Kotlin data class
     'AhpErrorDetailsMap',           // type-level mapping; not a Kotlin type
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

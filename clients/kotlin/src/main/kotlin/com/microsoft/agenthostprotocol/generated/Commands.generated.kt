@@ -718,6 +718,16 @@ data class CreateChatParams(
     val chat: String,
     /**
      * Optional initial message for the new chat.
+     *
+     * This existing field remains ungated, including for legacy fork requests.
+     * A client that needs the stronger composed fork-and-message guarantees MUST
+     * require both {@link MultipleChatsCapability.fork} and
+     * {@link MultipleChatsCapability.forkWithInitialMessage}. For that
+     * capability-backed operation, a host that has created the fork but can
+     * definitely not accept this message MUST return `InitialMessageRejected`
+     * (-32012) with the created chat URI and underlying rejection cause. A
+     * successful `null` result confirms message acceptance, not completion of
+     * the message's model turn.
      */
     val initialMessage: Message? = null,
     /**
