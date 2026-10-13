@@ -25,6 +25,7 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
+import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -305,6 +306,13 @@ export interface InitializeResult {
    * @see {@link /guide/automations | Automations Guide}
    */
   automations?: AutomationCapabilities;
+  /**
+   * Present when the host supports `createTcpConnection`, which opens a TCP
+   * connection on the host's network for the client to forward.
+   * @stability 1.0
+   * @see {@link /specification/tcp-channel | TCP Channel}
+   */
+  tcpConnections?: TcpConnectionsCapability;
 }
 
 /**

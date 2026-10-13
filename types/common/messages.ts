@@ -100,6 +100,8 @@ import type {
   OtlpExportMetricsParams,
 } from '../channels-otlp/notifications.js';
 import type { AhpError } from './errors.js';
+import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../channels-tcp/notifications.js';
+import type { CreateTcpConnectionParams } from '../channels-tcp/commands.js';
 
 // ─── JSON-RPC Base Types ─────────────────────────────────────────────────────
 
@@ -169,6 +171,7 @@ export interface CommandMap {
   'createSession': { params: CreateSessionParams; result: null };
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
+  'createTcpConnection': { params: CreateTcpConnectionParams; result: null };
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
@@ -230,8 +233,8 @@ export interface ServerCommandMap {
  * Every notification's params MUST carry a top-level `channel: URI` so that
  * the server can route the message to the correct subscription. See
  * {@link UnsubscribeParams} for the canonical "base" shape.
- * On a windowed subscription, `dispatchAction` counts against the window.
- * `unsubscribe` and `channel/credit` do not.
+ * On a windowed subscription, `dispatchAction`, `tcp/data`, and `tcp/eof` count
+ * against the window. `unsubscribe`, `channel/credit`, and `tcp/reset` do not.
  *
  * @category Notifications
  */
@@ -240,6 +243,9 @@ export interface ClientNotificationMap {
   'dispatchAction': { params: DispatchActionParams };
   'channel/frame': { params: ChannelFrameParams };
   'channel/credit': { params: ChannelCreditParams };
+  'tcp/data': { params: TcpDataParams };
+  'tcp/eof': { params: TcpEofParams };
+  'tcp/reset': { params: TcpResetParams };
 }
 
 /**
@@ -249,7 +255,7 @@ export interface ClientNotificationMap {
  * the client can dispatch the message to the right subscription.
  * On a windowed subscription, data notifications count against the window,
  * whether or not they are sent in `channel/frame` fragments.
- * `channel/credit` does not.
+ * `channel/credit` and `tcp/reset` do not.
  *
  * @category Notifications
  */
@@ -265,6 +271,9 @@ export interface ServerNotificationMap {
   'otlp/exportMetrics': { params: OtlpExportMetricsParams };
   'channel/frame': { params: ChannelFrameParams };
   'channel/credit': { params: ChannelCreditParams };
+  'tcp/data': { params: TcpDataParams };
+  'tcp/eof': { params: TcpEofParams };
+  'tcp/reset': { params: TcpResetParams };
   'channel/snapshot': { params: ChannelSnapshotParams };
 }
 

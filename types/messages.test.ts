@@ -35,6 +35,7 @@ function readChannelSources(baseName: string): string {
     'channels-annotations',
     'channels-resource-watch',
     'channels-otlp',
+    'channels-tcp',
     'channels-automation',
     'channels-automation-run',
   ];

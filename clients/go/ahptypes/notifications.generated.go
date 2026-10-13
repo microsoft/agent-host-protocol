@@ -28,6 +28,49 @@ const (
 
 // ─── Notification Payloads ────────────────────────────────────────────
 
+// Bytes in the sender's direction: from the client to the destination, or from
+// the destination to the client.
+//
+// The receiver writes the decoded bytes in the order received. The boundaries
+// between `tcp/data` notifications have no meaning. Data is not sent again
+// after the AHP connection is lost.
+//
+// Stability: 1.0 - Early development.
+type TcpDataParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+	// The bytes, as padded RFC 4648 base64 without whitespace.
+	Data string `json:"data"`
+}
+
+// Ends the sender's direction after the data that it has already sent, like a
+// TCP FIN. The other direction can continue. The sender MUST NOT send more
+// `tcp/data` after `tcp/eof`.
+//
+// Stability: 1.0 - Early development.
+type TcpEofParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+}
+
+// Aborts the connection in both directions, like a TCP RST.
+//
+// The sender discards data that it has not yet sent. The receiver discards data
+// that it has not yet written, and closes its own side of the connection. The
+// host sends `tcp/reset` when the destination connection fails or is reset, or
+// when the client sends invalid data. The client sends it to abort the
+// connection without waiting for buffered data to be written. After `tcp/reset`,
+// neither peer sends more data on the channel.
+//
+// Unlike `tcp/data` and `tcp/eof`, this notification does not count against the
+// window, so it can be sent when the window is full.
+//
+// Stability: 1.0 - Early development.
+type TcpResetParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+}
+
 // One fragment of a data message on a windowed subscription.
 //
 // A sender uses fragments when a data message is larger than

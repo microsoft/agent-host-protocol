@@ -1002,6 +1002,7 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
+  'TcpConnectionsCapability',
   'ChannelReceiveLimits',
   'ChannelFlowControl', 'ResumedChannelSubscription',
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
@@ -1778,6 +1779,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
+  'CreateTcpConnectionParams',
   'InitializeParams', 'InitializeResult',
   'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
@@ -2059,6 +2061,7 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
   'ChannelFrameParams', 'ChannelCreditParams',
   'ChannelSnapshotParams',
   'SessionAddedParams',

@@ -1,0 +1,20 @@
+{
+  "name": "tcp-capability",
+  "group": "A",
+  "description": "A host advertises TCP channels with an empty tcpConnections object.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "tcpConnections": {}
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 1,
+      "snapshots": [],
+      "tcpConnections": {}
+    }
+  ]
+}

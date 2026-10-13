@@ -1223,6 +1223,19 @@ enum class AutomationRunOriginKind {
 // ─── State Types ────────────────────────────────────────────────────────────
 
 /**
+ * Present when the host supports `createTcpConnection`.
+ *
+ * A client creates a connection with `createTcpConnection`, then subscribes to
+ * its channel with windowed delivery. A TCP channel's state is an
+ * {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+ * notifications. TCP connections do not survive the loss of the AHP connection.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class TcpConnectionsCapability
+
+/**
  * Limits on data that one peer receives on a windowed subscription.
  *
  * All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC

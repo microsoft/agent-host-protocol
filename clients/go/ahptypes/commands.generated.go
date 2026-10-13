@@ -99,6 +99,32 @@ const (
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+// Opens a TCP connection from the host to a destination on the host's network.
+//
+// The client chooses the channel URI. This command does not subscribe: after it
+// succeeds, the client subscribes to the channel with windowed delivery. The
+// host MUST NOT send data for the channel before that subscription, and MUST
+// limit how much destination data it buffers and how long it keeps a
+// connection that is never subscribed to.
+//
+// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+// is present. If the channel URI is already in use, the host returns
+// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+//
+// Stability: 1.0 - Early development.
+type CreateTcpConnectionParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// A DNS name or IP address, resolved on the host's network. Not a URL.
+	Host string `json:"host"`
+	// The destination port.
+	Port int64 `json:"port"`
+}
+
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
 type InitializeParams struct {
@@ -193,6 +219,11 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Present when the host supports `createTcpConnection`, which opens a TCP
+	// connection on the host's network for the client to forward.
+	//
+	// Stability: 1.0 - Early development.
+	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.

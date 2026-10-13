@@ -63,6 +63,8 @@ import type {
   Implementation, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
 } from '../src/types/common/commands.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
+import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
+import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
 import type { ChatSource } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
@@ -254,6 +256,10 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'ChannelFrameParams':  void (parsed as ChannelFrameParams); break;
     case 'ChannelCreditParams': void (parsed as ChannelCreditParams); break;
     case 'ReconnectParams':     void (parsed as ReconnectParams); break;
+    case 'TcpDataParams':       void (parsed as TcpDataParams); break;
+    case 'TcpEofParams':        void (parsed as TcpEofParams); break;
+    case 'TcpResetParams':      void (parsed as TcpResetParams); break;
+    case 'CreateTcpConnectionParams': void (parsed as CreateTcpConnectionParams); break;
     default:
       throw new Error(
         `${file}: unknown wire type "${type}". Add a decode entry to bindToType.`,

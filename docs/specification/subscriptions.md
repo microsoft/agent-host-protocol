@@ -27,6 +27,7 @@ All channels use the same `subscribe` and `unsubscribe` messages.
 | `ahp-chat:/<cid>` | `ChatState` | One chat: turns, streamed responses, tool calls, pending messages, input requests, and changesets. See [Chat Channel](/specification/chat-channel). |
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. The URI is listed in `ChatState.canvases`. See [Canvas Channel](/reference/canvas). |
 | `ahp-terminal:/<id>` | `TerminalState` | One terminal. See [Terminal Channel](/specification/terminal-channel). |
+| `ahp-tcp:/<id>` | `EmptyState` | Experimental. One TCP connection that the host opened with `createTcpConnection`. Private to the client that created it. See [TCP Channel](/specification/tcp-channel). |
 | `ahp-changeset:/<id>` | `ChangesetState` | One changeset. The client builds the URI from the `Changeset.uriTemplate` of a session or chat. |
 | `ahp-resource-watch:/<id>` | `ResourceWatchState` | One file watch. The URI is returned by `createResourceWatch`. |
 | `ahp-otlp:` | `EmptyState` | OpenTelemetry logs, traces, or metrics. The URIs are listed in `InitializeResult.telemetry`. See [Telemetry Channel](/specification/telemetry-channel). |
@@ -53,12 +54,14 @@ route any message using only its `method` and `params.channel`.
 | `fetchTurns`, `completions`, `disposeChat` | The chat URI |
 | `moveChat` | The URI of the chat to move |
 | `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
+| `createTcpConnection` | The URI of the new TCP channel |
 | `invokeChangesetOperation` | The changeset URI |
 | `subscribe`, `unsubscribe` | The URI of the channel being subscribed to or released |
 | `dispatchAction`, `action` | The URI of the channel that the action changes |
 | `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `root/progress` | `ahp-root://` |
 | `auth/required` | The URI of the channel that requires authentication |
 | `otlp/exportLogs`, `otlp/exportTraces`, `otlp/exportMetrics` | The telemetry channel URI |
+| `tcp/data`, `tcp/eof`, `tcp/reset` | The TCP channel URI |
 | `channel/snapshot`, `channel/frame`, `channel/credit` | The URI of the subscription using [windowed delivery](/specification/windowed-delivery) |
 
 The TypeScript definitions enforce this rule. The compile-time check in

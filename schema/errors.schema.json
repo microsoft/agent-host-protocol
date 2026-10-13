@@ -6056,6 +6056,11 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
     "BaseParams": {
       "type": "object",
       "description": "Base shape every command's params extends.\n\n`channel` identifies the channel the command targets, mirroring the\n`channel` field on every protocol notification. For commands that operate\non a specific channel (a session, terminal, or changeset), `channel` is\nthat channel's URI. For commands that are connection-level rather than\nchannel-scoped (e.g. {@link InitializeParams | `initialize`},\n{@link PingParams | `ping`}, {@link ListSessionsParams | `listSessions`},\nthe `resource*` filesystem commands, and {@link AuthenticateParams |\n`authenticate`}), the params type narrows `channel` to the literal\nroot URI `'ahp-root://'`.\n\nThis invariant lets implementations route every incoming message —\nrequest, response, or notification — by inspecting `params.channel`\nwithout needing to know the per-method param shape.",
@@ -6232,6 +6237,10 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "tcpConnections": {
+          "$ref": "#/$defs/TcpConnectionsCapability",
+          "description": "Present when the host supports `createTcpConnection`, which opens a TCP\nconnection on the host's network for the client to forward.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -7882,6 +7891,36 @@
       "type": "object",
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
+    },
+    "CreateTcpConnectionParams": {
+      "type": "object",
+      "description": "Opens a TCP connection from the host to a destination on the host's network.\n\nThe client chooses the channel URI. This command does not subscribe: after it\nsucceeds, the client subscribes to the channel with windowed delivery. The\nhost MUST NOT send data for the channel before that subscription, and MUST\nlimit how much destination data it buffers and how long it keeps a\nconnection that is never subscribed to.\n\nThe client MUST NOT send this command unless `InitializeResult.tcpConnections`\nis present. If the channel URI is already in use, the host returns\n`AlreadyExists` and MUST NOT replace the existing connection. If the host\ncannot open the connection, it returns `TcpConnectionOpenFailed`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The client-chosen URI for the new channel, for example `ahp-tcp:/<uuid>`."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "host": {
+          "type": "string",
+          "description": "A DNS name or IP address, resolved on the host's network. Not a URL."
+        },
+        "port": {
+          "type": "integer",
+          "description": "The destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "channel",
+        "host",
+        "port"
+      ]
     },
     "URI": {
       "type": "string",

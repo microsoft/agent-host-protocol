@@ -23,8 +23,9 @@ This page uses these terms:
 
 - **Sender** and **receiver** refer to one direction of a subscription. Both the
   client and the server can be a sender.
-- A **control message** is `channel/credit` or `unsubscribe`. Control messages
-  do not count against the window.
+- A **control message** is `channel/credit`, `unsubscribe`, or a control
+  message that a channel defines, such as `tcp/reset`. Control messages do not
+  count against the window.
 - A **data message** is any other notification for the subscription, including
   `channel/frame` fragments. Examples are `action`, `channel/snapshot`,
   `dispatchAction`, and `auth/required`. Data messages
@@ -457,12 +458,16 @@ roles reversed: the client checks the `hostReceive` limits, and the server sends
 | `channel/credit` | Either | Reports the total size of data messages and fragments that the receiver has released |
 | `unsubscribe` | Client to server | Ends the subscription |
 
+A channel can define its own control messages. For example, the
+[TCP channel](/specification/tcp-channel) defines `tcp/reset`, which aborts a
+connection.
+
 Control messages do not count against the window, and a peer can send them
 when the window is full. Implementations MUST limit the size, rate, and queue
 of control messages separately.
 
 There is no general message for ending a subscription because of an error. A
-channel can define its own, such as a way to abort a TCP connection.
+channel that needs one defines its own control message, such as `tcp/reset`.
 
 ## When the Window Is Full
 
@@ -471,7 +476,7 @@ unlimited amount of it. What it does instead depends on the channel. For
 example:
 
 - A terminal can stop reading process output until credit arrives.
-- A TCP connection can stop reading from its socket.
+- A [TCP channel](/specification/tcp-channel) can stop reading from its socket.
 - A chat can combine pending `chat/delta` actions for the same response part
   into one action.
 

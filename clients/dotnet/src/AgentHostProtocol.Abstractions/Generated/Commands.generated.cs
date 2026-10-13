@@ -272,6 +272,38 @@ public enum ResourceWriteMode
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// <summary>Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateTcpConnectionParams
+{
+    /// <summary>The client-chosen URI for the new channel, for example `ahp-tcp:/&lt;uuid&gt;`.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>A DNS name or IP address, resolved on the host's network. Not a URL.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>The destination port.</summary>
+    public long Port { get; init; }
+}
+
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
 public sealed record InitializeParams
@@ -397,6 +429,13 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpConnectionsCapability? TcpConnections { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end

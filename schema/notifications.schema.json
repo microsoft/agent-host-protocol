@@ -304,6 +304,51 @@
         "payload"
       ]
     },
+    "TcpDataParams": {
+      "type": "object",
+      "description": "Bytes in the sender's direction: from the client to the destination, or from\nthe destination to the client.\n\nThe receiver writes the decoded bytes in the order received. The boundaries\nbetween `tcp/data` notifications have no meaning. Data is not sent again\nafter the AHP connection is lost.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the TCP channel."
+        },
+        "data": {
+          "type": "string",
+          "description": "The bytes, as padded RFC 4648 base64 without whitespace.",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "channel",
+        "data"
+      ]
+    },
+    "TcpEofParams": {
+      "type": "object",
+      "description": "Ends the sender's direction after the data that it has already sent, like a\nTCP FIN. The other direction can continue. The sender MUST NOT send more\n`tcp/data` after `tcp/eof`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the TCP channel."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "TcpResetParams": {
+      "type": "object",
+      "description": "Aborts the connection in both directions, like a TCP RST.\n\nThe sender discards data that it has not yet sent. The receiver discards data\nthat it has not yet written, and closes its own side of the connection. The\nhost sends `tcp/reset` when the destination connection fails or is reset, or\nwhen the client sends invalid data. The client sends it to abort the\nconnection without waiting for buffered data to be written. After `tcp/reset`,\nneither peer sends more data on the channel.\n\nUnlike `tcp/data` and `tcp/eof`, this notification does not count against the\nwindow, so it can be sent when the window is full.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the TCP channel."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
     "ProtocolNotification": {
       "description": "Discriminated union of all protocol notifications.",
       "oneOf": [
@@ -339,6 +384,15 @@
         },
         {
           "$ref": "#/$defs/OtlpExportMetricsParams"
+        },
+        {
+          "$ref": "#/$defs/TcpDataParams"
+        },
+        {
+          "$ref": "#/$defs/TcpEofParams"
+        },
+        {
+          "$ref": "#/$defs/TcpResetParams"
         }
       ]
     },
@@ -6303,6 +6357,11 @@
         "lifecycle",
         "sessions"
       ]
+    },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "URI": {
       "type": "string",

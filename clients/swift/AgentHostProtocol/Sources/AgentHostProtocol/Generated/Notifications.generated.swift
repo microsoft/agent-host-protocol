@@ -36,6 +36,69 @@ public enum AuthRequiredReason: Codable, Sendable, Equatable {
 
 // MARK: - Notification Types
 
+/// Bytes in the sender's direction: from the client to the destination, or from
+/// the destination to the client.
+///
+/// The receiver writes the decoded bytes in the order received. The boundaries
+/// between `tcp/data` notifications have no meaning. Data is not sent again
+/// after the AHP connection is lost.
+///
+/// Stability: 1.0 - Early development.
+public struct TcpDataParams: Codable, Sendable {
+    /// The URI of the TCP channel.
+    public var channel: String
+    /// The bytes, as padded RFC 4648 base64 without whitespace.
+    public var data: String
+
+    public init(
+        channel: String,
+        data: String
+    ) {
+        self.channel = channel
+        self.data = data
+    }
+}
+
+/// Ends the sender's direction after the data that it has already sent, like a
+/// TCP FIN. The other direction can continue. The sender MUST NOT send more
+/// `tcp/data` after `tcp/eof`.
+///
+/// Stability: 1.0 - Early development.
+public struct TcpEofParams: Codable, Sendable {
+    /// The URI of the TCP channel.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
+/// Aborts the connection in both directions, like a TCP RST.
+///
+/// The sender discards data that it has not yet sent. The receiver discards data
+/// that it has not yet written, and closes its own side of the connection. The
+/// host sends `tcp/reset` when the destination connection fails or is reset, or
+/// when the client sends invalid data. The client sends it to abort the
+/// connection without waiting for buffered data to be written. After `tcp/reset`,
+/// neither peer sends more data on the channel.
+///
+/// Unlike `tcp/data` and `tcp/eof`, this notification does not count against the
+/// window, so it can be sent when the window is full.
+///
+/// Stability: 1.0 - Early development.
+public struct TcpResetParams: Codable, Sendable {
+    /// The URI of the TCP channel.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
 /// One fragment of a data message on a windowed subscription.
 ///
 /// A sender uses fragments when a data message is larger than

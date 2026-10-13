@@ -57,6 +57,7 @@ type _ExpectedCommands =
   | 'createSession'
   | 'disposeSession'
   | 'createChat'
+  | 'createTcpConnection'
   | 'moveChat'
   | 'disposeChat'
   | 'createTerminal'
@@ -87,7 +88,10 @@ type _ExpectedClientNotifications =
   | 'unsubscribe'
   | 'dispatchAction'
   | 'channel/frame'
-  | 'channel/credit';
+  | 'channel/credit'
+  | 'tcp/data'
+  | 'tcp/eof'
+  | 'tcp/reset';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =
@@ -102,7 +106,10 @@ type _ExpectedServerNotifications =
   | 'otlp/exportMetrics'
   | 'channel/frame'
   | 'channel/credit'
-  | 'channel/snapshot';
+  | 'channel/snapshot'
+  | 'tcp/data'
+  | 'tcp/eof'
+  | 'tcp/reset';
 
 /** All server → client request methods. */
 type _ExpectedServerCommands =

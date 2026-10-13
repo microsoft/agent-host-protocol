@@ -258,6 +258,51 @@ public struct SideChatSource: Codable, Sendable {
     }
 }
 
+/// Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// A DNS name or IP address, resolved on the host's network. Not a URL.
+    public var host: String
+    /// The destination port.
+    public var port: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case host
+        case port
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        host: String,
+        port: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.host = host
+        self.port = port
+    }
+}
+
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -373,6 +418,11 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var tcpConnections: TcpConnectionsCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -385,6 +435,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case tcpConnections
     }
 
     public init(
@@ -397,7 +448,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tcpConnections: TcpConnectionsCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -409,6 +461,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tcpConnections = tcpConnections
     }
 }
 

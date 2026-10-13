@@ -65,6 +65,53 @@ internal sealed class AuthRequiredReasonConverter : JsonConverter<AuthRequiredRe
 
 // ─── Notification Payloads ────────────────────────────────────────────
 
+/// <summary>Bytes in the sender's direction: from the client to the destination, or from
+/// the destination to the client.
+///
+/// The receiver writes the decoded bytes in the order received. The boundaries
+/// between `tcp/data` notifications have no meaning. Data is not sent again
+/// after the AHP connection is lost.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpDataParams
+{
+    /// <summary>The URI of the TCP channel.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>The bytes, as padded RFC 4648 base64 without whitespace.</summary>
+    public required string Data { get; init; }
+}
+
+/// <summary>Ends the sender's direction after the data that it has already sent, like a
+/// TCP FIN. The other direction can continue. The sender MUST NOT send more
+/// `tcp/data` after `tcp/eof`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpEofParams
+{
+    /// <summary>The URI of the TCP channel.</summary>
+    public required string Channel { get; init; }
+}
+
+/// <summary>Aborts the connection in both directions, like a TCP RST.
+///
+/// The sender discards data that it has not yet sent. The receiver discards data
+/// that it has not yet written, and closes its own side of the connection. The
+/// host sends `tcp/reset` when the destination connection fails or is reset, or
+/// when the client sends invalid data. The client sends it to abort the
+/// connection without waiting for buffered data to be written. After `tcp/reset`,
+/// neither peer sends more data on the channel.
+///
+/// Unlike `tcp/data` and `tcp/eof`, this notification does not count against the
+/// window, so it can be sent when the window is full.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpResetParams
+{
+    /// <summary>The URI of the TCP channel.</summary>
+    public required string Channel { get; init; }
+}
+
 /// <summary>One fragment of a data message on a windowed subscription.
 ///
 /// A sender uses fragments when a data message is larger than

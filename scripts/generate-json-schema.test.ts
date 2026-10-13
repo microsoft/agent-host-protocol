@@ -217,6 +217,28 @@ describe('generated JSON schemas', () => {
         assert.equal(schemaAccepts(schema, credit.consumedBytes, Number.MAX_SAFE_INTEGER + 1), false);
       });
 
+      it('keeps TCP payloads minimal and validates the destination port', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        if (file === 'notifications.schema.json') {
+          const data = defs.TcpDataParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(data).sort(), ['channel', 'data']);
+          assert.equal(data.data.minLength, 1);
+          for (const name of ['TcpEofParams', 'TcpResetParams']) {
+            assert.deepEqual(Object.keys(defs[name].properties as Record<string, unknown>), ['channel']);
+          }
+        }
+        if (file === 'commands.schema.json') {
+          const creation = defs.CreateTcpConnectionParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(creation).sort(), ['_meta', 'channel', 'host', 'port']);
+          for (const port of [1, 65535]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), true);
+          }
+          for (const port of [0, 65536, 1.5]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), false);
+          }
+        }
+      });
+
       it('preserves automation schedule restrictions', () => {
         if (file !== 'commands.schema.json') {
           return;

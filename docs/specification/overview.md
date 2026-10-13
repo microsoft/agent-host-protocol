@@ -86,6 +86,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Automation Run Channel](/specification/automation-run-channel)** — `ahp-automation-run:/<id>` — task lifecycle and linked sessions.
 - **[Chat Channel](/specification/chat-channel)** — `ahp-chat:/<cid>` — per-chat conversation state: turns, streaming, tool calls, pending messages, input requests, and changesets.
 - **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
+- **[TCP Channel](/specification/tcp-channel)** — `ahp-tcp:` — experimental forwarding of a TCP connection that the host opens on its network.
 - **[Telemetry Channel](/specification/telemetry-channel)** — `ahp-otlp:` — OpenTelemetry logs, traces, and metrics emitted by the agent host.
 - **[Versioning](/specification/versioning)** — Protocol version negotiation and compatibility.
 - **[Common Types](/reference/common)** — Cross-cutting types, base command/notification shapes, and JSON-RPC wire types.
@@ -93,6 +94,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Session Channel Reference](/reference/session)** — `SessionState`, session actions, and session commands.
 - **[Chat Channel Reference](/reference/chat)** — `ChatState`, chat actions, and chat commands.
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.
+- **[TCP Channel Reference](/reference/tcp)** — `createTcpConnection` and TCP notifications.
 - **[Changeset Channel Reference](/reference/changeset)** — `ChangesetState`, changeset actions, and changeset commands.
 - **[Annotations Channel Reference](/reference/annotations)** — `AnnotationsState` and annotations actions.
 - **[Automation Catalogue Channel Reference](/reference/automation)** — `AutomationState`, automation actions, and automation commands.
