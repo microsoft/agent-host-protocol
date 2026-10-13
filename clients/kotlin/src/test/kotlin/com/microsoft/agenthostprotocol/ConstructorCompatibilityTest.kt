@@ -4,15 +4,13 @@ import com.microsoft.agenthostprotocol.generated.CreateChatParams
 import com.microsoft.agenthostprotocol.generated.Message
 import com.microsoft.agenthostprotocol.generated.MessageKind
 import com.microsoft.agenthostprotocol.generated.MessageOrigin
-import com.microsoft.agenthostprotocol.generated.MultipleChatsCapability
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ConstructorCompatibilityTest {
     @Test
-    fun `old full positional constructors retain their source semantics`() {
+    fun `old full positional CreateChatParams constructor retains its source semantics`() {
         val message = Message("Hello", MessageOrigin(MessageKind.USER))
         val createChat =
             CreateChatParams(
@@ -23,14 +21,9 @@ class ConstructorCompatibilityTest {
                 null,
                 listOf("file:///workspace"),
             )
-        val multipleChats = MultipleChatsCapability(true, true)
 
         assertEquals(message, createChat.initialMessage)
         assertEquals(listOf("file:///workspace"), createChat.workingDirectories)
         assertNull(createChat.title)
-        assertTrue(multipleChats.fork == true)
-        assertTrue(multipleChats.sideChat == true)
-        assertNull(multipleChats.initialTitle)
-        assertNull(multipleChats.forkWithInitialMessage)
     }
 }

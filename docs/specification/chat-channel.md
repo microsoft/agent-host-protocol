@@ -104,64 +104,22 @@ fully replaces the catalogue or clears it when `changesets` is absent.
   `selection: { text, responsePartId? }`, an immutable selected-text snapshot
   captured when the host accepts `createChat`.
 
-`initialMessage` remains available without a capability, including for legacy
-fork requests on third-party hosts. A client that relies on the stronger
-composed fork-and-message guarantees MUST require both
-`multipleChats.fork: true` and `multipleChats.forkWithInitialMessage: true`;
-the latter capability attests that the agent supports that stronger operation.
-Its absence does not retroactively reject or otherwise gate legacy
-`initialMessage` requests.
-
 The server allocates the chat URI and adds the chat to the session's catalog (`session/chatAdded` on the session channel) before returning.
 
-Clients MUST send `title` only when the selected agent advertises
-[`multipleChats.initialTitle`](/reference/root#multiplechatscapability). A
-supporting server MUST trim leading and trailing whitespace. If the result is
-empty, it MUST treat `title` as absent and choose its normal initial title.
-Otherwise, it MUST use the remaining text in the first published chat summary
-and [`ChatState`](/reference/chat#chatstate) and preserve it exactly: it MUST
-NOT collapse internal whitespace, strip quotes or punctuation, or truncate it.
-The protocol defines no maximum title length. The server MUST NOT replace a
-non-empty supplied title through automatic title generation. A later explicit
-rename is still allowed. When the capability is absent or `false`, clients MUST
-omit `title` but MAY continue creating or forking the chat normally, allowing
-the server to choose its initial title. The top-level `title` describes the
-target chat and is independent of source provenance.
+The optional `title` field is additive. Older hosts that do not recognize it ignore it as an unknown field.
 
-Clients MUST also gate source-based creation using the selected
+Errors while processing `initialMessage` are reported through the chat's normal turn state, as with any other turn.
+
+Clients MUST gate source-based creation using the selected
 [`AgentInfo.capabilities.multipleChats`](/reference/root#multiplechatscapability):
 
 - `fork: true` permits `source.kind: "fork"`.
 - `sideChat: true` permits `source.kind: "sideChat"`.
-- `fork: true` and `forkWithInitialMessage: true` together attest the stronger
-  capability-backed fork-with-initial-message operation.
-Absence or `false` means the corresponding source form is unsupported, except
-that absence of `forkWithInitialMessage` does not reject an existing legacy
-fork request carrying `initialMessage`. The host MUST reject an unsupported
-source. It MUST also reject a source chat outside the target session, an
-unknown source chat or turn, or a source that names the chat being created. For
-forks, the host MUST additionally reject any source whose `kind` is not
-`"fork"` — forks only target completed turns.
-
-For the capability-backed fork-with-initial-message operation, the host admits
-and attaches the fork before accepting the first user message, and applies that
-message's model and agent selection normally. It makes the source title and the
-new prompt available to its normal naming strategy; the protocol does not
-prescribe a naming algorithm. An explicit non-empty `title` still wins over
-automatic naming.
-
-The normal `null` `createChat` success result for this operation means that the
-chat was created and the initial message was accepted; it does not mean the
-new chat's model turn completed. If the host has created the fork but can
-definitely determine before accepting the initial message that it must fail, it
-MUST return `InitialMessageRejected` (`-32012`). Its error data carries the
-created `chat` URI and the full underlying `cause` (`code`, `message`, and
-optional `data`), including authentication details. A client facing an unknown
-network outcome MUST NOT infer this rejection; it should reconcile chat state.
-When a capability-backed request names an already existing target chat, the
-host returns `AlreadyExists` and MUST NOT send the initial message. This does
-not alter existing no-message/default-chat creation or other legacy
-`initialMessage` behavior.
+Absence or `false` means the corresponding source form is unsupported. The host
+MUST reject an unsupported source. It MUST also reject a source chat outside the
+target session, an unknown source chat or turn, or a source that names the chat
+being created. For forks, the host MUST additionally reject any source whose
+`kind` is not `"fork"` — forks only target completed turns.
 
 For side chats, `turnId` is a stable identity, not a lifecycle snapshot. Hosts
 and clients resolve it against the source chat's current `activeTurn` or its

@@ -32,30 +32,6 @@ RootState {
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
-### Agent capabilities
-
-Each [`AgentInfo`](/reference/root#agentinfo) may advertise optional
-capabilities. Under
-[`multipleChats`](/reference/root#multiplechatscapability),
-`initialTitle: true` guarantees that the host honors
-[`CreateChatParams.title`](/reference/chat#createchatparams) as the target
-chat's first published title in its summary and state, without replacing it
-through automatic title generation. A later explicit rename remains allowed.
-
-When `initialTitle` is absent or `false`, clients MUST omit `title` from
-`createChat`. They MAY still create or fork a chat when the corresponding
-multi-chat capabilities permit it; the host then chooses the initial title
-normally.
-
-`forkWithInitialMessage: true`, together with `fork: true`, attests the
-stronger composed operation that combines a fork source with
-[`CreateChatParams.initialMessage`](/reference/chat#createchatparams). Clients
-that rely on its preserved context, acceptance/rejection, and prompt-aware
-naming timing MUST require both capabilities before issuing it; this does not
-guarantee title generation. This capability is deliberately narrow: it does
-not gate the long-standing `initialMessage` field, including legacy fork uses
-on third-party hosts.
-
 ### Paginating the catalogue
 
 A large catalogue can be fetched incrementally. [`listSessions`](/reference/root#listsessions) accepts an optional `limit` (the maximum number of entries the client wants in the page — the server SHOULD respect it, but MAY return fewer and MAY impose its own upper cap) and an optional opaque `cursor`. The result carries the page in `items` plus an optional `nextCursor`:

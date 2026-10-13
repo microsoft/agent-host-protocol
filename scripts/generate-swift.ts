@@ -2039,15 +2039,11 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
-  lines.push('    /// An optimistic-concurrency precondition failed');
-  lines.push('    public static let conflict = -32011');
-  lines.push('    /// A fork chat was created, but its initial message was rejected');
-  lines.push('    public static let initialMessageRejected = -32012');
   lines.push('}');
   lines.push('');
 
   lines.push('// MARK: - Error Detail Payloads\n');
-  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'InitialMessageRejectedErrorData', 'InitialMessageRejectedCause']) {
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
     try {
       lines.push(generateStructFromInterface(project, ifaceName));
       lines.push('');
@@ -2437,8 +2433,6 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
-    'InitialMessageRejectedErrorData', // emitted by generateErrorsFile()
-    'InitialMessageRejectedCause',  // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

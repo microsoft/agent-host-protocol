@@ -2097,8 +2097,6 @@ function generateNotificationsFile(project: Project): string {
 
 function generateErrorsFile(): string {
   return `${GENERATED_BANNER}
-import "encoding/json"
-
 // ─── Standard JSON-RPC Error Codes ─────────────────────────────────────────
 
 // Standard JSON-RPC 2.0 error codes.
@@ -2131,7 +2129,6 @@ const (
 \tErrorCodeNotFound                    int32 = -32008
 \tErrorCodePermissionDenied            int32 = -32009
 \tErrorCodeAlreadyExists               int32 = -32010
-\tErrorCodeInitialMessageRejected      int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -2158,21 +2155,6 @@ type PermissionDeniedErrorData struct {
 // UnsupportedProtocolVersion (-32005) error.
 type UnsupportedProtocolVersionErrorData struct {
 \tSupportedVersions []string \`json:"supportedVersions"\`
-}
-
-// InitialMessageRejectedErrorData is the detail payload of an
-// InitialMessageRejected (-32012) error.
-type InitialMessageRejectedErrorData struct {
-\tChat  URI                         \`json:"chat"\`
-\tCause InitialMessageRejectedCause \`json:"cause"\`
-}
-
-// InitialMessageRejectedCause is the preserved underlying error for an
-// InitialMessageRejected error.
-type InitialMessageRejectedCause struct {
-\tCode    int32           \`json:"code"\`
-\tMessage string          \`json:"message"\`
-\tData    json.RawMessage \`json:"data,omitempty"\`
 }
 `;
 }
@@ -2480,8 +2462,6 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
-    'InitialMessageRejectedErrorData',
-    'InitialMessageRejectedCause',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',

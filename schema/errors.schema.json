@@ -74,45 +74,6 @@
         "supportedVersions"
       ]
     },
-    "InitialMessageRejectedErrorData": {
-      "type": "object",
-      "description": "Details carried in the `data` field of an `InitialMessageRejected` (-32012)\nerror.\n\nThe fork chat identified by `chat` was created successfully. `cause`\npreserves the underlying rejection, including structured details such as an\nauthentication challenge, so clients can inspect or surface it.",
-      "properties": {
-        "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "URI of the successfully created fork chat."
-        },
-        "cause": {
-          "$ref": "#/$defs/InitialMessageRejectedCause",
-          "description": "Underlying reason the initial message could not be accepted."
-        }
-      },
-      "required": [
-        "chat",
-        "cause"
-      ]
-    },
-    "InitialMessageRejectedCause": {
-      "type": "object",
-      "description": "The preserved underlying error for an `InitialMessageRejected` error.",
-      "properties": {
-        "code": {
-          "type": "number",
-          "description": "Underlying JSON-RPC or application error code."
-        },
-        "message": {
-          "type": "string",
-          "description": "Underlying human-readable error message."
-        },
-        "data": {
-          "description": "Underlying structured error detail, when supplied."
-        }
-      },
-      "required": [
-        "code",
-        "message"
-      ]
-    },
     "AhpErrorDetailsMap": {
       "type": "object",
       "description": "Maps each AHP error code that carries structured `data` to the type of\nthat data.\n\nError codes not present in this map either have no `data` payload or\ncarry an unspecified payload that callers SHOULD treat as `unknown`.",
@@ -125,16 +86,12 @@
         },
         "[AhpErrorCodes.UnsupportedProtocolVersion]": {
           "$ref": "#/$defs/UnsupportedProtocolVersionErrorData"
-        },
-        "[AhpErrorCodes.InitialMessageRejected]": {
-          "$ref": "#/$defs/InitialMessageRejectedErrorData"
         }
       },
       "required": [
         "[AhpErrorCodes.AuthRequired]",
         "[AhpErrorCodes.PermissionDenied]",
-        "[AhpErrorCodes.UnsupportedProtocolVersion]",
-        "[AhpErrorCodes.InitialMessageRejected]"
+        "[AhpErrorCodes.UnsupportedProtocolVersion]"
       ]
     },
     "Icon": {
@@ -705,14 +662,6 @@
         "sideChat": {
           "type": "boolean",
           "description": "The agent can create a side chat from a specific turn. When absent or\n`false`, clients MUST NOT pass a {@link ChatSource} with\n`kind: \"sideChat\"` to `createChat`.\n\nA side chat receives the source turn as context without copying the source\ntranscript into its own visible history. The source is identified by a\nstable `turnId`, which the host resolves against the source chat's current\n`activeTurn` or retained history. When it names the current active turn,\nthe host snapshots the available partial assistant response at creation\ntime. Side-chat support always implies multi-chat support."
-        },
-        "initialTitle": {
-          "type": "boolean",
-          "description": "The agent honors {@link CreateChatParams.title} as the chat's first\npublished title and does not replace it through automatic title generation.\nA later explicit rename is still allowed. When absent or `false`, clients\nMUST omit `title` when calling `createChat`."
-        },
-        "forkWithInitialMessage": {
-          "type": "boolean",
-          "description": "The agent supports the stronger composed fork-and-initial-message\noperation. Clients relying on its preserved client context, definite\nacceptance or rejection result, and prompt-aware naming context MUST\nrequire this and {@link MultipleChatsCapability.fork} to be `true`.\nThe naming context is available to the host's normal strategy at its\nnormal time; it does not guarantee title generation.\n\nThis attestation applies only to the stronger combined operation. It does\nnot reject or otherwise change existing ungated `initialMessage` requests,\nincluding legacy fork requests on third-party hosts."
         }
       }
     },
@@ -7350,7 +7299,7 @@
         },
         "initialMessage": {
           "$ref": "#/$defs/Message",
-          "description": "Optional initial message for the new chat.\n\nThis existing field remains ungated, including for legacy fork requests.\nA client that needs the stronger composed fork-and-message guarantees MUST\nrequire both {@link MultipleChatsCapability.fork} and\n{@link MultipleChatsCapability.forkWithInitialMessage}. For that\ncapability-backed operation, a host that has created the fork but can\ndefinitely not accept this message MUST return `InitialMessageRejected`\n(-32012) with the created chat URI and underlying rejection cause. A\nsuccessful `null` result confirms message acceptance, not completion of\nthe message's model turn."
+          "description": "Optional initial message for the new chat."
         },
         "source": {
           "$ref": "#/$defs/ChatSource",
@@ -7365,7 +7314,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Client-selected initial display title for the new chat.\n\nClients MUST NOT supply this field unless the selected agent advertises\n{@link MultipleChatsCapability.initialTitle}.\n\nA server honoring this field MUST trim leading and trailing whitespace.\nIf the result is empty, it MUST treat the field as absent and choose its\nnormal initial title. Otherwise, it MUST preserve the remaining text\nexactly: it MUST NOT collapse internal whitespace, strip quotes or\npunctuation, or truncate it. The protocol defines no maximum title length."
+          "description": "Client-selected initial display title for the new chat."
         }
       },
       "required": [

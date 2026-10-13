@@ -1,5 +1,5 @@
 {
   "type": "changed",
-  "message": "Generated models gain trailing optional constructor properties; Kotlin binaries must be recompiled against the new client version.",
+  "message": "Generated `CreateChatParams` gains a trailing optional `title` constructor property; Kotlin binaries must be recompiled against the new client version.",
   "targets": ["kotlin"]
 }

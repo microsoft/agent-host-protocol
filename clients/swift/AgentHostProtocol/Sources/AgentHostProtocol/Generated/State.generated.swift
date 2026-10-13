@@ -1410,33 +1410,13 @@ public struct MultipleChatsCapability: Codable, Sendable {
     /// the host snapshots the available partial assistant response at creation
     /// time. Side-chat support always implies multi-chat support.
     public var sideChat: Bool?
-    /// The agent honors {@link CreateChatParams.title} as the chat's first
-    /// published title and does not replace it through automatic title generation.
-    /// A later explicit rename is still allowed. When absent or `false`, clients
-    /// MUST omit `title` when calling `createChat`.
-    public var initialTitle: Bool?
-    /// The agent supports the stronger composed fork-and-initial-message
-    /// operation. Clients relying on its preserved client context, definite
-    /// acceptance or rejection result, and prompt-aware naming context MUST
-    /// require this and {@link MultipleChatsCapability.fork} to be `true`.
-    /// The naming context is available to the host's normal strategy at its
-    /// normal time; it does not guarantee title generation.
-    ///
-    /// This attestation applies only to the stronger combined operation. It does
-    /// not reject or otherwise change existing ungated `initialMessage` requests,
-    /// including legacy fork requests on third-party hosts.
-    public var forkWithInitialMessage: Bool?
 
     public init(
         fork: Bool? = nil,
-        sideChat: Bool? = nil,
-        initialTitle: Bool? = nil,
-        forkWithInitialMessage: Bool? = nil
+        sideChat: Bool? = nil
     ) {
         self.fork = fork
         self.sideChat = sideChat
-        self.initialTitle = initialTitle
-        self.forkWithInitialMessage = forkWithInitialMessage
     }
 }
 

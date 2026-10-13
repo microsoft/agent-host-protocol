@@ -232,8 +232,6 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(Implementation))]
 [JsonSerializable(typeof(InitializeParams))]
 [JsonSerializable(typeof(InitializeResult))]
-[JsonSerializable(typeof(InitialMessageRejectedCause))]
-[JsonSerializable(typeof(InitialMessageRejectedErrorData))]
 [JsonSerializable(typeof(InputRequestResponsePart))]
 [JsonSerializable(typeof(InvokeChangesetOperationParams))]
 [JsonSerializable(typeof(InvokeChangesetOperationResult))]

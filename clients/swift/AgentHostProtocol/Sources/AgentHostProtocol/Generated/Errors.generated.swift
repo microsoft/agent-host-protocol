@@ -39,10 +39,6 @@ public enum AhpErrorCodes {
     public static let permissionDenied = -32009
     /// The target resource already exists and the operation does not allow overwriting
     public static let alreadyExists = -32010
-    /// An optimistic-concurrency precondition failed
-    public static let conflict = -32011
-    /// A fork chat was created, but its initial message was rejected
-    public static let initialMessageRejected = -32012
 }
 
 // MARK: - Error Detail Payloads
@@ -83,39 +79,5 @@ public struct UnsupportedProtocolVersionErrorData: Codable, Sendable {
         supportedVersions: [String]
     ) {
         self.supportedVersions = supportedVersions
-    }
-}
-
-public struct InitialMessageRejectedErrorData: Codable, Sendable {
-    /// URI of the successfully created fork chat.
-    public var chat: String
-    /// Underlying reason the initial message could not be accepted.
-    public var cause: InitialMessageRejectedCause
-
-    public init(
-        chat: String,
-        cause: InitialMessageRejectedCause
-    ) {
-        self.chat = chat
-        self.cause = cause
-    }
-}
-
-public struct InitialMessageRejectedCause: Codable, Sendable {
-    /// Underlying JSON-RPC or application error code.
-    public var code: Int
-    /// Underlying human-readable error message.
-    public var message: String
-    /// Underlying structured error detail, when supplied.
-    public var data: AnyCodable?
-
-    public init(
-        code: Int,
-        message: String,
-        data: AnyCodable? = nil
-    ) {
-        self.code = code
-        self.message = message
-        self.data = data
     }
 }

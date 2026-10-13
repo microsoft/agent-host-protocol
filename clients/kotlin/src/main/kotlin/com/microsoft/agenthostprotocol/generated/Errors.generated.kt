@@ -57,10 +57,6 @@ object AhpErrorCodes {
     const val PERMISSION_DENIED: Int = -32009
     /** The target resource already exists and the operation does not allow overwriting */
     const val ALREADY_EXISTS: Int = -32010
-    /** An optimistic-concurrency precondition failed */
-    const val CONFLICT: Int = -32011
-    /** A fork chat was created, but its initial message was rejected */
-    const val INITIAL_MESSAGE_REJECTED: Int = -32012
 }
 
 // ─── Error Detail Payloads ──────────────────────────────────────────────────
@@ -93,32 +89,4 @@ data class UnsupportedProtocolVersionErrorData(
      * constraint (e.g. `">=0.1.0 <0.3.0"` or `"^0.2.0"`).
      */
     val supportedVersions: List<String>
-)
-
-@Serializable
-data class InitialMessageRejectedErrorData(
-    /**
-     * URI of the successfully created fork chat.
-     */
-    val chat: String,
-    /**
-     * Underlying reason the initial message could not be accepted.
-     */
-    val cause: InitialMessageRejectedCause
-)
-
-@Serializable
-data class InitialMessageRejectedCause(
-    /**
-     * Underlying JSON-RPC or application error code.
-     */
-    val code: Long,
-    /**
-     * Underlying human-readable error message.
-     */
-    val message: String,
-    /**
-     * Underlying structured error detail, when supplied.
-     */
-    val data: JsonElement? = null
 )

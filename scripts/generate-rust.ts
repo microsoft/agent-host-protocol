@@ -2131,8 +2131,6 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
-    /// A fork chat was created, but its initial message was rejected.
-    pub const INITIAL_MESSAGE_REJECTED: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.
@@ -2170,25 +2168,6 @@ pub struct UnsupportedProtocolVersionErrorData {
     /// either a SemVer \`MAJOR.MINOR.PATCH\` string (e.g. \`"0.1.0"\`) or a
     /// SemVer range constraint (e.g. \`">=0.1.0 <0.3.0"\` or \`"^0.2.0"\`).
     pub supported_versions: Vec<String>,
-}
-
-/// Details carried in the \`data\` field of an \`InitialMessageRejected\`
-/// (-32012) error.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InitialMessageRejectedErrorData {
-    pub chat: Uri,
-    pub cause: InitialMessageRejectedCause,
-}
-
-/// The preserved underlying error for an \`InitialMessageRejected\` error.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InitialMessageRejectedCause {
-    pub code: i64,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<AnyValue>,
 }
 `;
 }
@@ -2413,8 +2392,6 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
-    'InitialMessageRejectedErrorData',
-    'InitialMessageRejectedCause',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',

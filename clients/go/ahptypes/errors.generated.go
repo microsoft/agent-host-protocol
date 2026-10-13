@@ -4,8 +4,6 @@
 
 package ahptypes
 
-import "encoding/json"
-
 // ─── Standard JSON-RPC Error Codes ─────────────────────────────────────────
 
 // Standard JSON-RPC 2.0 error codes.
@@ -34,11 +32,10 @@ const (
 	ErrorCodeTurnInProgress             int32 = -32004
 	ErrorCodeUnsupportedProtocolVersion int32 = -32005
 	// -32006 is intentionally reserved and unassigned.
-	ErrorCodeAuthRequired           int32 = -32007
-	ErrorCodeNotFound               int32 = -32008
-	ErrorCodePermissionDenied       int32 = -32009
-	ErrorCodeAlreadyExists          int32 = -32010
-	ErrorCodeInitialMessageRejected int32 = -32012
+	ErrorCodeAuthRequired     int32 = -32007
+	ErrorCodeNotFound         int32 = -32008
+	ErrorCodePermissionDenied int32 = -32009
+	ErrorCodeAlreadyExists    int32 = -32010
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -65,19 +62,4 @@ type PermissionDeniedErrorData struct {
 // UnsupportedProtocolVersion (-32005) error.
 type UnsupportedProtocolVersionErrorData struct {
 	SupportedVersions []string `json:"supportedVersions"`
-}
-
-// InitialMessageRejectedErrorData is the detail payload of an
-// InitialMessageRejected (-32012) error.
-type InitialMessageRejectedErrorData struct {
-	Chat  URI                         `json:"chat"`
-	Cause InitialMessageRejectedCause `json:"cause"`
-}
-
-// InitialMessageRejectedCause is the preserved underlying error for an
-// InitialMessageRejected error.
-type InitialMessageRejectedCause struct {
-	Code    int32           `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data,omitempty"`
 }

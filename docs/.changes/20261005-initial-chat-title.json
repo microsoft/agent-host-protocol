@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Optional initial titles for newly created chats, advertised through the multiple-chat capability."
+  "message": "Optional `CreateChatParams.title` for a client-selected initial display title."
 }
