@@ -1373,7 +1373,7 @@ function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 ///
 /// Deserialized by trying the empty state first (an object with no members,
-/// used by stateless channels), then session (has required \`lifecycle\`), then
+/// used by channels whose state has no fields), then session (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then canvas (has required instance/provider/type
 /// identifiers), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch

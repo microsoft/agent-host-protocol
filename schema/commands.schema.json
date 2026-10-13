@@ -437,7 +437,7 @@
         },
         "flowControl": {
           "$ref": "#/$defs/SubscriptionFlowControlOptions",
-          "description": "Offers windowed delivery for this subscription. The server accepts by\nreturning `flowControl` in the result. If the result does not contain\n`flowControl`, the subscription uses ordinary delivery. A client MUST NOT\noffer windowed delivery unless protocol version 1.1.0 or later was\nnegotiated.\n\nStability: 1.0 - Early development."
+          "description": "Offers windowed delivery for this subscription. The server accepts by\nreturning `flowControl` in the result. If the result does not contain\n`flowControl`, the subscription uses ordinary delivery.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [

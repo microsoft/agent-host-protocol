@@ -678,9 +678,7 @@ data class SubscribeParams(
     /**
      * Offers windowed delivery for this subscription. The server accepts by
      * returning `flowControl` in the result. If the result does not contain
-     * `flowControl`, the subscription uses ordinary delivery. A client MUST NOT
-     * offer windowed delivery unless protocol version 1.1.0 or later was
-     * negotiated.
+     * `flowControl`, the subscription uses ordinary delivery.
      *
      * Stability: 1.0 - Early development.
      */

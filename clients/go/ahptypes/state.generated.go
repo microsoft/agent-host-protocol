@@ -6428,7 +6428,7 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 // for required fields in the canonical order
 // (empty → automationRun → automations → session → chat → canvas → terminal →
 // changeset → resourceWatch → annotations → root). An object with no members
-// is the empty state of a stateless channel.
+// is an empty state, used by channels whose state has no fields.
 type SnapshotState struct {
 	Empty         *EmptyState         `json:"-"`
 	Root          *RootState          `json:"-"`

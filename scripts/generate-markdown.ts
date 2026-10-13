@@ -1152,12 +1152,12 @@ function generateOtlpChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Telemetry Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the `ahp-otlp:` channels — stateless channels that pass OpenTelemetry logs, traces, and metrics from the agent host to subscribed clients as [OTLP/JSON](https://github.com/open-telemetry/opentelemetry-proto) payloads. See [Telemetry Channel specification](/specification/telemetry-channel) for the wire-level overview, including URI templates and severity filtering.\n');
+  lines.push('Reference for the `ahp-otlp:` channels, which pass OpenTelemetry logs, traces, and metrics from the agent host to subscribed clients as [OTLP/JSON](https://github.com/open-telemetry/opentelemetry-proto) payloads. See [Telemetry Channel specification](/specification/telemetry-channel) for the wire-level overview, including URI templates and severity filtering.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {
     lines.push('## State Types\n');
-    lines.push('The `ahp-otlp:` channels are stateless; the only state type is the capability descriptor the host advertises on `InitializeResult.telemetry`.\n');
+    lines.push('The state of an `ahp-otlp:` channel is an `EmptyState`; its data arrives only in notifications. The type below is the capability descriptor that the host advertises on `InitializeResult.telemetry`.\n');
     lines.push(emitStateTypesSection([stateSf]));
   }
 

@@ -1428,12 +1428,12 @@ function generateSnapshotState(): string {
   /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
 /// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
-/// An object with no members is the empty state of a stateless channel.
+/// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
-    /// <summary>Empty state variant of a stateless channel, when populated.</summary>
+    /// <summary>Empty state variant, when populated.</summary>
     public EmptyState? Empty { get; set; }
 
     /// <summary>Root state variant, when populated.</summary>

@@ -8438,7 +8438,7 @@ public enum SnapshotState: Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
-        // An object with no members is the empty state of a stateless channel.
+        // An object with no members is an empty state, used by channels whose state has no fields.
         // EmptyState would decode any object, so check for members explicitly.
         if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
             self = .empty(EmptyState())

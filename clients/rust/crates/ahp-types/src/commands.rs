@@ -609,9 +609,7 @@ pub struct SubscribeParams {
     pub view: Option<SubscribeView>,
     /// Offers windowed delivery for this subscription. The server accepts by
     /// returning `flowControl` in the result. If the result does not contain
-    /// `flowControl`, the subscription uses ordinary delivery. A client MUST NOT
-    /// offer windowed delivery unless protocol version 1.1.0 or later was
-    /// negotiated.
+    /// `flowControl`, the subscription uses ordinary delivery.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]

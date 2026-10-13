@@ -870,7 +870,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // (checked after session, whose optional annotations summary reuses the
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
-        // An object with no members is the empty state of a stateless channel.
+        // An object with no members is an empty state, used by channels whose state has no fields.
         return when {
             obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
