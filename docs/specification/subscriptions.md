@@ -120,14 +120,26 @@ object, and `fromSeq` is the server's current `serverSeq`:
 }
 ```
 
+The server MAY omit the snapshot for a channel whose state has no fields. In
+that case `subscribe` returns `{}`, and `initialize` and `reconnect` results
+leave the channel out of `snapshots`. Clients MUST accept both forms.
+
+Later protocol versions can add channels with new kinds of state. A client
+MUST NOT fail because a snapshot's `state` has a form that it does not
+recognize; it ignores that snapshot.
+
 After a successful `subscribe`, the server sends the client every message for
 that channel until the client unsubscribes or the connection closes.
 
 A client has at most one subscription to each channel. If it sends `subscribe`
-for a channel that it is already subscribed to, the new subscription replaces
-the old one. Messages that the client receives before the result belong to the
-old subscription, and messages after it belong to the new one. The client
-discards data that it has queued for the old subscription.
+for a channel that it is already subscribed to, the request changes the
+existing subscription, for example to start windowed delivery or to change its
+window. No data is lost: the client keeps the messages that it has already
+received and processes them in order. The server answers as it would for a new
+subscription, so the client receives a new snapshot. If the subscription used
+windowed delivery both before and after the change, its counters continue from
+their current values; otherwise they start at zero when the server sends the
+result. If the request fails, the subscription does not change.
 
 The `subscribe` params can also contain these optional members:
 
@@ -267,9 +279,11 @@ without separate `subscribe` requests.
 }
 ```
 
-The `initialize` result contains a snapshot for each channel in the list. These
+The `initialize` result contains a snapshot for each channel in the list,
+except channels whose snapshot the server omits, as described in
+[Subscribing](#subscribe-request). These
 subscriptions use ordinary delivery. A client that wants windowed delivery for
-one of these channels sends `subscribe` for it, which replaces the existing
+one of these channels sends `subscribe` for it, which changes the existing
 subscription.
 
 ## Protocol Notifications

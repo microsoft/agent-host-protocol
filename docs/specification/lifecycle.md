@@ -151,8 +151,9 @@ can add `windows` to the `reconnect` request. The server includes `windows` in
 the result only if the request contained it, and lists only channels from the
 request. Windowed subscriptions are not included in the result's `actions` or
 `snapshots`. Each one recovers through its own data messages, using its own
-counters and `lastAppliedServerSeq` instead of the connection-wide
-`lastSeenServerSeq`.
+`lastAppliedServerSeq` instead of the connection-wide `lastSeenServerSeq`. Its
+window counters start at zero on the new connection, and its limits are
+negotiated again in the `reconnect` request and result.
 
 ## Unexpected Disconnection
 

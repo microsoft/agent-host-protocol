@@ -739,7 +739,7 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
-  { name: 'ChannelReceiveLimits' }, { name: 'ChannelReceiveProgress' },
+  { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
@@ -1314,9 +1314,12 @@ function generateSnapshotState(): string {
 // for required fields in the canonical order
 // (empty → automationRun → automations → session → chat → canvas → terminal →
 // changeset → resourceWatch → annotations → root). An object with no members
-// is an empty state, used by channels whose state has no fields.
+// is an empty state, used by channels whose state has no fields. A state that
+// matches none of these, such as the state of a channel added in a later
+// protocol version, is kept as raw JSON in Unknown.
 type SnapshotState struct {
 \tEmpty         *EmptyState         \`json:"-"\`
+\tUnknown       json.RawMessage     \`json:"-"\`
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
@@ -1354,6 +1357,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Annotations)
 \tcase s.Root != nil:
 \t\treturn json.Marshal(s.Root)
+\tcase s.Unknown != nil:
+\t\treturn s.Unknown, nil
 \tdefault:
 \t\treturn []byte("null"), nil
 \t}
@@ -1424,12 +1429,15 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Annotations = &v
-\tdefault:
+\tcase containsAll(probe, "agents"):
 \t\tvar v RootState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
 \t\ts.Root = &v
+\tdefault:
+\t\t// A state from a later protocol version: keep it rather than fail.
+\t\ts.Unknown = append(json.RawMessage(nil), data...)
 \t}
 \treturn nil
 }

@@ -106,7 +106,9 @@ When the server accepts:
 
 - The result MUST NOT contain `snapshot`. The snapshot is sent as a data message
   instead.
-- All counters for both directions start at zero.
+- All counters for both directions start at zero. If the client was already
+  subscribed with windowed delivery, the counters instead continue from their
+  current values, and only the limits change.
 - Both peers MUST apply the limits and counters in this specification to every
   data message on the subscription.
 
@@ -326,7 +328,7 @@ other languages MUST count UTF-16 code units, not characters or UTF-8 bytes.
 The size of a message is the size of its complete JSON-RPC text, as sent and as
 received. For a fragment, this includes the `channel/frame` envelope and the
 escape characters that JSON adds to `data`. The same size is used for the
-window, for credit, for the reconnection counters, and for `maximumFrameBytes`.
+window, for credit, and for `maximumFrameBytes`.
 
 | Message | Size |
 |---|---:|
@@ -411,13 +413,16 @@ The receiver decides when to send credit. For example:
   succeeded.
 - Stream data, such as terminal output written to a local buffer, can be
   released when that buffer has released the data.
-- A fragment can be released when the receiver has stored it for reassembly.
-  This lets the sender continue a large message after the window is full.
 
 When outstanding data reaches `windowBytes`, the sender stops. The receiver
 MUST send credit as soon as it is ready to receive more data. If it does not,
 the sender waits indefinitely. A receiver that sends credit as soon as data
 arrives does not slow the sender down.
+
+A receiver can release fragments at any time while it receives a message. It
+MUST NOT wait for all fragments of a message to arrive before releasing any of
+them. The sender stops when the window is full, so a message larger than the
+window would never be completed.
 
 `consumedBytes` can be any value up to sent bytes; it does not need to match
 the end of a message or fragment. A sender ignores a value that is less than or
@@ -477,33 +482,20 @@ it.
 
 ## Reconnection
 
-A client can keep windowed subscriptions across a reconnection. For each
-windowed subscription that it wants to keep, the client adds an item to
-`windows.items` in the `reconnect` request:
+When the connection closes, neither peer can know which data and credit the
+other received before it closed. Windowed subscriptions therefore do not carry
+their counters across a reconnection. A kept subscription starts its counters
+at zero on the new connection and negotiates its limits again, in the same way
+as `subscribe`.
+
+For each windowed subscription that it wants to keep, the client adds an item
+to `windows.items` in the `reconnect` request:
 
 | Member | Meaning |
 |---|---|
-| `channel` | The subscription's channel URI. This URI MUST also be in `subscriptions`. |
-| `clientReceive.acceptedBytes` | The total size of complete data messages, including all of their fragments, that the client has received and kept |
-| `clientReceive.consumedBytes` | The part of `acceptedBytes` that the client has released |
+| `channel` | The subscription's channel URI. This URI MUST also be in `subscriptions`. Each channel can appear only once. |
+| `flowControl.receive` | The limits that the client offers for the new connection, as in `subscribe` |
 | `lastAppliedServerSeq` | The `serverSeq` of the last action or observed state that the client has applied or kept for processing on this channel. Required for replay. |
-
-Each channel can appear in `windows.items` only once. The two byte counts
-always satisfy:
-
-```text
-0 <= consumedBytes <= acceptedBytes
-unread bytes = acceptedBytes - consumedBytes
-```
-
-`acceptedBytes` is what the client has received. `consumedBytes` is what it has
-released. These values can differ, for example when terminal output is waiting
-in a local buffer.
-
-Fragments of a message that the client had not finished receiving are
-discarded when the connection closes, so they are not included in
-`acceptedBytes`. If the client had already sent credit for some of those
-fragments, it reports `consumedBytes` equal to `acceptedBytes`.
 
 The server includes `windows` in the `reconnect` result only if the request
 contained `windows`. The result contains only channels from the request. Each
@@ -512,24 +504,26 @@ item contains:
 | Member | Meaning |
 |---|---|
 | `channel` | The subscription's channel URI |
-| `flowControl` | The limits for the subscription. These do not change. |
-| `clientReceive` | The counters for data sent to the client |
-| `hostReceive` | The counters for data sent to the server |
+| `flowControl` | The limits that the server accepted for the new connection, as in a `subscribe` result. The server MAY lower the limits that the client offered, and MUST NOT raise them. |
 | `recovery` | How the server resumes sending data: `snapshot`, `replay`, or `live` |
-
-The counters in the result are final. The server decides them for both
-directions; for `clientReceive`, it normally returns the values that the client
-reported. Before it sends any data message or credit for the subscription, each
-peer MUST set its counters to the returned values, even if they differ from its
-own. Both peers must have exactly the same counters. Otherwise one peer can send
-data while the other believes that the window is full, or send credit that the
-other treats as invalid.
 
 If a channel from the request is not in the result, the subscription was not
 kept. The client discards its old subscription and, for a byte stream, closes
 the stream. The client does this for every reason that a subscription is not
 kept, such as a permissions change or missing server data. The server SHOULD log
 the reason locally.
+
+For each kept subscription:
+
+- Both peers discard partial fragmented messages from the old connection.
+- All counters start at zero on the new connection. Credit counts only data
+  received on the new connection. A client that still holds data from the old
+  connection keeps it, but never sends credit for it.
+- Neither peer sends data messages or credit for the subscription before the
+  server sends the `reconnect` result.
+
+A client that still holds a lot of unread data from the old connection can offer
+a smaller window, and send `subscribe` later to increase it.
 
 Windowed subscriptions are not included in the `actions` or `snapshots` of the
 `reconnect` result. Each one recovers through its own data messages, using its
@@ -538,39 +532,27 @@ Windowed subscriptions are not included in the `actions` or `snapshots` of the
 | `recovery` | Server behavior | Client behavior |
 |---|---|---|
 | `snapshot` | Sends a new `channel/snapshot` | Replaces its state for the channel |
-| `replay` | Sends again each action with a `serverSeq` greater than `lastAppliedServerSeq` | Continues with the same state and buffers |
+| `replay` | Sends again each action with a `serverSeq` greater than `lastAppliedServerSeq` | Continues with the same state |
 | `live` | Sends only data created after reconnection | Continues from the current point |
 
 With `snapshot` recovery, the new `channel/snapshot` MUST be the first data
 message that the server sends after the `reconnect` result. With `live`
 recovery, every data message after the `reconnect` result is new data.
 
-Sequence numbers decide what is sent again; byte counters do not. The server
-uses `lastAppliedServerSeq`. Data messages without a sequence number, such as
-telemetry batches, are not sent again. The client knows which of its
-`dispatchAction` notifications the server received from their echoes, which
+Sequence numbers decide what is sent again. Data messages without a sequence
+number, such as telemetry batches, are not sent again. The client knows which of
+its `dispatchAction` notifications the server received from their echoes, which
 carry `origin.clientSeq`; see [Write-Ahead Reconciliation](/guide/reconciliation).
-Messages sent again count against the window in the same way as new messages.
-
-The following rules apply when a subscription is kept:
-
-- Both peers discard partial fragmented messages from the old connection.
-- Unread data is still counted against the window. A sender MUST NOT treat the
-  window as empty while the receiver still holds unread data.
-- With `snapshot` or `live` recovery, the client can discard data that it has
-  not released. It then sends `channel/credit` to release the discarded data.
 
 The client ID and channel URI identify a windowed subscription. A client has at
 most one subscription for each channel, so the protocol has no subscription IDs.
 The old connection MUST be closed before the new connection is used. Both peers
-MUST ignore delayed events from the old connection. If the reply to `reconnect`
-is lost, the client can send `reconnect` again for the same subscriptions.
+MUST ignore delayed events from the old connection. If the result of
+`reconnect` is lost, the client sends `reconnect` again for the same
+subscriptions.
 
-Retained data and the time allowed for reconnection MUST be limited. A byte
-stream cannot be recovered if a peer restarts or loses its buffers. After
-`unsubscribe`, or when a new `subscribe` replaces the subscription, the new
-subscription starts with new counters. The client discards data from the old
-subscription first.
+The time allowed for reconnection MUST be limited. A byte stream cannot be
+recovered if a peer restarts or loses its buffers.
 
 ### Example
 
@@ -594,12 +576,16 @@ credit for it. The client also had a windowed subscription to
       "items": [
         {
           "channel": "ahp-terminal:/t1",
-          "clientReceive": { "acceptedBytes": 804, "consumedBytes": 520 },
+          "flowControl": {
+            "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
+          },
           "lastAppliedServerSeq": 6
         },
         {
           "channel": "ahp-terminal:/t2",
-          "clientReceive": { "acceptedBytes": 0, "consumedBytes": 0 },
+          "flowControl": {
+            "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
+          },
           "lastAppliedServerSeq": 0
         }
       ]
@@ -629,8 +615,6 @@ credit for it. The client also had a windowed subscription to
               "maximumFrameBytes": 1024
             }
           },
-          "clientReceive": { "acceptedBytes": 804, "consumedBytes": 520 },
-          "hostReceive": { "acceptedBytes": 0, "consumedBytes": 0 },
           "recovery": "replay"
         }
       ]
@@ -641,14 +625,14 @@ credit for it. The client also had a windowed subscription to
 
 For `ahp-terminal:/t1`:
 
-- The client keeps its state and the 284 bytes of unread output.
+- The server accepts the same limits as before, and both peers start their
+  counters at zero.
+- The client keeps its state and the 284 bytes of unread output. When it
+  releases the output, it does not send credit for it, because it received the
+  output on the old connection.
 - The server does not send the output again, because its `serverSeq` (6) is
   not greater than `lastAppliedServerSeq`. The next data message on the
   subscription is new data.
-- Outstanding data is 284 bytes, so 228 bytes remain before the 512-byte window
-  is full.
-- When the client releases the output, it sends `channel/credit` with
-  `consumedBytes` set to 804.
 
 `ahp-terminal:/t2` is not in `windows.items`, so the client discards that
 subscription.

@@ -1,0 +1,30 @@
+{
+  "name": "snapshot-unknown-state",
+  "group": "A",
+  "description": "A snapshot whose state has a form this version does not recognize, such as the state of a channel added later, decodes without failing and re-encodes unchanged.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-future:/x1",
+    "state": {
+      "futureField": "value",
+      "items": [
+        "a",
+        "b"
+      ]
+    },
+    "fromSeq": 9
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-future:/x1",
+      "state": {
+        "futureField": "value",
+        "items": [
+          "a",
+          "b"
+        ]
+      },
+      "fromSeq": 9
+    }
+  ]
+}

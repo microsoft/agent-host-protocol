@@ -695,7 +695,7 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
-  'ChannelReceiveLimits', 'ChannelReceiveProgress',
+  'ChannelReceiveLimits',
   'ChannelFlowControl', 'ResumedChannelSubscription',
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
@@ -1128,6 +1128,9 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    case unknown(AnyCodable)
 
     private struct MemberKey: CodingKey {
         var stringValue: String
@@ -1166,8 +1169,11 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
+        } else if let root = try? RootState(from: decoder) {
+            self = .root(root)
         } else {
-            self = .root(try RootState(from: decoder))
+            // A state from a later protocol version: keep it rather than fail.
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -1184,6 +1190,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .unknown(let raw): try raw.encode(to: encoder)
         }
     }
 }`;

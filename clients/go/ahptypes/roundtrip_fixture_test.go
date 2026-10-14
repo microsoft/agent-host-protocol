@@ -286,6 +286,10 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v ChannelCreditParams
 		dec(&v)
 		return enc(&v)
+	case "ReconnectParams":
+		var v ReconnectParams
+		dec(&v)
+		return enc(&v)
 	default:
 		t.Fatalf("%s: round-trip fixture: unknown wire type %q. Add a decode entry to decodeAndReencode.", name, typ)
 		return ""

@@ -386,7 +386,8 @@ data class InitializeResult(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Snapshots for each `initialSubscriptions` URI
+     * Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+     * channel whose state has no fields ({@link EmptyState}).
      */
     val snapshots: List<Snapshot>,
     /**
@@ -575,7 +576,8 @@ data class ReconnectSnapshotResult(
     /**
      * Fresh snapshots for each resumed ordinary subscription. Windowed
      * subscriptions are not included; they recover through their own data
-     * messages, as described by `windows`.
+     * messages, as described by `windows`. The server MAY leave out a channel
+     * whose state has no fields ({@link EmptyState}).
      */
     val snapshots: List<Snapshot>,
     /**
@@ -590,7 +592,7 @@ data class ReconnectSnapshotResult(
 )
 
 /**
- * The client's progress on one windowed subscription that it wants to keep.
+ * One windowed subscription that the client wants to keep after reconnection.
  *
  * Stability: 1.0 - Early development.
  */
@@ -601,9 +603,10 @@ data class ChannelDeliveryResumeParams(
      */
     val channel: String,
     /**
-     * The client's progress on data that the server sent.
+     * The client's offer of limits for the new connection, as in `subscribe`.
+     * The subscription's counters start at zero on the new connection.
      */
-    val clientReceive: ChannelReceiveProgress,
+    val flowControl: SubscriptionFlowControlOptions,
     /**
      * The `serverSeq` of the last action or observed state that the client
      * applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
@@ -625,12 +628,10 @@ data class ChannelDeliveryResumeOptions(
 /**
  * Windowed subscriptions that the server kept after reconnection.
  *
- * A requested channel that is not listed was not kept. The counters are final:
- * before sending any data message or credit for a subscription, both peers MUST
- * set their counters to the returned values. Unread data stays counted against
- * the window. If the server cannot determine the counters, it omits the
- * subscription instead of starting them again from zero. Sequence numbers, not
- * these counters, decide what is sent again.
+ * A requested channel that is not listed was not kept. For each kept
+ * subscription, both peers start their counters at zero on the new connection,
+ * and credit counts only data received on that connection. Sequence numbers
+ * decide what is sent again.
  *
  * Stability: 1.0 - Early development.
  */
@@ -715,9 +716,10 @@ data class SubscriptionDeliveryOptions(
 @Serializable
 data class SubscribeResult(
     /**
-     * Snapshot of the subscribed channel's state. Present with ordinary delivery.
-     * With windowed delivery, the snapshot is sent in a `channel/snapshot`
-     * notification instead.
+     * Snapshot of the subscribed channel's state. Present with ordinary delivery,
+     * except that the server MAY omit it for a channel whose state has no fields
+     * ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+     * `channel/snapshot` notification instead.
      */
     val snapshot: Snapshot? = null,
     /**

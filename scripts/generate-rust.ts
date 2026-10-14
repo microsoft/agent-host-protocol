@@ -850,7 +850,7 @@ function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
  * discriminated union have `omitDiscriminants: true` set.
  */
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
-  { name: 'ChannelReceiveLimits' }, { name: 'ChannelReceiveProgress' },
+  { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
@@ -1379,7 +1379,9 @@ function generateSnapshotState(): string {
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
 /// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root.
+/// \`automations\`), then root (has required \`agents\`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as \`Unknown\` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -1394,6 +1396,9 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }`;
 }
 
@@ -1895,7 +1900,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ChannelReceiveProgress, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');

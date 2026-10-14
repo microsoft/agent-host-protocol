@@ -1255,32 +1255,6 @@ data class ChannelReceiveLimits(
 )
 
 /**
- * A receiver's progress on a windowed subscription, used during reconnection.
- *
- * Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
- * ends at a complete data message. `consumedBytes` is never greater than
- * `acceptedBytes`. The difference is data that the receiver has kept but not
- * yet released. Credit given for fragments of a message that was not completed
- * is not included.
- *
- * Stability: 1.0 - Early development.
- */
-@Serializable
-data class ChannelReceiveProgress(
-    /**
-     * Total size of complete data messages, including all of their fragments,
-     * that the receiver has received and kept.
-     */
-    val acceptedBytes: Long,
-    /**
-     * The part of `acceptedBytes` that the receiver has released. A rejected
-     * action counts as released; this value does not mean that an action
-     * succeeded.
-     */
-    val consumedBytes: Long
-)
-
-/**
  * The limits that the server accepted for a windowed subscription.
  *
  * The client ID and channel URI identify the subscription. All counters start at
@@ -1303,8 +1277,9 @@ data class ChannelFlowControl(
 /**
  * A windowed subscription that the server kept after reconnection.
  *
- * If a channel that the client requested is not in the result, the subscription
- * was not kept. The client discards the old subscription and, for a byte stream,
+ * The subscription's counters start at zero on the new connection. If a
+ * channel that the client requested is not in the result, the subscription was
+ * not kept. The client discards the old subscription and, for a byte stream,
  * closes the stream.
  *
  * Stability: 1.0 - Early development.
@@ -1316,17 +1291,11 @@ data class ResumedChannelSubscription(
      */
     val channel: String,
     /**
-     * The subscription's limits. These do not change during reconnection.
+     * The limits that the server accepted for the new connection, as in a
+     * `subscribe` result. The server MAY lower the limits that the client offered
+     * in its request, and MUST NOT raise them.
      */
     val flowControl: ChannelFlowControl,
-    /**
-     * The counters for data sent to the client. Both peers MUST use these values.
-     */
-    val clientReceive: ChannelReceiveProgress,
-    /**
-     * The counters for data sent to the server. Both peers MUST use these values.
-     */
-    val hostReceive: ChannelReceiveProgress,
     /**
      * How the server resumes sending data.
      */
@@ -5240,7 +5209,10 @@ data class Snapshot(
      */
     val resource: String,
     /**
-     * The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
+     * The current state of the resource. A channel with no state fields, such as a
+     * telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+     * new kinds of state; a client MUST NOT fail on a state that it does not
+     * recognize, and ignores that snapshot.
      */
     val state: SnapshotState,
     /**
@@ -5253,9 +5225,10 @@ data class Snapshot(
  * The state of a channel that has no state fields, such as a telemetry
  * channel. It is always the empty object `{}`.
  *
- * Every subscription starts with a snapshot, including subscriptions to these
- * channels. A channel can therefore gain state fields in a later revision
- * without changing how subscriptions start.
+ * Every windowed subscription starts with a snapshot, including subscriptions
+ * to these channels, so a channel can gain state fields in a later revision
+ * without changing how windowed subscriptions start. With ordinary delivery,
+ * the server MAY omit a snapshot whose state is an `EmptyState`.
  *
  * Stability: 1.0 - Early development.
  */
@@ -7634,6 +7607,8 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
+    @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -7674,7 +7649,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
-            else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            obj.containsKey("agents") -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            // A state from a later protocol version: keep it rather than fail.
+            else -> SnapshotState.Unknown(obj)
         }
     }
 
@@ -7693,6 +7670,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Unknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

@@ -92,7 +92,7 @@ describe('windowed delivery protocol examples', () => {
     assert.equal(credits[0].params.consumedBytes, bytes);
   });
 
-  it('charges direct output and preserves its unread debt on reconnect', () => {
+  it('charges direct output, then renegotiates limits without counters on reconnect', () => {
     assert.equal(serializedBytes(output), 284);
     assert.ok(serializedBytes(output) <= limits.maximumFrameBytes);
     const boundary = serializedBytes(snapshot) + serializedBytes(output);
@@ -112,13 +112,17 @@ describe('windowed delivery protocol examples', () => {
     const retained = response.result.windows.items[0];
     assert.equal(retained.recovery, 'replay');
     assert.deepEqual(retained.flowControl, acceptance.result.flowControl);
-    assert.deepEqual(retained.clientReceive, reconnect.params.windows.items[0].clientReceive);
-    assert.equal(retained.clientReceive.acceptedBytes, boundary);
-    assert.equal(retained.clientReceive.consumedBytes, serializedBytes(snapshot));
-    const unread = retained.clientReceive.acceptedBytes - retained.clientReceive.consumedBytes;
-    assert.equal(unread, 284);
-    assert.equal(limits.windowBytes - unread, 228);
-    assert.deepEqual(retained.hostReceive, { acceptedBytes: 0, consumedBytes: 0 });
+    assert.deepEqual(Object.keys(retained).sort(), ['channel', 'flowControl', 'recovery']);
+    for (const item of reconnect.params.windows.items) {
+      assert.deepEqual(Object.keys(item).sort(), ['channel', 'flowControl', 'lastAppliedServerSeq']);
+      assert.deepEqual(item.flowControl, request.params.flowControl);
+    }
+    // The server can lower the offered limits but never raise them.
+    const offer = reconnect.params.windows.items[0].flowControl.receive;
+    for (const key of ['windowBytes', 'maximumFrameBytes'] as const) {
+      assert.ok(retained.flowControl.clientReceive[key] <= offer[key]);
+    }
+    assert.equal(reconnect.params.windows.items[0].lastAppliedServerSeq, output.params.serverSeq);
   });
 
   it('charges the alternative fragments by their full size, including envelopes', () => {

@@ -29,8 +29,8 @@
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
-        ChangesetOperationTarget, ChatSource, Implementation, InitializeResult, ReconnectResult,
-        SubscribeParams, SubscribeResult,
+        ChangesetOperationTarget, ChatSource, Implementation, InitializeResult, ReconnectParams,
+        ReconnectResult, SubscribeParams, SubscribeResult,
     },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
@@ -235,6 +235,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "ReconnectResult" => round_trip!(ReconnectResult),
         "ChannelFrameParams" => round_trip!(ChannelFrameParams),
         "ChannelCreditParams" => round_trip!(ChannelCreditParams),
+        "ReconnectParams" => round_trip!(ReconnectParams),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

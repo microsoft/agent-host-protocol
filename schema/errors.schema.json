@@ -116,28 +116,6 @@
         "maximumFrameBytes"
       ]
     },
-    "ChannelReceiveProgress": {
-      "type": "object",
-      "description": "A receiver's progress on a windowed subscription, used during reconnection.\n\nBoth values are totals in UTF-16 bytes and start at zero. `acceptedBytes`\nends at a complete data message. `consumedBytes` is never greater than\n`acceptedBytes`. The difference is data that the receiver has kept but not\nyet released. Credit given for fragments of a message that was not completed\nis not included.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "acceptedBytes": {
-          "type": "integer",
-          "description": "Total size of complete data messages, including all of their fragments,\nthat the receiver has received and kept.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "consumedBytes": {
-          "type": "integer",
-          "description": "The part of `acceptedBytes` that the receiver has released. A rejected\naction counts as released; this value does not mean that an action\nsucceeded.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": [
-        "acceptedBytes",
-        "consumedBytes"
-      ]
-    },
     "ChannelFlowControl": {
       "type": "object",
       "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
@@ -158,7 +136,7 @@
     },
     "ResumedChannelSubscription": {
       "type": "object",
-      "description": "A windowed subscription that the server kept after reconnection.\n\nIf a channel that the client requested is not in the result, the subscription\nwas not kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nThe subscription's counters start at zero on the new connection. If a\nchannel that the client requested is not in the result, the subscription was\nnot kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -166,15 +144,7 @@
         },
         "flowControl": {
           "$ref": "#/$defs/ChannelFlowControl",
-          "description": "The subscription's limits. These do not change during reconnection."
-        },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress",
-          "description": "The counters for data sent to the client. Both peers MUST use these values."
-        },
-        "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress",
-          "description": "The counters for data sent to the server. Both peers MUST use these values."
+          "description": "The limits that the server accepted for the new connection, as in a\n`subscribe` result. The server MAY lower the limits that the client offered\nin its request, and MUST NOT raise them."
         },
         "recovery": {
           "$ref": "#/$defs/ChannelRecoveryKind",
@@ -184,8 +154,6 @@
       "required": [
         "channel",
         "flowControl",
-        "clientReceive",
-        "hostReceive",
         "recovery"
       ]
     },
@@ -638,7 +606,7 @@
               "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}."
+          "description": "The current state of the resource. A channel with no state fields, such as a\ntelemetry channel, has an {@link EmptyState}. Later protocol versions can add\nnew kinds of state; a client MUST NOT fail on a state that it does not\nrecognize, and ignores that snapshot."
         },
         "fromSeq": {
           "type": "number",
@@ -653,7 +621,7 @@
     },
     "EmptyState": {
       "type": "object",
-      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery subscription starts with a snapshot, including subscriptions to these\nchannels. A channel can therefore gain state fields in a later revision\nwithout changing how subscriptions start.\n\nStability: 1.0 - Early development.",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery windowed subscription starts with a snapshot, including subscriptions\nto these channels, so a channel can gain state fields in a later revision\nwithout changing how windowed subscriptions start. With ordinary delivery,\nthe server MAY omit a snapshot whose state is an `EmptyState`.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
     "RootState": {
@@ -6240,7 +6208,7 @@
           "items": {
             "$ref": "#/$defs/Snapshot"
           },
-          "description": "Snapshots for each `initialSubscriptions` URI"
+          "description": "Snapshots for each `initialSubscriptions` URI. The server MAY leave out a\nchannel whose state has no fields ({@link EmptyState})."
         },
         "defaultDirectory": {
           "$ref": "#/$defs/URI",
@@ -6387,15 +6355,15 @@
     },
     "ChannelDeliveryResumeParams": {
       "type": "object",
-      "description": "The client's progress on one windowed subscription that it wants to keep.\n\nStability: 1.0 - Early development.",
+      "description": "One windowed subscription that the client wants to keep after reconnection.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "The URI of the windowed subscription."
         },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress",
-          "description": "The client's progress on data that the server sent."
+        "flowControl": {
+          "$ref": "#/$defs/SubscriptionFlowControlOptions",
+          "description": "The client's offer of limits for the new connection, as in `subscribe`.\nThe subscription's counters start at zero on the new connection."
         },
         "lastAppliedServerSeq": {
           "type": "integer",
@@ -6406,7 +6374,7 @@
       },
       "required": [
         "channel",
-        "clientReceive"
+        "flowControl"
       ]
     },
     "ChannelDeliveryResumeOptions": {
@@ -6426,7 +6394,7 @@
     },
     "ChannelDeliveryResumeResult": {
       "type": "object",
-      "description": "Windowed subscriptions that the server kept after reconnection.\n\nA requested channel that is not listed was not kept. The counters are final:\nbefore sending any data message or credit for a subscription, both peers MUST\nset their counters to the returned values. Unread data stays counted against\nthe window. If the server cannot determine the counters, it omits the\nsubscription instead of starting them again from zero. Sequence numbers, not\nthese counters, decide what is sent again.\n\nStability: 1.0 - Early development.",
+      "description": "Windowed subscriptions that the server kept after reconnection.\n\nA requested channel that is not listed was not kept. For each kept\nsubscription, both peers start their counters at zero on the new connection,\nand credit counts only data received on that connection. Sequence numbers\ndecide what is sent again.\n\nStability: 1.0 - Early development.",
       "properties": {
         "items": {
           "type": "array",
@@ -6485,7 +6453,7 @@
           "items": {
             "$ref": "#/$defs/Snapshot"
           },
-          "description": "Fresh snapshots for each resumed ordinary subscription. Windowed\nsubscriptions are not included; they recover through their own data\nmessages, as described by `windows`."
+          "description": "Fresh snapshots for each resumed ordinary subscription. Windowed\nsubscriptions are not included; they recover through their own data\nmessages, as described by `windows`. The server MAY leave out a channel\nwhose state has no fields ({@link EmptyState})."
         },
         "windows": {
           "$ref": "#/$defs/ChannelDeliveryResumeResult",
@@ -6499,7 +6467,7 @@
     },
     "SubscribeParams": {
       "type": "object",
-      "description": "Subscribe to a URI-identified channel.\n\nWith ordinary delivery, the result contains a snapshot of the channel's\nstate. With windowed delivery, the result contains `flowControl` instead,\nand the snapshot is sent in a `channel/snapshot` notification.\n\nA client has at most one subscription to each channel. A `subscribe` for a\nchannel that the client is already subscribed to replaces the old\nsubscription.",
+      "description": "Subscribe to a URI-identified channel.\n\nWith ordinary delivery, the result contains a snapshot of the channel's\nstate; the server MAY omit it for a channel whose state has no fields. With\nwindowed delivery, the result contains `flowControl` instead,\nand the snapshot is sent in a `channel/snapshot` notification.\n\nA client has at most one subscription to each channel. A `subscribe` for a\nchannel that the client is already subscribed to changes the existing\nsubscription, for example its window, without losing data. Windowed counters\ncontinue if the subscription was already windowed.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -6562,11 +6530,11 @@
     },
     "SubscribeResult": {
       "type": "object",
-      "description": "Result of the `subscribe` command.\n\nWith ordinary delivery, `snapshot` is present. With windowed delivery,\n`flowControl` is present and `snapshot` MUST be absent. The server sends the\nsnapshot in a `channel/snapshot` notification.",
+      "description": "Result of the `subscribe` command.\n\nWith ordinary delivery, `snapshot` is present, except that the server MAY\nomit it for a channel whose state has no fields. With windowed delivery,\n`flowControl` is present and `snapshot` MUST be absent. The server sends the\nsnapshot in a `channel/snapshot` notification.",
       "properties": {
         "snapshot": {
           "$ref": "#/$defs/Snapshot",
-          "description": "Snapshot of the subscribed channel's state. Present with ordinary delivery.\nWith windowed delivery, the snapshot is sent in a `channel/snapshot`\nnotification instead."
+          "description": "Snapshot of the subscribed channel's state. Present with ordinary delivery,\nexcept that the server MAY omit it for a channel whose state has no fields\n({@link EmptyState}). With windowed delivery, the snapshot is sent in a\n`channel/snapshot` notification instead."
         },
         "flowControl": {
           "$ref": "#/$defs/ChannelFlowControl",

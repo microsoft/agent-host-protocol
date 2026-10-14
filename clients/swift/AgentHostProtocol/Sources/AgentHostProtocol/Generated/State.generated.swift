@@ -1195,33 +1195,6 @@ public struct ChannelReceiveLimits: Codable, Sendable {
     }
 }
 
-/// A receiver's progress on a windowed subscription, used during reconnection.
-///
-/// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
-/// ends at a complete data message. `consumedBytes` is never greater than
-/// `acceptedBytes`. The difference is data that the receiver has kept but not
-/// yet released. Credit given for fragments of a message that was not completed
-/// is not included.
-///
-/// Stability: 1.0 - Early development.
-public struct ChannelReceiveProgress: Codable, Sendable {
-    /// Total size of complete data messages, including all of their fragments,
-    /// that the receiver has received and kept.
-    public var acceptedBytes: Int
-    /// The part of `acceptedBytes` that the receiver has released. A rejected
-    /// action counts as released; this value does not mean that an action
-    /// succeeded.
-    public var consumedBytes: Int
-
-    public init(
-        acceptedBytes: Int,
-        consumedBytes: Int
-    ) {
-        self.acceptedBytes = acceptedBytes
-        self.consumedBytes = consumedBytes
-    }
-}
-
 /// The limits that the server accepted for a windowed subscription.
 ///
 /// The client ID and channel URI identify the subscription. All counters start at
@@ -1245,34 +1218,29 @@ public struct ChannelFlowControl: Codable, Sendable {
 
 /// A windowed subscription that the server kept after reconnection.
 ///
-/// If a channel that the client requested is not in the result, the subscription
-/// was not kept. The client discards the old subscription and, for a byte stream,
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
 /// closes the stream.
 ///
 /// Stability: 1.0 - Early development.
 public struct ResumedChannelSubscription: Codable, Sendable {
     /// The URI of the windowed subscription.
     public var channel: String
-    /// The subscription's limits. These do not change during reconnection.
+    /// The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.
     public var flowControl: ChannelFlowControl
-    /// The counters for data sent to the client. Both peers MUST use these values.
-    public var clientReceive: ChannelReceiveProgress
-    /// The counters for data sent to the server. Both peers MUST use these values.
-    public var hostReceive: ChannelReceiveProgress
     /// How the server resumes sending data.
     public var recovery: ChannelRecoveryKind
 
     public init(
         channel: String,
         flowControl: ChannelFlowControl,
-        clientReceive: ChannelReceiveProgress,
-        hostReceive: ChannelReceiveProgress,
         recovery: ChannelRecoveryKind
     ) {
         self.channel = channel
         self.flowControl = flowControl
-        self.clientReceive = clientReceive
-        self.hostReceive = hostReceive
         self.recovery = recovery
     }
 }
@@ -6058,7 +6026,10 @@ public struct ErrorInfo: Codable, Sendable {
 public struct Snapshot: Codable, Sendable {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     public var resource: String
-    /// The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
+    /// The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.
     public var state: SnapshotState
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     public var fromSeq: Int
@@ -6077,9 +6048,10 @@ public struct Snapshot: Codable, Sendable {
 /// The state of a channel that has no state fields, such as a telemetry
 /// channel. It is always the empty object `{}`.
 ///
-/// Every subscription starts with a snapshot, including subscriptions to these
-/// channels. A channel can therefore gain state fields in a later revision
-/// without changing how subscriptions start.
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
 ///
 /// Stability: 1.0 - Early development.
 public struct EmptyState: Codable, Sendable {
@@ -8429,6 +8401,9 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    case unknown(AnyCodable)
 
     private struct MemberKey: CodingKey {
         var stringValue: String
@@ -8467,8 +8442,11 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
+        } else if let root = try? RootState(from: decoder) {
+            self = .root(root)
         } else {
-            self = .root(try RootState(from: decoder))
+            // A state from a later protocol version: keep it rather than fail.
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -8485,6 +8463,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .unknown(let raw): try raw.encode(to: encoder)
         }
     }
 }

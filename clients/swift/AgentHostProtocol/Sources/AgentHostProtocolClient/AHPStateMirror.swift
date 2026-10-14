@@ -88,8 +88,8 @@ public actor AHPStateMirror {
     /// Seed the mirror from a `Snapshot`, routing by its `state` discriminator.
     public func applySnapshot(_ snapshot: Snapshot) {
         switch snapshot.state {
-        case .empty:
-            // An empty state has nothing to mirror.
+        case .empty, .unknown:
+            // An empty or unrecognized state has nothing to mirror.
             break
         case .root(let state):
             rootState = state

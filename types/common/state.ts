@@ -65,39 +65,6 @@ export interface ChannelReceiveLimits {
 }
 
 /**
- * A receiver's progress on a windowed subscription, used during reconnection.
- *
- * Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
- * ends at a complete data message. `consumedBytes` is never greater than
- * `acceptedBytes`. The difference is data that the receiver has kept but not
- * yet released. Credit given for fragments of a message that was not completed
- * is not included.
- *
- * @category Common Types
- * @stability 1.0
- * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
- */
-export interface ChannelReceiveProgress {
-  /**
-   * Total size of complete data messages, including all of their fragments,
-   * that the receiver has received and kept.
-   * @integer
-   * @minimum 0
-   * @maximum 9007199254740991
-   */
-  acceptedBytes: number;
-  /**
-   * The part of `acceptedBytes` that the receiver has released. A rejected
-   * action counts as released; this value does not mean that an action
-   * succeeded.
-   * @integer
-   * @minimum 0
-   * @maximum 9007199254740991
-   */
-  consumedBytes: number;
-}
-
-/**
  * The limits that the server accepted for a windowed subscription.
  *
  * The client ID and channel URI identify the subscription. All counters start at
@@ -135,8 +102,9 @@ export const enum ChannelRecoveryKind {
 /**
  * A windowed subscription that the server kept after reconnection.
  *
- * If a channel that the client requested is not in the result, the subscription
- * was not kept. The client discards the old subscription and, for a byte stream,
+ * The subscription's counters start at zero on the new connection. If a
+ * channel that the client requested is not in the result, the subscription was
+ * not kept. The client discards the old subscription and, for a byte stream,
  * closes the stream.
  *
  * @category Common Types
@@ -146,12 +114,12 @@ export const enum ChannelRecoveryKind {
 export interface ResumedChannelSubscription {
   /** The URI of the windowed subscription. */
   channel: URI;
-  /** The subscription's limits. These do not change during reconnection. */
+  /**
+   * The limits that the server accepted for the new connection, as in a
+   * `subscribe` result. The server MAY lower the limits that the client offered
+   * in its request, and MUST NOT raise them.
+   */
   flowControl: ChannelFlowControl;
-  /** The counters for data sent to the client. Both peers MUST use these values. */
-  clientReceive: ChannelReceiveProgress;
-  /** The counters for data sent to the server. Both peers MUST use these values. */
-  hostReceive: ChannelReceiveProgress;
   /** How the server resumes sending data. */
   recovery: ChannelRecoveryKind;
 }
@@ -485,7 +453,12 @@ export interface ErrorInfo {
 export interface Snapshot {
   /** The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`) */
   resource: URI;
-  /** The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}. */
+  /**
+   * The current state of the resource. A channel with no state fields, such as a
+   * telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+   * new kinds of state; a client MUST NOT fail on a state that it does not
+   * recognize, and ignores that snapshot.
+   */
   state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
@@ -495,9 +468,10 @@ export interface Snapshot {
  * The state of a channel that has no state fields, such as a telemetry
  * channel. It is always the empty object `{}`.
  *
- * Every subscription starts with a snapshot, including subscriptions to these
- * channels. A channel can therefore gain state fields in a later revision
- * without changing how subscriptions start.
+ * Every windowed subscription starts with a snapshot, including subscriptions
+ * to these channels, so a channel can gain state fields in a later revision
+ * without changing how windowed subscriptions start. With ordinary delivery,
+ * the server MAY omit a snapshot whose state is an `EmptyState`.
  *
  * @category Common Types
  * @stability 1.0

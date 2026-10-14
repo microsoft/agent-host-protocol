@@ -40,7 +40,7 @@ Each field is optional. A host that emits no metrics simply omits `metrics`. A h
 
 ## Subscribing
 
-A telemetry channel delivers its data only in notifications, so its state has no fields. Subscribing returns a snapshot whose `state` is the empty object `{}`. After the subscribe succeeds the client receives `otlp/export*` notifications for batches the host emits while the subscription is live.
+A telemetry channel delivers its data only in notifications, so its state has no fields. Subscribing returns a snapshot whose `state` is the empty object `{}`, or the server may omit the snapshot and return `{}`. After the subscribe succeeds the client receives `otlp/export*` notifications for batches the host emits while the subscription is live.
 
 ```jsonc
 // Client → Server

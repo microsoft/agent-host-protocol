@@ -192,18 +192,17 @@ describe('generated JSON schemas', () => {
       it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
         if (file !== 'notifications.schema.json') return;
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        for (const name of ['ChannelReceiveLimits', 'ChannelReceiveProgress']) {
-          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
-          for (const property of Object.values(properties)) {
-            assert.equal(property.type, 'integer');
-            assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
-            assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
-            assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
-            assert.equal(schemaAccepts(schema, property, 1.5), false);
-            assert.equal(schemaAccepts(schema, property, -1), false);
-            assert.equal(schemaAccepts(schema, property, 0), name === 'ChannelReceiveProgress');
-          }
+        const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
+        for (const property of Object.values(limits)) {
+          assert.equal(property.type, 'integer');
+          assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
+          assert.equal(schemaAccepts(schema, property, 1.5), false);
+          assert.equal(schemaAccepts(schema, property, -1), false);
+          assert.equal(schemaAccepts(schema, property, 0), false);
         }
+        assert.equal('ChannelReceiveProgress' in defs, false);
         const frame = defs.ChannelFrameParams.properties as Record<string, Record<string, unknown>>;
         assert.equal(frame.data.minLength, 1);
         assert.equal(schemaAccepts(schema, frame.data, ''), false);

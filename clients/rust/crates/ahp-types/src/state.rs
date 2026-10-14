@@ -1527,27 +1527,6 @@ pub struct ChannelReceiveLimits {
     pub maximum_frame_bytes: i64,
 }
 
-/// A receiver's progress on a windowed subscription, used during reconnection.
-///
-/// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
-/// ends at a complete data message. `consumedBytes` is never greater than
-/// `acceptedBytes`. The difference is data that the receiver has kept but not
-/// yet released. Credit given for fragments of a message that was not completed
-/// is not included.
-///
-/// Stability: 1.0 - Early development.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChannelReceiveProgress {
-    /// Total size of complete data messages, including all of their fragments,
-    /// that the receiver has received and kept.
-    pub accepted_bytes: i64,
-    /// The part of `acceptedBytes` that the receiver has released. A rejected
-    /// action counts as released; this value does not mean that an action
-    /// succeeded.
-    pub consumed_bytes: i64,
-}
-
 /// The limits that the server accepted for a windowed subscription.
 ///
 /// The client ID and channel URI identify the subscription. All counters start at
@@ -1565,8 +1544,9 @@ pub struct ChannelFlowControl {
 
 /// A windowed subscription that the server kept after reconnection.
 ///
-/// If a channel that the client requested is not in the result, the subscription
-/// was not kept. The client discards the old subscription and, for a byte stream,
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
 /// closes the stream.
 ///
 /// Stability: 1.0 - Early development.
@@ -1575,12 +1555,10 @@ pub struct ChannelFlowControl {
 pub struct ResumedChannelSubscription {
     /// The URI of the windowed subscription.
     pub channel: Uri,
-    /// The subscription's limits. These do not change during reconnection.
+    /// The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.
     pub flow_control: ChannelFlowControl,
-    /// The counters for data sent to the client. Both peers MUST use these values.
-    pub client_receive: ChannelReceiveProgress,
-    /// The counters for data sent to the server. Both peers MUST use these values.
-    pub host_receive: ChannelReceiveProgress,
     /// How the server resumes sending data.
     pub recovery: ChannelRecoveryKind,
 }
@@ -5258,7 +5236,10 @@ pub struct ErrorInfo {
 pub struct Snapshot {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     pub resource: Uri,
-    /// The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.
+    /// The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.
     pub state: SnapshotState,
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     pub from_seq: i64,
@@ -5267,9 +5248,10 @@ pub struct Snapshot {
 /// The state of a channel that has no state fields, such as a telemetry
 /// channel. It is always the empty object `{}`.
 ///
-/// Every subscription starts with a snapshot, including subscriptions to these
-/// channels. A channel can therefore gain state fields in a later revision
-/// without changing how subscriptions start.
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -6675,7 +6657,9 @@ pub enum AutomationRunLifecycle {
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
-/// `automations`), then root.
+/// `automations`), then root (has required `agents`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as `Unknown` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -6690,4 +6674,7 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }

@@ -348,7 +348,8 @@ public struct InitializeResult: Codable, Sendable {
     /// understand. Capabilities needed for interoperable behavior SHOULD use typed
     /// fields on {@link InitializeResult} instead.
     public var meta: [String: AnyCodable]?
-    /// Snapshots for each `initialSubscriptions` URI
+    /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
@@ -600,7 +601,8 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     public var type: ReconnectResultType
     /// Fresh snapshots for each resumed ordinary subscription. Windowed
     /// subscriptions are not included; they recover through their own data
-    /// messages, as described by `windows`.
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
     /// Windowed subscriptions that the server kept. Each one has its own
     /// `recovery` value, which does not depend on this result's type. The server
@@ -621,14 +623,15 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
     }
 }
 
-/// The client's progress on one windowed subscription that it wants to keep.
+/// One windowed subscription that the client wants to keep after reconnection.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeParams: Codable, Sendable {
     /// The URI of the windowed subscription.
     public var channel: String
-    /// The client's progress on data that the server sent.
-    public var clientReceive: ChannelReceiveProgress
+    /// The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.
+    public var flowControl: SubscriptionFlowControlOptions
     /// The `serverSeq` of the last action or observed state that the client
     /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
     /// replay recovery; absent for channels that resume only with new data.
@@ -636,11 +639,11 @@ public struct ChannelDeliveryResumeParams: Codable, Sendable {
 
     public init(
         channel: String,
-        clientReceive: ChannelReceiveProgress,
+        flowControl: SubscriptionFlowControlOptions,
         lastAppliedServerSeq: Int? = nil
     ) {
         self.channel = channel
-        self.clientReceive = clientReceive
+        self.flowControl = flowControl
         self.lastAppliedServerSeq = lastAppliedServerSeq
     }
 }
@@ -660,12 +663,10 @@ public struct ChannelDeliveryResumeOptions: Codable, Sendable {
 
 /// Windowed subscriptions that the server kept after reconnection.
 ///
-/// A requested channel that is not listed was not kept. The counters are final:
-/// before sending any data message or credit for a subscription, both peers MUST
-/// set their counters to the returned values. Unread data stays counted against
-/// the window. If the server cannot determine the counters, it omits the
-/// subscription instead of starting them again from zero. Sequence numbers, not
-/// these counters, decide what is sent again.
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelDeliveryResumeResult: Codable, Sendable {
@@ -769,9 +770,10 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
 }
 
 public struct SubscribeResult: Codable, Sendable {
-    /// Snapshot of the subscribed channel's state. Present with ordinary delivery.
-    /// With windowed delivery, the snapshot is sent in a `channel/snapshot`
-    /// notification instead.
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.
     public var snapshot: Snapshot?
     /// The limits that the server accepted for windowed delivery. The server sends
     /// this result before any data message for the subscription. The client MUST be

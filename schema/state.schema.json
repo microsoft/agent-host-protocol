@@ -27,28 +27,6 @@
         "maximumFrameBytes"
       ]
     },
-    "ChannelReceiveProgress": {
-      "type": "object",
-      "description": "A receiver's progress on a windowed subscription, used during reconnection.\n\nBoth values are totals in UTF-16 bytes and start at zero. `acceptedBytes`\nends at a complete data message. `consumedBytes` is never greater than\n`acceptedBytes`. The difference is data that the receiver has kept but not\nyet released. Credit given for fragments of a message that was not completed\nis not included.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "acceptedBytes": {
-          "type": "integer",
-          "description": "Total size of complete data messages, including all of their fragments,\nthat the receiver has received and kept.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "consumedBytes": {
-          "type": "integer",
-          "description": "The part of `acceptedBytes` that the receiver has released. A rejected\naction counts as released; this value does not mean that an action\nsucceeded.",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        }
-      },
-      "required": [
-        "acceptedBytes",
-        "consumedBytes"
-      ]
-    },
     "ChannelFlowControl": {
       "type": "object",
       "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
@@ -69,7 +47,7 @@
     },
     "ResumedChannelSubscription": {
       "type": "object",
-      "description": "A windowed subscription that the server kept after reconnection.\n\nIf a channel that the client requested is not in the result, the subscription\nwas not kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nThe subscription's counters start at zero on the new connection. If a\nchannel that the client requested is not in the result, the subscription was\nnot kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -77,15 +55,7 @@
         },
         "flowControl": {
           "$ref": "#/$defs/ChannelFlowControl",
-          "description": "The subscription's limits. These do not change during reconnection."
-        },
-        "clientReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress",
-          "description": "The counters for data sent to the client. Both peers MUST use these values."
-        },
-        "hostReceive": {
-          "$ref": "#/$defs/ChannelReceiveProgress",
-          "description": "The counters for data sent to the server. Both peers MUST use these values."
+          "description": "The limits that the server accepted for the new connection, as in a\n`subscribe` result. The server MAY lower the limits that the client offered\nin its request, and MUST NOT raise them."
         },
         "recovery": {
           "$ref": "#/$defs/ChannelRecoveryKind",
@@ -95,8 +65,6 @@
       "required": [
         "channel",
         "flowControl",
-        "clientReceive",
-        "hostReceive",
         "recovery"
       ]
     },
@@ -549,7 +517,7 @@
               "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}."
+          "description": "The current state of the resource. A channel with no state fields, such as a\ntelemetry channel, has an {@link EmptyState}. Later protocol versions can add\nnew kinds of state; a client MUST NOT fail on a state that it does not\nrecognize, and ignores that snapshot."
         },
         "fromSeq": {
           "type": "number",
@@ -564,7 +532,7 @@
     },
     "EmptyState": {
       "type": "object",
-      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery subscription starts with a snapshot, including subscriptions to these\nchannels. A channel can therefore gain state fields in a later revision\nwithout changing how subscriptions start.\n\nStability: 1.0 - Early development.",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery windowed subscription starts with a snapshot, including subscriptions\nto these channels, so a channel can gain state fields in a later revision\nwithout changing how windowed subscriptions start. With ordinary delivery,\nthe server MAY omit a snapshot whose state is an `EmptyState`.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
     "RootState": {

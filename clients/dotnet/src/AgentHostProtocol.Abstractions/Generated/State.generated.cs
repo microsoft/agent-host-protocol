@@ -1810,27 +1810,6 @@ public sealed record ChannelReceiveLimits
     public long MaximumFrameBytes { get; init; }
 }
 
-/// <summary>A receiver's progress on a windowed subscription, used during reconnection.
-///
-/// Both values are totals in UTF-16 bytes and start at zero. `acceptedBytes`
-/// ends at a complete data message. `consumedBytes` is never greater than
-/// `acceptedBytes`. The difference is data that the receiver has kept but not
-/// yet released. Credit given for fragments of a message that was not completed
-/// is not included.
-///
-/// Stability: 1.0 - Early development.</summary>
-public sealed record ChannelReceiveProgress
-{
-    /// <summary>Total size of complete data messages, including all of their fragments,
-    /// that the receiver has received and kept.</summary>
-    public long AcceptedBytes { get; init; }
-
-    /// <summary>The part of `acceptedBytes` that the receiver has released. A rejected
-    /// action counts as released; this value does not mean that an action
-    /// succeeded.</summary>
-    public long ConsumedBytes { get; init; }
-}
-
 /// <summary>The limits that the server accepted for a windowed subscription.
 ///
 /// The client ID and channel URI identify the subscription. All counters start at
@@ -1848,8 +1827,9 @@ public sealed record ChannelFlowControl
 
 /// <summary>A windowed subscription that the server kept after reconnection.
 ///
-/// If a channel that the client requested is not in the result, the subscription
-/// was not kept. The client discards the old subscription and, for a byte stream,
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
 /// closes the stream.
 ///
 /// Stability: 1.0 - Early development.</summary>
@@ -1858,14 +1838,10 @@ public sealed record ResumedChannelSubscription
     /// <summary>The URI of the windowed subscription.</summary>
     public required string Channel { get; init; }
 
-    /// <summary>The subscription's limits. These do not change during reconnection.</summary>
+    /// <summary>The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.</summary>
     public required ChannelFlowControl FlowControl { get; init; }
-
-    /// <summary>The counters for data sent to the client. Both peers MUST use these values.</summary>
-    public required ChannelReceiveProgress ClientReceive { get; init; }
-
-    /// <summary>The counters for data sent to the server. Both peers MUST use these values.</summary>
-    public required ChannelReceiveProgress HostReceive { get; init; }
 
     /// <summary>How the server resumes sending data.</summary>
     public ChannelRecoveryKind Recovery { get; init; }
@@ -6033,7 +6009,10 @@ public sealed record Snapshot
     /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, `ahp-chat:/&lt;uuid&gt;`, or `ahp-canvas:/&lt;uuid&gt;`)</summary>
     public required string Resource { get; init; }
 
-    /// <summary>The current state of the resource. A channel with no state fields, such as a telemetry channel, has an {@link EmptyState}.</summary>
+    /// <summary>The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.</summary>
     public required SnapshotState State { get; init; }
 
     /// <summary>The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq &gt; fromSeq`.</summary>
@@ -6043,9 +6022,10 @@ public sealed record Snapshot
 /// <summary>The state of a channel that has no state fields, such as a telemetry
 /// channel. It is always the empty object `{}`.
 ///
-/// Every subscription starts with a snapshot, including subscriptions to these
-/// channels. A channel can therefore gain state fields in a later revision
-/// without changing how subscriptions start.
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record EmptyState
@@ -7943,6 +7923,12 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>
+    /// A state that this version does not recognize, such as the state of a channel
+    /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
+    /// </summary>
+    public JsonElement? Unknown { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -8001,9 +7987,14 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
         }
-        else
+        else if (root.TryGetProperty("agents", out _))
         {
             result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
+        }
+        else
+        {
+            // A state from a later protocol version: keep it rather than fail.
+            result.Unknown = root.Clone();
         }
         return result;
     }
@@ -8021,6 +8012,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, AhpJsonTypeInfo.Get<ResourceWatchState>(options)); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, AhpJsonTypeInfo.Get<AnnotationsState>(options)); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, AhpJsonTypeInfo.Get<RootState>(options)); return; }
+        if (value.Unknown is { } unknown) { unknown.WriteTo(writer); return; }
         writer.WriteNullValue();
     }
 }

@@ -112,7 +112,6 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ChannelFlowControl))]
 [JsonSerializable(typeof(ChannelFrameParams))]
 [JsonSerializable(typeof(ChannelReceiveLimits))]
-[JsonSerializable(typeof(ChannelReceiveProgress))]
 [JsonSerializable(typeof(ChannelRecoveryKind))]
 [JsonSerializable(typeof(ChannelSnapshotParams))]
 [JsonSerializable(typeof(ChatActivityChangedAction))]

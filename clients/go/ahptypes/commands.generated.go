@@ -168,7 +168,8 @@ type InitializeResult struct {
 	// understand. Capabilities needed for interoperable behavior SHOULD use typed
 	// fields on {@link InitializeResult} instead.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Snapshots for each `initialSubscriptions` URI
+	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
@@ -321,14 +322,15 @@ type ReconnectParams struct {
 	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
 }
 
-// The client's progress on one windowed subscription that it wants to keep.
+// One windowed subscription that the client wants to keep after reconnection.
 //
 // Stability: 1.0 - Early development.
 type ChannelDeliveryResumeParams struct {
 	// The URI of the windowed subscription.
 	Channel URI `json:"channel"`
-	// The client's progress on data that the server sent.
-	ClientReceive ChannelReceiveProgress `json:"clientReceive"`
+	// The client's offer of limits for the new connection, as in `subscribe`.
+	// The subscription's counters start at zero on the new connection.
+	FlowControl SubscriptionFlowControlOptions `json:"flowControl"`
 	// The `serverSeq` of the last action or observed state that the client
 	// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
 	// replay recovery; absent for channels that resume only with new data.
@@ -344,12 +346,10 @@ type ChannelDeliveryResumeOptions struct {
 
 // Windowed subscriptions that the server kept after reconnection.
 //
-// A requested channel that is not listed was not kept. The counters are final:
-// before sending any data message or credit for a subscription, both peers MUST
-// set their counters to the returned values. Unread data stays counted against
-// the window. If the server cannot determine the counters, it omits the
-// subscription instead of starting them again from zero. Sequence numbers, not
-// these counters, decide what is sent again.
+// A requested channel that is not listed was not kept. For each kept
+// subscription, both peers start their counters at zero on the new connection,
+// and credit counts only data received on that connection. Sequence numbers
+// decide what is sent again.
 //
 // Stability: 1.0 - Early development.
 type ChannelDeliveryResumeResult struct {
@@ -389,7 +389,8 @@ type ReconnectReplayResult struct {
 type ReconnectSnapshotResult struct {
 	// Fresh snapshots for each resumed ordinary subscription. Windowed
 	// subscriptions are not included; they recover through their own data
-	// messages, as described by `windows`.
+	// messages, as described by `windows`. The server MAY leave out a channel
+	// whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
 	// Windowed subscriptions that the server kept. Each one has its own
 	// `recovery` value, which does not depend on this result's type. The server
@@ -403,12 +404,14 @@ type ReconnectSnapshotResult struct {
 // Subscribe to a URI-identified channel.
 //
 // With ordinary delivery, the result contains a snapshot of the channel's
-// state. With windowed delivery, the result contains `flowControl` instead,
+// state; the server MAY omit it for a channel whose state has no fields. With
+// windowed delivery, the result contains `flowControl` instead,
 // and the snapshot is sent in a `channel/snapshot` notification.
 //
 // A client has at most one subscription to each channel. A `subscribe` for a
-// channel that the client is already subscribed to replaces the old
-// subscription.
+// channel that the client is already subscribed to changes the existing
+// subscription, for example its window, without losing data. Windowed counters
+// continue if the subscription was already windowed.
 type SubscribeParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -455,13 +458,15 @@ type SubscriptionDeliveryOptions struct {
 
 // Result of the `subscribe` command.
 //
-// With ordinary delivery, `snapshot` is present. With windowed delivery,
+// With ordinary delivery, `snapshot` is present, except that the server MAY
+// omit it for a channel whose state has no fields. With windowed delivery,
 // `flowControl` is present and `snapshot` MUST be absent. The server sends the
 // snapshot in a `channel/snapshot` notification.
 type SubscribeResult struct {
-	// Snapshot of the subscribed channel's state. Present with ordinary delivery.
-	// With windowed delivery, the snapshot is sent in a `channel/snapshot`
-	// notification instead.
+	// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+	// except that the server MAY omit it for a channel whose state has no fields
+	// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+	// `channel/snapshot` notification instead.
 	Snapshot *Snapshot `json:"snapshot,omitempty"`
 	// The limits that the server accepted for windowed delivery. The server sends
 	// this result before any data message for the subscription. The client MUST be
