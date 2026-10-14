@@ -1,5 +1,0 @@
-{
-  "type": "changed",
-  "message": "The generated `CreateChatParams.title` field requires existing Rust struct literals to add `None` or use defaults/update syntax.",
-  "targets": ["rust"]
-}

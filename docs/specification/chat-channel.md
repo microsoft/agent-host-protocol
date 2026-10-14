@@ -106,10 +106,6 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 The server allocates the chat URI and adds the chat to the session's catalog (`session/chatAdded` on the session channel) before returning.
 
-The optional `title` field is additive. Older hosts that do not recognize it ignore it as an unknown field.
-
-Errors while processing `initialMessage` are reported through the chat's normal turn state, as with any other turn.
-
 Clients MUST gate source-based creation using the selected
 [`AgentInfo.capabilities.multipleChats`](/reference/root#multiplechatscapability):
 
