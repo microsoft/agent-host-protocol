@@ -2782,21 +2782,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Legacy replaceable steering slot, independent of {@link steeringMessages}."
-        },
-        "steeringMessages": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/PendingMessage"
-          },
-          "description": "Independently submitted steering messages, in host acceptance order.\nRequires negotiated {@link InitializeResult.steeringMessages} support."
+          "description": "Legacy steering input retained only when reading old snapshots.\nNew set actions never write this slot. A matching steering removal or\nturn consumption can clear it."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered. Each ID is unique across the list. New IDs append; existing\nIDs are replaced in place, even when their kind changes.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -3002,9 +2995,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries\nfrom older queued-message snapshots. Set actions always store their kind."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The message to inject into the current turn or send as a new turn"
         }
       },
       "required": [
@@ -6520,6 +6517,14 @@
         }
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
+    },
+    "PendingMessageKind": {
+      "enum": [
+        "steering",
+        "queued"
+      ],
+      "type": "string",
+      "description": "Discriminant for pending message kinds."
     },
     "ChatInputQuestion": {
       "oneOf": [

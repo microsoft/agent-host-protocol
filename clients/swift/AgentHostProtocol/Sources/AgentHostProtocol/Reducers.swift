@@ -150,10 +150,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             if next.steeringMessage?.id == queuedId {
                 next.steeringMessage = nil
             }
-            if var steering = next.steeringMessages {
-                steering.removeAll { $0.id == queuedId }
-                next.steeringMessages = steering.isEmpty ? nil : steering
-            }
             if var queued = next.queuedMessages {
                 queued.removeAll { $0.id == queuedId }
                 next.queuedMessages = queued.isEmpty ? nil : queued
@@ -672,32 +668,9 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     // ── Pending Messages ──────────────────────────────────────────────────
 
-    case .chatSteeringMessageSet(let a):
-        var next = state
-        var messages = next.steeringMessages ?? []
-        if let idx = messages.firstIndex(where: { $0.id == a.steeringMessage.id }) {
-            messages[idx] = a.steeringMessage
-        } else {
-            messages.append(a.steeringMessage)
-        }
-        next.steeringMessages = messages
-        return next
-
-    case .chatSteeringMessageRemoved(let a):
-        guard var messages = state.steeringMessages,
-              let idx = messages.firstIndex(where: { $0.id == a.id }) else { return state }
-        messages.remove(at: idx)
-        var next = state
-        next.steeringMessages = messages.isEmpty ? nil : messages
-        return next
-
     case .chatPendingMessageSet(let a):
-        let entry = PendingMessage(id: a.id, message: a.message)
+        let entry = PendingMessage(id: a.id, kind: a.kind, message: a.message)
         var next = state
-        if a.kind == .steering {
-            next.steeringMessage = entry
-            return next
-        }
         var existing = next.queuedMessages ?? []
         if let idx = existing.firstIndex(where: { $0.id == a.id }) {
             existing[idx] = entry
@@ -709,15 +682,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatPendingMessageRemoved(let a):
         var next = state
-        if a.kind == .steering {
-            guard next.steeringMessage?.id == a.id else { return state }
+        if a.kind == .steering && next.steeringMessage?.id == a.id {
             next.steeringMessage = nil
-            return next
         }
-        guard var existing = next.queuedMessages else { return state }
-        let before = existing.count
-        existing.removeAll { $0.id == a.id }
-        guard existing.count != before else { return state }
+        guard var existing = next.queuedMessages,
+              let idx = existing.firstIndex(where: { $0.id == a.id && ($0.kind ?? .queued) == a.kind }) else { return next }
+        existing.remove(at: idx)
         next.queuedMessages = existing.isEmpty ? nil : existing
         return next
 
@@ -1029,8 +999,6 @@ public let clientDispatchableActions: Set<String> = [
     "session/activeClientRemoved",
     "chat/pendingMessageSet",
     "chat/pendingMessageRemoved",
-    "chat/steeringMessageSet",
-    "chat/steeringMessageRemoved",
     "chat/queuedMessagesReordered",
     "chat/isReadChanged",
     "chat/isArchivedChanged",
@@ -1055,7 +1023,6 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionActiveClientRemoved,
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
-         .chatSteeringMessageSet, .chatSteeringMessageRemoved,
          .chatIsReadChanged, .chatIsArchivedChanged,
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,

@@ -77,8 +77,6 @@ import type {
   ChatReasoningAction,
   ChatPendingMessageSetAction,
   ChatPendingMessageRemovedAction,
-  ChatSteeringMessageSetAction,
-  ChatSteeringMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
   ChatIsReadChangedAction,
@@ -200,8 +198,6 @@ export const enum ActionType {
   SessionInputNeededRemoved = 'session/inputNeededRemoved',
   ChatPendingMessageSet = 'chat/pendingMessageSet',
   ChatPendingMessageRemoved = 'chat/pendingMessageRemoved',
-  ChatSteeringMessageSet = 'chat/steeringMessageSet',
-  ChatSteeringMessageRemoved = 'chat/steeringMessageRemoved',
   ChatQueuedMessagesReordered = 'chat/queuedMessagesReordered',
   ChatDraftChanged = 'chat/draftChanged',
   ChatIsReadChanged = 'chat/isReadChanged',
@@ -360,8 +356,6 @@ export type StateAction =
   | ChatReasoningAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
-  | ChatSteeringMessageSetAction
-  | ChatSteeringMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
   | ChatIsReadChangedAction

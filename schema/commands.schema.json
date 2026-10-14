@@ -124,11 +124,6 @@
       "type": "object",
       "description": "Optional capabilities a client declares during `initialize`.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities\nare reserved for future per-capability options.",
       "properties": {
-        "steeringMessages": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Client understands the independent {@link ChatState.steeringMessages} list and its actions."
-        },
         "mcpApps": {
           "type": "object",
           "additionalProperties": {},
@@ -140,11 +135,6 @@
       "type": "object",
       "description": "Result of the `initialize` command.\n\n`protocolVersion` is the version the server has selected from the client's\n`protocolVersions` list. The client and server MUST use this version for\nthe rest of the connection. If the server cannot speak any of the offered\nversions it MUST return error code `-32005` (`UnsupportedProtocolVersion`)\nwith required `UnsupportedProtocolVersionErrorData` containing\n`supportedVersions`, instead of a result.",
       "properties": {
-        "steeringMessages": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Host supports the independent steering-message list and its actions.\nAdvertised only when {@link ClientCapabilities.steeringMessages} was declared."
-        },
         "protocolVersion": {
           "type": "string",
           "description": "Protocol version selected by the server. MUST be one of the entries in\n`InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)\n`MAJOR.MINOR.PATCH` string (e.g. `\"0.1.0\"`)."
@@ -4351,21 +4341,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Legacy replaceable steering slot, independent of {@link steeringMessages}."
-        },
-        "steeringMessages": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/PendingMessage"
-          },
-          "description": "Independently submitted steering messages, in host acceptance order.\nRequires negotiated {@link InitializeResult.steeringMessages} support."
+          "description": "Legacy steering input retained only when reading old snapshots.\nNew set actions never write this slot. A matching steering removal or\nturn consumption can clear it."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered. Each ID is unique across the list. New IDs append; existing\nIDs are replaced in place, even when their kind changes.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -4571,9 +4554,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries\nfrom older queued-message snapshots. Set actions always store their kind."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The message to inject into the current turn or send as a new turn"
         }
       },
       "required": [
@@ -8500,7 +8487,7 @@
         },
         "queuedMessageId": {
           "type": "string",
-          "description": "If this turn consumes a queued or steering message, the ID of that message."
+          "description": "If this turn consumes a pending message, its ID. Removes the matching\nentry from {@link ChatState.queuedMessages} regardless of kind, and clears\na matching deprecated {@link ChatState.steeringMessage} snapshot slot."
         },
         "_meta": {
           "type": "object",
@@ -9329,7 +9316,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nIt never changes the independent {@link ChatState.steeringMessages} list.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place. Changing kind does not change its position.\nA new steering ID never replaces another pending submission. This action\nnever writes the deprecated {@link ChatState.steeringMessage} snapshot slot.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"
@@ -9356,7 +9343,7 @@
     },
     "ChatPendingMessageRemovedAction": {
       "type": "object",
-      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
+      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).\n\nRemoves an entry from {@link ChatState.queuedMessages} only when both `id`\nand effective kind match. An absent entry kind means\n{@link PendingMessageKind.Queued}. Unknown IDs and mismatched kinds are\nno-ops. A steering removal also clears a matching deprecated\n{@link ChatState.steeringMessage} snapshot slot.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageRemoved"
@@ -9376,43 +9363,9 @@
         "id"
       ]
     },
-    "ChatSteeringMessageSetAction": {
-      "type": "object",
-      "description": "Upserts one independently submitted steering message without changing the legacy slot.\nRequires negotiated {@link InitializeResult.steeringMessages} support.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
-      "properties": {
-        "type": {
-          "const": "chat/steeringMessageSet"
-        },
-        "steeringMessage": {
-          "$ref": "#/$defs/PendingMessage",
-          "description": "Full entry; a new ID appends and an existing ID is replaced in place."
-        }
-      },
-      "required": [
-        "type",
-        "steeringMessage"
-      ]
-    },
-    "ChatSteeringMessageRemovedAction": {
-      "type": "object",
-      "description": "Removes one message from {@link ChatState.steeringMessages}, leaving other messages and the legacy slot unchanged.\nRequires negotiated {@link InitializeResult.steeringMessages} support.",
-      "properties": {
-        "type": {
-          "const": "chat/steeringMessageRemoved"
-        },
-        "id": {
-          "type": "string",
-          "description": "Identifier of the consumed or cancelled steering message."
-        }
-      },
-      "required": [
-        "type",
-        "id"
-      ]
-    },
     "ChatQueuedMessagesReorderedAction": {
       "type": "object",
-      "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
+      "description": "Reorder the entire shared {@link ChatState.queuedMessages} list.\n\nThe `order` array contains pending message IDs of either kind in their new\ndesired raw order. Unknown and duplicate IDs are ignored.\nMessages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the list never silently drops messages). UIs SHOULD still group\nsteering messages first, independently of this raw order.",
       "properties": {
         "type": {
           "const": "chat/queuedMessagesReordered"
@@ -9422,7 +9375,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Queued message IDs in the desired order"
+          "description": "Pending message IDs of either kind in the desired raw order"
         }
       },
       "required": [
@@ -10497,12 +10450,6 @@
           "$ref": "#/$defs/ChatPendingMessageRemovedAction"
         },
         {
-          "$ref": "#/$defs/ChatSteeringMessageSetAction"
-        },
-        {
-          "$ref": "#/$defs/ChatSteeringMessageRemovedAction"
-        },
-        {
           "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
         },
         {
@@ -11052,6 +10999,14 @@
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
+    "PendingMessageKind": {
+      "enum": [
+        "steering",
+        "queued"
+      ],
+      "type": "string",
+      "description": "Discriminant for pending message kinds."
+    },
     "ChatInputQuestion": {
       "oneOf": [
         {
@@ -11398,14 +11353,6 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
-    },
-    "PendingMessageKind": {
-      "enum": [
-        "steering",
-        "queued"
-      ],
-      "type": "string",
-      "description": "Discriminant for pending message kinds."
     },
     "ChatToolCallConfirmedAction": {
       "oneOf": [

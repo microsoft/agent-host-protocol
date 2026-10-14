@@ -1356,12 +1356,17 @@ type ChatState struct {
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
-	// Legacy replaceable steering slot, independent of {@link steeringMessages}.
+	// Legacy steering input retained only when reading old snapshots.
+	// New set actions never write this slot. A matching steering removal or
+	// turn consumption can clear it.
 	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
-	// Independently submitted steering messages, in host acceptance order.
-	// Requires negotiated {@link InitializeResult.steeringMessages} support.
-	SteeringMessages []PendingMessage `json:"steeringMessages,omitempty"`
-	// Messages to send automatically as new turns after the current turn finishes
+	// Pending messages of both kinds, in host acceptance order unless explicitly
+	// reordered. Each ID is unique across the list. New IDs append; existing
+	// IDs are replaced in place, even when their kind changes.
+	//
+	// This raw order is not consumption priority. UIs SHOULD group steering
+	// messages before queued messages, preserving relative order within each
+	// group without changing the underlying array.
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
 	// The user's in-progress draft input for this chat — the message they are
 	// composing but have not sent yet, including its
@@ -1523,7 +1528,10 @@ type SideChatSelection struct {
 type PendingMessage struct {
 	// Unique identifier for this pending message
 	Id string `json:"id"`
-	// The message that will start the next turn
+	// Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries
+	// from older queued-message snapshots. Set actions always store their kind.
+	Kind *PendingMessageKind `json:"kind,omitempty"`
+	// The message to inject into the current turn or send as a new turn
 	Message Message `json:"message"`
 }
 
@@ -3318,7 +3326,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 }
@@ -3729,7 +3737,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review *map[string]json.RawMessage `json:"review,omitempty"`
+	Review map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to

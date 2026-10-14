@@ -53,8 +53,6 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionInputNeededRemoved
     case chatPendingMessageSet
     case chatPendingMessageRemoved
-    case chatSteeringMessageSet
-    case chatSteeringMessageRemoved
     case chatQueuedMessagesReordered
     case chatDraftChanged
     case chatIsReadChanged
@@ -168,8 +166,6 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/inputNeededRemoved": self = .sessionInputNeededRemoved
         case "chat/pendingMessageSet": self = .chatPendingMessageSet
         case "chat/pendingMessageRemoved": self = .chatPendingMessageRemoved
-        case "chat/steeringMessageSet": self = .chatSteeringMessageSet
-        case "chat/steeringMessageRemoved": self = .chatSteeringMessageRemoved
         case "chat/queuedMessagesReordered": self = .chatQueuedMessagesReordered
         case "chat/draftChanged": self = .chatDraftChanged
         case "chat/isReadChanged": self = .chatIsReadChanged
@@ -283,8 +279,6 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionInputNeededRemoved: try container.encode("session/inputNeededRemoved")
         case .chatPendingMessageSet: try container.encode("chat/pendingMessageSet")
         case .chatPendingMessageRemoved: try container.encode("chat/pendingMessageRemoved")
-        case .chatSteeringMessageSet: try container.encode("chat/steeringMessageSet")
-        case .chatSteeringMessageRemoved: try container.encode("chat/steeringMessageRemoved")
         case .chatQueuedMessagesReordered: try container.encode("chat/queuedMessagesReordered")
         case .chatDraftChanged: try container.encode("chat/draftChanged")
         case .chatIsReadChanged: try container.encode("chat/isReadChanged")
@@ -526,7 +520,9 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     public var startedAt: String
     /// The new message
     public var message: Message
-    /// If this turn consumes a queued or steering message, the ID of that message.
+    /// If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages} regardless of kind, and clears
+    /// a matching deprecated {@link ChatState.steeringMessage} snapshot slot.
     public var queuedMessageId: String?
     /// Additional provider-specific metadata for this action.
     ///
@@ -1639,37 +1635,9 @@ public struct ChatPendingMessageRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChatSteeringMessageSetAction: Codable, Sendable {
-    public var type: ActionType
-    /// Full entry; a new ID appends and an existing ID is replaced in place.
-    public var steeringMessage: PendingMessage
-
-    public init(
-        type: ActionType,
-        steeringMessage: PendingMessage
-    ) {
-        self.type = type
-        self.steeringMessage = steeringMessage
-    }
-}
-
-public struct ChatSteeringMessageRemovedAction: Codable, Sendable {
-    public var type: ActionType
-    /// Identifier of the consumed or cancelled steering message.
-    public var id: String
-
-    public init(
-        type: ActionType,
-        id: String
-    ) {
-        self.type = type
-        self.id = id
-    }
-}
-
 public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
     public var type: ActionType
-    /// Queued message IDs in the desired order
+    /// Pending message IDs of either kind in the desired raw order
     public var order: [String]
 
     public init(
@@ -2662,8 +2630,6 @@ public enum StateAction: Codable, Sendable {
     case sessionInputNeededRemoved(SessionInputNeededRemovedAction)
     case chatPendingMessageSet(ChatPendingMessageSetAction)
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
-    case chatSteeringMessageSet(ChatSteeringMessageSetAction)
-    case chatSteeringMessageRemoved(ChatSteeringMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
     case chatDraftChanged(ChatDraftChangedAction)
     case chatIsReadChanged(ChatIsReadChangedAction)
@@ -2833,10 +2799,6 @@ public enum StateAction: Codable, Sendable {
             self = .chatPendingMessageSet(try ChatPendingMessageSetAction(from: decoder))
         case "chat/pendingMessageRemoved":
             self = .chatPendingMessageRemoved(try ChatPendingMessageRemovedAction(from: decoder))
-        case "chat/steeringMessageSet":
-            self = .chatSteeringMessageSet(try ChatSteeringMessageSetAction(from: decoder))
-        case "chat/steeringMessageRemoved":
-            self = .chatSteeringMessageRemoved(try ChatSteeringMessageRemovedAction(from: decoder))
         case "chat/queuedMessagesReordered":
             self = .chatQueuedMessagesReordered(try ChatQueuedMessagesReorderedAction(from: decoder))
         case "chat/draftChanged":
@@ -3005,8 +2967,6 @@ public enum StateAction: Codable, Sendable {
         case .sessionInputNeededRemoved(let v): try v.encode(to: encoder)
         case .chatPendingMessageSet(let v): try v.encode(to: encoder)
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
-        case .chatSteeringMessageSet(let v): try v.encode(to: encoder)
-        case .chatSteeringMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)
         case .chatDraftChanged(let v): try v.encode(to: encoder)
         case .chatIsReadChanged(let v): try v.encode(to: encoder)

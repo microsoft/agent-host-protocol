@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Capability-negotiated steering message lists with per-ID set and removal actions, preserving the independent legacy steering slot."
-}

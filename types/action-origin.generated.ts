@@ -66,8 +66,6 @@ import type {
   ChatReasoningAction,
   ChatPendingMessageSetAction,
   ChatPendingMessageRemovedAction,
-  ChatSteeringMessageSetAction,
-  ChatSteeringMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
   ChatIsReadChangedAction,
@@ -239,8 +237,6 @@ export type ChatAction =
   | ChatReasoningAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
-  | ChatSteeringMessageSetAction
-  | ChatSteeringMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
   | ChatIsReadChangedAction
@@ -265,8 +261,6 @@ export type ClientChatAction =
   | ChatWorkingDirectoryRemovedAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
-  | ChatSteeringMessageSetAction
-  | ChatSteeringMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
   | ChatIsReadChangedAction
@@ -526,8 +520,6 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatReasoning]: false,
   [ActionType.ChatPendingMessageSet]: true,
   [ActionType.ChatPendingMessageRemoved]: true,
-  [ActionType.ChatSteeringMessageSet]: true,
-  [ActionType.ChatSteeringMessageRemoved]: true,
   [ActionType.ChatQueuedMessagesReordered]: true,
   [ActionType.ChatDraftChanged]: true,
   [ActionType.ChatIsReadChanged]: true,

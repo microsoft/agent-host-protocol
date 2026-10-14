@@ -1,12 +1,11 @@
 {
-  "name": "steering-list-capability-and-snapshot",
+  "name": "mixed-pending-message-snapshot",
   "group": "A",
-  "description": "Independent steering support and snapshots preserve all message identities alongside the legacy slot.",
+  "description": "Snapshots preserve mixed pending kinds, absent kinds on old queued entries, raw order and the deprecated steering slot.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "1.1.0",
     "serverSeq": 7,
-    "steeringMessages": {},
     "snapshots": [
       {
         "resource": "ahp-chat:/steering",
@@ -18,9 +17,10 @@
           "modifiedAt": "2026-10-08T00:00:00.000Z",
           "turns": [],
           "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
-          "steeringMessages": [
-            { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
-            { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+          "queuedMessages": [
+            { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+            { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+            { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
           ]
         }
       }
@@ -30,7 +30,6 @@
     {
       "protocolVersion": "1.1.0",
       "serverSeq": 7,
-      "steeringMessages": {},
       "snapshots": [
         {
           "resource": "ahp-chat:/steering",
@@ -42,9 +41,10 @@
             "modifiedAt": "2026-10-08T00:00:00.000Z",
             "turns": [],
             "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
-            "steeringMessages": [
-              { "id": "a", "message": { "text": "A", "origin": { "kind": "user" } } },
-              { "id": "b", "message": { "text": "B", "origin": { "kind": "user" } } }
+            "queuedMessages": [
+              { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+              { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+              { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
             ]
           }
         }

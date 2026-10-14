@@ -943,10 +943,6 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             if (next.steeringMessage?.id == a.queuedMessageId) {
                 next = next.copy(steeringMessage = null)
             }
-            val steering = next.steeringMessages
-            if (steering != null) {
-                next = next.copy(steeringMessages = steering.filter { it.id != a.queuedMessageId }.ifEmpty { null })
-            }
             val queued = next.queuedMessages
             if (queued != null) {
                 val filtered = queued.filter { it.id != a.queuedMessageId }
@@ -1568,65 +1564,34 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     // ── Pending Messages ──────────────────────────────────────────────────
 
-    is StateActionChatSteeringMessageSet -> {
-        val entry = action.value.steeringMessage
-        val existing = state.steeringMessages ?: emptyList()
-        val idx = existing.indexOfFirst { it.id == entry.id }
+    is StateActionChatPendingMessageSet -> {
+        val a = action.value
+        val entry = PendingMessage(id = a.id, kind = a.kind, message = a.message)
+        val existing = state.queuedMessages ?: emptyList()
+        val idx = existing.indexOfFirst { it.id == a.id }
         val next = existing.toMutableList()
         if (idx < 0) {
             next.add(entry)
         } else {
             next[idx] = entry
         }
-        state.copy(steeringMessages = next)
-    }
-
-    is StateActionChatSteeringMessageRemoved -> {
-        val existing = state.steeringMessages ?: return@chatReducer state
-        val idx = existing.indexOfFirst { it.id == action.value.id }
-        if (idx < 0) {
-            state
-        } else {
-            val next = existing.toMutableList()
-            next.removeAt(idx)
-            state.copy(steeringMessages = next.ifEmpty { null })
-        }
-    }
-
-    is StateActionChatPendingMessageSet -> {
-        val a = action.value
-        val entry = PendingMessage(id = a.id, message = a.message)
-        if (a.kind == PendingMessageKind.STEERING) {
-            state.copy(steeringMessage = entry)
-        } else {
-            val existing = state.queuedMessages ?: emptyList()
-            val idx = existing.indexOfFirst { it.id == a.id }
-            val updated = if (idx >= 0) {
-                existing.toMutableList().also { it[idx] = entry }
-            } else {
-                existing + entry
-            }
-            state.copy(queuedMessages = updated)
-        }
+        state.copy(queuedMessages = next)
     }
 
     is StateActionChatPendingMessageRemoved -> {
         val a = action.value
-        if (a.kind == PendingMessageKind.STEERING) {
-            val steering = state.steeringMessage
-            if (steering == null || steering.id != a.id) {
-                state
-            } else {
-                state.copy(steeringMessage = null)
-            }
+        var next = state
+        if (a.kind == PendingMessageKind.STEERING && state.steeringMessage?.id == a.id) {
+            next = next.copy(steeringMessage = null)
+        }
+        val existing = state.queuedMessages ?: return@chatReducer next
+        val idx = existing.indexOfFirst { it.id == a.id && (it.kind ?: PendingMessageKind.QUEUED) == a.kind }
+        if (idx < 0) {
+            next
         } else {
-            val existing = state.queuedMessages ?: return@chatReducer state
-            val filtered = existing.filter { it.id != a.id }
-            if (filtered.size == existing.size) {
-                state
-            } else {
-                state.copy(queuedMessages = filtered.ifEmpty { null })
-            }
+            val queuedMessages = existing.toMutableList()
+            queuedMessages.removeAt(idx)
+            next.copy(queuedMessages = queuedMessages.ifEmpty { null })
         }
     }
 

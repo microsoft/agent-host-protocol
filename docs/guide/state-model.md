@@ -198,9 +198,8 @@ ChatState {
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
   activeTurn?: ActiveTurn             // the in-progress turn, if any
-  steeringMessage?: PendingMessage      // legacy replaceable slot
-  steeringMessages?: PendingMessage[]   // negotiated independent submissions
-  queuedMessages?: PendingMessage[]
+  steeringMessage?: PendingMessage    // deprecated old-snapshot slot
+  queuedMessages?: PendingMessage[]   // shared steering and queued input
   draft?: Message                     // user's in-progress input
 }
 ```
@@ -551,38 +550,37 @@ Notifications are ephemeral — not processed by reducers, not stored in state, 
 
 ## Pending Messages
 
-Each chat maintains optional pending input for steering the active turn or starting future turns:
+Each chat maintains a single optional list of pending input for steering the active turn or starting future turns:
 
 ```typescript
 ChatState {
   // ...existing fields...
-  steeringMessage?: PendingMessage      // legacy replaceable slot
-  steeringMessages?: PendingMessage[]   // independent mid-turn submissions
-  queuedMessages?: PendingMessage[]     // start as new turns
+  steeringMessage?: PendingMessage    // deprecated old-snapshot slot
+  queuedMessages?: PendingMessage[]   // both kinds in raw host order
 }
 
 PendingMessage {
   id: string
+  kind?: PendingMessageKind          // 'steering' | 'queued'; absent means 'queued'
   message: Message
 }
 ```
 
 ### Steering Messages
 
-With negotiated `steeringMessages` support, each steering submission has its own entry in an ordered list. Clients use `chat/steeringMessageSet` to append or replace an entry by ID; hosts use `chat/steeringMessageRemoved` to acknowledge consumption of that entry. A later submission does not replace an earlier one. A consuming `chat/turnStarted` can also remove the matching entry via `queuedMessageId`.
+Each steering submission is an entry with `kind: 'steering'` in `queuedMessages`. Clients use `chat/pendingMessageSet` with a new ID to append input; reusing an ID replaces its message and kind in place. A later submission with a different ID does not replace an earlier one.
 
-Support is declared in `InitializeParams.capabilities.steeringMessages` and acknowledged in `InitializeResult.steeringMessages`. Updated clients display both the list and any legacy-slot message. See [steering consumption and compatibility](../specification/chat-channel.md#steering-messages) for negotiation, handoff, and reconnect rules.
+When a turn is active, the host may inject steering into the current turn. After consumption it dispatches `chat/pendingMessageRemoved` with the ID and `kind: 'steering'`. A consuming `chat/turnStarted` can also remove the matching entry via `queuedMessageId`, regardless of kind. Steering submitted while idle remains pending until it can be consumed.
 
-### Legacy Steering Slot
+### Raw Order and Display Order
 
-The legacy `steeringMessage` slot is injected into the **current turn** at a convenient point. Clients set it to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one message occupies this slot; replacing it does not modify the independent `steeringMessages` list.
+The shared array records host acceptance order unless reordered with `chat/queuedMessagesReordered`. New IDs always append, including steering IDs added after queued input. Reusing an ID, even to change its kind, keeps the same position.
 
-- When the chat has an active turn, the server consumes the steering message at its discretion, dispatching `chat/pendingMessageRemoved` when it does.
-- When set while idle, the steering message is silently stored until a turn starts.
+UIs should group steering first and queued second, preserving each group's relative array order without mutating state. For example, raw `[q1, s1, q2, s2]` is displayed as steering `[s1, s2]`, then queued `[q1, q2]`. A reorder action applies to both kinds in the raw array; unmentioned IDs stay at the end in their original relative order, and unknown or duplicate IDs are ignored.
 
 ### Queued Messages
 
-Queued messages are automatically started as **new turns** after the current turn finishes. The server processes them FIFO (by arrival order).
+Queued messages are automatically started as **new turns** after the current turn finishes. The server processes entries with effective kind `'queued'` in their current array order, skipping steering entries. An entry without `kind` is an old queued entry and is treated as `'queued'`.
 
 - When a turn completes and queued messages exist, the server removes the first queued message and starts a new turn from it.
 - When a queued message is added while the chat is idle, the server SHOULD immediately consume it and start a turn.
@@ -610,7 +608,13 @@ sequenceDiagram
 
 ### Management
 
-Clients can **set** or **remove** both steering and queued messages at any time using the `chat/pendingMessageSet` (upsert) and `chat/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
+Clients use the existing `chat/pendingMessageSet` and `chat/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`). Set always stores that kind. Remove requires both ID and effective kind to match; unknown IDs and mismatched kinds are reducer no-ops. Hosts must reject edits or removals they can no longer honor after handing input to the provider. Repeated identical upserts must not duplicate provider delivery.
+
+### Migration and the Deprecated Steering Slot
+
+This semantic change during 1.1.0 development requires a coordinated host/client upgrade. There is no new capability or enqueue flag. Old clients that expect new steering IDs to replace a singleton, or render all `queuedMessages` entries as queued, are not compatible with the new behavior.
+
+`steeringMessage` is retained only to read old snapshots; no new set action writes it. A matching steering removal or `chat/turnStarted.queuedMessageId` may clear the old slot, while a queued removal leaves it untouched. This limited snapshot compatibility does not preserve old replacement semantics. See [the migration contract](../specification/chat-channel.md#semantic-migration-and-old-snapshots) for host, client, and native model changes.
 
 ## Chat Truncation
 

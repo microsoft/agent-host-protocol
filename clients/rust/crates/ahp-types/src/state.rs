@@ -1916,7 +1916,11 @@ pub struct ConfigSchema {
 pub struct PendingMessage {
     /// Unique identifier for this pending message
     pub id: String,
-    /// The message that will start the next turn
+    /// Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries
+    /// from older queued-message snapshots. Set actions always store their kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<PendingMessageKind>,
+    /// The message to inject into the current turn or send as a new turn
     pub message: Message,
 }
 
@@ -2021,14 +2025,18 @@ pub struct ChatState {
     /// Currently in-progress turn
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_turn: Option<ActiveTurn>,
-    /// Legacy replaceable steering slot, independent of {@link steeringMessages}.
+    /// Legacy steering input retained only when reading old snapshots.
+    /// New set actions never write this slot. A matching steering removal or
+    /// turn consumption can clear it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steering_message: Option<PendingMessage>,
-    /// Independently submitted steering messages, in host acceptance order.
-    /// Requires negotiated {@link InitializeResult.steeringMessages} support.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub steering_messages: Option<Vec<PendingMessage>>,
-    /// Messages to send automatically as new turns after the current turn finishes
+    /// Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered. Each ID is unique across the list. New IDs append; existing
+    /// IDs are replaced in place, even when their kind changes.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_messages: Option<Vec<PendingMessage>>,
     /// The user's in-progress draft input for this chat — the message they are

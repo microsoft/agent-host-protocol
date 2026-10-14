@@ -1,5 +1,5 @@
 {
-  "description": "remove steering message",
+  "description": "remove deprecated steering snapshot slot",
   "reducer": "chat",
   "initial": {
     "turns": [],

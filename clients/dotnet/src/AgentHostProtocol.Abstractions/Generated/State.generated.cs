@@ -2217,7 +2217,12 @@ public sealed record PendingMessage
     /// <summary>Unique identifier for this pending message</summary>
     public required string Id { get; init; }
 
-    /// <summary>The message that will start the next turn</summary>
+    /// <summary>Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries
+    /// from older queued-message snapshots. Set actions always store their kind.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PendingMessageKind? Kind { get; init; }
+
+    /// <summary>The message to inject into the current turn or send as a new turn</summary>
     public required Message Message { get; init; }
 }
 
@@ -2454,16 +2459,19 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ActiveTurn? ActiveTurn { get; set; }
 
-    /// <summary>Legacy replaceable steering slot, independent of {@link steeringMessages}.</summary>
+    /// <summary>Legacy steering input retained only when reading old snapshots.
+    /// New set actions never write this slot. A matching steering removal or
+    /// turn consumption can clear it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PendingMessage? SteeringMessage { get; set; }
 
-    /// <summary>Independently submitted steering messages, in host acceptance order.
-    /// Requires negotiated {@link InitializeResult.steeringMessages} support.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<PendingMessage>? SteeringMessages { get; set; }
-
-    /// <summary>Messages to send automatically as new turns after the current turn finishes</summary>
+    /// <summary>Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered. Each ID is unique across the list. New IDs append; existing
+    /// IDs are replaced in place, even when their kind changes.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<PendingMessage>? QueuedMessages { get; set; }
 

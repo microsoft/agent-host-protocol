@@ -46,6 +46,7 @@
     "queuedMessages": [
       {
         "id": "pm-1",
+        "kind": "queued",
         "message": {
           "text": "Updated first",
           "origin": {
