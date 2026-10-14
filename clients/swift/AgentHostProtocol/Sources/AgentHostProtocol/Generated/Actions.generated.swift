@@ -1694,9 +1694,9 @@ public struct ChatIsArchivedChangedAction: Codable, Sendable {
 
 public struct ChatConfigChangedAction: Codable, Sendable {
     public var type: ActionType
-    /// Updated config values
+    /// Config values to set on the chat
     public var config: [String: AnyCodable]
-    /// When `true`, replaces all config values instead of merging
+    /// When `true`, replaces the chat's config values instead of merging
     public var replace: Bool?
 
     public init(

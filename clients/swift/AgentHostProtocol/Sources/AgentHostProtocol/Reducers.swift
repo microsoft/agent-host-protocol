@@ -730,7 +730,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return next
 
     case .chatConfigChanged(let a):
-        guard var config = state.config else { return state }
+        var config = state.config ?? ChatConfigState(values: [:])
         config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
         var next = state
         next.config = config

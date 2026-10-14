@@ -883,6 +883,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
+  { name: 'ChatConfigState' },
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },

@@ -865,12 +865,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatConfigChangedAction:
 		if state.Config == nil {
-			return ReduceOutcomeNoOp
+			state.Config = &ahptypes.ChatConfigState{}
 		}
-		replace := a.Replace != nil && *a.Replace
-		if replace {
-			state.Config.Values = make(map[string]json.RawMessage, len(a.Config))
-		} else if state.Config.Values == nil {
+		if (a.Replace != nil && *a.Replace) || state.Config.Values == nil {
 			state.Config.Values = make(map[string]json.RawMessage, len(a.Config))
 		}
 		for k, v := range a.Config {

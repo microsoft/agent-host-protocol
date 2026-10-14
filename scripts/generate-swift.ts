@@ -700,7 +700,7 @@ const STATE_STRUCTS = [
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
-  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'Message',
+  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
   'ChatInputTextAnswerValue', 'ChatInputNumberAnswerValue',

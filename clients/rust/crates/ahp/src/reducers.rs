@@ -58,8 +58,8 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
-    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
-    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
     McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
     ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
@@ -1422,9 +1422,9 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             ReduceOutcome::Applied
         }
         StateAction::ChatConfigChanged(a) => {
-            let Some(config) = state.config.as_mut() else {
-                return ReduceOutcome::NoOp;
-            };
+            let config = state.config.get_or_insert_with(|| ChatConfigState {
+                values: Default::default(),
+            });
             if a.replace.unwrap_or(false) {
                 config.values = a.config.clone();
             } else {

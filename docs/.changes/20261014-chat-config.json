@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`ChatState.config` and the `chat/configChanged` action expose each chat's effective configuration with the same shape and semantics as session configuration, so a change such as tool auto-approval in one chat no longer has to apply to every chat in the session."
+  "message": "`ChatState.config` overlay, the `chat/configChanged` action, and `chatMutable` on session config properties let a host allow per-chat values for selected settings, such as tool auto-approval, so changing them in one chat no longer changes every chat in the session."
 }

@@ -1140,12 +1140,9 @@ public static class Reducers
                 state.Status = WithStatusFlag(state.Status, SessionStatus.IsArchived, a.IsArchived);
                 return ReduceOutcome.Applied;
             case ChatConfigChangedAction a:
-                if (state.Config is null)
-                {
-                    return ReduceOutcome.NoOp;
-                }
-
-                state.Config.Values = MergeConfig(state.Config.Values, a.Config, a.Replace);
+                Dictionary<string, JsonElement> chatValues = MergeConfig(state.Config?.Values, a.Config, a.Replace);
+                state.Config ??= new ChatConfigState { Values = chatValues };
+                state.Config.Values = chatValues;
                 return ReduceOutcome.Applied;
         }
 

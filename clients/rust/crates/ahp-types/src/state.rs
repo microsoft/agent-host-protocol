@@ -2008,22 +2008,11 @@ pub struct ChatState {
     /// state, including its current live source URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvases: Option<Vec<CanvasReference>>,
-    /// The chat's complete effective configuration: every property the chat
-    /// runs with, including session-level ones, described by the full schema.
-    ///
-    /// Same shape and semantics as
-    /// {@link SessionState.config | `SessionState.config`}, scoped to this chat.
-    /// Clients render the chat's configuration from this field and change it
-    /// with `chat/configChanged`. The host decides where each change is stored:
-    /// a chat-scoped property affects only this chat, while a session-level
-    /// property changes the session and the host publishes it to every chat in
-    /// the session. A host without per-chat configuration MAY publish the
-    /// session's configuration into each chat.
-    ///
-    /// Absent when the host does not expose configuration on this chat; clients
-    /// then use the owning session's `SessionState.config`.
+    /// Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config: Option<SessionConfigState>,
+    pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -2751,6 +2740,10 @@ pub struct SessionConfigPropertySchema {
     /// When `true`, the user may change this property after session creation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mutable: Option<bool>,
+    /// When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_mutable: Option<bool>,
 }
 
 /// A JSON Schema object describing available session configuration metadata.
@@ -2776,6 +2769,20 @@ pub struct SessionConfigState {
     /// JSON Schema describing available configuration properties
     pub schema: SessionConfigSchema,
     /// Current configuration values
+    pub values: JsonObject,
+}
+
+/// Configuration values set on a chat: an overlay on the owning session's
+/// {@link SessionState.config | `SessionState.config`}.
+///
+/// It carries only the chat's own values; the session's config schema
+/// applies. The effective config of a chat is the session's values with
+/// these values applied over them. Only properties with `chatMutable: true`
+/// in the session's config schema can be set on a chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigState {
+    /// Config values set on this chat, keyed by property id
     pub values: JsonObject,
 }
 

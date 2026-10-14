@@ -3122,6 +3122,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatMutable": {
+          "type": "boolean",
+          "description": "When `true`, the property may be set per chat with `chat/configChanged`.\nThe chat's value overrides the session's value for that chat only."
         }
       },
       "required": [
@@ -4325,8 +4329,8 @@
           "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
         "config": {
-          "$ref": "#/$defs/SessionConfigState",
-          "description": "The chat's complete effective configuration: every property the chat\nruns with, including session-level ones, described by the full schema.\n\nSame shape and semantics as\n{@link SessionState.config | `SessionState.config`}, scoped to this chat.\nClients render the chat's configuration from this field and change it\nwith `chat/configChanged`. The host decides where each change is stored:\na chat-scoped property affects only this chat, while a session-level\nproperty changes the session and the host publishes it to every chat in\nthe session. A host without per-chat configuration MAY publish the\nsession's configuration into each chat.\n\nAbsent when the host does not expose configuration on this chat; clients\nthen use the owning session's `SessionState.config`."
+          "$ref": "#/$defs/ChatConfigState",
+          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
         },
         "turns": {
           "type": "array",
@@ -4548,6 +4552,20 @@
       },
       "required": [
         "text"
+      ]
+    },
+    "ChatConfigState": {
+      "type": "object",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values set on this chat, keyed by property id"
+        }
+      },
+      "required": [
+        "values"
       ]
     },
     "PendingMessage": {
@@ -9435,7 +9453,7 @@
     },
     "ChatConfigChangedAction": {
       "type": "object",
-      "description": "Client changed a mutable config value of a chat.\n\nThe chat-level counterpart of `session/configChanged`, with the same\npayload and reducer semantics applied to `ChatState.config`. Only\nproperties with `sessionMutable: true` in the chat's config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.\n\nThe host decides where a change is stored. A chat-scoped property affects\nonly this chat. A session-level property changes the owning session\n(`session/configChanged`), and the host publishes the new value to every\nchat in the session with `chat/configChanged`. Clients do not need to know\nwhich properties are chat-scoped. Clients MUST NOT dispatch this action\nwhen `ChatState.config` is absent.",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} overlay, or replaces the\noverlay when `replace` is `true`. Only properties with `chatMutable: true`\nin the session's config schema may be set. To reset a property to the\nsession's value, replace the overlay with one that omits the property.\n\nA host may change other chats' config as well.",
       "properties": {
         "type": {
           "const": "chat/configChanged"
@@ -9443,11 +9461,11 @@
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Updated config values"
+          "description": "Config values to set on the chat"
         },
         "replace": {
           "type": "boolean",
-          "description": "When `true`, replaces all config values instead of merging"
+          "description": "When `true`, replaces the chat's config values instead of merging"
         }
       },
       "required": [

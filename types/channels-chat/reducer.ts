@@ -967,14 +967,13 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     // ── Config ────────────────────────────────────────────────────────────
 
     case ActionType.ChatConfigChanged:
-      if (!state.config) {
-        return state;
-      }
       return {
         ...state,
         config: {
           ...state.config,
-          values: action.replace ? { ...action.config } : { ...state.config.values, ...action.config },
+          values: action.replace || !state.config
+            ? { ...action.config }
+            : { ...state.config.values, ...action.config },
         },
       };
 

@@ -1,5 +1,5 @@
 {
-  "description": "chat/configChanged merges new values into the chat's config.values",
+  "description": "chat/configChanged merges new values into the chat's config overlay",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -8,28 +8,9 @@
     "status": 1,
     "modifiedAt": "1970-01-01T00:00:01.000Z",
     "config": {
-      "schema": {
-        "type": "object",
-        "properties": {
-          "autoApprove": {
-            "type": "boolean",
-            "title": "Auto-approve tools",
-            "sessionMutable": true
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "enum": [
-              "agent",
-              "plan"
-            ],
-            "sessionMutable": true
-          }
-        }
-      },
       "values": {
         "autoApprove": false,
-        "mode": "agent"
+        "mode": "plan"
       }
     }
   },
@@ -48,28 +29,9 @@
     "status": 1,
     "modifiedAt": "1970-01-01T00:00:01.000Z",
     "config": {
-      "schema": {
-        "type": "object",
-        "properties": {
-          "autoApprove": {
-            "type": "boolean",
-            "title": "Auto-approve tools",
-            "sessionMutable": true
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "enum": [
-              "agent",
-              "plan"
-            ],
-            "sessionMutable": true
-          }
-        }
-      },
       "values": {
         "autoApprove": true,
-        "mode": "agent"
+        "mode": "plan"
       }
     }
   }

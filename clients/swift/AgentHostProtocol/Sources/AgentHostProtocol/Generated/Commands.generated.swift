@@ -1787,6 +1787,9 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
+    /// When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.
+    public var chatMutable: Bool?
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -1805,6 +1808,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         case additionalProperties
         case enumDynamic
         case sessionMutable
+        case chatMutable
     }
 
     public init(
@@ -1823,7 +1827,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         required: [String]? = nil,
         additionalProperties: ConfigPropertySchema? = nil,
         enumDynamic: Bool? = nil,
-        sessionMutable: Bool? = nil
+        sessionMutable: Bool? = nil,
+        chatMutable: Bool? = nil
     ) {
         self.type = type
         self.title = title
@@ -1841,6 +1846,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         self.additionalProperties = additionalProperties
         self.enumDynamic = enumDynamic
         self.sessionMutable = sessionMutable
+        self.chatMutable = chatMutable
     }
 }
 

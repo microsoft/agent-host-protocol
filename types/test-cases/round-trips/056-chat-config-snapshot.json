@@ -1,7 +1,7 @@
 {
   "name": "chat-config-snapshot",
   "group": "A",
-  "description": "ChatState.config reuses SessionConfigState: the chat's full config schema and its effective values survive a decode/re-encode cycle on a chat snapshot.",
+  "description": "ChatState.config is an overlay that carries only the chat's own config values (no schema); it survives a decode/re-encode cycle on a chat snapshot.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-chat:/peer",
@@ -12,28 +12,8 @@
       "modifiedAt": "2026-10-14T10:00:00.000Z",
       "turns": [],
       "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "autoApprove": {
-              "type": "boolean",
-              "title": "Auto-approve tools",
-              "sessionMutable": true
-            },
-            "mode": {
-              "type": "string",
-              "title": "Mode",
-              "enum": [
-                "agent",
-                "plan"
-              ],
-              "sessionMutable": true
-            }
-          }
-        },
         "values": {
-          "autoApprove": true,
-          "mode": "agent"
+          "autoApprove": true
         }
       }
     },
@@ -49,28 +29,8 @@
         "modifiedAt": "2026-10-14T10:00:00.000Z",
         "turns": [],
         "config": {
-          "schema": {
-            "type": "object",
-            "properties": {
-              "autoApprove": {
-                "type": "boolean",
-                "title": "Auto-approve tools",
-                "sessionMutable": true
-              },
-              "mode": {
-                "type": "string",
-                "title": "Mode",
-                "enum": [
-                  "agent",
-                  "plan"
-                ],
-                "sessionMutable": true
-              }
-            }
-          },
           "values": {
-            "autoApprove": true,
-            "mode": "agent"
+            "autoApprove": true
           }
         }
       },

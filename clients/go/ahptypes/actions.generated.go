@@ -867,25 +867,20 @@ type ChatIsArchivedChangedAction struct {
 	IsArchived bool `json:"isArchived"`
 }
 
-// Client changed a mutable config value of a chat.
+// Config values set on a chat changed.
 //
-// The chat-level counterpart of `session/configChanged`, with the same
-// payload and reducer semantics applied to `ChatState.config`. Only
-// properties with `sessionMutable: true` in the chat's config schema may be
-// changed. The server validates and broadcasts the action; the reducer merges
-// the new values into `state.config.values`.
+// Merges `config` into the chat's
+// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+// in the session's config schema may be set. To reset a property to the
+// session's value, replace the overlay with one that omits the property.
 //
-// The host decides where a change is stored. A chat-scoped property affects
-// only this chat. A session-level property changes the owning session
-// (`session/configChanged`), and the host publishes the new value to every
-// chat in the session with `chat/configChanged`. Clients do not need to know
-// which properties are chat-scoped. Clients MUST NOT dispatch this action
-// when `ChatState.config` is absent.
+// A host may change other chats' config as well.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
-	// Updated config values
+	// Config values to set on the chat
 	Config map[string]json.RawMessage `json:"config"`
-	// When `true`, replaces all config values instead of merging
+	// When `true`, replaces the chat's config values instead of merging
 	Replace *bool `json:"replace,omitempty"`
 }
 

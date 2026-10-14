@@ -771,6 +771,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
+  { name: 'ChatConfigState' },
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },

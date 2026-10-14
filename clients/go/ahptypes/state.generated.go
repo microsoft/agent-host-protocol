@@ -1345,21 +1345,10 @@ type ChatState struct {
 	// Clients subscribe to each resource for the experimental presentation
 	// state, including its current live source URL.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
-	// The chat's complete effective configuration: every property the chat
-	// runs with, including session-level ones, described by the full schema.
-	//
-	// Same shape and semantics as
-	// {@link SessionState.config | `SessionState.config`}, scoped to this chat.
-	// Clients render the chat's configuration from this field and change it
-	// with `chat/configChanged`. The host decides where each change is stored:
-	// a chat-scoped property affects only this chat, while a session-level
-	// property changes the session and the host publishes it to every chat in
-	// the session. A host without per-chat configuration MAY publish the
-	// session's configuration into each chat.
-	//
-	// Absent when the host does not expose configuration on this chat; clients
-	// then use the owning session's `SessionState.config`.
-	Config *SessionConfigState `json:"config,omitempty"`
+	// Configuration values set on this chat, applied over the owning session's
+	// {@link SessionState.config | `SessionState.config`}. See
+	// {@link ChatConfigState}.
+	Config *ChatConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1587,6 +1576,9 @@ type SessionConfigPropertySchema struct {
 	EnumDynamic *bool `json:"enumDynamic,omitempty"`
 	// When `true`, the user may change this property after session creation
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
+	// When `true`, the property may be set per chat with `chat/configChanged`.
+	// The chat's value overrides the session's value for that chat only.
+	ChatMutable *bool `json:"chatMutable,omitempty"`
 }
 
 // A JSON Schema object describing available session configuration metadata.
@@ -1607,6 +1599,18 @@ type SessionConfigState struct {
 	// JSON Schema describing available configuration properties
 	Schema SessionConfigSchema `json:"schema"`
 	// Current configuration values
+	Values map[string]json.RawMessage `json:"values"`
+}
+
+// Configuration values set on a chat: an overlay on the owning session's
+// {@link SessionState.config | `SessionState.config`}.
+//
+// It carries only the chat's own values; the session's config schema
+// applies. The effective config of a chat is the session's values with
+// these values applied over them. Only properties with `chatMutable: true`
+// in the session's config schema can be set on a chat.
+type ChatConfigState struct {
+	// Config values set on this chat, keyed by property id
 	Values map[string]json.RawMessage `json:"values"`
 }
 

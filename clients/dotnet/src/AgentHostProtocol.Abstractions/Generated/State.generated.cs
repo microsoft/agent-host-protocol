@@ -2438,22 +2438,11 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
-    /// <summary>The chat's complete effective configuration: every property the chat
-    /// runs with, including session-level ones, described by the full schema.
-    ///
-    /// Same shape and semantics as
-    /// {@link SessionState.config | `SessionState.config`}, scoped to this chat.
-    /// Clients render the chat's configuration from this field and change it
-    /// with `chat/configChanged`. The host decides where each change is stored:
-    /// a chat-scoped property affects only this chat, while a session-level
-    /// property changes the session and the host publishes it to every chat in
-    /// the session. A host without per-chat configuration MAY publish the
-    /// session's configuration into each chat.
-    ///
-    /// Absent when the host does not expose configuration on this chat; clients
-    /// then use the owning session's `SessionState.config`.</summary>
+    /// <summary>Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public SessionConfigState? Config { get; set; }
+    public ChatConfigState? Config { get; set; }
 
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
@@ -3371,6 +3360,11 @@ public sealed record SessionConfigPropertySchema
     /// <summary>When `true`, the user may change this property after session creation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SessionMutable { get; init; }
+
+    /// <summary>When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ChatMutable { get; init; }
 }
 
 /// <summary>A JSON Schema object describing available session configuration metadata.</summary>
@@ -3397,6 +3391,19 @@ public sealed class SessionConfigState
     public required SessionConfigSchema Schema { get; set; }
 
     /// <summary>Current configuration values</summary>
+    public required Dictionary<string, JsonElement> Values { get; set; }
+}
+
+/// <summary>Configuration values set on a chat: an overlay on the owning session's
+/// {@link SessionState.config | `SessionState.config`}.
+///
+/// It carries only the chat's own values; the session's config schema
+/// applies. The effective config of a chat is the session's values with
+/// these values applied over them. Only properties with `chatMutable: true`
+/// in the session's config schema can be set on a chat.</summary>
+public sealed class ChatConfigState
+{
+    /// <summary>Config values set on this chat, keyed by property id</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 

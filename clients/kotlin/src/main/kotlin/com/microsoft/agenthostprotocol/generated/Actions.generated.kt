@@ -1061,11 +1061,11 @@ data class ChatIsArchivedChangedAction(
 data class ChatConfigChangedAction(
     val type: ActionType,
     /**
-     * Updated config values
+     * Config values to set on the chat
      */
     val config: Map<String, JsonElement>,
     /**
-     * When `true`, replaces all config values instead of merging
+     * When `true`, replaces the chat's config values instead of merging
      */
     val replace: Boolean? = null
 )

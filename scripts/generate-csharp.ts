@@ -818,6 +818,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
+  { name: 'ChatConfigState', mutable: true },
   { name: 'Turn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },

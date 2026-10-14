@@ -12,7 +12,6 @@ import type {
   AgentSelection,
   ChangesSummary,
   McpAuthRequirement,
-  SessionConfigState,
   SessionStatus,
 } from '../channels-session/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -128,22 +127,11 @@ export interface ChatState {
    */
   canvases?: CanvasReference[];
   /**
-   * The chat's complete effective configuration: every property the chat
-   * runs with, including session-level ones, described by the full schema.
-   *
-   * Same shape and semantics as
-   * {@link SessionState.config | `SessionState.config`}, scoped to this chat.
-   * Clients render the chat's configuration from this field and change it
-   * with `chat/configChanged`. The host decides where each change is stored:
-   * a chat-scoped property affects only this chat, while a session-level
-   * property changes the session and the host publishes it to every chat in
-   * the session. A host without per-chat configuration MAY publish the
-   * session's configuration into each chat.
-   *
-   * Absent when the host does not expose configuration on this chat; clients
-   * then use the owning session's `SessionState.config`.
+   * Configuration values set on this chat, applied over the owning session's
+   * {@link SessionState.config | `SessionState.config`}. See
+   * {@link ChatConfigState}.
    */
-  config?: SessionConfigState;
+  config?: ChatConfigState;
 
   // ── Conversation contents ──────────────────────────────────────────
   /** Completed turns */
@@ -413,6 +401,24 @@ export const enum ChatInteractivity {
   ReadOnly = 'read-only',
   /** Internal worker not shown in UI at all */
   Hidden = 'hidden',
+}
+
+// ─── Chat Config Types ───────────────────────────────────────────────────────
+
+/**
+ * Configuration values set on a chat: an overlay on the owning session's
+ * {@link SessionState.config | `SessionState.config`}.
+ *
+ * It carries only the chat's own values; the session's config schema
+ * applies. The effective config of a chat is the session's values with
+ * these values applied over them. Only properties with `chatMutable: true`
+ * in the session's config schema can be set on a chat.
+ *
+ * @category Chat Config Types
+ */
+export interface ChatConfigState {
+  /** Config values set on this chat, keyed by property id */
+  values: Record<string, unknown>;
 }
 
 // ─── Pending Message Types ───────────────────────────────────────────────────
