@@ -11,7 +11,8 @@ use std::time::SystemTime;
 
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
-    ListSessionsParams, ListSessionsResult, ReconnectResult, SubscribeParams, SubscribeResult,
+    ChannelRecovery, ChannelReplayCursor, ListSessionsParams, ListSessionsResult, ReconnectResult,
+    SubscribeParams, SubscribeResult,
 };
 use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::state::{RootState, SessionSummary, SnapshotState};
@@ -92,6 +93,7 @@ pub(super) fn spawn(
         last_connected_at: None,
         protocol_version: None,
         server_seq: 0,
+        channel_cursors: std::collections::HashMap::new(),
         default_directory: None,
         automations: None,
         root_state: RootState {
@@ -269,18 +271,28 @@ impl HostRuntime {
         let events = client.events();
 
         // Decide between initialize and reconnect based on prior state.
-        let (subscriptions, server_seq_after, init_result, reconnect_result) = {
+        let (_subscriptions, server_seq_after, init_result, reconnect_result) = {
             let snapshot = self.shared.lock().await;
-            let can_reconnect = snapshot.server_seq > 0 && !snapshot.subscriptions.is_empty();
+            let can_reconnect =
+                snapshot.protocol_version.is_some() && !snapshot.subscriptions.is_empty();
             let subscriptions = snapshot.subscriptions.clone();
             let server_seq = snapshot.server_seq;
+            // Build one independent replay cursor per currently-subscribed
+            // channel from the per-channel cursor map (missing = 0). A
+            // single connection-wide watermark would let a fast channel's
+            // progress silently skip a slower channel's undelivered
+            // actions; per-channel cursors prevent that cross-channel skip.
+            let cursors: Vec<ChannelReplayCursor> = subscriptions
+                .iter()
+                .map(|uri| ChannelReplayCursor {
+                    channel: uri.clone(),
+                    last_seen_server_seq: snapshot.channel_cursors.get(uri).copied().unwrap_or(0),
+                })
+                .collect();
             drop(snapshot);
 
             if can_reconnect {
-                match client
-                    .reconnect(self.client_id.clone(), server_seq, subscriptions.clone())
-                    .await
-                {
+                match client.reconnect(self.client_id.clone(), cursors).await {
                     Ok(result) => (subscriptions, server_seq, None, Some(result)),
                     Err(ClientError::Rpc(_)) => {
                         // Server refused reconnect (likely too much state has
@@ -352,6 +364,17 @@ impl HostRuntime {
                     .completion_trigger_characters
                     .clone()
                     .unwrap_or_default();
+                // A full (re)initialize discards any prior per-channel
+                // progress — the server has no continuity guarantee for
+                // it — and re-baselines every subscribed channel from its
+                // fresh snapshot (or leaves it unset if the channel is
+                // stateless).
+                state.channel_cursors.clear();
+                for snapshot in &init.snapshots {
+                    state
+                        .channel_cursors
+                        .insert(snapshot.resource.clone(), snapshot.from_seq);
+                }
             }
             if let Ok(list) = summaries {
                 state.session_summaries.clear();
@@ -370,7 +393,7 @@ impl HostRuntime {
         // mirrors and aggregated views stay correct; missing
         // subscriptions must be dropped from the cache.
         if let Some(result) = reconnect_result {
-            self.apply_reconnect_result(result, &subscriptions).await;
+            self.apply_reconnect_result(result).await;
         }
 
         self.set_state(HostState::Connected, None).await;
@@ -391,58 +414,66 @@ impl HostRuntime {
 
     /// Apply the result of a `reconnect` call.
     ///
-    /// For [`ReconnectResult::Replay`]: fans the missed action envelopes
-    /// through the per-host event tap and the per-host state mirror so
-    /// consumers see them in `serverSeq` order, then drops any
-    /// `missing` URIs from the local subscription set.
+    /// The server recovers each subscribed channel independently — some
+    /// channels may replay, others may receive a fresh snapshot, and
+    /// others may be reported missing, all in the same response. Each
+    /// requested channel gets exactly one recovery outcome, so a fast
+    /// channel's progress can't cause a slower channel's undelivered
+    /// actions to be skipped (or a missing channel to hide another
+    /// channel's replay):
     ///
-    /// For [`ReconnectResult::Snapshot`]: refreshes the per-host root
-    /// state mirror and records the snapshot's `from_seq` in the
-    /// supervisor's `serverSeq`. URIs the server didn't return a
-    /// snapshot for are dropped from the local subscription set.
-    async fn apply_reconnect_result(
-        &self,
-        result: ReconnectResult,
-        prior_subscriptions: &[String],
-    ) {
-        match result {
-            ReconnectResult::Replay(replay) => {
-                for envelope in replay.actions {
-                    let channel = envelope.channel.clone();
-                    self.apply_action(&envelope).await;
-                    let host_event = HostSubscriptionEvent {
-                        host_id: self.config.id.clone(),
-                        channel: channel.clone(),
-                        event: SubscriptionEvent::Action(envelope),
-                    };
-                    let _ = self.fan_out.send(host_event);
-                }
-                if !replay.missing.is_empty() {
-                    let mut state = self.shared.lock().await;
-                    state.subscriptions.retain(|u| !replay.missing.contains(u));
-                }
-                let _ = prior_subscriptions; // intentionally unused on replay
-            }
-            ReconnectResult::Snapshot(snap) => {
-                let mut state = self.shared.lock().await;
-                let mut surviving: Vec<String> = Vec::with_capacity(snap.snapshots.len());
-                for snapshot in snap.snapshots {
-                    if snapshot.from_seq > state.server_seq {
-                        state.server_seq = snapshot.from_seq;
+    /// - [`ChannelRecovery::Replay`]: fans the missed action envelopes
+    ///   through the per-host event tap and the per-host state mirror
+    ///   (via [`Self::apply_action`], which advances only the matching
+    ///   channel's cursor) so consumers see them in `serverSeq` order.
+    /// - [`ChannelRecovery::Snapshot`]: refreshes the per-host root
+    ///   state mirror (if the channel is root) and sets that channel's
+    ///   cursor to the snapshot's `from_seq` baseline.
+    /// - [`ChannelRecovery::Missing`]: drops the channel from the local
+    ///   subscription set and its cursor entry, so it is never
+    ///   re-requested on a future reconnect.
+    async fn apply_reconnect_result(&self, result: ReconnectResult) {
+        let mut missing_channels: Vec<String> = Vec::new();
+        for recovery in result.channels {
+            match recovery {
+                ChannelRecovery::Replay(replay) => {
+                    for envelope in replay.actions {
+                        let channel = envelope.channel.clone();
+                        self.apply_action(&envelope).await;
+                        let host_event = HostSubscriptionEvent {
+                            host_id: self.config.id.clone(),
+                            channel: channel.clone(),
+                            event: SubscriptionEvent::Action(envelope),
+                        };
+                        let _ = self.fan_out.send(host_event);
                     }
-                    if snapshot.resource == ahp_types::ROOT_RESOURCE_URI {
-                        if let SnapshotState::Root(root) = &snapshot.state {
+                }
+                ChannelRecovery::Snapshot(snap) => {
+                    let mut state = self.shared.lock().await;
+                    if snap.snapshot.from_seq > state.server_seq {
+                        state.server_seq = snap.snapshot.from_seq;
+                    }
+                    state
+                        .channel_cursors
+                        .insert(snap.channel.clone(), snap.snapshot.from_seq);
+                    if snap.channel == ahp_types::ROOT_RESOURCE_URI {
+                        if let SnapshotState::Root(root) = &snap.snapshot.state {
                             state.root_state = root.as_ref().clone();
                         }
                     }
-                    surviving.push(snapshot.resource);
                 }
-                // Drop subscriptions the server didn't return a snapshot
-                // for — they're effectively `missing` even though the
-                // snapshot arm doesn't carry an explicit list.
-                state
-                    .subscriptions
-                    .retain(|u| surviving.contains(u) || !prior_subscriptions.contains(u));
+                ChannelRecovery::Missing(missing) => {
+                    missing_channels.push(missing.channel);
+                }
+            }
+        }
+        if !missing_channels.is_empty() {
+            let mut state = self.shared.lock().await;
+            state
+                .subscriptions
+                .retain(|u| !missing_channels.contains(u));
+            for channel in &missing_channels {
+                state.channel_cursors.remove(channel);
             }
         }
     }
@@ -504,6 +535,7 @@ impl HostRuntime {
                         {
                             let mut state = self.shared.lock().await;
                             state.subscriptions.retain(|u| u != &uri);
+                            state.channel_cursors.remove(&uri);
                         }
                         let _ = reply.send(Ok(()));
                     }
@@ -546,6 +578,7 @@ impl HostRuntime {
                         {
                             let mut state = self.shared.lock().await;
                             state.subscriptions.retain(|u| u != &uri);
+                            state.channel_cursors.remove(&uri);
                         }
                         let _ = reply.send(Ok(()));
                     }
@@ -599,6 +632,20 @@ impl HostRuntime {
         if envelope_seq > state.server_seq {
             state.server_seq = envelope_seq;
         }
+        // Advance only the matching channel's cursor — never another
+        // channel's — so a fast channel can never cause a slower
+        // channel's undelivered actions to be skipped on the next
+        // reconnect.
+        let prior_cursor = state
+            .channel_cursors
+            .get(&envelope.channel)
+            .copied()
+            .unwrap_or(0);
+        if envelope_seq > prior_cursor {
+            state
+                .channel_cursors
+                .insert(envelope.channel.clone(), envelope_seq);
+        }
         // Best-effort root state mirror update; for non-root actions this
         // is a no-op (the reducer reports OutOfScope).
         if matches!(
@@ -633,11 +680,23 @@ impl HostRuntime {
             )
             .await
             .map_err(HostError::Client)?;
-        // Track subscription so reconnect can replay it.
+        // Track subscription so reconnect can replay it. Seed (or raise)
+        // the channel's replay cursor from the subscribe response's
+        // snapshot `from_seq` baseline — never lower an existing cursor,
+        // since a re-subscribe shouldn't rewind a channel that's already
+        // caught up further via reconnect/replay.
         {
             let mut state = self.shared.lock().await;
             if !state.subscriptions.contains(&uri) {
                 state.subscriptions.push(uri.clone());
+            }
+            if let Some(baseline) = result.snapshot.as_ref().map(|s| s.from_seq) {
+                let current = state.channel_cursors.get(&uri).copied();
+                if current.map(|c| baseline > c).unwrap_or(true) {
+                    state.channel_cursors.insert(uri.clone(), baseline);
+                }
+            } else {
+                state.channel_cursors.entry(uri.clone()).or_insert(0);
             }
         }
         // Make sure local broadcasts exist so per-URI listeners don't miss events.
@@ -655,6 +714,7 @@ impl HostRuntime {
         }
         let mut state = self.shared.lock().await;
         state.subscriptions.retain(|u| u != &uri);
+        state.channel_cursors.remove(&uri);
         Ok(())
     }
 

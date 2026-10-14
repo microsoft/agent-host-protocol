@@ -1049,20 +1049,28 @@ public sealed class AhpClient : IAhpClient
     }
 
     /// <summary>Re-establishes a dropped connection via the <c>reconnect</c> flow.</summary>
+    /// <param name="clientId">Client identifier from the original connection.</param>
+    /// <param name="subscriptions">
+    /// Per-channel replay checkpoints for every channel the client is still
+    /// subscribed to. Each channel recovers independently from its own
+    /// <see cref="ChannelReplayCursor.LastSeenServerSeq"/> instead of one
+    /// connection-wide watermark, so a fast-moving channel can never cause a
+    /// slower channel's undelivered actions to be skipped (see
+    /// <see cref="ChannelReplayCursor"/>).
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<ReconnectResult> ReconnectAsync(
         string clientId,
-        long lastSeenServerSeq,
-        IReadOnlyList<string>? subscriptions = null,
+        IReadOnlyList<ChannelReplayCursor>? subscriptions = null,
         CancellationToken cancellationToken = default)
     {
         var @params = new ReconnectParams
         {
             Channel = ProtocolVersion.RootResourceUri,
             ClientId = clientId,
-            LastSeenServerSeq = lastSeenServerSeq,
             Subscriptions = subscriptions is not null
-                ? new List<string>(subscriptions)
-                : new List<string>(),
+                ? new List<ChannelReplayCursor>(subscriptions)
+                : new List<ChannelReplayCursor>(),
         };
 
         try

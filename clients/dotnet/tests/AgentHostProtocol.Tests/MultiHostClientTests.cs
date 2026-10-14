@@ -76,8 +76,9 @@ public sealed class MultiHostClientTests
             .AfterInitialize((side, c) => RepeatActionAsync(side, actionChannel, serverSeq, c))
             .OnReconnect((req, side, c) =>
             {
-                var replay = new ReconnectReplayResult
+                var replay = new ChannelReplayRecovery
                 {
+                    Channel = actionChannel,
                     Actions = new List<ActionEnvelope>
                     {
                         new ActionEnvelope
@@ -91,9 +92,12 @@ public sealed class MultiHostClientTests
                             }),
                         },
                     },
-                    Missing = new List<string>(),
                 };
-                return FakeHost.RespondResultAsync(side, req.Id, new ReconnectResult(replay), c);
+                var result = new ReconnectResult
+                {
+                    Channels = new List<ChannelRecovery> { new ChannelRecovery(replay) },
+                };
+                return FakeHost.RespondResultAsync(side, req.Id, result, c);
             })
             .RunAsync(serverSide, ct);
 
@@ -377,16 +381,22 @@ public sealed class MultiHostClientTests
                     {
                         reconnectParams.TrySetResult(
                             Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
-                        return FakeHost.RespondResultAsync(
-                            side,
-                            request.Id,
-                            new ReconnectResult(new ReconnectReplayResult
+                        var result = new ReconnectResult
+                        {
+                            Channels = new List<ChannelRecovery>
                             {
-                                Type = ReconnectResultType.Replay,
-                                Actions = new List<ActionEnvelope>(),
-                                Missing = new List<string> { "copilot:/dynamic" },
-                            }),
-                            token);
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = ProtocolVersion.RootResourceUri,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                                new ChannelRecovery(new ChannelMissingRecovery
+                                {
+                                    Channel = "copilot:/dynamic",
+                                }),
+                            },
+                        };
+                        return FakeHost.RespondResultAsync(side, request.Id, result, token);
                     })
                     .OnListSessions((request, side, token) =>
                         RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
@@ -426,10 +436,15 @@ public sealed class MultiHostClientTests
             cts.Token,
             8000);
 
-        Assert.Equal(41, observed.LastSeenServerSeq);
+        Assert.Equal(
+            41,
+            observed.Subscriptions.Single(s => s.Channel == ProtocolVersion.RootResourceUri).LastSeenServerSeq);
+        Assert.Equal(
+            0,
+            observed.Subscriptions.Single(s => s.Channel == "copilot:/dynamic").LastSeenServerSeq);
         Assert.Equal(
             new[] { ProtocolVersion.RootResourceUri, "copilot:/dynamic" },
-            observed.Subscriptions);
+            observed.Subscriptions.Select(s => s.Channel));
         Assert.DoesNotContain("copilot:/dynamic", m.Host(new HostId("h"))!.Subscriptions);
     }
 
@@ -468,12 +483,17 @@ public sealed class MultiHostClientTests
                     FakeHost.RespondResultAsync(
                         side,
                         request.Id,
-                        new ReconnectResult(new ReconnectReplayResult
+                        new ReconnectResult
                         {
-                            Type = ReconnectResultType.Replay,
-                            Actions = actions,
-                            Missing = new List<string>(),
-                        }),
+                            Channels = new List<ChannelRecovery>
+                            {
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = ProtocolVersion.RootResourceUri,
+                                    Actions = actions,
+                                }),
+                            },
+                        },
                         token));
             }
             _ = host.RunAsync(server, cts.Token);
@@ -540,10 +560,9 @@ public sealed class MultiHostClientTests
                             Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
                     }
 
-                    var replay = new ReconnectReplayResult
+                    var replay = new ChannelReplayRecovery
                     {
-                        Type = ReconnectResultType.Replay,
-                        Missing = new List<string>(),
+                        Channel = ProtocolVersion.RootResourceUri,
                         Actions = currentAttempt == 2
                             ? new List<ActionEnvelope>
                             {
@@ -573,7 +592,10 @@ public sealed class MultiHostClientTests
                     return FakeHost.RespondResultAsync(
                         side,
                         request.Id,
-                        new ReconnectResult(replay),
+                        new ReconnectResult
+                        {
+                            Channels = new List<ChannelRecovery> { new ChannelRecovery(replay) },
+                        },
                         token);
                 });
             }
@@ -587,6 +609,7 @@ public sealed class MultiHostClientTests
         {
             Id = new HostId("h"),
             TransportFactory = factory,
+            InitialSubscriptions = new[] { ProtocolVersion.RootResourceUri },
             ReconnectPolicy = new ReconnectPolicy
             {
                 InitialBackoff = TimeSpan.FromMilliseconds(1),
@@ -607,7 +630,12 @@ public sealed class MultiHostClientTests
         await m.ReconnectAsync(new HostId("h"), cts.Token);
         var observed = await thirdAttemptParams.Task.WaitAsync(cts.Token);
 
-        Assert.Equal(10, observed.LastSeenServerSeq);
+        // The root channel's replay cursor persisted across the FAILED second
+        // attempt at exactly the last action that truly committed (seq 10),
+        // not the seq 11 action whose apply threw.
+        Assert.Equal(
+            10,
+            observed.Subscriptions.Single(s => s.Channel == ProtocolVersion.RootResourceUri).LastSeenServerSeq);
     }
 
     [Fact]
@@ -630,41 +658,48 @@ public sealed class MultiHostClientTests
                     FakeHost.RespondResultAsync(
                         side,
                         request.Id,
-                        new ReconnectResult(new ReconnectSnapshotResult
+                        new ReconnectResult
                         {
-                            Type = ReconnectResultType.Snapshot,
-                            Snapshots = new List<Snapshot>
+                            Channels = new List<ChannelRecovery>
                             {
-                                new()
+                                new ChannelRecovery(new ChannelSnapshotRecovery
                                 {
-                                    Resource = ProtocolVersion.RootResourceUri,
-                                    FromSeq = 77,
-                                    State = new SnapshotState
+                                    Channel = ProtocolVersion.RootResourceUri,
+                                    Snapshot = new Snapshot
                                     {
-                                        Root = new RootState
+                                        Resource = ProtocolVersion.RootResourceUri,
+                                        FromSeq = 77,
+                                        State = new SnapshotState
                                         {
-                                            Agents = new List<AgentInfo>(),
-                                            ActiveSessions = 9,
+                                            Root = new RootState
+                                            {
+                                                Agents = new List<AgentInfo>(),
+                                                ActiveSessions = 9,
+                                            },
                                         },
                                     },
-                                },
-                                new()
+                                }),
+                                new ChannelRecovery(new ChannelSnapshotRecovery
                                 {
-                                    Resource = sessionResource,
-                                    FromSeq = 78,
-                                    State = new SnapshotState
+                                    Channel = sessionResource,
+                                    Snapshot = new Snapshot
                                     {
-                                        Session = new SessionState
+                                        Resource = sessionResource,
+                                        FromSeq = 78,
+                                        State = new SnapshotState
                                         {
-                                            Provider = "test",
-                                            Title = "Restored session",
-                                            ActiveClients = new List<SessionActiveClient>(),
-                                            Chats = new List<ChatSummary>(),
+                                            Session = new SessionState
+                                            {
+                                                Provider = "test",
+                                                Title = "Restored session",
+                                                ActiveClients = new List<SessionActiveClient>(),
+                                                Chats = new List<ChatSummary>(),
+                                            },
                                         },
                                     },
-                                },
+                                }),
                             },
-                        }),
+                        },
                         token))
                 .OnListSessions((request, side, token) =>
                     RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
@@ -778,12 +813,17 @@ public sealed class MultiHostClientTests
                         await FakeHost.RespondResultAsync(
                             side,
                             request.Id,
-                            new ReconnectResult(new ReconnectReplayResult
+                            new ReconnectResult
                             {
-                                Type = ReconnectResultType.Replay,
-                                Actions = new List<ActionEnvelope>(),
-                                Missing = new List<string>(),
-                            }),
+                                Channels = new List<ChannelRecovery>
+                                {
+                                    new ChannelRecovery(new ChannelReplayRecovery
+                                    {
+                                        Channel = ProtocolVersion.RootResourceUri,
+                                        Actions = new List<ActionEnvelope>(),
+                                    }),
+                                },
+                            },
                             token);
                     })
                     .OnListSessions((request, side, token) =>
@@ -938,24 +978,33 @@ public sealed class MultiHostClientTests
             .OnListSessions((req, side, c) => RespondListSessionsAsync(side, req.Id, Array.Empty<SessionSummary>(), c))
             .OnReconnect((req, side, c) =>
             {
-                var replay = new ReconnectReplayResult
+                var channels = new List<ChannelRecovery>
                 {
-                    Actions = new List<ActionEnvelope>
+                    new ChannelRecovery(new ChannelReplayRecovery
                     {
-                        new ActionEnvelope
+                        Channel = ProtocolVersion.RootResourceUri,
+                        Actions = new List<ActionEnvelope>
                         {
-                            Channel = ProtocolVersion.RootResourceUri,
-                            ServerSeq = replaySeq,
-                            Action = new StateAction(new RootActiveSessionsChangedAction
+                            new ActionEnvelope
                             {
-                                Type = ActionType.RootActiveSessionsChanged,
-                                ActiveSessions = 7,
-                            }),
+                                Channel = ProtocolVersion.RootResourceUri,
+                                ServerSeq = replaySeq,
+                                Action = new StateAction(new RootActiveSessionsChangedAction
+                                {
+                                    Type = ActionType.RootActiveSessionsChanged,
+                                    ActiveSessions = 7,
+                                }),
+                            },
                         },
-                    },
-                    Missing = new List<string>(missing),
+                    }),
                 };
-                return FakeHost.RespondResultAsync(side, req.Id, new ReconnectResult(replay), c);
+                channels.AddRange(missing.Select(uri =>
+                    new ChannelRecovery(new ChannelMissingRecovery { Channel = uri })));
+                return FakeHost.RespondResultAsync(
+                    side,
+                    req.Id,
+                    new ReconnectResult { Channels = channels },
+                    c);
             })
             .AckUnmatchedWithEmpty()
             .RunAsync(serverSide, ct);
@@ -3086,5 +3135,409 @@ public sealed class MultiHostClientTests
             var seqs = recorder.Seqs();
             return seqs.Count == 2 && seqs[0] == 42 && seqs[1] == 43;
         }, cts.Token, 8000);
+    }
+
+    // ── Per-channel replay cursor regression tests ──────────────────────────
+    // Ports of clients/typescript/test/hosts.test.ts's four newest tests.
+    // These prove the actual bug the per-channel cursor design fixes: a
+    // single connection-wide watermark would let one channel's progress
+    // silently skip another channel's undelivered actions on reconnect.
+
+    [Fact]
+    public async Task MultiHost_Reconnect_SendsIndependentPerChannelCursors_FastChannelNeverAdvancesSlowOne()
+    {
+        const string channelA = "ahp-canvas:/a";
+        const string channelB = "ahp-canvas:/b";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var reconnectParams = new TaskCompletionSource<ReconnectParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        MemTransport? firstServer = null;
+        var attempt = 0;
+
+        HostTransportFactory factory = (id, ct) =>
+        {
+            var (client, server) = MemTransport.CreatePair();
+            if (Interlocked.Increment(ref attempt) == 1)
+            {
+                firstServer = server;
+                _ = Task.Run(() => FakeHost.New()
+                    .OnInitialize((request, side, token) =>
+                        RespondInitializeWithRootAsync(side, request.Id, null, 0, token))
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .On("subscribe", (request, side, token) =>
+                        FakeHost.RespondResultAsync(side, request.Id, new SubscribeResult(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            else
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnReconnect((request, side, token) =>
+                    {
+                        reconnectParams.TrySetResult(
+                            Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
+                        var result = new ReconnectResult
+                        {
+                            Channels = new List<ChannelRecovery>
+                            {
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = channelA,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = channelB,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                            },
+                        };
+                        return FakeHost.RespondResultAsync(side, request.Id, result, token);
+                    })
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            return Task.FromResult<ITransport>(client);
+        };
+
+        var m = new MultiHostClient();
+        await using var _mh = m;
+        await m.AddHostAsync(new HostConfig
+        {
+            Id = new HostId("h"),
+            TransportFactory = factory,
+            ReconnectPolicy = new ReconnectPolicy
+            {
+                InitialBackoff = TimeSpan.FromMilliseconds(20),
+                MaxBackoff = TimeSpan.FromMilliseconds(20),
+                BackoffMultiplier = 1,
+            },
+        }, cts.Token);
+
+        await m.SubscribeAsync(new HostId("h"), channelA, cts.Token);
+        await m.SubscribeAsync(new HostId("h"), channelB, cts.Token);
+
+        // B races ahead to serverSeq=101 while A never receives anything. A
+        // single connection-wide watermark would send `lastSeenServerSeq: 101`
+        // on the next reconnect and silently skip any of A's undelivered
+        // actions below that value; per-channel cursors must keep A at its
+        // own baseline instead.
+        await SendActionAsync(firstServer!, channelB, 101, cts.Token);
+        await WaitUntilAsync(() => m.Host(new HostId("h"))?.ServerSeq == 101, cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        var observed = await reconnectParams.Task.WaitAsync(cts.Token);
+
+        Assert.Equal(
+            101,
+            observed.Subscriptions.Single(s => s.Channel == channelB).LastSeenServerSeq);
+        Assert.Equal(
+            0,
+            observed.Subscriptions.Single(s => s.Channel == channelA).LastSeenServerSeq);
+    }
+
+    [Fact]
+    public async Task MultiHost_ChannelReplayRecovery_AdvancesOnlyThatChannelsCursor()
+    {
+        const string channelA = "ahp-canvas:/a";
+        const string channelB = "ahp-canvas:/b";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var secondReconnectParams = new TaskCompletionSource<ReconnectParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempt = 0;
+
+        HostTransportFactory factory = (id, ct) =>
+        {
+            var (client, server) = MemTransport.CreatePair();
+            var currentAttempt = Interlocked.Increment(ref attempt);
+            if (currentAttempt == 1)
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnInitialize((request, side, token) =>
+                        RespondInitializeWithRootAsync(side, request.Id, null, 0, token))
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .On("subscribe", (request, side, token) =>
+                        FakeHost.RespondResultAsync(side, request.Id, new SubscribeResult(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            else
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnReconnect((request, side, token) =>
+                    {
+                        if (currentAttempt == 3)
+                        {
+                            secondReconnectParams.TrySetResult(
+                                Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
+                        }
+
+                        // On the first reconnect, A exhausts a 2-action replay
+                        // while B gets an empty replay. The *next* reconnect
+                        // must report A's advanced cursor (11) while B — which
+                        // had no actions — stays at 0.
+                        var channels = new List<ChannelRecovery>
+                        {
+                            new ChannelRecovery(new ChannelReplayRecovery
+                            {
+                                Channel = channelA,
+                                Actions = currentAttempt == 2
+                                    ? new List<ActionEnvelope>
+                                    {
+                                        new()
+                                        {
+                                            Channel = channelA,
+                                            ServerSeq = 10,
+                                            Action = new StateAction(new SessionTitleChangedAction
+                                            {
+                                                Type = ActionType.SessionTitleChanged,
+                                                Title = "a-10",
+                                            }),
+                                        },
+                                        new()
+                                        {
+                                            Channel = channelA,
+                                            ServerSeq = 11,
+                                            Action = new StateAction(new SessionTitleChangedAction
+                                            {
+                                                Type = ActionType.SessionTitleChanged,
+                                                Title = "a-11",
+                                            }),
+                                        },
+                                    }
+                                    : new List<ActionEnvelope>(),
+                            }),
+                            new ChannelRecovery(new ChannelReplayRecovery
+                            {
+                                Channel = channelB,
+                                Actions = new List<ActionEnvelope>(),
+                            }),
+                        };
+                        return FakeHost.RespondResultAsync(
+                            side, request.Id, new ReconnectResult { Channels = channels }, token);
+                    })
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            return Task.FromResult<ITransport>(client);
+        };
+
+        var m = new MultiHostClient();
+        await using var _mh = m;
+        await m.AddHostAsync(new HostConfig
+        {
+            Id = new HostId("h"),
+            TransportFactory = factory,
+            ReconnectPolicy = new ReconnectPolicy
+            {
+                InitialBackoff = TimeSpan.FromMilliseconds(1),
+                MaxBackoff = TimeSpan.FromMilliseconds(1),
+                BackoffMultiplier = 1,
+            },
+        }, cts.Token);
+
+        await m.SubscribeAsync(new HostId("h"), channelA, cts.Token);
+        await m.SubscribeAsync(new HostId("h"), channelB, cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        await WaitUntilAsync(() => m.Host(new HostId("h"))?.ServerSeq == 11, cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        var observed = await secondReconnectParams.Task.WaitAsync(cts.Token);
+
+        Assert.Equal(
+            11,
+            observed.Subscriptions.Single(s => s.Channel == channelA).LastSeenServerSeq);
+        Assert.Equal(
+            0,
+            observed.Subscriptions.Single(s => s.Channel == channelB).LastSeenServerSeq);
+    }
+
+    [Fact]
+    public async Task MultiHost_ChannelSnapshotRecovery_SetsCursorFromFromSeqBaseline()
+    {
+        const string channelA = "ahp-canvas:/a";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var secondReconnectParams = new TaskCompletionSource<ReconnectParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempt = 0;
+
+        HostTransportFactory factory = (id, ct) =>
+        {
+            var (client, server) = MemTransport.CreatePair();
+            var currentAttempt = Interlocked.Increment(ref attempt);
+            if (currentAttempt == 1)
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnInitialize((request, side, token) =>
+                        RespondInitializeWithRootAsync(side, request.Id, null, 0, token))
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .On("subscribe", (request, side, token) =>
+                        FakeHost.RespondResultAsync(side, request.Id, new SubscribeResult(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            else
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnReconnect((request, side, token) =>
+                    {
+                        if (currentAttempt == 3)
+                        {
+                            secondReconnectParams.TrySetResult(
+                                Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
+                        }
+
+                        var channels = new List<ChannelRecovery>
+                        {
+                            new ChannelRecovery(currentAttempt == 2
+                                ? new ChannelSnapshotRecovery
+                                {
+                                    Channel = channelA,
+                                    Snapshot = new Snapshot
+                                    {
+                                        Resource = channelA,
+                                        FromSeq = 50,
+                                        State = new SnapshotState(),
+                                    },
+                                }
+                                : (object)new ChannelReplayRecovery
+                                {
+                                    Channel = channelA,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                        };
+                        return FakeHost.RespondResultAsync(
+                            side, request.Id, new ReconnectResult { Channels = channels }, token);
+                    })
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            return Task.FromResult<ITransport>(client);
+        };
+
+        var m = new MultiHostClient();
+        await using var _mh = m;
+        await m.AddHostAsync(new HostConfig
+        {
+            Id = new HostId("h"),
+            TransportFactory = factory,
+            ReconnectPolicy = new ReconnectPolicy
+            {
+                InitialBackoff = TimeSpan.FromMilliseconds(1),
+                MaxBackoff = TimeSpan.FromMilliseconds(1),
+                BackoffMultiplier = 1,
+            },
+        }, cts.Token);
+
+        await m.SubscribeAsync(new HostId("h"), channelA, cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        await WaitUntilAsync(
+            () => m.Host(new HostId("h"))?.State.Kind == HostStateKind.Connected,
+            cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        var observed = await secondReconnectParams.Task.WaitAsync(cts.Token);
+
+        Assert.Equal(
+            50,
+            observed.Subscriptions.Single(s => s.Channel == channelA).LastSeenServerSeq);
+    }
+
+    [Fact]
+    public async Task MultiHost_ChannelMissingRecovery_DropsFromSubscriptionsAndIsNotReRequested()
+    {
+        const string channelA = "ahp-canvas:/a";
+        const string channelGone = "ahp-canvas:/gone";
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var secondReconnectParams = new TaskCompletionSource<ReconnectParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempt = 0;
+
+        HostTransportFactory factory = (id, ct) =>
+        {
+            var (client, server) = MemTransport.CreatePair();
+            var currentAttempt = Interlocked.Increment(ref attempt);
+            if (currentAttempt == 1)
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnInitialize((request, side, token) =>
+                        RespondInitializeWithRootAsync(side, request.Id, null, 0, token))
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .On("subscribe", (request, side, token) =>
+                        FakeHost.RespondResultAsync(side, request.Id, new SubscribeResult(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            else
+            {
+                _ = Task.Run(() => FakeHost.New()
+                    .OnReconnect((request, side, token) =>
+                    {
+                        if (currentAttempt == 3)
+                        {
+                            secondReconnectParams.TrySetResult(
+                                Ser.Deserialize<ReconnectParams>(request.Params!.Value.GetRawText()));
+                        }
+
+                        var channels = currentAttempt == 2
+                            ? new List<ChannelRecovery>
+                            {
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = channelA,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                                new ChannelRecovery(new ChannelMissingRecovery { Channel = channelGone }),
+                            }
+                            : new List<ChannelRecovery>
+                            {
+                                new ChannelRecovery(new ChannelReplayRecovery
+                                {
+                                    Channel = channelA,
+                                    Actions = new List<ActionEnvelope>(),
+                                }),
+                            };
+                        return FakeHost.RespondResultAsync(
+                            side, request.Id, new ReconnectResult { Channels = channels }, token);
+                    })
+                    .OnListSessions((request, side, token) =>
+                        RespondListSessionsAsync(side, request.Id, Array.Empty<SessionSummary>(), token))
+                    .RunAsync(server, cts.Token));
+            }
+            return Task.FromResult<ITransport>(client);
+        };
+
+        var m = new MultiHostClient();
+        await using var _mh = m;
+        await m.AddHostAsync(new HostConfig
+        {
+            Id = new HostId("h"),
+            TransportFactory = factory,
+            ReconnectPolicy = new ReconnectPolicy
+            {
+                InitialBackoff = TimeSpan.FromMilliseconds(1),
+                MaxBackoff = TimeSpan.FromMilliseconds(1),
+                BackoffMultiplier = 1,
+            },
+        }, cts.Token);
+
+        await m.SubscribeAsync(new HostId("h"), channelA, cts.Token);
+        await m.SubscribeAsync(new HostId("h"), channelGone, cts.Token);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        await WaitUntilAsync(
+            () => !(m.Host(new HostId("h"))?.Subscriptions.Contains(channelGone) ?? true),
+            cts.Token);
+        Assert.Contains(channelA, m.Host(new HostId("h"))!.Subscriptions);
+
+        await m.ReconnectAsync(new HostId("h"), cts.Token);
+        var observed = await secondReconnectParams.Task.WaitAsync(cts.Token);
+
+        Assert.DoesNotContain(channelGone, observed.Subscriptions.Select(s => s.Channel));
     }
 }

@@ -15,12 +15,16 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-// Discriminant for reconnect result types.
-type ReconnectResultType string
+// Discriminant for per-channel reconnect recovery outcomes.
+type ChannelRecoveryKind string
 
 const (
-	ReconnectResultTypeReplay   ReconnectResultType = "replay"
-	ReconnectResultTypeSnapshot ReconnectResultType = "snapshot"
+	// The server replayed the channel's missed actions.
+	ChannelRecoveryKindReplay ChannelRecoveryKind = "replay"
+	// The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead.
+	ChannelRecoveryKindSnapshot ChannelRecoveryKind = "snapshot"
+	// The channel can no longer be resumed (e.g. disposed, or no longer permitted).
+	ChannelRecoveryKindMissing ChannelRecoveryKind = "missing"
 )
 
 // How a new chat uses its source chat and turn.
@@ -299,8 +303,10 @@ type Implementation struct {
 	Title *string `json:"title,omitempty"`
 }
 
-// Re-establishes a dropped connection. The server replays missed actions or
-// provides fresh snapshots.
+// Re-establishes a dropped connection. The server recovers each subscribed
+// channel independently — some channels may replay, others may receive a
+// fresh snapshot, and others may be reported missing, all in the same
+// response (see {@link ChannelRecovery}).
 type ReconnectParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -309,29 +315,79 @@ type ReconnectParams struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Client identifier from the original connection
 	ClientId string `json:"clientId"`
-	// Last `serverSeq` the client received
-	LastSeenServerSeq int64 `json:"lastSeenServerSeq"`
-	// URIs the client was subscribed to
-	Subscriptions []URI `json:"subscriptions"`
+	// Per-channel replay checkpoints for every channel the client is still subscribed to.
+	Subscriptions []ChannelReplayCursor `json:"subscriptions"`
 }
 
-// Reconnect result when the server can replay from the requested sequence.
+// A single subscribed channel's replay checkpoint, carried in
+// `ReconnectParams.subscriptions`.
 //
-// The server MUST include all replayed data in the response.
-type ReconnectReplayResult struct {
-	// Missed action envelopes since `lastSeenServerSeq`
-	Actions []ActionEnvelope `json:"actions"`
-	// URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-	// This includes resources that no longer exist (e.g. disposed sessions or
-	// terminals) as well as resources the client is no longer permitted to
-	// observe. Clients SHOULD drop these from their local subscription set.
-	Missing []URI `json:"missing"`
+// Each subscription recovers independently from its own `lastSeenServerSeq`
+// instead of one connection-wide watermark. A single shared watermark lets a
+// fast-moving channel's `serverSeq` silently race ahead of a slower
+// channel's — if channel A has an undelivered action at `serverSeq=100` and
+// channel B goes on to deliver `serverSeq=101`, a connection-wide
+// `lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking
+// one checkpoint per channel prevents that cross-channel skip without
+// claiming any ordering *between* channels.
+type ChannelReplayCursor struct {
+	// The subscribed channel URI.
+	Channel URI `json:"channel"`
+	// `serverSeq` of the last action the client fully applied or safely
+	// retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+	// last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+	//
+	// `0` means the client has no baseline for `channel` yet — e.g. it
+	// subscribed but the `subscribe`/`initialize` response snapshot (if any)
+	// never arrived before the connection dropped. The server MUST NOT use
+	// another channel's progress to advance this checkpoint, and MUST NOT
+	// use it to seed the connection's global `serverSeq` identity (see
+	// {@link InitializeResult.serverSeq}).
+	LastSeenServerSeq int64 `json:"lastSeenServerSeq"`
 }
 
-// Reconnect result when the gap exceeds the replay buffer.
-type ReconnectSnapshotResult struct {
-	// Fresh snapshots for each subscription
-	Snapshots []Snapshot `json:"snapshots"`
+// Result of the `reconnect` command.
+//
+// The server MUST include all replayed and snapshotted data in the response
+// before returning, and MUST include exactly one {@link ChannelRecovery} per
+// channel named in `ReconnectParams.subscriptions`.
+type ReconnectResult struct {
+	// One recovery outcome per requested subscription, in any order.
+	Channels []ChannelRecovery `json:"channels"`
+}
+
+// Recovery outcome for a channel that replayed cleanly.
+//
+// The server MUST include every action the channel missed since the
+// matching `ChannelReplayCursor.lastSeenServerSeq`, in ascending `serverSeq`
+// order, and MUST only include actions whose `ActionEnvelope.channel`
+// equals `channel`.
+type ChannelReplayRecovery struct {
+	// The channel this recovery applies to.
+	Channel URI `json:"channel"`
+	// Missed action envelopes since the requested `lastSeenServerSeq`.
+	Actions []ActionEnvelope `json:"actions"`
+}
+
+// Recovery outcome for a channel whose gap exceeded its replay buffer.
+//
+// Absent for stateless channels that have no state to snapshot; the server
+// MUST instead use {@link ChannelReplayRecovery} with an empty `actions`
+// list (or {@link ChannelMissingRecovery}, if the channel itself no longer
+// exists) for those.
+type ChannelSnapshotRecovery struct {
+	// The channel this recovery applies to.
+	Channel URI `json:"channel"`
+	// Fresh snapshot the client MUST use as its new baseline for this channel.
+	Snapshot Snapshot `json:"snapshot"`
+}
+
+// Recovery outcome for a channel the server cannot resume — e.g. a disposed
+// session or terminal, or a resource the client is no longer permitted to
+// observe. Clients SHOULD drop `channel` from their local subscription set.
+type ChannelMissingRecovery struct {
+	// The channel this recovery applies to.
+	Channel URI `json:"channel"`
 }
 
 // Subscribe to a URI-identified channel.
@@ -1638,54 +1694,77 @@ func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
-// ─── ReconnectResult Union ────────────────────────────────────────────
+// ─── ChannelRecovery Union ────────────────────────────────────────────
 
-// ReconnectResult is the result of the `reconnect` command.
-type ReconnectResult struct {
-	Value isReconnectResult
+// ChannelRecovery is the per-channel reconnect recovery outcome.
+type ChannelRecovery struct {
+	Value isChannelRecovery
 }
 
-// isReconnectResult is the marker interface implemented by every
-// concrete variant of ReconnectResult.
-type isReconnectResult interface{ isReconnectResult() }
+// isChannelRecovery is the marker interface implemented by every
+// concrete variant of ChannelRecovery.
+type isChannelRecovery interface{ isChannelRecovery() }
 
-func (*ReconnectReplayResult) isReconnectResult()   {}
-func (*ReconnectSnapshotResult) isReconnectResult() {}
+func (*ChannelReplayRecovery) isChannelRecovery()   {}
+func (*ChannelSnapshotRecovery) isChannelRecovery() {}
+func (*ChannelMissingRecovery) isChannelRecovery()  {}
 
-// UnmarshalJSON decodes the variant indicated by the "type" discriminator.
-func (u *ReconnectResult) UnmarshalJSON(data []byte) error {
-	disc, ok, err := readDiscriminator(data, "type")
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *ChannelRecovery) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return missingDiscriminatorError("ReconnectResult", "type")
+		return missingDiscriminatorError("ChannelRecovery", "kind")
 	}
 	switch disc {
 	case "replay":
-		var value ReconnectReplayResult
+		var value ChannelReplayRecovery
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "snapshot":
-		var value ReconnectSnapshotResult
+		var value ChannelSnapshotRecovery
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "missing":
+		var value ChannelMissingRecovery
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	default:
-		return unknownDiscriminatorError("ReconnectResult", "type", disc)
+		return unknownDiscriminatorError("ChannelRecovery", "kind", disc)
 	}
 	return nil
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u ReconnectResult) MarshalJSON() ([]byte, error) {
+func (u ChannelRecovery) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(u.Value)
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *ChannelReplayRecovery:
+		object["kind"] = json.RawMessage("\"replay\"")
+	case *ChannelSnapshotRecovery:
+		object["kind"] = json.RawMessage("\"snapshot\"")
+	case *ChannelMissingRecovery:
+		object["kind"] = json.RawMessage("\"missing\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────

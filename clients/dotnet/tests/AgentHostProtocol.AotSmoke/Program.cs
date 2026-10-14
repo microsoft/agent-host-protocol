@@ -113,22 +113,31 @@ internal static class Program
             serverSide,
             serializer,
             "reconnect",
-            new ReconnectResult(new ReconnectReplayResult
+            new ReconnectResult
             {
-                Type = ReconnectResultType.Replay,
-                Actions = new List<ActionEnvelope>(),
-                Missing = new List<string>(),
-            }),
+                Channels = new List<ChannelRecovery>
+                {
+                    new ChannelRecovery(new ChannelReplayRecovery
+                    {
+                        Channel = envelopeChannel,
+                        Actions = new List<ActionEnvelope>(),
+                    }),
+                },
+            },
             cancellationToken);
         ReconnectResult reconnectResult = await client.ReconnectAsync(
             "native-aot-client",
-            lastSeenServerSeq: 4,
-            subscriptions: new[] { envelopeChannel },
+            subscriptions: new[]
+            {
+                new ChannelReplayCursor { Channel = envelopeChannel, LastSeenServerSeq = 4 },
+            },
             cancellationToken);
         JsonRpcRequest reconnectRequest = await reconnectResponse;
-        Ensure(reconnectResult.Value is ReconnectReplayResult, "Reconnect replay result failed.");
         Ensure(
-            reconnectRequest.Params?.GetProperty("lastSeenServerSeq").GetInt64() == 4,
+            reconnectResult.Channels is [{ Value: ChannelReplayRecovery }],
+            "Reconnect replay result failed.");
+        Ensure(
+            reconnectRequest.Params?.GetProperty("subscriptions")[0].GetProperty("lastSeenServerSeq").GetInt64() == 4,
             "Reconnect params failed.");
 
         Task<JsonRpcRequest> pingResponse = RespondToRequestAsync<object?>(

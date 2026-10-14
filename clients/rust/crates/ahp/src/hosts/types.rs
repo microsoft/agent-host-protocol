@@ -233,7 +233,10 @@ pub struct HostHandle {
     /// Protocol version negotiated with the host on the most recent
     /// successful `initialize`.
     pub protocol_version: Option<String>,
-    /// Highest `serverSeq` observed on this host.
+    /// Highest `serverSeq` ever observed across any channel. Informational
+    /// only — reconnect recovery for each subscribed channel is driven by
+    /// its own independent replay cursor, so this value is never used to
+    /// decide what gets replayed.
     pub server_seq: i64,
     /// Optional `defaultDirectory` from the host's `InitializeResult`.
     pub default_directory: Option<String>,
@@ -545,7 +548,19 @@ pub(super) struct HostInternal {
     pub(super) last_error: Option<Arc<ClientError>>,
     pub(super) last_connected_at: Option<SystemTime>,
     pub(super) protocol_version: Option<String>,
+    /// Highest `serverSeq` ever observed across any channel. Informational
+    /// only (surfaced on [`HostHandle`] for diagnostics) — it is never used
+    /// to decide what to replay on reconnect. Per-channel recovery uses
+    /// [`channel_cursors`](Self::channel_cursors) instead, so a fast
+    /// channel's `serverSeq` can never cause a slower channel's undelivered
+    /// actions to be skipped.
     pub(super) server_seq: i64,
+    /// Per-channel replay cursors: the highest `serverSeq` fully applied
+    /// (or snapshot baseline established) for each currently-subscribed
+    /// channel. Keyed by channel URI. Drives the `subscriptions` sent on
+    /// [`Client::reconnect`] and is only ever advanced by envelopes or
+    /// snapshots for the matching channel — never cross-channel.
+    pub(super) channel_cursors: std::collections::HashMap<String, i64>,
     pub(super) default_directory: Option<String>,
     pub(super) automations: Option<AutomationCapabilities>,
     pub(super) root_state: RootState,
@@ -584,7 +599,7 @@ impl HostInternal {
 /// [`ActionEnvelope`] in one place. The protocol exposes `serverSeq`
 /// as a non-negative wire counter; the SDK holds it as `i64` to match
 /// the rest of the surface (`InitializeResult::server_seq`,
-/// `ReconnectParams::last_seen_server_seq`).
+/// `ChannelReplayCursor::last_seen_server_seq`).
 pub(super) fn server_seq_from_envelope(env: &ActionEnvelope) -> i64 {
     env.server_seq as i64
 }

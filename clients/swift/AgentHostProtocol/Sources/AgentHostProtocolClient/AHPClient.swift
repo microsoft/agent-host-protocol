@@ -277,29 +277,37 @@ public actor AHPClient {
     ///
     /// This is *only* the typed handshake on the current connection — opening a
     /// new transport, backoff, and generation tracking belong to a higher
-    /// layer.
+    /// layer. `subscriptions` carries one independent replay cursor per
+    /// channel the caller is still subscribed to — recovery for each channel
+    /// is driven solely by that channel's own cursor, never by another
+    /// channel's progress.
     @discardableResult
     public func reconnect(
         clientId: String,
-        lastSeenServerSeq: Int,
-        subscriptions: [String]
+        subscriptions: [ChannelReplayCursor]
     ) async throws -> ReconnectResult {
         let params = ReconnectParams(
             channel: RootResourceURI,
             clientId: clientId,
-            lastSeenServerSeq: lastSeenServerSeq,
             subscriptions: subscriptions
         )
         let result: ReconnectResult = try await request(method: "reconnect", params: params)
-        switch result {
-        case .replay(let r):
-            if let last = r.actions.last, last.serverSeq > self.lastSeenServerSeq {
-                self.lastSeenServerSeq = last.serverSeq
-            }
-        case .snapshot(let r):
-            let maxSeq = r.snapshots.map(\.fromSeq).max() ?? self.lastSeenServerSeq
-            if maxSeq > self.lastSeenServerSeq {
-                self.lastSeenServerSeq = maxSeq
+        // `lastSeenServerSeq` here is purely an informational high-water mark
+        // across all channels — it MUST NOT be used to decide reconnect
+        // eligibility or what to replay (that's exactly the per-channel
+        // cursor's job).
+        for recovery in result.channels {
+            switch recovery {
+            case .replay(let r):
+                if let last = r.actions.last, last.serverSeq > self.lastSeenServerSeq {
+                    self.lastSeenServerSeq = last.serverSeq
+                }
+            case .snapshot(let r):
+                if r.snapshot.fromSeq > self.lastSeenServerSeq {
+                    self.lastSeenServerSeq = r.snapshot.fromSeq
+                }
+            case .missing:
+                break
             }
         }
         return result

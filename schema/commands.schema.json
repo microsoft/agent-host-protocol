@@ -260,9 +260,94 @@
         "channel"
       ]
     },
+    "ChannelReplayCursor": {
+      "type": "object",
+      "description": "A single subscribed channel's replay checkpoint, carried in\n`ReconnectParams.subscriptions`.\n\nEach subscription recovers independently from its own `lastSeenServerSeq`\ninstead of one connection-wide watermark. A single shared watermark lets a\nfast-moving channel's `serverSeq` silently race ahead of a slower\nchannel's — if channel A has an undelivered action at `serverSeq=100` and\nchannel B goes on to deliver `serverSeq=101`, a connection-wide\n`lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking\none checkpoint per channel prevents that cross-channel skip without\nclaiming any ordering *between* channels.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The subscribed channel URI."
+        },
+        "lastSeenServerSeq": {
+          "type": "number",
+          "description": "`serverSeq` of the last action the client fully applied or safely\nretained for `channel`, or the `fromSeq` of the `Snapshot` the client\nlast used to initialize `channel` (see {@link Snapshot.fromSeq}).\n\n`0` means the client has no baseline for `channel` yet — e.g. it\nsubscribed but the `subscribe`/`initialize` response snapshot (if any)\nnever arrived before the connection dropped. The server MUST NOT use\nanother channel's progress to advance this checkpoint, and MUST NOT\nuse it to seed the connection's global `serverSeq` identity (see\n{@link InitializeResult.serverSeq})."
+        }
+      },
+      "required": [
+        "channel",
+        "lastSeenServerSeq"
+      ]
+    },
+    "ChannelReplayRecovery": {
+      "type": "object",
+      "description": "Recovery outcome for a channel that replayed cleanly.\n\nThe server MUST include every action the channel missed since the\nmatching `ChannelReplayCursor.lastSeenServerSeq`, in ascending `serverSeq`\norder, and MUST only include actions whose `ActionEnvelope.channel`\nequals `channel`.",
+      "properties": {
+        "kind": {
+          "const": "replay",
+          "description": "Discriminant"
+        },
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The channel this recovery applies to."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ActionEnvelope"
+          },
+          "description": "Missed action envelopes since the requested `lastSeenServerSeq`."
+        }
+      },
+      "required": [
+        "kind",
+        "channel",
+        "actions"
+      ]
+    },
+    "ChannelSnapshotRecovery": {
+      "type": "object",
+      "description": "Recovery outcome for a channel whose gap exceeded its replay buffer.\n\nAbsent for stateless channels that have no state to snapshot; the server\nMUST instead use {@link ChannelReplayRecovery} with an empty `actions`\nlist (or {@link ChannelMissingRecovery}, if the channel itself no longer\nexists) for those.",
+      "properties": {
+        "kind": {
+          "const": "snapshot",
+          "description": "Discriminant"
+        },
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The channel this recovery applies to."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/Snapshot",
+          "description": "Fresh snapshot the client MUST use as its new baseline for this channel."
+        }
+      },
+      "required": [
+        "kind",
+        "channel",
+        "snapshot"
+      ]
+    },
+    "ChannelMissingRecovery": {
+      "type": "object",
+      "description": "Recovery outcome for a channel the server cannot resume — e.g. a disposed\nsession or terminal, or a resource the client is no longer permitted to\nobserve. Clients SHOULD drop `channel` from their local subscription set.",
+      "properties": {
+        "kind": {
+          "const": "missing",
+          "description": "Discriminant"
+        },
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The channel this recovery applies to."
+        }
+      },
+      "required": [
+        "kind",
+        "channel"
+      ]
+    },
     "ReconnectParams": {
       "type": "object",
-      "description": "Re-establishes a dropped connection. The server replays missed actions or\nprovides fresh snapshots.",
+      "description": "Re-establishes a dropped connection. The server recovers each subscribed\nchannel independently — some channels may replay, others may receive a\nfresh snapshot, and others may be reported missing, all in the same\nresponse (see {@link ChannelRecovery}).",
       "properties": {
         "channel": {
           "type": "string",
@@ -279,73 +364,34 @@
           "type": "string",
           "description": "Client identifier from the original connection"
         },
-        "lastSeenServerSeq": {
-          "type": "number",
-          "description": "Last `serverSeq` the client received"
-        },
         "subscriptions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "$ref": "#/$defs/ChannelReplayCursor"
           },
-          "description": "URIs the client was subscribed to"
+          "description": "Per-channel replay checkpoints for every channel the client is still subscribed to."
         }
       },
       "required": [
         "channel",
         "clientId",
-        "lastSeenServerSeq",
         "subscriptions"
       ]
     },
-    "ReconnectReplayResult": {
+    "ReconnectResult": {
       "type": "object",
-      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all replayed data in the response.",
+      "description": "Result of the `reconnect` command.\n\nThe server MUST include all replayed and snapshotted data in the response\nbefore returning, and MUST include exactly one {@link ChannelRecovery} per\nchannel named in `ReconnectParams.subscriptions`.",
       "properties": {
-        "type": {
-          "const": "replay",
-          "description": "Discriminant"
-        },
-        "actions": {
+        "channels": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ActionEnvelope"
+            "$ref": "#/$defs/ChannelRecovery"
           },
-          "description": "Missed action envelopes since `lastSeenServerSeq`"
-        },
-        "missing": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/URI"
-          },
-          "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
+          "description": "One recovery outcome per requested subscription, in any order."
         }
       },
       "required": [
-        "type",
-        "actions",
-        "missing"
-      ]
-    },
-    "ReconnectSnapshotResult": {
-      "type": "object",
-      "description": "Reconnect result when the gap exceeds the replay buffer.",
-      "properties": {
-        "type": {
-          "const": "snapshot",
-          "description": "Discriminant"
-        },
-        "snapshots": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Snapshot"
-          },
-          "description": "Fresh snapshots for each subscription"
-        }
-      },
-      "required": [
-        "type",
-        "snapshots"
+        "channels"
       ]
     },
     "SubscribeParams": {
@@ -1745,16 +1791,19 @@
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
     },
-    "ReconnectResult": {
+    "ChannelRecovery": {
       "oneOf": [
         {
-          "$ref": "#/$defs/ReconnectReplayResult"
+          "$ref": "#/$defs/ChannelReplayRecovery"
         },
         {
-          "$ref": "#/$defs/ReconnectSnapshotResult"
+          "$ref": "#/$defs/ChannelSnapshotRecovery"
+        },
+        {
+          "$ref": "#/$defs/ChannelMissingRecovery"
         }
       ],
-      "description": "Result of the `reconnect` command."
+      "description": "Per-channel reconnect recovery outcome."
     },
     "ChatSource": {
       "oneOf": [

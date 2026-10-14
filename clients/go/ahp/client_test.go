@@ -763,3 +763,189 @@ func TestShutdownIsIdempotent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestReconnectSendsIndependentPerChannelCursors drives a fake server
+// that asserts the `reconnect` request carries one independent
+// ChannelReplayCursor per subscribed channel rather than a single
+// connection-wide watermark. Channel A sits at serverSeq=100 while
+// channel B has raced ahead to serverSeq=101; a collapsed watermark
+// would report both at 101 (or some other merged value) and could
+// cause the server to skip A's still-undelivered actions on replay.
+func TestReconnectSendsIndependentPerChannelCursors(t *testing.T) {
+	const chanA = "ahp-session:/a"
+	const chanB = "ahp-session:/b"
+
+	clientSide, serverSide := newMemTransportPair()
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		msg, err := serverSide.Recv(ctx)
+		if err != nil {
+			t.Errorf("server recv: %v", err)
+			return
+		}
+		parsed, err := msg.IntoParsed()
+		if err != nil || parsed.Request == nil {
+			t.Errorf("expected request, got %+v (err=%v)", parsed, err)
+			return
+		}
+		if parsed.Request.Method != "reconnect" {
+			t.Errorf("method = %q, want %q", parsed.Request.Method, "reconnect")
+		}
+		var params ahptypes.ReconnectParams
+		if err := json.Unmarshal(parsed.Request.Params, &params); err != nil {
+			t.Errorf("server decode params: %v", err)
+			return
+		}
+		cursors := map[ahptypes.URI]int64{}
+		for _, c := range params.Subscriptions {
+			cursors[c.Channel] = c.LastSeenServerSeq
+		}
+		if got, want := cursors[chanA], int64(100); got != want {
+			t.Errorf("channel A cursor = %d, want %d (must stay at its own baseline)", got, want)
+		}
+		if got, want := cursors[chanB], int64(101); got != want {
+			t.Errorf("channel B cursor = %d, want %d", got, want)
+		}
+
+		resultJSON := fmt.Sprintf(`{"channels": [
+			{"kind": "replay", "channel": %q, "actions": []},
+			{"kind": "replay", "channel": %q, "actions": []}
+		]}`, chanA, chanB)
+		resp := ahptypes.JsonRpcMessage{SuccessResponse: &ahptypes.JsonRpcSuccessResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      parsed.Request.ID,
+			Result:  json.RawMessage(resultJSON),
+		}}
+		out, err := EncodeMessage(resp)
+		if err != nil {
+			t.Errorf("server encode: %v", err)
+			return
+		}
+		if err := serverSide.Send(ctx, out); err != nil {
+			t.Errorf("server send: %v", err)
+			return
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	_, err = client.Reconnect(ctx, "test-client", []ahptypes.ChannelReplayCursor{
+		{Channel: chanA, LastSeenServerSeq: 100},
+		{Channel: chanB, LastSeenServerSeq: 101},
+	})
+	if err != nil {
+		t.Fatalf("Reconnect: %v", err)
+	}
+}
+
+// TestReconnectResultDecodesChannelRecoveryIndependently verifies that
+// a `reconnect` response carrying three different recovery kinds for
+// three different channels (replay / snapshot / missing, in the same
+// response) decodes each independently — one channel's recovery data
+// must never bleed into another's.
+func TestReconnectResultDecodesChannelRecoveryIndependently(t *testing.T) {
+	const chanA = "ahp-session:/a"
+	const chanB = "ahp-canvas:/b"
+	const chanC = "ahp-terminal:/c"
+
+	clientSide, serverSide := newMemTransportPair()
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		msg, err := serverSide.Recv(ctx)
+		if err != nil {
+			t.Errorf("server recv: %v", err)
+			return
+		}
+		parsed, err := msg.IntoParsed()
+		if err != nil || parsed.Request == nil {
+			t.Errorf("expected request, got %+v (err=%v)", parsed, err)
+			return
+		}
+
+		resultJSON := `{
+			"channels": [
+				{"kind": "replay", "channel": "ahp-session:/a", "actions": [
+					{"channel": "ahp-session:/a", "action": {"type": "session/titleChanged", "title": "Hello"}, "serverSeq": 11}
+				]},
+				{"kind": "snapshot", "channel": "ahp-canvas:/b", "snapshot": {"resource": "ahp-canvas:/b", "state": {}, "fromSeq": 50}},
+				{"kind": "missing", "channel": "ahp-terminal:/c"}
+			]
+		}`
+		resp := ahptypes.JsonRpcMessage{SuccessResponse: &ahptypes.JsonRpcSuccessResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      parsed.Request.ID,
+			Result:  json.RawMessage(resultJSON),
+		}}
+		out, err := EncodeMessage(resp)
+		if err != nil {
+			t.Errorf("server encode: %v", err)
+			return
+		}
+		if err := serverSide.Send(ctx, out); err != nil {
+			t.Errorf("server send: %v", err)
+			return
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	result, err := client.Reconnect(ctx, "test-client", []ahptypes.ChannelReplayCursor{
+		{Channel: chanA, LastSeenServerSeq: 10},
+		{Channel: chanB, LastSeenServerSeq: 0},
+		{Channel: chanC, LastSeenServerSeq: 0},
+	})
+	if err != nil {
+		t.Fatalf("Reconnect: %v", err)
+	}
+	if len(result.Channels) != 3 {
+		t.Fatalf("len(Channels) = %d, want 3", len(result.Channels))
+	}
+
+	var sawReplayA, sawSnapshotB, sawMissingC bool
+	for _, recovery := range result.Channels {
+		switch v := recovery.Value.(type) {
+		case *ahptypes.ChannelReplayRecovery:
+			if v.Channel != chanA {
+				t.Errorf("replay recovery channel = %q, want %q", v.Channel, chanA)
+			}
+			if len(v.Actions) != 1 || v.Actions[0].ServerSeq != 11 {
+				t.Errorf("replay actions = %+v, want one action at serverSeq=11", v.Actions)
+			}
+			sawReplayA = true
+		case *ahptypes.ChannelSnapshotRecovery:
+			if v.Channel != chanB {
+				t.Errorf("snapshot recovery channel = %q, want %q", v.Channel, chanB)
+			}
+			if v.Snapshot.FromSeq != 50 {
+				t.Errorf("snapshot fromSeq = %d, want 50", v.Snapshot.FromSeq)
+			}
+			sawSnapshotB = true
+		case *ahptypes.ChannelMissingRecovery:
+			if v.Channel != chanC {
+				t.Errorf("missing recovery channel = %q, want %q", v.Channel, chanC)
+			}
+			sawMissingC = true
+		default:
+			t.Errorf("unexpected recovery variant: %T", v)
+		}
+	}
+	if !sawReplayA || !sawSnapshotB || !sawMissingC {
+		t.Errorf("missing expected recovery kinds: replayA=%v snapshotB=%v missingC=%v", sawReplayA, sawSnapshotB, sawMissingC)
+	}
+}

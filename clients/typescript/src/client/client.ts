@@ -13,6 +13,7 @@
 
 import type { StateAction } from '../types/actions.js';
 import type {
+  ChannelReplayCursor,
   DispatchActionParams,
   InitializeParams,
   InitializeResult,
@@ -367,13 +368,11 @@ export class AhpClient {
   /** Re-establish a dropped connection. */
   async reconnect(args: {
     clientId: string;
-    lastSeenServerSeq: number;
-    subscriptions: readonly URI[];
+    subscriptions: readonly ChannelReplayCursor[];
   }): Promise<ReconnectResult> {
     const params: ReconnectParams = {
       channel: 'ahp-root://',
       clientId: args.clientId,
-      lastSeenServerSeq: args.lastSeenServerSeq,
       subscriptions: [...args.subscriptions],
     };
     return this.request('reconnect', params);

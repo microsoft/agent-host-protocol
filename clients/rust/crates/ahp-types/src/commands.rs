@@ -23,13 +23,18 @@ use crate::state::{
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-/// Discriminant for reconnect result types.
+/// Discriminant for per-channel reconnect recovery outcomes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ReconnectResultType {
+pub enum ChannelRecoveryKind {
+    /// The server replayed the channel's missed actions.
     #[serde(rename = "replay")]
     Replay,
+    /// The gap for this channel exceeded its replay buffer; a fresh snapshot is provided instead.
     #[serde(rename = "snapshot")]
     Snapshot,
+    /// The channel can no longer be resumed (e.g. disposed, or no longer permitted).
+    #[serde(rename = "missing")]
+    Missing,
 }
 
 /// How a new chat uses its source chat and turn.
@@ -459,8 +464,10 @@ pub struct Implementation {
     pub title: Option<String>,
 }
 
-/// Re-establishes a dropped connection. The server replays missed actions or
-/// provides fresh snapshots.
+/// Re-establishes a dropped connection. The server recovers each subscribed
+/// channel independently — some channels may replay, others may receive a
+/// fresh snapshot, and others may be reported missing, all in the same
+/// response (see {@link ChannelRecovery}).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectParams {
@@ -472,33 +479,89 @@ pub struct ReconnectParams {
     pub meta: Option<JsonObject>,
     /// Client identifier from the original connection
     pub client_id: String,
-    /// Last `serverSeq` the client received
-    pub last_seen_server_seq: i64,
-    /// URIs the client was subscribed to
-    pub subscriptions: Vec<Uri>,
+    /// Per-channel replay checkpoints for every channel the client is still subscribed to.
+    pub subscriptions: Vec<ChannelReplayCursor>,
 }
 
-/// Reconnect result when the server can replay from the requested sequence.
+/// A single subscribed channel's replay checkpoint, carried in
+/// `ReconnectParams.subscriptions`.
 ///
-/// The server MUST include all replayed data in the response.
+/// Each subscription recovers independently from its own `lastSeenServerSeq`
+/// instead of one connection-wide watermark. A single shared watermark lets a
+/// fast-moving channel's `serverSeq` silently race ahead of a slower
+/// channel's — if channel A has an undelivered action at `serverSeq=100` and
+/// channel B goes on to deliver `serverSeq=101`, a connection-wide
+/// `lastSeenServerSeq=101` would skip A's action entirely on replay. Tracking
+/// one checkpoint per channel prevents that cross-channel skip without
+/// claiming any ordering *between* channels.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ReconnectReplayResult {
-    /// Missed action envelopes since `lastSeenServerSeq`
-    pub actions: Vec<ActionEnvelope>,
-    /// URIs from `ReconnectParams.subscriptions` that the server cannot resume.
-    /// This includes resources that no longer exist (e.g. disposed sessions or
-    /// terminals) as well as resources the client is no longer permitted to
-    /// observe. Clients SHOULD drop these from their local subscription set.
-    pub missing: Vec<Uri>,
+pub struct ChannelReplayCursor {
+    /// The subscribed channel URI.
+    pub channel: Uri,
+    /// `serverSeq` of the last action the client fully applied or safely
+    /// retained for `channel`, or the `fromSeq` of the `Snapshot` the client
+    /// last used to initialize `channel` (see {@link Snapshot.fromSeq}).
+    ///
+    /// `0` means the client has no baseline for `channel` yet — e.g. it
+    /// subscribed but the `subscribe`/`initialize` response snapshot (if any)
+    /// never arrived before the connection dropped. The server MUST NOT use
+    /// another channel's progress to advance this checkpoint, and MUST NOT
+    /// use it to seed the connection's global `serverSeq` identity (see
+    /// {@link InitializeResult.serverSeq}).
+    pub last_seen_server_seq: i64,
 }
 
-/// Reconnect result when the gap exceeds the replay buffer.
+/// Result of the `reconnect` command.
+///
+/// The server MUST include all replayed and snapshotted data in the response
+/// before returning, and MUST include exactly one {@link ChannelRecovery} per
+/// channel named in `ReconnectParams.subscriptions`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ReconnectSnapshotResult {
-    /// Fresh snapshots for each subscription
-    pub snapshots: Vec<Snapshot>,
+pub struct ReconnectResult {
+    /// One recovery outcome per requested subscription, in any order.
+    pub channels: Vec<ChannelRecovery>,
+}
+
+/// Recovery outcome for a channel that replayed cleanly.
+///
+/// The server MUST include every action the channel missed since the
+/// matching `ChannelReplayCursor.lastSeenServerSeq`, in ascending `serverSeq`
+/// order, and MUST only include actions whose `ActionEnvelope.channel`
+/// equals `channel`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReplayRecovery {
+    /// The channel this recovery applies to.
+    pub channel: Uri,
+    /// Missed action envelopes since the requested `lastSeenServerSeq`.
+    pub actions: Vec<ActionEnvelope>,
+}
+
+/// Recovery outcome for a channel whose gap exceeded its replay buffer.
+///
+/// Absent for stateless channels that have no state to snapshot; the server
+/// MUST instead use {@link ChannelReplayRecovery} with an empty `actions`
+/// list (or {@link ChannelMissingRecovery}, if the channel itself no longer
+/// exists) for those.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelSnapshotRecovery {
+    /// The channel this recovery applies to.
+    pub channel: Uri,
+    /// Fresh snapshot the client MUST use as its new baseline for this channel.
+    pub snapshot: Snapshot,
+}
+
+/// Recovery outcome for a channel the server cannot resume — e.g. a disposed
+/// session or terminal, or a resource the client is no longer permitted to
+/// observe. Clients SHOULD drop `channel` from their local subscription set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelMissingRecovery {
+    /// The channel this recovery applies to.
+    pub channel: Uri,
 }
 
 /// Subscribe to a URI-identified channel.
@@ -1831,16 +1894,18 @@ pub enum ChatMoveDestination {
     Unknown(serde_json::Value),
 }
 
-// ─── ReconnectResult Union ────────────────────────────────────────────
+// ─── ChannelRecovery Union ────────────────────────────────────────────
 
-/// Result of the `reconnect` command.
+/// Per-channel reconnect recovery outcome.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum ReconnectResult {
+#[serde(tag = "kind")]
+pub enum ChannelRecovery {
     #[serde(rename = "replay")]
-    Replay(ReconnectReplayResult),
+    Replay(ChannelReplayRecovery),
     #[serde(rename = "snapshot")]
-    Snapshot(ReconnectSnapshotResult),
+    Snapshot(ChannelSnapshotRecovery),
+    #[serde(rename = "missing")]
+    Missing(ChannelMissingRecovery),
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────

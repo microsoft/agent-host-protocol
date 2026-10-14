@@ -40,6 +40,14 @@ internal sealed class HostEntry : IDisposable
     private List<AgentInfo> _agents = new();
     private long? _activeSessions;
     private readonly List<string> _subscriptions;
+    // Per-channel replay cursors: the highest `serverSeq` fully applied (or
+    // snapshot baseline established) for each tracked channel. Keyed by
+    // channel URI. Drives the `subscriptions` sent on `AhpClient.ReconnectAsync`
+    // and is only ever advanced by envelopes or snapshots for the matching
+    // channel — never cross-channel. `_serverSeq` below stays purely
+    // informational/diagnostic (surfaced on `HostHandle.ServerSeq`) and MUST
+    // NOT be used to decide reconnect eligibility or what to replay.
+    private readonly Dictionary<string, long> _channelCursors = new(StringComparer.Ordinal);
     private readonly TimeProvider _timeProvider;
     private long _serverSeq;
     private DateTimeOffset? _lastConnectedAt;
@@ -381,24 +389,114 @@ internal sealed class HostEntry : IDisposable
         }
     }
 
-    /// <summary>Tracks a URI in the replay subscription set (idempotent).</summary>
-    public void AppendSubscription(string uri)
+    /// <summary>
+    /// Tracks a URI in the replay subscription set (idempotent). If
+    /// <paramref name="baselineServerSeq"/> is supplied (e.g. a subscribe
+    /// response's <c>snapshot.fromSeq</c>), seeds — or raises — the channel's
+    /// replay cursor from it. Never lowers an already-tracked cursor: a
+    /// re-subscribe shouldn't rewind a channel that already caught up further
+    /// via reconnect/replay.
+    /// </summary>
+    public void AppendSubscription(string uri, long? baselineServerSeq = null)
     {
-        lock (_gate) { if (!_subscriptions.Contains(uri)) _subscriptions.Add(uri); }
+        lock (_gate)
+        {
+            if (!_subscriptions.Contains(uri)) _subscriptions.Add(uri);
+            if (!_channelCursors.TryGetValue(uri, out var current))
+            {
+                _channelCursors[uri] = baselineServerSeq ?? 0;
+            }
+            else if (baselineServerSeq is { } baseline && baseline > current)
+            {
+                _channelCursors[uri] = baseline;
+            }
+        }
     }
 
-    /// <summary>Drops a URI from the replay subscription set.</summary>
+    /// <summary>Drops a URI from the replay subscription set and its replay cursor.</summary>
     public void RemoveSubscription(string uri)
     {
-        lock (_gate) { _subscriptions.Remove(uri); }
+        lock (_gate) { _subscriptions.Remove(uri); _channelCursors.Remove(uri); }
     }
 
-    /// <summary>Drops URIs that the server could not resume.</summary>
+    /// <summary>Drops URIs (and their replay cursors) that the server could not resume.</summary>
     public void RemoveSubscriptions(IEnumerable<string> uris)
     {
         lock (_gate)
         {
-            foreach (var uri in uris) _subscriptions.Remove(uri);
+            foreach (var uri in uris)
+            {
+                _subscriptions.Remove(uri);
+                _channelCursors.Remove(uri);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Builds the per-channel replay cursors for every currently tracked
+    /// subscription, for a <c>reconnect</c> request's <c>subscriptions</c>
+    /// field. A channel with no tracked cursor sends <c>0</c>.
+    /// </summary>
+    public List<ChannelReplayCursor> BuildReplayCursors()
+    {
+        lock (_gate)
+        {
+            var list = new List<ChannelReplayCursor>(_subscriptions.Count);
+            foreach (var uri in _subscriptions)
+            {
+                list.Add(new ChannelReplayCursor
+                {
+                    Channel = uri,
+                    LastSeenServerSeq = _channelCursors.TryGetValue(uri, out var seq) ? seq : 0,
+                });
+            }
+            return list;
+        }
+    }
+
+    /// <summary>Returns the tracked replay cursor for <paramref name="channel"/>, or <c>0</c> if untracked.</summary>
+    public long GetChannelCursor(string channel)
+    {
+        lock (_gate) { return _channelCursors.TryGetValue(channel, out var seq) ? seq : 0; }
+    }
+
+    /// <summary>
+    /// Advances only <paramref name="channel"/>'s replay cursor to
+    /// <paramref name="serverSeq"/>, never moving it backward. Never touches
+    /// another channel's cursor, so a fast channel can never cause a slower
+    /// channel's undelivered actions to be skipped on the next reconnect.
+    /// </summary>
+    public void AdvanceChannelCursor(string channel, long serverSeq)
+    {
+        lock (_gate)
+        {
+            if (!_channelCursors.TryGetValue(channel, out var current) || serverSeq > current)
+                _channelCursors[channel] = serverSeq;
+        }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="channel"/>'s replay cursor to an explicit baseline
+    /// (a fresh snapshot's <c>fromSeq</c>), overwriting any prior value — the
+    /// snapshot is the new baseline regardless of what came before.
+    /// </summary>
+    public void SetChannelCursor(string channel, long serverSeq)
+    {
+        lock (_gate) { _channelCursors[channel] = serverSeq; }
+    }
+
+    /// <summary>
+    /// Clears every tracked replay cursor and reseeds it from a fresh set of
+    /// per-channel snapshots (a full initialize/reinitialize has no continuity
+    /// guarantee for prior progress, so every subscribed channel re-baselines
+    /// from its fresh snapshot, or stays unset — i.e. <c>0</c> — if stateless).
+    /// </summary>
+    public void ResetChannelCursors(IEnumerable<Snapshot> snapshots)
+    {
+        lock (_gate)
+        {
+            _channelCursors.Clear();
+            foreach (var snapshot in snapshots) _channelCursors[snapshot.Resource] = snapshot.FromSeq;
         }
     }
 
@@ -843,11 +941,13 @@ public sealed class MultiHostClient : IMultiHostClient
             // race initialize/reconnect are buffered rather than discarded.
             var stream = client.CreateEventStream();
 
-            // On a reconnect with a known serverSeq, issue the AHP `reconnect` command
-            // (clientId + lastSeenServerSeq) so the host REPLAYS the actions missed
-            // while disconnected, instead of re-initializing from scratch. Mirrors
-            // Swift's HostRuntime reconnect path. Falls back to a fresh `initialize`
-            // on the still-live client if the host rejects reconnect.
+            // On a reconnect, issue the AHP `reconnect` command (clientId +
+            // per-channel replay cursors) so the host recovers each subscribed
+            // channel INDEPENDENTLY — replay, snapshot, or missing, all in one
+            // response — instead of re-initializing from scratch. Mirrors
+            // Swift's HostRuntime reconnect path. Falls back to a fresh
+            // `initialize` on the still-live client if the host rejects
+            // reconnect.
             var subscriptions = entry.Config.InitialSubscriptions;
             if (isReconnect)
             {
@@ -857,7 +957,7 @@ public sealed class MultiHostClient : IMultiHostClient
                 try
                 {
                     reconnectResult = await client.ReconnectAsync(
-                        snap.ClientId, snap.ServerSeq, subscriptions, cancellationToken)
+                        snap.ClientId, entry.BuildReplayCursors(), cancellationToken)
                         .ConfigureAwait(false);
                 }
                 catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -869,7 +969,7 @@ public sealed class MultiHostClient : IMultiHostClient
                     // fallback initialize.
                 }
 
-                if (reconnectResult?.Value is ReconnectReplayResult replay)
+                if (reconnectResult is not null)
                 {
                     var summaries = await FetchSessionSummariesAsync(entry, client, cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
@@ -881,30 +981,7 @@ public sealed class MultiHostClient : IMultiHostClient
                             () =>
                             {
                                 if (summaries is not null) entry.SeedSessionSummaries(summaries);
-                                ApplyReconnectReplay(entry, replay);
-                            });
-                        installed = true;
-                    }
-                    finally
-                    {
-                        entry.ConnectionGate.Release();
-                    }
-                    return;
-                }
-
-                if (reconnectResult?.Value is ReconnectSnapshotResult snapshot)
-                {
-                    var summaries = await FetchSessionSummariesAsync(entry, client, cancellationToken).ConfigureAwait(false);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await entry.ConnectionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try
-                    {
-                        attempt.BeginCommit(cancellationToken);
-                        InstallOpenHost(entry, client, snap.ProtocolVersion, stream,
-                            () =>
-                            {
-                                if (summaries is not null) entry.SeedSessionSummaries(summaries);
-                                ApplyReconnectSnapshot(entry, snapshot);
+                                ApplyReconnectResult(entry, reconnectResult);
                             });
                         installed = true;
                     }
@@ -939,6 +1016,12 @@ public sealed class MultiHostClient : IMultiHostClient
                     {
                         if (initialSummaries is not null) entry.SeedSessionSummaries(initialSummaries);
                         entry.ApplyConnected(root, result.ServerSeq);
+                        // A full (re)initialize discards any prior per-channel
+                        // progress — the server has no continuity guarantee for
+                        // it — and re-baselines every subscribed channel from
+                        // its fresh snapshot (or stays unset, i.e. `0`, for
+                        // stateless channels with none).
+                        entry.ResetChannelCursors(result.Snapshots);
                     });
                 installed = true;
             }
@@ -1009,87 +1092,122 @@ public sealed class MultiHostClient : IMultiHostClient
     }
 
     /// <summary>
-    /// Applies a reconnect-replay result: bumps the host generation (a reconnect
-    /// happened) + advances the serverSeq to the last replayed envelope, and fans
-    /// every replayed action out exactly like the live pump (host-state mirror +
-    /// global subscription fan-in + per-(host,uri) listeners) so consumers that
-    /// subscribed before the drop observe the actions missed while disconnected.
-    /// URIs in <c>Missing</c> are pruned from the reconnect subscription set.
+    /// Applies a <c>reconnect</c> result: bumps the host generation (a reconnect
+    /// happened) and processes each channel's independent recovery outcome —
+    /// replay, snapshot, or missing — exactly like the live pump (host-state
+    /// mirror + global subscription fan-in + per-(host,uri) listeners) so
+    /// consumers that subscribed before the drop observe the actions/snapshots
+    /// missed while disconnected.
+    ///
+    /// Each requested channel gets exactly one independent recovery outcome —
+    /// never a single connection-wide result — so a fast channel's progress
+    /// can't cause a slower channel's undelivered actions to be skipped (or a
+    /// missing channel to hide another channel's replay). Only the matching
+    /// channel's replay cursor is ever advanced; the entry's informational,
+    /// connection-wide <c>serverSeq</c> high-water mark is bumped from
+    /// whichever channel advanced furthest, purely for diagnostics.
     /// </summary>
-    private ulong ApplyReconnectReplay(HostEntry entry, ReconnectReplayResult replay)
+    private ulong ApplyReconnectResult(HostEntry entry, ReconnectResult result)
     {
-        var initialSeq = entry.Snapshot().ServerSeq;
-        var previousSeq = initialSeq;
-        if (replay.Actions is { } seqScan)
-        {
-            foreach (var env in seqScan)
-            {
-                if (env.ServerSeq <= previousSeq)
-                    throw new AhpTransportException(
-                        "protocol",
-                        $"ahp: reconnect replay sequence {env.ServerSeq} did not advance past {previousSeq}");
-                previousSeq = env.ServerSeq;
-            }
-        }
+        // The informational serverSeq starts from its last known value and is
+        // only bumped upfront from Snapshot recoveries here (setting state
+        // directly can't throw partway through). Replay recoveries are
+        // intentionally NOT folded in here — they're applied action-by-action
+        // below, advancing serverSeq only as each action actually commits, so
+        // a mid-replay failure (e.g. a malformed action) leaves serverSeq at
+        // the last action that truly applied rather than a value promised in
+        // advance.
+        var lastSeq = entry.Snapshot().ServerSeq;
+        RootState? root = null;
+        var missingChannels = new List<string>();
 
-        var generation = entry.ApplyConnected(null, initialSeq);
-
-        if (replay.Actions is { } actions)
+        // Pre-scan: every channel's replay actions MUST be strictly ascending
+        // past that channel's own cursor — never another channel's — and
+        // collect the root snapshot (if any) before committing the connect.
+        foreach (var recovery in result.Channels)
         {
-            foreach (var env in actions)
+            switch (recovery.Value)
             {
-                var evt = new SubscriptionEventAction(env);
-                ApplyEventToHostState(entry, evt);
-                if (env.Channel == ProtocolVersion.RootResourceUri)
-                    entry.ApplyRootAction(env.Action);
-                entry.AdvanceServerSeq(env.ServerSeq);
-                var hostEv = new HostSubscriptionEvent(entry.Id, env.Channel, evt);
-                List<Channel<HostSubscriptionEvent>>? channels;
-                lock (_subsLock)
+                case ChannelReplayRecovery replay:
                 {
-                    channels = _subChannels.Count == 0
-                        ? null
-                        : new List<Channel<HostSubscriptionEvent>>(_subChannels);
+                    var previousSeq = entry.GetChannelCursor(replay.Channel);
+                    foreach (var env in replay.Actions)
+                    {
+                        if (env.ServerSeq <= previousSeq)
+                            throw new AhpTransportException(
+                                "protocol",
+                                $"ahp: reconnect replay sequence {env.ServerSeq} did not advance past {previousSeq} for channel '{replay.Channel}'");
+                        previousSeq = env.ServerSeq;
+                    }
+                    break;
                 }
-                if (channels is not null)
-                    foreach (var ch in channels) ch.Writer.TryWrite(hostEv);
-                BroadcastPerResourceEvent(entry.Id, env.Channel, evt);
+                case ChannelSnapshotRecovery snapshotRecovery:
+                    if (snapshotRecovery.Snapshot.FromSeq > lastSeq) lastSeq = snapshotRecovery.Snapshot.FromSeq;
+                    if (snapshotRecovery.Channel == ProtocolVersion.RootResourceUri
+                        && snapshotRecovery.Snapshot.State?.Root is { } rootState)
+                        root = rootState;
+                    break;
+                case ChannelMissingRecovery missingRecovery:
+                    missingChannels.Add(missingRecovery.Channel);
+                    break;
             }
         }
-        entry.RemoveSubscriptions(replay.Missing);
+
+        var generation = entry.ApplyConnected(root, lastSeq);
+
+        foreach (var recovery in result.Channels)
+        {
+            switch (recovery.Value)
+            {
+                case ChannelReplayRecovery replay:
+                    foreach (var env in replay.Actions)
+                    {
+                        var evt = new SubscriptionEventAction(env);
+                        ApplyEventToHostState(entry, evt);
+                        if (env.Channel == ProtocolVersion.RootResourceUri)
+                            entry.ApplyRootAction(env.Action);
+                        entry.AdvanceServerSeq(env.ServerSeq);
+                        // Advance only the matching channel's cursor — never
+                        // another channel's.
+                        entry.AdvanceChannelCursor(env.Channel, env.ServerSeq);
+                        BroadcastSubscriptionEvent(entry.Id, env.Channel, evt);
+                    }
+                    break;
+                case ChannelSnapshotRecovery snapshotRecovery:
+                {
+                    // The snapshot IS the new baseline for this channel, so the
+                    // cursor is set directly rather than maxed against any
+                    // prior value.
+                    entry.SetChannelCursor(snapshotRecovery.Channel, snapshotRecovery.Snapshot.FromSeq);
+                    var evt = new SubscriptionEventSnapshot(snapshotRecovery.Snapshot);
+                    BroadcastSubscriptionEvent(entry.Id, snapshotRecovery.Channel, evt);
+                    break;
+                }
+                case ChannelMissingRecovery:
+                    // Handled below via entry.RemoveSubscriptions, which also
+                    // drops the (now meaningless) cursor entry.
+                    break;
+            }
+        }
+
+        if (missingChannels.Count > 0) entry.RemoveSubscriptions(missingChannels);
         return generation;
     }
 
-    /// <summary>
-    /// Applies a reconnect snapshot without issuing a second initialize. The
-    /// every returned resource snapshot is published before the host transitions
-    /// to connected. The subscription set is retained because stateless
-    /// subscriptions intentionally have no snapshot.
-    /// </summary>
-    private ulong ApplyReconnectSnapshot(HostEntry entry, ReconnectSnapshotResult result)
+    /// <summary>Fans a subscription event out to the global subscription stream and per-(host,uri) listeners.</summary>
+    private void BroadcastSubscriptionEvent(HostId hostId, string channel, SubscriptionEvent evt)
     {
-        var lastSeq = entry.Snapshot().ServerSeq;
-        foreach (var snapshot in result.Snapshots)
+        var hostEv = new HostSubscriptionEvent(hostId, channel, evt);
+        List<Channel<HostSubscriptionEvent>>? channels;
+        lock (_subsLock)
         {
-            if (snapshot.FromSeq > lastSeq) lastSeq = snapshot.FromSeq;
+            channels = _subChannels.Count == 0
+                ? null
+                : new List<Channel<HostSubscriptionEvent>>(_subChannels);
         }
-        var generation = entry.ApplyConnected(ExtractRootSnapshot(result.Snapshots), lastSeq);
-        foreach (var snapshot in result.Snapshots)
-        {
-            var evt = new SubscriptionEventSnapshot(snapshot);
-            var hostEv = new HostSubscriptionEvent(entry.Id, snapshot.Resource, evt);
-            List<Channel<HostSubscriptionEvent>>? channels;
-            lock (_subsLock)
-            {
-                channels = _subChannels.Count == 0
-                    ? null
-                    : new List<Channel<HostSubscriptionEvent>>(_subChannels);
-            }
-            if (channels is not null)
-                foreach (var ch in channels) ch.Writer.TryWrite(hostEv);
-            BroadcastPerResourceEvent(entry.Id, snapshot.Resource, evt);
-        }
-        return generation;
+        if (channels is not null)
+            foreach (var ch in channels) ch.Writer.TryWrite(hostEv);
+        BroadcastPerResourceEvent(hostId, channel, evt);
     }
 
     /// <summary>Pulls root state out of a snapshot collection, if present.</summary>
@@ -1162,7 +1280,12 @@ public sealed class MultiHostClient : IMultiHostClient
                     && rootAction.Envelope.Channel == ProtocolVersion.RootResourceUri
                     && entry.ApplyRootAction(rootAction.Envelope.Action);
                 if (ev.Event is SubscriptionEventAction action)
+                {
                     entry.AdvanceServerSeq(action.Envelope.ServerSeq);
+                    // Advance only this envelope's channel cursor — never let
+                    // one channel's progress advance another channel's.
+                    entry.AdvanceChannelCursor(action.Envelope.Channel, action.Envelope.ServerSeq);
+                }
 
                 var hostEv = new HostSubscriptionEvent(entry.Id, ev.Channel, ev.Event);
                 List<Channel<HostSubscriptionEvent>>? channels;
@@ -1802,7 +1925,7 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 if (ReferenceEquals(client, entry.CurrentClient))
                 {
-                    entry.AppendSubscription(uri);
+                    entry.AppendSubscription(uri, result.Snapshot?.FromSeq);
                     return result;
                 }
             }

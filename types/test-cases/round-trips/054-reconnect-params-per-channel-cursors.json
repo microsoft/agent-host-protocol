@@ -1,0 +1,26 @@
+{
+  "name": "reconnect-params-per-channel-cursors",
+  "group": "A",
+  "description": "ReconnectParams carries one ChannelReplayCursor per subscribed channel instead of a single connection-wide watermark; two channels at genuinely divergent checkpoints (100 vs 101) round-trip independently, and a never-caught-up channel keeps lastSeenServerSeq=0.",
+  "type": "ReconnectParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "subscriptions": [
+      { "channel": "ahp-session:/a", "lastSeenServerSeq": 100 },
+      { "channel": "ahp-session:/b", "lastSeenServerSeq": 101 },
+      { "channel": "ahp-canvas:/c", "lastSeenServerSeq": 0 }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "clientId": "client-1",
+      "subscriptions": [
+        { "channel": "ahp-session:/a", "lastSeenServerSeq": 100 },
+        { "channel": "ahp-session:/b", "lastSeenServerSeq": 101 },
+        { "channel": "ahp-canvas:/c", "lastSeenServerSeq": 0 }
+      ]
+    }
+  ]
+}

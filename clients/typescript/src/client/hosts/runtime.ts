@@ -18,10 +18,11 @@ import type { ActionEnvelope } from '../../types/common/actions.js';
 import type { URI } from '../../types/common/state.js';
 import type { Snapshot } from '../../types/common/state.js';
 import type {
+  ChannelReplayCursor,
   ReconnectResult,
   SubscribeResult,
 } from '../../types/common/commands.js';
-import { ReconnectResultType } from '../../types/common/commands.js';
+import { ChannelRecoveryKind } from '../../types/common/commands.js';
 import type { ListSessionsResult } from '../../types/channels-root/commands.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionSummary } from '../../types/channels-session/state.js';
@@ -70,7 +71,23 @@ export interface HostShared {
   lastError: Error | null;
   lastConnectedAt: number | null;
   protocolVersion: string | null;
+  /**
+   * Highest `serverSeq` ever observed across any channel. Informational
+   * only (surfaced on {@link HostHandle} for diagnostics) — it is never
+   * used to decide what to replay on reconnect. Per-channel recovery
+   * uses {@link channelCursors} instead, so a fast channel's `serverSeq`
+   * can never cause a slower channel's undelivered actions to be
+   * skipped.
+   */
   serverSeq: number;
+  /**
+   * Per-channel replay cursors: the highest `serverSeq` fully applied
+   * (or snapshot baseline established) for each currently-subscribed
+   * channel. Keyed by channel URI. Drives the `subscriptions` sent on
+   * {@link AhpClient.reconnect} and is only ever advanced by envelopes
+   * or snapshots for the matching channel — never cross-channel.
+   */
+  channelCursors: Map<URI, number>;
   defaultDirectory: string | null;
   automations: AutomationCapabilities | null;
   rootState: RootState;
@@ -102,6 +119,7 @@ export function makeInitialShared(
     lastConnectedAt: null,
     protocolVersion: null,
     serverSeq: 0,
+    channelCursors: new Map(),
     defaultDirectory: null,
     automations: null,
     rootState: { agents: [] },
@@ -392,7 +410,7 @@ export class HostRuntime {
       throw new HostNotConnectedError(this.shared.id);
     }
     const { result } = await client.subscribe(uri);
-    this.trackSubscription(uri);
+    this.trackSubscription(uri, result.snapshot?.fromSeq);
     return result;
   }
 
@@ -563,14 +581,17 @@ export class HostRuntime {
       let success = false;
       try {
         const prior = {
-          serverSeq: this.shared.serverSeq,
           subscriptions: [...this.shared.subscriptions],
         };
-        const canReconnect = prior.serverSeq > 0 && prior.subscriptions.length > 0;
+        // Reconnect is only meaningful once we've completed an initial
+        // handshake (so the server has an established client identity
+        // and per-channel cursors to look up) and we actually have
+        // channels to recover.
+        const canReconnect = this.shared.protocolVersion !== null && prior.subscriptions.length > 0;
 
         let reconnectResult: ReconnectResult | null = null;
         let initSnapshots: Snapshot[] | null = null;
-        let initServerSeq = prior.serverSeq;
+        let initServerSeq = this.shared.serverSeq;
         let initProtocolVersion: string | null = null;
         let initDefaultDirectory: string | null = null;
         let initAutomations = this.shared.automations;
@@ -581,8 +602,12 @@ export class HostRuntime {
             const reconnectRes = await raceWithAbort(
               client.reconnect({
                 clientId: this.shared.clientId,
-                lastSeenServerSeq: prior.serverSeq,
-                subscriptions: prior.subscriptions,
+                subscriptions: prior.subscriptions.map(
+                  (uri): ChannelReplayCursor => ({
+                    channel: uri,
+                    lastSeenServerSeq: this.shared.channelCursors.get(uri) ?? 0,
+                  }),
+                ),
               }),
               cancelSignal,
             );
@@ -649,31 +674,34 @@ export class HostRuntime {
         // Apply replay envelopes BEFORE transitioning to `connected` so
         // consumers observing the `connected` host event already see the
         // catch-up applied to state and event streams.
-        let postReplaySubscriptions: string[] | null = null;
         const replayEnvelopes: ActionEnvelope[] = [];
-        let snapshotPrunedSubscriptions: string[] | null = null;
+        const missingChannels = new Set<string>();
+        const snapshotCursorUpdates = new Map<URI, number>();
 
         if (reconnectResult !== null) {
-          if (reconnectResult.type === ReconnectResultType.Replay) {
-            for (const env of reconnectResult.actions) replayEnvelopes.push(env);
-            if (reconnectResult.missing.length > 0) {
-              const missing = new Set<string>(reconnectResult.missing);
-              postReplaySubscriptions = this.shared.subscriptions.filter(u => !missing.has(u));
-            }
-          } else {
-            // Snapshot variant: refresh root state from the matching
-            // snapshot, then drop subscriptions that were in prior set
-            // but are absent from the returned snapshot list.
-            const surviving = new Set<string>(reconnectResult.snapshots.map(s => s.resource));
-            const priorSet = new Set<string>(prior.subscriptions);
-            snapshotPrunedSubscriptions = this.shared.subscriptions.filter(
-              u => surviving.has(u) || !priorSet.has(u),
-            );
-            for (const snap of reconnectResult.snapshots) {
-              if (snap.fromSeq > initServerSeq) initServerSeq = snap.fromSeq;
-              if (snap.resource === ROOT_RESOURCE_URI) {
-                this.shared.rootState = (snap.state as RootState) ?? EMPTY_ROOT_STATE;
-              }
+          // Each requested channel gets exactly one independent recovery
+          // outcome — never a single connection-wide result — so a fast
+          // channel's progress can't cause a slower channel's undelivered
+          // actions to be skipped (or a missing channel to hide another
+          // channel's replay).
+          for (const recovery of reconnectResult.channels) {
+            switch (recovery.kind) {
+              case ChannelRecoveryKind.Replay:
+                for (const env of recovery.actions) {
+                  replayEnvelopes.push(env);
+                  if (env.serverSeq > initServerSeq) initServerSeq = env.serverSeq;
+                }
+                break;
+              case ChannelRecoveryKind.Snapshot:
+                snapshotCursorUpdates.set(recovery.channel, recovery.snapshot.fromSeq);
+                if (recovery.snapshot.fromSeq > initServerSeq) initServerSeq = recovery.snapshot.fromSeq;
+                if (recovery.channel === ROOT_RESOURCE_URI) {
+                  this.shared.rootState = (recovery.snapshot.state as RootState) ?? EMPTY_ROOT_STATE;
+                }
+                break;
+              case ChannelRecoveryKind.Missing:
+                missingChannels.add(recovery.channel);
+                break;
             }
           }
         }
@@ -686,22 +714,36 @@ export class HostRuntime {
         if (this.shared.serverSeq < initServerSeq) {
           this.shared.serverSeq = initServerSeq;
         }
+        if (reconnectResult !== null) {
+          for (const [uri, seq] of snapshotCursorUpdates) {
+            this.shared.channelCursors.set(uri, seq);
+          }
+          // Drop channels the server reports as unrecoverable; keep
+          // everything else (replay/snapshot outcomes don't change the
+          // subscription set, only the cursor).
+          this.shared.subscriptions = prior.subscriptions.filter(u => !missingChannels.has(u));
+          for (const uri of missingChannels) this.shared.channelCursors.delete(uri);
+        }
         if (initSnapshots !== null) {
+          // A full (re)initialize discards any prior per-channel
+          // progress — the server has no continuity guarantee for it —
+          // and re-baselines every subscribed channel from its fresh
+          // snapshot (or `0` if the channel is stateless).
+          this.shared.channelCursors.clear();
+          for (const snap of initSnapshots) {
+            this.shared.channelCursors.set(snap.resource, snap.fromSeq);
+          }
           const rootSnap = initSnapshots.find(s => s.resource === ROOT_RESOURCE_URI);
           if (rootSnap) this.shared.rootState = (rootSnap.state as RootState) ?? EMPTY_ROOT_STATE;
           if (initProtocolVersion) this.shared.protocolVersion = initProtocolVersion;
           this.shared.defaultDirectory = initDefaultDirectory;
           this.shared.automations = initAutomations;
           this.shared.completionTriggerCharacters = [...initCompletionTriggers];
+          this.shared.subscriptions = prior.subscriptions;
         }
         if (summaries !== null) {
           this.shared.sessionSummaries.clear();
           for (const s of summaries.items) this.shared.sessionSummaries.set(s.resource, s);
-        }
-        if (postReplaySubscriptions !== null) {
-          this.shared.subscriptions = postReplaySubscriptions;
-        } else if (snapshotPrunedSubscriptions !== null) {
-          this.shared.subscriptions = snapshotPrunedSubscriptions;
         }
 
         // Mirror the new generation + client into the shared handle source.
@@ -826,6 +868,13 @@ export class HostRuntime {
     if (envelope.serverSeq > this.shared.serverSeq) {
       this.shared.serverSeq = envelope.serverSeq;
     }
+    // Advance only the matching channel's cursor — never another
+    // channel's — so a fast channel can never cause a slower channel's
+    // undelivered actions to be skipped on the next reconnect.
+    const priorCursor = this.shared.channelCursors.get(envelope.channel) ?? 0;
+    if (envelope.serverSeq > priorCursor) {
+      this.shared.channelCursors.set(envelope.channel, envelope.serverSeq);
+    }
     if (envelope.channel === ROOT_RESOURCE_URI) {
       this.shared.rootState = rootReducer(this.shared.rootState, envelope.action as RootAction);
     }
@@ -835,14 +884,25 @@ export class HostRuntime {
     // MultiHostStateMirror or their own store).
   }
 
-  private trackSubscription(uri: URI): void {
+  private trackSubscription(uri: URI, baselineServerSeq?: number): void {
     if (!this.shared.subscriptions.includes(uri)) {
       this.shared.subscriptions.push(uri);
+    }
+    // Seed (or raise) the channel's replay cursor from a subscribe
+    // snapshot's `fromSeq` baseline. Never lower an existing cursor —
+    // a re-subscribe shouldn't rewind a channel that's already caught
+    // up further via reconnect/replay.
+    const current = this.shared.channelCursors.get(uri);
+    if (current === undefined) {
+      this.shared.channelCursors.set(uri, baselineServerSeq ?? 0);
+    } else if (baselineServerSeq !== undefined && baselineServerSeq > current) {
+      this.shared.channelCursors.set(uri, baselineServerSeq);
     }
   }
 
   private untrackSubscription(uri: URI): void {
     this.shared.subscriptions = this.shared.subscriptions.filter(u => u !== uri);
+    this.shared.channelCursors.delete(uri);
   }
 
   private transitionTo(state: HostState, lastError: Error | null): void {
