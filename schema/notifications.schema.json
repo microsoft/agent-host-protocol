@@ -325,7 +325,7 @@
     },
     "TcpEofParams": {
       "type": "object",
-      "description": "Ends the sender's direction after the data that it has already sent, like a\nTCP FIN. The other direction can continue. The sender MUST NOT send more\n`tcp/data` after `tcp/eof`.\n\nStability: 1.0 - Early development.",
+      "description": "Ends the sender's direction after the data that it has already sent, like a\nTCP FIN. The other direction can continue. The sender MUST NOT send more\n`tcp/data` after `tcp/eof`.\n\nThis notification counts against the window, so the sender may have to wait\nfor credit before sending it. A receiver MUST release `tcp/data` as it writes\nthe bytes, without waiting for `tcp/eof`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",

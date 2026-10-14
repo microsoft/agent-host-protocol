@@ -156,6 +156,11 @@ notification in fragments.
 The other direction can continue. The sender MUST NOT send `tcp/data` after
 `tcp/eof`.
 
+`tcp/eof` counts against the window, so a sender may have to wait for credit
+before it can send it. A receiver MUST therefore release `tcp/data` as it writes
+the bytes, and not wait for `tcp/eof` before releasing them. Otherwise neither
+peer can make progress.
+
 ```mermaid
 sequenceDiagram
     participant C as Client
@@ -187,6 +192,8 @@ processed the bytes.
 To close a connection normally, each peer sends `tcp/eof` when its direction
 ends. After both directions have ended, the client sends `unsubscribe`. The host
 writes the data that it has already accepted, then closes the destination
+connection. The host MUST limit how long it waits to write that data. If the
+destination does not accept it in time, the host aborts the destination
 connection.
 
 If the client sends `unsubscribe` before both directions have ended, the host
@@ -244,5 +251,6 @@ necessarily the agent's sandbox. A host MUST:
 - Apply its own policy for which destinations a client can connect to, and
   check the resolved address, not only the name in `host`.
 - Limit the number of connections for each client.
-- Limit the time for opening a connection, and the time that a created
-  connection can wait for a subscription.
+- Limit the time for opening a connection, the time that a created connection
+  can wait for a subscription, and the time to write remaining data when a
+  connection is closed.

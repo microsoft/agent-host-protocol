@@ -63,6 +63,10 @@ public struct TcpDataParams: Codable, Sendable {
 /// TCP FIN. The other direction can continue. The sender MUST NOT send more
 /// `tcp/data` after `tcp/eof`.
 ///
+/// This notification counts against the window, so the sender may have to wait
+/// for credit before sending it. A receiver MUST release `tcp/data` as it writes
+/// the bytes, without waiting for `tcp/eof`.
+///
 /// Stability: 1.0 - Early development.
 public struct TcpEofParams: Codable, Sendable {
     /// The URI of the TCP channel.
