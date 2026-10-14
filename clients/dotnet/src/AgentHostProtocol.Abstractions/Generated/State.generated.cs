@@ -2115,9 +2115,14 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
-    /// <summary>The agent can list canvas types for an exact chat with `listCanvasTypes`
+    /// <summary>Experimental Canvas API.
+    ///
+    /// The agent can list canvas types for an exact chat with `listCanvasTypes`
     /// and open them with `openCanvas`. Live instances are published through the
-    /// chat's canvas references and their `ahp-canvas:` state channels.</summary>
+    /// chat's canvas references and their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// discovery metadata while the Canvas channel remains experimental.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Canvases { get; init; }
 
@@ -2654,7 +2659,10 @@ public sealed class ChatState
 ///
 /// This is discovery metadata, not a live canvas instance. Live instances are
 /// represented by {@link CanvasReference} entries on chat state and their
-/// corresponding {@link CanvasState} channels.</summary>
+/// corresponding {@link CanvasState} channels.
+///
+/// This experimental object may gain optional discovery metadata. Clients
+/// SHOULD ignore fields they do not understand.</summary>
 public sealed record CanvasTypeDeclaration
 {
     /// <summary>Provider-local canvas type identifier.</summary>

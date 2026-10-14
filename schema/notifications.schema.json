@@ -1017,7 +1017,7 @@
         "canvases": {
           "type": "object",
           "additionalProperties": {},
-          "description": "The agent can list canvas types for an exact chat with `listCanvasTypes`\nand open them with `openCanvas`. Live instances are published through the\nchat's canvas references and their `ahp-canvas:` state channels."
+          "description": "Experimental Canvas API.\n\nThe agent can list canvas types for an exact chat with `listCanvasTypes`\nand open them with `openCanvas`. Live instances are published through the\nchat's canvas references and their `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\ndiscovery metadata while the Canvas channel remains experimental."
         },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
@@ -5110,7 +5110,7 @@
     },
     "CanvasTypeDeclaration": {
       "type": "object",
-      "description": "One canvas type currently available to open for an exact chat.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.",
+      "description": "One canvas type currently available to open for an exact chat.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
       "properties": {
         "canvasId": {
           "type": "string",

@@ -802,9 +802,14 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// Experimental Canvas API.
+	//
 	// The agent can list canvas types for an exact chat with `listCanvasTypes`
 	// and open them with `openCanvas`. Live instances are published through the
 	// chat's canvas references and their `ahp-canvas:` state channels.
+	//
+	// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+	// discovery metadata while the Canvas channel remains experimental.
 	Canvases map[string]json.RawMessage `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -1488,6 +1493,9 @@ type ChatState struct {
 // This is discovery metadata, not a live canvas instance. Live instances are
 // represented by {@link CanvasReference} entries on chat state and their
 // corresponding {@link CanvasState} channels.
+//
+// This experimental object may gain optional discovery metadata. Clients
+// SHOULD ignore fields they do not understand.
 type CanvasTypeDeclaration struct {
 	// Provider-local canvas type identifier.
 	CanvasId string `json:"canvasId"`
