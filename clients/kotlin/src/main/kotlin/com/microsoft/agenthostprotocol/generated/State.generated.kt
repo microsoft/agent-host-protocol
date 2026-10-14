@@ -73,6 +73,31 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 /**
+ * How the server resumes sending data on a windowed subscription after
+ * reconnection.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+enum class ChannelRecoveryKind {
+    /**
+     * The server sends a new `channel/snapshot`, and the client replaces its state.
+     */
+    @SerialName("snapshot")
+    SNAPSHOT,
+    /**
+     * The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+     */
+    @SerialName("replay")
+    REPLAY,
+    /**
+     * The server sends only data created after reconnection.
+     */
+    @SerialName("live")
+    LIVE
+}
+
+/**
  * Policy configuration state for a model.
  */
 @Serializable
@@ -1196,6 +1221,99 @@ enum class AutomationRunOriginKind {
 }
 
 // ─── State Types ────────────────────────────────────────────────────────────
+
+/**
+ * Present when the host supports `createTcpConnection`.
+ *
+ * A client creates a connection with `createTcpConnection`, then subscribes to
+ * its channel with windowed delivery. A TCP channel's state is an
+ * {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+ * notifications. TCP connections do not survive the loss of the AHP connection.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class TcpConnectionsCapability
+
+/**
+ * Limits on data that one peer receives on a windowed subscription.
+ *
+ * All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+ * message's complete text, as sent. For a `channel/frame` fragment, this
+ * includes its envelope and escape characters. The same size is used for the
+ * window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+ * size of a complete data message. Outstanding data is always less than
+ * `windowBytes + maximumFrameBytes`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelReceiveLimits(
+    /**
+     * The target amount of outstanding data. This is a soft target.
+     * The sender MUST NOT send a data message or fragment while outstanding data
+     * is equal to or greater than this value. The last message or fragment sent
+     * before the window is full can go past it, so a message that fits within
+     * `maximumFrameBytes` can be sent whole even when it is larger than the
+     * remaining credit.
+     */
+    val windowBytes: Long,
+    /**
+     * The largest JSON-RPC message that the sender can send for a data message.
+     * This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+     * notification, it includes the envelope and escape characters. A larger data
+     * message MUST be split into smaller messages or sent in fragments.
+     */
+    val maximumFrameBytes: Long
+)
+
+/**
+ * The limits that the server accepted for a windowed subscription.
+ *
+ * The client ID and channel URI identify the subscription. All counters start at
+ * zero when the subscription starts.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelFlowControl(
+    /**
+     * Limits for data that the server sends to the client.
+     */
+    val clientReceive: ChannelReceiveLimits,
+    /**
+     * Limits for data that the client sends to the server.
+     */
+    val hostReceive: ChannelReceiveLimits
+)
+
+/**
+ * A windowed subscription that the server kept after reconnection.
+ *
+ * The subscription's counters start at zero on the new connection. If a
+ * channel that the client requested is not in the result, the subscription was
+ * not kept. The client discards the old subscription and, for a byte stream,
+ * closes the stream.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ResumedChannelSubscription(
+    /**
+     * The URI of the windowed subscription.
+     */
+    val channel: String,
+    /**
+     * The limits that the server accepted for the new connection, as in a
+     * `subscribe` result. The server MAY lower the limits that the client offered
+     * in its request, and MUST NOT raise them.
+     */
+    val flowControl: ChannelFlowControl,
+    /**
+     * How the server resumes sending data.
+     */
+    val recovery: ChannelRecoveryKind
+)
 
 @Serializable
 data class Icon(
@@ -5128,7 +5246,10 @@ data class Snapshot(
      */
     val resource: String,
     /**
-     * The current state of the resource
+     * The current state of the resource. A channel with no state fields, such as a
+     * telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+     * new kinds of state; a client MUST NOT fail on a state that it does not
+     * recognize, and ignores that snapshot.
      */
     val state: SnapshotState,
     /**
@@ -5136,6 +5257,20 @@ data class Snapshot(
      */
     val fromSeq: Long
 )
+
+/**
+ * The state of a channel that has no state fields, such as a telemetry
+ * channel. It is always the empty object `{}`.
+ *
+ * Every windowed subscription starts with a snapshot, including subscriptions
+ * to these channels, so a channel can gain state fields in a later revision
+ * without changing how windowed subscriptions start. With ordinary delivery,
+ * the server MAY omit a snapshot whose state is an `EmptyState`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class EmptyState
 
 @Serializable
 data class Changeset(
@@ -7498,6 +7633,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
+    @JvmInline value class Empty(val value: EmptyState) : SnapshotState
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
@@ -7508,6 +7644,8 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
+    @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -7529,7 +7667,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // (checked after session, whose optional annotations summary reuses the
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
+        // An object with no members is an empty state, used by channels whose state has no fields.
         return when {
+            obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -7546,7 +7686,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
-            else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            obj.containsKey("agents") -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            // A state from a later protocol version: keep it rather than fail.
+            else -> SnapshotState.Unknown(obj)
         }
     }
 
@@ -7554,6 +7696,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val output = encoder as? JsonEncoder
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
+            is SnapshotState.Empty -> output.json.encodeToJsonElement(EmptyState.serializer(), value.value)
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
@@ -7564,6 +7707,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Unknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

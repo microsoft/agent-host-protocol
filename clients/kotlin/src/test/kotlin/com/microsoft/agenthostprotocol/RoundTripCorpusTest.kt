@@ -34,6 +34,16 @@ import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeResult
+import com.microsoft.agenthostprotocol.generated.SubscribeParams
+import com.microsoft.agenthostprotocol.generated.SubscribeResult
+import com.microsoft.agenthostprotocol.generated.ReconnectResult
+import com.microsoft.agenthostprotocol.generated.ChannelFrameParams
+import com.microsoft.agenthostprotocol.generated.ChannelCreditParams
+import com.microsoft.agenthostprotocol.generated.ReconnectParams
+import com.microsoft.agenthostprotocol.generated.TcpDataParams
+import com.microsoft.agenthostprotocol.generated.TcpEofParams
+import com.microsoft.agenthostprotocol.generated.TcpResetParams
+import com.microsoft.agenthostprotocol.generated.CreateTcpConnectionParams
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -255,6 +265,16 @@ class RoundTripCorpusTest {
             "InitializeResult" -> rt(InitializeResult.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())
+            "SubscribeParams" -> rt(SubscribeParams.serializer())
+            "SubscribeResult" -> rt(SubscribeResult.serializer())
+            "ReconnectResult" -> rt(ReconnectResult.serializer())
+            "ChannelFrameParams" -> rt(ChannelFrameParams.serializer())
+            "ChannelCreditParams" -> rt(ChannelCreditParams.serializer())
+            "ReconnectParams" -> rt(ReconnectParams.serializer())
+            "TcpDataParams" -> rt(TcpDataParams.serializer())
+            "TcpEofParams" -> rt(TcpEofParams.serializer())
+            "TcpResetParams" -> rt(TcpResetParams.serializer())
+            "CreateTcpConnectionParams" -> rt(CreateTcpConnectionParams.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +
                     "Add a decode entry to decodeAndReencode.",

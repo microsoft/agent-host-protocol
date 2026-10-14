@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
 const levels = {
   '0': {
     label: 'Deprecated',
-    description: 'Backward compatibility is not guaranteed, and the channel may be removed.',
+    description: 'Backward compatibility is not guaranteed, and the API may be removed.',
   },
   '1': {
     label: 'Experimental',
@@ -21,11 +21,11 @@ const levels = {
   },
   '1.0': {
     label: 'Early development',
-    description: 'The channel is unfinished and subject to substantial change.',
+    description: 'The API is unfinished and subject to substantial change.',
   },
   '1.1': {
     label: 'Active development',
-    description: 'The channel is nearing minimum viability but may still change incompatibly.',
+    description: 'The API is nearing minimum viability but may still change incompatibly.',
   },
   '1.2': {
     label: 'Release candidate',
@@ -37,7 +37,7 @@ const levels = {
   },
   '3': {
     label: 'Legacy',
-    description: 'The channel remains supported but is no longer actively developed.',
+    description: 'The API remains supported but is no longer actively developed.',
   },
 } as const satisfies Record<StabilityLevel, { label: string; description: string }>
 

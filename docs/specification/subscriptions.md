@@ -1,58 +1,95 @@
-# Channels & Subscriptions
+# Channels and Subscriptions
 
-AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, automation catalogues, sessions, terminals, changesets) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
+This section defines channels, the `channel` parameter that every message
+carries, and the messages that a client uses to subscribe to and unsubscribe
+from a channel.
 
-## Every message carries `channel`
+## Channels
 
-The channel concept is woven into every wire message. **Every command and every notification has a top-level `channel: URI` field on its params.** This invariant lets servers, clients, and intermediate proxies dispatch any incoming message by inspecting `(method, params.channel)` without per-method knowledge of the rest of the payload.
+A channel is a sequence of messages that is identified by a URI. Every channel
+has a state. A subscriber first receives a snapshot of the state, and then
+receives the messages that the channel defines: actions that change the state,
+and notifications for events that are not stored in it.
 
-| Direction | Methods | `channel` value |
+The state of some channels has no fields. For example, a telemetry channel
+delivers its data only in notifications, so its state is always the empty
+object `{}` (`EmptyState`).
+
+All channels use the same `subscribe` and `unsubscribe` messages.
+
+### Channel URIs
+
+| URI | State type | Contents |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `runAutomation`, and `fetchAutomationRuns` | The owning channel's URI (e.g. `ahp-session:/<uuid>` or `ahp-automations://`). |
-| Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
-| Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
-| Client → Server | `dispatchAction` | The channel the action targets. |
-| Client → Server | `unsubscribe` | The channel being unsubscribed. |
-| Server → Client | `action` | The channel that owns the action envelope. |
-| Server → Client protocol notifications | `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `auth/required`, `otlp/exportLogs`, `otlp/exportTraces`, `otlp/exportMetrics` | The channel the notification scopes to (the root channel for `root/*`; the channel the auth requirement targets for `auth/required`; the host-defined `ahp-otlp:` channel URI for `otlp/*`). |
+| `ahp-root://` | `RootState` | Agents, terminals, and host configuration. This channel always exists. |
+| `ahp-automations://` | `AutomationState` | All automations visible to the client. This channel exists when `InitializeResult.automations` is present. |
+| `ahp-session:/<uuid>` | `SessionState` | Session metadata and the session's list of chats. |
+| `ahp-chat:/<cid>` | `ChatState` | One chat: turns, streamed responses, tool calls, pending messages, input requests, and changesets. See [Chat Channel](/specification/chat-channel). |
+| `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. The URI is listed in `ChatState.canvases`. See [Canvas Channel](/reference/canvas). |
+| `ahp-terminal:/<id>` | `TerminalState` | One terminal. See [Terminal Channel](/specification/terminal-channel). |
+| `ahp-tcp:/<id>` | `EmptyState` | Experimental. One TCP connection that the host opened with `createTcpConnection`. Private to the client that created it. See [TCP Channel](/specification/tcp-channel). |
+| `ahp-changeset:/<id>` | `ChangesetState` | One changeset. The client builds the URI from the `Changeset.uriTemplate` of a session or chat. |
+| `ahp-resource-watch:/<id>` | `ResourceWatchState` | One file watch. The URI is returned by `createResourceWatch`. |
+| `ahp-otlp:` | `EmptyState` | OpenTelemetry logs, traces, or metrics. The URIs are listed in `InitializeResult.telemetry`. See [Telemetry Channel](/specification/telemetry-channel). |
 
-The constraint is encoded in the TypeScript types: every entry in `CommandMap` and the notification maps has params assignable to `BaseParams` (or, for notifications, structurally `{ channel: URI }`). The compile-time check in `types/version/message-checks.ts` fails if any new method omits the field.
+In the table, `<uuid>`, `<cid>`, and `<id>` are identifiers chosen by the client
+or server, as described on each channel's page. Clients MUST treat telemetry
+URIs as opaque.
 
-The rest of this page details the URI scheme and the lifecycle of a subscription. The mechanics of action delivery and protocol notifications are described under each channel page ([Root](/specification/root-channel), [Automation Catalogue](/specification/automation-channel), [Session](/specification/session-channel), [Terminal](/specification/terminal-channel)).
+Future channel types will use new URI schemes. A client MUST NOT subscribe to a
+URI whose scheme it does not understand.
 
-## URI Scheme
+## The `channel` Parameter
 
-| URI | State type | Description |
-|---|---|---|
-| `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
-| `ahp-automations://` | `AutomationState` | Full state for every visible automation. Present when `InitializeResult.automations` is advertised. |
-| `ahp-session:/<uuid>` | `SessionState` | Per-session state (metadata plus the `chats` catalog). The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
-| `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests, changeset catalogue). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
-| `ahp-canvas:/<id>` | `CanvasState` | Experimental per-canvas live presentation state. Subscribe to the resource advertised in `ChatState.canvases`; the id is host-defined. See [Canvas Channel](/reference/canvas). |
-| `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |
-| `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `Changeset.uriTemplate` advertised on a session or chat; the id is server-defined. |
-| `ahp-otlp:` _(authority/path host-defined)_ | _stateless_ | OpenTelemetry signal channels (logs, traces, metrics). Concrete URIs are advertised on `InitializeResult.telemetry`; clients MUST treat them as opaque. See [Telemetry Channel](/specification/telemetry-channel). |
-| `ahp-resource-watch:/<id>` | `ResourceWatchState` | Per-watch channel returned by `createResourceWatch`. Delivers `resourceWatch/changed` actions for file/directory changes under the watched URI. The id is receiver-assigned. |
+The `params` object of every request and every notification MUST contain a
+member named `channel` whose value is a channel URI. A receiver can therefore
+route any message using only its `method` and `params.channel`.
 
-Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes. Clients MUST NOT subscribe to a scheme they do not understand.
+| Messages | Value of `params.channel` |
+|---|---|
+| `initialize`, `ping`, `reconnect`, `authenticate`, `listSessions`, `resolveSessionConfig`, `sessionConfigCompletions`, `listAutomationTriggerDefinitions` | `ahp-root://` |
+| `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | `ahp-root://`. Either peer can send these requests. |
+| `runAutomation`, `fetchAutomationRuns` | `ahp-automations://` |
+| `createSession`, `disposeSession`, `createChat` | The session URI. For `createSession`, this is the URI of the new session. |
+| `fetchTurns`, `completions`, `disposeChat` | The chat URI |
+| `moveChat` | The URI of the chat to move |
+| `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
+| `createTcpConnection` | The URI of the new TCP channel |
+| `invokeChangesetOperation` | The changeset URI |
+| `subscribe`, `unsubscribe` | The URI of the channel being subscribed to or released |
+| `dispatchAction`, `action` | The URI of the channel that the action changes |
+| `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `root/progress` | `ahp-root://` |
+| `auth/required` | The URI of the channel that requires authentication |
+| `otlp/exportLogs`, `otlp/exportTraces`, `otlp/exportMetrics` | The telemetry channel URI |
+| `tcp/data`, `tcp/eof`, `tcp/reset` | The TCP channel URI |
+| `channel/snapshot`, `channel/frame`, `channel/credit` | The URI of the subscription using [windowed delivery](/specification/windowed-delivery) |
 
-## Subscribe (Request)
+The TypeScript definitions enforce this rule. The compile-time check in
+`types/version/message-checks.ts` fails if a method's params do not have a
+`channel` member.
 
-`subscribe` is a JSON-RPC **request**. The result includes a snapshot for state-bearing channels and omits it for stateless ones.
+## Subscribing {#subscribe-request}
+
+A client subscribes to a channel by sending a `subscribe` request.
+
+The result contains a `snapshot`. The snapshot has the channel's current
+`state` and `fromSeq`, which is the `serverSeq` at which the state was
+captured. Every action that the server sends after the snapshot has a
+`serverSeq` greater than `fromSeq`. With
+[windowed delivery](/specification/windowed-delivery), the result contains
+`flowControl` instead, and the snapshot is sent in a `channel/snapshot`
+notification.
 
 ```jsonc
-// Client → Server
+// Client to server
 {
   "jsonrpc": "2.0",
   "id": 1,
   "method": "subscribe",
-  "params": {
-    "channel": "ahp-session:/<uuid>",
-    "delivery": { "maxLatencyMs": 100 }
-  }
+  "params": { "channel": "ahp-session:/<uuid>" }
 }
 
-// Server → Client (state-bearing channel)
+// Server to client
 {
   "jsonrpc": "2.0",
   "id": 1,
@@ -71,44 +108,97 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
     }
   }
 }
+```
 
-// Server → Client (stateless channel)
+For a channel whose state has no fields, the snapshot's `state` is an empty
+object, and `fromSeq` is the server's current `serverSeq`:
+
+```json
 {
   "jsonrpc": "2.0",
-  "id": 1,
-  "result": {}
+  "id": 2,
+  "result": {
+    "snapshot": { "resource": "ahp-otlp://logs", "state": {}, "fromSeq": 5 }
+  }
 }
 ```
 
-After subscribing, the client receives all messages scoped to that channel — both action envelopes (for state channels) and any channel-specific notifications.
+The server MAY omit the snapshot for a channel whose state has no fields. In
+that case `subscribe` returns `{}`, and `initialize` and `reconnect` results
+leave the channel out of `snapshots`. Clients MUST accept both forms.
 
-### Delivery preferences
+Later protocol versions can add channels with new kinds of state. A client
+MUST NOT fail because a snapshot's `state` has a form that it does not
+recognize; it ignores that snapshot.
 
-Clients MAY include `delivery.maxLatencyMs` on `subscribe` to request an upper
-bound, in milliseconds, on intentional server-side buffering for that
-subscription. Servers MAY use that budget to coalesce high-frequency updates
-while preserving the same reduced state a client would observe from immediate
-delivery. A value of `0` requests immediate delivery with no intentional
-coalescing. Omitting `delivery` uses the server's default delivery behavior.
+After a successful `subscribe`, the server sends the client every message for
+that channel until the client unsubscribes or the connection closes.
 
-### Snapshot views
+A client has at most one subscription to each channel. If it sends `subscribe`
+for a channel that it is already subscribed to, the request changes the
+existing subscription, for example to start windowed delivery or to change its
+window. No data is lost: the client keeps the messages that it has already
+received and processes them in order. The server answers as it would for a new
+subscription, so the client receives a new snapshot. If the subscription used
+windowed delivery both before and after the change, its counters continue from
+their current values; otherwise they start at zero when the server sends the
+result. If the request fails, the subscription does not change.
 
-Clients MAY include `view` on `subscribe` to ask the server to shape the
-returned snapshot. View preferences are advisory and additive: a server that
-does not understand a requested view ignores it and returns its default
-snapshot, and clients MUST tolerate receiving more state than requested.
+The `subscribe` params can also contain these optional members:
 
-For chat channels, `view.turns` asks the server to expose approximately that
-many most-recent completed turns in the snapshot. The value is advisory: the
-server MAY return more or fewer turns than requested. If `view.turns` is
-omitted, the server MUST return all retained turns. If older retained turns
-remain available, the returned `ChatState` includes `turnsNextCursor`; the
-client can pass that cursor to `fetchTurns` to ask the host to page older turns
-into the same reduced state.
+| Member | Purpose |
+|---|---|
+| `delivery` | Asks the server to limit how long it holds updates. See [Delivery Preferences](#delivery-preferences). |
+| `view` | Asks for a smaller snapshot. See [Snapshot Views](#snapshot-views). |
+| `flowControl` | Offers windowed delivery. See [Windowed Delivery](/specification/windowed-delivery). |
 
-## Unsubscribe (Notification)
+### Delivery Preferences
 
-`unsubscribe` is a fire-and-forget client → server notification. Like every wire message, its params carry the channel URI being released.
+`delivery.maxLatencyMs` is the longest time, in milliseconds, that the client
+wants the server to hold updates for this subscription before sending them.
+
+A server MAY use this time to combine updates. A server MUST NOT combine
+updates unless the combined update produces the same state as the original
+updates and the client still receives every event that the channel requires.
+For example, if the server
+generates two `chat/delta` actions for the same response part within 100 ms, it
+can send one `chat/delta` that contains both pieces of text.
+
+A value of `0` asks the server to send each update without delay. If `delivery`
+is absent, the server uses its default behavior. Delivery preferences do not
+allow a server to exceed the limits of a
+[windowed subscription](/specification/windowed-delivery).
+
+### Snapshot Views
+
+A client MAY include `view` to ask for a smaller snapshot. A server that does
+not support a requested view ignores it. Clients MUST accept a snapshot that
+contains more state than they requested.
+
+For a chat channel, `view.turns` is the number of most recent completed turns
+that the client wants in the snapshot:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "subscribe",
+  "params": {
+    "channel": "ahp-chat:/<cid>",
+    "view": { "turns": 20 }
+  }
+}
+```
+
+The server MAY return more or fewer turns than requested. If `view.turns` is
+absent, the server MUST return all turns that it retains. If older turns are
+available, `ChatState.turnsNextCursor` is present. The client passes that cursor
+to `fetchTurns` to load older turns into the chat state.
+
+## Unsubscribing {#unsubscribe-notification}
+
+A client stops receiving messages for a channel by sending an `unsubscribe`
+notification. The server does not respond.
 
 ```json
 {
@@ -118,11 +208,14 @@ into the same reduced state.
 }
 ```
 
-After unsubscribing, the client stops receiving messages for that channel.
+The server stops sending messages for the channel after it processes the
+notification. Messages that the server sent before that point can still arrive.
 
-## Action Delivery (`action`)
+## Actions
 
-State channels deliver mutations via the `action` server notification. The params are an `ActionEnvelope` — flat, with `channel` identifying the channel and a single `action` payload:
+The server sends each change to a channel's state as an `action`
+notification. The server sends the notification to every client that is
+subscribed to the channel.
 
 ```json
 {
@@ -137,14 +230,19 @@ State channels deliver mutations via the `action` server notification. The param
 }
 ```
 
-- Root actions go to all clients subscribed to `ahp-root://`.
-- Session actions go to all clients subscribed to that session's URI.
-- Chat actions go to all clients subscribed to that chat's URI.
-- Terminal actions go to all clients subscribed to that terminal's URI.
+| Member | Meaning |
+|---|---|
+| `channel` | The channel that the action changes |
+| `action` | The change. Its `type` identifies the action. |
+| `serverSeq` | The position of the action in the server's order of actions |
+| `origin` | The client and client sequence number that sent the action. Absent for actions that the server created. |
+| `rejectionReason` | Present when the server rejected a client action |
 
-Action payloads (the inner `action` object) carry only fields intrinsic to the action — the channel comes from the envelope. Individual actions do NOT carry a `session: URI` or `terminal: URI` field of their own.
+The `action` object contains only the fields of the action itself. It does not
+contain the channel URI. For example, a terminal action does not contain a
+`terminal` field; the receiver uses `params.channel`.
 
-The client → server dispatch path uses a different method, `dispatchAction`, with params `{ channel, clientSeq, action }`:
+A client sends an action with the `dispatchAction` notification:
 
 ```json
 {
@@ -158,11 +256,17 @@ The client → server dispatch path uses a different method, `dispatchAction`, w
 }
 ```
 
-See [Actions](/guide/actions) for the full list of client-dispatchable actions.
+The server then sends the action to subscribers in an `action` notification
+whose `origin` identifies the sending client. See
+[Write-Ahead Reconciliation](/guide/reconciliation) for how a client applies its
+own actions before the server confirms them, and [Actions](/guide/actions) for
+the actions that clients can send.
 
-## Initial Subscriptions
+## Subscribing During Initialization
 
-During the handshake, clients MAY include `initialSubscriptions` in `initialize` to subscribe to channels in the same round-trip:
+A client MAY list channels in the `initialSubscriptions` member of `initialize`.
+The client is then subscribed to those channels when initialization completes,
+without separate `subscribe` requests.
 
 ```json
 {
@@ -178,11 +282,18 @@ During the handshake, clients MAY include `initialSubscriptions` in `initialize`
 }
 ```
 
-The server includes a snapshot for each state-bearing channel in the `initialize` response.
+The `initialize` result contains a snapshot for each channel in the list,
+except channels whose snapshot the server omits, as described in
+[Subscribing](#subscribe-request). These
+subscriptions use ordinary delivery. A client that wants windowed delivery for
+one of these channels sends `subscribe` for it, which changes the existing
+subscription.
 
 ## Protocol Notifications
 
-Beyond `action`, the server pushes per-channel **protocol notifications** for ephemeral events. Each one is its own top-level JSON-RPC method (e.g. `root/sessionAdded`, `auth/required`) — there is no `notification` wrapper.
+A channel can also define notifications for events that are not stored in its
+state. Each such notification is a separate JSON-RPC method. For example, the
+server sends `root/sessionAdded` when a session is created:
 
 ```json
 {
@@ -195,7 +306,7 @@ Beyond `action`, the server pushes per-channel **protocol notifications** for ep
 }
 ```
 
-For partial updates to an existing session's summary, the server broadcasts `root/sessionSummaryChanged`:
+and `root/sessionSummaryChanged` when some fields of a session summary change:
 
 ```json
 {
@@ -209,8 +320,21 @@ For partial updates to an existing session's summary, the server broadcasts `roo
 }
 ```
 
-Protocol notifications go only to clients subscribed to the channel they target. They are not stored in state and are not replayed on reconnection.
+The server sends a protocol notification only to clients that are subscribed to
+its channel. With ordinary delivery, protocol notifications are not replayed
+after a client reconnects. To get current data after reconnecting, a client uses
+channel state or a request such as `listSessions`.
 
-## Stateless Channels
+## Windowed Delivery
 
-A channel MAY be stateless — i.e. carry no `Snapshot`. Subscribing returns an empty result `{}`, and subsequent traffic flows via channel-specific methods rather than `action` envelopes. The subscription/unsubscription mechanism is identical to state channels. Stateless channels are not replayed across reconnection — clients re-subscribe and resume from the live edge.
+By default, the server sends a subscription's messages as soon as they are
+available. A client can instead offer **windowed delivery** when it subscribes.
+With windowed delivery, a sender waits for credit when the amount of data it
+has sent but the receiver has not released reaches the subscription's window.
+Large messages are sent in fragments, and each fragment counts against the
+window. The receiver releases data with `channel/credit` notifications.
+
+Windowed delivery is useful for channels that can produce data faster than a
+client processes it, such as terminal output. See
+[Windowed Delivery](/specification/windowed-delivery) for the complete
+definition.

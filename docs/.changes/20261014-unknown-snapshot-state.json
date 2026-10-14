@@ -1,0 +1,11 @@
+{
+  "type": "fixed",
+  "message": "Decoding a snapshot whose state has an unrecognized form no longer fails. The state is kept as an `Unknown` variant with its raw JSON, and state mirrors ignore it. Go no longer decodes such a state as an empty `RootState`.",
+  "targets": [
+    "rust",
+    "go",
+    "kotlin",
+    "swift",
+    "dotnet"
+  ]
+}

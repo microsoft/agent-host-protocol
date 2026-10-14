@@ -21,7 +21,9 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
@@ -165,6 +167,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -235,9 +238,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -379,7 +380,7 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
 function generateRustBitset(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
 
   if (desc) {
     for (const d of desc.split('\n')) lines.push(`/// ${d.trimEnd()}`);
@@ -474,7 +475,7 @@ function generateRustBitset(enumDecl: EnumDeclaration): string {
 function generateRustEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   const values = enumDecl.getMembers().map(m => m.getValue());
   const isNumeric = values.every(v => typeof v === 'number');
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
@@ -801,13 +802,14 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -849,6 +851,9 @@ function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
  * discriminated union have `omitDiscriminants: true` set.
  */
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -977,6 +982,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -1369,16 +1375,20 @@ ${unknownVariant}}`;
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required \`lifecycle\`), then
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by channels whose state has no fields), then session (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then canvas (has required instance/provider/type
 /// identifiers), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
 /// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root.
+/// \`automations\`), then root (has required \`agents\`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as \`Unknown\` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),
@@ -1389,6 +1399,9 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }`;
 }
 
@@ -1420,9 +1433,14 @@ function generateStateFile(project: Project): string {
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
-      lines.push(generateStructFromInterface(project, entry.name, entry.rustName, {
+      const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
-      }));
+      });
+      // EmptyState must match only `{}`, so the untagged SnapshotState does not
+      // decode an unknown state shape as empty.
+      lines.push(entry.name === 'EmptyState'
+        ? struct.replace('pub struct EmptyState', '#[serde(deny_unknown_fields)]\npub struct EmptyState')
+        : struct);
       if (entry.name === 'SessionToolClientExecutionRequest') {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
@@ -1805,6 +1823,7 @@ pub struct ActionEnvelope {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
@@ -1813,6 +1832,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
@@ -1884,7 +1905,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1970,6 +1991,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1980,6 +2002,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1990,6 +2013,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }`;
@@ -2028,6 +2052,9 @@ ${unknownVariant}}`;
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2041,7 +2068,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary, Snapshot};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2082,7 +2109,27 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptRust(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptRust(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+pub const WINDOW_EXEMPT_METHODS: &[&str] = &[
+${methods}
+];
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+pub fn counts_against_window(method: &str) -> bool {
+    !WINDOW_EXEMPT_METHODS.contains(&method)
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
@@ -2133,6 +2180,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// The host could not open the requested TCP connection.
+    pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.

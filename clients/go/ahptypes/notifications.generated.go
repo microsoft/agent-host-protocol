@@ -28,6 +28,132 @@ const (
 
 // ─── Notification Payloads ────────────────────────────────────────────
 
+// Bytes in the sender's direction: from the client to the destination, or from
+// the destination to the client.
+//
+// The receiver writes the decoded bytes in the order received. The boundaries
+// between `tcp/data` notifications have no meaning. Data is not sent again
+// after the AHP connection is lost.
+//
+// Stability: 1.0 - Early development.
+type TcpDataParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+	// The bytes, as padded RFC 4648 base64 without whitespace.
+	Data string `json:"data"`
+}
+
+// Ends the sender's direction after the data that it has already sent, like a
+// TCP FIN. The other direction can continue. The sender MUST NOT send more
+// `tcp/data` after `tcp/eof`.
+//
+// This notification counts against the window, so the sender may have to wait
+// for credit before sending it. A receiver MUST release `tcp/data` as it writes
+// the bytes, without waiting for `tcp/eof`.
+//
+// Stability: 1.0 - Early development.
+type TcpEofParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+}
+
+// Aborts the connection in both directions, like a TCP RST.
+//
+// The sender discards data that it has not yet sent. The receiver discards data
+// that it has not yet written, and closes its own side of the connection. The
+// host sends `tcp/reset` when the destination connection fails or is reset, or
+// when the client sends invalid data. The client sends it to abort the
+// connection without waiting for buffered data to be written. After `tcp/reset`,
+// neither peer sends more data on the channel.
+//
+// Unlike `tcp/data` and `tcp/eof`, this notification does not count against the
+// window, so it can be sent when the window is full.
+//
+// Stability: 1.0 - Early development.
+type TcpResetParams struct {
+	// The URI of the TCP channel.
+	Channel URI `json:"channel"`
+}
+
+// One fragment of a data message on a windowed subscription.
+//
+// A sender uses fragments when a data message is larger than
+// `maximumFrameBytes`, and to let subscriptions take turns so that one busy
+// subscription does not hold up the whole connection. It serializes the message
+// to JSON text, divides the text into pieces, and sends each piece in order. The
+// receiver joins the `data` strings and parses the result only after it receives
+// the fragment with `final: true`.
+//
+// Fragments MUST NOT be empty and MUST NOT divide a UTF-16 surrogate pair. The
+// channel inside the joined message MUST match `channel`. For each subscription
+// and direction, only one fragmented message can be in progress. Control
+// messages, requests, and responses MUST NOT be sent in fragments.
+//
+// Each fragment counts against the window when it is sent, by the size of the
+// complete `channel/frame` message, including its envelope and escape
+// characters. If the window becomes full partway through a message, the sender
+// waits for credit before it sends the next fragment.
+//
+// Stability: 1.0 - Early development.
+type ChannelFrameParams struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The next piece of the serialized JSON-RPC message.
+	Data string `json:"data"`
+	// `true` on the last fragment of the message. Absent or `false` on other fragments.
+	Final *bool `json:"final,omitempty"`
+}
+
+// Reports how much data the receiver has released.
+//
+// `consumedBytes` is the total size, in UTF-16 bytes, of the data messages and
+// fragments that the receiver has released on this subscription. It is a total,
+// not an increment, and can be any value up to the amount of data sent; it does
+// not need to match the end of a message or fragment. The size of a message or
+// fragment is the size of its complete JSON-RPC text as received.
+//
+// The receiver decides when to send credit; for example, after it applies an
+// action, after stream data leaves its local buffer, or after it stores a
+// fragment for reassembly. When outstanding data reaches `windowBytes`, the
+// receiver MUST send credit as soon as it is ready to receive more data.
+//
+// A sender ignores a value that is not greater than the previous value. The
+// protocol does not define what happens when the value is greater than the data
+// sent; an implementation can log the error or close the connection.
+//
+// Stability: 1.0 - Early development.
+type ChannelCreditParams struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// Total UTF-16 bytes of data messages and fragments that the receiver has released.
+	ConsumedBytes int64 `json:"consumedBytes"`
+}
+
+// Sends the state of a channel to a windowed subscription.
+//
+// On a windowed subscription, the `subscribe` result does not contain a
+// snapshot. The server sends this notification instead. It MUST be the first
+// data message that the server sends on every windowed subscription, and the
+// first after `snapshot` recovery. If it is sent in fragments, this applies to
+// the joined message. Data messages after it are changes to this state, or new
+// data for the channel. For a channel whose state has no fields,
+// `snapshot.state` is an {@link EmptyState} and `snapshot.fromSeq` is the
+// server's current `serverSeq`.
+//
+// This is a data message that counts against the window. The server can send it
+// in `channel/frame` fragments, and MUST do so if it is larger than
+// `maximumFrameBytes`. `snapshot.resource` MUST be the same as `channel`.
+//
+// The server does not send this notification on ordinary subscriptions.
+//
+// Stability: 1.0 - Early development.
+type ChannelSnapshotParams struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The channel's state.
+	Snapshot Snapshot `json:"snapshot"`
+}
+
 // Broadcast to all clients subscribed to the root channel when a new session
 // is created.
 type SessionAddedParams struct {
@@ -164,8 +290,8 @@ type AuthRequiredParams struct {
 // AHP does not redeclare the OTLP type system; clients SHOULD use an
 // OpenTelemetry SDK or schema to parse it.
 //
-// Like all stateless-channel notifications, this is ephemeral: it is not
-// replayed on reconnect. Subscribers receive only batches emitted after
+// Like other protocol notifications, this is not stored in the channel's
+// state and is not replayed on reconnect. Subscribers receive only batches emitted after
 // their `subscribe` succeeds.
 type OtlpExportLogsParams struct {
 	// Channel URI this notification belongs to (an `ahp-otlp:` URI advertised on `TelemetryCapabilities.logs`).
@@ -258,4 +384,27 @@ type PartialSessionSummary struct {
 	Chats []SessionChatSummary `json:"chats,omitempty"`
 	// Chat that receives input when none is selected, independent of catalog position.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
+}
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+// WindowExemptMethods lists the notification methods that do not count against
+// the window on a windowed subscription. Every other notification for a
+// subscription counts.
+var WindowExemptMethods = []string{
+	"channel/credit",
+	"tcp/reset",
+	"unsubscribe",
+}
+
+// CountsAgainstWindow reports whether a notification with this method counts
+// against the window on a windowed subscription. Methods that are not
+// recognized count.
+func CountsAgainstWindow(method string) bool {
+	for _, exempt := range WindowExemptMethods {
+		if method == exempt {
+			return false
+		}
+	}
+	return true
 }

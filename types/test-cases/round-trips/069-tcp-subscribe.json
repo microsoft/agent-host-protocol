@@ -1,0 +1,26 @@
+{
+  "name": "tcp-subscribe",
+  "group": "A",
+  "description": "A client subscribes to a created TCP channel with an ordinary subscribe request that offers windowed delivery.",
+  "type": "SubscribeParams",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "flowControl": {
+      "receive": {
+        "windowBytes": 262144,
+        "maximumFrameBytes": 16384
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-tcp:/t1",
+      "flowControl": {
+        "receive": {
+          "windowBytes": 262144,
+          "maximumFrameBytes": 16384
+        }
+      }
+    }
+  ]
+}

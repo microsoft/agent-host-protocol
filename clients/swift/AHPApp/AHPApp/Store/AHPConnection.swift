@@ -1024,10 +1024,9 @@ private actor LegacyAHPConnection {
 
     /// Subscribe to a channel URI and return the snapshot (if any).
     ///
-    /// For stateful channels (root/session/terminal/changeset), the server
-    /// returns a snapshot describing current state. For stateless channels
-    /// the snapshot is omitted. Callers that pre-suppose a stateful channel
-    /// SHOULD treat a `nil` snapshot as an error.
+    /// The server returns a snapshot describing current state. Older hosts
+    /// omit it for channels with no state, such as telemetry. Callers that
+    /// expect state SHOULD treat a `nil` snapshot as an error.
     func subscribe(resource: String) async throws -> Snapshot? {
         let result: SubscribeResult = try await sendRequest(
             method: "subscribe",

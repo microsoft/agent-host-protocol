@@ -40,6 +40,19 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 
 // MARK: - Enums
 
+/// How the server resumes sending data on a windowed subscription after
+/// reconnection.
+///
+/// Stability: 1.0 - Early development.
+public enum ChannelRecoveryKind: String, Codable, Sendable {
+    /// The server sends a new `channel/snapshot`, and the client replaces its state.
+    case snapshot = "snapshot"
+    /// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+    case replay = "replay"
+    /// The server sends only data created after reconnection.
+    case live = "live"
+}
+
 /// Policy configuration state for a model.
 public enum PolicyState: String, Codable, Sendable {
     case enabled = "enabled"
@@ -1148,6 +1161,105 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
 }
 
 // MARK: - State Types
+
+/// Present when the host supports `createTcpConnection`.
+///
+/// A client creates a connection with `createTcpConnection`, then subscribes to
+/// its channel with windowed delivery. A TCP channel's state is an
+/// {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+/// notifications. TCP connections do not survive the loss of the AHP connection.
+///
+/// Stability: 1.0 - Early development.
+public struct TcpConnectionsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelReceiveLimits: Codable, Sendable {
+    /// The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.
+    public var windowBytes: Int
+    /// The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.
+    public var maximumFrameBytes: Int
+
+    public init(
+        windowBytes: Int,
+        maximumFrameBytes: Int
+    ) {
+        self.windowBytes = windowBytes
+        self.maximumFrameBytes = maximumFrameBytes
+    }
+}
+
+/// The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelFlowControl: Codable, Sendable {
+    /// Limits for data that the server sends to the client.
+    public var clientReceive: ChannelReceiveLimits
+    /// Limits for data that the client sends to the server.
+    public var hostReceive: ChannelReceiveLimits
+
+    public init(
+        clientReceive: ChannelReceiveLimits,
+        hostReceive: ChannelReceiveLimits
+    ) {
+        self.clientReceive = clientReceive
+        self.hostReceive = hostReceive
+    }
+}
+
+/// A windowed subscription that the server kept after reconnection.
+///
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
+///
+/// Stability: 1.0 - Early development.
+public struct ResumedChannelSubscription: Codable, Sendable {
+    /// The URI of the windowed subscription.
+    public var channel: String
+    /// The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.
+    public var flowControl: ChannelFlowControl
+    /// How the server resumes sending data.
+    public var recovery: ChannelRecoveryKind
+
+    public init(
+        channel: String,
+        flowControl: ChannelFlowControl,
+        recovery: ChannelRecoveryKind
+    ) {
+        self.channel = channel
+        self.flowControl = flowControl
+        self.recovery = recovery
+    }
+}
 
 public struct Icon: Codable, Sendable {
     /// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
@@ -5959,7 +6071,10 @@ public struct ErrorInfo: Codable, Sendable {
 public struct Snapshot: Codable, Sendable {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     public var resource: String
-    /// The current state of the resource
+    /// The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.
     public var state: SnapshotState
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     public var fromSeq: Int
@@ -5972,6 +6087,23 @@ public struct Snapshot: Codable, Sendable {
         self.resource = resource
         self.state = state
         self.fromSeq = fromSeq
+    }
+}
+
+/// The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
+///
+/// Stability: 1.0 - Early development.
+public struct EmptyState: Codable, Sendable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -8303,6 +8435,7 @@ public enum ToolResultContent: Codable, Sendable {
 
 /// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
+    case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
@@ -8313,8 +8446,24 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    case unknown(AnyCodable)
+
+    private struct MemberKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
 
     public init(from decoder: Decoder) throws {
+        // An object with no members is an empty state, used by channels whose state has no fields.
+        // EmptyState would decode any object, so check for members explicitly.
+        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
+            self = .empty(EmptyState())
+            return
+        }
         // Try the most distinctive shapes first. SessionState has required
         // `lifecycle` / `activeClients` / `chats`; ChatState has required
         // `turns`; CanvasState has required instance/provider/type identifiers;
@@ -8338,13 +8487,17 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
+        } else if let root = try? RootState(from: decoder) {
+            self = .root(root)
         } else {
-            self = .root(try RootState(from: decoder))
+            // A state from a later protocol version: keep it rather than fail.
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .empty(let state): try state.encode(to: encoder)
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
@@ -8355,6 +8508,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .unknown(let raw): try raw.encode(to: encoder)
         }
     }
 }

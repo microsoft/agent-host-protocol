@@ -21,11 +21,13 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation, readStability } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
 } from './enum-compatibility.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -121,6 +123,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -198,9 +201,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -303,7 +304,7 @@ function emitSwiftDocLine(docLine: string, indent = ''): string {
 function generateSwiftEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   const values = enumDecl.getMembers().map(member => member.getValue());
   const rawType = values.every(value => typeof value === 'number') ? 'Int' : 'String';
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
@@ -583,7 +584,10 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = swiftNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  return generateSwiftStruct(name, props);
+  const declaration = generateSwiftStruct(name, props);
+  if (!readStability(iface)) return declaration;
+  const doc = getDocumentation(iface).split('\n').map(line => emitSwiftDocLine(line)).join('\n');
+  return `${doc}\n${declaration}`;
 }
 
 function generateFixedChatSourceBranchSwift(
@@ -671,6 +675,7 @@ function generatePartialStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -691,6 +696,9 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
+  'TcpConnectionsCapability',
+  'ChannelReceiveLimits',
+  'ChannelFlowControl', 'ResumedChannelSubscription',
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
@@ -742,7 +750,7 @@ const STATE_STRUCTS = [
   'TerminalClientClaim', 'TerminalSessionClaim',
   'TerminalRunningLifecycleState', 'TerminalExitedLifecycleState', 'TerminalState',
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
-  'UsageInfo', 'ErrorInfo', 'Snapshot',
+  'UsageInfo', 'ErrorInfo', 'Snapshot', 'EmptyState',
   'CanvasReference', 'CanvasState',
   'Changeset', 'ChangesetCapabilities', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
@@ -1111,6 +1119,7 @@ public enum ToolInput: Codable, Sendable {
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
+    case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
     case chat(ChatState)
@@ -1121,8 +1130,24 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    case unknown(AnyCodable)
+
+    private struct MemberKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
 
     public init(from decoder: Decoder) throws {
+        // An object with no members is an empty state, used by channels whose state has no fields.
+        // EmptyState would decode any object, so check for members explicitly.
+        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
+            self = .empty(EmptyState())
+            return
+        }
         // Try the most distinctive shapes first. SessionState has required
         // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
         // \`turns\`; CanvasState has required instance/provider/type identifiers;
@@ -1146,13 +1171,17 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
+        } else if let root = try? RootState(from: decoder) {
+            self = .root(root)
         } else {
-            self = .root(try RootState(from: decoder))
+            // A state from a later protocol version: keep it rather than fail.
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .empty(let state): try state.encode(to: encoder)
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
@@ -1163,6 +1192,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .unknown(let raw): try raw.encode(to: encoder)
         }
     }
 }`;
@@ -1674,6 +1704,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
+  'CreateTcpConnectionParams',
   'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
@@ -1681,6 +1712,8 @@ const COMMAND_STRUCTS = [
   'AutomationCustomizationsCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
+  'ChannelDeliveryResumeParams', 'ChannelDeliveryResumeOptions',
+  'ChannelDeliveryResumeResult', 'SubscriptionFlowControlOptions',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
@@ -1949,6 +1982,9 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams',
   'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',
@@ -1996,7 +2032,27 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptSwift(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptSwift(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// MARK: - Windowed Delivery
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+public let windowExemptMethods: Set<String> = [
+${methods}
+]
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+public func countsAgainstWindow(_ method: String) -> Bool {
+    !windowExemptMethods.contains(method)
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

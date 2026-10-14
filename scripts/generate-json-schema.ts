@@ -16,6 +16,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ interface JsonSchema {
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
+  maximum?: number;
+  minLength?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -54,9 +57,7 @@ function normalizeDescription(text: string): string {
 }
 
 function getPropertyDescription(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return normalizeDescription(jsDocs[0].getDescription());
+  return getDocumentation(prop);
 }
 
 function hasPropertyTag(prop: PropertySignature, tagName: string): boolean {
@@ -119,9 +120,7 @@ function getUniqueItemsByConstraints(prop: PropertySignature): JsonSchema[] | un
 }
 
 function getInterfaceDescription(node: InterfaceDeclaration): string {
-  const jsDocs = node.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return normalizeDescription(jsDocs[0].getDescription());
+  return getDocumentation(node);
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -407,14 +406,25 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
       }
       propSchema.type = 'integer';
     }
-    const minimum = getNumericPropertyTag(prop, 'minimum');
-    if (minimum !== undefined) {
-      if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+    for (const constraint of ['minimum', 'maximum'] as const) {
+      const value = getNumericPropertyTag(prop, constraint);
+      if (value !== undefined) {
+        if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+          throw new Error(
+            `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+          );
+        }
+        propSchema[constraint] = value;
+      }
+    }
+    const minLength = getNumericPropertyTag(prop, 'minLength');
+    if (minLength !== undefined) {
+      if (propSchema.type !== 'string' || !Number.isInteger(minLength) || minLength < 0) {
         throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+          `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @minLength on ${typeText}`,
         );
       }
-      propSchema.minimum = minimum;
+      propSchema.minLength = minLength;
     }
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {
