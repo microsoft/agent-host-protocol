@@ -35,6 +35,9 @@ export const enum CanvasExtensionSource {
  * represented by {@link CanvasReference} entries on chat state and their
  * corresponding {@link CanvasState} channels.
  *
+ * This experimental object may gain optional discovery metadata. Clients
+ * SHOULD ignore fields they do not understand.
+ *
  * @category Canvas State
  */
 export interface CanvasTypeDeclaration {

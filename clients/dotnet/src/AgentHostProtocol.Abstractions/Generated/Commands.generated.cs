@@ -1091,6 +1091,10 @@ public sealed record ListCanvasTypesResult
 /// Repeating this command with the same `instanceId` focuses or refreshes that
 /// logical instance rather than creating a duplicate.
 ///
+/// The null result is not presentation state. Clients MUST observe
+/// {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
+/// authoritative membership, availability, and presentation state.
+///
 /// Clients MUST NOT call this command unless the selected agent advertises
 /// {@link AgentCapabilities.canvases}.</summary>
 public sealed record OpenCanvasParams
