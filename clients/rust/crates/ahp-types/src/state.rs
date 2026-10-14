@@ -1823,9 +1823,14 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// Experimental Canvas API.
+    ///
     /// The agent can list canvas types for an exact chat with `listCanvasTypes`
     /// and open them with `openCanvas`. Live instances are published through the
     /// chat's canvas references and their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// discovery metadata while the Canvas channel remains experimental.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvases: Option<JsonObject>,
     /// The agent can host more than one concurrent chat per session. When absent,
@@ -2210,6 +2215,9 @@ pub struct ChatState {
 /// This is discovery metadata, not a live canvas instance. Live instances are
 /// represented by {@link CanvasReference} entries on chat state and their
 /// corresponding {@link CanvasState} channels.
+///
+/// This experimental object may gain optional discovery metadata. Clients
+/// SHOULD ignore fields they do not understand.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasTypeDeclaration {
