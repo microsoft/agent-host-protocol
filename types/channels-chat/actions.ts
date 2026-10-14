@@ -901,8 +901,6 @@ export interface ChatIsArchivedChangedAction {
  * in the session's config schema may be set. To reset a property to the
  * session's value, replace the overlay with one that omits the property.
  *
- * A host may change other chats' config as well.
- *
  * @category Chat Actions
  * @version 1
  * @clientDispatchable

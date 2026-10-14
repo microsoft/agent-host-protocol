@@ -1551,8 +1551,6 @@ pub struct ChatIsArchivedChangedAction {
 /// overlay when `replace` is `true`. Only properties with `chatMutable: true`
 /// in the session's config schema may be set. To reset a property to the
 /// session's value, replace the overlay with one that omits the property.
-///
-/// A host may change other chats' config as well.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatConfigChangedAction {

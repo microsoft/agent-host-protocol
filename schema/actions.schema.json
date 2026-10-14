@@ -1710,7 +1710,7 @@
     },
     "ChatConfigChangedAction": {
       "type": "object",
-      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} overlay, or replaces the\noverlay when `replace` is `true`. Only properties with `chatMutable: true`\nin the session's config schema may be set. To reset a property to the\nsession's value, replace the overlay with one that omits the property.\n\nA host may change other chats' config as well.",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} overlay, or replaces the\noverlay when `replace` is `true`. Only properties with `chatMutable: true`\nin the session's config schema may be set. To reset a property to the\nsession's value, replace the overlay with one that omits the property.",
       "properties": {
         "type": {
           "const": "chat/configChanged"

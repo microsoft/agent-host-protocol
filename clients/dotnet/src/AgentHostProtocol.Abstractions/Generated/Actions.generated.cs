@@ -2088,9 +2088,7 @@ public sealed record ChatIsArchivedChangedAction
 /// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
 /// overlay when `replace` is `true`. Only properties with `chatMutable: true`
 /// in the session's config schema may be set. To reset a property to the
-/// session's value, replace the overlay with one that omits the property.
-///
-/// A host may change other chats' config as well.</summary>
+/// session's value, replace the overlay with one that omits the property.</summary>
 public sealed record ChatConfigChangedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatConfigChanged;

@@ -93,8 +93,6 @@ To reset a property to the session's value, replace the overlay with one that
 omits the property. Every other property is changed on the session with
 `session/configChanged`.
 
-A host may change other chats' config as well.
-
 ## Relationship to the session channel
 
 - A chat's [`ChatSummary`](/reference/chat#chatsummary) appears in the session's [`SessionState.chats`](/reference/session#sessionstate) catalog. The session reducer keeps that catalog in sync with the underlying chat lifecycle.

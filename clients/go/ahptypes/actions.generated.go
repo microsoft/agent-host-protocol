@@ -874,8 +874,6 @@ type ChatIsArchivedChangedAction struct {
 // overlay when `replace` is `true`. Only properties with `chatMutable: true`
 // in the session's config schema may be set. To reset a property to the
 // session's value, replace the overlay with one that omits the property.
-//
-// A host may change other chats' config as well.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Config values to set on the chat
