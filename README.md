@@ -28,6 +28,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation ([`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node)).
 - **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
 - **[ahpd](https://github.com/softov/ahpd)** — An open-source AHP host over WebSocket, that runs plugins: the agent, the ports and the server tools are all installed rather than built in, and `@ahpd/sdk` is the library to build a host of your own.
+- **[hydra-ahp](https://github.com/smagnuso/hydra-ahp)** — An open-source AHP host for [Hydra](https://github.com/smagnuso/hydra-acp), a multi-client ACP session daemon, exposing Hydra sessions to AHP clients such as VS Code's agent UI.
 
 ## Versioning and releases
 

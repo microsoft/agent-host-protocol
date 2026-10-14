@@ -1765,7 +1765,7 @@ pub struct MultipleWorkingDirectoriesCapability {
 pub struct SessionModelInfo {
     /// Model identifier
     pub id: String,
-    /// Provider this model belongs to
+    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     pub provider: String,
     /// Human-readable model name
     pub name: String,
@@ -1795,6 +1795,15 @@ pub struct SessionModelInfo {
     /// For example, a `pricing` key may carry model pricing metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Vendor of this model as the provider reports it, for example `Anthropic`
+    /// or `Azure OpenAI`. This is sometimes the company that serves the model
+    /// rather than the one that built it. Not the same as {@link provider},
+    /// which names the agent provider that owns this model. Absent when the
+    /// provider does not report a vendor. Providers MAY send any value; clients
+    /// SHOULD fall back to a generic presentation for values they do not
+    /// recognize.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
 }
 
 /// A model selection: the chosen model ID together with any model-specific

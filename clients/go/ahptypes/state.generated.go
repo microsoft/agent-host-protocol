@@ -775,7 +775,7 @@ type MultipleWorkingDirectoriesCapability struct {
 type SessionModelInfo struct {
 	// Model identifier
 	Id string `json:"id"`
-	// Provider this model belongs to
+	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
 	Provider string `json:"provider"`
 	// Human-readable model name
 	Name string `json:"name"`
@@ -798,6 +798,14 @@ type SessionModelInfo struct {
 	// Clients MAY look for well-known keys here to provide enhanced UI.
 	// For example, a `pricing` key may carry model pricing metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Vendor of this model as the provider reports it, for example `Anthropic`
+	// or `Azure OpenAI`. This is sometimes the company that serves the model
+	// rather than the one that built it. Not the same as {@link provider},
+	// which names the agent provider that owns this model. Absent when the
+	// provider does not report a vendor. Providers MAY send any value; clients
+	// SHOULD fall back to a generic presentation for values they do not
+	// recognize.
+	Vendor *string `json:"vendor,omitempty"`
 }
 
 // A model selection: the chosen model ID together with any model-specific
