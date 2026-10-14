@@ -1520,9 +1520,14 @@ public struct AgentInfo: Codable, Sendable {
 }
 
 public struct AgentCapabilities: Codable, Sendable {
+    /// Experimental Canvas API.
+    ///
     /// The agent can list canvas types for an exact chat with `listCanvasTypes`
     /// and open them with `openCanvas`. Live instances are published through the
     /// chat's canvas references and their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// discovery metadata while the Canvas channel remains experimental.
     public var canvases: [String: AnyCodable]?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
