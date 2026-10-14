@@ -1742,6 +1742,10 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
+    /// Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.
+    public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -1786,6 +1790,7 @@ public struct ChatState: Codable, Sendable {
         case changesets
         case backgroundWork
         case canvases
+        case config
         case turns
         case turnsNextCursor
         case activeTurn
@@ -1809,6 +1814,7 @@ public struct ChatState: Codable, Sendable {
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
         canvases: [CanvasReference]? = nil,
+        config: ChatConfigState? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -1830,6 +1836,7 @@ public struct ChatState: Codable, Sendable {
         self.changesets = changesets
         self.backgroundWork = backgroundWork
         self.canvases = canvases
+        self.config = config
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
@@ -2537,6 +2544,17 @@ public struct SessionConfigState: Codable, Sendable {
         values: [String: AnyCodable]
     ) {
         self.schema = schema
+        self.values = values
+    }
+}
+
+public struct ChatConfigState: Codable, Sendable {
+    /// Config values set on this chat, keyed by property id
+    public var values: [String: AnyCodable]
+
+    public init(
+        values: [String: AnyCodable]
+    ) {
         self.values = values
     }
 }

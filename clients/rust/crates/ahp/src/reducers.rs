@@ -58,8 +58,8 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
-    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
-    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
     McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
     ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
@@ -1421,6 +1421,19 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.status = with_status_flag(state.status, SessionStatus::IsArchived, a.is_archived);
             ReduceOutcome::Applied
         }
+        StateAction::ChatConfigChanged(a) => {
+            let config = state.config.get_or_insert_with(|| ChatConfigState {
+                values: Default::default(),
+            });
+            if a.replace.unwrap_or(false) {
+                config.values = a.config.clone();
+            } else {
+                for (k, v) in &a.config {
+                    config.values.insert(k.clone(), v.clone());
+                }
+            }
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }
@@ -2316,6 +2329,7 @@ mod tests {
             working_directories: None,
             changesets: None,
             canvases: None,
+            config: None,
             turns: Vec::new(),
             turns_next_cursor: None,
             active_turn: None,

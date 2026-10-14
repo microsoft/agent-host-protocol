@@ -82,6 +82,7 @@ pub enum ActionType {
     ChatDraftChanged,
     ChatIsReadChanged,
     ChatIsArchivedChanged,
+    ChatConfigChanged,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -226,6 +227,7 @@ impl serde::Serialize for ActionType {
             Self::ChatDraftChanged => serializer.serialize_str("chat/draftChanged"),
             Self::ChatIsReadChanged => serializer.serialize_str("chat/isReadChanged"),
             Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
+            Self::ChatConfigChanged => serializer.serialize_str("chat/configChanged"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -380,6 +382,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/draftChanged" => Self::ChatDraftChanged,
             "chat/isReadChanged" => Self::ChatIsReadChanged,
             "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
+            "chat/configChanged" => Self::ChatConfigChanged,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -1541,6 +1544,23 @@ pub struct ChatIsArchivedChangedAction {
     pub is_archived: bool,
 }
 
+/// Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+/// in the session's config schema may be set. To reset a property to the
+/// session's value, replace the overlay with one that omits the property.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigChangedAction {
+    /// Config values to set on the chat
+    pub config: JsonObject,
+    /// When `true`, replaces the chat's config values instead of merging
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
+}
+
 /// A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2492,6 +2512,8 @@ pub enum StateAction {
     ChatIsReadChanged(ChatIsReadChangedAction),
     #[serde(rename = "chat/isArchivedChanged")]
     ChatIsArchivedChanged(ChatIsArchivedChangedAction),
+    #[serde(rename = "chat/configChanged")]
+    ChatConfigChanged(ChatConfigChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

@@ -1,0 +1,38 @@
+{
+  "description": "chat/configChanged with replace and the overlay minus a key resets that key to the session's value",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "config": {
+      "values": {
+        "autoApprove": true,
+        "mode": "plan"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/configChanged",
+      "config": {
+        "mode": "plan"
+      },
+      "replace": true
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "config": {
+      "values": {
+        "mode": "plan"
+      }
+    }
+  }
+}

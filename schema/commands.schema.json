@@ -3122,6 +3122,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatMutable": {
+          "type": "boolean",
+          "description": "When `true`, the property may be set per chat with `chat/configChanged`.\nThe chat's value overrides the session's value for that chat only."
         }
       },
       "required": [
@@ -4324,6 +4328,10 @@
           },
           "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
+        "config": {
+          "$ref": "#/$defs/ChatConfigState",
+          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -4544,6 +4552,20 @@
       },
       "required": [
         "text"
+      ]
+    },
+    "ChatConfigState": {
+      "type": "object",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values set on this chat, keyed by property id"
+        }
+      },
+      "required": [
+        "values"
       ]
     },
     "PendingMessage": {
@@ -9429,6 +9451,28 @@
         "isArchived"
       ]
     },
+    "ChatConfigChangedAction": {
+      "type": "object",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} overlay, or replaces the\noverlay when `replace` is `true`. Only properties with `chatMutable: true`\nin the session's config schema may be set. To reset a property to the\nsession's value, replace the overlay with one that omits the property.",
+      "properties": {
+        "type": {
+          "const": "chat/configChanged"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values to set on the chat"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces the chat's config values instead of merging"
+        }
+      },
+      "required": [
+        "type",
+        "config"
+      ]
+    },
     "ChatInputRequestedAction": {
       "type": "object",
       "description": "A session requested input from the user.\n\nCreates an unresolved {@link InputRequestResponsePart} in the active turn,\nor replaces the unresolved part with the same request `id`. Answer drafts\nare preserved unless `request.answers` is provided.",
@@ -10456,6 +10500,9 @@
         },
         {
           "$ref": "#/$defs/ChatIsArchivedChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatConfigChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"

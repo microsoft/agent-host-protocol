@@ -194,6 +194,7 @@ ChatState {
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
+  config?: ChatConfigState        // config values set on this chat (overlay)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -210,6 +211,13 @@ subscribe to each advertised `Changeset.uriTemplate` through the existing
 changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
+
+`config` is an overlay on `SessionState.config`: it carries only the values set
+on this chat, and the session's config schema applies. A chat's effective
+config is the session's values with the chat's values applied over them. Only
+properties marked `chatMutable: true` in the session's schema can be set per
+chat, with `chat/configChanged`. See
+[Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

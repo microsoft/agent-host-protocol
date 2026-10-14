@@ -108,6 +108,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `chat/isReadChanged` | **Yes** | Client marked any known chat, including the default chat, as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |
+| `chat/configChanged` | **Yes** | Config values set on a chat (`chatMutable` properties) changed |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
 ### Server & Active-Client Tools (session channel)
@@ -217,6 +218,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/isReadChanged` | Marks the session as read or unread |
 | `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats; refreshes the compact `SessionChatSummary.status` projection |
 | `session/isArchivedChanged` | Archives or unarchives the session |
+| `chat/configChanged` | Sets `chatMutable` config values for this chat, overriding the session's values for this chat only |
 
 ## Reducers
 

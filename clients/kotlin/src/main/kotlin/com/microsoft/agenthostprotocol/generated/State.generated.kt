@@ -1734,6 +1734,12 @@ data class ChatState(
      */
     val canvases: List<CanvasReference>? = null,
     /**
+     * Configuration values set on this chat, applied over the owning session's
+     * {@link SessionState.config | `SessionState.config`}. See
+     * {@link ChatConfigState}.
+     */
+    val config: ChatConfigState? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,
@@ -2408,6 +2414,14 @@ data class SessionConfigState(
     val schema: SessionConfigSchema,
     /**
      * Current configuration values
+     */
+    val values: Map<String, JsonElement>
+)
+
+@Serializable
+data class ChatConfigState(
+    /**
+     * Config values set on this chat, keyed by property id
      */
     val values: Map<String, JsonElement>
 )

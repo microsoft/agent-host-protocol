@@ -2008,6 +2008,11 @@ pub struct ChatState {
     /// state, including its current live source URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvases: Option<Vec<CanvasReference>>,
+    /// Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -2735,6 +2740,10 @@ pub struct SessionConfigPropertySchema {
     /// When `true`, the user may change this property after session creation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mutable: Option<bool>,
+    /// When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_mutable: Option<bool>,
 }
 
 /// A JSON Schema object describing available session configuration metadata.
@@ -2760,6 +2769,20 @@ pub struct SessionConfigState {
     /// JSON Schema describing available configuration properties
     pub schema: SessionConfigSchema,
     /// Current configuration values
+    pub values: JsonObject,
+}
+
+/// Configuration values set on a chat: an overlay on the owning session's
+/// {@link SessionState.config | `SessionState.config`}.
+///
+/// It carries only the chat's own values; the session's config schema
+/// applies. The effective config of a chat is the session's values with
+/// these values applied over them. Only properties with `chatMutable: true`
+/// in the session's config schema can be set on a chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigState {
+    /// Config values set on this chat, keyed by property id
     pub values: JsonObject,
 }
 

@@ -127,6 +127,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatIsArchivedChanged = new ActionType("chat/isArchivedChanged");
 
+    public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -2080,6 +2082,25 @@ public sealed record ChatIsArchivedChangedAction
     public bool IsArchived { get; init; }
 }
 
+/// <summary>Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+/// in the session's config schema may be set. To reset a property to the
+/// session's value, replace the overlay with one that omits the property.</summary>
+public sealed record ChatConfigChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
+
+    /// <summary>Config values to set on the chat</summary>
+    public required Dictionary<string, JsonElement> Config { get; init; }
+
+    /// <summary>When `true`, replaces the chat's config values instead of merging</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
+}
+
 /// <summary>A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2867,6 +2888,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
+        ["chat/configChanged"] = typeof(ChatConfigChangedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

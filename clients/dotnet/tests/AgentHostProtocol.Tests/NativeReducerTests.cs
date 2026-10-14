@@ -12,6 +12,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.AgentHostProtocol;
 using Xunit;
 
@@ -195,6 +196,20 @@ public sealed class NativeReducerTests
         {
             Type = ActionType.ChatIsReadChanged,
             IsRead = true,
+        });
+        Assert.True(Reducers.IsClientDispatchable(action));
+    }
+
+    [Fact]
+    public void ClientDispatchable_TrueForChatConfigChanged()
+    {
+        var action = new StateAction(new ChatConfigChangedAction
+        {
+            Type = ActionType.ChatConfigChanged,
+            Config = new Dictionary<string, JsonElement>
+            {
+                ["autoApprove"] = JsonDocument.Parse("true").RootElement,
+            },
         });
         Assert.True(Reducers.IsClientDispatchable(action));
     }
