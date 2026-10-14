@@ -2765,6 +2765,10 @@
           },
           "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
+        "config": {
+          "$ref": "#/$defs/SessionConfigState",
+          "description": "The chat's complete effective configuration: every property the chat\nruns with, including session-level ones, described by the full schema.\n\nSame shape and semantics as\n{@link SessionState.config | `SessionState.config`}, scoped to this chat.\nClients render the chat's configuration from this field and change it\nwith `chat/configChanged`. The host decides where each change is stored:\na chat-scoped property affects only this chat, while a session-level\nproperty changes the session and the host publishes it to every chat in\nthe session. A host without per-chat configuration MAY publish the\nsession's configuration into each chat.\n\nAbsent when the host does not expose configuration on this chat; clients\nthen use the owning session's `SessionState.config`."
+        },
         "turns": {
           "type": "array",
           "items": {

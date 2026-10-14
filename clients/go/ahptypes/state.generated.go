@@ -1345,6 +1345,21 @@ type ChatState struct {
 	// Clients subscribe to each resource for the experimental presentation
 	// state, including its current live source URL.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
+	// The chat's complete effective configuration: every property the chat
+	// runs with, including session-level ones, described by the full schema.
+	//
+	// Same shape and semantics as
+	// {@link SessionState.config | `SessionState.config`}, scoped to this chat.
+	// Clients render the chat's configuration from this field and change it
+	// with `chat/configChanged`. The host decides where each change is stored:
+	// a chat-scoped property affects only this chat, while a session-level
+	// property changes the session and the host publishes it to every chat in
+	// the session. A host without per-chat configuration MAY publish the
+	// session's configuration into each chat.
+	//
+	// Absent when the host does not expose configuration on this chat; clients
+	// then use the owning session's `SessionState.config`.
+	Config *SessionConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.

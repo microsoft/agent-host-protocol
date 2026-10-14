@@ -890,6 +890,36 @@ export interface ChatIsArchivedChangedAction {
   isArchived: boolean;
 }
 
+// ─── Chat Config Actions ─────────────────────────────────────────────────────
+
+/**
+ * Client changed a mutable config value of a chat.
+ *
+ * The chat-level counterpart of `session/configChanged`, with the same
+ * payload and reducer semantics applied to `ChatState.config`. Only
+ * properties with `sessionMutable: true` in the chat's config schema may be
+ * changed. The server validates and broadcasts the action; the reducer merges
+ * the new values into `state.config.values`.
+ *
+ * The host decides where a change is stored. A chat-scoped property affects
+ * only this chat. A session-level property changes the owning session
+ * (`session/configChanged`), and the host publishes the new value to every
+ * chat in the session with `chat/configChanged`. Clients do not need to know
+ * which properties are chat-scoped. Clients MUST NOT dispatch this action
+ * when `ChatState.config` is absent.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatConfigChangedAction {
+  type: ActionType.ChatConfigChanged;
+  /** Updated config values */
+  config: Record<string, unknown>;
+  /** When `true`, replaces all config values instead of merging */
+  replace?: boolean;
+}
+
 // ─── Session Input Actions ──────────────────────────────────────────────────
 
 /**
@@ -984,6 +1014,7 @@ export type ChatAction =
   | ChatDraftChangedAction
   | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
+  | ChatConfigChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

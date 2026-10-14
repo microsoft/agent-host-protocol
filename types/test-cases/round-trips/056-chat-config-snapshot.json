@@ -1,0 +1,80 @@
+{
+  "name": "chat-config-snapshot",
+  "group": "A",
+  "description": "ChatState.config reuses SessionConfigState: the chat's full config schema and its effective values survive a decode/re-encode cycle on a chat snapshot.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/peer",
+    "state": {
+      "resource": "ahp-chat:/peer",
+      "title": "Peer",
+      "status": 1,
+      "modifiedAt": "2026-10-14T10:00:00.000Z",
+      "turns": [],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "autoApprove": {
+              "type": "boolean",
+              "title": "Auto-approve tools",
+              "sessionMutable": true
+            },
+            "mode": {
+              "type": "string",
+              "title": "Mode",
+              "enum": [
+                "agent",
+                "plan"
+              ],
+              "sessionMutable": true
+            }
+          }
+        },
+        "values": {
+          "autoApprove": true,
+          "mode": "agent"
+        }
+      }
+    },
+    "fromSeq": 3
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-chat:/peer",
+      "state": {
+        "resource": "ahp-chat:/peer",
+        "title": "Peer",
+        "status": 1,
+        "modifiedAt": "2026-10-14T10:00:00.000Z",
+        "turns": [],
+        "config": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "autoApprove": {
+                "type": "boolean",
+                "title": "Auto-approve tools",
+                "sessionMutable": true
+              },
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "agent",
+                  "plan"
+                ],
+                "sessionMutable": true
+              }
+            }
+          },
+          "values": {
+            "autoApprove": true,
+            "mode": "agent"
+          }
+        }
+      },
+      "fromSeq": 3
+    }
+  ]
+}

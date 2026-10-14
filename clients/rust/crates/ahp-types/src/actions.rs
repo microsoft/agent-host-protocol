@@ -82,6 +82,7 @@ pub enum ActionType {
     ChatDraftChanged,
     ChatIsReadChanged,
     ChatIsArchivedChanged,
+    ChatConfigChanged,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -226,6 +227,7 @@ impl serde::Serialize for ActionType {
             Self::ChatDraftChanged => serializer.serialize_str("chat/draftChanged"),
             Self::ChatIsReadChanged => serializer.serialize_str("chat/isReadChanged"),
             Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
+            Self::ChatConfigChanged => serializer.serialize_str("chat/configChanged"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -380,6 +382,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/draftChanged" => Self::ChatDraftChanged,
             "chat/isReadChanged" => Self::ChatIsReadChanged,
             "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
+            "chat/configChanged" => Self::ChatConfigChanged,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -1541,6 +1544,30 @@ pub struct ChatIsArchivedChangedAction {
     pub is_archived: bool,
 }
 
+/// Client changed a mutable config value of a chat.
+///
+/// The chat-level counterpart of `session/configChanged`, with the same
+/// payload and reducer semantics applied to `ChatState.config`. Only
+/// properties with `sessionMutable: true` in the chat's config schema may be
+/// changed. The server validates and broadcasts the action; the reducer merges
+/// the new values into `state.config.values`.
+///
+/// The host decides where a change is stored. A chat-scoped property affects
+/// only this chat. A session-level property changes the owning session
+/// (`session/configChanged`), and the host publishes the new value to every
+/// chat in the session with `chat/configChanged`. Clients do not need to know
+/// which properties are chat-scoped. Clients MUST NOT dispatch this action
+/// when `ChatState.config` is absent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigChangedAction {
+    /// Updated config values
+    pub config: JsonObject,
+    /// When `true`, replaces all config values instead of merging
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
+}
+
 /// A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2492,6 +2519,8 @@ pub enum StateAction {
     ChatIsReadChanged(ChatIsReadChangedAction),
     #[serde(rename = "chat/isArchivedChanged")]
     ChatIsArchivedChanged(ChatIsArchivedChangedAction),
+    #[serde(rename = "chat/configChanged")]
+    ChatConfigChanged(ChatConfigChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

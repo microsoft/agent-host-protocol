@@ -110,6 +110,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ChatBackgroundWorkSetAction))]
 [JsonSerializable(typeof(ChatCanvasesChangedAction))]
 [JsonSerializable(typeof(ChatChangesetsChangedAction))]
+[JsonSerializable(typeof(ChatConfigChangedAction))]
 [JsonSerializable(typeof(ChatDeltaAction))]
 [JsonSerializable(typeof(ChatDraftChangedAction))]
 [JsonSerializable(typeof(ChatErrorAction))]

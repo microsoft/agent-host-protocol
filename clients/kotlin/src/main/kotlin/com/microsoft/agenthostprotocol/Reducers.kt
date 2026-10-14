@@ -1631,6 +1631,15 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         status = withStatusFlag(state.status, SessionStatus.IS_ARCHIVED, action.value.isArchived),
     )
 
+    is StateActionChatConfigChanged -> {
+        val a = action.value
+        val config = state.config
+        if (config == null) state else {
+            val newValues = if (a.replace == true) a.config else config.values + a.config
+            state.copy(config = config.copy(values = newValues))
+        }
+    }
+
     else -> state
 
 }

@@ -127,6 +127,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatIsArchivedChanged = new ActionType("chat/isArchivedChanged");
 
+    public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -2080,6 +2082,32 @@ public sealed record ChatIsArchivedChangedAction
     public bool IsArchived { get; init; }
 }
 
+/// <summary>Client changed a mutable config value of a chat.
+///
+/// The chat-level counterpart of `session/configChanged`, with the same
+/// payload and reducer semantics applied to `ChatState.config`. Only
+/// properties with `sessionMutable: true` in the chat's config schema may be
+/// changed. The server validates and broadcasts the action; the reducer merges
+/// the new values into `state.config.values`.
+///
+/// The host decides where a change is stored. A chat-scoped property affects
+/// only this chat. A session-level property changes the owning session
+/// (`session/configChanged`), and the host publishes the new value to every
+/// chat in the session with `chat/configChanged`. Clients do not need to know
+/// which properties are chat-scoped. Clients MUST NOT dispatch this action
+/// when `ChatState.config` is absent.</summary>
+public sealed record ChatConfigChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
+
+    /// <summary>Updated config values</summary>
+    public required Dictionary<string, JsonElement> Config { get; init; }
+
+    /// <summary>When `true`, replaces all config values instead of merging</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
+}
+
 /// <summary>A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2867,6 +2895,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
+        ["chat/configChanged"] = typeof(ChatConfigChangedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

@@ -1453,6 +1453,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/draftChanged', caseName: 'chatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', caseName: 'chatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', caseName: 'chatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', caseName: 'chatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
   { type: 'chat/inputRequested', caseName: 'chatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', caseName: 'chatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', caseName: 'chatInputCompleted', tsInterface: 'ChatInputCompletedAction' },

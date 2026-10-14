@@ -1685,6 +1685,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },

@@ -1742,6 +1742,21 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
+    /// The chat's complete effective configuration: every property the chat
+    /// runs with, including session-level ones, described by the full schema.
+    ///
+    /// Same shape and semantics as
+    /// {@link SessionState.config | `SessionState.config`}, scoped to this chat.
+    /// Clients render the chat's configuration from this field and change it
+    /// with `chat/configChanged`. The host decides where each change is stored:
+    /// a chat-scoped property affects only this chat, while a session-level
+    /// property changes the session and the host publishes it to every chat in
+    /// the session. A host without per-chat configuration MAY publish the
+    /// session's configuration into each chat.
+    ///
+    /// Absent when the host does not expose configuration on this chat; clients
+    /// then use the owning session's `SessionState.config`.
+    public var config: SessionConfigState?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -1786,6 +1801,7 @@ public struct ChatState: Codable, Sendable {
         case changesets
         case backgroundWork
         case canvases
+        case config
         case turns
         case turnsNextCursor
         case activeTurn
@@ -1809,6 +1825,7 @@ public struct ChatState: Codable, Sendable {
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
         canvases: [CanvasReference]? = nil,
+        config: SessionConfigState? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -1830,6 +1847,7 @@ public struct ChatState: Codable, Sendable {
         self.changesets = changesets
         self.backgroundWork = backgroundWork
         self.canvases = canvases
+        self.config = config
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn

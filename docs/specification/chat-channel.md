@@ -21,7 +21,7 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue and the chat's effective [`config`](#per-chat-configuration). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 Clients mark any known chat, including the owning session's default chat, as
 read or unread by dispatching
@@ -75,6 +75,40 @@ continue to use the existing `changeset/*` action contract. When the catalogue
 itself changes, the server dispatches
 [`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
 fully replaces the catalogue or clears it when `changesets` is absent.
+
+### Per-chat configuration
+
+[`ChatState.config`](/reference/chat#chatstate) is the chat's complete
+effective configuration. It has the same type and semantics as
+[`SessionState.config`](/reference/session#sessionstate): the full schema of
+every property the chat runs with, including session-level ones, and the
+chat's current values. Clients render a chat's settings from this field and
+change them by dispatching
+[`chat/configChanged`](/reference/chat#chatconfigchangedaction). The action
+has the same payload and reducer semantics as `session/configChanged`: it
+merges `config` into `values`, or replaces them when `replace` is `true`. Only
+properties with `sessionMutable: true` may be changed.
+
+Clients do not need to know where a value is stored. The host decides:
+
+- A **chat-scoped** property (for example, tool auto-approval) changes only
+  this chat. Other chats in the session keep their own values.
+- A **session-level** property changes the owning session
+  (`session/configChanged`), and the host publishes the new value to every
+  chat in the session with `chat/configChanged`.
+
+Which properties are chat-scoped is host policy. A host resolves a chat's
+effective value from, in order: the chat's own value, then (for a subagent
+chat) its parent chat's value, then the session's configuration. The host is
+authoritative and publishes the effective values with `chat/configChanged`,
+including when a value changes for another reason, such as the agent changing
+it itself.
+
+`config` is optional. A host without per-chat configuration MAY publish the
+session's configuration into each chat, or MAY omit `config`. When it is
+absent, clients use `SessionState.config` and MUST NOT dispatch
+`chat/configChanged` on that chat. Clients MUST only dispatch
+`chat/configChanged` when the negotiated protocol version includes it.
 
 ## Relationship to the session channel
 
@@ -357,6 +391,7 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | `chat/inputCompleted`                      | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                  |
 | `chat/inputCompleted`                      | `response` is `'accept'` but required questions do not have submitted answers                                              | Server SHOULD reject the action                                                                  |
 | `chat/pendingMessageRemoved`               | No pending message with matching `id` and `kind`                                                                           | Server SHOULD reject the action                                                                  |
+| `chat/configChanged`                       | `ChatState.config` is absent, or a changed property is not in its schema or is not `sessionMutable`                       | Server SHOULD reject the action                                                                  |
 
 ## Pending Message Consumption
 

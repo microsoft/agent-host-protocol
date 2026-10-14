@@ -70,6 +70,7 @@ const (
 	ActionTypeChatDraftChanged                    ActionType = "chat/draftChanged"
 	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
 	ActionTypeChatIsArchivedChanged               ActionType = "chat/isArchivedChanged"
+	ActionTypeChatConfigChanged                   ActionType = "chat/configChanged"
 	ActionTypeChatInputRequested                  ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged              ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                  ActionType = "chat/inputCompleted"
@@ -864,6 +865,28 @@ type ChatIsArchivedChangedAction struct {
 	Type ActionType `json:"type"`
 	// Whether the chat is archived
 	IsArchived bool `json:"isArchived"`
+}
+
+// Client changed a mutable config value of a chat.
+//
+// The chat-level counterpart of `session/configChanged`, with the same
+// payload and reducer semantics applied to `ChatState.config`. Only
+// properties with `sessionMutable: true` in the chat's config schema may be
+// changed. The server validates and broadcasts the action; the reducer merges
+// the new values into `state.config.values`.
+//
+// The host decides where a change is stored. A chat-scoped property affects
+// only this chat. A session-level property changes the owning session
+// (`session/configChanged`), and the host publishes the new value to every
+// chat in the session with `chat/configChanged`. Clients do not need to know
+// which properties are chat-scoped. Clients MUST NOT dispatch this action
+// when `ChatState.config` is absent.
+type ChatConfigChangedAction struct {
+	Type ActionType `json:"type"`
+	// Updated config values
+	Config map[string]json.RawMessage `json:"config"`
+	// When `true`, replaces all config values instead of merging
+	Replace *bool `json:"replace,omitempty"`
 }
 
 // A session requested input from the user.
@@ -1847,6 +1870,7 @@ func (*ChatQueuedMessagesReorderedAction) isStateAction()         {}
 func (*ChatDraftChangedAction) isStateAction()                    {}
 func (*ChatIsReadChangedAction) isStateAction()                   {}
 func (*ChatIsArchivedChangedAction) isStateAction()               {}
+func (*ChatConfigChangedAction) isStateAction()                   {}
 func (*ChatInputRequestedAction) isStateAction()                  {}
 func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
@@ -2174,6 +2198,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/isArchivedChanged":
 		var value ChatIsArchivedChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/configChanged":
+		var value ChatConfigChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
