@@ -87,6 +87,134 @@ state, each returned resource is delivered as a `SubscriptionEventSnapshot`
 before the host reports `Connected`. Consumers should replace that resource's
 local reducer state with the snapshot before processing later actions.
 
+## Windowed delivery (opt-in)
+
+Windowing is off by default. It is offered per subscription, without changing
+the protocol versions offered by initialization. A host that omits flow control
+declines the offer; the returned handle reports `FlowControl.Mode == "ordinary"`
+and `FallbackReason == "declined"`. Its snapshot is still the first event
+(when an ordinary empty-state result omits its snapshot, there is no snapshot
+event). Ordinary fallback retains the existing drop-oldest buffering behavior.
+TCP subscriptions require acceptance and cannot fall back.
+
+```csharp
+var config = new ClientConfig
+{
+    Windowing = new WindowingConfig
+    {
+        WindowBytes = 256 * 1024,
+        MaximumFrameBytes = 16 * 1024,
+        MaxBufferedSendBytes = 1024 * 1024, // per subscription
+    },
+};
+await using var client = AhpClient.Connect(transport, config);
+await client.InitializeAsync("my-client");
+var (result, terminal) = await client.SubscribeWindowedAsync("ahp-terminal:/t1");
+await foreach (var evt in terminal.ReadEventsAsync(cancellationToken))
+{
+    await RenderOrApplyAsync(evt, cancellationToken);
+} // advancing (or disposing) the iterator releases the preceding event
+```
+
+The additive `IWindowedAhpClient` capability and `IAhpClient` extension methods
+also work with clients returned by the DI factory. Existing `IAhpClient`,
+`ITransport`, and serializer implementations do not need new interface members.
+Per-host defaults use `HostConfig.ClientConfig.Windowing`; the multi-host
+runtime offers the same `SubscribeWindowedAsync(host, uri, options)` API.
+
+For manual release, choose `ReceiveMode.Manual` and process delivery leases:
+
+```csharp
+var (_, tcp) = await client.SubscribeWindowedAsync(tcpUri,
+    new WindowOptions { Receive = ReceiveMode.Manual, Coalescing = false });
+await foreach (var delivery in tcp.Deliveries.ReadAllAsync(cancellationToken))
+{
+    using (delivery)
+    {
+        await WriteToBoundedSinkAsync(delivery.Event, cancellationToken);
+    } // Dispose() or Release() returns credit exactly once
+}
+```
+
+There is one credit-owning handle per URI. Re-subscribing updates that same
+handle. `AttachSubscription`, global event streams, and host observer streams
+remain lossy observers and **never** release credit. The owning handle retains
+every windowed event; it does not silently discard events when a consumer is slow.
+New event variants cover snapshots, TCP data/EOF/reset, and unknown notifications.
+
+Send-side backpressure is exposed independently:
+
+```csharp
+await tcp.WaitWritableAsync(cancellationToken); // advisory, not a reservation
+await tcp.NotifyAsync("tcp/data",
+    new TcpDataParams { Channel = tcpUri, Data = Convert.ToBase64String(bytes) },
+    cancellationToken); // completes after transport transmission
+var status = tcp.FlowControl;
+tcp.FlowControlChanged += (_, current) => UpdateStatus(current);
+await foreach (var current in tcp.FlowControlChanges().ReadAllAsync(cancellationToken))
+{
+    UpdateStatus(current);
+}
+```
+
+Existing `NotifyAsync` and `DispatchAsync` use the same fair scheduler for an
+enabled URI. An oversized single send is accepted when its subscription's queue
+is empty; fragmentation and the negotiated window pace it. `MaxBufferedSendBytes`
+bounds additional queued data, not the size of that first logical message.
+Cancellation removes unsent messages, but an already-started fragmented message
+finishes to avoid corrupting the channel.
+
+Receive coalescing is enabled by default, only for adjacent unconsumed terminal
+output or chat deltas targeting the same part with matching metadata. It does
+not introduce latency or delivery preferences. TCP sends can combine decoded
+bytes; numbered dispatches, client-origin echoes, snapshots and EOF/reset never
+combine. Register custom rules per connection:
+
+```csharp
+config.Windowing.Coalescers.Add(new ProgressCoalescer()); // before Connect()
+
+sealed class ProgressCoalescer : IChannelMessageCoalescer
+{
+    public JsonRpcNotification? Coalesce(JsonRpcNotification earlier,
+        JsonRpcNotification later, CoalescingContext context)
+    {
+        // Example only when this application's progress events are replaceable.
+        return context.Direction == CoalescingDirection.Incoming &&
+            earlier.Method == "root/progress" &&
+            earlier.Params?.GetProperty("progressToken").GetString() ==
+                later.Params?.GetProperty("progressToken").GetString()
+            ? later : null;
+    }
+}
+```
+
+A rule must preserve channel/method and channel-required event semantics.
+Custom coalescers must be fast and synchronous; the library validates their
+output and faults invalid results. Merged receive deliveries preserve original
+wire charges, not the serialization size of the merged event.
+
+All protocol sizes are **UTF-16 code units × 2 of the exact JSON text**, not
+UTF-8 bytes. `WebSocketTransportOptions.MaxMessageBytes` defaults to 32 MiB of
+complete inbound wire-message bytes; its growing 64 KiB receive buffer limits
+only a read chunk. The transport-derived AHP frame default is
+`2 * (MaxMessageBytes / 3)` = **22,369,620 UTF-16 bytes**. Unknown or unbounded
+transport limits use **1,048,576**. Custom transports may implement the optional
+`ITransportMessageLimits` capability; raw text/binary payloads are already
+retained by `TransportMessage`.
+
+Managed windowed subscriptions retain their owner and unread deliveries across
+reconnect, reset byte counters, and resume with snapshot/replay/live recovery.
+Releasing old-connection deliveries never credits the new connection. Missing
+subscriptions fail visibly. TCP channels close on connection loss and are never
+automatically recreated. Low-level users open a new client and call
+`ResumeAsync(ReconnectParams)` with the generated `Windows.Items` wrapper;
+`GetWindowedSubscription(uri)` exposes its new owners.
+
+The receive window does not cap complete reassembled message size or total
+memory. Incomplete fragments are credited as they are stored so messages larger
+than a window can finish; consumer release holds the final fragment's credit.
+Applications must still avoid retaining deliveries indefinitely.
+
 ## Observability
 
 The client emits OpenTelemetry-native traces and metrics via `System.Diagnostics`

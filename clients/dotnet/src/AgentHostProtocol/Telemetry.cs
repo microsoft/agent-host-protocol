@@ -11,6 +11,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Reflection;
+using System.Collections.Concurrent;
 
 namespace Microsoft.AgentHostProtocol;
 
@@ -74,4 +75,51 @@ public static class AhpTelemetry
     internal static readonly Counter<long> MalformedFrames =
         Meter.CreateCounter<long>(AhpTelemetryNames.FramesMalformed, unit: AhpTelemetryNames.FramesMalformedUnit,
             description: AhpTelemetryNames.FramesMalformedDescription);
+
+    internal static readonly Counter<long> WindowDataBytesSent = Meter.CreateCounter<long>("ahp.client.window.data.sent", "By");
+    internal static readonly Counter<long> WindowDataBytesReceived = Meter.CreateCounter<long>("ahp.client.window.data.received", "By");
+    internal static readonly Counter<long> WindowCreditBytesSent = Meter.CreateCounter<long>("ahp.client.window.credit.sent", "By");
+    internal static readonly Counter<long> WindowCreditBytesReceived = Meter.CreateCounter<long>("ahp.client.window.credit.received", "By");
+    internal static readonly Histogram<double> WindowBlockedDuration = Meter.CreateHistogram<double>("ahp.client.window.blocked.duration", "ms");
+    private static readonly ConcurrentDictionary<long, WeakReference<WindowedSubscription>> Windows = new();
+    private static long _nextWindow;
+    private static readonly ObservableGauge<long> BufferedWindowBytes =
+        Meter.CreateObservableGauge<long>("ahp.client.window.buffered", ObserveWindowBytes, "By");
+
+    internal static long TrackWindow(WindowedSubscription subscription)
+    {
+        foreach (var pair in Windows)
+            if (!pair.Value.TryGetTarget(out _)) Windows.TryRemove(pair.Key, out _);
+        var key = System.Threading.Interlocked.Increment(ref _nextWindow);
+        Windows.TryAdd(key, new WeakReference<WindowedSubscription>(subscription));
+        return key;
+    }
+
+    internal static void UntrackWindow(long key) => Windows.TryRemove(key, out _);
+    internal static int TrackedWindowCount => Windows.Count;
+
+    private static IEnumerable<Measurement<long>> ObserveWindowBytes()
+    {
+        long send = 0, receive = 0;
+        foreach (var pair in Windows)
+        {
+            if (!pair.Value.TryGetTarget(out var owner) || owner.Closed)
+            {
+                Windows.TryRemove(pair.Key, out _);
+                continue;
+            }
+            var status = owner.FlowControl;
+            send += status.BufferedSendBytes;
+            receive += status.BufferedReceiveBytes;
+        }
+        yield return new Measurement<long>(send, new KeyValuePair<string, object?>("direction", "send"));
+        yield return new Measurement<long>(receive, new KeyValuePair<string, object?>("direction", "receive"));
+    }
+
+    internal static void FlowEvent(FlowControlEvent value)
+    {
+        using var activity = Activity.Current is null ? ActivitySource.StartActivity("ahp.flowcontrol") : null;
+        (Activity.Current ?? activity)?.AddEvent(new ActivityEvent("ahp.flowcontrol." + value.Kind,
+            tags: new ActivityTagsCollection { { "ahp.flowcontrol.bytes", value.Bytes } }));
+    }
 }
