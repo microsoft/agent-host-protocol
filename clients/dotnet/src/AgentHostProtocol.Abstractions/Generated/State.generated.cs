@@ -2311,7 +2311,11 @@ public sealed record PendingMessage
     /// <summary>Unique identifier for this pending message</summary>
     public required string Id { get; init; }
 
-    /// <summary>The message that will start the next turn</summary>
+    /// <summary>Delivery kind, defaults to {@link PendingMessageKind.Queued}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PendingMessageKind? Kind { get; init; }
+
+    /// <summary>The queued or steering message</summary>
     public required Message Message { get; init; }
 }
 
@@ -2554,11 +2558,16 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ActiveTurn? ActiveTurn { get; set; }
 
-    /// <summary>Message to inject into the current turn at a convenient point</summary>
+    /// <summary>Legacy steering input retained only when reading old snapshots.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PendingMessage? SteeringMessage { get; set; }
 
-    /// <summary>Messages to send automatically as new turns after the current turn finishes</summary>
+    /// <summary>Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<PendingMessage>? QueuedMessages { get; set; }
 

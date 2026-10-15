@@ -762,7 +762,7 @@
         },
         "queuedMessageId": {
           "type": "string",
-          "description": "If this turn was auto-started from a queued message, the ID of that message"
+          "description": "If this turn consumes a pending message, its ID. Removes the matching\nentry from {@link ChatState.queuedMessages}."
         },
         "_meta": {
           "type": "object",
@@ -1591,7 +1591,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"
@@ -1618,7 +1618,7 @@
     },
     "ChatPendingMessageRemovedAction": {
       "type": "object",
-      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
+      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).\n\nRemoves an entry from {@link ChatState.queuedMessages} only when both `id`\nand effective kind match. Unknown IDs and mismatched kinds are\nno-ops.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageRemoved"
@@ -1640,7 +1640,7 @@
     },
     "ChatQueuedMessagesReorderedAction": {
       "type": "object",
-      "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
+      "description": "Reorder the entire shared {@link ChatState.queuedMessages} list.\n\nThe `order` array contains pending message IDs of either kind in their new\ndesired raw order. Unknown and duplicate IDs are ignored.\nMessages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the list never silently drops messages). UIs SHOULD still group\nsteering messages first, independently of this raw order.",
       "properties": {
         "type": {
           "const": "chat/queuedMessagesReordered"
@@ -1650,7 +1650,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Queued message IDs in the desired order"
+          "description": "Pending message IDs in the desired raw order"
         }
       },
       "required": [
@@ -5269,14 +5269,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy steering input retained only when reading old snapshots."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -5496,9 +5496,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind, defaults to {@link PendingMessageKind.Queued}."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The queued or steering message"
         }
       },
       "required": [

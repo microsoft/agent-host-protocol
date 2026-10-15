@@ -523,7 +523,8 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     public var startedAt: String
     /// The new message
     public var message: Message
-    /// If this turn was auto-started from a queued message, the ID of that message
+    /// If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages}.
     public var queuedMessageId: String?
     /// Additional provider-specific metadata for this action.
     ///
@@ -1638,7 +1639,7 @@ public struct ChatPendingMessageRemovedAction: Codable, Sendable {
 
 public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
     public var type: ActionType
-    /// Queued message IDs in the desired order
+    /// Pending message IDs in the desired raw order
     public var order: [String]
 
     public init(

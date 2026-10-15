@@ -38,6 +38,7 @@ import {
   SessionLifecycle,
   TurnState,
   MessageKind,
+  PendingMessageKind,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -143,6 +144,80 @@ describe('reducer fixtures', () => {
       assert.deepStrictEqual(state, fixture.expected);
     });
   }
+});
+
+describe('pending message identity', () => {
+  const message = { text: 'Pending', origin: { kind: MessageKind.User } } as const;
+  const empty: ChatState = {
+    resource: 'ahp-chat:/pending',
+    title: 'Pending',
+    status: SessionStatus.Idle,
+    modifiedAt: '2026-10-14T00:00:00.000Z',
+    turns: [],
+  };
+  const mixed: ChatState = {
+    ...empty,
+    steeringMessage: { id: 'legacy', message },
+    queuedMessages: [
+      { id: 'old', message },
+      { id: 'q', kind: PendingMessageKind.Queued, message },
+      { id: 's', kind: PendingMessageKind.Steering, message },
+    ],
+  };
+
+  it('returns the original state for unknown IDs or mismatched effective kinds', () => {
+    for (const state of [empty, { ...empty, queuedMessages: [] }, mixed]) {
+      for (const [id, kind] of [
+        ['unknown', PendingMessageKind.Queued],
+        ['unknown', PendingMessageKind.Steering],
+        ['legacy', PendingMessageKind.Queued],
+        ['old', PendingMessageKind.Steering],
+        ['q', PendingMessageKind.Steering],
+        ['s', PendingMessageKind.Queued],
+      ] as const) {
+        assert.strictEqual(chatReducer(state, {
+          type: ActionType.ChatPendingMessageRemoved,
+          id,
+          kind,
+        }), state);
+      }
+    }
+  });
+
+  it('does not mutate the shared list when setting, reordering or removing entries', () => {
+    const original = structuredClone(mixed);
+    const updated = chatReducer(mixed, {
+      type: ActionType.ChatPendingMessageSet,
+      id: 'q',
+      kind: PendingMessageKind.Steering,
+      message: { ...message, text: 'Updated' },
+    });
+    const beforeReorder = structuredClone(updated);
+    const reordered = chatReducer(updated, {
+      type: ActionType.ChatQueuedMessagesReordered,
+      order: ['s', 'q'],
+    });
+    const beforeRemoval = structuredClone(reordered);
+    const removed = chatReducer(reordered, {
+      type: ActionType.ChatPendingMessageRemoved,
+      id: 'q',
+      kind: PendingMessageKind.Steering,
+    });
+    assert.deepStrictEqual({
+      original: mixed,
+      beforeReorder: updated,
+      beforeRemoval: reordered,
+      remaining: removed.queuedMessages,
+    }, {
+      original,
+      beforeReorder,
+      beforeRemoval,
+      remaining: [
+        { id: 's', kind: PendingMessageKind.Steering, message },
+        { id: 'old', message },
+      ],
+    });
+  });
 });
 
 // ─── IS_CLIENT_DISPATCHABLE validation ───────────────────────────────────────

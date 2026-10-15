@@ -1,0 +1,42 @@
+{
+  "description": "mixed pending upserts append new IDs and replace repeated IDs and kinds in place",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+      { "id": "q1", "kind": "queued", "message": { "text": "Queue 1", "origin": { "kind": "user" }, "_meta": { "old": true } } },
+      { "id": "s1", "kind": "steering", "message": { "text": "Steering 1", "origin": { "kind": "user" } } },
+      { "id": "s2", "kind": "steering", "message": { "text": "Steering 2", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageSet", "kind": "steering", "id": "old", "message": { "text": "Old entry is now steering", "origin": { "kind": "user" } } },
+    { "type": "chat/pendingMessageSet", "kind": "steering", "id": "q1", "message": { "text": "First edit", "origin": { "kind": "user" } } },
+    { "type": "chat/pendingMessageSet", "kind": "steering", "id": "q1", "message": { "text": "Final edit", "origin": { "kind": "user" } } },
+    { "type": "chat/pendingMessageSet", "kind": "queued", "id": "s1", "message": { "text": "Steering 1 is now queued", "origin": { "kind": "user" } } },
+    { "type": "chat/pendingMessageSet", "kind": "steering", "id": "s3", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
+    { "type": "chat/pendingMessageSet", "kind": "queued", "id": "q2", "message": { "text": "Queue 2", "origin": { "kind": "user" } } }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "kind": "steering", "message": { "text": "Old entry is now steering", "origin": { "kind": "user" } } },
+      { "id": "q1", "kind": "steering", "message": { "text": "Final edit", "origin": { "kind": "user" } } },
+      { "id": "s1", "kind": "queued", "message": { "text": "Steering 1 is now queued", "origin": { "kind": "user" } } },
+      { "id": "s2", "kind": "steering", "message": { "text": "Steering 2", "origin": { "kind": "user" } } },
+      { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
+      { "id": "q2", "kind": "queued", "message": { "text": "Queue 2", "origin": { "kind": "user" } } }
+    ]
+  }
+}

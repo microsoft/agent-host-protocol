@@ -1776,14 +1776,18 @@ public struct ConfigSchema: Codable, Sendable {
 public struct PendingMessage: Codable, Sendable {
     /// Unique identifier for this pending message
     public var id: String
-    /// The message that will start the next turn
+    /// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+    public var kind: PendingMessageKind?
+    /// The queued or steering message
     public var message: Message
 
     public init(
         id: String,
+        kind: PendingMessageKind? = nil,
         message: Message
     ) {
         self.id = id
+        self.kind = kind
         self.message = message
     }
 }
@@ -1869,9 +1873,14 @@ public struct ChatState: Codable, Sendable {
     public var turnsNextCursor: String?
     /// Currently in-progress turn
     public var activeTurn: ActiveTurn?
-    /// Message to inject into the current turn at a convenient point
+    /// Legacy steering input retained only when reading old snapshots.
     public var steeringMessage: PendingMessage?
-    /// Messages to send automatically as new turns after the current turn finishes
+    /// Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.
     public var queuedMessages: [PendingMessage]?
     /// The user's in-progress draft input for this chat — the message they are
     /// composing but have not sent yet, including its

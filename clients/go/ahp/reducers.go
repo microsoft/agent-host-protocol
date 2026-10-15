@@ -772,60 +772,44 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		}
 		return ReduceOutcomeNoOp
 	case *ahptypes.ChatPendingMessageSetAction:
-		entry := ahptypes.PendingMessage{Id: a.Id, Message: a.Message}
-		switch a.Kind {
-		case ahptypes.PendingMessageKindSteering:
+		kind := a.Kind
+		entry := ahptypes.PendingMessage{Id: a.Id, Kind: &kind, Message: a.Message}
+		if a.Kind == ahptypes.PendingMessageKindSteering {
 			state.SteeringMessage = &entry
-		case ahptypes.PendingMessageKindQueued:
-			list := state.QueuedMessages
-			idx := -1
-			for i := range list {
-				if list[i].Id == entry.Id {
-					idx = i
-					break
-				}
-			}
-			if idx >= 0 {
-				list[idx] = entry
-			} else {
-				list = append(list, entry)
-			}
-			state.QueuedMessages = list
+		} else if state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
+			state.SteeringMessage = nil
 		}
-		return ReduceOutcomeApplied
-	case *ahptypes.ChatPendingMessageRemovedAction:
-		switch a.Kind {
-		case ahptypes.PendingMessageKindSteering:
-			if state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
-				state.SteeringMessage = nil
+		list := state.QueuedMessages
+		for i := range list {
+			if list[i].Id == entry.Id {
+				list[i] = entry
 				return ReduceOutcomeApplied
 			}
-			return ReduceOutcomeNoOp
-		case ahptypes.PendingMessageKindQueued:
-			list := state.QueuedMessages
-			if list == nil {
-				return ReduceOutcomeNoOp
-			}
-			next := list[:0]
-			removed := false
-			for _, m := range list {
-				if m.Id == a.Id {
-					removed = true
-					continue
-				}
-				next = append(next, m)
-			}
-			if !removed {
-				return ReduceOutcomeNoOp
-			}
-			if len(next) == 0 {
-				state.QueuedMessages = nil
-			} else {
-				state.QueuedMessages = next
-			}
-			return ReduceOutcomeApplied
 		}
-		return ReduceOutcomeNoOp
+		state.QueuedMessages = append(list, entry)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatPendingMessageRemovedAction:
+		outcome := ReduceOutcomeNoOp
+		if a.Kind == ahptypes.PendingMessageKindSteering && state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
+			state.SteeringMessage = nil
+			outcome = ReduceOutcomeApplied
+		}
+		for i, message := range state.QueuedMessages {
+			kind := ahptypes.PendingMessageKindQueued
+			if message.Kind != nil {
+				kind = *message.Kind
+			}
+			if message.Id == a.Id && kind == a.Kind {
+				list := state.QueuedMessages
+				list = append(list[:i], list[i+1:]...)
+				if len(list) == 0 {
+					list = nil
+				}
+				state.QueuedMessages = list
+				return ReduceOutcomeApplied
+			}
+		}
+		return outcome
 	case *ahptypes.ChatQueuedMessagesReorderedAction:
 		if state.QueuedMessages == nil {
 			return ReduceOutcomeNoOp

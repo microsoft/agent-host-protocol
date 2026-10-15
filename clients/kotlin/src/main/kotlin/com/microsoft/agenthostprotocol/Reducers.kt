@@ -1566,38 +1566,37 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatPendingMessageSet -> {
         val a = action.value
-        val entry = PendingMessage(id = a.id, message = a.message)
-        if (a.kind == PendingMessageKind.STEERING) {
-            state.copy(steeringMessage = entry)
+        val entry = PendingMessage(id = a.id, kind = a.kind, message = a.message)
+        val existing = state.queuedMessages ?: emptyList()
+        val idx = existing.indexOfFirst { it.id == a.id }
+        val next = existing.toMutableList()
+        if (idx < 0) {
+            next.add(entry)
         } else {
-            val existing = state.queuedMessages ?: emptyList()
-            val idx = existing.indexOfFirst { it.id == a.id }
-            val updated = if (idx >= 0) {
-                existing.toMutableList().also { it[idx] = entry }
-            } else {
-                existing + entry
-            }
-            state.copy(queuedMessages = updated)
+            next[idx] = entry
         }
+        val steeringMessage = when {
+            a.kind == PendingMessageKind.STEERING -> entry
+            state.steeringMessage?.id == a.id -> null
+            else -> state.steeringMessage
+        }
+        state.copy(queuedMessages = next, steeringMessage = steeringMessage)
     }
 
     is StateActionChatPendingMessageRemoved -> {
         val a = action.value
-        if (a.kind == PendingMessageKind.STEERING) {
-            val steering = state.steeringMessage
-            if (steering == null || steering.id != a.id) {
-                state
-            } else {
-                state.copy(steeringMessage = null)
-            }
+        var next = state
+        if (a.kind == PendingMessageKind.STEERING && state.steeringMessage?.id == a.id) {
+            next = next.copy(steeringMessage = null)
+        }
+        val existing = state.queuedMessages ?: return@chatReducer next
+        val idx = existing.indexOfFirst { it.id == a.id && (it.kind ?: PendingMessageKind.QUEUED) == a.kind }
+        if (idx < 0) {
+            next
         } else {
-            val existing = state.queuedMessages ?: return@chatReducer state
-            val filtered = existing.filter { it.id != a.id }
-            if (filtered.size == existing.size) {
-                state
-            } else {
-                state.copy(queuedMessages = filtered.ifEmpty { null })
-            }
+            val queuedMessages = existing.toMutableList()
+            queuedMessages.removeAt(idx)
+            next.copy(queuedMessages = queuedMessages.ifEmpty { null })
         }
     }
 

@@ -2985,14 +2985,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy steering input retained only when reading old snapshots."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -3212,9 +3212,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind, defaults to {@link PendingMessageKind.Queued}."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The queued or steering message"
         }
       },
       "required": [
@@ -6744,6 +6748,14 @@
         }
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
+    },
+    "PendingMessageKind": {
+      "enum": [
+        "steering",
+        "queued"
+      ],
+      "type": "string",
+      "description": "Discriminant for pending message kinds."
     },
     "ChatInputQuestion": {
       "oneOf": [

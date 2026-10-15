@@ -1347,65 +1347,63 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         StateAction::ChatPendingMessageSet(a) => {
             let entry = PendingMessage {
                 id: a.id.clone(),
+                kind: Some(a.kind),
                 message: a.message.clone(),
             };
-            match &a.kind {
-                PendingMessageKind::Steering => {
-                    state.steering_message = Some(entry);
-                }
-                PendingMessageKind::Queued => {
-                    let list = state.queued_messages.get_or_insert_with(Vec::new);
-                    if let Some(idx) = list.iter().position(|m| m.id == entry.id) {
-                        list[idx] = entry;
-                    } else {
-                        list.push(entry);
-                    }
-                }
+            if a.kind == PendingMessageKind::Steering {
+                state.steering_message = Some(entry.clone());
+            } else if state.steering_message.as_ref().map(|m| &m.id) == Some(&a.id) {
+                state.steering_message = None;
+            }
+            let list = state.queued_messages.get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|m| m.id == entry.id) {
+                list[idx] = entry;
+            } else {
+                list.push(entry);
             }
             ReduceOutcome::Applied
         }
-        StateAction::ChatPendingMessageRemoved(a) => match a.kind {
-            PendingMessageKind::Steering => match &state.steering_message {
-                Some(m) if m.id == a.id => {
-                    state.steering_message = None;
-                    ReduceOutcome::Applied
-                }
-                _ => ReduceOutcome::NoOp,
-            },
-            PendingMessageKind::Queued => {
-                let Some(list) = state.queued_messages.as_mut() else {
-                    return ReduceOutcome::NoOp;
-                };
-                let before = list.len();
-                list.retain(|m| m.id != a.id);
-                if list.len() == before {
-                    return ReduceOutcome::NoOp;
-                }
-                if list.is_empty() {
-                    state.queued_messages = None;
-                }
-                ReduceOutcome::Applied
+        StateAction::ChatPendingMessageRemoved(a) => {
+            let mut outcome = ReduceOutcome::NoOp;
+            if a.kind == PendingMessageKind::Steering
+                && state.steering_message.as_ref().map(|m| &m.id) == Some(&a.id)
+            {
+                state.steering_message = None;
+                outcome = ReduceOutcome::Applied;
             }
-        },
+            let Some(list) = state.queued_messages.as_mut() else {
+                return outcome;
+            };
+            let Some(idx) = list.iter().position(|m| {
+                m.id == a.id && m.kind.unwrap_or(PendingMessageKind::Queued) == a.kind
+            }) else {
+                return outcome;
+            };
+            list.remove(idx);
+            if list.is_empty() {
+                state.queued_messages = None;
+            }
+            ReduceOutcome::Applied
+        }
         StateAction::ChatQueuedMessagesReordered(a) => {
             let Some(list) = state.queued_messages.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
+            let original_order: Vec<String> = list.iter().map(|m| m.id.clone()).collect();
             let mut by_id: HashMap<String, PendingMessage> =
                 list.drain(..).map(|m| (m.id.clone(), m)).collect();
             let mut reordered: Vec<PendingMessage> = Vec::with_capacity(by_id.len());
-            let mut seen: std::collections::HashSet<String> = Default::default();
             for id in &a.order {
                 if let Some(msg) = by_id.remove(id) {
-                    if seen.insert(id.clone()) {
-                        reordered.push(msg);
-                    }
+                    reordered.push(msg);
                 }
             }
-            // Append any remaining messages in their original iteration order.
-            let mut leftover: Vec<PendingMessage> = by_id.into_values().collect();
-            leftover.sort_by(|a, b| a.id.cmp(&b.id));
-            reordered.extend(leftover);
+            // Append unmentioned IDs in the shared list's original order.
+            for id in original_order {
+                if let Some(msg) = by_id.remove(&id) {
+                    reordered.push(msg);
+                }
+            }
             *list = reordered;
             ReduceOutcome::Applied
         }

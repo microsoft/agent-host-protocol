@@ -1443,9 +1443,14 @@ type ChatState struct {
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
-	// Message to inject into the current turn at a convenient point
+	// Legacy steering input retained only when reading old snapshots.
 	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
-	// Messages to send automatically as new turns after the current turn finishes
+	// Pending messages of both kinds, in host acceptance order unless explicitly
+	// reordered.
+	//
+	// This raw order is not consumption priority. UIs SHOULD group steering
+	// messages before queued messages, preserving relative order within each
+	// group without changing the underlying array.
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
 	// The user's in-progress draft input for this chat — the message they are
 	// composing but have not sent yet, including its
@@ -1607,7 +1612,9 @@ type SideChatSelection struct {
 type PendingMessage struct {
 	// Unique identifier for this pending message
 	Id string `json:"id"`
-	// The message that will start the next turn
+	// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+	Kind *PendingMessageKind `json:"kind,omitempty"`
+	// The queued or steering message
 	Message Message `json:"message"`
 }
 

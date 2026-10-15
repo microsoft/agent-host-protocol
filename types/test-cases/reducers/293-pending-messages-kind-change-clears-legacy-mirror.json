@@ -1,0 +1,31 @@
+{
+  "description": "changing the mirrored steering entry to queued clears the legacy slot without promoting older input",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending",
+    "status": 1,
+    "modifiedAt": "2026-10-15T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "a", "kind": "steering", "message": { "text": "A", "origin": { "kind": "user" } } },
+      { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageSet", "kind": "queued", "id": "b", "message": { "text": "B later", "origin": { "kind": "user" } } }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending",
+    "status": 1,
+    "modifiedAt": "2026-10-15T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": null,
+    "queuedMessages": [
+      { "id": "a", "kind": "steering", "message": { "text": "A", "origin": { "kind": "user" } } },
+      { "id": "b", "kind": "queued", "message": { "text": "B later", "origin": { "kind": "user" } } }
+    ]
+  }
+}

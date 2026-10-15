@@ -669,11 +669,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     // ── Pending Messages ──────────────────────────────────────────────────
 
     case .chatPendingMessageSet(let a):
-        let entry = PendingMessage(id: a.id, message: a.message)
+        let entry = PendingMessage(id: a.id, kind: a.kind, message: a.message)
         var next = state
         if a.kind == .steering {
             next.steeringMessage = entry
-            return next
+        } else if next.steeringMessage?.id == a.id {
+            next.steeringMessage = nil
         }
         var existing = next.queuedMessages ?? []
         if let idx = existing.firstIndex(where: { $0.id == a.id }) {
@@ -686,15 +687,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatPendingMessageRemoved(let a):
         var next = state
-        if a.kind == .steering {
-            guard next.steeringMessage?.id == a.id else { return state }
+        if a.kind == .steering && next.steeringMessage?.id == a.id {
             next.steeringMessage = nil
-            return next
         }
-        guard var existing = next.queuedMessages else { return state }
-        let before = existing.count
-        existing.removeAll { $0.id == a.id }
-        guard existing.count != before else { return state }
+        guard var existing = next.queuedMessages,
+              let idx = existing.firstIndex(where: { $0.id == a.id && ($0.kind ?? .queued) == a.kind }) else { return next }
+        existing.remove(at: idx)
         next.queuedMessages = existing.isEmpty ? nil : existing
         return next
 

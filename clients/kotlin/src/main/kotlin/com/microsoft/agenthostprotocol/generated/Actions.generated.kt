@@ -271,7 +271,8 @@ data class ChatTurnStartedAction(
      */
     val message: Message,
     /**
-     * If this turn was auto-started from a queued message, the ID of that message
+     * If this turn consumes a pending message, its ID. Removes the matching
+     * entry from {@link ChatState.queuedMessages}.
      */
     val queuedMessageId: String? = null,
     /**
@@ -1025,7 +1026,7 @@ data class ChatPendingMessageRemovedAction(
 data class ChatQueuedMessagesReorderedAction(
     val type: ActionType,
     /**
-     * Queued message IDs in the desired order
+     * Pending message IDs in the desired raw order
      */
     val order: List<String>
 )

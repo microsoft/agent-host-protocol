@@ -1753,7 +1753,11 @@ data class PendingMessage(
      */
     val id: String,
     /**
-     * The message that will start the next turn
+     * Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+     */
+    val kind: PendingMessageKind? = null,
+    /**
+     * The queued or steering message
      */
     val message: Message
 )
@@ -1875,11 +1879,16 @@ data class ChatState(
      */
     val activeTurn: ActiveTurn? = null,
     /**
-     * Message to inject into the current turn at a convenient point
+     * Legacy steering input retained only when reading old snapshots.
      */
     val steeringMessage: PendingMessage? = null,
     /**
-     * Messages to send automatically as new turns after the current turn finishes
+     * Pending messages of both kinds, in host acceptance order unless explicitly
+     * reordered.
+     *
+     * This raw order is not consumption priority. UIs SHOULD group steering
+     * messages before queued messages, preserving relative order within each
+     * group without changing the underlying array.
      */
     val queuedMessages: List<PendingMessage>? = null,
     /**

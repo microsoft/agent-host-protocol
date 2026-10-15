@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Store steering and queued input in one `queuedMessages` list with optional `PendingMessage.kind` (absent means queued), using the existing per-ID pending actions. New IDs append, kind changes replace in place, and UIs group steering first without changing raw order. Mirror the latest steering update in the deprecated `steeringMessage` slot for older clients."
+}

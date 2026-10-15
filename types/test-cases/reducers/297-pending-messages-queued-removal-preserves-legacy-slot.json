@@ -1,0 +1,27 @@
+{
+  "description": "queued removal clears the last shared-list entry without clearing a matching legacy steering slot",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "same", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "same", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageRemoved", "kind": "queued", "id": "same" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "same", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": null
+  }
+}

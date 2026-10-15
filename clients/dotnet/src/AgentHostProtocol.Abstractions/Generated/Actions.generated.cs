@@ -1226,7 +1226,8 @@ public sealed record ChatTurnStartedAction
     /// <summary>The new message</summary>
     public required Message Message { get; init; }
 
-    /// <summary>If this turn was auto-started from a queued message, the ID of that message</summary>
+    /// <summary>If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? QueuedMessageId { get; init; }
 
@@ -1980,11 +1981,12 @@ public sealed record ChatTurnsLoadedAction
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
 ///
-/// For steering messages, this always replaces the single steering message.
-/// For queued messages, if a message with the given `id` already exists it is
-/// updated in place; otherwise it is appended to the queue. If the chat is
-/// idle when a queued message is set, the server SHOULD immediately consume it
-/// and start a new turn.
+/// Both kinds are stored in {@link ChatState.queuedMessages}, including this
+/// action's `kind`. A new `id` appends an entry; an existing `id` replaces its
+/// message and kind in place.
+///
+/// If the chat is idle when a queued message is set, the server SHOULD
+/// immediately consume it and start a new turn.
 ///
 /// A client is only allowed to send {@link MessageKind.User} messages.</summary>
 public sealed record ChatPendingMessageSetAction
@@ -2005,7 +2007,11 @@ public sealed record ChatPendingMessageSetAction
 ///
 /// Dispatched by clients to cancel a pending message, or by the server when
 /// it consumes a message (e.g. starting a turn from a queued message or
-/// injecting a steering message into the current turn).</summary>
+/// injecting a steering message into the current turn).
+///
+/// Removes an entry from {@link ChatState.queuedMessages} only when both `id`
+/// and effective kind match. Unknown IDs and mismatched kinds are
+/// no-ops.</summary>
 public sealed record ChatPendingMessageRemovedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatPendingMessageRemoved;
@@ -2017,18 +2023,19 @@ public sealed record ChatPendingMessageRemovedAction
     public required string Id { get; init; }
 }
 
-/// <summary>Reorder the queued messages.
+/// <summary>Reorder the entire shared {@link ChatState.queuedMessages} list.
 ///
-/// The `order` array contains the IDs of queued messages in their new
-/// desired order. IDs not present in the current queue are ignored.
-/// Queued messages whose IDs are absent from `order` are appended at
+/// The `order` array contains pending message IDs of either kind in their new
+/// desired raw order. Unknown and duplicate IDs are ignored.
+/// Messages whose IDs are absent from `order` are appended at
 /// the end in their original relative order (so a client with a stale
-/// view of the queue never silently drops messages).</summary>
+/// view of the list never silently drops messages). UIs SHOULD still group
+/// steering messages first, independently of this raw order.</summary>
 public sealed record ChatQueuedMessagesReorderedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatQueuedMessagesReordered;
 
-    /// <summary>Queued message IDs in the desired order</summary>
+    /// <summary>Pending message IDs in the desired raw order</summary>
     public required List<string> Order { get; init; }
 }
 
