@@ -1390,7 +1390,7 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Automations = &v
-\tcase containsAll(probe, "lifecycle"):
+\tcase containsAll(probe, "lifecycle", "provider"):
 \t\tvar v SessionState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err

@@ -6530,7 +6530,7 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Automations = &v
-	case containsAll(probe, "lifecycle"):
+	case containsAll(probe, "lifecycle", "provider"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
