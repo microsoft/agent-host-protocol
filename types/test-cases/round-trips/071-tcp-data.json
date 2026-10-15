@@ -1,0 +1,16 @@
+{
+  "name": "tcp-data",
+  "group": "A",
+  "description": "tcp/data carries only the channel and base64 bytes, with no offsets or counters.",
+  "type": "TcpDataParams",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "data": "AAECAw=="
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-tcp:/t1",
+      "data": "AAECAw=="
+    }
+  ]
+}

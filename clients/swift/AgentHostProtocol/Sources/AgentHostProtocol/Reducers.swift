@@ -671,6 +671,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatPendingMessageSet(let a):
         let entry = PendingMessage(id: a.id, kind: a.kind, message: a.message)
         var next = state
+        if a.kind == .steering {
+            next.steeringMessage = entry
+        } else if next.steeringMessage?.id == a.id {
+            next.steeringMessage = nil
+        }
         var existing = next.queuedMessages ?? []
         if let idx = existing.firstIndex(where: { $0.id == a.id }) {
             existing[idx] = entry
@@ -720,6 +725,13 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatIsArchivedChanged(let a):
         var next = state
         next.status = withStatusFlag(next.status, .isArchived, a.isArchived)
+        return next
+
+    case .chatConfigChanged(let a):
+        var config = state.config ?? ChatConfigState(values: [:])
+        config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
+        var next = state
+        next.config = config
         return next
 
     default:
@@ -1002,6 +1014,7 @@ public let clientDispatchableActions: Set<String> = [
     "chat/queuedMessagesReordered",
     "chat/isReadChanged",
     "chat/isArchivedChanged",
+    "chat/configChanged",
     "chat/inputAnswerChanged",
     "chat/inputCompleted",
     "session/customizationToggled",
@@ -1023,7 +1036,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionActiveClientRemoved,
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
-         .chatIsReadChanged, .chatIsArchivedChanged,
+         .chatIsReadChanged, .chatIsArchivedChanged, .chatConfigChanged,
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,
          .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,

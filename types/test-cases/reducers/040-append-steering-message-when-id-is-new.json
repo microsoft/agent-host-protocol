@@ -3,6 +3,7 @@
   "reducer": "chat",
   "initial": {
     "turns": [],
+    "steeringMessage": { "id": "sm-1", "kind": "steering", "message": { "text": "Old", "origin": { "kind": "user" } } },
     "queuedMessages": [
       {
         "id": "sm-1",
@@ -35,6 +36,7 @@
   ],
   "expected": {
     "turns": [],
+    "steeringMessage": { "id": "sm-2", "kind": "steering", "message": { "text": "New", "origin": { "kind": "user" } } },
     "queuedMessages": [
       {
         "id": "sm-1",

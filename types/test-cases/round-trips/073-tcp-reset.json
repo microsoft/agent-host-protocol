@@ -1,0 +1,14 @@
+{
+  "name": "tcp-reset",
+  "group": "A",
+  "description": "tcp/reset carries only the channel.",
+  "type": "TcpResetParams",
+  "input": {
+    "channel": "ahp-tcp:/t1"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-tcp:/t1"
+    }
+  ]
+}

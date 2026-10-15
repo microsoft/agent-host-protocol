@@ -16,9 +16,10 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
+    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
+    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
+    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -223,6 +224,35 @@ pub enum ResourceWriteMode {
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTcpConnectionParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// A DNS name or IP address, resolved on the host's network. Not a URL.
+    pub host: String,
+    /// The destination port.
+    pub port: i64,
+}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -303,7 +333,8 @@ pub struct InitializeResult {
     /// fields on {@link InitializeResult} instead.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Snapshots for each `initialSubscriptions` URI
+    /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -332,6 +363,12 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tcp_connections: Option<TcpConnectionsCapability>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -476,11 +513,71 @@ pub struct ReconnectParams {
     pub last_seen_server_seq: i64,
     /// URIs the client was subscribed to
     pub subscriptions: Vec<Uri>,
+    /// Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeOptions>,
+}
+
+/// One windowed subscription that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeParams {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.
+    pub flow_control: SubscriptionFlowControlOptions,
+    /// The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_applied_server_seq: Option<i64>,
+}
+
+/// Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeOptions {
+    pub items: Vec<ChannelDeliveryResumeParams>,
+}
+
+/// Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeResult {
+    pub items: Vec<ResumedChannelSubscription>,
+}
+
+/// A client's offer of windowed delivery.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionFlowControlOptions {
+    /// The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.
+    pub receive: ChannelReceiveLimits,
 }
 
 /// Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all replayed data in the response.
+/// The server MUST include all replayed data for ordinary subscriptions in the
+/// response. Windowed subscriptions recover through their own data messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectReplayResult {
@@ -491,22 +588,45 @@ pub struct ReconnectReplayResult {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     pub missing: Vec<Uri>,
+    /// Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Reconnect result when the gap exceeds the replay buffer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectSnapshotResult {
-    /// Fresh snapshots for each subscription
+    /// Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
+    /// Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Subscribe to a URI-identified channel.
 ///
-/// A channel MAY have state associated with it (e.g. root, sessions,
-/// terminals) or be stateless (pure pub/sub for streaming data). For
-/// state-bearing channels the result includes a snapshot; for stateless
-/// channels `snapshot` is omitted.
+/// With ordinary delivery, the result contains a snapshot of the channel's
+/// state; the server MAY omit it for a channel whose state has no fields. With
+/// windowed delivery, the result contains `flowControl` instead,
+/// and the snapshot is sent in a `channel/snapshot` notification.
+///
+/// A client has at most one subscription to each channel. A `subscribe` for a
+/// channel that the client is already subscribed to changes the existing
+/// subscription, for example its window, without losing data. Windowed counters
+/// continue if the subscription was already windowed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeParams {
@@ -516,19 +636,21 @@ pub struct SubscribeParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.
+    /// Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery: Option<SubscriptionDeliveryOptions>,
-    /// Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.
+    /// Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<SubscribeView>,
+    /// Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<SubscriptionFlowControlOptions>,
 }
 
 impl SubscribeParams {
@@ -539,6 +661,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -549,6 +672,7 @@ impl SubscribeParams {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -559,6 +683,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }
@@ -579,28 +704,43 @@ pub struct SubscribeView {
     pub turns: Option<i64>,
 }
 
-/// Advisory delivery preferences for a single subscription.
+/// Delivery preferences for one subscription. They do not allow a server to
+/// exceed the limits of a windowed subscription.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscriptionDeliveryOptions {
-    /// Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    /// The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_latency_ms: Option<i64>,
 }
 
 /// Result of the `subscribe` command.
 ///
-/// `snapshot` is present when the subscribed channel has associated state, and
-/// absent for stateless channels.
+/// With ordinary delivery, `snapshot` is present, except that the server MAY
+/// omit it for a channel whose state has no fields. With windowed delivery,
+/// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+/// snapshot in a `channel/snapshot` notification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeResult {
-    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<Snapshot>,
+    /// The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<ChannelFlowControl>,
 }
 
 /// Creates a new session with the specified agent provider.
@@ -922,6 +1062,9 @@ pub struct ResourceReadParams {
 /// The server SHOULD honor the `encoding` requested in the params. If the
 /// server cannot provide the requested encoding, it MUST fall back to either
 /// `base64` or `utf-8`.
+///
+/// The result contains the whole resource. Windowed delivery does not limit its
+/// size, because it is a response and not part of a subscription.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadResult {

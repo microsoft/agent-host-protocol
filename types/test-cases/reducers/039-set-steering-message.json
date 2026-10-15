@@ -23,6 +23,7 @@
   ],
   "expected": {
     "turns": [],
+    "steeringMessage": { "id": "sm-1", "kind": "steering", "message": { "text": "Focus on tests", "origin": { "kind": "user" } } },
     "queuedMessages": [
       {
         "id": "sm-1",

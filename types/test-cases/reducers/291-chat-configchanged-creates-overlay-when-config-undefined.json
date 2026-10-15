@@ -1,0 +1,31 @@
+{
+  "description": "chat/configChanged creates the chat's config overlay when the chat has none",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/configChanged",
+      "config": {
+        "autoApprove": true
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "config": {
+      "values": {
+        "autoApprove": true
+      }
+    }
+  }
+}

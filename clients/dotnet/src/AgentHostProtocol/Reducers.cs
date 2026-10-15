@@ -646,7 +646,7 @@ public static class Reducers
         return ReduceOutcome.OutOfScope;
     }
 
-    // Shared config merge for the root and session `configChanged` actions:
+    // Shared config merge for the root, session, and chat `configChanged` actions:
     // when `replace` is set (or no values exist yet) start fresh, otherwise
     // mutate the existing map in place; then overlay the incoming entries.
     private static Dictionary<string, JsonElement> MergeConfig(
@@ -1138,6 +1138,11 @@ public static class Reducers
                 return ReduceOutcome.Applied;
             case ChatIsArchivedChangedAction a:
                 state.Status = WithStatusFlag(state.Status, SessionStatus.IsArchived, a.IsArchived);
+                return ReduceOutcome.Applied;
+            case ChatConfigChangedAction a:
+                Dictionary<string, JsonElement> chatValues = MergeConfig(state.Config?.Values, a.Config, a.Replace);
+                state.Config ??= new ChatConfigState { Values = chatValues };
+                state.Config.Values = chatValues;
                 return ReduceOutcome.Applied;
         }
 
@@ -1739,6 +1744,14 @@ public static class Reducers
     private static ReduceOutcome ApplyChatPendingMessageSet(ChatState state, ChatPendingMessageSetAction a)
     {
         var entry = new PendingMessage { Id = a.Id, Kind = a.Kind, Message = a.Message };
+        if (a.Kind == PendingMessageKind.Steering)
+        {
+            state.SteeringMessage = entry;
+        }
+        else if (state.SteeringMessage?.Id == a.Id)
+        {
+            state.SteeringMessage = null;
+        }
         var list = state.QueuedMessages ?? new List<PendingMessage>();
         int idx = list.FindIndex(m => m.Id == entry.Id);
         if (idx < 0)
@@ -2571,6 +2584,7 @@ public static class Reducers
         "chat/draftChanged",
         "chat/isReadChanged",
         "chat/isArchivedChanged",
+        "chat/configChanged",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

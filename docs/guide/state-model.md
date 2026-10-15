@@ -194,11 +194,12 @@ ChatState {
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
+  config?: ChatConfigState        // config values set on this chat (overlay)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
   activeTurn?: ActiveTurn             // the in-progress turn, if any
-  steeringMessage?: PendingMessage    // deprecated old-snapshot slot
+  steeringMessage?: PendingMessage    // deprecated latest-steering mirror
   queuedMessages?: PendingMessage[]   // shared steering and queued input
   draft?: Message                     // user's in-progress input
 }
@@ -210,6 +211,13 @@ subscribe to each advertised `Changeset.uriTemplate` through the existing
 changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
+
+`config` is an overlay on `SessionState.config`: it carries only the values set
+on this chat, and the session's config schema applies. A chat's effective
+config is the session's values with the chat's values applied over them. Only
+properties marked `chatMutable: true` in the session's schema can be set per
+chat, with `chat/configChanged`. See
+[Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`
@@ -555,7 +563,7 @@ Each chat maintains a single optional list of pending input for steering the act
 ```typescript
 ChatState {
   // ...existing fields...
-  steeringMessage?: PendingMessage    // deprecated old-snapshot slot
+  steeringMessage?: PendingMessage    // deprecated latest-steering mirror
   queuedMessages?: PendingMessage[]   // both kinds in raw host order
 }
 
@@ -612,9 +620,9 @@ Clients use the existing `chat/pendingMessageSet` and `chat/pendingMessageRemove
 
 ### Migration and the Deprecated Steering Slot
 
-This semantic change during 1.1.0 development requires a coordinated host/client upgrade. There is no new capability or enqueue flag. Old clients that expect new steering IDs to replace a singleton, or render all `queuedMessages` entries as queued, are not compatible with the new behavior.
+There is no new capability or enqueue flag. For 1.0.0 clients, each steering set also replaces the deprecated `steeringMessage` slot with the latest entry. The shared list keeps every outstanding submission independently. Updated clients deduplicate the mirror by ID and use the list's order and kinds.
 
-`steeringMessage` is retained only to read old snapshots; no new set action writes it. A matching steering removal or `chat/turnStarted.queuedMessageId` may clear the old slot, while a queued removal leaves it untouched. This limited snapshot compatibility does not preserve old replacement semantics. See [the migration contract](../specification/chat-channel.md#semantic-migration-and-old-snapshots) for host, client, and native model changes.
+A matching steering removal, `chat/turnStarted.queuedMessageId`, or set changing the mirrored ID to queued input clears the slot without promoting an older entry. Other removals and reordering leave it untouched. Singleton-only entries from old snapshots remain supported. The legacy slot preserves a latest-message view, not the complete multi-message experience. See [the compatibility contract](../specification/chat-channel.md#legacy-steering-compatibility) for host, client, and native model changes.
 
 ## Chat Truncation
 

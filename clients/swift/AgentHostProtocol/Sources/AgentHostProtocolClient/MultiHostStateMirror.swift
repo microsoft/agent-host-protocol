@@ -132,6 +132,9 @@ public actor MultiHostStateMirror {
     public func applySnapshot(host: HostId, snapshot: Snapshot) {
         let key = HostedResourceKey(hostId: host, uri: snapshot.resource)
         switch snapshot.state {
+        case .empty, .unknown:
+            // An empty or unrecognized state has nothing to mirror.
+            break
         case .root(let state):
             rootStates[host] = state
         case .session(let state):

@@ -15,7 +15,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
     ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
-    SessionSummary,
+    SessionSummary, Snapshot,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -60,6 +60,145 @@ impl<'de> serde::Deserialize<'de> for AuthRequiredReason {
 }
 
 // ─── Notification Payloads ────────────────────────────────────────────
+
+/// Bytes in the sender's direction: from the client to the destination, or from
+/// the destination to the client.
+///
+/// The receiver writes the decoded bytes in the order received. The boundaries
+/// between `tcp/data` notifications have no meaning. Data is not sent again
+/// after the AHP connection is lost.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpDataParams {
+    /// The URI of the TCP channel.
+    pub channel: Uri,
+    /// The bytes, as padded RFC 4648 base64 without whitespace.
+    pub data: String,
+}
+
+/// Ends the sender's direction after the data that it has already sent, like a
+/// TCP FIN. The other direction can continue. The sender MUST NOT send more
+/// `tcp/data` after `tcp/eof`.
+///
+/// This notification counts against the window, so the sender may have to wait
+/// for credit before sending it. A receiver MUST release `tcp/data` as it writes
+/// the bytes, without waiting for `tcp/eof`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpEofParams {
+    /// The URI of the TCP channel.
+    pub channel: Uri,
+}
+
+/// Aborts the connection in both directions, like a TCP RST.
+///
+/// The sender discards data that it has not yet sent. The receiver discards data
+/// that it has not yet written, and closes its own side of the connection. The
+/// host sends `tcp/reset` when the destination connection fails or is reset, or
+/// when the client sends invalid data. The client sends it to abort the
+/// connection without waiting for buffered data to be written. After `tcp/reset`,
+/// neither peer sends more data on the channel.
+///
+/// Unlike `tcp/data` and `tcp/eof`, this notification does not count against the
+/// window, so it can be sent when the window is full.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpResetParams {
+    /// The URI of the TCP channel.
+    pub channel: Uri,
+}
+
+/// One fragment of a data message on a windowed subscription.
+///
+/// A sender uses fragments when a data message is larger than
+/// `maximumFrameBytes`, and to let subscriptions take turns so that one busy
+/// subscription does not hold up the whole connection. It serializes the message
+/// to JSON text, divides the text into pieces, and sends each piece in order. The
+/// receiver joins the `data` strings and parses the result only after it receives
+/// the fragment with `final: true`.
+///
+/// Fragments MUST NOT be empty and MUST NOT divide a UTF-16 surrogate pair. The
+/// channel inside the joined message MUST match `channel`. For each subscription
+/// and direction, only one fragmented message can be in progress. Control
+/// messages, requests, and responses MUST NOT be sent in fragments.
+///
+/// Each fragment counts against the window when it is sent, by the size of the
+/// complete `channel/frame` message, including its envelope and escape
+/// characters. If the window becomes full partway through a message, the sender
+/// waits for credit before it sends the next fragment.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelFrameParams {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The next piece of the serialized JSON-RPC message.
+    pub data: String,
+    /// `true` on the last fragment of the message. Absent or `false` on other fragments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#final: Option<bool>,
+}
+
+/// Reports how much data the receiver has released.
+///
+/// `consumedBytes` is the total size, in UTF-16 bytes, of the data messages and
+/// fragments that the receiver has released on this subscription. It is a total,
+/// not an increment, and can be any value up to the amount of data sent; it does
+/// not need to match the end of a message or fragment. The size of a message or
+/// fragment is the size of its complete JSON-RPC text as received.
+///
+/// The receiver decides when to send credit; for example, after it applies an
+/// action, after stream data leaves its local buffer, or after it stores a
+/// fragment for reassembly. When outstanding data reaches `windowBytes`, the
+/// receiver MUST send credit as soon as it is ready to receive more data.
+///
+/// A sender ignores a value that is not greater than the previous value. The
+/// protocol does not define what happens when the value is greater than the data
+/// sent; an implementation can log the error or close the connection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelCreditParams {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// Total UTF-16 bytes of data messages and fragments that the receiver has released.
+    pub consumed_bytes: i64,
+}
+
+/// Sends the state of a channel to a windowed subscription.
+///
+/// On a windowed subscription, the `subscribe` result does not contain a
+/// snapshot. The server sends this notification instead. It MUST be the first
+/// data message that the server sends on every windowed subscription, and the
+/// first after `snapshot` recovery. If it is sent in fragments, this applies to
+/// the joined message. Data messages after it are changes to this state, or new
+/// data for the channel. For a channel whose state has no fields,
+/// `snapshot.state` is an {@link EmptyState} and `snapshot.fromSeq` is the
+/// server's current `serverSeq`.
+///
+/// This is a data message that counts against the window. The server can send it
+/// in `channel/frame` fragments, and MUST do so if it is larger than
+/// `maximumFrameBytes`. `snapshot.resource` MUST be the same as `channel`.
+///
+/// The server does not send this notification on ordinary subscriptions.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelSnapshotParams {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The channel's state.
+    pub snapshot: Snapshot,
+}
 
 /// Broadcast to all clients subscribed to the root channel when a new session
 /// is created.
@@ -210,8 +349,8 @@ pub struct AuthRequiredParams {
 /// AHP does not redeclare the OTLP type system; clients SHOULD use an
 /// OpenTelemetry SDK or schema to parse it.
 ///
-/// Like all stateless-channel notifications, this is ephemeral: it is not
-/// replayed on reconnect. Subscribers receive only batches emitted after
+/// Like other protocol notifications, this is not stored in the channel's
+/// state and is not replayed on reconnect. Subscribers receive only batches emitted after
 /// their `subscribe` succeeds.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -327,4 +466,16 @@ pub struct PartialSessionSummary {
     /// Chat that receives input when none is selected, independent of catalog position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
+}
+
+// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+pub const WINDOW_EXEMPT_METHODS: &[&str] = &["channel/credit", "tcp/reset", "unsubscribe"];
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+pub fn counts_against_window(method: &str) -> bool {
+    !WINDOW_EXEMPT_METHODS.contains(&method)
 }

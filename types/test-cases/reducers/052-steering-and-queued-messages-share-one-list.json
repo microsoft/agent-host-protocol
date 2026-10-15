@@ -34,6 +34,7 @@
   ],
   "expected": {
     "turns": [],
+    "steeringMessage": { "id": "s-1", "kind": "steering", "message": { "text": "Steer", "origin": { "kind": "user" } } },
     "queuedMessages": [
       {
         "id": "s-1",

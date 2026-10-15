@@ -9,6 +9,24 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// <summary>How the server resumes sending data on a windowed subscription after
+/// reconnection.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChannelRecoveryKind>))]
+public enum ChannelRecoveryKind
+{
+    /// <summary>The server sends a new `channel/snapshot`, and the client replaces its state.</summary>
+    [WireValue("snapshot")]
+    Snapshot,
+    /// <summary>The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.</summary>
+    [WireValue("replay")]
+    Replay,
+    /// <summary>The server sends only data created after reconnection.</summary>
+    [WireValue("live")]
+    Live,
+}
+
 /// <summary>Policy configuration state for a model.</summary>
 [JsonConverter(typeof(WireEnumConverter<PolicyState>))]
 public enum PolicyState
@@ -1765,6 +1783,82 @@ public enum AutomationRunOriginKind
 
 // ─── Classes ──────────────────────────────────────────────────────────
 
+/// <summary>Present when the host supports `createTcpConnection`.
+///
+/// A client creates a connection with `createTcpConnection`, then subscribes to
+/// its channel with windowed delivery. A TCP channel's state is an
+/// {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+/// notifications. TCP connections do not survive the loss of the AHP connection.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record TcpConnectionsCapability
+{
+}
+
+/// <summary>Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelReceiveLimits
+{
+    /// <summary>The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.</summary>
+    public long WindowBytes { get; init; }
+
+    /// <summary>The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.</summary>
+    public long MaximumFrameBytes { get; init; }
+}
+
+/// <summary>The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelFlowControl
+{
+    /// <summary>Limits for data that the server sends to the client.</summary>
+    public required ChannelReceiveLimits ClientReceive { get; init; }
+
+    /// <summary>Limits for data that the client sends to the server.</summary>
+    public required ChannelReceiveLimits HostReceive { get; init; }
+}
+
+/// <summary>A windowed subscription that the server kept after reconnection.
+///
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ResumedChannelSubscription
+{
+    /// <summary>The URI of the windowed subscription.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.</summary>
+    public required ChannelFlowControl FlowControl { get; init; }
+
+    /// <summary>How the server resumes sending data.</summary>
+    public ChannelRecoveryKind Recovery { get; init; }
+}
+
 /// <summary>An optionally-sized icon that can be displayed in a user interface.</summary>
 public sealed record Icon
 {
@@ -2217,12 +2311,11 @@ public sealed record PendingMessage
     /// <summary>Unique identifier for this pending message</summary>
     public required string Id { get; init; }
 
-    /// <summary>Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries
-    /// from older queued-message snapshots. Set actions always store their kind.</summary>
+    /// <summary>Delivery kind, defaults to {@link PendingMessageKind.Queued}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PendingMessageKind? Kind { get; init; }
 
-    /// <summary>The message to inject into the current turn or send as a new turn</summary>
+    /// <summary>The queued or steering message</summary>
     public required Message Message { get; init; }
 }
 
@@ -2443,6 +2536,12 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
+    /// <summary>Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChatConfigState? Config { get; set; }
+
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
 
@@ -2459,15 +2558,12 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ActiveTurn? ActiveTurn { get; set; }
 
-    /// <summary>Legacy steering input retained only when reading old snapshots.
-    /// New set actions never write this slot. A matching steering removal or
-    /// turn consumption can clear it.</summary>
+    /// <summary>Legacy steering input retained only when reading old snapshots.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PendingMessage? SteeringMessage { get; set; }
 
     /// <summary>Pending messages of both kinds, in host acceptance order unless explicitly
-    /// reordered. Each ID is unique across the list. New IDs append; existing
-    /// IDs are replaced in place, even when their kind changes.
+    /// reordered.
     ///
     /// This raw order is not consumption priority. UIs SHOULD group steering
     /// messages before queued messages, preserving relative order within each
@@ -3367,6 +3463,11 @@ public sealed record SessionConfigPropertySchema
     /// <summary>When `true`, the user may change this property after session creation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SessionMutable { get; init; }
+
+    /// <summary>When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ChatMutable { get; init; }
 }
 
 /// <summary>A JSON Schema object describing available session configuration metadata.</summary>
@@ -3393,6 +3494,19 @@ public sealed class SessionConfigState
     public required SessionConfigSchema Schema { get; set; }
 
     /// <summary>Current configuration values</summary>
+    public required Dictionary<string, JsonElement> Values { get; set; }
+}
+
+/// <summary>Configuration values set on a chat: an overlay on the owning session's
+/// {@link SessionState.config | `SessionState.config`}.
+///
+/// It carries only the chat's own values; the session's config schema
+/// applies. The effective config of a chat is the session's values with
+/// these values applied over them. Only properties with `chatMutable: true`
+/// in the session's config schema can be set on a chat.</summary>
+public sealed class ChatConfigState
+{
+    /// <summary>Config values set on this chat, keyed by property id</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
@@ -5944,17 +6058,33 @@ public sealed record ErrorInfo
 }
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
-/// `initialize`, `reconnect`, and `subscribe`.</summary>
+/// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.</summary>
 public sealed record Snapshot
 {
     /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, `ahp-chat:/&lt;uuid&gt;`, or `ahp-canvas:/&lt;uuid&gt;`)</summary>
     public required string Resource { get; init; }
 
-    /// <summary>The current state of the resource</summary>
+    /// <summary>The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.</summary>
     public required SnapshotState State { get; init; }
 
     /// <summary>The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq &gt; fromSeq`.</summary>
     public long FromSeq { get; init; }
+}
+
+/// <summary>The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record EmptyState
+{
 }
 
 /// <summary>Catalogue entry describing one changeset the server can produce for a
@@ -7808,13 +7938,17 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Empty state variant, when populated.</summary>
+    public EmptyState? Empty { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -7844,6 +7978,12 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>
+    /// A state that this version does not recognize, such as the state of a channel
+    /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
+    /// </summary>
+    public JsonElement? Unknown { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -7854,7 +7994,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        var members = root.EnumerateObject();
+        if (!members.MoveNext())
+        {
+            result.Empty = new EmptyState();
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -7897,15 +8042,21 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
         }
-        else
+        else if (root.TryGetProperty("agents", out _))
         {
             result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
+        }
+        else
+        {
+            // A state from a later protocol version: keep it rather than fail.
+            result.Unknown = root.Clone();
         }
         return result;
     }
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -7916,6 +8067,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, AhpJsonTypeInfo.Get<ResourceWatchState>(options)); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, AhpJsonTypeInfo.Get<AnnotationsState>(options)); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, AhpJsonTypeInfo.Get<RootState>(options)); return; }
+        if (value.Unknown is { } unknown) { unknown.WriteTo(writer); return; }
         writer.WriteNullValue();
     }
 }

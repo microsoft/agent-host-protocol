@@ -29,7 +29,7 @@
     "status": 1,
     "modifiedAt": "2026-10-14T00:00:00.000Z",
     "turns": [],
-    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "steeringMessage": { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
     "queuedMessages": [
       { "id": "old", "kind": "steering", "message": { "text": "Old entry is now steering", "origin": { "kind": "user" } } },
       { "id": "q1", "kind": "steering", "message": { "text": "Final edit", "origin": { "kind": "user" } } },

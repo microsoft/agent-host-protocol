@@ -1,0 +1,22 @@
+{
+  "name": "channel-delivery-ordinary-subscribe-result",
+  "group": "A",
+  "description": "A host can decline windowed delivery by omitting flowControl; the ordinary result contains the snapshot inline, here for a channel whose state is empty.",
+  "type": "SubscribeResult",
+  "input": {
+    "snapshot": {
+      "resource": "ahp-otlp://logs",
+      "state": {},
+      "fromSeq": 3
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "snapshot": {
+        "resource": "ahp-otlp://logs",
+        "state": {},
+        "fromSeq": 3
+      }
+    }
+  ]
+}

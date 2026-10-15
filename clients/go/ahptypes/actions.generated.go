@@ -70,6 +70,7 @@ const (
 	ActionTypeChatDraftChanged                    ActionType = "chat/draftChanged"
 	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
 	ActionTypeChatIsArchivedChanged               ActionType = "chat/isArchivedChanged"
+	ActionTypeChatConfigChanged                   ActionType = "chat/configChanged"
 	ActionTypeChatInputRequested                  ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged              ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                  ActionType = "chat/inputCompleted"
@@ -260,8 +261,7 @@ type ChatTurnStartedAction struct {
 	// The new message
 	Message Message `json:"message"`
 	// If this turn consumes a pending message, its ID. Removes the matching
-	// entry from {@link ChatState.queuedMessages} regardless of kind, and clears
-	// a matching deprecated {@link ChatState.steeringMessage} snapshot slot.
+	// entry from {@link ChatState.queuedMessages}.
 	QueuedMessageId *string `json:"queuedMessageId,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
@@ -784,9 +784,7 @@ type ChatReasoningAction struct {
 //
 // Both kinds are stored in {@link ChatState.queuedMessages}, including this
 // action's `kind`. A new `id` appends an entry; an existing `id` replaces its
-// message and kind in place. Changing kind does not change its position.
-// A new steering ID never replaces another pending submission. This action
-// never writes the deprecated {@link ChatState.steeringMessage} snapshot slot.
+// message and kind in place.
 //
 // If the chat is idle when a queued message is set, the server SHOULD
 // immediately consume it and start a new turn.
@@ -809,10 +807,8 @@ type ChatPendingMessageSetAction struct {
 // injecting a steering message into the current turn).
 //
 // Removes an entry from {@link ChatState.queuedMessages} only when both `id`
-// and effective kind match. An absent entry kind means
-// {@link PendingMessageKind.Queued}. Unknown IDs and mismatched kinds are
-// no-ops. A steering removal also clears a matching deprecated
-// {@link ChatState.steeringMessage} snapshot slot.
+// and effective kind match. Unknown IDs and mismatched kinds are
+// no-ops.
 type ChatPendingMessageRemovedAction struct {
 	Type ActionType `json:"type"`
 	// Whether this is a steering or queued message
@@ -831,7 +827,7 @@ type ChatPendingMessageRemovedAction struct {
 // steering messages first, independently of this raw order.
 type ChatQueuedMessagesReorderedAction struct {
 	Type ActionType `json:"type"`
-	// Pending message IDs of either kind in the desired raw order
+	// Pending message IDs in the desired raw order
 	Order []string `json:"order"`
 }
 
@@ -876,6 +872,21 @@ type ChatIsArchivedChangedAction struct {
 	Type ActionType `json:"type"`
 	// Whether the chat is archived
 	IsArchived bool `json:"isArchived"`
+}
+
+// Config values set on a chat changed.
+//
+// Merges `config` into the chat's
+// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+// in the session's config schema may be set. To reset a property to the
+// session's value, replace the overlay with one that omits the property.
+type ChatConfigChangedAction struct {
+	Type ActionType `json:"type"`
+	// Config values to set on the chat
+	Config map[string]json.RawMessage `json:"config"`
+	// When `true`, replaces the chat's config values instead of merging
+	Replace *bool `json:"replace,omitempty"`
 }
 
 // A session requested input from the user.
@@ -1859,6 +1870,7 @@ func (*ChatQueuedMessagesReorderedAction) isStateAction()         {}
 func (*ChatDraftChangedAction) isStateAction()                    {}
 func (*ChatIsReadChangedAction) isStateAction()                   {}
 func (*ChatIsArchivedChangedAction) isStateAction()               {}
+func (*ChatConfigChangedAction) isStateAction()                   {}
 func (*ChatInputRequestedAction) isStateAction()                  {}
 func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
@@ -2186,6 +2198,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/isArchivedChanged":
 		var value ChatIsArchivedChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/configChanged":
+		var value ChatConfigChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

@@ -1063,8 +1063,9 @@ public sealed class MultiHostClient : IMultiHostClient
     /// <summary>
     /// Applies a reconnect snapshot without issuing a second initialize. The
     /// every returned resource snapshot is published before the host transitions
-    /// to connected. The subscription set is retained because stateless
-    /// subscriptions intentionally have no snapshot.
+    /// to connected. The subscription set is retained because a resumed
+    /// subscription may have no snapshot in the result (for example, a
+    /// windowed subscription, or one from an older host).
     /// </summary>
     private ulong ApplyReconnectSnapshot(HostEntry entry, ReconnectSnapshotResult result)
     {

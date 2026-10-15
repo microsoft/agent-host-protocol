@@ -1,0 +1,7 @@
+{
+  "type": "added",
+  "message": "Experimental TCP channel: `createTcpConnection` opens a TCP connection on the host's network, which the client forwards over a windowed subscription with `tcp/data`, `tcp/eof`, and `tcp/reset`. TCP channels do not survive the loss of the AHP connection.",
+  "issues": [
+    488
+  ]
+}

@@ -127,6 +127,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatIsArchivedChanged = new ActionType("chat/isArchivedChanged");
 
+    public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -1225,8 +1227,7 @@ public sealed record ChatTurnStartedAction
     public required Message Message { get; init; }
 
     /// <summary>If this turn consumes a pending message, its ID. Removes the matching
-    /// entry from {@link ChatState.queuedMessages} regardless of kind, and clears
-    /// a matching deprecated {@link ChatState.steeringMessage} snapshot slot.</summary>
+    /// entry from {@link ChatState.queuedMessages}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? QueuedMessageId { get; init; }
 
@@ -1982,9 +1983,7 @@ public sealed record ChatTurnsLoadedAction
 ///
 /// Both kinds are stored in {@link ChatState.queuedMessages}, including this
 /// action's `kind`. A new `id` appends an entry; an existing `id` replaces its
-/// message and kind in place. Changing kind does not change its position.
-/// A new steering ID never replaces another pending submission. This action
-/// never writes the deprecated {@link ChatState.steeringMessage} snapshot slot.
+/// message and kind in place.
 ///
 /// If the chat is idle when a queued message is set, the server SHOULD
 /// immediately consume it and start a new turn.
@@ -2011,10 +2010,8 @@ public sealed record ChatPendingMessageSetAction
 /// injecting a steering message into the current turn).
 ///
 /// Removes an entry from {@link ChatState.queuedMessages} only when both `id`
-/// and effective kind match. An absent entry kind means
-/// {@link PendingMessageKind.Queued}. Unknown IDs and mismatched kinds are
-/// no-ops. A steering removal also clears a matching deprecated
-/// {@link ChatState.steeringMessage} snapshot slot.</summary>
+/// and effective kind match. Unknown IDs and mismatched kinds are
+/// no-ops.</summary>
 public sealed record ChatPendingMessageRemovedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatPendingMessageRemoved;
@@ -2038,7 +2035,7 @@ public sealed record ChatQueuedMessagesReorderedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatQueuedMessagesReordered;
 
-    /// <summary>Pending message IDs of either kind in the desired raw order</summary>
+    /// <summary>Pending message IDs in the desired raw order</summary>
     public required List<string> Order { get; init; }
 }
 
@@ -2090,6 +2087,25 @@ public sealed record ChatIsArchivedChangedAction
 
     /// <summary>Whether the chat is archived</summary>
     public bool IsArchived { get; init; }
+}
+
+/// <summary>Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+/// in the session's config schema may be set. To reset a property to the
+/// session's value, replace the overlay with one that omits the property.</summary>
+public sealed record ChatConfigChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
+
+    /// <summary>Config values to set on the chat</summary>
+    public required Dictionary<string, JsonElement> Config { get; init; }
+
+    /// <summary>When `true`, replaces the chat's config values instead of merging</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
 }
 
 /// <summary>A session requested input from the user.
@@ -2879,6 +2895,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
+        ["chat/configChanged"] = typeof(ChatConfigChangedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

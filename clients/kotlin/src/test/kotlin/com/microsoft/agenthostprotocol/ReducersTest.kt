@@ -166,7 +166,7 @@ class ReducersTest {
             listOf(PendingMessage(id = "s1", kind = PendingMessageKind.STEERING, message = userMessage("steer"))),
             withSteering.queuedMessages,
         )
-        assertNull(withSteering.steeringMessage)
+        assertEquals(withSteering.queuedMessages?.first(), withSteering.steeringMessage)
 
         val setQueued1 = StateActionChatPendingMessageSet(
             ChatPendingMessageSetAction(

@@ -40,7 +40,9 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
@@ -175,6 +177,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -260,9 +263,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -406,7 +407,7 @@ function emitDocComment(prefix: string, doc: string | undefined, lines: string[]
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} string`);
   lines.push('');
@@ -431,7 +432,7 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} uint32`);
   lines.push('');
@@ -517,7 +518,7 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateGoStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -701,6 +702,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
     lines.push('\tif err != nil { return nil, err }');
     lines.push('\tvar object map[string]json.RawMessage');
     lines.push('\tif err := json.Unmarshal(data, &object); err != nil { return nil, err }');
+    lines.push('\tif object == nil { return data, nil }');
     lines.push('\tswitch u.Value.(type) {');
     for (const v of cfg.variants) {
       lines.push(`\tcase *${v.innerType}: object[${JSON.stringify(cfg.discriminantField)}] = json.RawMessage(${JSON.stringify(JSON.stringify(v.wireValue))})`);
@@ -717,6 +719,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -737,6 +740,9 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -771,6 +777,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
+  { name: 'ChatConfigState' },
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },
@@ -864,6 +871,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -1304,12 +1312,17 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → canvas → terminal → changeset →
-// resourceWatch → annotations → root).
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
+// is an empty state, used by channels whose state has no fields. A state that
+// matches none of these, such as the state of a channel added in a later
+// protocol version, is kept as raw JSON in Unknown.
 type SnapshotState struct {
+\tEmpty         *EmptyState         \`json:"-"\`
+\tUnknown       json.RawMessage     \`json:"-"\`
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
@@ -1325,6 +1338,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
+\tcase s.Empty != nil:
+\t\treturn json.Marshal(s.Empty)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1345,6 +1360,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Annotations)
 \tcase s.Root != nil:
 \t\treturn json.Marshal(s.Root)
+\tcase s.Unknown != nil:
+\t\treturn s.Unknown, nil
 \tdefault:
 \t\treturn []byte("null"), nil
 \t}
@@ -1359,6 +1376,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
+\tcase len(probe) == 0:
+\t\ts.Empty = &EmptyState{}
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1413,12 +1432,15 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Annotations = &v
-\tdefault:
+\tcase containsAll(probe, "agents"):
 \t\tvar v RootState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
 \t\ts.Root = &v
+\tdefault:
+\t\t// A state from a later protocol version: keep it rather than fail.
+\t\ts.Unknown = append(json.RawMessage(nil), data...)
 \t}
 \treturn nil
 }
@@ -1606,6 +1628,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1774,6 +1797,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
@@ -1782,6 +1806,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
@@ -1819,6 +1845,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
   discriminantField: 'type',
+  injectDiscriminantOnMarshal: true,
   doc: 'ReconnectResult is the result of the `reconnect` command.',
   variants: [
     { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
@@ -2037,6 +2064,9 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2090,7 +2120,34 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptGo(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptGo(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `\t${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+// WindowExemptMethods lists the notification methods that do not count against
+// the window on a windowed subscription. Every other notification for a
+// subscription counts.
+var WindowExemptMethods = []string{
+${methods}
+}
+
+// CountsAgainstWindow reports whether a notification with this method counts
+// against the window on a windowed subscription. Methods that are not
+// recognized count.
+func CountsAgainstWindow(method string) bool {
+\tfor _, exempt := range WindowExemptMethods {
+\t\tif method == exempt {
+\t\t\treturn false
+\t\t}
+\t}
+\treturn true
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
@@ -2129,6 +2186,8 @@ const (
 \tErrorCodeNotFound                    int32 = -32008
 \tErrorCodePermissionDenied            int32 = -32009
 \tErrorCodeAlreadyExists               int32 = -32010
+\t// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
+\tErrorCodeTcpConnectionOpenFailed     int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.

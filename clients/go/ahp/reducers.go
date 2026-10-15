@@ -774,6 +774,11 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatPendingMessageSetAction:
 		kind := a.Kind
 		entry := ahptypes.PendingMessage{Id: a.Id, Kind: &kind, Message: a.Message}
+		if a.Kind == ahptypes.PendingMessageKindSteering {
+			state.SteeringMessage = &entry
+		} else if state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
+			state.SteeringMessage = nil
+		}
 		list := state.QueuedMessages
 		for i := range list {
 			if list[i].Id == entry.Id {
@@ -841,6 +846,17 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatIsArchivedChangedAction:
 		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatConfigChangedAction:
+		if state.Config == nil {
+			state.Config = &ahptypes.ChatConfigState{}
+		}
+		if (a.Replace != nil && *a.Replace) || state.Config.Values == nil {
+			state.Config.Values = make(map[string]json.RawMessage, len(a.Config))
+		}
+		for k, v := range a.Config {
+			state.Config.Values[k] = v
+		}
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope

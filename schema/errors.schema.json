@@ -94,6 +94,69 @@
         "[AhpErrorCodes.UnsupportedProtocolVersion]"
       ]
     },
+    "ChannelReceiveLimits": {
+      "type": "object",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumFrameBytes": {
+          "type": "integer",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "minimum": 1024,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumFrameBytes"
+      ]
+    },
+    "ChannelFlowControl": {
+      "type": "object",
+      "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the server sends to the client."
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the client sends to the server."
+        }
+      },
+      "required": [
+        "clientReceive",
+        "hostReceive"
+      ]
+    },
+    "ResumedChannelSubscription": {
+      "type": "object",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nThe subscription's counters start at zero on the new connection. If a\nchannel that the client requested is not in the result, the subscription was\nnot kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "The limits that the server accepted for the new connection, as in a\n`subscribe` result. The server MAY lower the limits that the client offered\nin its request, and MUST NOT raise them."
+        },
+        "recovery": {
+          "$ref": "#/$defs/ChannelRecoveryKind",
+          "description": "How the server resumes sending data."
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl",
+        "recovery"
+      ]
+    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
@@ -501,7 +564,7 @@
     },
     "Snapshot": {
       "type": "object",
-      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
+      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -538,9 +601,12 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource"
+          "description": "The current state of the resource. A channel with no state fields, such as a\ntelemetry channel, has an {@link EmptyState}. Later protocol versions can add\nnew kinds of state; a client MUST NOT fail on a state that it does not\nrecognize, and ignores that snapshot."
         },
         "fromSeq": {
           "type": "number",
@@ -552,6 +618,11 @@
         "state",
         "fromSeq"
       ]
+    },
+    "EmptyState": {
+      "type": "object",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery windowed subscription starts with a snapshot, including subscriptions\nto these channels, so a channel can gain state fields in a later revision\nwithout changing how windowed subscriptions start. With ordinary delivery,\nthe server MAY omit a snapshot whose state is an `EmptyState`.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "RootState": {
       "type": "object",
@@ -1385,6 +1456,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatMutable": {
+          "type": "boolean",
+          "description": "When `true`, the property may be set per chat with `chat/configChanged`.\nThe chat's value overrides the session's value for that chat only."
         }
       },
       "required": [
@@ -2587,6 +2662,10 @@
           },
           "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
+        "config": {
+          "$ref": "#/$defs/ChatConfigState",
+          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -2604,14 +2683,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Legacy steering input retained only when reading old snapshots.\nNew set actions never write this slot. A matching steering removal or\nturn consumption can clear it."
+          "description": "Legacy steering input retained only when reading old snapshots."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered. Each ID is unique across the list. New IDs append; existing\nIDs are replaced in place, even when their kind changes.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -2809,6 +2888,20 @@
         "text"
       ]
     },
+    "ChatConfigState": {
+      "type": "object",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values set on this chat, keyed by property id"
+        }
+      },
+      "required": [
+        "values"
+      ]
+    },
     "PendingMessage": {
       "type": "object",
       "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
@@ -2819,11 +2912,11 @@
         },
         "kind": {
           "$ref": "#/$defs/PendingMessageKind",
-          "description": "Delivery kind. Absence means {@link PendingMessageKind.Queued} for entries\nfrom older queued-message snapshots. Set actions always store their kind."
+          "description": "Delivery kind, defaults to {@link PendingMessageKind.Queued}."
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message to inject into the current turn or send as a new turn"
+          "description": "The queued or steering message"
         }
       },
       "required": [
@@ -5993,6 +6086,11 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
     "BaseParams": {
       "type": "object",
       "description": "Base shape every command's params extends.\n\n`channel` identifies the channel the command targets, mirroring the\n`channel` field on every protocol notification. For commands that operate\non a specific channel (a session, terminal, or changeset), `channel` is\nthat channel's URI. For commands that are connection-level rather than\nchannel-scoped (e.g. {@link InitializeParams | `initialize`},\n{@link PingParams | `ping`}, {@link ListSessionsParams | `listSessions`},\nthe `resource*` filesystem commands, and {@link AuthenticateParams |\n`authenticate`}), the params type narrows `channel` to the literal\nroot URI `'ahp-root://'`.\n\nThis invariant lets implementations route every incoming message —\nrequest, response, or notification — by inspecting `params.channel`\nwithout needing to know the per-method param shape.",
@@ -6145,7 +6243,7 @@
           "items": {
             "$ref": "#/$defs/Snapshot"
           },
-          "description": "Snapshots for each `initialSubscriptions` URI"
+          "description": "Snapshots for each `initialSubscriptions` URI. The server MAY leave out a\nchannel whose state has no fields ({@link EmptyState})."
         },
         "defaultDirectory": {
           "$ref": "#/$defs/URI",
@@ -6169,6 +6267,10 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "tcpConnections": {
+          "$ref": "#/$defs/TcpConnectionsCapability",
+          "description": "Present when the host supports `createTcpConnection`, which opens a TCP\nconnection on the host's network for the client to forward.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6277,6 +6379,10 @@
             "$ref": "#/$defs/URI"
           },
           "description": "URIs the client was subscribed to"
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeOptions",
+          "description": "Windowed subscriptions that the client wants to keep. Each channel MUST\nalso be in `subscriptions` and MUST appear only once. These subscriptions\nare not included in the result's `actions` or `snapshots`.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6286,9 +6392,63 @@
         "subscriptions"
       ]
     },
+    "ChannelDeliveryResumeParams": {
+      "type": "object",
+      "description": "One windowed subscription that the client wants to keep after reconnection.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/SubscriptionFlowControlOptions",
+          "description": "The client's offer of limits for the new connection, as in `subscribe`.\nThe subscription's counters start at zero on the new connection."
+        },
+        "lastAppliedServerSeq": {
+          "type": "integer",
+          "description": "The `serverSeq` of the last action or observed state that the client\napplied, or kept for processing, on this channel. Parsing an action is not enough. Required for\nreplay recovery; absent for channels that resume only with new data.",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl"
+      ]
+    },
+    "ChannelDeliveryResumeOptions": {
+      "type": "object",
+      "description": "Windowed subscriptions that the client wants to keep after reconnection.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChannelDeliveryResumeParams"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "ChannelDeliveryResumeResult": {
+      "type": "object",
+      "description": "Windowed subscriptions that the server kept after reconnection.\n\nA requested channel that is not listed was not kept. For each kept\nsubscription, both peers start their counters at zero on the new connection,\nand credit counts only data received on that connection. Sequence numbers\ndecide what is sent again.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResumedChannelSubscription"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
     "ReconnectReplayResult": {
       "type": "object",
-      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all replayed data in the response.",
+      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all replayed data for ordinary subscriptions in the\nresponse. Windowed subscriptions recover through their own data messages.",
       "properties": {
         "type": {
           "const": "replay",
@@ -6307,6 +6467,10 @@
             "$ref": "#/$defs/URI"
           },
           "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeResult",
+          "description": "Windowed subscriptions that the server kept. Their data is sent separately.\nThe server MUST omit this field unless the request contained `windows`,\nand MUST list only channels from the request.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6328,7 +6492,11 @@
           "items": {
             "$ref": "#/$defs/Snapshot"
           },
-          "description": "Fresh snapshots for each subscription"
+          "description": "Fresh snapshots for each resumed ordinary subscription. Windowed\nsubscriptions are not included; they recover through their own data\nmessages, as described by `windows`. The server MAY leave out a channel\nwhose state has no fields ({@link EmptyState})."
+        },
+        "windows": {
+          "$ref": "#/$defs/ChannelDeliveryResumeResult",
+          "description": "Windowed subscriptions that the server kept. Each one has its own\n`recovery` value, which does not depend on this result's type. The server\nMUST omit this field unless the request contained `windows`, and MUST list\nonly channels from the request.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6338,7 +6506,7 @@
     },
     "SubscribeParams": {
       "type": "object",
-      "description": "Subscribe to a URI-identified channel.\n\nA channel MAY have state associated with it (e.g. root, sessions,\nterminals) or be stateless (pure pub/sub for streaming data). For\nstate-bearing channels the result includes a snapshot; for stateless\nchannels `snapshot` is omitted.",
+      "description": "Subscribe to a URI-identified channel.\n\nWith ordinary delivery, the result contains a snapshot of the channel's\nstate; the server MAY omit it for a channel whose state has no fields. With\nwindowed delivery, the result contains `flowControl` instead,\nand the snapshot is sent in a `channel/snapshot` notification.\n\nA client has at most one subscription to each channel. A `subscribe` for a\nchannel that the client is already subscribed to changes the existing\nsubscription, for example its window, without losing data. Windowed counters\ncontinue if the subscription was already windowed.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -6351,15 +6519,32 @@
         },
         "delivery": {
           "$ref": "#/$defs/SubscriptionDeliveryOptions",
-          "description": "Optional delivery preferences for this subscription.\n\nServers MAY use these preferences to buffer and coalesce high-frequency\nupdates while preserving the same reduced state. Omit this field for the\nserver's default delivery behavior."
+          "description": "Asks the server to limit how long it holds updates. If absent, the server\nuses its default behavior."
         },
         "view": {
           "$ref": "#/$defs/SubscribeView",
-          "description": "Optional client-requested shape for the returned snapshot.\n\nServers that do not understand a requested view ignore it and return their\ndefault snapshot. Clients MUST tolerate receiving more state than requested."
+          "description": "Asks for a smaller snapshot. A server that does not support the requested\nview ignores it. Clients MUST accept more state than they requested."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/SubscriptionFlowControlOptions",
+          "description": "Offers windowed delivery for this subscription. The server accepts by\nreturning `flowControl` in the result. If the result does not contain\n`flowControl`, the subscription uses ordinary delivery.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
         "channel"
+      ]
+    },
+    "SubscriptionFlowControlOptions": {
+      "type": "object",
+      "description": "A client's offer of windowed delivery.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "receive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "The largest limits that the client accepts for data that it receives. The\nserver MAY accept lower values, and MUST NOT accept higher values."
+        }
+      },
+      "required": [
+        "receive"
       ]
     },
     "SubscribeView": {
@@ -6374,21 +6559,25 @@
     },
     "SubscriptionDeliveryOptions": {
       "type": "object",
-      "description": "Advisory delivery preferences for a single subscription.",
+      "description": "Delivery preferences for one subscription. They do not allow a server to\nexceed the limits of a windowed subscription.",
       "properties": {
         "maxLatencyMs": {
           "type": "number",
-          "description": "Maximum time, in milliseconds, that the server may intentionally delay\ndelivery while buffering/coalescing updates for this subscription.\n\nA value of `0` requests immediate delivery with no intentional coalescing."
+          "description": "The longest time, in milliseconds, that the server should hold updates for\nthis subscription in order to combine them. The server MUST NOT combine\nupdates unless the combined update produces the same state and the client\nstill receives every event that the channel requires. A value of `0` asks\nthe server not to delay updates."
         }
       }
     },
     "SubscribeResult": {
       "type": "object",
-      "description": "Result of the `subscribe` command.\n\n`snapshot` is present when the subscribed channel has associated state, and\nabsent for stateless channels.",
+      "description": "Result of the `subscribe` command.\n\nWith ordinary delivery, `snapshot` is present, except that the server MAY\nomit it for a channel whose state has no fields. With windowed delivery,\n`flowControl` is present and `snapshot` MUST be absent. The server sends the\nsnapshot in a `channel/snapshot` notification.",
       "properties": {
         "snapshot": {
           "$ref": "#/$defs/Snapshot",
-          "description": "Snapshot of the subscribed channel's state (omitted for stateless channels)"
+          "description": "Snapshot of the subscribed channel's state. Present with ordinary delivery,\nexcept that the server MAY omit it for a channel whose state has no fields\n({@link EmptyState}). With windowed delivery, the snapshot is sent in a\n`channel/snapshot` notification instead."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "The limits that the server accepted for windowed delivery. The server sends\nthis result before any data message for the subscription. The client MUST be\nready to process data messages as soon as it receives this result, and can\nsend data messages without waiting for the snapshot.\n\nStability: 1.0 - Early development."
         }
       }
     },
@@ -6459,7 +6648,7 @@
     },
     "ResourceReadResult": {
       "type": "object",
-      "description": "Result of the `resourceRead` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.",
+      "description": "Result of the `resourceRead` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.\n\nThe result contains the whole resource. Windowed delivery does not limit its\nsize, because it is a response and not part of a subscription.",
       "properties": {
         "data": {
           "type": "string",
@@ -7733,9 +7922,48 @@
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
     },
+    "CreateTcpConnectionParams": {
+      "type": "object",
+      "description": "Opens a TCP connection from the host to a destination on the host's network.\n\nThe client chooses the channel URI. This command does not subscribe: after it\nsucceeds, the client subscribes to the channel with windowed delivery. The\nhost MUST NOT send data for the channel before that subscription, and MUST\nlimit how much destination data it buffers and how long it keeps a\nconnection that is never subscribed to.\n\nThe client MUST NOT send this command unless `InitializeResult.tcpConnections`\nis present. If the channel URI is already in use, the host returns\n`AlreadyExists` and MUST NOT replace the existing connection. If the host\ncannot open the connection, it returns `TcpConnectionOpenFailed`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The client-chosen URI for the new channel, for example `ahp-tcp:/<uuid>`."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "host": {
+          "type": "string",
+          "description": "A DNS name or IP address, resolved on the host's network. Not a URL."
+        },
+        "port": {
+          "type": "integer",
+          "description": "The destination port.",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "required": [
+        "channel",
+        "host",
+        "port"
+      ]
+    },
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
+    },
+    "ChannelRecoveryKind": {
+      "enum": [
+        "snapshot",
+        "replay",
+        "live"
+      ],
+      "type": "string",
+      "description": "How the server resumes sending data on a windowed subscription after\nreconnection."
     },
     "JsonPrimitive": {
       "oneOf": [
@@ -8708,6 +8936,9 @@
           "$ref": "#/$defs/ChatIsArchivedChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatConfigChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatInputRequestedAction"
         },
         {
@@ -9642,7 +9873,7 @@
         },
         "queuedMessageId": {
           "type": "string",
-          "description": "If this turn consumes a pending message, its ID. Removes the matching\nentry from {@link ChatState.queuedMessages} regardless of kind, and clears\na matching deprecated {@link ChatState.steeringMessage} snapshot slot."
+          "description": "If this turn consumes a pending message, its ID. Removes the matching\nentry from {@link ChatState.queuedMessages}."
         },
         "_meta": {
           "type": "object",
@@ -10360,7 +10591,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place. Changing kind does not change its position.\nA new steering ID never replaces another pending submission. This action\nnever writes the deprecated {@link ChatState.steeringMessage} snapshot slot.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"
@@ -10387,7 +10618,7 @@
     },
     "ChatPendingMessageRemovedAction": {
       "type": "object",
-      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).\n\nRemoves an entry from {@link ChatState.queuedMessages} only when both `id`\nand effective kind match. An absent entry kind means\n{@link PendingMessageKind.Queued}. Unknown IDs and mismatched kinds are\nno-ops. A steering removal also clears a matching deprecated\n{@link ChatState.steeringMessage} snapshot slot.",
+      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).\n\nRemoves an entry from {@link ChatState.queuedMessages} only when both `id`\nand effective kind match. Unknown IDs and mismatched kinds are\nno-ops.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageRemoved"
@@ -10419,7 +10650,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Pending message IDs of either kind in the desired raw order"
+          "description": "Pending message IDs in the desired raw order"
         }
       },
       "required": [
@@ -10475,6 +10706,28 @@
       "required": [
         "type",
         "isArchived"
+      ]
+    },
+    "ChatConfigChangedAction": {
+      "type": "object",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} overlay, or replaces the\noverlay when `replace` is `true`. Only properties with `chatMutable: true`\nin the session's config schema may be set. To reset a property to the\nsession's value, replace the overlay with one that omits the property.",
+      "properties": {
+        "type": {
+          "const": "chat/configChanged"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values to set on the chat"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces the chat's config values instead of merging"
+        }
+      },
+      "required": [
+        "type",
+        "config"
       ]
     },
     "ChatInputRequestedAction": {

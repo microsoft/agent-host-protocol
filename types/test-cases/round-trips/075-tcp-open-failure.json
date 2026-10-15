@@ -1,0 +1,24 @@
+{
+  "name": "tcp-open-failure",
+  "group": "A",
+  "description": "A failed createTcpConnection returns the TcpConnectionOpenFailed error code.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 12,
+    "error": {
+      "code": -32012,
+      "message": "Could not open the TCP connection"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "id": 12,
+      "error": {
+        "code": -32012,
+        "message": "Could not open the TCP connection"
+      }
+    }
+  ]
+}

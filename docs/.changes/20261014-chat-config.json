@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`ChatState.config` overlay, the `chat/configChanged` action, and `chatMutable` on session config properties let a host allow per-chat values for selected settings, such as tool auto-approval, so changing them in one chat no longer changes every chat in the session."
+}
