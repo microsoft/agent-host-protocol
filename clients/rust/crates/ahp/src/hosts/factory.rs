@@ -34,6 +34,10 @@ use super::types::HostId;
 /// use_factory(open_ws);
 /// ```
 pub trait HostTransportFactory: Send + Sync + 'static {
+    /// Connection windowing defaults. Does not enable any subscription.
+    fn windowing_config(&self) -> crate::WindowingConfig {
+        crate::WindowingConfig::default()
+    }
     /// Open a fresh transport for `host_id`.
     ///
     /// Errors are surfaced as the host's `last_error` and trigger the
@@ -55,5 +59,21 @@ where
         host_id: HostId,
     ) -> Pin<Box<dyn Future<Output = Result<BoxedTransport, TransportError>> + Send + '_>> {
         Box::pin(self(host_id))
+    }
+}
+
+pub(super) struct ConfiguredFactory {
+    pub(super) inner: std::sync::Arc<dyn HostTransportFactory>,
+    pub(super) windowing: crate::WindowingConfig,
+}
+impl HostTransportFactory for ConfiguredFactory {
+    fn windowing_config(&self) -> crate::WindowingConfig {
+        self.windowing.clone()
+    }
+    fn open_transport(
+        &self,
+        host_id: HostId,
+    ) -> Pin<Box<dyn Future<Output = Result<BoxedTransport, TransportError>> + Send + '_>> {
+        self.inner.open_transport(host_id)
     }
 }
