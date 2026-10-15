@@ -118,6 +118,214 @@ Acquire the lease before awaiting `ready`: its event iterator is attached
 before the `subscribe` request is sent, so actions delivered during the
 snapshot round-trip remain ordered behind that snapshot instead of being lost.
 
+## Windowed delivery and backpressure
+
+Windowing is **off by default**. Opt in on each subscription:
+
+```ts
+const { subscription } = await client.subscribe(terminalUri, { windowed: true });
+for await (const event of subscription) {
+  if (event.type === 'snapshot') {
+    mirror.applySnapshot(event.params.snapshot);
+  } else if (event.type === 'action') {
+    await renderTerminal(event.params);
+  }
+}
+```
+
+The first event is the snapshot, whether the host accepts windowing or declines
+and returns an ordinary snapshot. With automatic release (the default), asking
+for the next event releases the previous one. Await work inside the loop to
+slow down the host. Closing a windowed owner (including an iterator's `return()`)
+unsubscribes it and stops credit, including pending timers and old receipts.
+Ordinary local observer iterators retain their existing close behavior.
+
+The extended `DeliveryEvent` type includes snapshots, TCP data/EOF/reset, and
+unknown notifications, without extending the legacy `SubscriptionEvent` union.
+`subscribe(uri, { windowed: true })` returns `Subscription<DeliveryEvent>`;
+existing ordinary calls keep their existing type and buffering behavior.
+An ordinary empty-state result without a snapshot has no synthetic snapshot.
+
+### Defaults and transport support
+
+```ts
+const transport = await WebSocketTransport.connect(url, {
+  maximumFrameBytes: 1_048_576, // UTF-16 bytes, including the JSON envelope
+});
+const client = new AhpClient(transport, {
+  windowing: {
+    windowBytes: 262_144,
+    // maximumFrameBytes: override the transport-derived default if needed
+    maxBufferedSendBytes: 1_048_576,
+    coalescers: [],
+  },
+});
+const { subscription } = await client.subscribe(terminalUri, {
+  windowed: { windowBytes: 65_536, maximumFrameBytes: 16_384 },
+  // Existing delivery and view preferences remain independent.
+});
+```
+
+Connection configuration supplies defaults; it does not enable windowing.
+Global WebSocket exposes no native maximum message size, so this adapter's
+default `maximumFrameBytes` is **1,048,576**. `fromSocket(socket, options)`
+accepts the same override. There are no new runtime dependencies.
+When windowing is active, the scheduler also uses the adapter's cancelable
+`waitWritable()` to keep the physical WebSocket send buffer near its internal
+1 MiB high-water / 256 KiB low-water marks. `bufferedAmount` remains available
+in transport bytes, separately from the subscription's UTF-16 accounting.
+
+Custom transports opt in by exposing `supportsWindowedDelivery = true`. They
+must return exact text frames, UTF-8 binary frames, or parsed frames with
+`rawText` containing the original JSON, and must send pre-serialized strings
+verbatim. A parsed-only transport can keep its existing implementation; the
+subscription reports `fallbackReason: 'transport'` and does not offer windowing.
+Host rejection reports `'declined'`. There is no protocol-version gating.
+TCP requires accepted windowing and never falls back.
+Before using the low-level `createTcpConnection` request, check that the host
+advertised `InitializeResult.tcpConnections`; raw request APIs otherwise remain
+capability-agnostic.
+
+### Manual receive release
+
+```ts
+const { subscription } = await client.subscribe(tcpUri, {
+  windowed: { receive: 'manual' },
+});
+for await (const delivery of subscription.deliveries()) {
+  if (delivery.event.type === 'tcpData') {
+    const bytes = Uint8Array.from(atob(delivery.event.params.data), c => c.charCodeAt(0));
+    await sink.write(bytes);
+  }
+  delivery.release(); // idempotent; releases only this delivery's remaining credit
+}
+```
+
+Use one owner to consume the reliable queue; do not mix `next()` and
+`deliveries()` on that handle. `deliveries()` also works in auto mode and
+automatically releases the previous receipt on advance. `delivery.bytes` is the
+sum of the **original raw wire sizes**, not a re-serialization of its payload.
+
+Fragments are special: non-final fragments are credited when stored so that a
+message larger than the window can finish. The final fragment is credited on
+consumer release. The receipt includes every original fragment's size, but
+`release()` never credits a non-final fragment twice. Windowing is not a limit
+on complete-message size or total retained memory; a consumer must still avoid
+retaining unbounded application data.
+
+### Send-side backpressure and diagnostics
+
+```ts
+for await (const chunk of boundedSource) {
+  await subscription.waitWritable();
+  const binary = Array.from(chunk, byte => String.fromCharCode(byte)).join('');
+  await client.notifyAsync('tcp/data', { channel: tcpUri, data: btoa(binary) });
+}
+await client.notifyAsync('tcp/eof', { channel: tcpUri });
+```
+
+Use bounded source chunks and await each send instead of constructing an
+unbounded set of promises. `notifyAsync(method, params, { signal? })` and
+`dispatchAsync(channel, action, { clientSeq?, signal? })` complete when written
+to the transport, not when echoed, processed, or flushed by a WebSocket.
+The window, fragmentation, and a fair per-channel scheduler apply to both
+async sends and the existing synchronous `notify`/`dispatch`.
+The first logical send is accepted even if it exceeds `maxBufferedSendBytes`;
+the window and fragmentation pace it. The cap bounds data queued behind that
+head message, and coalescing does not bypass it. Queue overflow throws/rejects
+with `BackpressureError` without disconnecting the client; awaited sends also
+fail on overflow rather than retaining unbounded admission waiters. `waitWritable`
+is advisory, not a reservation when multiple producers share a subscription.
+
+Cancellation removes a queued message before transmission begins; a fragmented
+message that has started is completed to preserve framing. Unsent messages fail
+on connection loss and are never automatically replayed. TCP EOF is ordered and
+counts against the window; TCP reset bypasses the window and discards pending data.
+
+`subscription.flowControl` (or `client.flowControl(uri)`) reports mode, negotiated
+limits, outstanding sends, queued sends, unreleased receive bytes, and writability.
+`flowControlChanges()` observes changes without releasing credit.
+`client.waitWritable(uri, { signal? })` is the connection-level convenience API.
+`client.flowControlEvents()` provides a lossy observer stream for blocked/unblocked,
+credit, fragments, coalescing, resumed, and dropped events.
+Credit batching and exempt-message queue/size/rate bounds are internal policies,
+not additional public configuration.
+Malformed frames on accepted windowed connections and protocol violations close
+the connection with a `TransportError` of kind `protocol`.
+
+### Coalescing and custom behavior
+
+Coalescing defaults to on for accepted windowing and can be disabled with
+`windowed: { coalescing: false }`. It merges only adjacent queued items, adds no
+delay, and never changes an item already handed to its consumer.
+Built-ins concatenate received terminal output, concatenate chat deltas for the
+same turn/part/metadata, and concatenate **decoded** outgoing TCP bytes.
+Origins/rejections, distinct dispatch sequence numbers, snapshots, EOF/reset,
+unknown methods, and different connection epochs are not merged by the built-ins.
+Receive coalescing is local and independent of `delivery.maxLatencyMs`.
+
+Register pure custom coalescers per connection, before the built-ins:
+
+```ts
+import type { ActionEnvelope } from '@microsoft/agent-host-protocol';
+import type { ChannelCoalescer } from '@microsoft/agent-host-protocol/client';
+
+const terminalCoalescer: ChannelCoalescer = {
+  method: 'action',
+  merge(earlier, later, { direction }) {
+    if (direction !== 'receive') return;
+    const a = earlier.params as ActionEnvelope;
+    const b = later.params as ActionEnvelope;
+    if (a.action.type !== 'terminal/data' || b.action.type !== 'terminal/data') return;
+    return {
+      ...later,
+      params: { ...b, action: { ...b.action, data: a.action.data + b.action.data } },
+    };
+  },
+};
+const client = new AhpClient(transport, { windowing: { coalescers: [terminalCoalescer] } });
+```
+
+A custom merge must preserve channel semantics and required events. The client
+enforces channel/method identity and excludes controls, snapshots, dispatches,
+origins, and cross-epoch merges. Returning `undefined` delegates to the next
+custom coalescer or built-in.
+
+### Shared ownership and reconnect
+
+`ManagedSubscriptionManager.acquire(uri, owner, { windowed: ... })` exposes a
+single reliable owner through `lease.deliveries()` (also
+`lease.subscription.deliveries()`). Choose one lease to consume that stream;
+the existing independent `lease.events` iterators remain lossy observers.
+They never release the owner queue's credit. Managed status also exposes
+`flowControl`, `flowControlChanges()` and `waitWritable()`.
+Active windowed leases on a multi-host client's raw connection automatically
+rebind their owner queue and observer fan-out before the next handshake; a dropped
+subscription closes the managed entry with an observable error.
+A failed per-channel re-subscribe drops only that channel, not the host.
+Closing the owner removes it from future reconnect requests.
+
+`subscribe(uri, { windowed: true, signal })` supports local cancellation.
+Canceled/timed-out requests clean up their provisional state, and late server
+acceptances are accounted for or unsubscribed rather than closing the connection.
+
+`MultiHostClient.subscribe(hostId, uri, { windowed: true })` returns
+`{ result, subscription }`; its existing two-argument call still returns the
+ordinary `SubscribeResult`. `HostConfig.clientConfig.windowing` supplies defaults.
+Host-aware async sends, `flowControl`, `waitWritable`, and `flowControlEvents`
+are available; telemetry carries `hostId`. `HostClientHandle` checks generation
+before and after awaited sends.
+
+The multi-host supervisor keeps the owner handle, queued deliveries and options
+across reconnect. It sends `reconnect.windows` using each queue's retained
+sequence, resets wire counters, and appends snapshot/replay/live recovery data
+after retained items. Releasing an old-connection receipt sends no credit on the
+new connection. Dropped channels end with a visible error. TCP never resumes.
+Low-level `client.reconnect` also accepts the generated `windows` parameter.
+Global `events()` and `deliveryEvents()` are observe-only; use owner deliveries
+with `AhpStateMirror.applyDelivery` or
+`MultiHostStateMirror.applyDelivery(hostId, delivery)` for reliable state feeding.
+
 ## Reducers and state mirror
 
 The reducer functions (`rootReducer`, `sessionReducer`,

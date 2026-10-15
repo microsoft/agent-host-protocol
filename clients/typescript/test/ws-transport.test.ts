@@ -100,3 +100,37 @@ test('lastClose reflects the wasClean flag from the close event', async () => {
   assert.equal(info.wasClean, false);
   assert.equal(info.reason, 'gone');
 });
+
+test('WebSocket windowing advertises the 1 MiB fallback and a configurable override', async () => {
+  const { WebSocketTransport } = await import('../src/ws/index.js');
+  const { transport } = await makeTransport();
+  assert.equal(transport.supportsWindowedDelivery, true);
+  assert.equal(transport.maximumFrameBytes, 1_048_576);
+  const overridden = WebSocketTransport.fromSocket(new MockWebSocket() as unknown as WebSocket, {
+    maximumFrameBytes: 16384,
+  });
+  assert.equal(overridden.maximumFrameBytes, 16384);
+  assert.throws(() => WebSocketTransport.fromSocket(new MockWebSocket() as unknown as WebSocket, {
+    maximumFrameBytes: 512,
+  }), TypeError);
+  await assert.rejects(WebSocketTransport.connect('ws://unused.invalid', { maximumFrameBytes: 0 }), TypeError);
+});
+
+test('WebSocket physical writability waits for drain and honors cancellation and close', async () => {
+  const { ws, transport } = await makeTransport();
+  ws.bufferedAmount = 2_097_152;
+  let writable = false;
+  const pending = transport.waitWritable().then(() => { writable = true; });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(writable, false);
+  ws.bufferedAmount = 262_144;
+  await pending;
+  ws.bufferedAmount = 2_097_152;
+  const controller = new AbortController();
+  const canceled = transport.waitWritable({ signal: controller.signal });
+  controller.abort();
+  await assert.rejects(canceled, /abort/i);
+  const closed = transport.waitWritable();
+  ws.close();
+  await assert.rejects(closed, TransportError);
+});

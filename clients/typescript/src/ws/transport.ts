@@ -18,6 +18,8 @@ interface PendingRead {
 
 /** Options for {@link WebSocketTransport.connect}. */
 export interface WebSocketTransportOptions {
+  /** AHP receive message limit in UTF-16 bytes. Global WebSocket exposes no limit; default 1048576. */
+  maximumFrameBytes?: number;
   /**
    * WebSocket subprotocols to negotiate. Browsers do not allow setting
    * arbitrary HTTP headers; subprotocols and query-string parameters are
@@ -47,6 +49,8 @@ export interface WebSocketCloseInfo {
  *   query-string parameters for auth.
  */
 export class WebSocketTransport implements AhpTransport {
+  readonly supportsWindowedDelivery = true;
+  readonly maximumFrameBytes: number;
   private readonly socket: WebSocket;
   private readonly inbox: Array<TransportFrame | null> = [];
   private waiters: PendingRead[] = [];
@@ -63,6 +67,11 @@ export class WebSocketTransport implements AhpTransport {
    */
   static connect(url: string | URL, options: WebSocketTransportOptions = {}): Promise<WebSocketTransport> {
     return new Promise((resolve, reject) => {
+      if (options.maximumFrameBytes !== undefined
+        && (!Number.isSafeInteger(options.maximumFrameBytes) || options.maximumFrameBytes < 1024)) {
+        reject(new TypeError('maximumFrameBytes must be a safe integer of at least 1024'));
+        return;
+      }
       const SocketCtor = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
       if (!SocketCtor) {
         reject(new TransportError('io', 'global WebSocket is not available; install or polyfill it'));
@@ -85,7 +94,7 @@ export class WebSocketTransport implements AhpTransport {
       };
       const onOpen = () => {
         cleanup();
-        resolve(new WebSocketTransport(socket));
+        resolve(new WebSocketTransport(socket, options));
       };
       const onErrorBeforeOpen = () => {
         cleanup();
@@ -108,14 +117,18 @@ export class WebSocketTransport implements AhpTransport {
    *
    * The socket MUST already be in the `OPEN` state.
    */
-  static fromSocket(socket: WebSocket): WebSocketTransport {
+  static fromSocket(socket: WebSocket, options: WebSocketTransportOptions = {}): WebSocketTransport {
     if (socket.readyState !== socket.OPEN) {
       throw new TransportError('io', 'socket is not OPEN');
     }
-    return new WebSocketTransport(socket);
+    return new WebSocketTransport(socket, options);
   }
 
-  private constructor(socket: WebSocket) {
+  private constructor(socket: WebSocket, options: WebSocketTransportOptions) {
+    this.maximumFrameBytes = options.maximumFrameBytes ?? 1_048_576;
+    if (!Number.isSafeInteger(this.maximumFrameBytes) || this.maximumFrameBytes < 1024) {
+      throw new TypeError('maximumFrameBytes must be a safe integer of at least 1024');
+    }
     this.socket = socket;
     socket.binaryType = 'arraybuffer';
 
@@ -166,6 +179,29 @@ export class WebSocketTransport implements AhpTransport {
   /** Bytes still queued in the underlying socket's send buffer. */
   get bufferedAmount(): number {
     return this.socket.bufferedAmount;
+  }
+
+  /** Bound queued physical sends when the client's windowed scheduler uses this transport. */
+  async waitWritable(options: { signal?: AbortSignal } = {}): Promise<void> {
+    const check = () => {
+      if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
+      if (this.error) throw this.error;
+      if (this.closed || this.socket.readyState !== this.socket.OPEN) throw new TransportError('closed', 'transport closed');
+    };
+    check();
+    if (this.socket.bufferedAmount < 1_048_576) return;
+    while (this.socket.bufferedAmount > 262_144) {
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => options.signal?.removeEventListener('abort', abort);
+        const timer = setTimeout(() => { cleanup(); resolve(); }, 5);
+        const abort = () => {
+          clearTimeout(timer); cleanup();
+          reject(options.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+        };
+        options.signal?.addEventListener('abort', abort, { once: true });
+      });
+      check();
+    }
   }
 
   /**

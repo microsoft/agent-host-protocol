@@ -38,7 +38,7 @@ export type JsonRpcMessage =
  * through JSON.
  */
 export type TransportFrame =
-  | { readonly kind: 'parsed'; readonly message: ProtocolMessage }
+  | { readonly kind: 'parsed'; readonly message: ProtocolMessage; readonly rawText?: string }
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'binary'; readonly data: Uint8Array };
 
@@ -48,6 +48,12 @@ export type TransportFrame =
  * a clean close.
  */
 export interface AhpTransport {
+  /** Opt in only when inbound raw text is retained and outbound strings are sent verbatim. */
+  readonly supportsWindowedDelivery?: boolean;
+  /** Receive message limit in UTF-16 bytes; unknown defaults to 1048576. */
+  readonly maximumFrameBytes?: number;
+  /** Optional physical send-buffer backpressure. Implementations should honor cancellation. */
+  waitWritable?(options?: { signal?: AbortSignal }): Promise<void>;
   /**
    * Send a single message. The argument may be either a {@link JsonRpcMessage}
    * (which the transport serialises) or a pre-serialised JSON-RPC string
@@ -94,6 +100,7 @@ export function decodeMessage(text: string): ProtocolMessage {
 // ─── In-memory transport (for tests) ─────────────────────────────────────────
 
 class InMemoryHalf implements AhpTransport {
+  readonly supportsWindowedDelivery = true;
   private inbox: Array<TransportFrame | null> = [];
   private waiter: ((frame: TransportFrame | null) => void) | null = null;
   private closed = false;

@@ -15,6 +15,11 @@ import type { ClientIdStore } from './client-id-store.js';
 import type { HostTransportFactory } from './factory.js';
 import { defaultReconnectPolicy, type ReconnectPolicy } from './policy.js';
 import type { AhpClientConfig } from '../client.js';
+import type { FlowControlEvent } from '../flow-control.js';
+
+export interface HostFlowControlEvent extends FlowControlEvent {
+  readonly hostId: HostId;
+}
 
 /**
  * Opaque, consumer-supplied identifier for a host registered with

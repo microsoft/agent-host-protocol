@@ -86,4 +86,13 @@ export class ClientClosedError extends AhpClientError {
     super(message);
     this.name = 'ClientClosedError';
   }
+
+}
+
+/** A windowed subscription's bounded unsent queue is full. */
+export class BackpressureError extends AhpClientError {
+  constructor(readonly channel: string, readonly maximumBufferedBytes: number) {
+    super(`Send queue for "${channel}" exceeds ${maximumBufferedBytes} UTF-16 bytes; await waitWritable()`);
+    this.name = 'BackpressureError';
+  }
 }

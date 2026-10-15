@@ -29,9 +29,13 @@ import type {
   SessionSummaryChangedParams,
 } from '../../types/channels-root/notifications.js';
 import { PROTOCOL_VERSION } from '../../types/version/registry.js';
-import { AhpClient, type DispatchHandle } from '../client.js';
-import type { ClientEvent } from '../events.js';
-import { RpcError } from '../error.js';
+import { AhpClient, type DispatchHandle, type SubscribeOptions, type Subscription } from '../client.js';
+import type { ClientDeliveryEvent, DeliveryEvent } from '../events.js';
+import type { WindowChannel, FlowControlEvent, FlowControlStatus } from '../flow-control.js';
+import type { ClientNotificationMap } from '../../types/common/messages.js';
+import { ClientClosedError } from '../error.js';
+import { isKnownSnapshot } from '../state-mirror.js';
+import { RpcError, TransportError } from '../error.js';
 import type { AsyncBroadcastQueue } from '../async-queue.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import type { RootAction } from '../../types/action-origin.generated.js';
@@ -284,11 +288,15 @@ const EMPTY_ROOT_STATE: RootState = { agents: [] };
  * @internal
  */
 export class HostRuntime {
+  private retainedChannels = new Map<URI, WindowChannel>();
+  private readonly subscriptionOptions = new Map<URI, SubscribeOptions>();
+  private readonly trackedChannels = new Map<URI, { channel: WindowChannel; close: () => void }>();
   private readonly config: ResolvedHostConfig;
   readonly shared: HostShared;
   readonly handleSource: HostClientHandleSource;
   private readonly fanOut: AsyncBroadcastQueue<HostSubscriptionEvent>;
   private readonly hostEvents: AsyncBroadcastQueue<HostEvent>;
+  private readonly flowEvents?: AsyncBroadcastQueue<FlowControlEvent & { readonly hostId: HostId }>;
 
   private readonly shutdownController = new AbortController();
   private manualReconnectController = new AbortController();
@@ -306,10 +314,12 @@ export class HostRuntime {
     resolvedClientId: string,
     fanOut: AsyncBroadcastQueue<HostSubscriptionEvent>,
     hostEvents: AsyncBroadcastQueue<HostEvent>,
+    flowEvents?: AsyncBroadcastQueue<FlowControlEvent & { readonly hostId: HostId }>,
   ) {
     this.config = config;
     this.fanOut = fanOut;
     this.hostEvents = hostEvents;
+    this.flowEvents = flowEvents;
     this.shared = makeInitialShared(config, resolvedClientId);
     this.handleSource = {
       hostId: this.shared.id,
@@ -382,18 +392,23 @@ export class HostRuntime {
    * subscription list first, so the next successful (re)connect will
    * subscribe to it automatically.
    */
-  async subscribe(uri: URI): Promise<SubscribeResult> {
+  async subscribe(uri: URI, options: SubscribeOptions = {}):
+    Promise<{ result: SubscribeResult; subscription: Subscription<DeliveryEvent> }> {
     if (this.shared.shutdownReason !== null) {
       throw new HostShutDownError(this.shared.id);
     }
     const client = this.shared.currentClient;
     if (!client) {
       this.trackSubscription(uri);
+      this.subscriptionOptions.set(uri, options);
       throw new HostNotConnectedError(this.shared.id);
     }
-    const { result } = await client.subscribe(uri);
+    const subscribed = await client.subscribe(uri, options);
+    if (subscribed.subscription.windowChannel?.isClosed) throw new ClientClosedError('subscription closed while subscribing');
+    this.subscriptionOptions.set(uri, options);
     this.trackSubscription(uri);
-    return result;
+    if (subscribed.subscription.windowChannel) this.trackChannel(subscribed.subscription.windowChannel);
+    return subscribed;
   }
 
   /**
@@ -407,6 +422,9 @@ export class HostRuntime {
     }
     const client = this.shared.currentClient;
     this.untrackSubscription(uri);
+    this.subscriptionOptions.delete(uri);
+    this.retainedChannels.get(uri)?.close();
+    this.retainedChannels.delete(uri);
     if (client) await client.unsubscribe(uri);
   }
 
@@ -430,6 +448,34 @@ export class HostRuntime {
     return client.dispatch(channel, action, clientSeq);
   }
 
+  flowControl(uri: URI): FlowControlStatus {
+    const client = this.shared.currentClient;
+    if (client) return client.flowControl(uri);
+    const channel = this.retainedChannels.get(uri);
+    if (channel) return channel.status;
+    throw new HostNotConnectedError(this.shared.id);
+  }
+
+  async waitWritable(uri: URI, options: { signal?: AbortSignal } = {}): Promise<void> {
+    const client = this.shared.currentClient;
+    if (!client) throw new HostNotConnectedError(this.shared.id);
+    return client.waitWritable(uri, options);
+  }
+
+  async notifyAsync<M extends keyof ClientNotificationMap>(method: M,
+    params: ClientNotificationMap[M]['params'], options: { signal?: AbortSignal } = {}): Promise<void> {
+    const client = this.shared.currentClient;
+    if (!client) throw new HostNotConnectedError(this.shared.id);
+    return client.notifyAsync(method, params, options);
+  }
+
+  async dispatchAsync(uri: URI, action: StateAction,
+    options: { clientSeq?: number; signal?: AbortSignal } = {}): Promise<DispatchHandle> {
+    const client = this.shared.currentClient;
+    if (!client) throw new HostNotConnectedError(this.shared.id);
+    return client.dispatchAsync(uri, action, options);
+  }
+
   // ─── Supervisor loop ───────────────────────────────────────────────────────
 
   private async runSupervisor(): Promise<void> {
@@ -448,7 +494,7 @@ export class HostRuntime {
       this.reconnectAck = null;
       pendingAck?.resolve();
 
-      let connection: { client: AhpClient; events: AsyncIterableIterator<ClientEvent> } | null = null;
+      let connection: { client: AhpClient; events: AsyncIterableIterator<ClientDeliveryEvent> } | null = null;
       try {
         connection = await this.connectOnce();
       } catch (err) {
@@ -517,6 +563,7 @@ export class HostRuntime {
     // Final cleanup. The handle source mirrors shared state already.
     this.handleSource.currentClient = null;
     this.handleSource.generation = this.shared.generation;
+    for (const channel of this.retainedChannels.values()) channel.close(new ClientClosedError('host shut down'));
   }
 
   /**
@@ -536,7 +583,7 @@ export class HostRuntime {
    * signal's listeners are detached in a `finally` so successful
    * connects don't leak listeners on the long-lived shutdown signal.
    */
-  private async connectOnce(): Promise<{ client: AhpClient; events: AsyncIterableIterator<ClientEvent> }> {
+  private async connectOnce(): Promise<{ client: AhpClient; events: AsyncIterableIterator<ClientDeliveryEvent> }> {
     const shutdownSignal = this.shutdownController.signal;
     const manualSignal = this.manualReconnectController.signal;
     const link = linkAbortSignals(shutdownSignal, manualSignal);
@@ -553,20 +600,29 @@ export class HostRuntime {
       const transport = transportResult;
 
       const client = new AhpClient(transport, this.config.clientConfig);
+      client.restoreWindowedSubscriptions(this.retainedChannels);
+      client.retainWindowedSubscriptions();
       client.connect();
       // Attach the events stream BEFORE the handshake so any
       // notifications the server pushes between the handshake response
       // and `runConnection` are captured rather than dropped by the
       // broadcast queue's no-replay-for-late-readers behaviour.
-      const events = client.events();
+      const events = client.deliveryEvents();
+      const flowEvents = client.flowControlEvents();
+      void (async () => {
+        for await (const event of flowEvents) this.flowEvents?.publish({ ...event, hostId: this.shared.id });
+      })();
 
       let success = false;
       try {
         const prior = {
           serverSeq: this.shared.serverSeq,
-          subscriptions: [...this.shared.subscriptions],
+          subscriptions: this.shared.subscriptions.filter(uri => !uri.startsWith('ahp-tcp:')),
         };
-        const canReconnect = prior.serverSeq > 0 && prior.subscriptions.length > 0;
+        const windows = client.windowedResumeOptions();
+        const initialSubscriptions = prior.subscriptions.filter(uri =>
+          !this.subscriptionOptions.get(uri)?.windowed && !windows.items.some(i => i.channel === uri));
+        const canReconnect = (prior.serverSeq > 0 || windows.items.length > 0) && prior.subscriptions.length > 0;
 
         let reconnectResult: ReconnectResult | null = null;
         let initSnapshots: Snapshot[] | null = null;
@@ -583,6 +639,7 @@ export class HostRuntime {
                 clientId: this.shared.clientId,
                 lastSeenServerSeq: prior.serverSeq,
                 subscriptions: prior.subscriptions,
+                ...(windows.items.length ? { windows } : {}),
               }),
               cancelSignal,
             );
@@ -599,7 +656,7 @@ export class HostRuntime {
               client.initialize({
                 clientId: this.shared.clientId,
                 protocolVersions: [PROTOCOL_VERSION],
-                initialSubscriptions: prior.subscriptions,
+                initialSubscriptions,
               }),
               cancelSignal,
             );
@@ -616,7 +673,7 @@ export class HostRuntime {
             client.initialize({
               clientId: this.shared.clientId,
               protocolVersions: [PROTOCOL_VERSION],
-              initialSubscriptions: prior.subscriptions,
+              initialSubscriptions,
             }),
             cancelSignal,
           );
@@ -627,6 +684,27 @@ export class HostRuntime {
           initDefaultDirectory = initResult.defaultDirectory ?? null;
           initAutomations = initResult.automations ?? null;
           initCompletionTriggers = initResult.completionTriggerCharacters ?? [];
+        }
+
+        for (const uri of prior.subscriptions) {
+          const options = this.subscriptionOptions.get(uri);
+          const previouslyWindowed = windows.items.some(i => i.channel === uri);
+          if ((initSnapshots !== null && (options?.windowed || previouslyWindowed))
+            || (reconnectResult !== null && options?.windowed && !previouslyWindowed
+              && !(reconnectResult.type === 'replay' && reconnectResult.missing.includes(uri)))) {
+            const channel = client.windowedSubscription(uri)?.windowChannel ?? this.retainedChannels.get(uri);
+            try {
+              const subscribed = await raceWithAbort(client.subscribe(uri, options ?? { windowed: true }), cancelSignal);
+              if (subscribed === ABORTED) throw new Error('re-subscribe aborted');
+              if (subscribed.subscription.windowChannel) this.trackChannel(subscribed.subscription.windowChannel);
+            } catch (error) {
+              if (cancelSignal.aborted || error instanceof TransportError) throw error;
+              channel?.close(error as Error);
+              this.untrackSubscription(uri);
+              this.subscriptionOptions.delete(uri);
+              this.retainedChannels.delete(uri);
+            }
+          }
         }
 
         // Refresh session summaries. Failures are non-fatal — we keep the
@@ -664,14 +742,17 @@ export class HostRuntime {
             // Snapshot variant: refresh root state from the matching
             // snapshot, then drop subscriptions that were in prior set
             // but are absent from the returned snapshot list.
-            const surviving = new Set<string>(reconnectResult.snapshots.map(s => s.resource));
+            const surviving = new Set<string>([
+              ...reconnectResult.snapshots.map(s => s.resource),
+              ...(reconnectResult.windows?.items.map(item => item.channel) ?? []),
+            ]);
             const priorSet = new Set<string>(prior.subscriptions);
             snapshotPrunedSubscriptions = this.shared.subscriptions.filter(
               u => surviving.has(u) || !priorSet.has(u),
             );
             for (const snap of reconnectResult.snapshots) {
               if (snap.fromSeq > initServerSeq) initServerSeq = snap.fromSeq;
-              if (snap.resource === ROOT_RESOURCE_URI) {
+              if (snap.resource === ROOT_RESOURCE_URI && isKnownSnapshot(snap)) {
                 this.shared.rootState = (snap.state as RootState) ?? EMPTY_ROOT_STATE;
               }
             }
@@ -688,7 +769,7 @@ export class HostRuntime {
         }
         if (initSnapshots !== null) {
           const rootSnap = initSnapshots.find(s => s.resource === ROOT_RESOURCE_URI);
-          if (rootSnap) this.shared.rootState = (rootSnap.state as RootState) ?? EMPTY_ROOT_STATE;
+          if (rootSnap && isKnownSnapshot(rootSnap)) this.shared.rootState = (rootSnap.state as RootState) ?? EMPTY_ROOT_STATE;
           if (initProtocolVersion) this.shared.protocolVersion = initProtocolVersion;
           this.shared.defaultDirectory = initDefaultDirectory;
           this.shared.automations = initAutomations;
@@ -702,6 +783,15 @@ export class HostRuntime {
           this.shared.subscriptions = postReplaySubscriptions;
         } else if (snapshotPrunedSubscriptions !== null) {
           this.shared.subscriptions = snapshotPrunedSubscriptions;
+        }
+        if (reconnectResult !== null && windows.items.length) {
+          const kept = new Set(reconnectResult.windows?.items.map(item => item.channel) ?? []);
+          const dropped = new Set(windows.items.filter(item => !kept.has(item.channel)).map(item => item.channel));
+          this.shared.subscriptions = this.shared.subscriptions.filter(uri => !dropped.has(uri));
+          for (const uri of dropped) {
+            this.subscriptionOptions.delete(uri);
+            this.retainedChannels.delete(uri);
+          }
         }
 
         // Mirror the new generation + client into the shared handle source.
@@ -752,7 +842,7 @@ export class HostRuntime {
    * shutdown signal aborts, or a manual reconnect is requested.
    */
   private async runConnection(
-    events: AsyncIterableIterator<ClientEvent>,
+    events: AsyncIterableIterator<ClientDeliveryEvent>,
   ): Promise<'shutdown' | 'manualReconnect' | 'disconnected'> {
     const shutdownSignal = this.shutdownController.signal;
     const manualSignal = this.manualReconnectController.signal;
@@ -789,6 +879,19 @@ export class HostRuntime {
     this.shared.currentClient = null;
     this.handleSource.currentClient = null;
     if (prev) {
+      this.retainedChannels = prev.retainWindowedSubscriptions();
+      for (const [uri, channel] of this.retainedChannels) {
+        this.trackSubscription(uri);
+        this.trackChannel(channel);
+        if (!this.subscriptionOptions.has(uri)) {
+          this.subscriptionOptions.set(uri, channel.limits || channel.fallbackReason
+            ? { windowed: { ...channel.options } } : {});
+        }
+      }
+      this.shared.subscriptions = this.shared.subscriptions.filter(uri => !uri.startsWith('ahp-tcp:'));
+      for (const channel of this.retainedChannels.values()) {
+        this.shared.serverSeq = Math.max(this.shared.serverSeq, channel.lastAppliedServerSeq);
+      }
       try {
         await prev.shutdown();
       } catch {
@@ -797,7 +900,7 @@ export class HostRuntime {
     }
   }
 
-  private handleEvent(event: ClientEvent): void {
+  private handleEvent(event: ClientDeliveryEvent): void {
     // Update local mirrors before fanning out so consumers observing
     // the next snapshot see the result of this event.
     switch (event.event.type) {
@@ -818,8 +921,19 @@ export class HostRuntime {
       case 'authRequired':
         // No cache update; consumers observe via the event stream.
         break;
+      case 'snapshot':
+        this.shared.serverSeq = Math.max(this.shared.serverSeq, event.event.params.snapshot.fromSeq);
+        if (event.channel === ROOT_RESOURCE_URI && isKnownSnapshot(event.event.params.snapshot)) {
+          this.shared.rootState = event.event.params.snapshot.state as RootState;
+        }
+        return;
+      case 'tcpData':
+      case 'tcpEof':
+      case 'tcpReset':
+      case 'notification':
+        return;
     }
-    this.fanOut.publish(tagClientEvent(this.shared.id, event));
+    this.fanOut.publish(tagClientEvent(this.shared.id, { channel: event.channel, event: event.event }));
   }
 
   private applyEnvelopeLocally(envelope: ActionEnvelope): void {
@@ -839,6 +953,23 @@ export class HostRuntime {
     if (!this.shared.subscriptions.includes(uri)) {
       this.shared.subscriptions.push(uri);
     }
+  }
+
+  private trackChannel(channel: WindowChannel): void {
+    const existing = this.trackedChannels.get(channel.uri);
+    if (existing?.channel === channel) return;
+    if (existing) existing.channel.closed.delete(existing.close);
+    const close = () => {
+      if (this.trackedChannels.get(channel.uri)?.channel !== channel) return;
+      this.trackedChannels.delete(channel.uri);
+      this.untrackSubscription(channel.uri);
+      this.subscriptionOptions.delete(channel.uri);
+      this.retainedChannels.delete(channel.uri);
+      channel.closed.delete(close);
+    };
+    this.trackedChannels.set(channel.uri, { channel, close });
+    channel.closed.add(close);
+    if (channel.isClosed) close();
   }
 
   private untrackSubscription(uri: URI): void {
