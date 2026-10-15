@@ -214,3 +214,23 @@ with `ahp::transport::RawTextTransport::new(transport, Some(safe_utf16_limit))`.
 Never return parsed-only data after asserting this capability: exact received text
 is required for accounting. Advanced generated subscribe/reconnect requests use
 the same negotiation hook; obtain their owning queue with `windowed_subscription`.
+
+### Examples
+
+Two runnable examples use an in-memory demo host that follows the window rules,
+so they need no server:
+
+- [`examples/windowing_basic.rs`](https://github.com/microsoft/agent-host-protocol/blob/main/clients/rust/crates/ahp/examples/windowing_basic.rs) opts a terminal
+  subscription into windowed delivery and shows the host pausing when the
+  window is full and resuming as the client returns credit.
+- [`examples/windowing_backpressure.rs`](https://github.com/microsoft/agent-host-protocol/blob/main/clients/rust/crates/ahp/examples/windowing_backpressure.rs)
+  adds a slow renderer, a custom coalescer that keeps only the latest terminal
+  resize, and a paste that waits for `wait_writable()` instead of queueing.
+
+```sh
+cargo run -p ahp --example windowing_basic
+cargo run -p ahp --example windowing_backpressure
+```
+
+The shared host is in
+[`examples/support/windowing_demo_host.rs`](https://github.com/microsoft/agent-host-protocol/blob/main/clients/rust/crates/ahp/examples/support/windowing_demo_host.rs).

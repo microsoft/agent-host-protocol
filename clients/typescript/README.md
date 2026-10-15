@@ -146,6 +146,27 @@ unknown notifications, without extending the legacy `SubscriptionEvent` union.
 existing ordinary calls keep their existing type and buffering behavior.
 An ordinary empty-state result without a snapshot has no synthetic snapshot.
 
+### Examples
+
+Two runnable examples use an in-memory demo host that follows the window rules,
+so they need no server:
+
+- [`examples/windowing-basic.ts`](examples/windowing-basic.ts) opts a terminal
+  subscription into windowed delivery and shows the host pausing when the
+  window is full and resuming as the client returns credit.
+- [`examples/windowing-backpressure.ts`](examples/windowing-backpressure.ts)
+  adds a slow renderer, a custom coalescer that keeps only the latest terminal
+  resize, and a paste that waits for `waitWritable()` instead of queueing.
+
+```sh
+npx tsx examples/windowing-basic.ts
+npx tsx examples/windowing-backpressure.ts
+npm run typecheck:examples
+```
+
+The examples import from `../src`; applications import from
+`@microsoft/agent-host-protocol/client` instead.
+
 ### Defaults and transport support
 
 ```ts

@@ -49,6 +49,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:examples": "tsc -p examples/tsconfig.json",
     "test": "node --test --import tsx test/*.test.ts",
     "clean": "rm -rf dist"
   },

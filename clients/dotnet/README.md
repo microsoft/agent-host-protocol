@@ -51,7 +51,8 @@ Reducers.ApplyToSession(state, action);   // mutates `state` in place
 ```
 
 See [`examples/`](examples/) for runnable `ConnectWs` and `ReducersDemo`
-console apps.
+console apps, and the windowing examples described under
+[Windowed delivery](#windowed-delivery-opt-in).
 
 ## Dependency injection
 
@@ -214,6 +215,25 @@ The receive window does not cap complete reassembled message size or total
 memory. Incomplete fragments are credited as they are stored so messages larger
 than a window can finish; consumer release holds the final fragment's credit.
 Applications must still avoid retaining deliveries indefinitely.
+
+### Examples
+
+Two runnable examples use an in-memory demo host that follows the window rules,
+so they need no server:
+
+- [`examples/WindowingBasic`](examples/WindowingBasic/Program.cs) opts a
+  terminal subscription into windowed delivery and shows the host pausing when
+  the window is full and resuming as the client returns credit.
+- [`examples/WindowingBackpressure`](examples/WindowingBackpressure/Program.cs)
+  adds a slow renderer, a custom coalescer that keeps only the latest terminal
+  resize, and a paste that waits for `WaitWritableAsync()` instead of queueing.
+
+```sh
+dotnet run --project examples/WindowingBasic
+dotnet run --project examples/WindowingBackpressure
+```
+
+The demo host and in-memory transport are in [`examples/Shared`](examples/Shared).
 
 ## Observability
 

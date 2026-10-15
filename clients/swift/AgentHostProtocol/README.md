@@ -213,6 +213,26 @@ not the other subscriptions or the host connection.
 State mirrors can consume `apply(delivery:)` / `apply(host:delivery:)`; these
 helpers never release credit implicitly. The sample app is not changed.
 
+### Examples
+
+Two runnable examples use an in-memory demo host that follows the window rules,
+so they need no server. They live in a separate local package,
+[`clients/swift/Examples`](../Examples), so the published package is unchanged:
+
+- [`WindowingBasic`](../Examples/Sources/WindowingBasic/main.swift) opts a
+  terminal subscription into windowed delivery and shows the host pausing when
+  the window is full and resuming as the client returns credit.
+- [`WindowingBackpressure`](../Examples/Sources/WindowingBackpressure/main.swift)
+  adds a slow renderer, a custom coalescer that keeps only the latest terminal
+  resize, and a paste that waits for `waitUntilWritable()` instead of queueing.
+
+From the repository root:
+
+```sh
+swift run --package-path clients/swift/Examples WindowingBasic
+swift run --package-path clients/swift/Examples WindowingBackpressure
+```
+
 ## Multi-Host Client
 
 Use `MultiHostClient` when one app talks to more than one AHP host, or when you want the same supervisor model for a single host. It owns per-host transport creation, reconnect backoff, stable `clientId` lookup, event fan-in, session-summary caches, generation-checked client handles, and deterministic aggregated views.

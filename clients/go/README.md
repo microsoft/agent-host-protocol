@@ -140,6 +140,27 @@ handle; `sub.Update(ctx, options)` is equivalent. Counters continue for
 windowed-to-windowed updates. Limits, snapshot views and delivery preferences
 are independent; the SDK never adds `maxLatencyMs` automatically.
 
+### Examples
+
+Two runnable examples use an in-memory demo host that follows the window rules,
+so they need no server:
+
+- [`examples/windowing_basic`](examples/windowing_basic/main.go) opts a terminal
+  subscription into windowed delivery and shows the host pausing when the
+  window is full and resuming as the client returns credit.
+- [`examples/windowing_backpressure`](examples/windowing_backpressure/main.go)
+  adds a slow renderer, a custom coalescer that keeps only the latest terminal
+  resize, and a paste that waits for `WaitWritable` instead of queueing.
+
+```sh
+go run ./examples/windowing_basic
+go run ./examples/windowing_backpressure
+```
+
+The demo host and its in-memory transport live in
+[`examples/internal/demohost`](examples/internal/demohost); they implement the
+public `ahp.Transport` and `ahp.TransportCapabilitiesProvider` interfaces.
+
 ### Send-side backpressure and observability
 
 `Notify` and `Dispatch` await the actual transport write, including credit and
