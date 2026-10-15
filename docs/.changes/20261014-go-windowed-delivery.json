@@ -1,0 +1,7 @@
+{
+  "type": "added",
+  "message": "Windowed delivery for subscriptions: configure with `Config.Windowing` and opt in with `SubscribeWithOptions`. Credit follows the consumer (`Next` and `Delivery.Release`), sends wait for the host window (`WaitWritable`), and queued `terminal/data`, `chat/delta`, and `tcp/data` are coalesced. Off by default.",
+  "targets": [
+    "go"
+  ]
+}
