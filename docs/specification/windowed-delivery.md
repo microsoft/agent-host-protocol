@@ -669,11 +669,18 @@ file in parts.
 
 ## Implementation Notes
 
-Generated client models contain the message types for windowed delivery. They
-do not implement negotiation, counting, scheduling, or retained queues. A peer
-MUST implement the rules on this page before it offers or accepts windowed
-delivery. After acceptance, a peer MUST NOT treat data messages as uncounted
-and MUST NOT change the subscription to ordinary delivery.
+Generated client models contain the message types for windowed delivery. The
+TypeScript, Rust, Go, Swift, and .NET client libraries also implement the client
+side of windowed delivery: negotiation, counting, credit, fragments, fair
+sending, and reconnection. Each client turns it on only for subscriptions that
+ask for it. A peer MUST implement the rules on this page before it offers or
+accepts windowed delivery. After acceptance, a peer MUST NOT treat data messages
+as uncounted, and MUST NOT change the subscription to ordinary delivery on its
+own; only a new `subscribe` can change it.
+
+The shared corpus in `types/test-cases/windowed-delivery/` describes the
+expected client behavior as scripted conversations with a host. Each client
+library runs it.
 
 These message types are optional additions. Peers that do not offer windowed
 delivery continue to use ordinary subscriptions. In Rust, struct literals for

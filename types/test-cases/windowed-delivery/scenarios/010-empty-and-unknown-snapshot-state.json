@@ -1,0 +1,83 @@
+{
+  "description": "Snapshots with an empty or unrecognized state are delivered and credited, not rejected.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {}
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 4096,
+            "maximumFrameBytes": 1024
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{},\"fromSeq\":9}}}"
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"somethingNew\":{\"a\":1}},\"fromSeq\":9}}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot"
+      },
+      "expectBytes": 302
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot"
+      },
+      "expectBytes": 346
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 648
+        }
+      }
+    }
+  ]
+}
