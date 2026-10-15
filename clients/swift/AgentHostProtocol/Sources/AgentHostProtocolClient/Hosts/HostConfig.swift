@@ -78,6 +78,12 @@ public struct HostConfig: Sendable {
         return copy
     }
 
+    public func withWindowing(_ config: AHPWindowingConfig) -> Self {
+        var copy = self
+        copy.clientConfig.windowing = config
+        return copy
+    }
+
     /// Override the reconnect policy.
     public func withReconnectPolicy(_ policy: ReconnectPolicy) -> Self {
         var copy = self

@@ -78,6 +78,141 @@ for snapshot in initialized.snapshots {
 
 `AHPStateMirror` is a convenience for simple consumers. Larger apps can keep their own state store and route snapshots/actions through the generated reducers directly.
 
+## Windowed delivery and backpressure
+
+Windowing is off by default. Connection configuration supplies defaults but
+does not enable it. Existing `subscribe(uri, delivery:view:)` calls are unchanged.
+On a connected client, opt in with a managed subscription:
+
+```swift
+let subscription = try await client.subscribe(
+    "ahp-terminal:/t1",
+    options: .windowed(windowBytes: 262_144)
+)
+let result = await subscription.result
+for try await delivery in subscription.events {
+    await mirror.apply(delivery: delivery)
+    // Auto mode releases this delivery when the loop asks for the next one.
+}
+```
+
+The first delivery is the snapshot: `channel/snapshot` after acceptance, or
+the ordinary result's snapshot when the host declines (if that snapshot exists).
+There is no protocol-version gate. A parsed-only custom transport falls back
+to ordinary delivery with status `fallbackReason == "transport"`. A host
+declining the offer reports `"declined"`. TCP requires acceptance and never
+falls back. Ordinary receive queues retain their existing unbounded behavior.
+
+For manual credit, use `.windowed(receive: .manual)` and `deliveries`:
+
+```swift
+let subscription = try await client.subscribe(
+    "ahp-terminal:/t1", options: .windowed(receive: .manual)
+)
+for try await delivery in subscription.deliveries {
+    await mirror.apply(delivery: delivery)
+    await delivery.release() // idempotent; call after processing, not on receipt
+}
+```
+
+For terminal or TCP byte sinks, release after bytes have been written or accepted
+by a bounded application buffer, not merely handed to another unbounded queue.
+Non-final protocol fragments are credited when stored so that messages larger
+than the window can complete; the final fragment is held until consumer release.
+There is no additional logical-message or reassembly cap. Stop with
+`try await subscription.close()`; breaking an auto loop alone does not release
+its last item. Re-subscribe or `subscription.update(options:)` changes the same
+handle. Windowed-to-windowed counters continue; changing mode resets counters.
+
+Send methods await transport completion, not server processing:
+
+```swift
+try await subscription.waitUntilWritable() // advisory, not a reservation
+try await subscription.send(
+    method: "dispatchAction",
+    params: DispatchActionParams(
+        channel: subscription.channel, clientSeq: 1,
+        action: .terminalInput(.init(type: .terminalInput, data: "hello\n"))
+    )
+)
+let status = await subscription.status()
+print(status.outstandingSendBytes, status.bufferedSendBytes)
+```
+
+The per-subscription queue defaults to 1 MiB for data waiting behind another
+message; exceeding that queued allowance throws `AHPWindowingError.backpressure`.
+A single message is accepted when the queue is empty even if it is larger than
+the allowance: fragmentation and credit pace its transmission. Controls,
+scheduler frames, and RPCs are never rejected by this user send cap.
+Cancellation before emission removes the
+send. Once fragmentation starts, the message is completed. Sends/dispatches
+through the original client API also respect accepted windows. Requests and
+generated controls (`channel/credit`, `unsubscribe`, `tcp/reset`) bypass full
+data windows. Observe `subscription.statusChanges` and
+`await client.flowControlEvents` without granting credit.
+
+Configure defaults through `AHPClientConfig(windowing:)` or
+`HostConfig.withWindowing(_:)`. All protocol sizes count the **complete raw JSON
+text** as `text.utf16.count * 2`, not its UTF-8 transport payload:
+
+```swift
+let configuration = AHPClientConfig(windowing: AHPWindowingConfig(
+    windowBytes: 262_144, maximumFrameBytes: 16_384,
+    maxBufferedSendBytes: 1_048_576
+))
+```
+
+When no frame override is supplied, URLSession derives the default from the
+actual task's `maximumMessageSize` as `2 * (limit / 3)`: **699,050** UTF-16
+bytes for the usual 1-MiB payload limit. The native NWConnection transport has
+no message cap (its 65,536-byte read chunk is not one), so it uses the
+**1,048,576**-byte fallback. Custom transports retain source compatibility:
+adopt `AHPWindowingTransport` and declare raw-text capabilities to opt in;
+parsed frames need an original JSON text envelope, never reconstructed text.
+
+Coalescing is enabled by default only on accepted windowed subscriptions.
+Adjacent queued terminal output and same-part/same-metadata chat deltas merge
+locally; queued outbound TCP data merges decoded bytes. No latency preference
+is added. Origins, clientSeq sends, snapshots, EOF/reset and epochs are barriers.
+Disable with `.windowed(coalescing: false)`. Custom coalescers are registered
+per connection and run before the built-ins:
+
+```swift
+let terminalCoalescer = AHPCoalescer(method: "action") { earlier, later, context in
+    guard context.direction == "inbound" else { return nil }
+    var first = try earlier.decode(ActionEnvelope.self)
+    let second = try later.decode(ActionEnvelope.self)
+    guard case .terminalData(let a) = first.action,
+          case .terminalData(let b) = second.action else { return nil }
+    first.action = .terminalData(.init(type: .terminalData, data: a.data + b.data))
+    first.serverSeq = second.serverSeq
+    return try AHPNotificationMessage(method: "action", params: first)
+}
+let configuration = AHPClientConfig(
+    windowing: .init(coalescers: [terminalCoalescer])
+)
+```
+
+A custom merge must preserve channel-required events and state. The library
+checks channel/method identity and control exemptions; received credit still
+uses the sum of original wire sizes, not the merged serialization.
+
+Multi-host consumers use the same shape:
+`multi.subscribe(host: hostId, uri: uri, options: .windowed())`. Its owner queue
+survives reconnect, with per-channel retained sequence checkpoints and fresh
+counters. Old deliveries remain readable but never credit the new connection.
+Snapshot/replay/live recovery is per channel; dropped handles throw
+`subscriptionDropped`. TCP streams close on connection loss and are never
+resumed. `multi.flowControlEvents()` tags advisory flow events with a host ID.
+Cancellation and request timeouts end only the caller's wait; a late negotiation
+response is still processed in order without disconnecting the host. Unaccepted
+subscriptions created by an abandoned call are removed, and late acceptance is
+unsubscribed. Closing a handle cancels its credit timer and removes its replay
+registration. A failed re-subscribe during reconnect closes only that handle,
+not the other subscriptions or the host connection.
+State mirrors can consume `apply(delivery:)` / `apply(host:delivery:)`; these
+helpers never release credit implicitly. The sample app is not changed.
+
 ## Multi-Host Client
 
 Use `MultiHostClient` when one app talks to more than one AHP host, or when you want the same supervisor model for a single host. It owns per-host transport creation, reconnect backoff, stable `clientId` lookup, event fan-in, session-summary caches, generation-checked client handles, and deterministic aggregated views.
