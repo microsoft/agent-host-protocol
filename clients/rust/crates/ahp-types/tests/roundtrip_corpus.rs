@@ -30,7 +30,8 @@ use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
         ChangesetOperationTarget, ChatSource, CreateTcpConnectionParams, Implementation,
-        InitializeResult, ReconnectParams, ReconnectResult, SubscribeParams, SubscribeResult,
+        InitializeResult, OpenCanvasParams, ReconnectParams, ReconnectResult, SubscribeParams,
+        SubscribeResult,
     },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
@@ -241,6 +242,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "TcpEofParams" => round_trip!(TcpEofParams),
         "TcpResetParams" => round_trip!(TcpResetParams),
         "CreateTcpConnectionParams" => round_trip!(CreateTcpConnectionParams),
+        "OpenCanvasParams" => round_trip!(OpenCanvasParams),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

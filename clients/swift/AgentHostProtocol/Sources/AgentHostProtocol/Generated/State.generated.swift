@@ -1522,12 +1522,15 @@ public struct AgentInfo: Codable, Sendable {
 public struct AgentCapabilities: Codable, Sendable {
     /// Experimental Canvas API.
     ///
-    /// The agent can list canvas types for an exact chat with `listCanvasTypes`
-    /// and open them with `openCanvas`. Live instances are published through the
-    /// chat's canvas references and their `ahp-canvas:` state channels.
+    /// The agent can materialize an exact chat's
+    /// {@link ChatState.canvasRegistry | Canvas registry} through
+    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+    /// Live instances are published through the chat's canvas references and
+    /// their `ahp-canvas:` state channels.
     ///
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
-    /// discovery metadata while the Canvas channel remains experimental.
+    /// registry metadata while the Canvas channel remains experimental. This
+    /// capability does not gate server-published Canvas references.
     public var canvases: [String: AnyCodable]?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -1900,6 +1903,15 @@ public struct ChatState: Codable, Sendable {
     /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
     /// chat channel.
     public var backgroundWork: [BackgroundWork]?
+    /// Canvas types currently registered for this exact chat.
+    ///
+    /// Absence means the registry has not been materialized or is not currently
+    /// available. Clients that need it MAY dispatch
+    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
+    /// registry through `chat/canvasRegistryChanged`. An empty
+    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
+    /// available canvas types.
+    public var canvasRegistry: CanvasRegistry?
     /// Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -1953,6 +1965,7 @@ public struct ChatState: Codable, Sendable {
         case workingDirectories
         case changesets
         case backgroundWork
+        case canvasRegistry
         case canvases
         case config
         case turns
@@ -1977,6 +1990,7 @@ public struct ChatState: Codable, Sendable {
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
+        canvasRegistry: CanvasRegistry? = nil,
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
         turns: [Turn],
@@ -1999,6 +2013,7 @@ public struct ChatState: Codable, Sendable {
         self.workingDirectories = workingDirectories
         self.changesets = changesets
         self.backgroundWork = backgroundWork
+        self.canvasRegistry = canvasRegistry
         self.canvases = canvases
         self.config = config
         self.turns = turns
@@ -6159,42 +6174,62 @@ public struct EmptyState: Codable, Sendable {
     }
 }
 
+public struct CanvasExtensionDeclaration: Codable, Sendable {
+    /// Stable opaque identifier of the extension/provider.
+    public var extensionId: String
+    /// Where the runtime discovered the extension/provider.
+    public var extensionSource: CanvasExtensionSource
+    /// Human-readable extension/provider name, when available.
+    public var extensionName: String?
+    /// Canvas types declared by this extension/provider. `canvasId` MUST be
+    /// unique within this array.
+    public var canvases: [CanvasTypeDeclaration]
+
+    public init(
+        extensionId: String,
+        extensionSource: CanvasExtensionSource,
+        extensionName: String? = nil,
+        canvases: [CanvasTypeDeclaration]
+    ) {
+        self.extensionId = extensionId
+        self.extensionSource = extensionSource
+        self.extensionName = extensionName
+        self.canvases = canvases
+    }
+}
+
 public struct CanvasTypeDeclaration: Codable, Sendable {
     /// Provider-local canvas type identifier.
     public var canvasId: String
-    /// Stable identifier of the extension that declares the canvas.
-    public var extensionId: String
-    /// Where the runtime discovered the declaring extension.
-    public var extensionSource: CanvasExtensionSource
-    /// Human-readable extension name, when available.
-    public var extensionName: String?
     /// Human-readable canvas type name.
     public var displayName: String
     /// Description of what the canvas type does.
     public var description: String
     /// Whether opening this canvas requires an input flow.
     public var requiresInput: Bool
-    /// Number of actions the canvas declares.
-    public var actionCount: Int
 
     public init(
         canvasId: String,
-        extensionId: String,
-        extensionSource: CanvasExtensionSource,
-        extensionName: String? = nil,
         displayName: String,
         description: String,
-        requiresInput: Bool,
-        actionCount: Int
+        requiresInput: Bool
     ) {
         self.canvasId = canvasId
-        self.extensionId = extensionId
-        self.extensionSource = extensionSource
-        self.extensionName = extensionName
         self.displayName = displayName
         self.description = description
         self.requiresInput = requiresInput
-        self.actionCount = actionCount
+    }
+}
+
+public struct CanvasRegistry: Codable, Sendable {
+    /// Declaring extensions/providers. `extensionId` MUST be unique within this
+    /// array. An empty array is an authoritative loaded registry with no types.
+    public var extensions: [CanvasExtensionDeclaration]
+
+    public init(
+        extensions: [CanvasExtensionDeclaration]
+    ) {
+        self.extensions = extensions
     }
 }
 
@@ -6210,7 +6245,11 @@ public struct CanvasReference: Codable, Sendable {
 }
 
 public struct CanvasState: Codable, Sendable {
-    /// Stable caller-supplied instance identifier.
+    /// Provider-facing instance identifier.
+    ///
+    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+    /// URI. They MUST NOT treat this provider identifier as a second resource
+    /// identity.
     public var instanceId: String
     /// Owning extension/provider identifier.
     public var extensionId: String

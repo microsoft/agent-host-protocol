@@ -1055,6 +1055,12 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatCanvasesChanged ->
         state.copy(canvases = action.value.canvases)
 
+    is StateActionChatCanvasRegistryRequested ->
+        state
+
+    is StateActionChatCanvasRegistryChanged ->
+        state.copy(canvasRegistry = action.value.canvasRegistry)
+
     is StateActionChatWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
         if (list.contains(action.value.directory)) {

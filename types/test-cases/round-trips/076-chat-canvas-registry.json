@@ -1,0 +1,76 @@
+{
+  "name": "chat-canvas-registry",
+  "group": "A",
+  "description": "A chat snapshot preserves its normalized Canvas type registry separately from live Canvas references.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/peer",
+    "state": {
+      "resource": "ahp-chat:/peer",
+      "title": "Peer",
+      "status": 1,
+      "modifiedAt": "2026-10-14T10:00:00.000Z",
+      "turns": [],
+      "canvasRegistry": {
+        "extensions": [
+          {
+            "extensionId": "opaque-provider-id",
+            "extensionSource": "plugin",
+            "extensionName": "Diagram Tools",
+            "canvases": [
+              {
+                "canvasId": "diagram",
+                "displayName": "Diagram",
+                "description": "Visualize a diagram.",
+                "requiresInput": false
+              },
+              {
+                "canvasId": "form",
+                "displayName": "Form",
+                "description": "Collect structured input.",
+                "requiresInput": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fromSeq": 3
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-chat:/peer",
+      "state": {
+        "resource": "ahp-chat:/peer",
+        "title": "Peer",
+        "status": 1,
+        "modifiedAt": "2026-10-14T10:00:00.000Z",
+        "turns": [],
+        "canvasRegistry": {
+          "extensions": [
+            {
+              "extensionId": "opaque-provider-id",
+              "extensionSource": "plugin",
+              "extensionName": "Diagram Tools",
+              "canvases": [
+                {
+                  "canvasId": "diagram",
+                  "displayName": "Diagram",
+                  "description": "Visualize a diagram.",
+                  "requiresInput": false
+                },
+                {
+                  "canvasId": "form",
+                  "displayName": "Form",
+                  "description": "Collect structured input.",
+                  "requiresInput": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "fromSeq": 3
+    }
+  ]
+}

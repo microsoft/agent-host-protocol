@@ -109,12 +109,15 @@ export interface AgentCapabilities {
   /**
    * Experimental Canvas API.
    *
-   * The agent can list canvas types for an exact chat with `listCanvasTypes`
-   * and open them with `openCanvas`. Live instances are published through the
-   * chat's canvas references and their `ahp-canvas:` state channels.
+   * The agent can materialize an exact chat's
+   * {@link ChatState.canvasRegistry | Canvas registry} through
+   * `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+   * Live instances are published through the chat's canvas references and
+   * their `ahp-canvas:` state channels.
    *
    * Clients MUST treat absence as unsupported and SHOULD tolerate additive
-   * discovery metadata while the Canvas channel remains experimental.
+   * registry metadata while the Canvas channel remains experimental. This
+   * capability does not gate server-published Canvas references.
    */
   canvases?: Record<string, never>;
   /**

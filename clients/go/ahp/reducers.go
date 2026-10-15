@@ -625,6 +625,11 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			state.Canvases = append([]ahptypes.CanvasReference(nil), a.Canvases...)
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatCanvasRegistryRequestedAction:
+		return ReduceOutcomeNoOp
+	case *ahptypes.ChatCanvasRegistryChangedAction:
+		state.CanvasRegistry = a.CanvasRegistry
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatWorkingDirectorySetAction:
 		for _, d := range state.WorkingDirectories {
 			if d == a.Directory {

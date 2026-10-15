@@ -76,6 +76,44 @@ itself changes, the server dispatches
 [`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
 fully replaces the catalogue or clears it when `changesets` is absent.
 
+### Canvas type registry
+
+When the selected agent advertises
+[`AgentCapabilities.canvases`](/reference/root#agentcapabilities), an exact chat
+may expose a [`canvasRegistry`](/reference/chat#chatstate). This is the
+authoritative set of Canvas **types** the chat can currently open. It is
+separate from [`canvases`](/reference/chat#chatstate), which contains references
+to already-open live Canvas **instances**.
+
+The registry normalizes extension/provider metadata: each
+[`CanvasExtensionDeclaration`](/reference/canvas#canvasextensiondeclaration)
+appears once and carries its own Canvas types. Clients treat `extensionId` as
+opaque, key a type by `(extensionId, canvasId)`, and do not infer source or
+management behavior from the identifier's text.
+
+For a live chat, hosts keep this registry synchronized with provider
+registration and dispatch
+[`chat/canvasRegistryChanged`](/reference/chat#chatcanvasregistrychangedaction)
+only when the authoritative set changes. Clients do not poll the list or use
+`ChatState.canvases` changes as a registry-invalidation signal.
+
+Absence of `canvasRegistry` means it has not been materialized or is not
+currently available. A client may dispatch
+[`chat/canvasRegistryRequested`](/reference/chat#chatcanvasregistryrequestedaction)
+to request materialization. This action is explicitly effectful: for a
+persisted cold chat, the host may resume its backing runtime, discover
+extensions, and execute extension startup code. The host MUST NOT create a
+backing for a brand-new chat, send a user message, or invoke a model. The
+action's reducer is a no-op; the host publishes the complete resulting registry
+through `chat/canvasRegistryChanged`.
+
+To open a no-input declaration, the client sends
+[`openCanvas`](/reference/canvas#opencanvas) with a client-chosen
+`ahp-canvas:` URI in `channel`, the exact owning chat URI, and the declaration's
+`extensionId` and `canvasId`. Reusing the same Canvas URI focuses or refreshes
+that logical instance. Live membership and presentation then flow through
+`ChatState.canvases` and the Canvas channel.
+
 ### Per-chat configuration
 
 [`ChatState.config`](/reference/chat#chatstate) is an overlay on the owning

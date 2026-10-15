@@ -37,6 +37,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatMovableChanged
     case chatChangesetsChanged
     case chatCanvasesChanged
+    case chatCanvasRegistryRequested
+    case chatCanvasRegistryChanged
     case canvasStateChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
@@ -151,6 +153,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/movableChanged": self = .chatMovableChanged
         case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/canvasesChanged": self = .chatCanvasesChanged
+        case "chat/canvasRegistryRequested": self = .chatCanvasRegistryRequested
+        case "chat/canvasRegistryChanged": self = .chatCanvasRegistryChanged
         case "canvas/stateChanged": self = .canvasStateChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
@@ -265,6 +269,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatMovableChanged: try container.encode("chat/movableChanged")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatCanvasesChanged: try container.encode("chat/canvasesChanged")
+        case .chatCanvasRegistryRequested: try container.encode("chat/canvasRegistryRequested")
+        case .chatCanvasRegistryChanged: try container.encode("chat/canvasRegistryChanged")
         case .canvasStateChanged: try container.encode("canvas/stateChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
@@ -1290,6 +1296,30 @@ public struct ChatCanvasesChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.canvases = canvases
+    }
+}
+
+public struct ChatCanvasRegistryRequestedAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
+public struct ChatCanvasRegistryChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Authoritative registry, or `undefined` to clear it.
+    public var canvasRegistry: CanvasRegistry?
+
+    public init(
+        type: ActionType,
+        canvasRegistry: CanvasRegistry? = nil
+    ) {
+        self.type = type
+        self.canvasRegistry = canvasRegistry
     }
 }
 
@@ -2629,6 +2659,8 @@ public enum StateAction: Codable, Sendable {
     case chatMovableChanged(ChatMovableChangedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
     case chatCanvasesChanged(ChatCanvasesChangedAction)
+    case chatCanvasRegistryRequested(ChatCanvasRegistryRequestedAction)
+    case chatCanvasRegistryChanged(ChatCanvasRegistryChangedAction)
     case canvasStateChanged(CanvasStateChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
@@ -2779,6 +2811,10 @@ public enum StateAction: Codable, Sendable {
             self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
         case "chat/canvasesChanged":
             self = .chatCanvasesChanged(try ChatCanvasesChangedAction(from: decoder))
+        case "chat/canvasRegistryRequested":
+            self = .chatCanvasRegistryRequested(try ChatCanvasRegistryRequestedAction(from: decoder))
+        case "chat/canvasRegistryChanged":
+            self = .chatCanvasRegistryChanged(try ChatCanvasRegistryChangedAction(from: decoder))
         case "canvas/stateChanged":
             self = .canvasStateChanged(try CanvasStateChangedAction(from: decoder))
         case "session/titleChanged":
@@ -2969,6 +3005,8 @@ public enum StateAction: Codable, Sendable {
         case .chatMovableChanged(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .chatCanvasesChanged(let v): try v.encode(to: encoder)
+        case .chatCanvasRegistryRequested(let v): try v.encode(to: encoder)
+        case .chatCanvasRegistryChanged(let v): try v.encode(to: encoder)
         case .canvasStateChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)

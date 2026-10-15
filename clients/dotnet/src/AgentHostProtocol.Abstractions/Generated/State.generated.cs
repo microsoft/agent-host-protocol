@@ -2117,12 +2117,15 @@ public sealed record AgentCapabilities
 {
     /// <summary>Experimental Canvas API.
     ///
-    /// The agent can list canvas types for an exact chat with `listCanvasTypes`
-    /// and open them with `openCanvas`. Live instances are published through the
-    /// chat's canvas references and their `ahp-canvas:` state channels.
+    /// The agent can materialize an exact chat's
+    /// {@link ChatState.canvasRegistry | Canvas registry} through
+    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+    /// Live instances are published through the chat's canvas references and
+    /// their `ahp-canvas:` state channels.
     ///
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
-    /// discovery metadata while the Canvas channel remains experimental.</summary>
+    /// registry metadata while the Canvas channel remains experimental. This
+    /// capability does not gate server-published Canvas references.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Canvases { get; init; }
 
@@ -2597,6 +2600,17 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<BackgroundWork>? BackgroundWork { get; set; }
 
+    /// <summary>Canvas types currently registered for this exact chat.
+    ///
+    /// Absence means the registry has not been materialized or is not currently
+    /// available. Clients that need it MAY dispatch
+    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
+    /// registry through `chat/canvasRegistryChanged`. An empty
+    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
+    /// available canvas types.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CanvasRegistry? CanvasRegistry { get; set; }
+
     /// <summary>Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -2655,7 +2669,29 @@ public sealed class ChatState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
-/// <summary>One canvas type currently available to open for an exact chat.
+/// <summary>One extension/provider that declares canvas types for an exact chat.
+///
+/// The extension metadata is normalized here instead of repeated on every
+/// {@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT
+/// infer its source or management behavior by parsing it.</summary>
+public sealed record CanvasExtensionDeclaration
+{
+    /// <summary>Stable opaque identifier of the extension/provider.</summary>
+    public required string ExtensionId { get; init; }
+
+    /// <summary>Where the runtime discovered the extension/provider.</summary>
+    public CanvasExtensionSource ExtensionSource { get; init; }
+
+    /// <summary>Human-readable extension/provider name, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExtensionName { get; init; }
+
+    /// <summary>Canvas types declared by this extension/provider. `canvasId` MUST be
+    /// unique within this array.</summary>
+    public required List<CanvasTypeDeclaration> Canvases { get; init; }
+}
+
+/// <summary>One canvas type currently available to open.
 ///
 /// This is discovery metadata, not a live canvas instance. Live instances are
 /// represented by {@link CanvasReference} entries on chat state and their
@@ -2668,16 +2704,6 @@ public sealed record CanvasTypeDeclaration
     /// <summary>Provider-local canvas type identifier.</summary>
     public required string CanvasId { get; init; }
 
-    /// <summary>Stable identifier of the extension that declares the canvas.</summary>
-    public required string ExtensionId { get; init; }
-
-    /// <summary>Where the runtime discovered the declaring extension.</summary>
-    public CanvasExtensionSource ExtensionSource { get; init; }
-
-    /// <summary>Human-readable extension name, when available.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ExtensionName { get; init; }
-
     /// <summary>Human-readable canvas type name.</summary>
     public required string DisplayName { get; init; }
 
@@ -2686,9 +2712,18 @@ public sealed record CanvasTypeDeclaration
 
     /// <summary>Whether opening this canvas requires an input flow.</summary>
     public bool RequiresInput { get; init; }
+}
 
-    /// <summary>Number of actions the canvas declares.</summary>
-    public long ActionCount { get; init; }
+/// <summary>Canvas types currently registered for one exact chat.
+///
+/// This is a compact presentation registry, not extension installation state
+/// and not the list of live instances. The host replaces the complete registry
+/// through `chat/canvasRegistryChanged` whenever provider registration changes.</summary>
+public sealed record CanvasRegistry
+{
+    /// <summary>Declaring extensions/providers. `extensionId` MUST be unique within this
+    /// array. An empty array is an authoritative loaded registry with no types.</summary>
+    public required List<CanvasExtensionDeclaration> Extensions { get; init; }
 }
 
 /// <summary>Stable reference to a subscribable canvas channel.
@@ -2709,7 +2744,11 @@ public sealed record CanvasReference
 /// redundantly carry its channel URI.</summary>
 public sealed class CanvasState
 {
-    /// <summary>Stable caller-supplied instance identifier.</summary>
+    /// <summary>Provider-facing instance identifier.
+    ///
+    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+    /// URI. They MUST NOT treat this provider identifier as a second resource
+    /// identity.</summary>
     public required string InstanceId { get; set; }
 
     /// <summary>Owning extension/provider identifier.</summary>
