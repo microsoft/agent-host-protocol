@@ -87,6 +87,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatCanvasesChanged = new ActionType("chat/canvasesChanged");
 
+    public static readonly ActionType ChatCanvasRegistryRequested = new ActionType("chat/canvasRegistryRequested");
+
+    public static readonly ActionType ChatCanvasRegistryChanged = new ActionType("chat/canvasRegistryChanged");
+
     public static readonly ActionType CanvasStateChanged = new ActionType("canvas/stateChanged");
 
     public static readonly ActionType ChatWorkingDirectorySet = new ActionType("chat/workingDirectorySet");
@@ -1846,6 +1850,37 @@ public sealed record ChatCanvasesChangedAction
     public List<CanvasReference>? Canvases { get; init; }
 }
 
+/// <summary>Requests materialization of the exact chat's Canvas type registry.
+///
+/// This operation is potentially effectful: for a persisted cold chat, the host
+/// may resume its backing runtime, discover extensions, and execute extension
+/// startup code. It MUST NOT create a backing for a brand-new chat, send a user
+/// message, or invoke a model.
+///
+/// The reducer is a no-op. The host remains authoritative and publishes the
+/// complete result through
+/// {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
+/// Clients do not need to dispatch this action when
+/// {@link ChatState.canvasRegistry} is already present because live provider
+/// registration changes are published reactively.</summary>
+public sealed record ChatCanvasRegistryRequestedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatCanvasRegistryRequested;
+}
+
+/// <summary>The Canvas type registry for this exact chat changed.
+///
+/// Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
+/// Set to `undefined` when the registry is no longer materialized or available.</summary>
+public sealed record ChatCanvasRegistryChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatCanvasRegistryChanged;
+
+    /// <summary>Authoritative registry, or `undefined` to clear it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CanvasRegistry? CanvasRegistry { get; init; }
+}
+
 /// <summary>The presentation state for this canvas changed.
 ///
 /// Replaces the subscribed canvas channel state entirely. Full-replacement
@@ -2882,6 +2917,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
+        ["chat/canvasRegistryRequested"] = typeof(ChatCanvasRegistryRequestedAction),
+        ["chat/canvasRegistryChanged"] = typeof(ChatCanvasRegistryChangedAction),
         ["canvas/stateChanged"] = typeof(CanvasStateChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),

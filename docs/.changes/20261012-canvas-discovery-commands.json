@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Experimental, capability-gated `listCanvasTypes` and `openCanvas` commands for discovering extension canvases and opening them in an exact chat."
+  "message": "Experimental exact-chat Canvas registry state, explicit cold-registry materialization, and URI-addressed `openCanvas` support."
 }

@@ -29,7 +29,30 @@ export const enum CanvasExtensionSource {
 }
 
 /**
- * One canvas type currently available to open for an exact chat.
+ * One extension/provider that declares canvas types for an exact chat.
+ *
+ * The extension metadata is normalized here instead of repeated on every
+ * {@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT
+ * infer its source or management behavior by parsing it.
+ *
+ * @category Canvas State
+ */
+export interface CanvasExtensionDeclaration {
+  /** Stable opaque identifier of the extension/provider. */
+  extensionId: string;
+  /** Where the runtime discovered the extension/provider. */
+  extensionSource: CanvasExtensionSource;
+  /** Human-readable extension/provider name, when available. */
+  extensionName?: string;
+  /**
+   * Canvas types declared by this extension/provider. `canvasId` MUST be
+   * unique within this array.
+   */
+  canvases: CanvasTypeDeclaration[];
+}
+
+/**
+ * One canvas type currently available to open.
  *
  * This is discovery metadata, not a live canvas instance. Live instances are
  * represented by {@link CanvasReference} entries on chat state and their
@@ -43,20 +66,29 @@ export const enum CanvasExtensionSource {
 export interface CanvasTypeDeclaration {
   /** Provider-local canvas type identifier. */
   canvasId: string;
-  /** Stable identifier of the extension that declares the canvas. */
-  extensionId: string;
-  /** Where the runtime discovered the declaring extension. */
-  extensionSource: CanvasExtensionSource;
-  /** Human-readable extension name, when available. */
-  extensionName?: string;
   /** Human-readable canvas type name. */
   displayName: string;
   /** Description of what the canvas type does. */
   description: string;
   /** Whether opening this canvas requires an input flow. */
   requiresInput: boolean;
-  /** Number of actions the canvas declares. */
-  actionCount: number;
+}
+
+/**
+ * Canvas types currently registered for one exact chat.
+ *
+ * This is a compact presentation registry, not extension installation state
+ * and not the list of live instances. The host replaces the complete registry
+ * through `chat/canvasRegistryChanged` whenever provider registration changes.
+ *
+ * @category Canvas State
+ */
+export interface CanvasRegistry {
+  /**
+   * Declaring extensions/providers. `extensionId` MUST be unique within this
+   * array. An empty array is an authoritative loaded registry with no types.
+   */
+  extensions: CanvasExtensionDeclaration[];
 }
 
 /**
@@ -83,7 +115,13 @@ export interface CanvasReference {
  * @category Canvas State
  */
 export interface CanvasState {
-  /** Stable caller-supplied instance identifier. */
+  /**
+   * Provider-facing instance identifier.
+   *
+   * AHP clients address this instance by the subscribed `ahp-canvas:` channel
+   * URI. They MUST NOT treat this provider identifier as a second resource
+   * identity.
+   */
   instanceId: string;
   /** Owning extension/provider identifier. */
   extensionId: string;

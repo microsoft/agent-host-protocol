@@ -721,34 +721,13 @@ type MoveChatResult struct {
 	Session URI `json:"session"`
 }
 
-// Lists canvas types currently available to open for one exact chat.
-//
-// This read MAY lazily resume an existing persisted chat so its extension
-// registry can be reconstructed. It MUST NOT create a backing runtime for a
-// brand-new chat, send a user message, or invoke a model.
-//
-// Clients MUST NOT call this command unless the selected agent advertises
-// {@link AgentCapabilities.canvases}.
-type ListCanvasTypesParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
-	// Optional JSON-serializable metadata associated with this request.
-	// Receivers MUST ignore keys they do not understand.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-}
-
-// Canvas types available to open for the requested chat.
-type ListCanvasTypesResult struct {
-	// Available canvas types and their declaring extensions.
-	Items []CanvasTypeDeclaration `json:"items"`
-}
-
-// Opens or focuses one stable canvas instance in an exact chat.
+// Opens or focuses one client-addressed canvas resource in an exact chat.
 //
 // The resulting live instance is published through the chat's
 // {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
-// Repeating this command with the same `instanceId` focuses or refreshes that
-// logical instance rather than creating a duplicate.
+// Repeating this command with the same `channel` focuses or refreshes that
+// logical instance rather than creating a duplicate. Reusing the channel for
+// a different chat, extension, or canvas type MUST fail with `Conflict`.
 //
 // The null result is not presentation state. Clients MUST observe
 // {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
@@ -762,12 +741,12 @@ type OpenCanvasParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Exact chat URI that owns the canvas instance.
+	Chat URI `json:"chat"`
 	// Stable identifier of the extension that declares the canvas.
 	ExtensionId string `json:"extensionId"`
 	// Provider-local canvas type identifier.
 	CanvasId string `json:"canvasId"`
-	// Caller-chosen stable instance identifier.
-	InstanceId string `json:"instanceId"`
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
