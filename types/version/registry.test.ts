@@ -112,3 +112,20 @@ test('chat/configChanged is available starting in protocol 1.1.0', () => {
   assert.equal(isActionKnownToVersion(action, '1.0.0'), false);
   assert.equal(isActionKnownToVersion(action, '1.1.0'), true);
 });
+
+test('chat Canvas registry actions are available starting in protocol 1.1.0', () => {
+  const requested = {
+    type: ActionType.ChatCanvasRegistryRequested,
+  } as const;
+  const changed = {
+    type: ActionType.ChatCanvasRegistryChanged,
+    canvasRegistry: { extensions: [] },
+  } as const;
+
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatCanvasRegistryRequested], '1.1.0');
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatCanvasRegistryChanged], '1.1.0');
+  assert.equal(isActionKnownToVersion(requested, '1.0.0'), false);
+  assert.equal(isActionKnownToVersion(changed, '1.0.0'), false);
+  assert.equal(isActionKnownToVersion(requested, '1.1.0'), true);
+  assert.equal(isActionKnownToVersion(changed, '1.1.0'), true);
+});
