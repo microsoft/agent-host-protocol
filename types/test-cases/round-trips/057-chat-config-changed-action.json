@@ -1,0 +1,24 @@
+{
+  "name": "chat-config-changed-action",
+  "group": "A",
+  "description": "chat/configChanged carries the same payload as session/configChanged: arbitrary JSON config values keyed by property id, plus the optional replace flag.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/configChanged",
+    "config": {
+      "autoApprove": true,
+      "mode": "plan"
+    },
+    "replace": true
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/configChanged",
+      "config": {
+        "autoApprove": true,
+        "mode": "plan"
+      },
+      "replace": true
+    }
+  ]
+}

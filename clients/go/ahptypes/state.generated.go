@@ -15,6 +15,21 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+// How the server resumes sending data on a windowed subscription after
+// reconnection.
+//
+// Stability: 1.0 - Early development.
+type ChannelRecoveryKind string
+
+const (
+	// The server sends a new `channel/snapshot`, and the client replaces its state.
+	ChannelRecoveryKindSnapshot ChannelRecoveryKind = "snapshot"
+	// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+	ChannelRecoveryKindReplay ChannelRecoveryKind = "replay"
+	// The server sends only data created after reconnection.
+	ChannelRecoveryKindLive ChannelRecoveryKind = "live"
+)
+
 // Policy configuration state for a model.
 type PolicyState string
 
@@ -569,6 +584,74 @@ const (
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
+// Present when the host supports `createTcpConnection`.
+//
+// A client creates a connection with `createTcpConnection`, then subscribes to
+// its channel with windowed delivery. A TCP channel's state is an
+// {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+// notifications. TCP connections do not survive the loss of the AHP connection.
+//
+// Stability: 1.0 - Early development.
+type TcpConnectionsCapability struct {
+}
+
+// Limits on data that one peer receives on a windowed subscription.
+//
+// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+// message's complete text, as sent. For a `channel/frame` fragment, this
+// includes its envelope and escape characters. The same size is used for the
+// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+// size of a complete data message. Outstanding data is always less than
+// `windowBytes + maximumFrameBytes`.
+//
+// Stability: 1.0 - Early development.
+type ChannelReceiveLimits struct {
+	// The target amount of outstanding data. This is a soft target.
+	// The sender MUST NOT send a data message or fragment while outstanding data
+	// is equal to or greater than this value. The last message or fragment sent
+	// before the window is full can go past it, so a message that fits within
+	// `maximumFrameBytes` can be sent whole even when it is larger than the
+	// remaining credit.
+	WindowBytes int64 `json:"windowBytes"`
+	// The largest JSON-RPC message that the sender can send for a data message.
+	// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+	// notification, it includes the envelope and escape characters. A larger data
+	// message MUST be split into smaller messages or sent in fragments.
+	MaximumFrameBytes int64 `json:"maximumFrameBytes"`
+}
+
+// The limits that the server accepted for a windowed subscription.
+//
+// The client ID and channel URI identify the subscription. All counters start at
+// zero when the subscription starts.
+//
+// Stability: 1.0 - Early development.
+type ChannelFlowControl struct {
+	// Limits for data that the server sends to the client.
+	ClientReceive ChannelReceiveLimits `json:"clientReceive"`
+	// Limits for data that the client sends to the server.
+	HostReceive ChannelReceiveLimits `json:"hostReceive"`
+}
+
+// A windowed subscription that the server kept after reconnection.
+//
+// The subscription's counters start at zero on the new connection. If a
+// channel that the client requested is not in the result, the subscription was
+// not kept. The client discards the old subscription and, for a byte stream,
+// closes the stream.
+//
+// Stability: 1.0 - Early development.
+type ResumedChannelSubscription struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The limits that the server accepted for the new connection, as in a
+	// `subscribe` result. The server MAY lower the limits that the client offered
+	// in its request, and MUST NOT raise them.
+	FlowControl ChannelFlowControl `json:"flowControl"`
+	// How the server resumes sending data.
+	Recovery ChannelRecoveryKind `json:"recovery"`
+}
+
 // An optionally-sized icon that can be displayed in a user interface.
 type Icon struct {
 	// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
@@ -775,7 +858,7 @@ type MultipleWorkingDirectoriesCapability struct {
 type SessionModelInfo struct {
 	// Model identifier
 	Id string `json:"id"`
-	// Provider this model belongs to
+	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
 	Provider string `json:"provider"`
 	// Human-readable model name
 	Name string `json:"name"`
@@ -798,6 +881,14 @@ type SessionModelInfo struct {
 	// Clients MAY look for well-known keys here to provide enhanced UI.
 	// For example, a `pricing` key may carry model pricing metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Vendor of this model as the provider reports it, for example `Anthropic`
+	// or `Azure OpenAI`. This is sometimes the company that serves the model
+	// rather than the one that built it. Not the same as {@link provider},
+	// which names the agent provider that owns this model. Absent when the
+	// provider does not report a vendor. Providers MAY send any value; clients
+	// SHOULD fall back to a generic presentation for values they do not
+	// recognize.
+	Vendor *string `json:"vendor,omitempty"`
 }
 
 // A model selection: the chosen model ID together with any model-specific
@@ -1337,6 +1428,10 @@ type ChatState struct {
 	// Clients subscribe to each resource for the experimental presentation
 	// state, including its current live source URL.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
+	// Configuration values set on this chat, applied over the owning session's
+	// {@link SessionState.config | `SessionState.config`}. See
+	// {@link ChatConfigState}.
+	Config *ChatConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1348,9 +1443,14 @@ type ChatState struct {
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
-	// Message to inject into the current turn at a convenient point
+	// Legacy steering input retained only when reading old snapshots.
 	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
-	// Messages to send automatically as new turns after the current turn finishes
+	// Pending messages of both kinds, in host acceptance order unless explicitly
+	// reordered.
+	//
+	// This raw order is not consumption priority. UIs SHOULD group steering
+	// messages before queued messages, preserving relative order within each
+	// group without changing the underlying array.
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
 	// The user's in-progress draft input for this chat — the message they are
 	// composing but have not sent yet, including its
@@ -1512,7 +1612,9 @@ type SideChatSelection struct {
 type PendingMessage struct {
 	// Unique identifier for this pending message
 	Id string `json:"id"`
-	// The message that will start the next turn
+	// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+	Kind *PendingMessageKind `json:"kind,omitempty"`
+	// The queued or steering message
 	Message Message `json:"message"`
 }
 
@@ -1564,6 +1666,9 @@ type SessionConfigPropertySchema struct {
 	EnumDynamic *bool `json:"enumDynamic,omitempty"`
 	// When `true`, the user may change this property after session creation
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
+	// When `true`, the property may be set per chat with `chat/configChanged`.
+	// The chat's value overrides the session's value for that chat only.
+	ChatMutable *bool `json:"chatMutable,omitempty"`
 }
 
 // A JSON Schema object describing available session configuration metadata.
@@ -1584,6 +1689,18 @@ type SessionConfigState struct {
 	// JSON Schema describing available configuration properties
 	Schema SessionConfigSchema `json:"schema"`
 	// Current configuration values
+	Values map[string]json.RawMessage `json:"values"`
+}
+
+// Configuration values set on a chat: an overlay on the owning session's
+// {@link SessionState.config | `SessionState.config`}.
+//
+// It carries only the chat's own values; the session's config schema
+// applies. The effective config of a chat is the session's values with
+// these values applied over them. Only properties with `chatMutable: true`
+// in the session's config schema can be set on a chat.
+type ChatConfigState struct {
+	// Config values set on this chat, keyed by property id
 	Values map[string]json.RawMessage `json:"values"`
 }
 
@@ -3639,14 +3756,29 @@ type ErrorInfo struct {
 }
 
 // A point-in-time snapshot of a subscribed resource's state, returned by
-// `initialize`, `reconnect`, and `subscribe`.
+// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
 type Snapshot struct {
 	// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
 	Resource URI `json:"resource"`
-	// The current state of the resource
+	// The current state of the resource. A channel with no state fields, such as a
+	// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+	// new kinds of state; a client MUST NOT fail on a state that it does not
+	// recognize, and ignores that snapshot.
 	State SnapshotState `json:"state"`
 	// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
 	FromSeq int64 `json:"fromSeq"`
+}
+
+// The state of a channel that has no state fields, such as a telemetry
+// channel. It is always the empty object `{}`.
+//
+// Every windowed subscription starts with a snapshot, including subscriptions
+// to these channels, so a channel can gain state fields in a later revision
+// without changing how windowed subscriptions start. With ordinary delivery,
+// the server MAY omit a snapshot whose state is an `EmptyState`.
+//
+// Stability: 1.0 - Early development.
+type EmptyState struct {
 }
 
 // Catalogue entry describing one changeset the server can produce for a
@@ -5925,6 +6057,9 @@ func (u SessionOrigin) MarshalJSON() ([]byte, error) {
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
 	}
+	if object == nil {
+		return data, nil
+	}
 	switch u.Value.(type) {
 	case *AutomationSessionOrigin:
 		object["kind"] = json.RawMessage("\"automation\"")
@@ -5984,6 +6119,9 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationScheduleTrigger:
@@ -6047,6 +6185,9 @@ func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
 	}
+	if object == nil {
+		return data, nil
+	}
 	switch u.Value.(type) {
 	case *AutomationAfterRunsCondition:
 		object["kind"] = json.RawMessage("\"afterRuns\"")
@@ -6108,6 +6249,9 @@ func (u AutomationRunOrigin) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationManualRunOrigin:
@@ -6191,6 +6335,9 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
 		return nil, err
+	}
+	if object == nil {
+		return data, nil
 	}
 	switch u.Value.(type) {
 	case *AutomationPendingRunLifecycle:
@@ -6305,12 +6452,17 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 // SnapshotState is the state payload of a snapshot — root, session,
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → canvas → terminal → changeset →
-// resourceWatch → annotations → root).
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
+// is an empty state, used by channels whose state has no fields. A state that
+// matches none of these, such as the state of a channel added in a later
+// protocol version, is kept as raw JSON in Unknown.
 type SnapshotState struct {
+	Empty         *EmptyState         `json:"-"`
+	Unknown       json.RawMessage     `json:"-"`
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
@@ -6326,6 +6478,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
+	case s.Empty != nil:
+		return json.Marshal(s.Empty)
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
 	case s.Automations != nil:
@@ -6346,6 +6500,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Annotations)
 	case s.Root != nil:
 		return json.Marshal(s.Root)
+	case s.Unknown != nil:
+		return s.Unknown, nil
 	default:
 		return []byte("null"), nil
 	}
@@ -6360,6 +6516,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
+	case len(probe) == 0:
+		s.Empty = &EmptyState{}
 	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {
@@ -6414,12 +6572,15 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Annotations = &v
-	default:
+	case containsAll(probe, "agents"):
 		var v RootState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		s.Root = &v
+	default:
+		// A state from a later protocol version: keep it rather than fail.
+		s.Unknown = append(json.RawMessage(nil), data...)
 	}
 	return nil
 }

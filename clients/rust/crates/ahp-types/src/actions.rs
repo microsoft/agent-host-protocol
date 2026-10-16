@@ -82,6 +82,7 @@ pub enum ActionType {
     ChatDraftChanged,
     ChatIsReadChanged,
     ChatIsArchivedChanged,
+    ChatConfigChanged,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -226,6 +227,7 @@ impl serde::Serialize for ActionType {
             Self::ChatDraftChanged => serializer.serialize_str("chat/draftChanged"),
             Self::ChatIsReadChanged => serializer.serialize_str("chat/isReadChanged"),
             Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
+            Self::ChatConfigChanged => serializer.serialize_str("chat/configChanged"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -380,6 +382,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/draftChanged" => Self::ChatDraftChanged,
             "chat/isReadChanged" => Self::ChatIsReadChanged,
             "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
+            "chat/configChanged" => Self::ChatConfigChanged,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -595,7 +598,8 @@ pub struct ChatTurnStartedAction {
     pub started_at: String,
     /// The new message
     pub message: Message,
-    /// If this turn was auto-started from a queued message, the ID of that message
+    /// If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_message_id: Option<String>,
     /// Additional provider-specific metadata for this action.
@@ -1448,11 +1452,12 @@ pub struct SessionInputNeededRemovedAction {
 
 /// A pending message was set (upsert semantics: creates or replaces).
 ///
-/// For steering messages, this always replaces the single steering message.
-/// For queued messages, if a message with the given `id` already exists it is
-/// updated in place; otherwise it is appended to the queue. If the chat is
-/// idle when a queued message is set, the server SHOULD immediately consume it
-/// and start a new turn.
+/// Both kinds are stored in {@link ChatState.queuedMessages}, including this
+/// action's `kind`. A new `id` appends an entry; an existing `id` replaces its
+/// message and kind in place.
+///
+/// If the chat is idle when a queued message is set, the server SHOULD
+/// immediately consume it and start a new turn.
 ///
 /// A client is only allowed to send {@link MessageKind.User} messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1471,6 +1476,10 @@ pub struct ChatPendingMessageSetAction {
 /// Dispatched by clients to cancel a pending message, or by the server when
 /// it consumes a message (e.g. starting a turn from a queued message or
 /// injecting a steering message into the current turn).
+///
+/// Removes an entry from {@link ChatState.queuedMessages} only when both `id`
+/// and effective kind match. Unknown IDs and mismatched kinds are
+/// no-ops.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatPendingMessageRemovedAction {
@@ -1480,17 +1489,18 @@ pub struct ChatPendingMessageRemovedAction {
     pub id: String,
 }
 
-/// Reorder the queued messages.
+/// Reorder the entire shared {@link ChatState.queuedMessages} list.
 ///
-/// The `order` array contains the IDs of queued messages in their new
-/// desired order. IDs not present in the current queue are ignored.
-/// Queued messages whose IDs are absent from `order` are appended at
+/// The `order` array contains pending message IDs of either kind in their new
+/// desired raw order. Unknown and duplicate IDs are ignored.
+/// Messages whose IDs are absent from `order` are appended at
 /// the end in their original relative order (so a client with a stale
-/// view of the queue never silently drops messages).
+/// view of the list never silently drops messages). UIs SHOULD still group
+/// steering messages first, independently of this raw order.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatQueuedMessagesReorderedAction {
-    /// Queued message IDs in the desired order
+    /// Pending message IDs in the desired raw order
     pub order: Vec<String>,
 }
 
@@ -1539,6 +1549,23 @@ pub struct ChatIsReadChangedAction {
 pub struct ChatIsArchivedChangedAction {
     /// Whether the chat is archived
     pub is_archived: bool,
+}
+
+/// Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
+/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
+/// in the session's config schema may be set. To reset a property to the
+/// session's value, replace the overlay with one that omits the property.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigChangedAction {
+    /// Config values to set on the chat
+    pub config: JsonObject,
+    /// When `true`, replaces the chat's config values instead of merging
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
 }
 
 /// A session requested input from the user.
@@ -2492,6 +2519,8 @@ pub enum StateAction {
     ChatIsReadChanged(ChatIsReadChangedAction),
     #[serde(rename = "chat/isArchivedChanged")]
     ChatIsArchivedChanged(ChatIsArchivedChangedAction),
+    #[serde(rename = "chat/configChanged")]
+    ChatConfigChanged(ChatConfigChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

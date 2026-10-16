@@ -80,6 +80,7 @@ value class ActionType(val rawValue: String) {
         val CHAT_DRAFT_CHANGED: ActionType = ActionType("chat/draftChanged")
         val CHAT_IS_READ_CHANGED: ActionType = ActionType("chat/isReadChanged")
         val CHAT_IS_ARCHIVED_CHANGED: ActionType = ActionType("chat/isArchivedChanged")
+        val CHAT_CONFIG_CHANGED: ActionType = ActionType("chat/configChanged")
         val CHAT_INPUT_REQUESTED: ActionType = ActionType("chat/inputRequested")
         val CHAT_INPUT_ANSWER_CHANGED: ActionType = ActionType("chat/inputAnswerChanged")
         val CHAT_INPUT_COMPLETED: ActionType = ActionType("chat/inputCompleted")
@@ -270,7 +271,8 @@ data class ChatTurnStartedAction(
      */
     val message: Message,
     /**
-     * If this turn was auto-started from a queued message, the ID of that message
+     * If this turn consumes a pending message, its ID. Removes the matching
+     * entry from {@link ChatState.queuedMessages}.
      */
     val queuedMessageId: String? = null,
     /**
@@ -1024,7 +1026,7 @@ data class ChatPendingMessageRemovedAction(
 data class ChatQueuedMessagesReorderedAction(
     val type: ActionType,
     /**
-     * Queued message IDs in the desired order
+     * Pending message IDs in the desired raw order
      */
     val order: List<String>
 )
@@ -1054,6 +1056,19 @@ data class ChatIsArchivedChangedAction(
      * Whether the chat is archived
      */
     val isArchived: Boolean
+)
+
+@Serializable
+data class ChatConfigChangedAction(
+    val type: ActionType,
+    /**
+     * Config values to set on the chat
+     */
+    val config: Map<String, JsonElement>,
+    /**
+     * When `true`, replaces the chat's config values instead of merging
+     */
+    val replace: Boolean? = null
 )
 
 @Serializable
@@ -1747,6 +1762,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatDraftChanged(val value: ChatDraftChangedAction) : StateAction
 @JvmInline value class StateActionChatIsReadChanged(val value: ChatIsReadChangedAction) : StateAction
 @JvmInline value class StateActionChatIsArchivedChanged(val value: ChatIsArchivedChangedAction) : StateAction
+@JvmInline value class StateActionChatConfigChanged(val value: ChatConfigChangedAction) : StateAction
 @JvmInline value class StateActionChatInputRequested(val value: ChatInputRequestedAction) : StateAction
 @JvmInline value class StateActionChatInputAnswerChanged(val value: ChatInputAnswerChangedAction) : StateAction
 @JvmInline value class StateActionChatInputCompleted(val value: ChatInputCompletedAction) : StateAction
@@ -1868,6 +1884,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/draftChanged" -> StateActionChatDraftChanged(input.json.decodeFromJsonElement(ChatDraftChangedAction.serializer(), element))
             "chat/isReadChanged" -> StateActionChatIsReadChanged(input.json.decodeFromJsonElement(ChatIsReadChangedAction.serializer(), element))
             "chat/isArchivedChanged" -> StateActionChatIsArchivedChanged(input.json.decodeFromJsonElement(ChatIsArchivedChangedAction.serializer(), element))
+            "chat/configChanged" -> StateActionChatConfigChanged(input.json.decodeFromJsonElement(ChatConfigChangedAction.serializer(), element))
             "chat/inputRequested" -> StateActionChatInputRequested(input.json.decodeFromJsonElement(ChatInputRequestedAction.serializer(), element))
             "chat/inputAnswerChanged" -> StateActionChatInputAnswerChanged(input.json.decodeFromJsonElement(ChatInputAnswerChangedAction.serializer(), element))
             "chat/inputCompleted" -> StateActionChatInputCompleted(input.json.decodeFromJsonElement(ChatInputCompletedAction.serializer(), element))
@@ -1982,6 +1999,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatDraftChanged -> output.json.encodeToJsonElement(ChatDraftChangedAction.serializer(), value.value)
             is StateActionChatIsReadChanged -> output.json.encodeToJsonElement(ChatIsReadChangedAction.serializer(), value.value)
             is StateActionChatIsArchivedChanged -> output.json.encodeToJsonElement(ChatIsArchivedChangedAction.serializer(), value.value)
+            is StateActionChatConfigChanged -> output.json.encodeToJsonElement(ChatConfigChangedAction.serializer(), value.value)
             is StateActionChatInputRequested -> output.json.encodeToJsonElement(ChatInputRequestedAction.serializer(), value.value)
             is StateActionChatInputAnswerChanged -> output.json.encodeToJsonElement(ChatInputAnswerChangedAction.serializer(), value.value)
             is StateActionChatInputCompleted -> output.json.encodeToJsonElement(ChatInputCompletedAction.serializer(), value.value)

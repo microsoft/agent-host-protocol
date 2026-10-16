@@ -99,6 +99,32 @@ const (
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+// Opens a TCP connection from the host to a destination on the host's network.
+//
+// The client chooses the channel URI. This command does not subscribe: after it
+// succeeds, the client subscribes to the channel with windowed delivery. The
+// host MUST NOT send data for the channel before that subscription, and MUST
+// limit how much destination data it buffers and how long it keeps a
+// connection that is never subscribed to.
+//
+// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+// is present. If the channel URI is already in use, the host returns
+// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+//
+// Stability: 1.0 - Early development.
+type CreateTcpConnectionParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// A DNS name or IP address, resolved on the host's network. Not a URL.
+	Host string `json:"host"`
+	// The destination port.
+	Port int64 `json:"port"`
+}
+
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
 type InitializeParams struct {
@@ -168,7 +194,8 @@ type InitializeResult struct {
 	// understand. Capabilities needed for interoperable behavior SHOULD use typed
 	// fields on {@link InitializeResult} instead.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Snapshots for each `initialSubscriptions` URI
+	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
@@ -192,6 +219,11 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Present when the host supports `createTcpConnection`, which opens a TCP
+	// connection on the host's network for the client to forward.
+	//
+	// Stability: 1.0 - Early development.
+	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -313,11 +345,61 @@ type ReconnectParams struct {
 	LastSeenServerSeq int64 `json:"lastSeenServerSeq"`
 	// URIs the client was subscribed to
 	Subscriptions []URI `json:"subscriptions"`
+	// Windowed subscriptions that the client wants to keep. Each channel MUST
+	// also be in `subscriptions` and MUST appear only once. These subscriptions
+	// are not included in the result's `actions` or `snapshots`.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
+}
+
+// One windowed subscription that the client wants to keep after reconnection.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeParams struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The client's offer of limits for the new connection, as in `subscribe`.
+	// The subscription's counters start at zero on the new connection.
+	FlowControl SubscriptionFlowControlOptions `json:"flowControl"`
+	// The `serverSeq` of the last action or observed state that the client
+	// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+	// replay recovery; absent for channels that resume only with new data.
+	LastAppliedServerSeq *int64 `json:"lastAppliedServerSeq,omitempty"`
+}
+
+// Windowed subscriptions that the client wants to keep after reconnection.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeOptions struct {
+	Items []ChannelDeliveryResumeParams `json:"items"`
+}
+
+// Windowed subscriptions that the server kept after reconnection.
+//
+// A requested channel that is not listed was not kept. For each kept
+// subscription, both peers start their counters at zero on the new connection,
+// and credit counts only data received on that connection. Sequence numbers
+// decide what is sent again.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeResult struct {
+	Items []ResumedChannelSubscription `json:"items"`
+}
+
+// A client's offer of windowed delivery.
+//
+// Stability: 1.0 - Early development.
+type SubscriptionFlowControlOptions struct {
+	// The largest limits that the client accepts for data that it receives. The
+	// server MAY accept lower values, and MUST NOT accept higher values.
+	Receive ChannelReceiveLimits `json:"receive"`
 }
 
 // Reconnect result when the server can replay from the requested sequence.
 //
-// The server MUST include all replayed data in the response.
+// The server MUST include all replayed data for ordinary subscriptions in the
+// response. Windowed subscriptions recover through their own data messages.
 type ReconnectReplayResult struct {
 	// Missed action envelopes since `lastSeenServerSeq`
 	Actions []ActionEnvelope `json:"actions"`
@@ -326,37 +408,59 @@ type ReconnectReplayResult struct {
 	// terminals) as well as resources the client is no longer permitted to
 	// observe. Clients SHOULD drop these from their local subscription set.
 	Missing []URI `json:"missing"`
+	// Windowed subscriptions that the server kept. Their data is sent separately.
+	// The server MUST omit this field unless the request contained `windows`,
+	// and MUST list only channels from the request.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Reconnect result when the gap exceeds the replay buffer.
 type ReconnectSnapshotResult struct {
-	// Fresh snapshots for each subscription
+	// Fresh snapshots for each resumed ordinary subscription. Windowed
+	// subscriptions are not included; they recover through their own data
+	// messages, as described by `windows`. The server MAY leave out a channel
+	// whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
+	// Windowed subscriptions that the server kept. Each one has its own
+	// `recovery` value, which does not depend on this result's type. The server
+	// MUST omit this field unless the request contained `windows`, and MUST list
+	// only channels from the request.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Subscribe to a URI-identified channel.
 //
-// A channel MAY have state associated with it (e.g. root, sessions,
-// terminals) or be stateless (pure pub/sub for streaming data). For
-// state-bearing channels the result includes a snapshot; for stateless
-// channels `snapshot` is omitted.
+// With ordinary delivery, the result contains a snapshot of the channel's
+// state; the server MAY omit it for a channel whose state has no fields. With
+// windowed delivery, the result contains `flowControl` instead,
+// and the snapshot is sent in a `channel/snapshot` notification.
+//
+// A client has at most one subscription to each channel. A `subscribe` for a
+// channel that the client is already subscribed to changes the existing
+// subscription, for example its window, without losing data. Windowed counters
+// continue if the subscription was already windowed.
 type SubscribeParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Optional delivery preferences for this subscription.
-	//
-	// Servers MAY use these preferences to buffer and coalesce high-frequency
-	// updates while preserving the same reduced state. Omit this field for the
-	// server's default delivery behavior.
+	// Asks the server to limit how long it holds updates. If absent, the server
+	// uses its default behavior.
 	Delivery *SubscriptionDeliveryOptions `json:"delivery,omitempty"`
-	// Optional client-requested shape for the returned snapshot.
-	//
-	// Servers that do not understand a requested view ignore it and return their
-	// default snapshot. Clients MUST tolerate receiving more state than requested.
+	// Asks for a smaller snapshot. A server that does not support the requested
+	// view ignores it. Clients MUST accept more state than they requested.
 	View *SubscribeView `json:"view,omitempty"`
+	// Offers windowed delivery for this subscription. The server accepts by
+	// returning `flowControl` in the result. If the result does not contain
+	// `flowControl`, the subscription uses ordinary delivery.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *SubscriptionFlowControlOptions `json:"flowControl,omitempty"`
 }
 
 // Optional client-requested shape for a subscription snapshot.
@@ -372,22 +476,36 @@ type SubscribeView struct {
 	Turns *int64 `json:"turns,omitempty"`
 }
 
-// Advisory delivery preferences for a single subscription.
+// Delivery preferences for one subscription. They do not allow a server to
+// exceed the limits of a windowed subscription.
 type SubscriptionDeliveryOptions struct {
-	// Maximum time, in milliseconds, that the server may intentionally delay
-	// delivery while buffering/coalescing updates for this subscription.
-	//
-	// A value of `0` requests immediate delivery with no intentional coalescing.
+	// The longest time, in milliseconds, that the server should hold updates for
+	// this subscription in order to combine them. The server MUST NOT combine
+	// updates unless the combined update produces the same state and the client
+	// still receives every event that the channel requires. A value of `0` asks
+	// the server not to delay updates.
 	MaxLatencyMs *int64 `json:"maxLatencyMs,omitempty"`
 }
 
 // Result of the `subscribe` command.
 //
-// `snapshot` is present when the subscribed channel has associated state, and
-// absent for stateless channels.
+// With ordinary delivery, `snapshot` is present, except that the server MAY
+// omit it for a channel whose state has no fields. With windowed delivery,
+// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+// snapshot in a `channel/snapshot` notification.
 type SubscribeResult struct {
-	// Snapshot of the subscribed channel's state (omitted for stateless channels)
+	// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+	// except that the server MAY omit it for a channel whose state has no fields
+	// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+	// `channel/snapshot` notification instead.
 	Snapshot *Snapshot `json:"snapshot,omitempty"`
+	// The limits that the server accepted for windowed delivery. The server sends
+	// this result before any data message for the subscription. The client MUST be
+	// ready to process data messages as soon as it receives this result, and can
+	// send data messages without waiting for the snapshot.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *ChannelFlowControl `json:"flowControl,omitempty"`
 }
 
 // Creates a new session with the specified agent provider.
@@ -673,6 +791,9 @@ type ResourceReadParams struct {
 // The server SHOULD honor the `encoding` requested in the params. If the
 // server cannot provide the requested encoding, it MUST fall back to either
 // `base64` or `utf-8`.
+//
+// The result contains the whole resource. Windowed delivery does not limit its
+// size, because it is a response and not part of a subscription.
 type ResourceReadResult struct {
 	// Content encoded as a string
 	Data string `json:"data"`
@@ -1687,7 +1808,24 @@ func (u ReconnectResult) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(u.Value)
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *ReconnectReplayResult:
+		object["type"] = json.RawMessage("\"replay\"")
+	case *ReconnectSnapshotResult:
+		object["type"] = json.RawMessage("\"snapshot\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────

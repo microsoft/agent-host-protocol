@@ -1,0 +1,38 @@
+{
+  "description": "mixed pending removal ignores unknown IDs and mismatched effective kinds",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+      { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+      { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "old" },
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "q" },
+    { "type": "chat/pendingMessageRemoved", "kind": "queued", "id": "s" },
+    { "type": "chat/pendingMessageRemoved", "kind": "queued", "id": "unknown" },
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "unknown" },
+    { "type": "chat/pendingMessageRemoved", "kind": "queued", "id": "legacy" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+      { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+      { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
+    ]
+  }
+}

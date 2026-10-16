@@ -646,7 +646,7 @@ public static class Reducers
         return ReduceOutcome.OutOfScope;
     }
 
-    // Shared config merge for the root and session `configChanged` actions:
+    // Shared config merge for the root, session, and chat `configChanged` actions:
     // when `replace` is set (or no values exist yet) start fresh, otherwise
     // mutate the existing map in place; then overlay the incoming entries.
     private static Dictionary<string, JsonElement> MergeConfig(
@@ -1138,6 +1138,11 @@ public static class Reducers
                 return ReduceOutcome.Applied;
             case ChatIsArchivedChangedAction a:
                 state.Status = WithStatusFlag(state.Status, SessionStatus.IsArchived, a.IsArchived);
+                return ReduceOutcome.Applied;
+            case ChatConfigChangedAction a:
+                Dictionary<string, JsonElement> chatValues = MergeConfig(state.Config?.Values, a.Config, a.Replace);
+                state.Config ??= new ChatConfigState { Values = chatValues };
+                state.Config.Values = chatValues;
                 return ReduceOutcome.Applied;
         }
 
@@ -1738,61 +1743,46 @@ public static class Reducers
 
     private static ReduceOutcome ApplyChatPendingMessageSet(ChatState state, ChatPendingMessageSetAction a)
     {
-        var entry = new PendingMessage { Id = a.Id, Message = a.Message };
-        switch (a.Kind)
+        var entry = new PendingMessage { Id = a.Id, Kind = a.Kind, Message = a.Message };
+        if (a.Kind == PendingMessageKind.Steering)
         {
-            case PendingMessageKind.Steering:
-                state.SteeringMessage = entry;
-                break;
-            case PendingMessageKind.Queued:
-                List<PendingMessage> list = state.QueuedMessages ?? new List<PendingMessage>();
-                int idx = list.FindIndex(m => m.Id == entry.Id);
-                if (idx >= 0)
-                {
-                    list[idx] = entry;
-                }
-                else
-                {
-                    list.Add(entry);
-                }
-
-                state.QueuedMessages = list;
-                break;
+            state.SteeringMessage = entry;
         }
-
+        else if (state.SteeringMessage?.Id == a.Id)
+        {
+            state.SteeringMessage = null;
+        }
+        var list = state.QueuedMessages ?? new List<PendingMessage>();
+        int idx = list.FindIndex(m => m.Id == entry.Id);
+        if (idx < 0)
+        {
+            list.Add(entry);
+        }
+        else
+        {
+            list[idx] = entry;
+        }
+        state.QueuedMessages = list;
         return ReduceOutcome.Applied;
     }
 
     private static ReduceOutcome ApplyChatPendingMessageRemoved(ChatState state, ChatPendingMessageRemovedAction a)
     {
-        switch (a.Kind)
+        var outcome = ReduceOutcome.NoOp;
+        if (a.Kind == PendingMessageKind.Steering && state.SteeringMessage?.Id == a.Id)
         {
-            case PendingMessageKind.Steering:
-                if (state.SteeringMessage is not null && state.SteeringMessage.Id == a.Id)
-                {
-                    state.SteeringMessage = null;
-                    return ReduceOutcome.Applied;
-                }
-
-                return ReduceOutcome.NoOp;
-            case PendingMessageKind.Queued:
-                List<PendingMessage>? list = state.QueuedMessages;
-                if (list is null)
-                {
-                    return ReduceOutcome.NoOp;
-                }
-
-                int removed = list.RemoveAll(m => m.Id == a.Id);
-                if (removed == 0)
-                {
-                    return ReduceOutcome.NoOp;
-                }
-
-                state.QueuedMessages = list.Count == 0 ? null : list;
-                return ReduceOutcome.Applied;
+            state.SteeringMessage = null;
+            outcome = ReduceOutcome.Applied;
         }
-
-        return ReduceOutcome.NoOp;
+        var list = state.QueuedMessages;
+        int idx = list?.FindIndex(m => m.Id == a.Id && (m.Kind ?? PendingMessageKind.Queued) == a.Kind) ?? -1;
+        if (list is null || idx < 0)
+        {
+            return outcome;
+        }
+        list.RemoveAt(idx);
+        state.QueuedMessages = list.Count == 0 ? null : list;
+        return ReduceOutcome.Applied;
     }
 
     private static ReduceOutcome ApplyChatQueuedMessagesReordered(ChatState state, ChatQueuedMessagesReorderedAction a)
@@ -2594,6 +2584,7 @@ public static class Reducers
         "chat/draftChanged",
         "chat/isReadChanged",
         "chat/isArchivedChanged",
+        "chat/configChanged",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

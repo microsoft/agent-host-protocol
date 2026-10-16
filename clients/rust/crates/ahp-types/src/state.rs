@@ -13,6 +13,23 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// How the server resumes sending data on a windowed subscription after
+/// reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChannelRecoveryKind {
+    /// The server sends a new `channel/snapshot`, and the client replaces its state.
+    #[serde(rename = "snapshot")]
+    Snapshot,
+    /// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+    #[serde(rename = "replay")]
+    Replay,
+    /// The server sends only data created after reconnection.
+    #[serde(rename = "live")]
+    Live,
+}
+
 /// Policy configuration state for a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PolicyState {
@@ -1483,6 +1500,81 @@ pub enum AutomationRunOriginKind {
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
+/// Present when the host supports `createTcpConnection`.
+///
+/// A client creates a connection with `createTcpConnection`, then subscribes to
+/// its channel with windowed delivery. A TCP channel's state is an
+/// {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+/// notifications. TCP connections do not survive the loss of the AHP connection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionsCapability {}
+
+/// Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReceiveLimits {
+    /// The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.
+    pub window_bytes: i64,
+    /// The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.
+    pub maximum_frame_bytes: i64,
+}
+
+/// The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelFlowControl {
+    /// Limits for data that the server sends to the client.
+    pub client_receive: ChannelReceiveLimits,
+    /// Limits for data that the client sends to the server.
+    pub host_receive: ChannelReceiveLimits,
+}
+
+/// A windowed subscription that the server kept after reconnection.
+///
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumedChannelSubscription {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.
+    pub flow_control: ChannelFlowControl,
+    /// How the server resumes sending data.
+    pub recovery: ChannelRecoveryKind,
+}
+
 /// An optionally-sized icon that can be displayed in a user interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1765,7 +1857,7 @@ pub struct MultipleWorkingDirectoriesCapability {
 pub struct SessionModelInfo {
     /// Model identifier
     pub id: String,
-    /// Provider this model belongs to
+    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     pub provider: String,
     /// Human-readable model name
     pub name: String,
@@ -1795,6 +1887,15 @@ pub struct SessionModelInfo {
     /// For example, a `pricing` key may carry model pricing metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Vendor of this model as the provider reports it, for example `Anthropic`
+    /// or `Azure OpenAI`. This is sometimes the company that serves the model
+    /// rather than the one that built it. Not the same as {@link provider},
+    /// which names the agent provider that owns this model. Absent when the
+    /// provider does not report a vendor. Providers MAY send any value; clients
+    /// SHOULD fall back to a generic presentation for values they do not
+    /// recognize.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
 }
 
 /// A model selection: the chosen model ID together with any model-specific
@@ -1907,7 +2008,10 @@ pub struct ConfigSchema {
 pub struct PendingMessage {
     /// Unique identifier for this pending message
     pub id: String,
-    /// The message that will start the next turn
+    /// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<PendingMessageKind>,
+    /// The queued or steering message
     pub message: Message,
 }
 
@@ -1999,6 +2103,11 @@ pub struct ChatState {
     /// state, including its current live source URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvases: Option<Vec<CanvasReference>>,
+    /// Configuration values set on this chat, applied over the owning session's
+    /// {@link SessionState.config | `SessionState.config`}. See
+    /// {@link ChatConfigState}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -2012,10 +2121,15 @@ pub struct ChatState {
     /// Currently in-progress turn
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_turn: Option<ActiveTurn>,
-    /// Message to inject into the current turn at a convenient point
+    /// Legacy steering input retained only when reading old snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steering_message: Option<PendingMessage>,
-    /// Messages to send automatically as new turns after the current turn finishes
+    /// Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_messages: Option<Vec<PendingMessage>>,
     /// The user's in-progress draft input for this chat — the message they are
@@ -2726,6 +2840,10 @@ pub struct SessionConfigPropertySchema {
     /// When `true`, the user may change this property after session creation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mutable: Option<bool>,
+    /// When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_mutable: Option<bool>,
 }
 
 /// A JSON Schema object describing available session configuration metadata.
@@ -2751,6 +2869,20 @@ pub struct SessionConfigState {
     /// JSON Schema describing available configuration properties
     pub schema: SessionConfigSchema,
     /// Current configuration values
+    pub values: JsonObject,
+}
+
+/// Configuration values set on a chat: an overlay on the owning session's
+/// {@link SessionState.config | `SessionState.config`}.
+///
+/// It carries only the chat's own values; the session's config schema
+/// applies. The effective config of a chat is the session's values with
+/// these values applied over them. Only properties with `chatMutable: true`
+/// in the session's config schema can be set on a chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigState {
+    /// Config values set on this chat, keyed by property id
     pub values: JsonObject,
 }
 
@@ -5150,17 +5282,34 @@ pub struct ErrorInfo {
 }
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by
-/// `initialize`, `reconnect`, and `subscribe`.
+/// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     pub resource: Uri,
-    /// The current state of the resource
+    /// The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.
     pub state: SnapshotState,
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     pub from_seq: i64,
 }
+
+/// The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct EmptyState {}
 
 /// Catalogue entry describing one changeset the server can produce for a
 /// session or chat.
@@ -6553,16 +6702,20 @@ pub enum AutomationRunLifecycle {
 
 /// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required `lifecycle`), then
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by channels whose state has no fields), then session (has required `lifecycle`), then
 /// chat (has required `turns`), then canvas (has required instance/provider/type
 /// identifiers), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
-/// `automations`), then root.
+/// `automations`), then root (has required `agents`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as `Unknown` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),
@@ -6573,4 +6726,7 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }

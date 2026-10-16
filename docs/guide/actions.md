@@ -108,6 +108,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `chat/isReadChanged` | **Yes** | Client marked any known chat, including the default chat, as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |
+| `chat/configChanged` | **Yes** | Config values set on a chat (`chatMutable` properties) changed |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
 ### Server & Active-Client Tools (session channel)
@@ -126,9 +127,9 @@ See [Customizations & Client Tools](/guide/customizations) for the full flow.
 |---|---|---|
 | `chat/pendingMessageSet` | **Yes** | A steering or queued message was set (upsert) |
 | `chat/pendingMessageRemoved` | **Yes** | A pending message was cancelled (by client) or consumed (by server) |
-| `chat/queuedMessagesReordered` | **Yes** | Queued messages were reordered |
+| `chat/queuedMessagesReordered` | **Yes** | The shared pending list (both kinds) was reordered |
 
-The `pendingMessageSet` and `pendingMessageRemoved` actions carry a `kind` discriminant (`'steering'` or `'queued'`). See the [State Model — Pending Messages](/guide/state-model#pending-messages) for semantics.
+The `pendingMessageSet` and `pendingMessageRemoved` actions carry a `kind` discriminant (`'steering'` or `'queued'`) and operate on the shared `queuedMessages` list. Set stores the kind and upserts by ID; remove requires a matching effective kind (an absent entry kind means `'queued'`). See the [State Model — Pending Messages](/guide/state-model#pending-messages) for ordering and migration semantics.
 
 ### Input Requests (chat channel)
 
@@ -212,11 +213,12 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/titleChanged` | Updates the session title (rename) |
 | `chat/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
 | `chat/pendingMessageRemoved` | Cancels a pending message before it is consumed |
-| `chat/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
+| `chat/queuedMessagesReordered` | Reorders the shared list of both kinds; unknown and duplicate IDs ignored, unmentioned messages kept at the end in their original order |
 | `session/customizationToggled` | Replaces a customization's explicit enablement decisions by id |
 | `session/isReadChanged` | Marks the session as read or unread |
 | `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats; refreshes the compact `SessionChatSummary.status` projection |
 | `session/isArchivedChanged` | Archives or unarchives the session |
+| `chat/configChanged` | Sets `chatMutable` config values for this chat, overriding the session's values for this chat only |
 
 ## Reducers
 

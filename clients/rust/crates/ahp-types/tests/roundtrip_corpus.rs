@@ -29,11 +29,16 @@
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
-        ChangesetOperationTarget, ChatSource, CreateChatParams, Implementation, InitializeResult,
+        ChangesetOperationTarget, ChatSource, CreateChatParams, CreateTcpConnectionParams,
+        Implementation, InitializeResult, ReconnectParams, ReconnectResult, SubscribeParams,
+        SubscribeResult,
     },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
-    notifications::{PartialSessionSummary, SessionAddedParams},
+    notifications::{
+        ChannelCreditParams, ChannelFrameParams, PartialSessionSummary, SessionAddedParams,
+        TcpDataParams, TcpEofParams, TcpResetParams,
+    },
     state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
@@ -228,6 +233,16 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "CreateChatParams" => round_trip!(CreateChatParams),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
+        "SubscribeParams" => round_trip!(SubscribeParams),
+        "SubscribeResult" => round_trip!(SubscribeResult),
+        "ReconnectResult" => round_trip!(ReconnectResult),
+        "ChannelFrameParams" => round_trip!(ChannelFrameParams),
+        "ChannelCreditParams" => round_trip!(ChannelCreditParams),
+        "ReconnectParams" => round_trip!(ReconnectParams),
+        "TcpDataParams" => round_trip!(TcpDataParams),
+        "TcpEofParams" => round_trip!(TcpEofParams),
+        "TcpResetParams" => round_trip!(TcpResetParams),
+        "CreateTcpConnectionParams" => round_trip!(CreateTcpConnectionParams),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

@@ -115,6 +115,14 @@ final class ReducersTests: XCTestCase {
         XCTAssertTrue(isClientDispatchable(action))
     }
 
+    func testChatConfigChangeIsClientDispatchable() {
+        let action: StateAction = .chatConfigChanged(
+            ChatConfigChangedAction(type: .chatConfigChanged, config: ["autoApprove": AnyCodable(true)])
+        )
+        XCTAssertTrue(isClientDispatchable(action))
+        XCTAssertTrue(clientDispatchableActions.contains("chat/configChanged"))
+    }
+
     func testChatReadStateIsClientDispatchable() {
         let action: StateAction = .chatIsReadChanged(
             ChatIsReadChangedAction(type: .chatIsReadChanged, isRead: true)

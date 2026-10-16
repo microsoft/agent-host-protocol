@@ -46,6 +46,7 @@
       },
       {
         "id": "pm-2",
+        "kind": "queued",
         "message": {
           "text": "Second",
           "origin": {

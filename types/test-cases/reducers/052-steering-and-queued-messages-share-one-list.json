@@ -1,5 +1,5 @@
 {
-  "description": "steering and queued messages are independent",
+  "description": "steering and queued messages share one list",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -34,18 +34,21 @@
   ],
   "expected": {
     "turns": [],
-    "steeringMessage": {
-      "id": "s-1",
-      "message": {
-        "text": "Steer",
-        "origin": {
-          "kind": "user"
-        }
-      }
-    },
+    "steeringMessage": { "id": "s-1", "kind": "steering", "message": { "text": "Steer", "origin": { "kind": "user" } } },
     "queuedMessages": [
       {
+        "id": "s-1",
+        "kind": "steering",
+        "message": {
+          "text": "Steer",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      },
+      {
         "id": "q-1",
+        "kind": "queued",
         "message": {
           "text": "Queue",
           "origin": {

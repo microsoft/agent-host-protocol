@@ -144,12 +144,14 @@ function schemaAccepts(
 
   switch (schema.type) {
     case 'string':
-      return typeof value === 'string';
+      return typeof value === 'string' &&
+        (typeof schema.minLength !== 'number' || [...value].length >= schema.minLength);
     case 'number':
     case 'integer':
       return typeof value === 'number' &&
         (schema.type !== 'integer' || Number.isInteger(value)) &&
-        (typeof schema.minimum !== 'number' || value >= schema.minimum);
+        (typeof schema.minimum !== 'number' || value >= schema.minimum) &&
+        (typeof schema.maximum !== 'number' || value <= schema.maximum);
     case 'boolean':
       return typeof value === 'boolean';
     case 'null':
@@ -185,6 +187,56 @@ describe('generated JSON schemas', () => {
           [],
           `${file} references ${dangling.length} undefined $def(s) (bug #302.2): ${dangling.slice(0, 10).join(', ')}`,
         );
+      });
+
+      it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
+        if (file !== 'notifications.schema.json') return;
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
+        for (const property of Object.values(limits)) {
+          assert.equal(property.type, 'integer');
+          assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
+          assert.equal(schemaAccepts(schema, property, 1.5), false);
+          assert.equal(schemaAccepts(schema, property, -1), false);
+          assert.equal(schemaAccepts(schema, property, 0), false);
+        }
+        assert.equal('ChannelReceiveProgress' in defs, false);
+        const frame = defs.ChannelFrameParams.properties as Record<string, Record<string, unknown>>;
+        assert.equal(frame.data.minLength, 1);
+        assert.equal(schemaAccepts(schema, frame.data, ''), false);
+        assert.equal(schemaAccepts(schema, frame.data, '{'), true);
+        assert.equal('messageId' in frame, false);
+        assert.equal('subscriptionId' in frame, false);
+        assert.equal('control' in frame, false);
+        const credit = defs.ChannelCreditParams.properties as Record<string, Record<string, unknown>>;
+        assert.equal(credit.consumedBytes.type, 'integer');
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, 0), true);
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, 1.5), false);
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, Number.MAX_SAFE_INTEGER + 1), false);
+      });
+
+      it('keeps TCP payloads minimal and validates the destination port', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        if (file === 'notifications.schema.json') {
+          const data = defs.TcpDataParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(data).sort(), ['channel', 'data']);
+          assert.equal(data.data.minLength, 1);
+          for (const name of ['TcpEofParams', 'TcpResetParams']) {
+            assert.deepEqual(Object.keys(defs[name].properties as Record<string, unknown>), ['channel']);
+          }
+        }
+        if (file === 'commands.schema.json') {
+          const creation = defs.CreateTcpConnectionParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(creation).sort(), ['_meta', 'channel', 'host', 'port']);
+          for (const port of [1, 65535]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), true);
+          }
+          for (const port of [0, 65536, 1.5]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), false);
+          }
+        }
       });
 
       it('preserves automation schedule restrictions', () => {

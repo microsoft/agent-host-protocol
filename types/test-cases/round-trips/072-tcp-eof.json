@@ -1,0 +1,14 @@
+{
+  "name": "tcp-eof",
+  "group": "A",
+  "description": "tcp/eof carries only the channel.",
+  "type": "TcpEofParams",
+  "input": {
+    "channel": "ahp-tcp:/t1"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-tcp:/t1"
+    }
+  ]
+}

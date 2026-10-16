@@ -31,6 +31,7 @@ import { Project, SourceFile } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
 import { generateActionOrigin } from './generate-action-origin.js';
+import { generateWindowExempt } from './read-window-exempt.js';
 
 const GENERATED_BANNER = `// Generated from types/*.ts — do not edit.
 // Regenerate with: npm run generate:typescript
@@ -93,6 +94,7 @@ export function generateTypeScriptClient(project: Project, typesDir: string, out
   // doesn't carry stale `RootAction` / `SessionAction` / `TerminalAction`
   // / `ChangesetAction` unions when only `--typescript` is invoked.
   generateActionOrigin(project, typesDir);
+  generateWindowExempt(project, typesDir);
 
   const sources = project.getSourceFiles().filter(sf => shouldEmit(sf, typesDir));
 

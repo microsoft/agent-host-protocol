@@ -237,6 +237,8 @@ impl MultiHostStateMirror {
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
         match &snapshot.state {
+            // An empty or unrecognized state has nothing to mirror.
+            SnapshotState::Empty(_) | SnapshotState::Unknown(_) => {}
             SnapshotState::Root(state) => {
                 self.root_states
                     .insert(host.clone(), state.as_ref().clone());

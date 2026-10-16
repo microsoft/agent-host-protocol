@@ -5,6 +5,69 @@
   "title": "AHP State Types",
   "description": "All state types in the Agent Host Protocol.",
   "$defs": {
+    "ChannelReceiveLimits": {
+      "type": "object",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumFrameBytes": {
+          "type": "integer",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "minimum": 1024,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumFrameBytes"
+      ]
+    },
+    "ChannelFlowControl": {
+      "type": "object",
+      "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the server sends to the client."
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the client sends to the server."
+        }
+      },
+      "required": [
+        "clientReceive",
+        "hostReceive"
+      ]
+    },
+    "ResumedChannelSubscription": {
+      "type": "object",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nThe subscription's counters start at zero on the new connection. If a\nchannel that the client requested is not in the result, the subscription was\nnot kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "The limits that the server accepted for the new connection, as in a\n`subscribe` result. The server MAY lower the limits that the client offered\nin its request, and MUST NOT raise them."
+        },
+        "recovery": {
+          "$ref": "#/$defs/ChannelRecoveryKind",
+          "description": "How the server resumes sending data."
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl",
+        "recovery"
+      ]
+    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
@@ -412,7 +475,7 @@
     },
     "Snapshot": {
       "type": "object",
-      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
+      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -449,9 +512,12 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource"
+          "description": "The current state of the resource. A channel with no state fields, such as a\ntelemetry channel, has an {@link EmptyState}. Later protocol versions can add\nnew kinds of state; a client MUST NOT fail on a state that it does not\nrecognize, and ignores that snapshot."
         },
         "fromSeq": {
           "type": "number",
@@ -463,6 +529,11 @@
         "state",
         "fromSeq"
       ]
+    },
+    "EmptyState": {
+      "type": "object",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery windowed subscription starts with a snapshot, including subscriptions\nto these channels, so a channel can gain state fields in a later revision\nwithout changing how windowed subscriptions start. With ordinary delivery,\nthe server MAY omit a snapshot whose state is an `EmptyState`.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "RootState": {
       "type": "object",
@@ -599,7 +670,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Provider this model belongs to"
+          "description": "Agent provider that owns this model. Matches {@link AgentInfo.provider}."
         },
         "name": {
           "type": "string",
@@ -633,6 +704,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this model.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `pricing` key may carry model pricing metadata."
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Vendor of this model as the provider reports it, for example `Anthropic`\nor `Azure OpenAI`. This is sometimes the company that serves the model\nrather than the one that built it. Not the same as {@link provider},\nwhich names the agent provider that owns this model. Absent when the\nprovider does not report a vendor. Providers MAY send any value; clients\nSHOULD fall back to a generic presentation for values they do not\nrecognize."
         }
       },
       "required": [
@@ -1292,6 +1367,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatMutable": {
+          "type": "boolean",
+          "description": "When `true`, the property may be set per chat with `chat/configChanged`.\nThe chat's value overrides the session's value for that chat only."
         }
       },
       "required": [
@@ -2494,6 +2573,10 @@
           },
           "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
         },
+        "config": {
+          "$ref": "#/$defs/ChatConfigState",
+          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -2511,14 +2594,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy steering input retained only when reading old snapshots."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -2716,6 +2799,20 @@
         "text"
       ]
     },
+    "ChatConfigState": {
+      "type": "object",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values set on this chat, keyed by property id"
+        }
+      },
+      "required": [
+        "values"
+      ]
+    },
     "PendingMessage": {
       "type": "object",
       "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
@@ -2724,9 +2821,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind, defaults to {@link PendingMessageKind.Queued}."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The queued or steering message"
         }
       },
       "required": [
@@ -5896,6 +5997,11 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
     "StringOrMarkdown": {
       "oneOf": [
         {
@@ -6467,6 +6573,15 @@
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
     },
+    "ChannelRecoveryKind": {
+      "enum": [
+        "snapshot",
+        "replay",
+        "live"
+      ],
+      "type": "string",
+      "description": "How the server resumes sending data on a windowed subscription after\nreconnection."
+    },
     "PolicyState": {
       "enum": [
         "enabled",
@@ -6514,6 +6629,14 @@
       ],
       "type": "string",
       "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
+    },
+    "PendingMessageKind": {
+      "enum": [
+        "steering",
+        "queued"
+      ],
+      "type": "string",
+      "description": "Discriminant for pending message kinds."
     },
     "TurnState": {
       "enum": [

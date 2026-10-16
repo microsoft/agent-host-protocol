@@ -1,0 +1,18 @@
+{
+  "name": "tcp-framed-data",
+  "group": "A",
+  "description": "A tcp/data notification sent in a channel/frame fragment is a complete JSON-RPC notification in the data string.",
+  "type": "ChannelFrameParams",
+  "input": {
+    "channel": "ahp-tcp:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"tcp/data\",\"params\":{\"channel\":\"ahp-tcp:/t1\",\"data\":\"AAECAw==\"}}",
+    "final": true
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-tcp:/t1",
+      "data": "{\"jsonrpc\":\"2.0\",\"method\":\"tcp/data\",\"params\":{\"channel\":\"ahp-tcp:/t1\",\"data\":\"AAECAw==\"}}",
+      "final": true
+    }
+  ]
+}

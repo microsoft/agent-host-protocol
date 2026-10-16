@@ -3,15 +3,19 @@
   "reducer": "chat",
   "initial": {
     "turns": [],
-    "steeringMessage": {
-      "id": "sm-1",
-      "message": {
-        "text": "Original",
-        "origin": {
-          "kind": "user"
+    "steeringMessage": { "id": "sm-1", "kind": "steering", "message": { "text": "Original", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      {
+        "id": "sm-1",
+        "kind": "steering",
+        "message": {
+          "text": "Original",
+          "origin": {
+            "kind": "user"
+          }
         }
       }
-    },
+    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 1,
@@ -32,15 +36,19 @@
   ],
   "expected": {
     "turns": [],
-    "steeringMessage": {
-      "id": "sm-1",
-      "message": {
-        "text": "Updated",
-        "origin": {
-          "kind": "user"
+    "steeringMessage": { "id": "sm-1", "kind": "steering", "message": { "text": "Updated", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      {
+        "id": "sm-1",
+        "kind": "steering",
+        "message": {
+          "text": "Updated",
+          "origin": {
+            "kind": "user"
+          }
         }
       }
-    },
+    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 1,

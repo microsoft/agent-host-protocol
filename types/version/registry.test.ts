@@ -101,3 +101,14 @@ test('public package entry re-exports both protocol-version constants', async ()
   assert.equal(pkg.PROTOCOL_VERSION, PROTOCOL_VERSION);
   assert.deepEqual([...pkg.SUPPORTED_PROTOCOL_VERSIONS], [...SUPPORTED_PROTOCOL_VERSIONS]);
 });
+
+test('chat/configChanged is available starting in protocol 1.1.0', () => {
+  const action = {
+    type: ActionType.ChatConfigChanged,
+    config: { autoApprove: true },
+  } as const;
+
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatConfigChanged], '1.1.0');
+  assert.equal(isActionKnownToVersion(action, '1.0.0'), false);
+  assert.equal(isActionKnownToVersion(action, '1.1.0'), true);
+});

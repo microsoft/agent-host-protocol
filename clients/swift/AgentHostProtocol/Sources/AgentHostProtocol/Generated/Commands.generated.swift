@@ -258,6 +258,51 @@ public struct SideChatSource: Codable, Sendable {
     }
 }
 
+/// Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// A DNS name or IP address, resolved on the host's network. Not a URL.
+    public var host: String
+    /// The destination port.
+    public var port: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case host
+        case port
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        host: String,
+        port: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.host = host
+        self.port = port
+    }
+}
+
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -348,7 +393,8 @@ public struct InitializeResult: Codable, Sendable {
     /// understand. Capabilities needed for interoperable behavior SHOULD use typed
     /// fields on {@link InitializeResult} instead.
     public var meta: [String: AnyCodable]?
-    /// Snapshots for each `initialSubscriptions` URI
+    /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
@@ -372,6 +418,11 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var tcpConnections: TcpConnectionsCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -384,6 +435,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case tcpConnections
     }
 
     public init(
@@ -396,7 +448,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tcpConnections: TcpConnectionsCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -408,6 +461,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tcpConnections = tcpConnections
     }
 }
 
@@ -532,6 +586,12 @@ public struct ReconnectParams: Codable, Sendable {
     public var lastSeenServerSeq: Int
     /// URIs the client was subscribed to
     public var subscriptions: [String]
+    /// Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -539,6 +599,7 @@ public struct ReconnectParams: Codable, Sendable {
         case clientId
         case lastSeenServerSeq
         case subscriptions
+        case windows
     }
 
     public init(
@@ -546,13 +607,15 @@ public struct ReconnectParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         clientId: String,
         lastSeenServerSeq: Int,
-        subscriptions: [String]
+        subscriptions: [String],
+        windows: ChannelDeliveryResumeOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.clientId = clientId
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
+        self.windows = windows
     }
 }
 
@@ -566,30 +629,121 @@ public struct ReconnectReplayResult: Codable, Sendable {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     public var missing: [String]
+    /// Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
         actions: [ActionEnvelope],
-        missing: [String]
+        missing: [String],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.actions = actions
         self.missing = missing
+        self.windows = windows
     }
 }
 
 public struct ReconnectSnapshotResult: Codable, Sendable {
     /// Discriminant
     public var type: ReconnectResultType
-    /// Fresh snapshots for each subscription
+    /// Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
+    /// Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
-        snapshots: [Snapshot]
+        snapshots: [Snapshot],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.snapshots = snapshots
+        self.windows = windows
+    }
+}
+
+/// One windowed subscription that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
+    public var channel: String
+    /// The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.
+    public var flowControl: SubscriptionFlowControlOptions
+    /// The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.
+    public var lastAppliedServerSeq: Int?
+
+    public init(
+        channel: String,
+        flowControl: SubscriptionFlowControlOptions,
+        lastAppliedServerSeq: Int? = nil
+    ) {
+        self.channel = channel
+        self.flowControl = flowControl
+        self.lastAppliedServerSeq = lastAppliedServerSeq
+    }
+}
+
+/// Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeOptions: Codable, Sendable {
+    public var items: [ChannelDeliveryResumeParams]
+
+    public init(
+        items: [ChannelDeliveryResumeParams]
+    ) {
+        self.items = items
+    }
+}
+
+/// Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeResult: Codable, Sendable {
+    public var items: [ResumedChannelSubscription]
+
+    public init(
+        items: [ResumedChannelSubscription]
+    ) {
+        self.items = items
+    }
+}
+
+/// A client's offer of windowed delivery.
+///
+/// Stability: 1.0 - Early development.
+public struct SubscriptionFlowControlOptions: Codable, Sendable {
+    /// The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.
+    public var receive: ChannelReceiveLimits
+
+    public init(
+        receive: ChannelReceiveLimits
+    ) {
+        self.receive = receive
     }
 }
 
@@ -599,35 +753,39 @@ public struct SubscribeParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.
+    /// Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.
     public var delivery: SubscriptionDeliveryOptions?
-    /// Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.
+    /// Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.
     public var view: SubscribeView?
+    /// Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: SubscriptionFlowControlOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case delivery
         case view
+        case flowControl
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         delivery: SubscriptionDeliveryOptions? = nil,
-        view: SubscribeView? = nil
+        view: SubscribeView? = nil,
+        flowControl: SubscriptionFlowControlOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.delivery = delivery
         self.view = view
+        self.flowControl = flowControl
     }
 }
 
@@ -650,10 +808,11 @@ public struct SubscribeView: Codable, Sendable {
 }
 
 public struct SubscriptionDeliveryOptions: Codable, Sendable {
-    /// Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    /// The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.
     public var maxLatencyMs: Int?
 
     public init(
@@ -664,13 +823,25 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
 }
 
 public struct SubscribeResult: Codable, Sendable {
-    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.
     public var snapshot: Snapshot?
+    /// The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: ChannelFlowControl?
 
     public init(
-        snapshot: Snapshot? = nil
+        snapshot: Snapshot? = nil,
+        flowControl: ChannelFlowControl? = nil
     ) {
         self.snapshot = snapshot
+        self.flowControl = flowControl
     }
 }
 
@@ -1792,6 +1963,9 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
+    /// When `true`, the property may be set per chat with `chat/configChanged`.
+    /// The chat's value overrides the session's value for that chat only.
+    public var chatMutable: Bool?
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -1810,6 +1984,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         case additionalProperties
         case enumDynamic
         case sessionMutable
+        case chatMutable
     }
 
     public init(
@@ -1828,7 +2003,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         required: [String]? = nil,
         additionalProperties: ConfigPropertySchema? = nil,
         enumDynamic: Bool? = nil,
-        sessionMutable: Bool? = nil
+        sessionMutable: Bool? = nil,
+        chatMutable: Bool? = nil
     ) {
         self.type = type
         self.title = title
@@ -1846,6 +2022,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         self.additionalProperties = additionalProperties
         self.enumDynamic = enumDynamic
         self.sessionMutable = sessionMutable
+        self.chatMutable = chatMutable
     }
 }
 

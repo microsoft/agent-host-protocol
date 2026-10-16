@@ -168,6 +168,26 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<CreateChatParams>(inputJson));
             case "Snapshot":
                 return Wrap(Ser.Deserialize<Snapshot>(inputJson));
+            case "SubscribeParams":
+                return Wrap(Ser.Deserialize<SubscribeParams>(inputJson));
+            case "SubscribeResult":
+                return Wrap(Ser.Deserialize<SubscribeResult>(inputJson));
+            case "ReconnectResult":
+                return Wrap(Ser.Deserialize<ReconnectResult>(inputJson));
+            case "ChannelFrameParams":
+                return Wrap(Ser.Deserialize<ChannelFrameParams>(inputJson));
+            case "ChannelCreditParams":
+                return Wrap(Ser.Deserialize<ChannelCreditParams>(inputJson));
+            case "ReconnectParams":
+                return Wrap(Ser.Deserialize<ReconnectParams>(inputJson));
+            case "TcpDataParams":
+                return Wrap(Ser.Deserialize<TcpDataParams>(inputJson));
+            case "TcpEofParams":
+                return Wrap(Ser.Deserialize<TcpEofParams>(inputJson));
+            case "TcpResetParams":
+                return Wrap(Ser.Deserialize<TcpResetParams>(inputJson));
+            case "CreateTcpConnectionParams":
+                return Wrap(Ser.Deserialize<CreateTcpConnectionParams>(inputJson));
             default:
                 throw new Xunit.Sdk.XunitException(
                     $"round-trip fixture: unknown wire type \"{type}\". "

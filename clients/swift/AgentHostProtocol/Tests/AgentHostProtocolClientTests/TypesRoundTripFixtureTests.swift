@@ -194,6 +194,26 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ChatSource.self, from: inputData))
         case "Snapshot":
             return try reencode(dec.decode(Snapshot.self, from: inputData))
+        case "SubscribeParams":
+            return try reencode(dec.decode(SubscribeParams.self, from: inputData))
+        case "SubscribeResult":
+            return try reencode(dec.decode(SubscribeResult.self, from: inputData))
+        case "ReconnectResult":
+            return try reencode(dec.decode(ReconnectResult.self, from: inputData))
+        case "ChannelFrameParams":
+            return try reencode(dec.decode(ChannelFrameParams.self, from: inputData))
+        case "ChannelCreditParams":
+            return try reencode(dec.decode(ChannelCreditParams.self, from: inputData))
+        case "ReconnectParams":
+            return try reencode(dec.decode(ReconnectParams.self, from: inputData))
+        case "TcpDataParams":
+            return try reencode(dec.decode(TcpDataParams.self, from: inputData))
+        case "TcpEofParams":
+            return try reencode(dec.decode(TcpEofParams.self, from: inputData))
+        case "TcpResetParams":
+            return try reencode(dec.decode(TcpResetParams.self, from: inputData))
+        case "CreateTcpConnectionParams":
+            return try reencode(dec.decode(CreateTcpConnectionParams.self, from: inputData))
         default:
             throw FixtureError.message(
                 "round-trip fixture: unknown wire type \"\(type)\". Add a decode entry to decodeAndReencode.")

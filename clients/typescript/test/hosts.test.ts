@@ -167,8 +167,8 @@ function handleRequest(req: JsonRpcRequest, state: FakeHostState): unknown {
     case 'listSessions':
       return buildListResult(state);
     case 'subscribe': {
-      // Minimal `SubscribeResult` — snapshot omitted (stateless channels
-      // are valid). The fake server doesn't enforce real subscriptions.
+      // Minimal `SubscribeResult` — snapshot omitted, as older hosts do for
+      // channels with no state. The fake server doesn't enforce real subscriptions.
       return {};
     }
     default:

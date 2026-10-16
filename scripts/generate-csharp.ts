@@ -46,10 +46,12 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -254,9 +256,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -432,7 +432,7 @@ function escapeXmlDoc(s: string): string {
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push(`[JsonConverter(typeof(WireEnumConverter<${name}>))]`);
   lines.push(`public enum ${name}`);
   lines.push('{');
@@ -456,7 +456,7 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push('[Flags]');
   lines.push(`public enum ${name} : uint`);
   lines.push('{');
@@ -489,7 +489,7 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
 function generateOpenStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push(`[JsonConverter(typeof(${name}Converter))]`);
   lines.push(`public readonly struct ${name} : IEquatable<${name}>`);
   lines.push('{');
@@ -662,7 +662,7 @@ function generateClassFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -749,6 +749,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
@@ -771,6 +772,9 @@ const STATE_ENUMS = [
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState', mutable: true },
@@ -818,6 +822,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
+  { name: 'ChatConfigState', mutable: true },
   { name: 'Turn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },
@@ -896,6 +901,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState', mutable: true },
@@ -1422,13 +1428,17 @@ function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Empty state variant, when populated.</summary>
+    public EmptyState? Empty { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -1458,6 +1468,12 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>
+    /// A state that this version does not recognize, such as the state of a channel
+    /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
+    /// </summary>
+    public JsonElement? Unknown { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -1468,7 +1484,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        var members = root.EnumerateObject();
+        if (!members.MoveNext())
+        {
+            result.Empty = new EmptyState();
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1511,15 +1532,21 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
         }
-        else
+        else if (root.TryGetProperty("agents", out _))
         {
             result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
+        }
+        else
+        {
+            // A state from a later protocol version: keep it rather than fail.
+            result.Unknown = root.Clone();
         }
         return result;
     }
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -1530,6 +1557,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, AhpJsonTypeInfo.Get<ResourceWatchState>(options)); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, AhpJsonTypeInfo.Get<AnnotationsState>(options)); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, AhpJsonTypeInfo.Get<RootState>(options)); return; }
+        if (value.Unknown is { } unknown) { unknown.WriteTo(writer); return; }
         writer.WriteNullValue();
     }
 }`;
@@ -1685,6 +1713,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -2271,6 +2300,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
@@ -2283,6 +2313,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   // Union variants MUST self-carry their `type` discriminator: UnionConverter<T>.Write
   // serializes the inner value by its runtime type and relies on that property to
   // emit the discriminator (matching ACTION_VARIANTS' includeDiscriminants). Omitting
@@ -2464,6 +2496,9 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2513,7 +2548,36 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptCSharp(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptCSharp(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `        ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// <summary>Which notifications count against the window on a windowed subscription.</summary>
+public static class WindowedDelivery
+{
+    private static readonly HashSet<string> s_exemptMethods = new(StringComparer.Ordinal)
+    {
+${methods}
+    };
+
+    /// <summary>
+    /// Notification methods that do not count against the window on a windowed
+    /// subscription. Every other notification for a subscription counts.
+    /// </summary>
+    public static IReadOnlyCollection<string> ExemptMethods => s_exemptMethods;
+
+    /// <summary>
+    /// Whether a notification with this method counts against the window on a
+    /// windowed subscription. Methods that are not recognized count.
+    /// </summary>
+    public static bool CountsAgainstWindow(string method) => !s_exemptMethods.Contains(method);
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────

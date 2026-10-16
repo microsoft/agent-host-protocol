@@ -21,7 +21,7 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue and the chat's [`config`](#per-chat-configuration) overlay. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 Clients mark any known chat, including the owning session's default chat, as
 read or unread by dispatching
@@ -75,6 +75,23 @@ continue to use the existing `changeset/*` action contract. When the catalogue
 itself changes, the server dispatches
 [`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
 fully replaces the catalogue or clears it when `changesets` is absent.
+
+### Per-chat configuration
+
+[`ChatState.config`](/reference/chat#chatstate) is an overlay on the owning
+session's [`SessionState.config`](/reference/session#sessionstate). It carries
+only the values set on this chat; the session's config schema applies. A
+chat's effective config is the session's values with the chat's values
+applied over them. Hosts do not mirror session config into chats.
+
+A host opts a property in to per-chat values by setting
+[`chatMutable: true`](/reference/session#sessionconfigpropertyschema) on it in
+the session's config schema. Clients set such properties for one chat by
+dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
+which merges into the chat's overlay or replaces it when `replace` is `true`.
+To reset a property to the session's value, replace the overlay with one that
+omits the property. Every other property is changed on the session with
+`session/configChanged`.
 
 ## Relationship to the session channel
 
@@ -357,29 +374,50 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | `chat/inputAnswerChanged`                  | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action                                                                  |
 | `chat/inputCompleted`                      | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                  |
 | `chat/inputCompleted`                      | `response` is `'accept'` but required questions do not have submitted answers                                              | Server SHOULD reject the action                                                                  |
-| `chat/pendingMessageRemoved`               | No pending message with matching `id` and `kind`                                                                           | Server SHOULD reject the action                                                                  |
+| `chat/pendingMessageRemoved`               | No pending message with matching `id` and effective kind (an absent list-entry kind means `'queued'`)                      | Server SHOULD reject the action; the reducer is a no-op                                           |
+| `chat/configChanged`                       | A changed property is not `chatMutable` in the session's config schema                                                     | Server SHOULD reject the action                                                                  |
 
 ## Pending Message Consumption
 
-Pending messages live on the chat, not the session. The consumption rules mirror the legacy session behavior:
+Pending messages live on the chat, not the session. `ChatState.queuedMessages` is one shared list containing both steering and queued input. Its name is historical: not every entry starts a future turn. Each `PendingMessage` has an optional `kind: PendingMessageKind`; absence means `'queued'` for entries read from old queued-message snapshots.
+
+### Shared List Mutations and Ordering
+
+Both kinds use the existing `chat/pendingMessageSet`, `chat/pendingMessageRemoved`, and `chat/queuedMessagesReordered` actions:
+
+- **Set** stores the action's `id`, `kind`, and full `message` in `queuedMessages`. A new ID appends; an existing ID replaces the entry in its current position, including when its kind changes. A later submission with a different ID MUST NOT replace an earlier one. IDs MUST be unique across the shared list, not just within a kind.
+- **Remove** deletes an entry only when its ID and effective kind match the action. Unknown IDs and mismatched kinds are reducer no-ops. An omitted entry kind is treated as `'queued'`, so a steering removal cannot delete an old queued entry.
+- **Reorder** applies to the entire shared array, including both kinds. Unknown and duplicate IDs in `order` are ignored. Entries not mentioned in `order` are appended in their original relative order.
+- **Turn consumption** via `chat/turnStarted.queuedMessageId` removes the matching entry regardless of kind.
+
+The raw array follows host acceptance order unless explicitly reordered; it does not encode consumption priority. UIs SHOULD display steering messages before queued messages, preserving the relative array order within each group. Clients MUST NOT reorder synchronized state merely to produce this display grouping. For example, raw `[q1, s1, q2, s2]` displays as `[s1, s2]` followed by `[q1, q2]`, but remains `[q1, s1, q2, s2]` in state. Snapshots and replay preserve raw order.
 
 ### Queued Messages
 
-When a turn completes and `queuedMessages` is non-empty, the server SHOULD:
+When a turn completes and the shared list contains queued messages, the server SHOULD:
 
-1. Dispatch `chat/pendingMessageRemoved` with `kind: 'queued'` for the first queued message.
+1. Select the first entry whose effective kind is `'queued'`, skipping steering entries, and dispatch `chat/pendingMessageRemoved` with `kind: 'queued'`.
 2. Dispatch `chat/turnStarted` with the queued message's `message` and `queuedMessageId` set to the message's `id`.
 
 When a queued message is added while the chat is idle (no active turn), the server SHOULD immediately consume it using the same two-step sequence.
 
 ### Steering Messages
 
-When a turn is active and `steeringMessages` is non-empty, the server MAY consume steering messages at its discretion. To consume a steering message, the server:
+Steering entries have `kind: 'steering'` in the shared `queuedMessages` list. When a turn is active, the host MAY inject pending steering at its discretion. A later submission MUST NOT implicitly consume an earlier one. After consumption, the host dispatches `chat/pendingMessageRemoved` with that ID and `kind: 'steering'`, or `chat/turnStarted` with that `queuedMessageId` when consumption is represented as a new presentation turn. Both remove only the matching entry from the list. Providers MAY batch delivery internally without collapsing submission identities.
 
-1. Dispatches `chat/pendingMessageRemoved` with `kind: 'steering'`.
-2. Injects the message content into the model context (the injection mechanism is opaque to the protocol).
+Transport or SDK acceptance is not necessarily model consumption. A host MUST NOT report consumption solely because a different steering message arrived. Pending messages are retained while idle and may be consumed when a turn becomes active. If delivery fails terminally, the host SHOULD surface the failure and remove the affected entry rather than leave it pending indefinitely.
 
-Steering messages added while idle are silently stored and consumed when a turn becomes active.
+An accepted set action is not a promise that subsequently changing or removing the entry can retract provider input. Hosts MUST reject edits or client removals that they can no longer honor after handoff. Repeated identical upserts MUST NOT cause duplicate provider delivery.
+
+### Legacy Steering Compatibility
+
+Protocol 1.1.0 keeps `ChatState.steeringMessage` synchronized for 1.0.0 clients that use the singleton. Each steering set replaces this compatibility slot with the set entry while independently upserting the shared list. Older clients therefore retain their latest-message view; the list remains authoritative for clients that support multiple outstanding steering messages.
+
+There is no new capability, enqueue flag, separate steering list, or steering-specific action family. To append input, use a new ID with `chat/pendingMessageSet`; to edit or change the kind of an existing entry, reuse its ID. Hosts must update their pending-input handling, and clients must update their reducers, display grouping, cancellation kinds, and reorder requests. Native SDK consumers must also update affected model construction; in particular, Rust `PendingMessage` struct literals now include `kind: Option<PendingMessageKind>`.
+
+The deprecated singleton is cleared by a matching steering removal, matching `chat/turnStarted.queuedMessageId`, or a set that changes the same ID to queued input. Other removals and reordering leave it unchanged. Clearing the slot does not promote an older list entry into it. These compatibility mutations do not remove other shared-list entries.
+
+New clients MUST deduplicate the singleton against the shared list by ID, using the list entry and its kind when present. A singleton-only entry from an old snapshot remains steering input even if its `kind` is absent. Old queued snapshots continue to default missing kinds to `'queued'`. The singleton preserves the legacy latest-message view, not the full multi-message experience; clients must understand entry kinds before treating the mixed list as queued follow-ups.
 
 ## Actions
 
