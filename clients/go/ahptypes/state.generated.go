@@ -503,6 +503,22 @@ const (
 	SessionOriginKindAutomation SessionOriginKind = "automation"
 )
 
+// Where the runtime discovered an extension that declares a canvas type.
+type CanvasExtensionSource string
+
+const (
+	// Extension installed for the current user.
+	CanvasExtensionSourceUser CanvasExtensionSource = "user"
+	// Extension discovered in the current project.
+	CanvasExtensionSourceProject CanvasExtensionSource = "project"
+	// Extension installed only for the current session.
+	CanvasExtensionSourceSession CanvasExtensionSource = "session"
+	// Extension contributed by an installed plugin.
+	CanvasExtensionSourcePlugin CanvasExtensionSource = "plugin"
+	// Extension source is unavailable or not recognized by this protocol version.
+	CanvasExtensionSourceUnspecified CanvasExtensionSource = "unknown"
+)
+
 // Operations the host currently permits for an automation.
 //
 // The list on {@link AutomationEntry.operations} is authoritative and may
@@ -786,6 +802,18 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// Experimental Canvas API.
+	//
+	// The agent can materialize an exact chat's
+	// {@link ChatState.canvasRegistry | Canvas registry} through
+	// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+	// Live instances are published through the chat's canvas references and
+	// their `ahp-canvas:` state channels.
+	//
+	// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+	// registry metadata while the Canvas channel remains experimental. This
+	// capability does not gate server-published Canvas references.
+	Canvases map[string]json.RawMessage `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -1422,6 +1450,15 @@ type ChatState struct {
 	// absent from {@link ChatSummary}; clients obtain it by subscribing to the
 	// chat channel.
 	BackgroundWork *[]BackgroundWork `json:"backgroundWork,omitempty"`
+	// Canvas types currently registered for this exact chat.
+	//
+	// Absence means the registry has not been materialized or is not currently
+	// available. Clients that need it MAY dispatch
+	// `chat/canvasRegistryRequested`; the host publishes the authoritative
+	// registry through `chat/canvasRegistryChanged`. An empty
+	// {@link CanvasRegistry.extensions} array is a loaded registry with no
+	// available canvas types.
+	CanvasRegistry *CanvasRegistry `json:"canvasRegistry,omitempty"`
 	// Live canvases currently exposed by this chat.
 	//
 	// Entries intentionally contain only subscribable channel references.
@@ -1468,6 +1505,53 @@ type ChatState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// One extension/provider that declares canvas types for an exact chat.
+//
+// The extension metadata is normalized here instead of repeated on every
+// {@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT
+// infer its source or management behavior by parsing it.
+type CanvasExtensionDeclaration struct {
+	// Stable opaque identifier of the extension/provider.
+	ExtensionId string `json:"extensionId"`
+	// Where the runtime discovered the extension/provider.
+	ExtensionSource CanvasExtensionSource `json:"extensionSource"`
+	// Human-readable extension/provider name, when available.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Canvas types declared by this extension/provider. `canvasId` MUST be
+	// unique within this array.
+	Canvases []CanvasTypeDeclaration `json:"canvases"`
+}
+
+// One canvas type currently available to open.
+//
+// This is discovery metadata, not a live canvas instance. Live instances are
+// represented by {@link CanvasReference} entries on chat state and their
+// corresponding {@link CanvasState} channels.
+//
+// This experimental object may gain optional discovery metadata. Clients
+// SHOULD ignore fields they do not understand.
+type CanvasTypeDeclaration struct {
+	// Provider-local canvas type identifier.
+	CanvasId string `json:"canvasId"`
+	// Human-readable canvas type name.
+	DisplayName string `json:"displayName"`
+	// Description of what the canvas type does.
+	Description string `json:"description"`
+	// Whether opening this canvas requires an input flow.
+	RequiresInput bool `json:"requiresInput"`
+}
+
+// Canvas types currently registered for one exact chat.
+//
+// This is a compact presentation registry, not extension installation state
+// and not the list of live instances. The host replaces the complete registry
+// through `chat/canvasRegistryChanged` whenever provider registration changes.
+type CanvasRegistry struct {
+	// Declaring extensions/providers. `extensionId` MUST be unique within this
+	// array. An empty array is an authoritative loaded registry with no types.
+	Extensions []CanvasExtensionDeclaration `json:"extensions"`
+}
+
 // Stable reference to a subscribable canvas channel.
 //
 // Chat state intentionally carries only this reference so the experimental
@@ -1484,7 +1568,11 @@ type CanvasReference struct {
 // The client already knows the subscribed resource, so the state does not
 // redundantly carry its channel URI.
 type CanvasState struct {
-	// Stable caller-supplied instance identifier.
+	// Provider-facing instance identifier.
+	//
+	// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+	// URI. They MUST NOT treat this provider identifier as a second resource
+	// identity.
 	InstanceId string `json:"instanceId"`
 	// Owning extension/provider identifier.
 	ExtensionId string `json:"extensionId"`

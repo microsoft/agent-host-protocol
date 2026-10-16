@@ -50,6 +50,8 @@ const (
 	ActionTypeChatMovableChanged                  ActionType = "chat/movableChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
 	ActionTypeChatCanvasesChanged                 ActionType = "chat/canvasesChanged"
+	ActionTypeChatCanvasRegistryRequested         ActionType = "chat/canvasRegistryRequested"
+	ActionTypeChatCanvasRegistryChanged           ActionType = "chat/canvasRegistryChanged"
 	ActionTypeCanvasStateChanged                  ActionType = "canvas/stateChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
@@ -720,6 +722,33 @@ type ChatCanvasesChangedAction struct {
 	Type ActionType `json:"type"`
 	// New canvas channel references, or `undefined` to clear the collection.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
+}
+
+// Requests materialization of the exact chat's Canvas type registry.
+//
+// This operation is potentially effectful: for a persisted cold chat, the host
+// may resume its backing runtime, discover extensions, and execute extension
+// startup code. It MUST NOT create a backing for a brand-new chat, send a user
+// message, or invoke a model.
+//
+// The reducer is a no-op. The host remains authoritative and publishes the
+// complete result through
+// {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
+// Clients do not need to dispatch this action when
+// {@link ChatState.canvasRegistry} is already present because live provider
+// registration changes are published reactively.
+type ChatCanvasRegistryRequestedAction struct {
+	Type ActionType `json:"type"`
+}
+
+// The Canvas type registry for this exact chat changed.
+//
+// Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
+// Set to `undefined` when the registry is no longer materialized or available.
+type ChatCanvasRegistryChangedAction struct {
+	Type ActionType `json:"type"`
+	// Authoritative registry, or `undefined` to clear it.
+	CanvasRegistry *CanvasRegistry `json:"canvasRegistry,omitempty"`
 }
 
 // The presentation state for this canvas changed.
@@ -1860,6 +1889,8 @@ func (*ChatBackgroundWorkRemovedAction) isStateAction()           {}
 func (*ChatMovableChangedAction) isStateAction()                  {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
 func (*ChatCanvasesChangedAction) isStateAction()                 {}
+func (*ChatCanvasRegistryRequestedAction) isStateAction()         {}
+func (*ChatCanvasRegistryChangedAction) isStateAction()           {}
 func (*CanvasStateChangedAction) isStateAction()                  {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
@@ -2138,6 +2169,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/canvasesChanged":
 		var value ChatCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasRegistryRequested":
+		var value ChatCanvasRegistryRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasRegistryChanged":
+		var value ChatCanvasRegistryChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

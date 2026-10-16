@@ -107,6 +107,20 @@ export interface AgentInfo {
  */
 export interface AgentCapabilities {
   /**
+   * Experimental Canvas API.
+   *
+   * The agent can materialize an exact chat's
+   * {@link ChatState.canvasRegistry | Canvas registry} through
+   * `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+   * Live instances are published through the chat's canvas references and
+   * their `ahp-canvas:` state channels.
+   *
+   * Clients MUST treat absence as unsupported and SHOULD tolerate additive
+   * registry metadata while the Canvas channel remains experimental. This
+   * capability does not gate server-published Canvas references.
+   */
+  canvases?: Record<string, never>;
+  /**
    * The agent can host more than one concurrent chat per session. When absent,
    * clients MUST NOT call `createChat` to open chats beyond the default one the
    * session starts with. An empty object `{}` advertises multi-chat without

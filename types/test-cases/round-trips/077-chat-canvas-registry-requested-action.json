@@ -1,0 +1,14 @@
+{
+  "name": "chat-canvas-registry-requested-action",
+  "group": "A",
+  "description": "chat/canvasRegistryRequested explicitly requests potentially effectful cold-registry materialization.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/canvasRegistryRequested"
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/canvasRegistryRequested"
+    }
+  ]
+}
