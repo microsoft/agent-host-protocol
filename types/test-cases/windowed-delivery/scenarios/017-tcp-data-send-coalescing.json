@@ -1,0 +1,110 @@
+{
+  "description": "While the host window is full, queued tcp/data sends are merged by concatenating the decoded bytes, not the base64 text.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-tcp:/t1",
+      "window": {}
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-tcp:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 65536,
+            "maximumFrameBytes": 16384
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 16384
+          }
+        }
+      }
+    },
+    {
+      "op": "send",
+      "channel": "ahp-tcp:/t1",
+      "method": "tcp/data",
+      "params": {
+        "channel": "ahp-tcp:/t1",
+        "data": "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4"
+      }
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "tcp/data",
+        "params": {
+          "channel": "ahp-tcp:/t1",
+          "data": "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4"
+        }
+      }
+    },
+    {
+      "op": "send",
+      "channel": "ahp-tcp:/t1",
+      "method": "tcp/data",
+      "params": {
+        "channel": "ahp-tcp:/t1",
+        "data": "aGVs"
+      }
+    },
+    {
+      "op": "send",
+      "channel": "ahp-tcp:/t1",
+      "method": "tcp/data",
+      "params": {
+        "channel": "ahp-tcp:/t1",
+        "data": "bG8="
+      }
+    },
+    {
+      "op": "expectNotSent",
+      "match": {
+        "method": "tcp/data"
+      },
+      "withinMs": 150
+    },
+    {
+      "op": "hostCreditsAll",
+      "channel": "ahp-tcp:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "tcp/data",
+        "params": {
+          "channel": "ahp-tcp:/t1",
+          "data": "aGVsbG8="
+        }
+      }
+    },
+    {
+      "op": "expectNotSent",
+      "match": {
+        "method": "tcp/data"
+      },
+      "withinMs": 100
+    }
+  ]
+}

@@ -72,7 +72,29 @@ public actor AHPClient {
     /// Outbound channel carries raw JSON bytes. Going via JSONSerialization
     /// preserves the NSNumber Bool/Int distinction that AnyCodable would
     /// otherwise erase on Apple platforms.
-    private var outboundContinuation: AsyncStream<Data>.Continuation?
+    private struct OutboundWrite: Sendable {
+        let data: Data
+        let completion: UUID?
+        let beforeWrite: AHPBeforeWrite?
+        init(data: Data, completion: UUID?, beforeWrite: AHPBeforeWrite? = nil) {
+            self.data = data
+            self.completion = completion
+            self.beforeWrite = beforeWrite
+        }
+    }
+    private var outboundContinuation: AsyncStream<OutboundWrite>.Continuation?
+    private var windowingEngine: AHPWindowingEngine?
+    private var requestContexts: [Int: (String, Data)] = [:]
+    private var requestOptions: [Int: AHPSubscriptionOptions] = [:]
+    private var flowNegotiations: Set<Int> = []
+    private struct SubscriptionRequest {
+        let owner: AHPSubscription
+        let created: Bool
+    }
+    private var requestSubscriptions: [Int: SubscriptionRequest] = [:]
+    private var abandonedRequests: Set<Int> = []
+    private var windowWrites: [UUID: CheckedContinuation<Void, Error>] = [:]
+    private var callerWrites: Set<UUID> = []
     private var writerTask: Task<Void, Never>?
     private var keepAliveTask: Task<Void, Never>?
 
@@ -119,15 +141,25 @@ public actor AHPClient {
         // from inside the actor and the writer Task drains and serializes them
         // to `transport.send`. This avoids two `await transport.send` calls
         // racing under actor reentrancy.
-        var cont: AsyncStream<Data>.Continuation!
-        let outbound = AsyncStream<Data>(bufferingPolicy: .unbounded) { c in
+        var cont: AsyncStream<OutboundWrite>.Continuation!
+        let outbound = AsyncStream<OutboundWrite>(bufferingPolicy: .unbounded) { c in
             cont = c
         }
         self.outboundContinuation = cont
         let transport = self.transport
         self.writerTask = Task { [weak self] in
-            for await data in outbound {
-                guard let text = String(data: data, encoding: .utf8) else {
+            for await packet in outbound {
+                if let before = packet.beforeWrite {
+                    do { try await before() }
+                    catch {
+                        if let id = packet.completion { await self?.finishWindowWrite(id, error: error) }
+                        continue
+                    }
+                }
+                guard let text = String(data: packet.data, encoding: .utf8) else {
+                    if let id = packet.completion {
+                        await self?.finishWindowWrite(id, error: TransportError.protocol("invalid UTF-8"))
+                    }
                     await self?.handleTransportFailure(
                         TransportError.protocol("outbound bytes are not valid UTF-8")
                     )
@@ -135,7 +167,10 @@ public actor AHPClient {
                 }
                 do {
                     try await transport.send(.text(text))
+                    if let id = packet.completion { await self?.finishWindowWrite(id, error: nil) }
                 } catch {
+                    if let id = packet.completion { await self?.finishWindowWrite(id, error: error) }
+                    if case AHPWindowingError.backpressure = error { continue }
                     await self?.handleTransportFailure(error)
                     return
                 }
@@ -158,13 +193,9 @@ public actor AHPClient {
     public func shutdown() async {
         if didShutdown { return }
         didShutdown = true
-
-        // Stop the writer (no more sends). Order matters: finishing the
-        // outbound stream lets the writer loop exit naturally; cancelling the
-        // receive task aborts the inbound loop.
         outboundContinuation?.finish()
         outboundContinuation = nil
-        writerTask?.cancel()
+        let writer = writerTask
         writerTask = nil
         keepAliveTask?.cancel()
         keepAliveTask = nil
@@ -172,9 +203,19 @@ public actor AHPClient {
         receiveTask?.cancel()
         receiveTask = nil
 
+        await windowingEngine?.disconnect(AHPClientError.shutdown)
+        failAllPending(with: .shutdown)
+        // Preserve already-enqueued ordinary notifications on graceful close.
+        // Closing a stalled transport also bounds teardown of a pending write.
+        let transport = self.transport
+        let watchdog = Task {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { try? await transport.close() }
+        }
+        await writer?.value
+        watchdog.cancel()
         try? await transport.close()
 
-        failAllPending(with: .shutdown)
         finishAllSubscriptions()
         finishAllEventListeners()
         // Final state transition (also fans out).
@@ -260,6 +301,9 @@ public actor AHPClient {
         protocolVersions: [String],
         initialSubscriptions: [String] = []
     ) async throws -> InitializeResult {
+        guard !initialSubscriptions.contains(where: { $0.hasPrefix("ahp-tcp:") }) else {
+            throw TransportError.protocol("TCP cannot use initialSubscriptions")
+        }
         let params = InitializeParams(
             channel: RootResourceURI,
             protocolVersions: protocolVersions,
@@ -303,6 +347,197 @@ public actor AHPClient {
             }
         }
         return result
+    }
+
+    @discardableResult
+    public func reconnect(clientId: String, lastSeenServerSeq: Int, subscriptions: [String],
+                          windows: ChannelDeliveryResumeOptions) async throws -> ReconnectResult {
+        let result: ReconnectResult = try await request(method: "reconnect", params: ReconnectParams(
+            channel: RootResourceURI, clientId: clientId, lastSeenServerSeq: lastSeenServerSeq,
+            subscriptions: subscriptions, windows: windows))
+        switch result {
+        case .replay(let value): self.lastSeenServerSeq = max(self.lastSeenServerSeq, value.actions.map(\.serverSeq).max() ?? 0)
+        case .snapshot(let value): self.lastSeenServerSeq = max(self.lastSeenServerSeq, value.snapshots.map(\.fromSeq).max() ?? 0)
+        }
+        return result
+    }
+
+    /// Observe flow control without owning or releasing any data.
+    public var flowControlEvents: AsyncStream<AHPFlowControlEvent> {
+        get async { await flowEngine().events }
+    }
+
+    /// Obtain the owner installed by a typed or raw flow-control handshake.
+    public func subscription(for channel: String) async -> AHPSubscription? {
+        await windowingEngine?.subscription(channel)
+    }
+
+    internal func dropManagedSubscription(_ channel: String, error: Error) async {
+        await windowingEngine?.drop(channel, error: error)
+    }
+
+    private func flowEngine() -> AHPWindowingEngine {
+        if let windowingEngine { return windowingEngine }
+        let engine = AHPWindowingEngine(config: config.windowing, write: { [weak self] data, before, limited in
+            guard let self else { throw AHPClientError.shutdown }
+            try await self.writeWindowData(data, beforeWrite: before, callerInitiated: limited)
+        }, fail: { [weak self] error in
+            await self?.handleTransportFailure(error)
+        }, dispatch: { [weak self] action, channel, seq in
+            guard let self else { throw AHPClientError.shutdown }
+            return try await self.dispatchAndWait(action, channel: channel, clientSeq: seq)
+        }, update: { [weak self] channel, options in
+            guard let self else { throw AHPClientError.shutdown }
+            return try await self.subscribe(channel, options: options)
+        })
+        windowingEngine = engine
+        return engine
+    }
+
+    private func writeWindowData(_ data: Data, beforeWrite: AHPBeforeWrite? = nil,
+                                 callerInitiated: Bool = false) async throws {
+        guard !didShutdown, let continuation = outboundContinuation else { throw AHPClientError.shutdown }
+        guard !callerInitiated || callerWrites.count < 256 else { throw AHPWindowingError.backpressure }
+        try await withCheckedThrowingContinuation { completion in
+            let id = UUID()
+            windowWrites[id] = completion
+            if callerInitiated { callerWrites.insert(id) }
+            continuation.yield(.init(data: data, completion: id, beforeWrite: beforeWrite))
+        }
+    }
+
+    private func finishWindowWrite(_ id: UUID, error: Error?) {
+        callerWrites.remove(id)
+        guard let reply = windowWrites.removeValue(forKey: id) else { return }
+        if let error { reply.resume(throwing: error) } else { reply.resume() }
+    }
+
+    private func dispatchAndWait(_ action: StateAction, channel: String, clientSeq: Int?)
+        async throws -> DispatchHandle {
+        let seq = clientSeq ?? nextClientSeq
+        if seq >= nextClientSeq { nextClientSeq = seq + 1 }
+        try await send(method: "dispatchAction",
+                       params: DispatchActionParams(channel: channel, clientSeq: seq, action: action))
+        return DispatchHandle(clientSeq: seq)
+    }
+
+    /// Send a notification and await its actual transport write, including ordinary fallback.
+    public func send<P: Encodable & Sendable>(method: String, params: P) async throws {
+        try await flowEngine().send(AHPNotificationMessage(method: method, params: params))
+    }
+
+    private func transportWindowCapabilities() async -> AHPTransportCapabilities {
+        guard let transport = transport as? AHPWindowingTransport else { return .init() }
+        return await transport.windowingCapabilities
+    }
+
+    private func prepareRequestContext(method: String, params: Data)
+        async throws -> (Data, AHPSubscriptionOptions?) {
+        if method == "subscribe", let request = try? decoder.decode(SubscribeParams.self, from: params),
+           request.channel.hasPrefix("ahp-tcp:"), request.flowControl == nil {
+            throw TransportError.protocol("TCP requires windowed subscription options")
+        }
+        if method == "reconnect", let request = try? decoder.decode(ReconnectParams.self, from: params),
+           request.subscriptions.contains(where: { $0.hasPrefix("ahp-tcp:") }) {
+            throw TransportError.protocol("TCP cannot reconnect")
+        }
+        if method == "subscribe", let request = try? decoder.decode(SubscribeParams.self, from: params),
+           windowingEngine != nil || request.flowControl != nil {
+            let engine = flowEngine()
+            let capabilities = await transportWindowCapabilities()
+            if let offer = request.flowControl?.receive, !capabilities.preservesOriginalJSONText {
+                let options = AHPSubscriptionOptions.windowed(
+                    windowBytes: offer.windowBytes, maximumFrameBytes: offer.maximumFrameBytes,
+                    delivery: request.delivery, view: request.view)
+                _ = try await engine.prepare(channel: request.channel, options: options, capabilities: capabilities)
+                var object = try JSONSerialization.jsonObject(with: params) as! [String: Any]
+                object.removeValue(forKey: "flowControl")
+                let adjusted = try JSONSerialization.data(withJSONObject: object)
+                try await engine.prepareGeneric(adjusted, capabilities: capabilities)
+                return (adjusted, options)
+            }
+            do {
+                try await engine.prepareGeneric(params, capabilities: capabilities)
+                if request.flowControl == nil { try await engine.pauseForOrdinarySubscribe(request.channel) }
+            } catch {
+                await engine.abortSubscribe(request.channel, error: error)
+                throw error
+            }
+        } else if method == "reconnect",
+                  windowingEngine != nil || (try? decoder.decode(ReconnectParams.self, from: params).windows) != nil {
+            try await flowEngine().prepareReconnect(params, capabilities: transportWindowCapabilities())
+        }
+        return (params, nil)
+    }
+
+    private func flowNegotiation(method: String, params: Data) async -> Bool {
+        if method == "subscribe", let request = try? decoder.decode(SubscribeParams.self, from: params) {
+            if request.flowControl != nil { return true }
+            return await windowingEngine?.isWindowed(request.channel) ?? false
+        }
+        if method == "reconnect" {
+            return (try? decoder.decode(ReconnectParams.self, from: params).windows) != nil
+        }
+        return false
+    }
+
+    private func checkRequestAdmission(method: String, params: Data) async throws {
+        do {
+            try Task.checkCancellation()
+            guard !didShutdown, outboundContinuation != nil else { throw AHPClientError.shutdown }
+        } catch {
+            if method == "subscribe", let request = try? decoder.decode(SubscribeParams.self, from: params) {
+                await windowingEngine?.abortSubscribe(request.channel)
+            }
+            throw error
+        }
+    }
+
+    public func subscribe(_ uri: String, options: AHPSubscriptionOptions) async throws -> AHPSubscription {
+        try await subscribeManaged(uri, options: options, observer: nil, onPrepared: nil)
+    }
+
+    internal func subscribeManaged(_ uri: String, options: AHPSubscriptionOptions,
+                                   observer: (@Sendable (AHPDeliveryPayload) async -> Void)?,
+                                   onPrepared: (@Sendable (AHPSubscription) async throws -> Void)?)
+        async throws -> AHPSubscription {
+        guard !didShutdown, outboundContinuation != nil else { throw AHPClientError.shutdown }
+        let (subscription, offer, created) = try await flowEngine().prepare(
+            channel: uri, options: options, capabilities: transportWindowCapabilities())
+        do {
+            if let observer {
+                await subscription.markManaged()
+                await subscription.setObserver(observer)
+            }
+            try await onPrepared?(subscription)
+            let _: SubscribeResult = try await requestWithOptions(method: "subscribe", params: SubscribeParams(
+                channel: uri, delivery: options.delivery, view: options.view,
+                flowControl: offer.map { SubscriptionFlowControlOptions(receive: $0) }),
+                subscriptionOptions: options, owner: subscription, created: created)
+            return subscription
+        } catch {
+            await windowingEngine?.abortPrepared(subscription, error: error)
+            throw error
+        }
+    }
+
+    internal func restoreManagedSubscriptions(_ subscriptions: [AHPSubscription])
+        async throws -> ChannelDeliveryResumeOptions {
+        var items: [ChannelDeliveryResumeParams] = []
+        for subscription in subscriptions {
+            let pendingOffer = await subscription.pendingWindowOffer
+            let wasWindowed = await subscription.status().mode == "windowed" || pendingOffer
+            let options = await subscription.options
+            let (_, offer, _) = try await flowEngine().prepare(
+                channel: subscription.channel, options: options,
+                capabilities: transportWindowCapabilities(), retained: subscription)
+            if let offer, wasWindowed {
+                items.append(.init(channel: subscription.channel,
+                                   flowControl: .init(receive: offer),
+                                   lastAppliedServerSeq: await subscription.lastAppliedServerSeq))
+            }
+        }
+        return .init(items: items)
     }
 
     /// Protocol-level liveness `ping`.
@@ -397,11 +632,17 @@ public actor AHPClient {
     public func unsubscribe(_ uri: String) async throws {
         let listeners = perUriListeners.removeValue(forKey: uri) ?? []
         for l in listeners { l.continuation.finish() }
-        try await notify(method: "unsubscribe", params: UnsubscribeParams(channel: uri))
+        if let engine = windowingEngine, await engine.subscription(uri) != nil {
+            try await engine.unsubscribe(uri)
+        } else {
+            try await notify(method: "unsubscribe", params: UnsubscribeParams(channel: uri))
+        }
     }
 
     /// Fire a write-ahead `dispatchAction` notification on `channel`. Returns
-    /// a handle carrying the assigned `clientSeq`.
+    /// a handle carrying the assigned `clientSeq`. On an accepted windowed
+    /// channel this waits for transport completion; ordinary delivery retains
+    /// its fire-and-forget behavior.
     @discardableResult
     public func dispatch(_ action: StateAction, channel: String) async throws -> DispatchHandle {
         let seq = nextClientSeq
@@ -580,6 +821,13 @@ public actor AHPClient {
         method: String,
         params: P
     ) async throws -> R {
+        try await requestWithOptions(method: method, params: params, subscriptionOptions: nil)
+    }
+
+    private func requestWithOptions<P: Encodable & Sendable, R: Decodable & Sendable>(
+        method: String, params: P, subscriptionOptions: AHPSubscriptionOptions?,
+        owner: AHPSubscription? = nil, created: Bool? = nil
+    ) async throws -> R {
         if didShutdown { throw AHPClientError.shutdown }
         guard let cont = outboundContinuation else {
             throw AHPClientError.shutdown
@@ -588,6 +836,15 @@ public actor AHPClient {
         // Avoids minting a request id and pushing wire bytes for a
         // request whose result will be thrown away immediately.
         try Task.checkCancellation()
+        let encodedParams = try encoder.encode(params)
+        let channel = method == "subscribe" ? (try? decoder.decode(SubscribeParams.self, from: encodedParams).channel) : nil
+        var binding = owner
+        if binding == nil, let channel { binding = await windowingEngine?.subscription(channel) }
+        let createdHere = created ?? (binding == nil)
+        let (contextParams, fallbackOptions) = try await prepareRequestContext(method: method, params: encodedParams)
+        if binding == nil, let channel { binding = await windowingEngine?.subscription(channel) }
+        let isFlowNegotiation = await flowNegotiation(method: method, params: contextParams)
+        try await checkRequestAdmission(method: method, params: contextParams)
 
         // Order matters: register the pending entry BEFORE pushing the
         // outbound message, so an immediate response (which a fast in-memory
@@ -600,10 +857,14 @@ public actor AHPClient {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 let entry = PendingEntry(continuation: continuation)
                 pending[id] = entry
+                requestContexts[id] = (method, contextParams)
+                requestOptions[id] = subscriptionOptions ?? fallbackOptions
+                if let binding { requestSubscriptions[id] = .init(owner: binding, created: createdHere) }
+                if isFlowNegotiation { flowNegotiations.insert(id) }
 
                 let wireData: Data
                 do {
-                    wireData = try buildRequestWire(id: id, method: method, params: params)
+                    wireData = try buildRawRequestWire(id: id, method: method, paramsData: contextParams)
                 } catch {
                     pending.removeValue(forKey: id)
                     continuation.resume(throwing: AHPClientError.decoding(
@@ -611,7 +872,7 @@ public actor AHPClient {
                     ))
                     return
                 }
-                cont.yield(wireData)
+                cont.yield(.init(data: wireData, completion: nil))
 
                 // Schedule a timeout. The timeout task races against the response;
                 // whichever resolves first wins. The task is tracked on the entry
@@ -665,6 +926,14 @@ public actor AHPClient {
             throw AHPClientError.shutdown
         }
         try Task.checkCancellation()
+        let channel = method == "subscribe" ? (try? decoder.decode(SubscribeParams.self, from: paramsData).channel) : nil
+        var binding: AHPSubscription?
+        if let channel { binding = await windowingEngine?.subscription(channel) }
+        let createdHere = binding == nil
+        let (paramsData, fallbackOptions) = try await prepareRequestContext(method: method, params: paramsData)
+        if binding == nil, let channel { binding = await windowingEngine?.subscription(channel) }
+        let isFlowNegotiation = await flowNegotiation(method: method, params: paramsData)
+        try await checkRequestAdmission(method: method, params: paramsData)
 
         let id = nextRequestId
         nextRequestId += 1
@@ -673,6 +942,10 @@ public actor AHPClient {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
                 let entry = PendingEntry(continuation: continuation)
                 pending[id] = entry
+                requestContexts[id] = (method, paramsData)
+                requestOptions[id] = fallbackOptions
+                if let binding { requestSubscriptions[id] = .init(owner: binding, created: createdHere) }
+                if isFlowNegotiation { flowNegotiations.insert(id) }
 
                 let wireData: Data
                 do {
@@ -684,7 +957,7 @@ public actor AHPClient {
                     ))
                     return
                 }
-                cont.yield(wireData)
+                cont.yield(.init(data: wireData, completion: nil))
 
                 let timeoutDuration = config.requestTimeout
                 entry.timeoutTask = Task { [weak self] in
@@ -706,26 +979,49 @@ public actor AHPClient {
     /// no-op when the entry has already been removed by the response or
     /// timeout path — only the first of those three to find the entry
     /// wins, so the continuation is never double-resumed.
-    private func cancelPending(id: Int) {
-        if let entry = pending.removeValue(forKey: id) {
-            entry.timeoutTask?.cancel()
-            entry.continuation.resume(throwing: CancellationError())
-        }
+    private func cancelPending(id: Int) async {
+        await abandonPending(id: id, error: CancellationError())
     }
 
-    /// Send a JSON-RPC notification (fire-and-forget).
+    private func abandonPending(id: Int, error: Error) async {
+        guard let entry = pending.removeValue(forKey: id) else { return }
+        entry.timeoutTask?.cancel()
+        if let context = requestContexts[id], ["subscribe", "reconnect"].contains(context.0) {
+            abandonedRequests.insert(id)
+            if let subscription = requestSubscriptions[id] {
+                await windowingEngine?.abandonSubscribe(subscription.owner, created: subscription.created, error: error)
+            }
+        } else {
+            requestContexts.removeValue(forKey: id)
+            requestOptions.removeValue(forKey: id)
+            requestSubscriptions.removeValue(forKey: id)
+            flowNegotiations.remove(id)
+        }
+        entry.continuation.resume(throwing: error)
+    }
+
+    /// Send a JSON-RPC notification. Ordinary delivery is fire-and-forget;
+    /// accepted windowed data waits for credit and transport completion.
     public func notify<P: Encodable & Sendable>(method: String, params: P) async throws {
         if didShutdown { throw AHPClientError.shutdown }
         guard let cont = outboundContinuation else {
             throw AHPClientError.shutdown
         }
-        let wireData: Data
+        let paramsData: Data
         do {
-            wireData = try buildNotificationWire(method: method, params: params)
+            paramsData = try encoder.encode(params)
         } catch {
             throw AHPClientError.decoding("failed to encode params for \(method): \(error)")
         }
-        cont.yield(wireData)
+        if let engine = windowingEngine {
+            if let message = try? AHPNotificationMessage(method: method, paramsJSON: paramsData),
+               await engine.isWindowed(message.channel) {
+                try await engine.send(message)
+                return
+            }
+        }
+        let wireData = try buildRawNotificationWire(method: method, paramsData: paramsData)
+        cont.yield(.init(data: wireData, completion: nil))
     }
 
     // MARK: - Private: wire-building
@@ -770,7 +1066,10 @@ public actor AHPClient {
     private func buildNotificationWire<P: Encodable>(
         method: String, params: P
     ) throws -> Data {
-        let paramsData = try encoder.encode(params)
+        try buildRawNotificationWire(method: method, paramsData: encoder.encode(params))
+    }
+
+    private func buildRawNotificationWire(method: String, paramsData: Data) throws -> Data {
         let paramsAny = try JSONSerialization.jsonObject(
             with: paramsData, options: [.fragmentsAllowed]
         )
@@ -787,8 +1086,20 @@ public actor AHPClient {
     private func runReceiveLoop() async {
         while !Task.isCancelled {
             let msg: TransportMessage?
+            let rawText: String?
             do {
-                msg = try await transport.recv()
+                if let measured = transport as? AHPWindowingTransport {
+                    let wire = try await measured.recvWireMessage()
+                    msg = wire?.message
+                    rawText = wire?.originalJSONText
+                } else {
+                    msg = try await transport.recv()
+                    switch msg {
+                    case .text(let text): rawText = text
+                    case .binary(let data): rawText = String(data: data, encoding: .utf8)
+                    default: rawText = nil
+                    }
+                }
             } catch {
                 await handleTransportFailure(error)
                 return
@@ -804,7 +1115,7 @@ public actor AHPClient {
             let data: Data
             switch msg {
             case .text(let s):
-                guard let d = s.data(using: .utf8) else {
+                guard let d = (rawText ?? s).data(using: .utf8) else {
                     #if DEBUG
                     print("[AHPClient] dropped malformed text frame")
                     #endif
@@ -812,7 +1123,7 @@ public actor AHPClient {
                 }
                 data = d
             case .binary(let d):
-                data = d
+                data = rawText.map { Data($0.utf8) } ?? d
             case .parsed(let parsed):
                 // Slow path: re-serialize via Codable so the rest of the
                 // pipeline only deals with raw bytes. Note that any
@@ -820,6 +1131,10 @@ public actor AHPClient {
                 // have been corrupted by an earlier `JSONDecoder` pass —
                 // see `TransportMessage` docs and microsoft/agent-host-protocol#123.
                 // Transports SHOULD prefer `.text`/`.binary` for inbound frames.
+                if let rawText {
+                    data = Data(rawText.utf8)
+                    break
+                }
                 guard let d = try? encoder.encode(parsed) else {
                     #if DEBUG
                     print("[AHPClient] dropped unencodable parsed frame")
@@ -829,12 +1144,16 @@ public actor AHPClient {
                 data = d
             }
             guard let frame = parseRawFrame(from: data) else {
+                if await windowingEngine?.hasWindows == true {
+                    await handleTransportFailure(TransportError.protocol("malformed JSON-RPC on windowed connection"))
+                    return
+                }
                 #if DEBUG
                 print("[AHPClient] dropped malformed frame")
                 #endif
                 continue
             }
-            await dispatchInbound(frame)
+            await dispatchInbound(frame, rawText: rawText)
         }
     }
 
@@ -900,14 +1219,47 @@ public actor AHPClient {
         return nil
     }
 
-    private func dispatchInbound(_ frame: RawFrame) async {
+    private func dispatchInbound(_ frame: RawFrame, rawText: String? = nil) async {
         switch frame {
         case .successResponse(let id, let resultData):
+            flowNegotiations.remove(id)
+            let abandoned = abandonedRequests.remove(id) != nil
+            let subscription = requestSubscriptions.removeValue(forKey: id)
+            if let (method, params) = requestContexts.removeValue(forKey: id), let engine = windowingEngine {
+                do {
+                    if method == "subscribe" {
+                        let p = try decoder.decode(SubscribeParams.self, from: params)
+                        try await engine.installSubscribe(request: p, options: requestOptions.removeValue(forKey: id),
+                                                          resultData: resultData, expected: subscription?.owner,
+                                                          retain: !abandoned)
+                        if abandoned, let subscription {
+                            await engine.cleanAbandoned(subscription.owner, created: subscription.created)
+                        } else if let subscription, await engine.subscription(p.channel) !== subscription.owner {
+                            await engine.cleanAbandoned(subscription.owner, created: true)
+                        }
+                    } else if method == "reconnect" {
+                        try await engine.installReconnect(request: params, resultData: resultData)
+                    }
+                } catch {
+                    await handleTransportFailure(TransportError.protocol("\(error)"))
+                    return
+                }
+            }
             if let entry = pending.removeValue(forKey: id) {
                 entry.timeoutTask?.cancel()
                 entry.continuation.resume(returning: resultData)
             }
         case .errorResponse(let id, let error):
+            flowNegotiations.remove(id)
+            abandonedRequests.remove(id)
+            let subscription = requestSubscriptions.removeValue(forKey: id)
+            if let context = requestContexts.removeValue(forKey: id), context.0 == "subscribe",
+               let request = try? decoder.decode(SubscribeParams.self, from: context.1) {
+                await windowingEngine?.abortSubscribe(request.channel,
+                    error: AHPClientError.rpc(code: error.code, message: error.message, data: error.data),
+                    expected: subscription?.owner)
+            }
+            requestOptions.removeValue(forKey: id)
             if let entry = pending.removeValue(forKey: id) {
                 entry.timeoutTask?.cancel()
                 entry.continuation.resume(throwing: AHPClientError.rpc(
@@ -915,6 +1267,26 @@ public actor AHPClient {
                 ))
             }
         case .notification(let method, let params):
+            if let engine = windowingEngine, let params {
+                do {
+                    if let message = try? AHPNotificationMessage(method: method, paramsJSON: params),
+                       let subscription = await engine.subscription(message.channel) {
+                        if let delivered = try await engine.receive(message, rawText: rawText) {
+                            let body = try JSONSerialization.jsonObject(with: delivered.paramsJSON) as? [String: Any]
+                            let seq = body?["serverSeq"] as? Int ??
+                                ((body?["snapshot"] as? [String: Any])?["fromSeq"] as? Int) ?? 0
+                            lastSeenServerSeq = max(lastSeenServerSeq, seq)
+                            if await !subscription.managed {
+                                await handleNotification(method: delivered.method, paramsData: delivered.paramsJSON)
+                            }
+                        }
+                        return
+                    }
+                } catch {
+                    await handleTransportFailure(TransportError.protocol("\(error)"))
+                    return
+                }
+            }
             await handleNotification(method: method, paramsData: params)
         case .request(let id, let method, let params):
             // Server-initiated requests (the symmetrical `resource*` family)
@@ -1028,6 +1400,7 @@ public actor AHPClient {
         } else {
             clientError = .shutdown
         }
+        await windowingEngine?.disconnect(clientError)
 
         outboundContinuation?.finish()
         outboundContinuation = nil
@@ -1048,6 +1421,15 @@ public actor AHPClient {
     }
 
     private func failAllPending(with error: AHPClientError) {
+        requestContexts.removeAll()
+        requestOptions.removeAll()
+        requestSubscriptions.removeAll()
+        abandonedRequests.removeAll()
+        flowNegotiations.removeAll()
+        let writes = windowWrites.values
+        windowWrites.removeAll()
+        callerWrites.removeAll()
+        for reply in writes { reply.resume(throwing: error) }
         let entries = pending
         pending.removeAll()
         for (_, entry) in entries {
@@ -1056,11 +1438,8 @@ public actor AHPClient {
         }
     }
 
-    private func timeoutPending(id: Int) {
-        if let entry = pending.removeValue(forKey: id) {
-            entry.timeoutTask = nil
-            entry.continuation.resume(throwing: AHPClientError.requestTimeout)
-        }
+    private func timeoutPending(id: Int) async {
+        await abandonPending(id: id, error: AHPClientError.requestTimeout)
     }
 
     /// Answer an inbound server-initiated request via the installed
@@ -1093,7 +1472,7 @@ public actor AHPClient {
             "result": resultAny,
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
-        cont.yield(data)
+        cont.yield(.init(data: data, completion: nil))
     }
 
     /// Yield a JSON-RPC error response with the given code/message/data.
@@ -1114,7 +1493,7 @@ public actor AHPClient {
             "error": errorObject,
         ]
         guard let wire = try? JSONSerialization.data(withJSONObject: dict) else { return }
-        cont.yield(wire)
+        cont.yield(.init(data: wire, completion: nil))
     }
 
     /// Adapt a typed `ResourceRequestHandlers` into a generic
@@ -1189,7 +1568,7 @@ public actor AHPClient {
             ] as [String: Any],
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
-        cont.yield(data)
+        cont.yield(.init(data: data, completion: nil))
     }
 
     private func finishAllSubscriptions() {
@@ -1261,6 +1640,11 @@ public actor AHPClient {
     internal func _pendingCount() -> Int {
         return pending.count
     }
+
+    internal func _windowWriteCount() -> Int { windowWrites.count }
+    internal func _callerWriteCount() -> Int { callerWrites.count }
+    internal func _windowOrderCount() async -> Int { await windowingEngine?.bookkeepingCount() ?? 0 }
+    internal func _requestContextCount() -> Int { requestContexts.count }
 }
 
 // MARK: - Server-initiated request handling

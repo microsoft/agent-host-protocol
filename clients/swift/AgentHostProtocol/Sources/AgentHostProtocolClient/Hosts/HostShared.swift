@@ -31,6 +31,9 @@ internal struct HostInternal {
     /// The currently-installed `AHPClient`, when connected. `nil` between
     /// connections.
     var currentClient: AHPClient?
+    var connectingClient: AHPClient? = nil
+    var shuttingDown = false
+    var managedSubscriptions: [String: AHPSubscription] = [:]
 
     func snapshot() -> HostHandle {
         let summaries = sessionSummaries.values

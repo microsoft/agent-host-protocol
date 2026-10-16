@@ -130,6 +130,7 @@ public actor NWConnectionWebSocketTransport: AHPTransport, AHPKeepAliveTransport
         do {
             try await connectIfNeeded()
             while true {
+                let bufferedBytes = readBuffer.count
                 switch try await nextMessageFromBuffer() {
                 case .message(let message):
                     switch message {
@@ -140,6 +141,9 @@ public actor NWConnectionWebSocketTransport: AHPTransport, AHPKeepAliveTransport
                     try await closeAfterPeerClose()
                     return nil
                 case .none:
+                    // Continuations and controls can share a socket read with
+                    // the next frame. Drain them before waiting for more bytes.
+                    if readBuffer.count < bufferedBytes { continue }
                     let chunk = try await receiveRaw()
                     if chunk.isEmpty {
                         markClosed()

@@ -31,6 +31,49 @@ type TransportMessage struct {
 	parsed *ahptypes.JsonRpcMessage
 	text   string
 	binary []byte
+	raw    *string
+}
+
+// TransportCapabilities describes optional support for exact JSON text
+// accounting. MaximumFrameBytes is measured in AHP UTF-16 bytes, not UTF-8.
+type TransportCapabilities struct {
+	SupportsWindowedDelivery bool
+	MaximumFrameBytes        int64
+}
+
+// TransportCapabilitiesProvider is optional; Transport itself is unchanged.
+// Providers must retain received text and send text messages without rewriting.
+type TransportCapabilitiesProvider interface {
+	TransportCapabilities() TransportCapabilities
+}
+
+// MaximumFrameBytesForReadLimit converts a UTF-8 message limit to a safe AHP
+// UTF-16 limit. Unknown or unlimited limits use 1 MiB.
+func MaximumFrameBytesForReadLimit(limit int64) int64 {
+	if limit <= 0 {
+		return 1 << 20
+	}
+	return 2 * (limit / 3)
+}
+
+// NewParsedMessageWithRawText preserves the original text alongside its parse.
+func NewParsedMessageWithRawText(m ahptypes.JsonRpcMessage, raw string) TransportMessage {
+	return TransportMessage{kind: transportFrameParsed, parsed: &m, raw: &raw}
+}
+
+// RawJSONText returns the original received JSON, never a reserialization.
+func (m TransportMessage) RawJSONText() (string, bool) {
+	switch m.kind {
+	case transportFrameText:
+		return m.text, true
+	case transportFrameBinary:
+		return string(m.binary), true
+	case transportFrameParsed:
+		if m.raw != nil {
+			return *m.raw, true
+		}
+	}
+	return "", false
 }
 
 // NewParsedMessage wraps an already-decoded JSON-RPC message.
@@ -173,4 +216,12 @@ func (b *BoxedTransport) Recv(ctx context.Context) (TransportMessage, error) {
 // Close forwards to the underlying transport.
 func (b *BoxedTransport) Close(ctx context.Context) error {
 	return b.inner.Close(ctx)
+}
+
+// TransportCapabilities preserves the optional capabilities of the inner transport.
+func (b *BoxedTransport) TransportCapabilities() TransportCapabilities {
+	if p, ok := b.inner.(TransportCapabilitiesProvider); ok {
+		return p.TransportCapabilities()
+	}
+	return TransportCapabilities{}
 }

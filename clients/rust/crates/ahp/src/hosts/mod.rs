@@ -102,6 +102,7 @@ pub use factory::HostTransportFactory;
 pub use multi::MultiHostClient;
 pub use policy::{Backoff, ReconnectPolicy};
 pub use types::{
-    HostClientHandle, HostConfig, HostError, HostEvent, HostEventStream, HostHandle, HostId,
-    HostState, HostSubscriptionEvent, HostSubscriptionStream, HostedAgent, HostedSessionSummary,
+    HostClientHandle, HostConfig, HostError, HostEvent, HostEventStream, HostFlowControlEvent,
+    HostHandle, HostId, HostState, HostSubscriptionEvent, HostSubscriptionStream, HostedAgent,
+    HostedSessionSummary,
 };

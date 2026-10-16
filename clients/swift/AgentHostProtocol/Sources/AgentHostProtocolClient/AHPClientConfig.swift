@@ -42,6 +42,18 @@ public struct AHPClientConfig: Sendable {
 
     /// Optional transport liveness policy. Defaults to `.disabled`.
     public var keepAlive: AHPKeepAlivePolicy
+    public var windowing: AHPWindowingConfig = .init()
+
+    public init(
+        windowing: AHPWindowingConfig,
+        requestTimeout: Duration = .seconds(30),
+        subscriptionBufferSize: Int = 256,
+        keepAlive: AHPKeepAlivePolicy = .disabled
+    ) {
+        self.init(requestTimeout: requestTimeout, subscriptionBufferSize: subscriptionBufferSize,
+                  keepAlive: keepAlive)
+        self.windowing = windowing
+    }
 
     public init(
         requestTimeout: Duration = .seconds(30),

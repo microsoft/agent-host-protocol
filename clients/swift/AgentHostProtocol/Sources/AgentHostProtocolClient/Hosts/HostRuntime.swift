@@ -28,6 +28,7 @@ internal final class HostRuntime: Sendable {
     private let fanOut: @Sendable (HostSubscriptionEvent) async -> Void
     /// Sink for connection-level events. Awaited for the same reason.
     private let hostEventSink: @Sendable (HostEvent) async -> Void
+    private let flowEventSink: @Sendable (AHPHostedFlowControlEvent) async -> Void
 
     private let cmdContinuation: AsyncStream<HostCommand>.Continuation
     private let cmdStream: AsyncStream<HostCommand>
@@ -44,11 +45,13 @@ internal final class HostRuntime: Sendable {
         config: HostConfig,
         clientIdStore: ClientIdStore,
         fanOut: @escaping @Sendable (HostSubscriptionEvent) async -> Void,
-        hostEventSink: @escaping @Sendable (HostEvent) async -> Void
+        hostEventSink: @escaping @Sendable (HostEvent) async -> Void,
+        flowEventSink: @escaping @Sendable (AHPHostedFlowControlEvent) async -> Void = { _ in }
     ) async {
         self.config = config
         self.fanOut = fanOut
         self.hostEventSink = hostEventSink
+        self.flowEventSink = flowEventSink
 
         let resolved: String
         if let explicit = config.clientId {
@@ -133,6 +136,33 @@ internal final class HostRuntime: Sendable {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SubscribeResult, Error>) in
             cmdContinuation.yield(.subscribe(uri: uri, reply: continuation))
         }
+
+    }
+
+    func subscribe(_ uri: String, options: AHPSubscriptionOptions) async throws -> AHPSubscription {
+        guard let client = await shared.currentClient() else { throw HostError.hostShutDown(config.id) }
+        let subscription = try await client.subscribeManaged(uri, options: options, observer: { [weak self] payload in
+                await self?.handleManagedPayload(payload)
+            }, onPrepared: { [shared, config] subscription in
+                await subscription.setCloseObserver { [shared, weak subscription] in
+                    guard let subscription else { return }
+                    await shared.update { state in
+                        guard state.managedSubscriptions[uri] === subscription else { return }
+                        state.managedSubscriptions.removeValue(forKey: uri)
+                        state.subscriptions.removeAll { $0 == uri }
+                    }
+                }
+                var current = false
+                await shared.update { state in
+                    current = state.currentClient === client && !state.shuttingDown
+                    if current {
+                        state.managedSubscriptions[uri] = subscription
+                        if !state.subscriptions.contains(uri) { state.subscriptions.append(uri) }
+                    }
+                }
+                guard current else { throw HostError.hostShutDown(config.id) }
+            })
+        return subscription
     }
 
     /// Unsubscribe from `uri`. Stops replay of `uri` across reconnects. Safe
@@ -165,9 +195,17 @@ internal final class HostRuntime: Sendable {
     /// Tear down the supervisor: cancel any in-flight connect/sleep, close
     /// the current `AHPClient` if any, and finish the supervisor task.
     func shutdown() async {
+        await shared.update { $0.shuttingDown = true }
         cmdContinuation.yield(.shutdown)
         cmdContinuation.finish()
+        supervisorTask?.cancel()
+        let state = await shared.internalState
+        await state.currentClient?.shutdown()
+        if state.connectingClient !== state.currentClient { await state.connectingClient?.shutdown() }
         await supervisorTask?.value
+        let subscriptions = await shared.internalState.managedSubscriptions
+        for subscription in subscriptions.values { await subscription.finish(AHPClientError.shutdown) }
+        await shared.update { $0.managedSubscriptions.removeAll() }
     }
 
     // MARK: - Supervisor loop
@@ -277,7 +315,12 @@ internal final class HostRuntime: Sendable {
     /// the next attempt while the previous client's tasks remain alive).
     private func connectOnce() async throws -> ConnectionStreams {
         let transport = try await config.transportFactory(config.id)
+        guard await !shared.internalState.shuttingDown else {
+            try? await transport.close()
+            throw HostError.hostShutDown(config.id)
+        }
         let client = AHPClient(transport: transport, config: config.clientConfig)
+        await shared.update { $0.connectingClient = client }
 
         // Attach the events and state-change taps BEFORE the
         // initialize/reconnect handshake so any notifications the server
@@ -292,6 +335,7 @@ internal final class HostRuntime: Sendable {
         // to `.disconnected`.
         let events = await client.events
         let stateChanges = await client.stateChanges
+        let flowEvents = await client.flowControlEvents
 
         try await client.connect()
 
@@ -299,7 +343,8 @@ internal final class HostRuntime: Sendable {
         // propagating — `client.connect()` started writer/receive tasks
         // that hold the transport. `withClientShutdownOnThrow` enforces it.
         return try await withClientShutdownOnThrow(client) {
-            try await self.completeHandshake(client: client, events: events, stateChanges: stateChanges)
+            try await self.completeHandshake(client: client, events: events,
+                                             stateChanges: stateChanges, flowEvents: flowEvents)
         }
     }
 
@@ -310,13 +355,20 @@ internal final class HostRuntime: Sendable {
     private func completeHandshake(
         client: AHPClient,
         events: AsyncStream<ClientEvent>,
-        stateChanges: AsyncStream<ConnectionState>
+        stateChanges: AsyncStream<ConnectionState>,
+        flowEvents: AsyncStream<AHPFlowControlEvent>
     ) async throws -> ConnectionStreams {
         // Decide between initialize and reconnect based on prior state.
         let priorSnapshot = await shared.internalState
         let canReconnect = priorSnapshot.serverSeq > 0 && !priorSnapshot.subscriptions.isEmpty
-        let priorSubscriptions = priorSnapshot.subscriptions
+        let priorSubscriptions = priorSnapshot.subscriptions.filter { !$0.hasPrefix("ahp-tcp:") }
         let priorSeq = priorSnapshot.serverSeq
+        let retained = priorSnapshot.managedSubscriptions.values.filter { !$0.channel.hasPrefix("ahp-tcp:") }
+        let windows = try await client.restoreManagedSubscriptions(Array(retained))
+        await shared.update { state in
+            state.subscriptions.removeAll { $0.hasPrefix("ahp-tcp:") }
+            state.managedSubscriptions = state.managedSubscriptions.filter { !$0.key.hasPrefix("ahp-tcp:") }
+        }
 
         var initResult: InitializeResult? = nil
         var reconnectResult: ReconnectResult? = nil
@@ -324,11 +376,14 @@ internal final class HostRuntime: Sendable {
 
         if canReconnect {
             do {
-                reconnectResult = try await client.reconnect(
-                    clientId: clientId,
-                    lastSeenServerSeq: priorSeq,
-                    subscriptions: priorSubscriptions
-                )
+                if windows.items.isEmpty {
+                    reconnectResult = try await client.reconnect(
+                        clientId: clientId, lastSeenServerSeq: priorSeq, subscriptions: priorSubscriptions)
+                } else {
+                    reconnectResult = try await client.reconnect(
+                        clientId: clientId, lastSeenServerSeq: priorSeq,
+                        subscriptions: priorSubscriptions, windows: windows)
+                }
             } catch let error as AHPClientError {
                 if case .rpc = error {
                     let init1 = try await client.initialize(
@@ -366,6 +421,7 @@ internal final class HostRuntime: Sendable {
             await shared.update { state in
                 state.generation = state.generation &+ 1
                 state.currentClient = client
+                state.connectingClient = nil
                 state.lastConnectedAt = Date()
                 state.lastError = nil
                 state.serverSeq = newSeq
@@ -394,11 +450,21 @@ internal final class HostRuntime: Sendable {
         if let reconnectResult {
             await applyReconnectResult(reconnectResult, priorSubscriptions: priorSubscriptions)
             await hostEventSink(.reconnectResult(config.id, reconnectResult))
+        } else if initResult != nil {
+            for subscription in retained {
+                do {
+                    _ = try await client.subscribe(subscription.channel, options: await subscription.options)
+                } catch {
+                    await subscription.removeManagedRegistration()
+                    await subscription.finish(error)
+                    await client.dropManagedSubscription(subscription.channel, error: error)
+                }
+            }
         }
 
         await transition(to: .connected, error: nil)
         await hostEventSink(.connected(config.id, generation: newGeneration))
-        return ConnectionStreams(events: events, stateChanges: stateChanges)
+        return ConnectionStreams(events: events, stateChanges: stateChanges, flowEvents: flowEvents)
     }
 
     /// Apply the result of a successful `reconnect` call.
@@ -414,6 +480,7 @@ internal final class HostRuntime: Sendable {
         switch result {
         case .replay(let replay):
             for envelope in replay.actions {
+                if await shared.internalState.managedSubscriptions[envelope.channel] != nil { continue }
                 await applyAction(envelope)
                 if config.fanOutReconnectReplayActions {
                     await fanOut(HostSubscriptionEvent(
@@ -428,7 +495,9 @@ internal final class HostRuntime: Sendable {
                     state.subscriptions.removeAll { replay.missing.contains($0) }
                 }
             }
+            await pruneManaged(replay.windows?.items.map(\.channel) ?? [])
         case .snapshot(let snapshotResult):
+            let windows = snapshotResult.windows?.items.map(\.channel) ?? []
             await shared.update { state in
                 var surviving: [String] = []
                 surviving.reserveCapacity(snapshotResult.snapshots.count)
@@ -443,9 +512,25 @@ internal final class HostRuntime: Sendable {
                     surviving.append(snapshot.resource)
                 }
                 state.subscriptions.removeAll { uri in
-                    priorSubscriptions.contains(uri) && !surviving.contains(uri)
+                    priorSubscriptions.contains(uri) && !surviving.contains(uri) && !windows.contains(uri)
                 }
             }
+            await pruneManaged(windows)
+        }
+    }
+
+    private func pruneManaged(_ kept: [String]) async {
+        let current = await shared.internalState.managedSubscriptions
+        var dropped: [String] = []
+        for (channel, subscription) in current {
+            if await subscription.status().mode == "windowed", !kept.contains(channel) {
+                dropped.append(channel)
+                await subscription.finish(AHPWindowingError.subscriptionDropped(channel))
+            }
+        }
+        await shared.update { state in
+            for channel in dropped { state.managedSubscriptions.removeValue(forKey: channel) }
+            state.subscriptions.removeAll { dropped.contains($0) }
         }
     }
 
@@ -483,9 +568,18 @@ internal final class HostRuntime: Sendable {
             }
         }
 
+        let flowPump = Task { [flowEventSink, config] in
+            if let events = streams.flowEvents {
+                for await event in events {
+                    await flowEventSink(.init(hostId: config.id, event: event))
+                }
+            }
+        }
+
         defer {
             pumpTask.cancel()
             dropDetector.cancel()
+            flowPump.cancel()
         }
 
         while let cmd = await iter.next() {
@@ -508,8 +602,18 @@ internal final class HostRuntime: Sendable {
                 let result = await handleUnsubscribe(uri)
                 resumeCommand(reply: reply, with: result)
             case .dispatch(let action, let channel, let clientSeq, let reply):
-                let result = await handleDispatch(action, channel: channel, clientSeq: clientSeq)
-                resumeCommand(reply: reply, with: result)
+                if let client = await shared.currentClient(),
+                   let subscription = await client.subscription(for: channel),
+                   await subscription.status().mode == "windowed" {
+                    // Do not monopolize the supervisor while a send waits for credit.
+                    Task { [self] in
+                        let result = await handleDispatch(action, channel: channel, clientSeq: clientSeq, client: client)
+                        resumeCommand(reply: reply, with: result)
+                    }
+                } else {
+                    let result = await handleDispatch(action, channel: channel, clientSeq: clientSeq)
+                    resumeCommand(reply: reply, with: result)
+                }
             }
         }
         return .shutdown
@@ -588,6 +692,8 @@ internal final class HostRuntime: Sendable {
     // MARK: - Event handling
 
     private func handleEvent(_ event: ClientEvent) async {
+        if let channel = event.resource,
+           await shared.internalState.managedSubscriptions[channel] != nil { return }
         // Mutate per-host mirrors before broadcasting so observers reading
         // the next snapshot see the post-event state.
         switch event.event {
@@ -597,6 +703,7 @@ internal final class HostRuntime: Sendable {
             await shared.update { state in
                 state.sessionSummaries[n.summary.resource] = n.summary
             }
+
         case .sessionRemoved(let n):
             await shared.update { state in
                 state.sessionSummaries.removeValue(forKey: n.session)
@@ -617,6 +724,40 @@ internal final class HostRuntime: Sendable {
             event: event.event
         )
         await fanOut(hostEvent)
+    }
+
+    private func handleManagedPayload(_ payload: AHPDeliveryPayload) async {
+        switch payload {
+        case .snapshot(let snapshot):
+            await shared.update { state in
+                state.serverSeq = max(state.serverSeq, snapshot.fromSeq)
+                if snapshot.resource == RootResourceURI, case .root(let root) = snapshot.state {
+                    state.rootState = root
+                }
+            }
+        case .event(let event):
+            let channel: String
+            switch event {
+            case .action(let envelope): channel = envelope.channel; await applyAction(envelope)
+            case .sessionAdded(let value):
+                channel = value.channel
+                await shared.update { $0.sessionSummaries[value.summary.resource] = value.summary }
+            case .sessionRemoved(let value):
+                channel = value.channel
+                await shared.update { $0.sessionSummaries.removeValue(forKey: value.session) }
+            case .sessionSummaryChanged(let value):
+                channel = value.channel
+                await shared.update { state in
+                    if var summary = state.sessionSummaries[value.session] {
+                        applySummaryChanges(&summary, changes: value.changes)
+                        state.sessionSummaries[value.session] = summary
+                    }
+                }
+            case .authRequired(let value): channel = value.channel
+            }
+            await fanOut(.init(hostId: config.id, resource: channel, event: event))
+        default: break
+        }
     }
 
     private func applyAction(_ envelope: ActionEnvelope) async {
@@ -662,12 +803,16 @@ internal final class HostRuntime: Sendable {
             }
         }
         await shared.removeSubscription(uri)
+        await shared.update { $0.managedSubscriptions.removeValue(forKey: uri) }
         return .success(())
     }
 
-    private func handleDispatch(_ action: StateAction, channel: String, clientSeq: Int?) async -> Result<DispatchHandle, HostError> {
-        guard let client = await shared.currentClient() else {
-            return .failure(.hostShutDown(config.id))
+    private func handleDispatch(_ action: StateAction, channel: String, clientSeq: Int?,
+                                client explicitClient: AHPClient? = nil) async -> Result<DispatchHandle, Error> {
+        let connection: AHPClient?
+        if let explicitClient { connection = explicitClient } else { connection = await shared.currentClient() }
+        guard let client = connection else {
+            return .failure(HostError.hostShutDown(config.id))
         }
         do {
             let handle: DispatchHandle
@@ -678,9 +823,11 @@ internal final class HostRuntime: Sendable {
             }
             return .success(handle)
         } catch let error as AHPClientError {
-            return .failure(.client(error))
+            return .failure(HostError.client(error))
+        } catch let error as AHPWindowingError {
+            return .failure(error)
         } catch {
-            return .failure(.client(.transport(.io(String(describing: error)))))
+            return .failure(HostError.client(.transport(.io(String(describing: error)))))
         }
     }
 
@@ -746,12 +893,13 @@ private enum RunOutcome {
 internal struct ConnectionStreams: @unchecked Sendable {
     let events: AsyncStream<ClientEvent>
     let stateChanges: AsyncStream<ConnectionState>
+    var flowEvents: AsyncStream<AHPFlowControlEvent>? = nil
 }
 
 /// Resume a `CheckedContinuation<T, Error>` with a `Result<T, HostError>`.
-private func resumeCommand<T: Sendable>(
+private func resumeCommand<T: Sendable, E: Error>(
     reply: CheckedContinuation<T, Error>,
-    with result: Result<T, HostError>
+    with result: Result<T, E>
 ) {
     switch result {
     case .success(let value): reply.resume(returning: value)

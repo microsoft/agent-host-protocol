@@ -867,7 +867,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // Try the most distinctive shape first. AutomationRunState has required
         // \`automation\`, \`origin\`, and \`sessions\`; AutomationState has
         // required \`entries\`; SessionState has required
-        // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
+        // \`lifecycle\` + \`provider\` (TerminalState also has \`lifecycle\`);
+        // ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
         // (checked after session, whose optional annotations summary reuses the
@@ -880,7 +881,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
-            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("lifecycle") && obj.containsKey("provider") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
                 SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))

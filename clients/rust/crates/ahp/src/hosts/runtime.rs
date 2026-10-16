@@ -27,6 +27,11 @@ use super::types::{
 
 /// Commands the runtime accepts from the [`MultiHostClient`].
 pub(super) enum HostCommand {
+    SubscribeWindowed {
+        uri: String,
+        options: crate::WindowOptions,
+        reply: oneshot::Sender<Result<(SubscribeResult, crate::WindowedSubscription), HostError>>,
+    },
     Reconnect {
         reply: oneshot::Sender<()>,
     },
@@ -82,6 +87,7 @@ pub(super) fn spawn(
     resolved_client_id: String,
     fan_out: broadcast::Sender<HostSubscriptionEvent>,
     host_events: broadcast::Sender<HostEvent>,
+    flow_events: broadcast::Sender<super::HostFlowControlEvent>,
 ) -> HostHandleTx {
     let initial = HostInternal {
         id: config.id.clone(),
@@ -102,6 +108,7 @@ pub(super) fn spawn(
             meta: None,
         },
         subscriptions: config.initial_subscriptions.clone(),
+        owning_channels: std::collections::HashMap::new(),
         completion_trigger_characters: vec![],
         session_summaries: BTreeMap::new(),
         generation: 0,
@@ -112,6 +119,9 @@ pub(super) fn spawn(
 
     let (cmd_tx, cmd_rx) = mpsc::channel(32);
     let runtime = HostRuntime {
+        managed: vec![],
+        flow_events,
+        flow_task: None,
         client_id: resolved_client_id,
         config,
         cmd_rx,
@@ -130,7 +140,27 @@ pub(super) fn spawn(
     }
 }
 
+fn prune_owned(
+    state: &mut HostInternal,
+    uri: &str,
+    owner: &std::sync::Weak<crate::windowing::Channel>,
+) {
+    if state
+        .owning_channels
+        .get(uri)
+        .is_some_and(|current| current.ptr_eq(owner))
+    {
+        state.owning_channels.remove(uri);
+        state
+            .subscriptions
+            .retain(|subscription| subscription != uri);
+    }
+}
+
 struct HostRuntime {
+    managed: Vec<Arc<crate::windowing::Channel>>,
+    flow_events: broadcast::Sender<super::HostFlowControlEvent>,
+    flow_task: Option<JoinHandle<()>>,
     config: HostConfig,
     client_id: String,
     cmd_rx: mpsc::Receiver<HostCommand>,
@@ -194,7 +224,8 @@ impl HostRuntime {
                         attempt = 0;
                     }
                     let outcome = self.run_connection(events).await;
-                    self.tear_down_client().await;
+                    self.tear_down_client(matches!(outcome, InnerOutcome::Shutdown))
+                        .await;
                     match outcome {
                         InnerOutcome::Shutdown => break,
                         InnerOutcome::ManualReconnect => {
@@ -225,6 +256,9 @@ impl HostRuntime {
 
             // Decide whether to retry.
             if self.config.reconnect_policy.attempts_exhausted(attempt) {
+                for channel in &self.managed {
+                    channel.finish(Some(crate::WindowError::new("host reconnection failed")));
+                }
                 let last_error = self.shared.lock().await.last_error.clone();
                 let error = last_error.unwrap_or_else(|| Arc::new(ClientError::Shutdown));
                 self.set_state(
@@ -251,16 +285,44 @@ impl HostRuntime {
                 break;
             }
         }
+        self.tear_down_client(true).await;
     }
 
     async fn connect_once(&mut self) -> Result<crate::ClientEventStream, ClientError> {
+        if let Some(task) = self.flow_task.take() {
+            task.abort();
+        }
         let transport = self
             .config
             .transport_factory
             .open_transport(self.config.id.clone())
             .await?;
 
-        let client = Client::connect(transport, self.config.client_config.clone()).await?;
+        let client = Client::builder()
+            .config(self.config.client_config.clone())
+            .windowing(self.config.transport_factory.windowing_config())
+            .connect(transport)
+            .await?;
+        let mut flow = client.flow_control_events();
+        let flow_events = self.flow_events.clone();
+        let host_id = self.config.id.clone();
+        self.flow_task = Some(tokio::spawn(async move {
+            loop {
+                match flow.recv().await {
+                    Ok(event) => {
+                        let _ = flow_events.send(super::HostFlowControlEvent {
+                            host_id: host_id.clone(),
+                            event,
+                        });
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }));
+        client
+            .restore_channels(&self.managed)
+            .map_err(|e| ClientError::Transport(crate::TransportError::Protocol(e.to_string())))?;
 
         // Attach the events receiver BEFORE the initialize/reconnect
         // handshake so any notifications the server pushes between the
@@ -270,7 +332,23 @@ impl HostRuntime {
 
         // Decide between initialize and reconnect based on prior state.
         let (subscriptions, server_seq_after, init_result, reconnect_result) = {
-            let snapshot = self.shared.lock().await;
+            let mut snapshot = self.shared.lock().await;
+            let dropped: Vec<_> = snapshot
+                .owning_channels
+                .iter()
+                .filter(|(_, owner)| {
+                    owner
+                        .upgrade()
+                        .map_or(true, |channel| channel.dropped() || channel.unowned_drop())
+                })
+                .map(|(uri, _)| uri.clone())
+                .collect();
+            for uri in dropped {
+                snapshot.owning_channels.remove(&uri);
+                snapshot
+                    .subscriptions
+                    .retain(|subscription| subscription != &uri);
+            }
             let can_reconnect = snapshot.server_seq > 0 && !snapshot.subscriptions.is_empty();
             let subscriptions = snapshot.subscriptions.clone();
             let server_seq = snapshot.server_seq;
@@ -278,7 +356,21 @@ impl HostRuntime {
 
             if can_reconnect {
                 match client
-                    .reconnect(self.client_id.clone(), server_seq, subscriptions.clone())
+                    .request(
+                        "reconnect",
+                        ahp_types::commands::ReconnectParams {
+                            channel: ROOT_RESOURCE_URI.into(),
+                            meta: None,
+                            client_id: self.client_id.clone(),
+                            last_seen_server_seq: server_seq,
+                            subscriptions: subscriptions
+                                .iter()
+                                .filter(|uri| !uri.starts_with("ahp-tcp:"))
+                                .cloned()
+                                .collect(),
+                            windows: client.resume_windows(),
+                        },
+                    )
                     .await
                 {
                     Ok(result) => (subscriptions, server_seq, None, Some(result)),
@@ -310,6 +402,26 @@ impl HostRuntime {
             }
         };
 
+        if init_result.is_some() {
+            for channel in &self.managed {
+                if channel.dropped() {
+                    continue;
+                }
+                if let Err(error) = client
+                    .subscribe_windowed(channel.uri.clone(), channel.options())
+                    .await
+                {
+                    if !client.is_connected() {
+                        return Err(ClientError::Transport(crate::TransportError::Protocol(
+                            error.to_string(),
+                        )));
+                    }
+                    client.fail_subscription(channel, error);
+                    let _ = client.unsubscribe(channel.uri.clone()).await;
+                }
+            }
+        }
+
         // Refresh session summaries from `listSessions` — cheap on first
         // connect, kept in sync by notifications afterward. Failures are
         // non-fatal: we just leave the cache as-is and log.
@@ -336,6 +448,7 @@ impl HostRuntime {
                 state.server_seq = server_seq_after;
             }
             if let Some(init) = init_result.as_ref() {
+                state.server_seq = init.server_seq;
                 if let Some(snapshot) = init
                     .snapshots
                     .iter()
@@ -405,6 +518,29 @@ impl HostRuntime {
         result: ReconnectResult,
         prior_subscriptions: &[String],
     ) {
+        let kept: Vec<String> = match &result {
+            ReconnectResult::Replay(result) => result.windows.as_ref(),
+            ReconnectResult::Snapshot(result) => result.windows.as_ref(),
+        }
+        .map(|windows| {
+            windows
+                .items
+                .iter()
+                .map(|item| item.channel.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+        let windowed: Vec<String> = self
+            .managed
+            .iter()
+            .filter(|channel| channel.windowed())
+            .map(|channel| channel.uri.clone())
+            .collect();
+        self.shared
+            .lock()
+            .await
+            .subscriptions
+            .retain(|uri| !windowed.contains(uri) || kept.contains(uri));
         match result {
             ReconnectResult::Replay(replay) => {
                 for envelope in replay.actions {
@@ -425,7 +561,7 @@ impl HostRuntime {
             }
             ReconnectResult::Snapshot(snap) => {
                 let mut state = self.shared.lock().await;
-                let mut surviving: Vec<String> = Vec::with_capacity(snap.snapshots.len());
+                let mut surviving = kept;
                 for snapshot in snap.snapshots {
                     if snapshot.from_seq > state.server_seq {
                         state.server_seq = snapshot.from_seq;
@@ -440,9 +576,11 @@ impl HostRuntime {
                 // Drop subscriptions the server didn't return a snapshot
                 // for — they're effectively `missing` even though the
                 // snapshot arm doesn't carry an explicit list.
-                state
-                    .subscriptions
-                    .retain(|u| surviving.contains(u) || !prior_subscriptions.contains(u));
+                state.subscriptions.retain(|u| {
+                    surviving.contains(u)
+                        || !prior_subscriptions.contains(u)
+                        || u.starts_with("ahp-otlp:")
+                });
             }
         }
     }
@@ -464,15 +602,42 @@ impl HostRuntime {
                         return InnerOutcome::ManualReconnect;
                     }
                     Some(HostCommand::Subscribe { uri, reply }) => {
-                        let result = self.handle_subscribe(uri).await;
+                        let shutdown = self.shutdown_signal.clone();
+                        let result = tokio::select! {
+                            result = self.handle_subscribe(uri) => result,
+                            _ = shutdown.notified() => return InnerOutcome::Shutdown,
+                        };
+                        let _ = reply.send(result);
+                    }
+                    Some(HostCommand::SubscribeWindowed { uri, options, reply }) => {
+                        let client = self.shared.lock().await.current_client.clone();
+                        let shutdown = self.shutdown_signal.clone();
+                        let result = match client {
+                            Some(client) => tokio::select! {
+                                result = client.subscribe_windowed(uri.clone(), options) => result.map_err(|error| HostError::Client(ClientError::Transport(crate::TransportError::Protocol(error.to_string())))),
+                                _ = shutdown.notified() => return InnerOutcome::Shutdown,
+                            },
+                            None => Err(HostError::HostShutDown(self.config.id.clone())),
+                        };
+                        if let Ok((_, subscription)) = &result {
+                            self.bind_managed(&subscription.channel).await;
+                        }
                         let _ = reply.send(result);
                     }
                     Some(HostCommand::Unsubscribe { uri, reply }) => {
-                        let result = self.handle_unsubscribe(uri).await;
+                        let shutdown = self.shutdown_signal.clone();
+                        let result = tokio::select! {
+                            result = self.handle_unsubscribe(uri) => result,
+                            _ = shutdown.notified() => return InnerOutcome::Shutdown,
+                        };
                         let _ = reply.send(result);
                     }
                     Some(HostCommand::Dispatch { channel, action, reply }) => {
-                        let result = self.handle_dispatch(channel, *action).await;
+                        let shutdown = self.shutdown_signal.clone();
+                        let result = tokio::select! {
+                            result = self.handle_dispatch(channel, *action) => result,
+                            _ = shutdown.notified() => return InnerOutcome::Shutdown,
+                        };
                         let _ = reply.send(result);
                     }
                 },
@@ -486,6 +651,9 @@ impl HostRuntime {
                 _ = self.shutdown_signal.notified() => return false,
                 cmd = self.cmd_rx.recv() => match cmd {
                     None => return false,
+                    Some(HostCommand::SubscribeWindowed { reply, .. }) => {
+                        let _ = reply.send(Err(HostError::HostShutDown(self.config.id.clone())));
+                    }
                     Some(HostCommand::Reconnect { reply }) => {
                         let _ = reply.send(());
                         return true;
@@ -529,6 +697,9 @@ impl HostRuntime {
                 _ = &mut sleep => return true,
                 cmd = self.cmd_rx.recv() => match cmd {
                     None => return false,
+                    Some(HostCommand::SubscribeWindowed { reply, .. }) => {
+                        let _ = reply.send(Err(HostError::HostShutDown(self.config.id.clone())));
+                    }
                     Some(HostCommand::Reconnect { reply }) => {
                         let _ = reply.send(());
                         return true;
@@ -583,6 +754,14 @@ impl HostRuntime {
             SubscriptionEvent::AuthRequired(_) => {
                 // No cache update; consumers observe via the event stream.
             }
+            SubscriptionEvent::Snapshot(snapshot) => {
+                let mut state = self.shared.lock().await;
+                state.server_seq = state.server_seq.max(snapshot.from_seq);
+                if let SnapshotState::Root(root) = &snapshot.state {
+                    state.root_state = root.as_ref().clone();
+                }
+            }
+            _ => {}
         }
 
         let host_event = HostSubscriptionEvent {
@@ -646,6 +825,37 @@ impl HostRuntime {
         Ok(result)
     }
 
+    async fn bind_managed(&self, channel: &Arc<crate::windowing::Channel>) {
+        let uri = channel.uri.clone();
+        let owner = Arc::downgrade(channel);
+        {
+            let mut state = self.shared.lock().await;
+            if !state.subscriptions.contains(&uri) {
+                state.subscriptions.push(uri.clone());
+            }
+            state.owning_channels.insert(uri.clone(), owner.clone());
+        }
+        let shared = Arc::downgrade(&self.shared);
+        let hook = Arc::new(move || {
+            if let Some(shared) = shared.upgrade() {
+                if let Ok(mut state) = shared.try_lock() {
+                    prune_owned(&mut state, &uri, &owner);
+                } else if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                    let uri = uri.clone();
+                    let owner = owner.clone();
+                    let shared = shared.clone();
+                    runtime.spawn(async move {
+                        let mut state = shared.lock().await;
+                        prune_owned(&mut state, &uri, &owner);
+                    });
+                }
+            }
+        });
+        let mut state = channel.lock();
+        state.managed = !channel.uri.starts_with("ahp-tcp:");
+        state.drop_hook = Some(hook);
+    }
+
     async fn handle_unsubscribe(&self, uri: String) -> Result<(), HostError> {
         let client_opt = { self.shared.lock().await.current_client.clone() };
         if let Some(client) = client_opt {
@@ -656,6 +866,7 @@ impl HostRuntime {
         }
         let mut state = self.shared.lock().await;
         state.subscriptions.retain(|u| u != &uri);
+        state.owning_channels.remove(&uri);
         Ok(())
     }
 
@@ -677,13 +888,37 @@ impl HostRuntime {
             .map_err(HostError::Client)
     }
 
-    async fn tear_down_client(&self) {
+    async fn tear_down_client(&mut self, permanent: bool) {
+        if let Some(task) = self.flow_task.take() {
+            task.abort();
+        }
         let prev = {
             let mut state = self.shared.lock().await;
             state.current_client.take()
         };
         if let Some(client) = prev {
+            self.managed = client.managed_channels();
+            if permanent {
+                for channel in &self.managed {
+                    channel.finish(None);
+                }
+            }
+            self.shared
+                .lock()
+                .await
+                .subscriptions
+                .retain(|uri| !uri.starts_with("ahp-tcp:"));
+            self.shared
+                .lock()
+                .await
+                .owning_channels
+                .retain(|uri, _| !uri.starts_with("ahp-tcp:"));
             client.shutdown().await;
+        }
+        if permanent {
+            for channel in &self.managed {
+                channel.finish(None);
+            }
         }
     }
 

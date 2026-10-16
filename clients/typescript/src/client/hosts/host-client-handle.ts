@@ -11,10 +11,11 @@
  * @module client/hosts/host-client-handle
  */
 
-import type { CommandMap } from '../../types/common/messages.js';
+import type { CommandMap, ClientNotificationMap } from '../../types/common/messages.js';
 import type { StateAction } from '../../types/common/actions.js';
 import type { URI } from '../../types/common/state.js';
 import type { AhpClient, DispatchHandle } from '../client.js';
+import type { FlowControlStatus, FlowControlEvent } from '../flow-control.js';
 import {
   HostReconnectedError,
   HostShutDownError,
@@ -104,5 +105,33 @@ export class HostClientHandle {
   rawClient(): AhpClient {
     this.checkAlive();
     return this.client;
+  }
+
+  async dispatchAsync(channel: URI, action: StateAction,
+    options: { clientSeq?: number; signal?: AbortSignal } = {}): Promise<DispatchHandle> {
+    this.checkAlive();
+    const result = await this.client.dispatchAsync(channel, action, options);
+    this.checkAlive();
+    return result;
+  }
+  async notifyAsync<M extends keyof ClientNotificationMap>(method: M,
+    params: ClientNotificationMap[M]['params'], options: { signal?: AbortSignal } = {}): Promise<void> {
+    this.checkAlive();
+    await this.client.notifyAsync(method, params, options);
+    this.checkAlive();
+  }
+  async waitWritable(channel: URI, options: { signal?: AbortSignal } = {}): Promise<void> {
+    this.checkAlive();
+    await this.client.waitWritable(channel, options);
+    this.checkAlive();
+  }
+
+  flowControl(channel: URI): FlowControlStatus {
+    this.checkAlive();
+    return this.client.flowControl(channel);
+  }
+  flowControlEvents(): AsyncIterableIterator<FlowControlEvent> {
+    this.checkAlive();
+    return this.client.flowControlEvents();
   }
 }

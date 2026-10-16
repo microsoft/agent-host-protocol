@@ -1,0 +1,38 @@
+{
+  "name": "terminal-snapshot",
+  "group": "A",
+  "description": "A terminal snapshot decodes as terminal state, not session state, even though both have a lifecycle member.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-terminal:/t1",
+    "state": {
+      "title": "Shell",
+      "content": [],
+      "lifecycle": {
+        "status": "running"
+      },
+      "claim": {
+        "kind": "client",
+        "clientId": "client-1"
+      }
+    },
+    "fromSeq": 5
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-terminal:/t1",
+      "state": {
+        "title": "Shell",
+        "content": [],
+        "lifecycle": {
+          "status": "running"
+        },
+        "claim": {
+          "kind": "client",
+          "clientId": "client-1"
+        }
+      },
+      "fromSeq": 5
+    }
+  ]
+}

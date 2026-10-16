@@ -112,6 +112,10 @@ impl TransportMessage {
 /// client sends indefinitely until the underlying connection closes,
 /// and `recv` signals closure by returning `None`.
 pub trait Transport: Send + 'static {
+    /// Exact-text windowing support; defaults to ordinary delivery.
+    fn window_capabilities(&self) -> crate::WindowTransportCapabilities {
+        crate::WindowTransportCapabilities::default()
+    }
     /// Send a single message.
     ///
     /// Errors returned here are typically fatal for the transport
@@ -154,6 +158,10 @@ pub trait Transport: Send + 'static {
 /// allocation cost (typically: registries that hold one transport per
 /// host).
 pub trait DynTransport: Send + 'static {
+    /// Object-safe windowing hints.
+    fn window_capabilities(&self) -> crate::WindowTransportCapabilities {
+        crate::WindowTransportCapabilities::default()
+    }
     /// Object-safe analogue of [`Transport::send`].
     fn send<'a>(
         &'a mut self,
@@ -172,6 +180,9 @@ pub trait DynTransport: Send + 'static {
 }
 
 impl<T: Transport> DynTransport for T {
+    fn window_capabilities(&self) -> crate::WindowTransportCapabilities {
+        Transport::window_capabilities(self)
+    }
     fn send<'a>(
         &'a mut self,
         msg: TransportMessage,
@@ -247,6 +258,9 @@ impl std::fmt::Debug for BoxedTransport {
 }
 
 impl Transport for BoxedTransport {
+    fn window_capabilities(&self) -> crate::WindowTransportCapabilities {
+        self.inner.window_capabilities()
+    }
     fn send(
         &mut self,
         msg: TransportMessage,
@@ -262,5 +276,39 @@ impl Transport for BoxedTransport {
 
     fn close(&mut self) -> impl Future<Output = Result<(), TransportError>> + Send {
         self.inner.close()
+    }
+}
+
+/// Assert exact-text support for a custom transport.
+///
+/// Incoming notifications must be unmodified Text/UTF-8 Binary and outgoing
+/// Text must be sent unchanged. Parsed windowed data is a protocol error.
+pub struct RawTextTransport<T> {
+    inner: T,
+    maximum_frame_bytes: Option<u64>,
+}
+impl<T> RawTextTransport<T> {
+    /// Wrap a transport with an optional safe UTF-16 receive limit.
+    pub fn new(inner: T, maximum_frame_bytes: Option<u64>) -> Self {
+        Self {
+            inner,
+            maximum_frame_bytes,
+        }
+    }
+}
+impl<T: Transport> Transport for RawTextTransport<T> {
+    fn window_capabilities(&self) -> crate::WindowTransportCapabilities {
+        let mut capabilities = crate::WindowTransportCapabilities::default().raw_text(true);
+        capabilities.maximum_frame_bytes = self.maximum_frame_bytes;
+        capabilities
+    }
+    async fn send(&mut self, message: TransportMessage) -> Result<(), TransportError> {
+        self.inner.send(message).await
+    }
+    async fn recv(&mut self) -> Result<Option<TransportMessage>, TransportError> {
+        self.inner.recv().await
+    }
+    async fn close(&mut self) -> Result<(), TransportError> {
+        self.inner.close().await
     }
 }

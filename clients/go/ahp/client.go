@@ -24,6 +24,9 @@ type Config struct {
 	// channel. Slow consumers that fail to drain within this many
 	// messages will drop frames and must resubscribe.
 	SubscriptionBuffer int
+
+	// Windowing supplies defaults, but does not opt any subscription in.
+	Windowing WindowingConfig
 }
 
 // DefaultConfig returns a [Config] with sensible defaults: 30s request
@@ -32,6 +35,7 @@ func DefaultConfig() Config {
 	return Config{
 		DefaultRequestTimeout: 30 * time.Second,
 		SubscriptionBuffer:    256,
+		Windowing:             WindowingConfig{WindowBytes: 256 << 10, MaxBufferedSendBytes: 1 << 20},
 	}
 }
 
@@ -99,6 +103,7 @@ type Subscription struct {
 	events  chan SubscriptionEvent
 	closeMu sync.Mutex
 	closed  bool
+	owner   *deliveryQueue
 }
 
 // URI returns the channel URI this subscription is bound to.
@@ -107,18 +112,38 @@ func (s *Subscription) URI() string { return s.uri }
 // Events returns a receive-only channel of events. The channel closes
 // when the [Client] shuts down or the caller invokes
 // [Subscription.Close].
-func (s *Subscription) Events() <-chan SubscriptionEvent { return s.events }
-
-// Close stops the subscription locally without notifying the server.
-// Safe to call multiple times.
-func (s *Subscription) Close() {
+func (s *Subscription) Events() <-chan SubscriptionEvent {
 	s.closeMu.Lock()
 	defer s.closeMu.Unlock()
+	return s.events
+}
+
+// Close stops this handle. Options-based owners also queue unsubscribe and
+// retire their credit epoch; legacy observer handles only close locally.
+// Safe to call multiple times.
+func (s *Subscription) Close() {
+	s.closeEvents()
+	if s.owner != nil {
+		q := s.owner
+		q.mu.Lock()
+		q.finishLocked(ErrClosed)
+		e, f := q.engine, q.flow
+		q.mu.Unlock()
+		e.mu.Lock()
+		e.retireLocked(f, ErrClosed, true)
+		e.mu.Unlock()
+	}
+}
+
+func (s *Subscription) closeEvents() {
+	s.closeMu.Lock()
 	if s.closed {
+		s.closeMu.Unlock()
 		return
 	}
 	s.closed = true
 	close(s.events)
+	s.closeMu.Unlock()
 }
 
 func (s *Subscription) trySend(ev SubscriptionEvent) {
@@ -147,15 +172,17 @@ type DispatchHandle struct {
 // pendingResult routes a single in-flight request's outcome to its
 // waiter.
 type pendingResult struct {
-	value json.RawMessage
-	err   *ahptypes.JsonRpcError
+	value    json.RawMessage
+	err      *ahptypes.JsonRpcError
+	localErr error
 }
 
 // outboundMsg is the writer goroutine's input queue payload.
 type outboundMsg struct {
 	msg ahptypes.JsonRpcMessage
 	// done, if non-nil, receives the result of the send attempt.
-	done chan error
+	done  chan error
+	hooks *requestHooks
 }
 
 // EventStream is a top-level fan-in receiver over every inbound event
@@ -228,8 +255,10 @@ type Client struct {
 	outbound chan outboundMsg
 
 	// pending is the request-correlation map keyed by JSON-RPC id.
-	pendingMu sync.Mutex
-	pending   map[uint64]chan pendingResult
+	pendingMu    sync.Mutex
+	pending      map[uint64]chan pendingResult
+	pendingHooks map[uint64]*requestHooks
+	flow         *flowEngine
 
 	// subscriptionsMu guards subscriptions and the all-events
 	// fan-out registry.
@@ -269,8 +298,14 @@ func Connect(_ context.Context, transport Transport, cfg Config) (*Client, error
 		transport:     transport,
 		outbound:      make(chan outboundMsg, 64),
 		pending:       make(map[uint64]chan pendingResult),
+		pendingHooks:  make(map[uint64]*requestHooks),
 		subscriptions: make(map[string][]*Subscription),
 		done:          make(chan struct{}),
+	}
+	var err error
+	c.flow, err = newFlowEngine(c)
+	if err != nil {
+		return nil, err
 	}
 	c.nextID.Store(1)
 	c.nextClientSeq.Store(1)
@@ -322,6 +357,7 @@ func (c *Client) shutdownWithError(err error) {
 			c.closeErr.Store(err)
 		}
 		close(c.done)
+		c.flow.stop()
 
 		// Close the transport so any blocked Recv unblocks.
 		closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -341,6 +377,7 @@ func (c *Client) shutdownWithError(err error) {
 			}
 			close(ch)
 			delete(c.pending, id)
+			delete(c.pendingHooks, id)
 		}
 		c.pendingMu.Unlock()
 
@@ -353,7 +390,14 @@ func (c *Client) shutdownWithError(err error) {
 		c.subscriptionsMu.Unlock()
 		for _, list := range subs {
 			for _, s := range list {
-				s.Close()
+				s.closeEvents()
+				if s.owner != nil {
+					reason := err
+					if reason == nil {
+						reason = ErrShutdown
+					}
+					s.owner.close(reason)
+				}
 			}
 		}
 		for _, l := range listeners {
@@ -365,36 +409,7 @@ func (c *Client) shutdownWithError(err error) {
 // runWriter drains outbound messages and ships them via the transport.
 // Exits when c.done is closed.
 func (c *Client) runWriter() {
-	defer c.wg.Done()
-	for {
-		select {
-		case <-c.done:
-			return
-		case msg, ok := <-c.outbound:
-			if !ok {
-				return
-			}
-			wire, err := EncodeMessage(msg.msg)
-			if err != nil {
-				if msg.done != nil {
-					msg.done <- err
-				}
-				continue
-			}
-			ctx, cancel := contextWithDone(context.Background(), c.done)
-			sendErr := c.transport.Send(ctx, wire)
-			cancel()
-			if msg.done != nil {
-				msg.done <- sendErr
-			}
-			if sendErr != nil {
-				// Transport faulted — trigger global shutdown so all
-				// consumers see EOF in bounded time.
-				c.shutdownWithError(fmt.Errorf("ahp: transport send: %w", sendErr))
-				return
-			}
-		}
-	}
+	c.flow.runWriter()
 }
 
 // runReader pumps inbound messages from the transport and dispatches
@@ -415,11 +430,30 @@ func (c *Client) runReader() {
 			c.shutdownWithError(fmt.Errorf("ahp: transport recv: %w", err))
 			return
 		}
+		select {
+		case <-c.done:
+			return
+		default:
+		}
 		parsed, perr := msg.IntoParsed()
 		if perr != nil {
 			// Skip malformed frames; protocol resync is the server's
 			// responsibility.
+			if c.flow.hasWindows() {
+				c.shutdownWithError(&TransportError{Kind: "protocol", Err: perr})
+				return
+			}
 			continue
+		}
+		if parsed.Notification != nil {
+			handled, err := c.flow.receive(*parsed.Notification, msg)
+			if err != nil {
+				c.shutdownWithError(&TransportError{Kind: "protocol", Err: err})
+				return
+			}
+			if handled {
+				continue
+			}
 		}
 		c.dispatch(parsed)
 	}
@@ -462,12 +496,26 @@ func (c *Client) dispatch(msg ahptypes.JsonRpcMessage) {
 func (c *Client) deliver(id uint64, r pendingResult) {
 	c.pendingMu.Lock()
 	ch, ok := c.pending[id]
+	hook := c.pendingHooks[id]
 	if ok {
 		delete(c.pending, id)
+		delete(c.pendingHooks, id)
 	}
 	c.pendingMu.Unlock()
 	if !ok {
 		return
+	}
+	if r.err != nil && hook != nil {
+		hook.failed(&RPCError{Code: r.err.Code, Message: r.err.Message, Data: r.err.Data})
+	}
+	if r.err == nil && hook != nil {
+		if err := hook.complete(r.value); err != nil {
+			r.localErr = &TransportError{Kind: "protocol", Err: err}
+			ch <- r
+			close(ch)
+			c.shutdownWithError(r.localErr)
+			return
+		}
 	}
 	ch <- r
 	close(ch)
@@ -638,6 +686,20 @@ func (c *Client) handleServerRequest(req ahptypes.JsonRpcRequest) {
 // Request sends a JSON-RPC request and decodes the response into out.
 // If out is nil, the result is discarded.
 func (c *Client) Request(ctx context.Context, method string, params any, out any) error {
+	return c.request(ctx, method, params, out, nil)
+}
+
+func (c *Client) request(ctx context.Context, method string, params any, out any, opts *SubscribeOptions) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c.cfg.DefaultRequestTimeout > 0 {
+		if _, ok := ctx.Deadline(); !ok {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, c.cfg.DefaultRequestTimeout)
+			defer cancel()
+		}
+	}
 	select {
 	case <-c.done:
 		return ErrShutdown
@@ -647,11 +709,16 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 	if err != nil {
 		return err
 	}
+	rawParams, hook, err := c.flow.prepareRequest(method, rawParams, opts)
+	if err != nil {
+		return err
+	}
 	id := c.nextID.Add(1) - 1
 	resultCh := make(chan pendingResult, 1)
 
 	c.pendingMu.Lock()
 	c.pending[id] = resultCh
+	c.pendingHooks[id] = hook
 	c.pendingMu.Unlock()
 
 	req := ahptypes.JsonRpcMessage{Request: &ahptypes.JsonRpcRequest{
@@ -660,24 +727,27 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 		Method:  method,
 		Params:  rawParams,
 	}}
-	if err := c.send(ctx, req); err != nil {
+	if err := c.sendOrdinary(ctx, req, hook); err != nil {
+		if hook != nil {
+			hook.cancel()
+		}
 		c.pendingMu.Lock()
 		delete(c.pending, id)
+		delete(c.pendingHooks, id)
 		c.pendingMu.Unlock()
 		return err
 	}
 
-	// Apply the configured default timeout if no deadline is set.
-	if c.cfg.DefaultRequestTimeout > 0 {
-		if _, ok := ctx.Deadline(); !ok {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, c.cfg.DefaultRequestTimeout)
-			defer cancel()
-		}
+	var abandoned <-chan struct{}
+	if hook != nil {
+		abandoned = hook.done
 	}
 
 	select {
 	case r := <-resultCh:
+		if r.localErr != nil {
+			return r.localErr
+		}
 		if r.err != nil {
 			return &RPCError{Code: r.err.Code, Message: r.err.Message, Data: r.err.Data}
 		}
@@ -688,16 +758,30 @@ func (c *Client) Request(ctx context.Context, method string, params any, out any
 		}
 		return nil
 	case <-ctx.Done():
+		if hook != nil {
+			hook.cancel()
+		}
 		c.pendingMu.Lock()
 		delete(c.pending, id)
+		delete(c.pendingHooks, id)
 		c.pendingMu.Unlock()
 		return ctx.Err()
+	case <-abandoned:
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		delete(c.pendingHooks, id)
+		c.pendingMu.Unlock()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return hook.err
 	case <-c.done:
 		return ErrShutdown
 	}
 }
 
-// Notify sends a JSON-RPC notification (fire-and-forget).
+// Notify waits until a JSON-RPC notification is written. Windowed data may
+// wait for host credit, and a full buffered-send queue returns ErrBackpressure.
 func (c *Client) Notify(ctx context.Context, method string, params any) error {
 	select {
 	case <-c.done:
@@ -717,11 +801,27 @@ func (c *Client) Notify(ctx context.Context, method string, params any) error {
 }
 
 func (c *Client) send(ctx context.Context, msg ahptypes.JsonRpcMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if handled, err := c.flow.send(ctx, msg); handled {
+		return err
+	}
+	return c.sendOrdinary(ctx, msg, nil)
+}
+
+func (c *Client) sendOrdinary(ctx context.Context, msg ahptypes.JsonRpcMessage, hooks *requestHooks) error {
 	done := make(chan error, 1)
+	var abandoned <-chan struct{}
+	if hooks != nil {
+		abandoned = hooks.done
+	}
 	select {
-	case c.outbound <- outboundMsg{msg: msg, done: done}:
+	case c.outbound <- outboundMsg{msg: msg, done: done, hooks: hooks}:
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-abandoned:
+		return hooks.err
 	case <-c.done:
 		return ErrShutdown
 	}
@@ -733,6 +833,8 @@ func (c *Client) send(ctx context.Context, msg ahptypes.JsonRpcMessage) error {
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-abandoned:
+		return hooks.err
 	case <-c.done:
 		return ErrShutdown
 	}
@@ -780,12 +882,15 @@ func (c *Client) Initialize(ctx context.Context, clientID string, protocolVersio
 // Reconnect re-establishes a dropped connection with the server's
 // `reconnect` flow.
 func (c *Client) Reconnect(ctx context.Context, clientID string, lastSeenServerSeq int64, subscriptions []string) (*ahptypes.ReconnectResult, error) {
-	params := ahptypes.ReconnectParams{
-		Channel:           ahptypes.RootResourceURI,
-		ClientId:          clientID,
-		LastSeenServerSeq: lastSeenServerSeq,
-		Subscriptions:     subscriptions,
-	}
+	return c.ReconnectWithParams(ctx, ahptypes.ReconnectParams{
+		Channel: ahptypes.RootResourceURI, ClientId: clientID,
+		LastSeenServerSeq: lastSeenServerSeq, Subscriptions: subscriptions,
+	})
+}
+
+// ReconnectWithParams also accepts the generated Windows resume options.
+func (c *Client) ReconnectWithParams(ctx context.Context, params ahptypes.ReconnectParams) (*ahptypes.ReconnectResult, error) {
+	params.Channel = ahptypes.RootResourceURI
 	var out ahptypes.ReconnectResult
 	if err := c.Request(ctx, "reconnect", params, &out); err != nil {
 		return nil, err
@@ -839,12 +944,36 @@ func (c *Client) AttachSubscription(uri string) *Subscription {
 // Unsubscribe sends an `unsubscribe` notification and drops every
 // local [Subscription] for uri.
 func (c *Client) Unsubscribe(ctx context.Context, uri string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	var cleanupDone chan error
+	c.flow.mu.Lock()
+	if f := c.flow.channels[uri]; f != nil {
+		c.flow.retireLocked(f, ErrClosed, false)
+		if !c.flow.stopped {
+			cleanupDone = make(chan error, 1)
+			c.flow.cleanup = append(c.flow.cleanup, flowCleanup{channel: uri, done: cleanupDone})
+			c.flow.signal()
+		}
+	}
+	c.flow.mu.Unlock()
 	c.subscriptionsMu.Lock()
 	subs := c.subscriptions[uri]
 	delete(c.subscriptions, uri)
 	c.subscriptionsMu.Unlock()
 	for _, s := range subs {
 		s.Close()
+	}
+	if cleanupDone != nil {
+		select {
+		case err := <-cleanupDone:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-c.done:
+			return ErrShutdown
+		}
 	}
 	return c.Notify(ctx, "unsubscribe", ahptypes.UnsubscribeParams{Channel: uri})
 }

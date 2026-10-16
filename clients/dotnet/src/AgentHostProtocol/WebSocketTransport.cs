@@ -38,7 +38,7 @@ public sealed class WebSocketTransportOptions
 /// or <see cref="FromClientWebSocket(ClientWebSocket, WebSocketTransportOptions?)"/> to wrap
 /// an existing connection.
 /// </summary>
-public sealed class WebSocketTransport : ITransport
+public sealed class WebSocketTransport : ITransport, ITransportMessageLimits
 {
     private readonly WebSocket _ws;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
@@ -46,6 +46,8 @@ public sealed class WebSocketTransport : ITransport
     private int _disposed;
 
     internal long MaxMessageBytes => _maxMessageBytes;
+    /// <summary>Complete inbound WebSocket message cap, not the receive-buffer size.</summary>
+    public long? MaximumInboundMessageBytes => _maxMessageBytes > 0 ? _maxMessageBytes : null;
 
     // Receive buffer: 64 KiB initial, grows as needed.
     private byte[] _receiveBuffer = new byte[64 * 1024];

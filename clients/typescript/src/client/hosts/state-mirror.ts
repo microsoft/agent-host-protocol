@@ -54,6 +54,8 @@ import { automationReducer } from '../../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../../types/channels-automation-run/reducer.js';
 import { ROOT_RESOURCE_URI, type HostId, type HostSubscriptionEvent } from './types.js';
 import { isCanvasState } from '../canvas-state.js';
+import { isKnownSnapshot } from '../state-mirror.js';
+import type { ReceivedDelivery } from '../events.js';
 
 const INITIAL_ROOT: RootState = { agents: [] };
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
@@ -112,6 +114,15 @@ export class MultiHostStateMirror {
   private readonly automationCatalogsMap = new Map<HostId, AutomationState>();
   private readonly automationsMap = new Map<string, AutomationEntry>();
   private readonly automationRunsMap = new Map<string, AutomationRunState>();
+
+  /** Consume from a reliable owner queue rather than the legacy lossy fan-in. */
+  applyDelivery(hostId: HostId, delivery: ReceivedDelivery): void {
+    const event = delivery.event;
+    if (event.type === 'snapshot') {
+      if (isKnownSnapshot(event.params.snapshot)) this.applySnapshot(hostId, event.params.snapshot);
+    } else if (event.type === 'action') this.applyEnvelope(hostId, event.params);
+    delivery.release();
+  }
 
   /** All known root states keyed by host. */
   get rootStates(): ReadonlyMap<HostId, RootState> {
