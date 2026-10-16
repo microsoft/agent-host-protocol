@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Controller commands preserve opaque protocol turn IDs; oversized message inputs report format-neutral errors.",
+  "targets": ["cli"]
+}

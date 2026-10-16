@@ -1,15 +1,18 @@
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { join } from 'node:path';
 
 import {
   applyReleaseToChangelog,
+  changelogPathForTarget,
   parseChangeFragment,
+  releaseIntroForTarget,
   renderChangeSections,
   type ChangeFragment,
 } from './change-fragments.js';
 
 describe('change fragments', () => {
-  it('defaults targets to every changelog artifact', () => {
+  it('defaults targets to the spec and clients, not the independently released CLI', () => {
     const result = parseChangeFragment(
       'docs/.changes/example.json',
       JSON.stringify({ type: 'added', message: 'New protocol field.' }),
@@ -35,11 +38,30 @@ describe('change fragments', () => {
       [
         '`message` must not include the leading Markdown bullet',
         'duplicate target typescript',
-        'invalid target "python"; expected one of spec, rust, kotlin, typescript, swift, go, dotnet',
+        'invalid target "python"; expected one of spec, rust, kotlin, typescript, swift, go, dotnet, cli',
         'invalid issue number 0; expected a positive integer',
         'duplicate issue number 12',
       ],
     );
+  });
+
+  it('supports CLI-only fragments and an independently versioned CLI changelog', () => {
+    const result = parseChangeFragment(
+      'docs/.changes/cli.json',
+      JSON.stringify({ type: 'added', message: 'New CLI command.', targets: ['cli'] }),
+    );
+    assert.deepEqual(result.errors, []);
+    assert.deepEqual(result.fragment?.targets, ['cli']);
+    assert.equal(changelogPathForTarget('cli', '.'), join('cli', 'CHANGELOG.md'));
+    assert.equal(releaseIntroForTarget('cli', '0.1.0'), 'CLI version: `0.1.0`');
+    assert.ok(result.fragment);
+    const released = applyReleaseToChangelog(
+      '# Changelog\n\n## [Unreleased]\n', 'cli', '0.1.0', '2026-10-08', [result.fragment],
+    );
+    assert.match(released, /## \[0\.1\.0\]/);
+    assert.match(released, /CLI version: `0\.1\.0`/);
+    assert.match(released, /- New CLI command\./);
+    assert.doesNotMatch(released, /Implements AHP/);
   });
 
   it('renders only fragments targeting the requested artifact', () => {

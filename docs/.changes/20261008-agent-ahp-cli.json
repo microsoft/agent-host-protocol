@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Standalone `@microsoft/agent-host-protocol-cli` npm package with the agent-oriented `ahp` executable for protocol inspection, explicit requests and dispatch, bounded observation, recording, and offline replay.",
+  "targets": ["cli"]
+}
