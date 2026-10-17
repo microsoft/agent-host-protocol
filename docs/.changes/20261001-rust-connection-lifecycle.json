@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Rust clients provide configurable automatic idle keepalive; managed hosts become ready after the handshake and refresh sessions concurrently without losing live updates, while preserving request IDs across reconnect attempts.",
+  "targets": ["rust"]
+}
