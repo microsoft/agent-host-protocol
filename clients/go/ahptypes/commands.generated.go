@@ -643,6 +643,8 @@ type CreateChatParams struct {
 	// A client MUST NOT supply this field unless the agent advertises
 	// {@link AgentCapabilities.multipleWorkingDirectories}.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Client-selected initial display title for the new chat.
+	Title *string `json:"title,omitempty"`
 }
 
 // Disposes a chat and cleans up server-side resources.

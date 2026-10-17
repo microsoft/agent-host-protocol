@@ -900,7 +900,11 @@ data class CreateChatParams(
      * A client MUST NOT supply this field unless the agent advertises
      * {@link AgentCapabilities.multipleWorkingDirectories}.
      */
-    val workingDirectories: List<String>? = null
+    val workingDirectories: List<String>? = null,
+    /**
+     * Client-selected initial display title for the new chat.
+     */
+    val title: String? = null
 )
 
 @Serializable

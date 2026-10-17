@@ -962,6 +962,10 @@ public sealed record CreateChatParams
     /// {@link AgentCapabilities.multipleWorkingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
+
+    /// <summary>Client-selected initial display title for the new chat.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
 }
 
 /// <summary>Disposes a chat and cleans up server-side resources.</summary>

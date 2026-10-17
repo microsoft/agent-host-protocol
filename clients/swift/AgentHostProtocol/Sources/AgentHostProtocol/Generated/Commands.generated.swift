@@ -973,6 +973,8 @@ public struct CreateChatParams: Codable, Sendable {
     /// A client MUST NOT supply this field unless the agent advertises
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     public var workingDirectories: [String]?
+    /// Client-selected initial display title for the new chat.
+    public var title: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -981,6 +983,7 @@ public struct CreateChatParams: Codable, Sendable {
         case initialMessage
         case source
         case workingDirectories
+        case title
     }
 
     public init(
@@ -989,7 +992,8 @@ public struct CreateChatParams: Codable, Sendable {
         chat: String,
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
-        workingDirectories: [String]? = nil
+        workingDirectories: [String]? = nil,
+        title: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -997,6 +1001,7 @@ public struct CreateChatParams: Codable, Sendable {
         self.initialMessage = initialMessage
         self.source = source
         self.workingDirectories = workingDirectories
+        self.title = title
     }
 }
 

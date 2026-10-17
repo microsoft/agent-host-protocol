@@ -896,6 +896,9 @@ pub struct CreateChatParams {
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Client-selected initial display title for the new chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 /// Disposes a chat and cleans up server-side resources.
