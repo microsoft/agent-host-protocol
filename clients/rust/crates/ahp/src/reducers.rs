@@ -2325,6 +2325,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
             changesets: None,
             canvases: None,
@@ -2486,6 +2487,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
         };
         let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {
