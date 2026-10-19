@@ -80,7 +80,8 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 [`ChatState.config`](/reference/chat#chatstate) is an overlay on the owning
 session's [`SessionState.config`](/reference/session#sessionstate). It carries
-only the values set on this chat; the session's config schema applies. A
+only the values set on this chat and, optionally, a `schema`. When `schema` is
+absent, the session's config schema applies. A
 chat's effective config is the session's values with the chat's values
 applied over them. Hosts do not mirror session config into chats.
 
@@ -94,11 +95,16 @@ omits the property. Every other property is changed on the session with
 `session/configChanged`.
 
 A chat backed by a different agent than its session (see
-[Chat providers](#chat-providers)) does not inherit the session's values,
-which belong to the session's agent. The host seeds that chat's
-`ChatState.config` from its own agent's defaults when it creates the chat, and
-those values are the chat's effective config. The chat's settings are its own
-and change only through `chat/configChanged` on that chat.
+[Chat providers](#chat-providers)) does not inherit the session's schema or
+values, which belong to the session's agent. The host MUST set
+`ChatState.config.schema` to that agent's chat-applicable config schema and
+seed `ChatState.config.values` from that agent's defaults when it creates the
+chat; those values are the chat's effective config. When a chat uses the
+session's agent, the host MAY omit `schema`, and clients MUST then use the
+session's `SessionState.config.schema`. Whenever `schema` is present, clients
+MUST render and validate the chat's settings against it rather than the
+session's schema. The chat's settings change only through `chat/configChanged`
+on that chat, which never changes the schema.
 
 ### Chat providers
 
@@ -127,6 +133,9 @@ chat. A host that advertises
   agents.
 - Agent capability checks (`multipleChats.fork`, `multipleChats.sideChat`,
   `multipleWorkingDirectories`) use the chat's agent.
+- A chat whose agent differs from the session's carries its own config schema
+  and agent-default values in `ChatState.config`; see
+  [Per-chat configuration](#per-chat-configuration).
 - Hosts MUST NOT advertise `multipleChatProviders` on connections that
   negotiated a protocol version earlier than `1.1.0`. Clients and hosts that do
   not use the capability are unaffected: every chat uses the session's agent.

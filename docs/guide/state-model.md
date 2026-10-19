@@ -214,7 +214,8 @@ working directories: the chat's subset when present, otherwise the full
 session set.
 
 `config` is an overlay on `SessionState.config`: it carries only the values set
-on this chat, and the session's config schema applies. A chat's effective
+on this chat, and the session's config schema applies unless the chat carries
+its own `config.schema`. A chat's effective
 config is the session's values with the chat's values applied over them. Only
 properties marked `chatMutable: true` in the session's schema can be set per
 chat, with `chat/configChanged`. See
@@ -224,8 +225,10 @@ chat, with `chat/configChanged`. See
 Hosts that advertise `multipleChatProviders` in their `initialize` result may
 back chats in one session with different agents, chosen by `createChat`'s
 `provider`; forks and side chats keep their source chat's agent. A chat whose
-agent differs from the session's starts from that agent's config defaults
-rather than inheriting the session's values. See
+agent differs from the session's carries that agent's config schema in
+`config.schema` and starts from that agent's default values rather than
+inheriting the session's; clients render and validate its settings against
+that schema. See
 [Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.

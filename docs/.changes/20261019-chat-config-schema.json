@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `ChatConfigState.schema` lets a chat carry its own config schema. Hosts set it for chats backed by a different agent than their session, whose values start from that agent's defaults; when absent, clients use the session's config schema."
+}

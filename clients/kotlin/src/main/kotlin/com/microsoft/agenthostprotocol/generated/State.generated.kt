@@ -2585,6 +2585,20 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
+     * JSON Schema describing the config properties that apply to this chat.
+     *
+     * The host MUST set it when the chat's provider differs from the session's
+     * provider and MAY omit it otherwise. When absent, clients MUST use the
+     * session's {@link SessionState.config | `SessionState.config.schema`}.
+     * When present, clients MUST render and validate this chat's settings
+     * against it instead, and only its properties with `chatMutable: true`
+     * can be set with `chat/configChanged`. `chat/configChanged` never changes
+     * the schema.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val schema: SessionConfigSchema? = null,
+    /**
      * Config values set on this chat, keyed by property id
      */
     val values: Map<String, JsonElement>

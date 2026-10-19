@@ -12,6 +12,7 @@ import type {
   AgentSelection,
   ChangesSummary,
   McpAuthRequirement,
+  SessionConfigSchema,
   SessionStatus,
 } from '../channels-session/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -441,21 +442,36 @@ export const enum ChatInteractivity {
  * Configuration values set on a chat: an overlay on the owning session's
  * {@link SessionState.config | `SessionState.config`}.
  *
- * It carries only the chat's own values; the session's config schema
- * applies. The effective config of a chat is the session's values with
- * these values applied over them. Only properties with `chatMutable: true`
- * in the session's config schema can be set on a chat.
+ * It carries only the chat's own values. When {@link schema} is absent, the
+ * session's config schema applies: the effective config of a chat is the
+ * session's values with these values applied over them, and only properties
+ * with `chatMutable: true` in the session's config schema can be set on a
+ * chat.
  *
  * A chat whose {@link ChatState.provider | `provider`} differs from the
- * session's provider does not inherit the session's values: the session's
- * agent owns those. The host seeds that chat's values from its agent's
- * defaults when it creates the chat, and they are the chat's effective
- * config. The chat's settings are its own and change only through
+ * session's provider does not inherit the session's schema or values: the
+ * session's agent owns those. The host MUST set {@link schema} to that chat's
+ * agent's chat-applicable config schema and seed {@link values} from that
+ * agent's defaults when it creates the chat; those values are the chat's
+ * effective config. The chat's settings are its own and change only through
  * `chat/configChanged` on that chat.
  *
  * @category Chat Config Types
  */
 export interface ChatConfigState {
+  /**
+   * JSON Schema describing the config properties that apply to this chat.
+   *
+   * The host MUST set it when the chat's provider differs from the session's
+   * provider and MAY omit it otherwise. When absent, clients MUST use the
+   * session's {@link SessionState.config | `SessionState.config.schema`}.
+   * When present, clients MUST render and validate this chat's settings
+   * against it instead, and only its properties with `chatMutable: true`
+   * can be set with `chat/configChanged`. `chat/configChanged` never changes
+   * the schema.
+   * @stability 1.0
+   */
+  schema?: SessionConfigSchema;
   /** Config values set on this chat, keyed by property id */
   values: Record<string, unknown>;
 }
