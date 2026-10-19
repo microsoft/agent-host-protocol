@@ -213,22 +213,24 @@ changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
 
-`config` is an overlay on `SessionState.config`: it carries only the values set
-on this chat, and the session's config schema applies unless the chat carries
-its own `config.schema`. A chat's effective
-config is the session's values with the chat's values applied over them. Only
-properties marked `chatMutable: true` in the session's schema can be set per
-chat, with `chat/configChanged`. See
+`config` holds the chat's own settings. Without `config.schema` it is an
+overlay on `SessionState.config`: it carries only the values set on this chat,
+the session's config schema applies, and the chat's effective config is the
+session's values with the chat's values applied over them. Only properties
+marked `chatMutable: true` in the session's schema can be set per chat, with
+`chat/configChanged`. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
 `provider` names the chat's agent. Absence means the session's `provider`.
 Hosts that advertise `multipleChatProviders` in their `initialize` result may
 back chats in one session with different agents, chosen by `createChat`'s
-`provider`; forks and side chats keep their source chat's agent. A chat whose
-agent differs from the session's carries that agent's config schema in
-`config.schema` and starts from that agent's default values rather than
-inheriting the session's; clients render and validate its settings against
-that schema. See
+`provider`; forks and side chats keep their source chat's agent, and a chat's
+agent never changes. The host sets `config.schema` if and only if a chat's
+agent differs from the session's. Such a chat inherits nothing from the
+session: `config.values` is its full effective config, seeded from that
+agent's defaults, and omitted properties take their `schema` defaults. Clients
+render and validate its settings against that schema. `moveChat` normalizes
+`config` when a chat's agent relationship to its session changes. See
 [Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.

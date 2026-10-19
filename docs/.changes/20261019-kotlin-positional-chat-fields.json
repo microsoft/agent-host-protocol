@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "`ChatState`, `ChatSummary`, `SessionChatSummary`, and `ChatConfigState` gained parameters (`provider`, `schema`), which shifts their positional constructor arguments and `componentN` destructuring; use named arguments.",
+  "targets": ["kotlin"]
+}

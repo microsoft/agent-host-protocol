@@ -1421,6 +1421,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatConfigChanged(a) => {
             let config = state.config.get_or_insert_with(|| ChatConfigState {
+                schema: None,
                 values: Default::default(),
             });
             if a.replace.unwrap_or(false) {

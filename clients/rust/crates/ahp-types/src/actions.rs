@@ -543,8 +543,8 @@ pub struct SessionChatRemovedAction {
 /// One existing chat's summary fields changed.
 ///
 /// Partial-update semantics: only fields present in `changes` are written;
-/// omitted fields are preserved. Identity fields (`resource`) MUST NOT be
-/// carried in `changes`. No-op when no entry with `chat` exists — clients
+/// omitted fields are preserved. Identity fields (`resource`, `provider`) MUST
+/// NOT be carried in `changes`. No-op when no entry with `chat` exists — clients
 /// SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
 ///
 /// Mirrors the root-channel `root/sessionSummaryChanged` notification.
@@ -558,8 +558,8 @@ pub struct SessionChatUpdatedAction {
     pub chat: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
-    /// senders; receivers SHOULD ignore them if present.
+    /// Identity fields (`resource` and `provider`) never change and MUST be
+    /// omitted by senders; receivers SHOULD ignore them if present.
     pub changes: PartialChatSummary,
 }
 

@@ -2507,8 +2507,9 @@ public sealed class ChatState
     /// absent value that way. Hosts MAY omit it when it equals the session's
     /// provider and MUST set it when it differs, which only happens when the
     /// host advertises {@link InitializeResult.multipleChatProviders}. A chat's
-    /// agent never changes; hosts MUST NOT change this value through
-    /// `session/chatUpdated`. Forks and side chats always use their source
+    /// agent never changes, including across `moveChat`: like `resource`, it is
+    /// an identity field that senders MUST omit from `session/chatUpdated`
+    /// changes and receivers ignore. Forks and side chats always use their source
     /// chat's agent.
     ///
     /// Stability: 1.0 - Early development.</summary>
@@ -2559,8 +2560,9 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
-    /// <summary>Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
+    /// <summary>Configuration set on this chat: an overlay on the owning session's
+    /// {@link SessionState.config | `SessionState.config`}, or the chat's own
+    /// schema and full values when its agent differs from the session's. See
     /// {@link ChatConfigState}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
@@ -3534,39 +3536,48 @@ public sealed class SessionConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>Configuration values set on a chat: an overlay on the owning session's
-/// {@link SessionState.config | `SessionState.config`}.
+/// <summary>Configuration set on a chat. Its meaning depends on whether {@link schema}
+/// is present.
 ///
-/// It carries only the chat's own values. When {@link schema} is absent, the
-/// session's config schema applies: the effective config of a chat is the
-/// session's values with these values applied over them, and only properties
-/// with `chatMutable: true` in the session's config schema can be set on a
-/// chat.
+/// - **Without `schema`** (the chat uses the session's agent): {@link values}
+///   is an overlay on the owning session's
+///   {@link SessionState.config | `SessionState.config`}. The session's config
+///   schema applies; the chat's effective config is the session's values with
+///   these values applied over them, and only properties with
+///   `chatMutable: true` in the session's schema can be set on the chat. A
+///   property omitted from `values` takes the session's value.
+/// - **With `schema`** (the chat's {@link ChatState.provider | `provider`}
+///   differs from the session's): {@link values} is the chat's full effective
+///   config and nothing is inherited from the session, whose schema and values
+///   belong to the session's agent. The host seeds `values` from the chat
+///   agent's defaults when it creates the chat. A property omitted from
+///   `values`, including after a `chat/configChanged` with `replace: true`,
+///   takes its `default` from `schema`.
 ///
-/// A chat whose {@link ChatState.provider | `provider`} differs from the
-/// session's provider does not inherit the session's schema or values: the
-/// session's agent owns those. The host MUST set {@link schema} to that chat's
-/// agent's chat-applicable config schema and seed {@link values} from that
-/// agent's defaults when it creates the chat; those values are the chat's
-/// effective config. The chat's settings are its own and change only through
-/// `chat/configChanged` on that chat.</summary>
+/// Settings change only through `chat/configChanged` on the chat, which never
+/// changes `schema`. Hosts MUST reject `chat/configChanged` keys that are not
+/// valid for the chat's effective schema (`schema` when present, otherwise the
+/// session's schema restricted to `chatMutable` properties).</summary>
 public sealed class ChatConfigState
 {
     /// <summary>JSON Schema describing the config properties that apply to this chat.
     ///
-    /// The host MUST set it when the chat's provider differs from the session's
-    /// provider and MAY omit it otherwise. When absent, clients MUST use the
-    /// session's {@link SessionState.config | `SessionState.config.schema`}.
-    /// When present, clients MUST render and validate this chat's settings
-    /// against it instead, and only its properties with `chatMutable: true`
-    /// can be set with `chat/configChanged`. `chat/configChanged` never changes
-    /// the schema.
+    /// The host MUST set it if and only if the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's
+    /// provider, to that agent's chat-applicable config schema, and MUST NOT set
+    /// it otherwise. When absent, clients MUST use the session's
+    /// {@link SessionState.config | `SessionState.config.schema`}. When present,
+    /// clients MUST render and validate this chat's settings against it instead,
+    /// and only its properties with `chatMutable: true` can be set with
+    /// `chat/configChanged`.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigSchema? Schema { get; set; }
 
-    /// <summary>Config values set on this chat, keyed by property id</summary>
+    /// <summary>Config values set on this chat, keyed by property id. An overlay on the
+    /// session's values when {@link schema} is absent; the chat's full effective
+    /// config when it is present.</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 

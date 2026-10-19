@@ -472,8 +472,8 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
     public var chat: String
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
-    /// senders; receivers SHOULD ignore them if present.
+    /// Identity fields (`resource` and `provider`) never change and MUST be
+    /// omitted by senders; receivers SHOULD ignore them if present.
     public var changes: PartialChatSummary
 
     public init(

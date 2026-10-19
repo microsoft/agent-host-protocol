@@ -1829,8 +1829,9 @@ public struct ChatState: Codable, Sendable {
     /// absent value that way. Hosts MAY omit it when it equals the session's
     /// provider and MUST set it when it differs, which only happens when the
     /// host advertises {@link InitializeResult.multipleChatProviders}. A chat's
-    /// agent never changes; hosts MUST NOT change this value through
-    /// `session/chatUpdated`. Forks and side chats always use their source
+    /// agent never changes, including across `moveChat`: like `resource`, it is
+    /// an identity field that senders MUST omit from `session/chatUpdated`
+    /// changes and receivers ignore. Forks and side chats always use their source
     /// chat's agent.
     ///
     /// Stability: 1.0 - Early development.
@@ -1871,8 +1872,9 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
-    /// Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
+    /// Configuration set on this chat: an overlay on the owning session's
+    /// {@link SessionState.config | `SessionState.config`}, or the chat's own
+    /// schema and full values when its agent differs from the session's. See
     /// {@link ChatConfigState}.
     public var config: ChatConfigState?
     /// Completed turns
@@ -2710,17 +2712,20 @@ public struct SessionConfigState: Codable, Sendable {
 public struct ChatConfigState: Codable, Sendable {
     /// JSON Schema describing the config properties that apply to this chat.
     ///
-    /// The host MUST set it when the chat's provider differs from the session's
-    /// provider and MAY omit it otherwise. When absent, clients MUST use the
-    /// session's {@link SessionState.config | `SessionState.config.schema`}.
-    /// When present, clients MUST render and validate this chat's settings
-    /// against it instead, and only its properties with `chatMutable: true`
-    /// can be set with `chat/configChanged`. `chat/configChanged` never changes
-    /// the schema.
+    /// The host MUST set it if and only if the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's
+    /// provider, to that agent's chat-applicable config schema, and MUST NOT set
+    /// it otherwise. When absent, clients MUST use the session's
+    /// {@link SessionState.config | `SessionState.config.schema`}. When present,
+    /// clients MUST render and validate this chat's settings against it instead,
+    /// and only its properties with `chatMutable: true` can be set with
+    /// `chat/configChanged`.
     ///
     /// Stability: 1.0 - Early development.
     public var schema: SessionConfigSchema?
-    /// Config values set on this chat, keyed by property id
+    /// Config values set on this chat, keyed by property id. An overlay on the
+    /// session's values when {@link schema} is absent; the chat's full effective
+    /// config when it is present.
     public var values: [String: AnyCodable]
 
     public init(
