@@ -403,7 +403,9 @@ pub struct OtlpExportMetricsParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialSessionSummary {
-    /// Agent provider ID
+    /// Agent provider ID of the session: the agent that backs the session's
+    /// initial chat and every chat that does not report its own
+    /// {@link ChatSummary.provider | `provider`}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     /// Session title

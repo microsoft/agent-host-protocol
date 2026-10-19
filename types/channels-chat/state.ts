@@ -83,6 +83,20 @@ export interface ChatState {
    */
   interactivity?: ChatInteractivity;
   /**
+   * Agent provider ID (an {@link AgentInfo.provider}) backing this chat.
+   *
+   * Absence means the owning session's
+   * {@link SessionMetadata.provider | `provider`}; clients MUST treat an
+   * absent value that way. Hosts MAY omit it when it equals the session's
+   * provider and MUST set it when it differs, which only happens when the
+   * host advertises {@link InitializeResult.multipleChatProviders}. A chat's
+   * agent never changes; hosts MUST NOT change this value through
+   * `session/chatUpdated`. Forks and side chats always use their source
+   * chat's agent.
+   * @stability 1.0
+   */
+  provider?: string;
+  /**
    * The subset of the session's
    * {@link SessionState.workingDirectories | `workingDirectories`} that this
    * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -223,6 +237,13 @@ export interface ChatSummary {
    * compatibility.
    */
   interactivity?: ChatInteractivity;
+  /**
+   * Agent provider ID backing this chat. Absence means the owning session's
+   * {@link SessionMetadata.provider | `provider`}.
+   * See {@link ChatState.provider} for the full semantics.
+   * @stability 1.0
+   */
+  provider?: string;
   /**
    * The subset of the session's working directories this chat uses.
    * See {@link ChatState.workingDirectories} for the full semantics.
@@ -424,6 +445,13 @@ export const enum ChatInteractivity {
  * applies. The effective config of a chat is the session's values with
  * these values applied over them. Only properties with `chatMutable: true`
  * in the session's config schema can be set on a chat.
+ *
+ * A chat whose {@link ChatState.provider | `provider`} differs from the
+ * session's provider does not inherit the session's values: the session's
+ * agent owns those. The host seeds that chat's values from its agent's
+ * defaults when it creates the chat, and they are the chat's effective
+ * config. The chat's settings are its own and change only through
+ * `chat/configChanged` on that chat.
  *
  * @category Chat Config Types
  */

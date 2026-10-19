@@ -93,6 +93,44 @@ To reset a property to the session's value, replace the overlay with one that
 omits the property. Every other property is changed on the session with
 `session/configChanged`.
 
+A chat backed by a different agent than its session (see
+[Chat providers](#chat-providers)) does not inherit the session's values,
+which belong to the session's agent. The host seeds that chat's
+`ChatState.config` from its own agent's defaults when it creates the chat, and
+those values are the chat's effective config. The chat's settings are its own
+and change only through `chat/configChanged` on that chat.
+
+### Chat providers
+
+Every chat is backed by one agent, identified by its
+[`AgentInfo.provider`](/reference/root#agentinfo).
+[`SessionState.provider`](/reference/session#sessionmetadata) is the session's
+agent: the agent of the session's initial chat and the default for every other
+chat. A host that advertises
+[`multipleChatProviders`](/reference/common#initializeresult) in its
+`initialize` result lets one session contain chats backed by different agents.
+
+- [`ChatSummary.provider`](/reference/chat#chatsummary) (mirrored on
+  `ChatState` and on [`SessionChatSummary`](/reference/session#sessionchatsummary))
+  reports a chat's agent. Absence means the session's `provider`; clients MUST
+  treat it that way. Hosts MAY omit it when it equals the session's provider
+  and MUST set it when it differs. A chat's agent never changes.
+- A client MAY pass [`provider`](/reference/chat#createchatparams) to
+  `createChat` only when the host advertises `multipleChatProviders`. When it is
+  absent, the new chat uses the source chat's agent for forks and side chats,
+  and the session's agent otherwise.
+- The host MUST reject `createChat` with `InvalidParams` when `provider` is sent
+  without the capability, names an agent that is not in the root state's
+  `agents`, names an agent that does not advertise `multipleChats`, or differs
+  from the source chat's agent when `source` is present. Forks and side chats
+  always keep the source chat's agent; history is never transferred between
+  agents.
+- Agent capability checks (`multipleChats.fork`, `multipleChats.sideChat`,
+  `multipleWorkingDirectories`) use the chat's agent.
+- Hosts MUST NOT advertise `multipleChatProviders` on connections that
+  negotiated a protocol version earlier than `1.1.0`. Clients and hosts that do
+  not use the capability are unaffected: every chat uses the session's agent.
+
 ## Relationship to the session channel
 
 - A chat's [`ChatSummary`](/reference/chat#chatsummary) appears in the session's [`SessionState.chats`](/reference/session#sessionstate) catalog. The session reducer keeps that catalog in sync with the underlying chat lifecycle.
@@ -114,6 +152,8 @@ omits the property. Every other property is changed on the session with
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
 - a `title` containing the client-selected initial display title for the target chat,
+- a `provider` selecting the agent that backs the chat, when the host
+  advertises `multipleChatProviders` (see [Chat providers](#chat-providers)),
 - an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatSource`](/reference/chat#chatsource), either
   `{ kind: "fork", chat, turnId }` or `{ kind: "sideChat", chat, turnId }`,
@@ -234,6 +274,14 @@ Success preserves every moved chat URI, state, and origin, and converges the
 durable session catalogs. The protocol does not require provider equality,
 prohibit active turns universally, or otherwise expose host-specific storage
 and runtime constraints.
+
+When the host advertises `multipleChatProviders`, every moved chat keeps its
+agent, and a moved chat whose agent differs from the destination session's
+`provider` MUST carry `provider` in its destination catalog entry. A
+`newSession` destination's `provider` is the requested chat's agent. A host
+that does not advertise the capability cannot report a per-chat agent, so it
+MAY reject, as an unsupported destination, a move into a session with a
+different `provider`. See [Chat providers](#chat-providers).
 
 #### Atomic synchronization
 

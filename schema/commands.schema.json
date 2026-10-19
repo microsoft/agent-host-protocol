@@ -185,6 +185,10 @@
         "tcpConnections": {
           "$ref": "#/$defs/TcpConnectionsCapability",
           "description": "Present when the host supports `createTcpConnection`, which opens a TCP\nconnection on the host's network for the client to forward.\n\nStability: 1.0 - Early development."
+        },
+        "multipleChatProviders": {
+          "$ref": "#/$defs/MultipleChatProvidersCapability",
+          "description": "Present when the host lets chats in one session be backed by different\nagents. Clients MAY then pass {@link CreateChatParams.provider} to\n`createChat`, and chats MAY report a {@link ChatSummary.provider} that\ndiffers from the session's {@link SessionMetadata.provider}. When absent,\nevery chat uses its session's provider and clients MUST NOT send\n{@link CreateChatParams.provider}.\n\nThis is a host capability rather than an {@link AgentCapabilities | agent\ncapability} because the host, not an individual agent, decides which\nagents may share a session. Hosts MUST NOT advertise it on connections\nthat negotiated a protocol version earlier than `1.1.0`.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -192,6 +196,11 @@
         "serverSeq",
         "snapshots"
       ]
+    },
+    "MultipleChatProvidersCapability": {
+      "type": "object",
+      "description": "Present when the host supports chats backed by different agents within one\nsession. See {@link InitializeResult.multipleChatProviders}.\n\nThe empty object means \"supported\"; sub-fields are reserved for future\noptions.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "AutomationCapabilities": {
       "type": "object",
@@ -1426,6 +1435,10 @@
         "title": {
           "type": "string",
           "description": "Client-selected initial display title for the new chat."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID (an {@link AgentInfo.provider}) that backs the new chat.\nWhen absent, the chat uses the source chat's provider if `source` is\npresent, and otherwise the session's\n{@link SessionMetadata.provider | `provider`}.\n\nA client MUST NOT supply this field unless the host advertises\n{@link InitializeResult.multipleChatProviders}. The host MUST reject the\nrequest with `InvalidParams` when:\n\n- it does not advertise `multipleChatProviders`;\n- the value is not the `provider` of an agent in the root state's\n  `agents`, or that agent does not advertise\n  {@link AgentCapabilities.multipleChats}; or\n- `source` is present and the value differs from the source chat's\n  provider. Forks and side chats always use their source chat's agent;\n  history is never transferred between agents.\n\nCapability checks that depend on the agent — `multipleChats.fork`,\n`multipleChats.sideChat`, and `multipleWorkingDirectories` — apply to the\nchat's agent. The new chat's\n{@link ChatSummary.provider | `ChatSummary.provider`} reports the\nresolved agent.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -1470,7 +1483,7 @@
     },
     "MoveChatParams": {
       "type": "object",
-      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
+      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nWhen the host advertises {@link InitializeResult.multipleChatProviders},\nevery moved chat keeps its agent ({@link ChatSummary.provider}), and every\nmoved chat whose provider differs from the destination session's\n{@link SessionMetadata.provider} MUST carry `provider` in its destination\ncatalog entry. A `newSession` destination's session `provider` is the\nrequested chat's provider. A host that does not advertise the capability\ncannot report a per-chat provider, so it MAY reject, as an unsupported\ndestination, a move that would place a chat in a session with a different\nprovider.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -2734,7 +2747,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID"
+          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
         },
         "title": {
           "type": "string",
@@ -2780,7 +2793,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID"
+          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
         },
         "title": {
           "type": "string",
@@ -3088,7 +3101,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID"
+          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
         },
         "title": {
           "type": "string",
@@ -3182,6 +3195,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat, matching {@link ChatSummary.provider}.\n\nAbsence means the session's {@link SessionMetadata.provider | `provider`}.\nHosts MUST set it when it differs, so session lists can show sessions\nwhose chats use different agents without subscribing to them.\n\nStability: 1.0 - Early development."
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -4496,6 +4513,10 @@
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID (an {@link AgentInfo.provider}) backing this chat.\n\nAbsence means the owning session's\n{@link SessionMetadata.provider | `provider`}; clients MUST treat an\nabsent value that way. Hosts MAY omit it when it equals the session's\nprovider and MUST set it when it differs, which only happens when the\nhost advertises {@link InitializeResult.multipleChatProviders}. A chat's\nagent never changes; hosts MUST NOT change this value through\n`session/chatUpdated`. Forks and side chats always use their source\nchat's agent.\n\nStability: 1.0 - Early development."
+        },
         "workingDirectories": {
           "type": "array",
           "items": {
@@ -4611,6 +4632,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. Absence means the owning session's\n{@link SessionMetadata.provider | `provider`}.\nSee {@link ChatState.provider} for the full semantics.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -4752,7 +4777,7 @@
     },
     "ChatConfigState": {
       "type": "object",
-      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.\n\nA chat whose {@link ChatState.provider | `provider`} differs from the\nsession's provider does not inherit the session's values: the session's\nagent owns those. The host seeds that chat's values from its agent's\ndefaults when it creates the chat, and they are the chat's effective\nconfig. The chat's settings are its own and change only through\n`chat/configChanged` on that chat.",
       "properties": {
         "values": {
           "type": "object",
@@ -8187,6 +8212,10 @@
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
               "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+            },
+            "provider": {
+              "type": "string",
+              "description": "Agent provider ID backing this chat. Absence means the owning session's\n{@link SessionMetadata.provider | `provider`}.\nSee {@link ChatState.provider} for the full semantics.\n\nStability: 1.0 - Early development."
             },
             "workingDirectories": {
               "type": "array",

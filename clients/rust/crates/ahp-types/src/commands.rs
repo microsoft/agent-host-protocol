@@ -369,6 +369,21 @@ pub struct InitializeResult {
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tcp_connections: Option<TcpConnectionsCapability>,
+    /// Present when the host lets chats in one session be backed by different
+    /// agents. Clients MAY then pass {@link CreateChatParams.provider} to
+    /// `createChat`, and chats MAY report a {@link ChatSummary.provider} that
+    /// differs from the session's {@link SessionMetadata.provider}. When absent,
+    /// every chat uses its session's provider and clients MUST NOT send
+    /// {@link CreateChatParams.provider}.
+    ///
+    /// This is a host capability rather than an {@link AgentCapabilities | agent
+    /// capability} because the host, not an individual agent, decides which
+    /// agents may share a session. Hosts MUST NOT advertise it on connections
+    /// that negotiated a protocol version earlier than `1.1.0`.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiple_chat_providers: Option<MultipleChatProvidersCapability>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -467,6 +482,17 @@ pub struct AutomationRunCancellationCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
+
+/// Present when the host supports chats backed by different agents within one
+/// session. See {@link InitializeResult.multipleChatProviders}.
+///
+/// The empty object means "supported"; sub-fields are reserved for future
+/// options.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultipleChatProvidersCapability {}
 
 /// Identifies a protocol implementation — the software (and build) on one end
 /// of the connection, as distinct from the {@link AgentInfo | agent persona} it
@@ -899,6 +925,32 @@ pub struct CreateChatParams {
     /// Client-selected initial display title for the new chat.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// Agent provider ID (an {@link AgentInfo.provider}) that backs the new chat.
+    /// When absent, the chat uses the source chat's provider if `source` is
+    /// present, and otherwise the session's
+    /// {@link SessionMetadata.provider | `provider`}.
+    ///
+    /// A client MUST NOT supply this field unless the host advertises
+    /// {@link InitializeResult.multipleChatProviders}. The host MUST reject the
+    /// request with `InvalidParams` when:
+    ///
+    /// - it does not advertise `multipleChatProviders`;
+    /// - the value is not the `provider` of an agent in the root state's
+    ///   `agents`, or that agent does not advertise
+    ///   {@link AgentCapabilities.multipleChats}; or
+    /// - `source` is present and the value differs from the source chat's
+    ///   provider. Forks and side chats always use their source chat's agent;
+    ///   history is never transferred between agents.
+    ///
+    /// Capability checks that depend on the agent — `multipleChats.fork`,
+    /// `multipleChats.sideChat`, and `multipleWorkingDirectories` — apply to the
+    /// chat's agent. The new chat's
+    /// {@link ChatSummary.provider | `ChatSummary.provider`} reports the
+    /// resolved agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 /// Disposes a chat and cleans up server-side resources.
@@ -956,6 +1008,16 @@ pub struct ChatMoveToNewSessionDestination {}
 /// optional anchor MUST resolve; and the source MUST NOT anchor itself.
 /// Rejection leaves ownership, catalog order, chat state, and root summaries
 /// unchanged.
+///
+/// When the host advertises {@link InitializeResult.multipleChatProviders},
+/// every moved chat keeps its agent ({@link ChatSummary.provider}), and every
+/// moved chat whose provider differs from the destination session's
+/// {@link SessionMetadata.provider} MUST carry `provider` in its destination
+/// catalog entry. A `newSession` destination's session `provider` is the
+/// requested chat's provider. A host that does not advertise the capability
+/// cannot report a per-chat provider, so it MAY reject, as an unsupported
+/// destination, a move that would place a chat in a session with a different
+/// provider.
 ///
 /// On success every moved chat keeps its URI, state, and immutable
 /// `ChatOrigin`. The host commits ownership and catalog order before publishing

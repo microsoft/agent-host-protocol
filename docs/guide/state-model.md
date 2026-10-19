@@ -192,6 +192,7 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
+  provider?: string        // chat's agent; absent = session's provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
   config?: ChatConfigState        // config values set on this chat (overlay)
@@ -218,6 +219,14 @@ config is the session's values with the chat's values applied over them. Only
 properties marked `chatMutable: true` in the session's schema can be set per
 chat, with `chat/configChanged`. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
+
+`provider` names the chat's agent. Absence means the session's `provider`.
+Hosts that advertise `multipleChatProviders` in their `initialize` result may
+back chats in one session with different agents, chosen by `createChat`'s
+`provider`; forks and side chats keep their source chat's agent. A chat whose
+agent differs from the session's starts from that agent's config defaults
+rather than inheriting the session's values. See
+[Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

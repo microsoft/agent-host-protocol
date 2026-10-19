@@ -423,6 +423,20 @@ public struct InitializeResult: Codable, Sendable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
+    /// Present when the host lets chats in one session be backed by different
+    /// agents. Clients MAY then pass {@link CreateChatParams.provider} to
+    /// `createChat`, and chats MAY report a {@link ChatSummary.provider} that
+    /// differs from the session's {@link SessionMetadata.provider}. When absent,
+    /// every chat uses its session's provider and clients MUST NOT send
+    /// {@link CreateChatParams.provider}.
+    ///
+    /// This is a host capability rather than an {@link AgentCapabilities | agent
+    /// capability} because the host, not an individual agent, decides which
+    /// agents may share a session. Hosts MUST NOT advertise it on connections
+    /// that negotiated a protocol version earlier than `1.1.0`.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var multipleChatProviders: MultipleChatProvidersCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -436,6 +450,7 @@ public struct InitializeResult: Codable, Sendable {
         case telemetry
         case automations
         case tcpConnections
+        case multipleChatProviders
     }
 
     public init(
@@ -449,7 +464,8 @@ public struct InitializeResult: Codable, Sendable {
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil,
-        tcpConnections: TcpConnectionsCapability? = nil
+        tcpConnections: TcpConnectionsCapability? = nil,
+        multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -462,6 +478,7 @@ public struct InitializeResult: Codable, Sendable {
         self.telemetry = telemetry
         self.automations = automations
         self.tcpConnections = tcpConnections
+        self.multipleChatProviders = multipleChatProviders
     }
 }
 
@@ -547,6 +564,21 @@ public struct AutomationRunCancellationCapability: Codable, Sendable {
 }
 
 public struct AutomationCustomizationsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Present when the host supports chats backed by different agents within one
+/// session. See {@link InitializeResult.multipleChatProviders}.
+///
+/// The empty object means "supported"; sub-fields are reserved for future
+/// options.
+///
+/// Stability: 1.0 - Early development.
+public struct MultipleChatProvidersCapability: Codable, Sendable {
 
     public init(
 
@@ -975,6 +1007,31 @@ public struct CreateChatParams: Codable, Sendable {
     public var workingDirectories: [String]?
     /// Client-selected initial display title for the new chat.
     public var title: String?
+    /// Agent provider ID (an {@link AgentInfo.provider}) that backs the new chat.
+    /// When absent, the chat uses the source chat's provider if `source` is
+    /// present, and otherwise the session's
+    /// {@link SessionMetadata.provider | `provider`}.
+    ///
+    /// A client MUST NOT supply this field unless the host advertises
+    /// {@link InitializeResult.multipleChatProviders}. The host MUST reject the
+    /// request with `InvalidParams` when:
+    ///
+    /// - it does not advertise `multipleChatProviders`;
+    /// - the value is not the `provider` of an agent in the root state's
+    /// `agents`, or that agent does not advertise
+    /// {@link AgentCapabilities.multipleChats}; or
+    /// - `source` is present and the value differs from the source chat's
+    /// provider. Forks and side chats always use their source chat's agent;
+    /// history is never transferred between agents.
+    ///
+    /// Capability checks that depend on the agent — `multipleChats.fork`,
+    /// `multipleChats.sideChat`, and `multipleWorkingDirectories` — apply to the
+    /// chat's agent. The new chat's
+    /// {@link ChatSummary.provider | `ChatSummary.provider`} reports the
+    /// resolved agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -984,6 +1041,7 @@ public struct CreateChatParams: Codable, Sendable {
         case source
         case workingDirectories
         case title
+        case provider
     }
 
     public init(
@@ -993,7 +1051,8 @@ public struct CreateChatParams: Codable, Sendable {
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
         workingDirectories: [String]? = nil,
-        title: String? = nil
+        title: String? = nil,
+        provider: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1002,6 +1061,7 @@ public struct CreateChatParams: Codable, Sendable {
         self.source = source
         self.workingDirectories = workingDirectories
         self.title = title
+        self.provider = provider
     }
 }
 

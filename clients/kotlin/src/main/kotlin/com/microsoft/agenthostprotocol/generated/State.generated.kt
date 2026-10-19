@@ -1812,6 +1812,21 @@ data class ChatState(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID (an {@link AgentInfo.provider}) backing this chat.
+     *
+     * Absence means the owning session's
+     * {@link SessionMetadata.provider | `provider`}; clients MUST treat an
+     * absent value that way. Hosts MAY omit it when it equals the session's
+     * provider and MUST set it when it differs, which only happens when the
+     * host advertises {@link InitializeResult.multipleChatProviders}. A chat's
+     * agent never changes; hosts MUST NOT change this value through
+     * `session/chatUpdated`. Forks and side chats always use their source
+     * chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * The subset of the session's
      * {@link SessionState.workingDirectories | `workingDirectories`} that this
      * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1960,6 +1975,14 @@ data class ChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. Absence means the owning session's
+     * {@link SessionMetadata.provider | `provider`}.
+     * See {@link ChatState.provider} for the full semantics.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * The subset of the session's working directories this chat uses.
      * See {@link ChatState.workingDirectories} for the full semantics.
      */
@@ -1987,7 +2010,9 @@ data class SideChatSelection(
 @Serializable
 data class SessionState(
     /**
-     * Agent provider ID
+     * Agent provider ID of the session: the agent that backs the session's
+     * initial chat and every chat that does not report its own
+     * {@link ChatSummary.provider | `provider`}.
      */
     val provider: String,
     /**
@@ -2382,7 +2407,9 @@ data class SessionToolAuthenticationRequest(
 @Serializable
 data class SessionSummary(
     /**
-     * Agent provider ID
+     * Agent provider ID of the session: the agent that backs the session's
+     * initial chat and every chat that does not report its own
+     * {@link ChatSummary.provider | `provider`}.
      */
     val provider: String,
     /**
@@ -2484,6 +2511,16 @@ data class SessionChatSummary(
      * backward compatibility.
      */
     val interactivity: ChatInteractivity? = null,
+    /**
+     * Agent provider ID backing this chat, matching {@link ChatSummary.provider}.
+     *
+     * Absence means the session's {@link SessionMetadata.provider | `provider`}.
+     * Hosts MUST set it when it differs, so session lists can show sessions
+     * whose chats use different agents without subscribing to them.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
     /**
      * Current chat status, matching {@link ChatSummary.status}.
      *

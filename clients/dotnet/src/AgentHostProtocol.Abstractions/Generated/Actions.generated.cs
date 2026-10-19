@@ -2781,6 +2781,14 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
 
+    /// <summary>Agent provider ID backing this chat. Absence means the owning session's
+    /// {@link SessionMetadata.provider | `provider`}.
+    /// See {@link ChatState.provider} for the full semantics.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

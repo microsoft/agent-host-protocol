@@ -1687,6 +1687,14 @@ data class PartialChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. Absence means the owning session's
+     * {@link SessionMetadata.provider | `provider`}.
+     * See {@link ChatState.provider} for the full semantics.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * The subset of the session's working directories this chat uses.
      * See {@link ChatState.workingDirectories} for the full semantics.
      */

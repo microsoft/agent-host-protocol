@@ -356,7 +356,9 @@ data class OtlpExportMetricsParams(
 @Serializable
 data class PartialSessionSummary(
     /**
-     * Agent provider ID
+     * Agent provider ID of the session: the agent that backs the session's
+     * initial chat and every chat that does not report its own
+     * {@link ChatSummary.provider | `provider`}.
      */
     val provider: String? = null,
     /**

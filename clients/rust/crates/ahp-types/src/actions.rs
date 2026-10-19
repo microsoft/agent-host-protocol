@@ -2395,6 +2395,13 @@ pub struct PartialChatSummary {
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. Absence means the owning session's
+    /// {@link SessionMetadata.provider | `provider`}.
+    /// See {@link ChatState.provider} for the full semantics.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]

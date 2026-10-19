@@ -336,7 +336,9 @@ type OtlpExportMetricsParams struct {
 
 // PartialSessionSummary is the partial equivalent of SessionSummary — every field is optional for delta updates.
 type PartialSessionSummary struct {
-	// Agent provider ID
+	// Agent provider ID of the session: the agent that backs the session's
+	// initial chat and every chat that does not report its own
+	// {@link ChatSummary.provider | `provider`}.
 	Provider *string `json:"provider,omitempty"`
 	// Session title
 	Title *string `json:"title,omitempty"`

@@ -2566,6 +2566,12 @@ public struct PartialChatSummary: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. Absence means the owning session's
+    /// {@link SessionMetadata.provider | `provider`}.
+    /// See {@link ChatState.provider} for the full semantics.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     public var workingDirectories: [String]?
@@ -2580,6 +2586,7 @@ public struct PartialChatSummary: Codable, Sendable {
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.resource = resource
@@ -2591,6 +2598,7 @@ public struct PartialChatSummary: Codable, Sendable {
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
     }
 }

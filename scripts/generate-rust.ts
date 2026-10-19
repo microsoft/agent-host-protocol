@@ -1830,6 +1830,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },

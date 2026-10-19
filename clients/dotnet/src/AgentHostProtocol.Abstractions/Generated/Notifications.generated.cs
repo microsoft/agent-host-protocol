@@ -410,7 +410,9 @@ public sealed record OtlpExportMetricsParams
 /// <summary>Partial equivalent of SessionSummary — every field is optional for delta updates.</summary>
 public sealed record PartialSessionSummary
 {
-    /// <summary>Agent provider ID</summary>
+    /// <summary>Agent provider ID of the session: the agent that backs the session's
+    /// initial chat and every chat that does not report its own
+    /// {@link ChatSummary.provider | `provider`}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Provider { get; init; }
 
