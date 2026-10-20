@@ -1701,7 +1701,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
@@ -1731,6 +1731,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
+  'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
@@ -1744,6 +1745,15 @@ const COMMAND_STRUCTS = [
   'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
 ];
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'mcpServer', structName: 'McpServerAuthenticateTarget', discriminantValue: 'mcpServer' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
@@ -1818,6 +1828,10 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
+  lines.push('// MARK: - AuthenticateTarget Union\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
+  lines.push('');
+
   lines.push('// MARK: - ReconnectResult Union\n');
   lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
   lines.push('');
@@ -2444,6 +2458,7 @@ function checkExhaustiveness(project: Project): void {
 
   // Types that ARE generated but via explicit non-list code paths.
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI',                          // type alias for string
     'JsonPrimitive',                // primitive JSON value alias; mapped to AnyCodable
     'BaseParams',                    // marker base interface; flattened into each command params struct

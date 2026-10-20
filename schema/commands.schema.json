@@ -952,6 +952,28 @@
       "description": "Result of the `resourceMkdir` command.\n\nAn empty object on success.",
       "properties": {}
     },
+    "McpServerAuthenticateTarget": {
+      "type": "object",
+      "description": "An MCP server identified by host-published session and customization state.",
+      "properties": {
+        "kind": {
+          "const": "mcpServer"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI whose `SessionState.customizations` contains the MCP server."
+        },
+        "customizationId": {
+          "type": "string",
+          "description": "The server's session-unique `McpServerCustomization.id`, echoed from the\ncustomization carrying `McpServerAuthRequiredState` or from\n`ToolCallAuthRequiredState.contributor.customizationId`."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "customizationId"
+      ]
+    },
     "AuthenticateParams": {
       "type": "object",
       "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (both surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth).\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these three mechanisms.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
@@ -987,9 +1009,9 @@
           },
           "description": "OAuth scopes the token grants, when known. Lets the server determine\nwhether a specific challenge — e.g. the `requiredScopes` on a live\n`McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is\nsatisfied without decoding the (opaque, server-specific) token itself.\nOmit when the client doesn't track granted scopes separately from the\ntoken."
         },
-        "serverName": {
-          "type": "string",
-          "description": "Exact, case-sensitive MCP server configuration name when the token resolves\na server-owned authentication request. The host MUST apply the token only\nto that named server. Omit for provider-level protected resources."
+        "target": {
+          "$ref": "#/$defs/AuthenticateTarget",
+          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nWhen present, the host MUST apply the token only to that MCP server in\nthat session, never to sibling servers, other sessions, or agent-level\nresources, even if they share the resource and scopes. `resource` MUST\nstill equal that server's advertised `McpAuthRequirement.resource.resource`.\nThe host MUST reject an unknown session or customization, or a\ncustomization that is not an MCP server, with `InvalidParams` (-32602).\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
         }
       },
       "required": [
@@ -1884,6 +1906,10 @@
         }
       ],
       "description": "Result of the `reconnect` command."
+    },
+    "AuthenticateTarget": {
+      "$ref": "#/$defs/McpServerAuthenticateTarget",
+      "description": "Consumer of an authentication token, discriminated by `kind`.\nExtensible to support additional consumers, such as host-owned authentication."
     },
     "ChatSource": {
       "oneOf": [

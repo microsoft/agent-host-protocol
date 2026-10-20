@@ -1,4 +1,4 @@
 {
   "type": "security",
-  "message": "Scope MCP authentication tokens to the named server when multiple servers share a protected resource."
+  "message": "Add an optional `authenticate.target` identifying an MCP server by session URI and customization ID, preventing tokens from reaching other consumers that share a protected resource and scopes."
 }

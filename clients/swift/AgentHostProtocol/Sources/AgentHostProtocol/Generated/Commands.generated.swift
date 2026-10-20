@@ -156,6 +156,30 @@ public enum ResourceWriteMode: String, Codable, Sendable {
     case insert = "insert"
 }
 
+/// Identifies the consumer of an authentication token.
+public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
+    case mcpServer
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "mcpServer": self = .mcpServer
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .mcpServer: try container.encode("mcpServer")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - Command Types
 
 /// Copies source history through a completed turn into the new chat.
@@ -1742,6 +1766,26 @@ public struct DispatchActionParams: Codable, Sendable {
     }
 }
 
+public struct McpServerAuthenticateTarget: Codable, Sendable {
+    public var kind: AuthenticateTargetKind
+    /// Session URI whose `SessionState.customizations` contains the MCP server.
+    public var session: String
+    /// The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.
+    public var customizationId: String
+
+    public init(
+        kind: AuthenticateTargetKind,
+        session: String,
+        customizationId: String
+    ) {
+        self.kind = kind
+        self.session = session
+        self.customizationId = customizationId
+    }
+}
+
 public struct AuthenticateParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -1774,10 +1818,21 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
-    /// Exact, case-sensitive MCP server configuration name when the token resolves
-    /// a server-owned authentication request. The host MUST apply the token only
-    /// to that named server. Omit for provider-level protected resources.
-    public var serverName: String?
+    /// Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.
+    public var target: AuthenticateTarget?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1786,7 +1841,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
-        case serverName
+        case target
     }
 
     public init(
@@ -1796,7 +1851,7 @@ public struct AuthenticateParams: Codable, Sendable {
         token: String,
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
-        serverName: String? = nil
+        target: AuthenticateTarget? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1804,7 +1859,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
-        self.serverName = serverName
+        self.target = target
     }
 }
 
@@ -2472,6 +2527,42 @@ public enum ChatMoveDestination: Codable, Sendable {
         switch self {
         case .session(let value): try value.encode(to: encoder)
         case .newSession(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+// MARK: - AuthenticateTarget Union
+
+public enum AuthenticateTarget: Codable, Sendable {
+    case mcpServer(McpServerAuthenticateTarget)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "mcpServer":
+            self = .mcpServer(try McpServerAuthenticateTarget(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .mcpServer(var value):
+            value.kind = .mcpServer
+            try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }
