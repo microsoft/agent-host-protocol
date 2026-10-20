@@ -97,6 +97,13 @@ const (
 	ResourceWriteModeInsert   ResourceWriteMode = "insert"
 )
 
+// Identifies the consumer of an authentication token.
+type AuthenticateTargetKind string
+
+const (
+	AuthenticateTargetKindMcpServer AuthenticateTargetKind = "mcpServer"
+)
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 // Opens a TCP connection from the host to a destination on the host's network.
@@ -1182,6 +1189,17 @@ type DispatchActionParams struct {
 	Action StateAction `json:"action"`
 }
 
+// An MCP server identified by host-published session and customization state.
+type McpServerAuthenticateTarget struct {
+	Kind AuthenticateTargetKind `json:"kind"`
+	// Session URI whose `SessionState.customizations` contains the MCP server.
+	Session URI `json:"session"`
+	// The server's session-unique `McpServerCustomization.id`, echoed from the
+	// customization carrying `McpServerAuthRequiredState` or from
+	// `ToolCallAuthRequiredState.contributor.customizationId`.
+	CustomizationId string `json:"customizationId"`
+}
+
 // Pushes a Bearer token for a protected resource. The `resource` field MUST
 // match a protected-resource identifier the client has discovered from the
 // server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1227,6 +1245,21 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Optional consumer of the token. Clients SHOULD include this when answering
+	// a specific MCP server's `McpServerAuthRequiredState` or
+	// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+	// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+	//
+	// When present, the host MUST apply the token only to that MCP server in
+	// that session, never to sibling servers, other sessions, or agent-level
+	// resources, even if they share the resource and scopes. `resource` MUST
+	// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+	// The host MUST reject an unknown session or customization, or a
+	// customization that is not an MCP server, with `InvalidParams` (-32602).
+	//
+	// Without a target, resource/scope matching is unchanged; the token may
+	// satisfy every matching pending challenge. Older hosts ignore this field.
+	Target *AuthenticateTarget `json:"target,omitempty"`
 }
 
 // Result of the `authenticate` command.
@@ -1759,6 +1792,76 @@ func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	return json.Marshal(u.Value)
+}
+
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+// AuthenticateTarget identifies the consumer of an authentication token.
+type AuthenticateTarget struct {
+	Value isAuthenticateTarget
+}
+
+// isAuthenticateTarget is the marker interface implemented by every
+// concrete variant of AuthenticateTarget.
+type isAuthenticateTarget interface{ isAuthenticateTarget() }
+
+func (*McpServerAuthenticateTarget) isAuthenticateTarget() {}
+
+// AuthenticateTargetUnknown carries an unrecognized AuthenticateTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AuthenticateTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AuthenticateTargetUnknown) isAuthenticateTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AuthenticateTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "mcpServer":
+		var value McpServerAuthenticateTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AuthenticateTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AuthenticateTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AuthenticateTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *McpServerAuthenticateTarget:
+		object["kind"] = json.RawMessage("\"mcpServer\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

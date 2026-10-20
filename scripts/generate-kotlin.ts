@@ -1778,7 +1778,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
@@ -1809,6 +1809,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
+  'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
@@ -1822,6 +1823,15 @@ const COMMAND_STRUCTS = [
   'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
 ];
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'McpServer', structName: 'McpServerAuthenticateTarget', discriminantValue: 'mcpServer' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
@@ -2043,6 +2053,11 @@ function generateCommandsFile(project: Project): string {
   lines.push('// ─── ChatMoveDestination Union ──────────────────────────────────────────────');
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
+  lines.push('');
+
+  lines.push('// ─── AuthenticateTarget Union ───────────────────────────────────────────────');
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
   lines.push('');
 
   lines.push('// ─── ReconnectResult Union ──────────────────────────────────────────────────');
@@ -2408,6 +2423,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI',                          // type alias for string
     'JsonPrimitive',                // primitive JSON value alias; mapped to JsonElement
     'BaseParams',                    // marker base interface; flattened into each command params struct

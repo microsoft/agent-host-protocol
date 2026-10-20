@@ -122,7 +122,7 @@ sequenceDiagram
     Client->>AS: OAuth flow against PRM.authorization_servers
     AS-->>Client: Bearer token
 
-    Client->>Host: authenticate({ channel: 'ahp-root://', resource, token })
+    Client->>Host: authenticate({ channel: 'ahp-root://', resource, token, target: { kind: 'mcpServer', session, customizationId } })
     Host-->>Client: {}
 
     Host->>Client: customizationUpdated (state: ready)
@@ -148,6 +148,8 @@ The same monitoring pattern also covers `reason: 'expired'` mid-turn — the dif
 Per-agent protected resources in [`AgentInfo.protectedResources`](/reference/root#agentinfo) cover agents themselves. MCP server resources are advertised here, on the customization, so a single agent can carry an arbitrary number of MCP servers each with their own authorization servers without bloating the root state.
 
 The `authenticate` command's `resource` field accepts any protected-resource identifier the server has advertised — statically via `AgentInfo.protectedResources`, or dynamically via a live `McpServerAuthRequiredState.resource` (or, for the tool-call-level state below, `ToolCallAuthRequiredState.auth.resource`). Servers surfacing MCP auth this way don't need to mirror the resource into `AgentInfo.protectedResources`.
+
+Clients SHOULD include `target: { kind: 'mcpServer', session, customizationId }` when answering either MCP challenge, echoing the session URI and the server's `McpServerCustomization.id` (or `ToolCallAuthRequiredState.contributor.customizationId`). This confines the token to that server in that session even when other consumers share its resource and scopes; see [Token Delivery](/specification/authentication#token-delivery) for matching and backwards-compatibility rules.
 
 ### Tool-call-level authentication
 
