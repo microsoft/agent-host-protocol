@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Optional `ChatConfigState.schema` lets a chat carry its own config schema. Hosts set it if and only if the chat's agent differs from its session's; then `values` is the chat's full effective config, seeded from that agent's defaults, with omitted properties taking their schema defaults. Without it, `values` stays an overlay on the session config. `moveChat` normalizes `config` for the destination session."
+  "message": "Optional `ChatConfigState.schema`: hosts set it when a chat's agent differs from its session's. It replaces the session's schema for that chat, and its property defaults replace the session's values as the base that the chat's `values` overlay."
 }

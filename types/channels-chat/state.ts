@@ -84,21 +84,11 @@ export interface ChatState {
    */
   interactivity?: ChatInteractivity;
   /**
-   * Agent provider ID (an {@link AgentInfo.provider}) backing this chat.
-   *
-   * Absence means the owning session's
-   * {@link SessionMetadata.provider | `provider`}; clients MUST treat an
-   * absent value that way. Hosts MAY omit it when it equals the session's
-   * provider and MUST set it when it differs, which only happens on a host
-   * that advertises {@link InitializeResult.multipleChatProviders} on some
-   * connection. Such a host MUST also set it on a movable chat whose
-   * cross-provider moves it accepts (see `moveChat`). Clients that do not
-   * understand this field, including clients on pre-`1.1.0` connections,
-   * ignore it and show the chat as using the session's agent. A chat's agent
-   * never changes, including across `moveChat`: like `resource`, it is an
-   * identity field that senders MUST omit from `session/chatUpdated` changes
-   * and receivers SHOULD ignore. Forks and side chats always use their source
-   * chat's agent.
+   * Agent provider ID backing this chat. Absent means the session's
+   * {@link SessionMetadata.provider | `provider`}; hosts set it when it
+   * differs. It never changes: like `resource`, it is an identity field and is
+   * omitted from `session/chatUpdated` changes. Forks and side chats use the
+   * source chat's agent.
    * @stability 1.0
    */
   provider?: string;
@@ -147,9 +137,8 @@ export interface ChatState {
    */
   canvases?: CanvasReference[];
   /**
-   * Configuration set on this chat: an overlay on the owning session's
-   * {@link SessionState.config | `SessionState.config`}, or the chat's own
-   * schema and full values when its agent differs from the session's. See
+   * Configuration values set on this chat, applied over the owning session's
+   * {@link SessionState.config | `SessionState.config`}. See
    * {@link ChatConfigState}.
    */
   config?: ChatConfigState;
@@ -245,9 +234,7 @@ export interface ChatSummary {
    */
   interactivity?: ChatInteractivity;
   /**
-   * Agent provider ID backing this chat. Absence means the owning session's
-   * {@link SessionMetadata.provider | `provider`}.
-   * See {@link ChatState.provider} for the full semantics.
+   * Agent provider ID backing this chat. See {@link ChatState.provider}.
    * @stability 1.0
    */
   provider?: string;
@@ -445,57 +432,30 @@ export const enum ChatInteractivity {
 // ─── Chat Config Types ───────────────────────────────────────────────────────
 
 /**
- * Configuration set on a chat. Its meaning depends on whether {@link schema}
- * is present.
+ * Configuration values set on a chat: an overlay on the owning session's
+ * {@link SessionState.config | `SessionState.config`}.
  *
- * - **Without `schema`** (the chat uses the session's agent): {@link values}
- *   is an overlay on the owning session's
- *   {@link SessionState.config | `SessionState.config`}. The session's config
- *   schema applies; the chat's effective config is the session's values with
- *   these values applied over them, and only properties with
- *   `chatMutable: true` in the session's schema can be set on the chat. A
- *   property omitted from `values` takes the session's value.
- * - **With `schema`** (the chat's {@link ChatState.provider | `provider`}
- *   differs from the session's): {@link values} is the chat's full effective
- *   config and nothing is inherited from the session, whose schema and values
- *   belong to the session's agent. The host seeds `values` from the chat
- *   agent's defaults when it creates the chat. A property omitted from
- *   `values`, including after a `chat/configChanged` with `replace: true`,
- *   takes its `default` from `schema`.
+ * It carries only the chat's own values; the session's config schema
+ * applies. The effective config of a chat is the session's values with
+ * these values applied over them. Only properties with `chatMutable: true`
+ * in the session's config schema can be set on a chat.
  *
- * Settings change only through `chat/configChanged` on the chat, which never
- * changes `schema`. A chat's `schema` is fixed for the chat's lifetime; only
- * `moveChat` normalization can change it. Hosts MUST reject
- * `chat/configChanged` keys that are not valid for the chat's effective
- * schema: `schema`'s `chatMutable` properties when present, otherwise the
- * session's `chatMutable` properties. With `schema`, a `replace` may only
- * change or drop `chatMutable` keys: it MUST carry every non-`chatMutable`
- * value unchanged (hosts accept those keys when their value is unchanged and
- * reject the request otherwise), so those values stay at whatever the host
- * set.
+ * When {@link schema} is present, it replaces the session's schema for this
+ * chat, and its property `default`s replace the session's values as the base
+ * that {@link values} overlays. Hosts reject `chat/configChanged` keys that are
+ * not `chatMutable` in the effective schema.
  *
  * @category Chat Config Types
  */
 export interface ChatConfigState {
   /**
-   * JSON Schema describing the config properties that apply to this chat.
-   *
-   * The host MUST set it if and only if the chat's
-   * {@link ChatState.provider | `provider`} differs from the session's
-   * provider, to that agent's chat-applicable config schema, and MUST NOT set
-   * it otherwise. When absent, clients MUST use the session's
-   * {@link SessionState.config | `SessionState.config.schema`}. When present,
-   * clients MUST render and validate this chat's settings against it instead,
-   * and only its properties with `chatMutable: true` can be set with
-   * `chat/configChanged`.
+   * Config schema for this chat. Hosts set it when the chat's agent differs
+   * from the session's; when present, clients use it instead of the session's
+   * schema. No action changes it.
    * @stability 1.0
    */
   schema?: SessionConfigSchema;
-  /**
-   * Config values set on this chat, keyed by property id. An overlay on the
-   * session's values when {@link schema} is absent; the chat's full effective
-   * config when it is present.
-   */
+  /** Config values set on this chat, keyed by property id */
   values: Record<string, unknown>;
 }
 

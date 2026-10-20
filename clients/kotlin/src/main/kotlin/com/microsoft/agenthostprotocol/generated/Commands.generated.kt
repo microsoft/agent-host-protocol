@@ -468,22 +468,15 @@ data class InitializeResult(
      */
     val tcpConnections: TcpConnectionsCapability? = null,
     /**
-     * Present when the host lets chats in one session be backed by different
-     * agents. Clients MAY then pass {@link CreateChatParams.provider} to
-     * `createChat`, and chats MAY report a {@link ChatSummary.provider} that
-     * differs from the session's {@link SessionMetadata.provider}. When absent
-     * on a connection, clients on that connection MUST NOT send
-     * {@link CreateChatParams.provider}.
+     * Present when chats in one session may be backed by different agents
+     * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+     * Clients MUST NOT send `CreateChatParams.provider` without it. Hosts do not
+     * advertise it below protocol `1.1.0`.
      *
-     * This is a host capability rather than an {@link AgentCapabilities | agent
-     * capability} because the host, not an individual agent, decides which
-     * agents may share a session. Hosts MUST NOT advertise it on connections
-     * that negotiated a protocol version earlier than `1.1.0`. Only a host that
-     * advertises it on some connection creates chats whose provider differs from
-     * their session's; such chats are shared state, so clients on other
-     * connections, including pre-`1.1.0` connections, can observe them. On those
-     * connections `provider` and `ChatConfigState.schema` arrive as unknown
-     * fields and are ignored, so the chats appear to use the session's agent.
+     * Chats are shared state, so a client that does not understand `provider`
+     * sees such a chat as using the session's agent and may offer that agent's
+     * settings or models for it; hosts reject requests that are invalid for the
+     * chat's agent.
      *
      * Stability: 1.0 - Early development.
      */
@@ -556,11 +549,7 @@ class AutomationRunCancellationCapability
 class AutomationCustomizationsCapability
 
 /**
- * Present when the host supports chats backed by different agents within one
- * session. See {@link InitializeResult.multipleChatProviders}.
- *
- * The empty object means "supported"; sub-fields are reserved for future
- * options.
+ * Presence capability for {@link InitializeResult.multipleChatProviders}.
  *
  * Stability: 1.0 - Early development.
  */
@@ -939,28 +928,14 @@ data class CreateChatParams(
      */
     val title: String? = null,
     /**
-     * Agent provider ID (an {@link AgentInfo.provider}) that backs the new chat.
-     * When absent, the chat uses the source chat's provider if `source` is
-     * present, and otherwise the session's
-     * {@link SessionMetadata.provider | `provider`}.
+     * Agent provider ID for the new chat. Absent means the source chat's agent
+     * when `source` is present, otherwise the session's provider.
      *
-     * A client MUST NOT supply this field unless the host advertises
-     * {@link InitializeResult.multipleChatProviders}. The host MUST reject the
-     * request with `InvalidParams` when:
-     *
-     * - it does not advertise `multipleChatProviders`;
-     * - the value is not the `provider` of an agent in the root state's
-     * `agents`, or that agent does not advertise
-     * {@link AgentCapabilities.multipleChats}; or
-     * - `source` is present and the value differs from the source chat's
-     * provider. Forks and side chats always use their source chat's agent;
-     * history is never transferred between agents.
-     *
-     * Capability checks that depend on the agent — `multipleChats.fork`,
-     * `multipleChats.sideChat`, and `multipleWorkingDirectories` — apply to the
-     * chat's agent. The new chat's
-     * {@link ChatSummary.provider | `ChatSummary.provider`} reports the
-     * resolved agent.
+     * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+     * `InvalidParams` a provider that is not in the root state's `agents`, whose
+     * agent does not advertise `multipleChats`, or that differs from the source
+     * chat's agent. Agent capability checks for this request use the chat's
+     * agent.
      *
      * Stability: 1.0 - Early development.
      */

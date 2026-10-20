@@ -472,8 +472,8 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
     public var chat: String
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource` and `provider`) never change and MUST be
-    /// omitted by senders; receivers SHOULD ignore them if present.
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
+    /// senders; receivers SHOULD ignore them if present.
     public var changes: PartialChatSummary
 
     public init(
@@ -2566,9 +2566,7 @@ public struct PartialChatSummary: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
-    /// Agent provider ID backing this chat. Absence means the owning session's
-    /// {@link SessionMetadata.provider | `provider`}.
-    /// See {@link ChatState.provider} for the full semantics.
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
     ///
     /// Stability: 1.0 - Early development.
     public var provider: String?

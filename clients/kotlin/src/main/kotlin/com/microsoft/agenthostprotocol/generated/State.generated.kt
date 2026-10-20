@@ -1812,21 +1812,11 @@ data class ChatState(
      */
     val interactivity: ChatInteractivity? = null,
     /**
-     * Agent provider ID (an {@link AgentInfo.provider}) backing this chat.
-     *
-     * Absence means the owning session's
-     * {@link SessionMetadata.provider | `provider`}; clients MUST treat an
-     * absent value that way. Hosts MAY omit it when it equals the session's
-     * provider and MUST set it when it differs, which only happens on a host
-     * that advertises {@link InitializeResult.multipleChatProviders} on some
-     * connection. Such a host MUST also set it on a movable chat whose
-     * cross-provider moves it accepts (see `moveChat`). Clients that do not
-     * understand this field, including clients on pre-`1.1.0` connections,
-     * ignore it and show the chat as using the session's agent. A chat's agent
-     * never changes, including across `moveChat`: like `resource`, it is an
-     * identity field that senders MUST omit from `session/chatUpdated` changes
-     * and receivers SHOULD ignore. Forks and side chats always use their source
-     * chat's agent.
+     * Agent provider ID backing this chat. Absent means the session's
+     * {@link SessionMetadata.provider | `provider`}; hosts set it when it
+     * differs. It never changes: like `resource`, it is an identity field and is
+     * omitted from `session/chatUpdated` changes. Forks and side chats use the
+     * source chat's agent.
      *
      * Stability: 1.0 - Early development.
      */
@@ -1876,9 +1866,8 @@ data class ChatState(
      */
     val canvases: List<CanvasReference>? = null,
     /**
-     * Configuration set on this chat: an overlay on the owning session's
-     * {@link SessionState.config | `SessionState.config`}, or the chat's own
-     * schema and full values when its agent differs from the session's. See
+     * Configuration values set on this chat, applied over the owning session's
+     * {@link SessionState.config | `SessionState.config`}. See
      * {@link ChatConfigState}.
      */
     val config: ChatConfigState? = null,
@@ -1981,9 +1970,7 @@ data class ChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
-     * Agent provider ID backing this chat. Absence means the owning session's
-     * {@link SessionMetadata.provider | `provider`}.
-     * See {@link ChatState.provider} for the full semantics.
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
      *
      * Stability: 1.0 - Early development.
      */
@@ -2016,9 +2003,7 @@ data class SideChatSelection(
 @Serializable
 data class SessionState(
     /**
-     * Agent provider ID of the session: the agent that backs the session's
-     * initial chat and every chat that does not report its own
-     * {@link ChatSummary.provider | `provider`}.
+     * Agent provider ID
      */
     val provider: String,
     /**
@@ -2413,9 +2398,7 @@ data class SessionToolAuthenticationRequest(
 @Serializable
 data class SessionSummary(
     /**
-     * Agent provider ID of the session: the agent that backs the session's
-     * initial chat and every chat that does not report its own
-     * {@link ChatSummary.provider | `provider`}.
+     * Agent provider ID
      */
     val provider: String,
     /**
@@ -2518,11 +2501,7 @@ data class SessionChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
-     * Agent provider ID backing this chat, matching {@link ChatSummary.provider}.
-     *
-     * Absence means the session's {@link SessionMetadata.provider | `provider`}.
-     * Hosts MUST set it when it differs, so session lists can show sessions
-     * whose chats use different agents without subscribing to them.
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
      *
      * Stability: 1.0 - Early development.
      */
@@ -2591,24 +2570,15 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
-     * JSON Schema describing the config properties that apply to this chat.
-     *
-     * The host MUST set it if and only if the chat's
-     * {@link ChatState.provider | `provider`} differs from the session's
-     * provider, to that agent's chat-applicable config schema, and MUST NOT set
-     * it otherwise. When absent, clients MUST use the session's
-     * {@link SessionState.config | `SessionState.config.schema`}. When present,
-     * clients MUST render and validate this chat's settings against it instead,
-     * and only its properties with `chatMutable: true` can be set with
-     * `chat/configChanged`.
+     * Config schema for this chat. Hosts set it when the chat's agent differs
+     * from the session's; when present, clients use it instead of the session's
+     * schema. No action changes it.
      *
      * Stability: 1.0 - Early development.
      */
     val schema: SessionConfigSchema? = null,
     /**
-     * Config values set on this chat, keyed by property id. An overlay on the
-     * session's values when {@link schema} is absent; the chat's full effective
-     * config when it is present.
+     * Config values set on this chat, keyed by property id
      */
     val values: Map<String, JsonElement>
 )

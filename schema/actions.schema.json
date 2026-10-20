@@ -192,7 +192,7 @@
     },
     "SessionChatUpdatedAction": {
       "type": "object",
-      "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`, `provider`) MUST\nNOT be carried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.\nWhen `changes.status` changes, the host MUST project that exact value into\nthe matching `SessionChatSummary.status` field and publish\nthe updated compact chat catalog through `root/sessionSummaryChanged`.",
+      "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`) MUST NOT be\ncarried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.\nWhen `changes.status` changes, the host MUST project that exact value into\nthe matching `SessionChatSummary.status` field and publish\nthe updated compact chat catalog through `root/sessionSummaryChanged`.",
       "properties": {
         "type": {
           "const": "session/chatUpdated"
@@ -242,7 +242,7 @@
             },
             "provider": {
               "type": "string",
-              "description": "Agent provider ID backing this chat. Absence means the owning session's\n{@link SessionMetadata.provider | `provider`}.\nSee {@link ChatState.provider} for the full semantics.\n\nStability: 1.0 - Early development."
+              "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
             },
             "workingDirectories": {
               "type": "array",
@@ -252,7 +252,7 @@
               "description": "The subset of the session's working directories this chat uses.\nSee {@link ChatState.workingDirectories} for the full semantics."
             }
           },
-          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource` and `provider`) never change and MUST be\nomitted by senders; receivers SHOULD ignore them if present."
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
         }
       },
       "required": [
@@ -3462,7 +3462,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
+          "description": "Agent provider ID"
         },
         "title": {
           "type": "string",
@@ -3508,7 +3508,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
+          "description": "Agent provider ID"
         },
         "title": {
           "type": "string",
@@ -3816,7 +3816,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID of the session: the agent that backs the session's\ninitial chat and every chat that does not report its own\n{@link ChatSummary.provider | `provider`}."
+          "description": "Agent provider ID"
         },
         "title": {
           "type": "string",
@@ -3913,7 +3913,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat, matching {@link ChatSummary.provider}.\n\nAbsence means the session's {@link SessionMetadata.provider | `provider`}.\nHosts MUST set it when it differs, so session lists can show sessions\nwhose chats use different agents without subscribing to them.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -5230,7 +5230,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID (an {@link AgentInfo.provider}) backing this chat.\n\nAbsence means the owning session's\n{@link SessionMetadata.provider | `provider`}; clients MUST treat an\nabsent value that way. Hosts MAY omit it when it equals the session's\nprovider and MUST set it when it differs, which only happens on a host\nthat advertises {@link InitializeResult.multipleChatProviders} on some\nconnection. Such a host MUST also set it on a movable chat whose\ncross-provider moves it accepts (see `moveChat`). Clients that do not\nunderstand this field, including clients on pre-`1.1.0` connections,\nignore it and show the chat as using the session's agent. A chat's agent\nnever changes, including across `moveChat`: like `resource`, it is an\nidentity field that senders MUST omit from `session/chatUpdated` changes\nand receivers SHOULD ignore. Forks and side chats always use their source\nchat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. It never changes: like `resource`, it is an identity field and is\nomitted from `session/chatUpdated` changes. Forks and side chats use the\nsource chat's agent.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -5262,7 +5262,7 @@
         },
         "config": {
           "$ref": "#/$defs/ChatConfigState",
-          "description": "Configuration set on this chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}, or the chat's own\nschema and full values when its agent differs from the session's. See\n{@link ChatConfigState}."
+          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
         },
         "turns": {
           "type": "array",
@@ -5350,7 +5350,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat. Absence means the owning session's\n{@link SessionMetadata.provider | `provider`}.\nSee {@link ChatState.provider} for the full semantics.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -5492,16 +5492,16 @@
     },
     "ChatConfigState": {
       "type": "object",
-      "description": "Configuration set on a chat. Its meaning depends on whether {@link schema}\nis present.\n\n- **Without `schema`** (the chat uses the session's agent): {@link values}\n  is an overlay on the owning session's\n  {@link SessionState.config | `SessionState.config`}. The session's config\n  schema applies; the chat's effective config is the session's values with\n  these values applied over them, and only properties with\n  `chatMutable: true` in the session's schema can be set on the chat. A\n  property omitted from `values` takes the session's value.\n- **With `schema`** (the chat's {@link ChatState.provider | `provider`}\n  differs from the session's): {@link values} is the chat's full effective\n  config and nothing is inherited from the session, whose schema and values\n  belong to the session's agent. The host seeds `values` from the chat\n  agent's defaults when it creates the chat. A property omitted from\n  `values`, including after a `chat/configChanged` with `replace: true`,\n  takes its `default` from `schema`.\n\nSettings change only through `chat/configChanged` on the chat, which never\nchanges `schema`. A chat's `schema` is fixed for the chat's lifetime; only\n`moveChat` normalization can change it. Hosts MUST reject\n`chat/configChanged` keys that are not valid for the chat's effective\nschema: `schema`'s `chatMutable` properties when present, otherwise the\nsession's `chatMutable` properties. With `schema`, a `replace` may only\nchange or drop `chatMutable` keys: it MUST carry every non-`chatMutable`\nvalue unchanged (hosts accept those keys when their value is unchanged and\nreject the request otherwise), so those values stay at whatever the host\nset.",
+      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.\n\nWhen {@link schema} is present, it replaces the session's schema for this\nchat, and its property `default`s replace the session's values as the base\nthat {@link values} overlays. Hosts reject `chat/configChanged` keys that are\nnot `chatMutable` in the effective schema.",
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
-          "description": "JSON Schema describing the config properties that apply to this chat.\n\nThe host MUST set it if and only if the chat's\n{@link ChatState.provider | `provider`} differs from the session's\nprovider, to that agent's chat-applicable config schema, and MUST NOT set\nit otherwise. When absent, clients MUST use the session's\n{@link SessionState.config | `SessionState.config.schema`}. When present,\nclients MUST render and validate this chat's settings against it instead,\nand only its properties with `chatMutable: true` can be set with\n`chat/configChanged`.\n\nStability: 1.0 - Early development."
+          "description": "Config schema for this chat. Hosts set it when the chat's agent differs\nfrom the session's; when present, clients use it instead of the session's\nschema. No action changes it.\n\nStability: 1.0 - Early development."
         },
         "values": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Config values set on this chat, keyed by property id. An overlay on the\nsession's values when {@link schema} is absent; the chat's full effective\nconfig when it is present."
+          "description": "Config values set on this chat, keyed by property id"
         }
       },
       "required": [

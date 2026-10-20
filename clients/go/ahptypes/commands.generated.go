@@ -224,22 +224,15 @@ type InitializeResult struct {
 	//
 	// Stability: 1.0 - Early development.
 	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
-	// Present when the host lets chats in one session be backed by different
-	// agents. Clients MAY then pass {@link CreateChatParams.provider} to
-	// `createChat`, and chats MAY report a {@link ChatSummary.provider} that
-	// differs from the session's {@link SessionMetadata.provider}. When absent
-	// on a connection, clients on that connection MUST NOT send
-	// {@link CreateChatParams.provider}.
+	// Present when chats in one session may be backed by different agents
+	// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+	// Clients MUST NOT send `CreateChatParams.provider` without it. Hosts do not
+	// advertise it below protocol `1.1.0`.
 	//
-	// This is a host capability rather than an {@link AgentCapabilities | agent
-	// capability} because the host, not an individual agent, decides which
-	// agents may share a session. Hosts MUST NOT advertise it on connections
-	// that negotiated a protocol version earlier than `1.1.0`. Only a host that
-	// advertises it on some connection creates chats whose provider differs from
-	// their session's; such chats are shared state, so clients on other
-	// connections, including pre-`1.1.0` connections, can observe them. On those
-	// connections `provider` and `ChatConfigState.schema` arrive as unknown
-	// fields and are ignored, so the chats appear to use the session's agent.
+	// Chats are shared state, so a client that does not understand `provider`
+	// sees such a chat as using the session's agent and may offer that agent's
+	// settings or models for it; hosts reject requests that are invalid for the
+	// chat's agent.
 	//
 	// Stability: 1.0 - Early development.
 	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
@@ -326,11 +319,7 @@ type AutomationRunCancellationCapability struct {
 type AutomationCustomizationsCapability struct {
 }
 
-// Present when the host supports chats backed by different agents within one
-// session. See {@link InitializeResult.multipleChatProviders}.
-//
-// The empty object means "supported"; sub-fields are reserved for future
-// options.
+// Presence capability for {@link InitializeResult.multipleChatProviders}.
 //
 // Stability: 1.0 - Early development.
 type MultipleChatProvidersCapability struct {
@@ -674,28 +663,14 @@ type CreateChatParams struct {
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Client-selected initial display title for the new chat.
 	Title *string `json:"title,omitempty"`
-	// Agent provider ID (an {@link AgentInfo.provider}) that backs the new chat.
-	// When absent, the chat uses the source chat's provider if `source` is
-	// present, and otherwise the session's
-	// {@link SessionMetadata.provider | `provider`}.
+	// Agent provider ID for the new chat. Absent means the source chat's agent
+	// when `source` is present, otherwise the session's provider.
 	//
-	// A client MUST NOT supply this field unless the host advertises
-	// {@link InitializeResult.multipleChatProviders}. The host MUST reject the
-	// request with `InvalidParams` when:
-	//
-	// - it does not advertise `multipleChatProviders`;
-	// - the value is not the `provider` of an agent in the root state's
-	//   `agents`, or that agent does not advertise
-	//   {@link AgentCapabilities.multipleChats}; or
-	// - `source` is present and the value differs from the source chat's
-	//   provider. Forks and side chats always use their source chat's agent;
-	//   history is never transferred between agents.
-	//
-	// Capability checks that depend on the agent — `multipleChats.fork`,
-	// `multipleChats.sideChat`, and `multipleWorkingDirectories` — apply to the
-	// chat's agent. The new chat's
-	// {@link ChatSummary.provider | `ChatSummary.provider`} reports the
-	// resolved agent.
+	// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+	// `InvalidParams` a provider that is not in the root state's `agents`, whose
+	// agent does not advertise `multipleChats`, or that differs from the source
+	// chat's agent. Agent capability checks for this request use the chat's
+	// agent.
 	//
 	// Stability: 1.0 - Early development.
 	Provider *string `json:"provider,omitempty"`
@@ -754,52 +729,14 @@ type ChatMoveToNewSessionDestination struct {
 // Rejection leaves ownership, catalog order, chat state, and root summaries
 // unchanged.
 //
-// When the host advertises {@link InitializeResult.multipleChatProviders},
-// every moved chat keeps its agent ({@link ChatSummary.provider}), and every
-// moved chat whose provider differs from the destination session's
-// {@link SessionMetadata.provider} MUST carry `provider` in its destination
-// catalog entry. A `newSession` destination's session `provider` is the
-// requested chat's provider. A host that does not advertise the capability
-// cannot report a per-chat provider, so it MAY reject, as an unsupported
-// destination, a move that would place a chat in a session with a different
-// provider.
+// A moved chat keeps its {@link ChatState.provider | `provider`}. Hosts MAY
+// refuse, as an unsupported destination, a move they cannot support, such as
+// one that changes whether the chat's agent matches its session's. No action
+// carries a changed `ChatConfigState.schema`, so when a move changes a chat's
+// `config`, clients SHOULD resubscribe to the chat to get it.
 //
-// A moved chat always keeps its `provider`. Because no action changes
-// `ChatState.provider`, a host that advertises the capability MUST set
-// `provider` on the `ChatState` of a `movable` chat if it accepts moves of
-// that chat into sessions with a different provider; otherwise the
-// {@link ChatState.provider} omission rule applies. When ownership changes,
-// such a host MUST normalize each moved chat's
-// {@link ChatConfigState | `ChatState.config`} for the destination session as
-// part of the committed move. A value is valid in a schema when its key is a
-// property of that schema and its value matches the property's type and any
-// `enum`.
-//
-//   - If the chat's provider differs from the destination session's provider,
-//     `config.schema` is the chat agent's chat-applicable config schema and
-//     `config.values` is that agent's defaults overlaid with the chat's existing
-//     values that are valid in that schema. Session-level values that are not
-//     `chatMutable` do not carry over.
-//   - If the providers are equal, `config.schema` is removed and
-//     `config.values` keeps, as an overlay, only the existing values that are
-//     valid in the destination session's schema and whose properties it
-//     declares `chatMutable`.
-//   - For a `newSession` destination, the new session's `provider` is the
-//     requested chat's provider, its `config` is seeded from that chat's
-//     effective config values, and the chat drops `schema`, keeping as an
-//     overlay only its values that are `chatMutable` in the new session's
-//     schema.
-//
-// Whenever normalization changes a moved chat's `config.values`, the host
-// MUST publish `chat/configChanged` with `replace: true` and the normalized
-// values on that chat's channel. No action carries a changed `schema`, so
-// clients subscribed to a moved chat whose `config.schema` changed SHOULD
-// resubscribe to obtain it. Hosts MAY refuse, as an unsupported destination,
-// any move that would require normalization.
-//
-// On success every moved chat keeps its URI, its state (apart from the
-// `config` normalization above), and its immutable `ChatOrigin`. The host
-// commits ownership and catalog order before publishing
+// On success every moved chat keeps its URI, state (except `config`, as
+// above), and immutable `ChatOrigin`. The host commits ownership and catalog order before publishing
 // `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
 // root summary updates as applicable. Session and root snapshots are the
 // durable recovery path after reconnect or an uncertain response.

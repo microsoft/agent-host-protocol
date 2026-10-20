@@ -1,5 +1,5 @@
 {
-  "description": "chat/configChanged merges values and preserves the chat's config schema",
+  "description": "chat/configChanged merges into the overlay values and preserves the chat's config schema",
   "reducer": "chat",
   "initial": {
     "turns": [],
