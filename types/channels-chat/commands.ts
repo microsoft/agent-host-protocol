@@ -227,22 +227,36 @@ export type ChatMoveDestination =
  *
  * A moved chat always keeps its `provider`. Because no action changes
  * `ChatState.provider`, a host that advertises the capability MUST set
- * `provider` on the `ChatState` of every chat it advertises as `movable`.
- * When ownership changes, such a host MUST normalize each moved chat's
+ * `provider` on the `ChatState` of a `movable` chat if it accepts moves of
+ * that chat into sessions with a different provider; otherwise the
+ * {@link ChatState.provider} omission rule applies. When ownership changes,
+ * such a host MUST normalize each moved chat's
  * {@link ChatConfigState | `ChatState.config`} for the destination session as
- * part of the committed move:
+ * part of the committed move. A value is valid in a schema when its key is a
+ * property of that schema and its value matches the property's type and any
+ * `enum`.
  *
  * - If the chat's provider differs from the destination session's provider,
  *   `config.schema` is the chat agent's chat-applicable config schema and
  *   `config.values` is that agent's defaults overlaid with the chat's existing
- *   values that are valid in that schema.
+ *   values that are valid in that schema. Session-level values that are not
+ *   `chatMutable` do not carry over.
  * - If the providers are equal, `config.schema` is removed and
- *   `config.values` keeps, as an overlay, only the existing values whose
- *   properties the destination session's schema declares `chatMutable`.
+ *   `config.values` keeps, as an overlay, only the existing values that are
+ *   valid in the destination session's schema and whose properties it
+ *   declares `chatMutable`.
+ * - For a `newSession` destination, the new session's `provider` is the
+ *   requested chat's provider, its `config` is seeded from that chat's
+ *   effective config values, and the chat drops `schema`, keeping as an
+ *   overlay only its values that are `chatMutable` in the new session's
+ *   schema.
  *
- * No action carries a changed `schema`, so clients subscribed to a moved chat
- * whose provider relationship to its session changed SHOULD resubscribe to
- * obtain the normalized `config`.
+ * Whenever normalization changes a moved chat's `config.values`, the host
+ * MUST publish `chat/configChanged` with `replace: true` and the normalized
+ * values on that chat's channel. No action carries a changed `schema`, so
+ * clients subscribed to a moved chat whose `config.schema` changed SHOULD
+ * resubscribe to obtain it. Hosts MAY refuse, as an unsupported destination,
+ * any move that would require normalization.
  *
  * On success every moved chat keeps its URI, its state (apart from the
  * `config` normalization above), and its immutable `ChatOrigin`. The host

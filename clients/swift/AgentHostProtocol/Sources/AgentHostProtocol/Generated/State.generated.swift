@@ -1827,11 +1827,15 @@ public struct ChatState: Codable, Sendable {
     /// Absence means the owning session's
     /// {@link SessionMetadata.provider | `provider`}; clients MUST treat an
     /// absent value that way. Hosts MAY omit it when it equals the session's
-    /// provider and MUST set it when it differs, which only happens when the
-    /// host advertises {@link InitializeResult.multipleChatProviders}. A chat's
-    /// agent never changes, including across `moveChat`: like `resource`, it is
-    /// an identity field that senders MUST omit from `session/chatUpdated`
-    /// changes and receivers ignore. Forks and side chats always use their source
+    /// provider and MUST set it when it differs, which only happens on a host
+    /// that advertises {@link InitializeResult.multipleChatProviders} on some
+    /// connection. Such a host MUST also set it on a movable chat whose
+    /// cross-provider moves it accepts (see `moveChat`). Clients that do not
+    /// understand this field, including clients on pre-`1.1.0` connections,
+    /// ignore it and show the chat as using the session's agent. A chat's agent
+    /// never changes, including across `moveChat`: like `resource`, it is an
+    /// identity field that senders MUST omit from `session/chatUpdated` changes
+    /// and receivers SHOULD ignore. Forks and side chats always use their source
     /// chat's agent.
     ///
     /// Stability: 1.0 - Early development.

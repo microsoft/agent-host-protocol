@@ -471,14 +471,19 @@ data class InitializeResult(
      * Present when the host lets chats in one session be backed by different
      * agents. Clients MAY then pass {@link CreateChatParams.provider} to
      * `createChat`, and chats MAY report a {@link ChatSummary.provider} that
-     * differs from the session's {@link SessionMetadata.provider}. When absent,
-     * every chat uses its session's provider and clients MUST NOT send
+     * differs from the session's {@link SessionMetadata.provider}. When absent
+     * on a connection, clients on that connection MUST NOT send
      * {@link CreateChatParams.provider}.
      *
      * This is a host capability rather than an {@link AgentCapabilities | agent
      * capability} because the host, not an individual agent, decides which
      * agents may share a session. Hosts MUST NOT advertise it on connections
-     * that negotiated a protocol version earlier than `1.1.0`.
+     * that negotiated a protocol version earlier than `1.1.0`. Only a host that
+     * advertises it on some connection creates chats whose provider differs from
+     * their session's; such chats are shared state, so clients on other
+     * connections, including pre-`1.1.0` connections, can observe them. On those
+     * connections `provider` and `ChatConfigState.schema` arrive as unknown
+     * fields and are ignored, so the chats appear to use the session's agent.
      *
      * Stability: 1.0 - Early development.
      */

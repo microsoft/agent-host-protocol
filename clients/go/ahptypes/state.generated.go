@@ -1409,11 +1409,15 @@ type ChatState struct {
 	// Absence means the owning session's
 	// {@link SessionMetadata.provider | `provider`}; clients MUST treat an
 	// absent value that way. Hosts MAY omit it when it equals the session's
-	// provider and MUST set it when it differs, which only happens when the
-	// host advertises {@link InitializeResult.multipleChatProviders}. A chat's
-	// agent never changes, including across `moveChat`: like `resource`, it is
-	// an identity field that senders MUST omit from `session/chatUpdated`
-	// changes and receivers ignore. Forks and side chats always use their source
+	// provider and MUST set it when it differs, which only happens on a host
+	// that advertises {@link InitializeResult.multipleChatProviders} on some
+	// connection. Such a host MUST also set it on a movable chat whose
+	// cross-provider moves it accepts (see `moveChat`). Clients that do not
+	// understand this field, including clients on pre-`1.1.0` connections,
+	// ignore it and show the chat as using the session's agent. A chat's agent
+	// never changes, including across `moveChat`: like `resource`, it is an
+	// identity field that senders MUST omit from `session/chatUpdated` changes
+	// and receivers SHOULD ignore. Forks and side chats always use their source
 	// chat's agent.
 	//
 	// Stability: 1.0 - Early development.
@@ -1744,9 +1748,15 @@ type SessionConfigState struct {
 //     takes its `default` from `schema`.
 //
 // Settings change only through `chat/configChanged` on the chat, which never
-// changes `schema`. Hosts MUST reject `chat/configChanged` keys that are not
-// valid for the chat's effective schema (`schema` when present, otherwise the
-// session's schema restricted to `chatMutable` properties).
+// changes `schema`. A chat's `schema` is fixed for the chat's lifetime; only
+// `moveChat` normalization can change it. Hosts MUST reject
+// `chat/configChanged` keys that are not valid for the chat's effective
+// schema: `schema`'s `chatMutable` properties when present, otherwise the
+// session's `chatMutable` properties. With `schema`, a `replace` may only
+// change or drop `chatMutable` keys: it MUST carry every non-`chatMutable`
+// value unchanged (hosts accept those keys when their value is unchanged and
+// reject the request otherwise), so those values stay at whatever the host
+// set.
 type ChatConfigState struct {
 	// JSON Schema describing the config properties that apply to this chat.
 	//
