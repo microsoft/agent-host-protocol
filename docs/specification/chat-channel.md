@@ -93,11 +93,11 @@ To reset a property to the session's value, replace the overlay with one that
 omits the property. Every other property is changed on the session with
 `session/configChanged`.
 
-When a chat's agent differs from the session's, the host also sets
-`config.schema`. It replaces the session's schema for that chat, and its
-property defaults replace the session's values as the base the overlay applies
-to. Hosts reject `chat/configChanged` keys that are not `chatMutable` in the
-chat's effective schema.
+For a chat whose `provider` differs from the session's, the session's config
+does not apply: its properties come from that agent's schema, which clients
+obtain with [`resolveSessionConfig`](/reference/root#resolvesessionconfig) for
+the chat's `provider`, and `values` overlays that agent's resolved values. Only
+`chatMutable` properties can be set.
 
 ### Chat providers
 
@@ -109,8 +109,8 @@ changes.
 Hosts that advertise
 [`multipleChatProviders`](/reference/common#initializeresult) accept a
 `provider` on `createChat`, letting one session mix agents. Forks and side
-chats always use the source chat's agent. A client that does not understand
-`provider` sees such chats as using the session's agent.
+chats continue the source chat's history, so they always use the source chat's
+agent.
 
 ## Relationship to the session channel
 
@@ -239,8 +239,7 @@ anchor. Hosts publish `chat/movableChanged` and the corresponding
 ```
 
 The result always reports the authoritative destination session. Every moved
-chat keeps its URI, state (except `config`; see [Validation](#validation)), and
-byte-for-byte `ChatOrigin`, so existing
+chat keeps its URI, state, and byte-for-byte `ChatOrigin`, so existing
 chat-channel subscriptions remain valid.
 
 #### Validation
@@ -256,10 +255,10 @@ durable session catalogs. The protocol does not require provider equality,
 prohibit active turns universally, or otherwise expose host-specific storage
 and runtime constraints.
 
-A moved chat keeps its `provider`. Hosts MAY refuse, as an unsupported
-destination, a move that changes whether the chat's agent matches its
-session's. When a move changes a chat's `config`, clients SHOULD resubscribe to
-the chat, since no action carries a changed `config.schema`.
+A moved chat keeps its agent. After the move the host reports `provider` on the
+chat whenever it differs from the destination session's provider, including
+when the chat had none because it matched its old session. Hosts MAY refuse, as
+an unsupported destination, a move they cannot support.
 
 #### Atomic synchronization
 

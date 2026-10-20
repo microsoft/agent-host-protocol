@@ -316,13 +316,7 @@ export interface InitializeResult {
   /**
    * Present when chats in one session may be backed by different agents
    * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
-   * Clients MUST NOT send `CreateChatParams.provider` without it. Hosts do not
-   * advertise it below protocol `1.1.0`.
-   *
-   * Chats are shared state, so a client that does not understand `provider`
-   * sees such a chat as using the session's agent and may offer that agent's
-   * settings or models for it; hosts reject requests that are invalid for the
-   * chat's agent.
+   * Clients MUST NOT send `CreateChatParams.provider` without it.
    * @stability 1.0
    * @see {@link /specification/chat-channel#chat-providers | Chat Channel: Chat providers}
    */

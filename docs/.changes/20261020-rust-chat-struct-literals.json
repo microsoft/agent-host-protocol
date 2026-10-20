@@ -1,5 +1,7 @@
 {
   "type": "changed",
-  "message": "Direct Rust struct literals for `ChatState`, `ChatSummary`, and `SessionChatSummary` must now include `provider: None`, and `ChatConfigState` literals must include `schema: None`.",
-  "targets": ["rust"]
+  "message": "Direct Rust struct literals for `ChatState`, `ChatSummary`, and `SessionChatSummary` must now include `provider: None`.",
+  "targets": [
+    "rust"
+  ]
 }

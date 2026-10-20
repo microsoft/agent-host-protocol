@@ -1716,17 +1716,12 @@ type SessionConfigState struct {
 // these values applied over them. Only properties with `chatMutable: true`
 // in the session's config schema can be set on a chat.
 //
-// When {@link schema} is present, it replaces the session's schema for this
-// chat, and its property `default`s replace the session's values as the base
-// that {@link values} overlays. Hosts reject `chat/configChanged` keys that are
-// not `chatMutable` in the effective schema.
+// For a chat whose {@link ChatState.provider | `provider`} differs from the
+// session's, the session's config does not apply: its properties come from
+// that agent's schema, which clients obtain with `resolveSessionConfig` for
+// the chat's `provider`, and `values` overlays that agent's resolved values.
+// Only `chatMutable` properties can be set.
 type ChatConfigState struct {
-	// Config schema for this chat. Hosts set it when the chat's agent differs
-	// from the session's; when present, clients use it instead of the session's
-	// schema. No action changes it.
-	//
-	// Stability: 1.0 - Early development.
-	Schema *SessionConfigSchema `json:"schema,omitempty"`
 	// Config values set on this chat, keyed by property id
 	Values map[string]json.RawMessage `json:"values"`
 }

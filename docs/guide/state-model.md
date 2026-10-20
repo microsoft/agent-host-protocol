@@ -221,8 +221,7 @@ chat, with `chat/configChanged`. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
 `provider` names the chat's agent when it differs from the session's. Hosts
-advertising `multipleChatProviders` let one session mix agents; such a chat's
-`config.schema` replaces the session's schema. See
+advertising `multipleChatProviders` let one session mix agents. See
 [Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.

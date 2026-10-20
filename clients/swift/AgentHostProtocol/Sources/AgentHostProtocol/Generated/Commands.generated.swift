@@ -425,13 +425,7 @@ public struct InitializeResult: Codable, Sendable {
     public var tcpConnections: TcpConnectionsCapability?
     /// Present when chats in one session may be backed by different agents
     /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
-    /// Clients MUST NOT send `CreateChatParams.provider` without it. Hosts do not
-    /// advertise it below protocol `1.1.0`.
-    ///
-    /// Chats are shared state, so a client that does not understand `provider`
-    /// sees such a chat as using the session's agent and may offer that agent's
-    /// settings or models for it; hosts reject requests that are invalid for the
-    /// chat's agent.
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
     ///
     /// Stability: 1.0 - Early development.
     public var multipleChatProviders: MultipleChatProvidersCapability?
@@ -1001,14 +995,14 @@ public struct CreateChatParams: Codable, Sendable {
     public var workingDirectories: [String]?
     /// Client-selected initial display title for the new chat.
     public var title: String?
-    /// Agent provider ID for the new chat. Absent means the source chat's agent
-    /// when `source` is present, otherwise the session's provider.
+    /// Agent provider ID for the new chat. Absent means the session's provider.
     ///
     /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-    /// `InvalidParams` a provider that is not in the root state's `agents`, whose
-    /// agent does not advertise `multipleChats`, or that differs from the source
-    /// chat's agent. Agent capability checks for this request use the chat's
-    /// agent.
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
     ///
     /// Stability: 1.0 - Early development.
     public var provider: String?

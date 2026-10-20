@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `ChatConfigState.schema`: hosts set it when a chat's agent differs from its session's. It replaces the session's schema for that chat, and its property defaults replace the session's values as the base that the chat's `values` overlay."
-}

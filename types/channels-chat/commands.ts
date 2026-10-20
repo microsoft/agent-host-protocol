@@ -121,14 +121,14 @@ export interface CreateChatParams extends BaseParams {
   /** Client-selected initial display title for the new chat. */
   title?: string;
   /**
-   * Agent provider ID for the new chat. Absent means the source chat's agent
-   * when `source` is present, otherwise the session's provider.
+   * Agent provider ID for the new chat. Absent means the session's provider.
    *
    * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-   * `InvalidParams` a provider that is not in the root state's `agents`, whose
-   * agent does not advertise `multipleChats`, or that differs from the source
-   * chat's agent. Agent capability checks for this request use the chat's
-   * agent.
+   * `InvalidParams` a provider that is not in the root state's `agents` or
+   * whose agent does not advertise `multipleChats`. Forks and side chats
+   * (`source` present) continue the source chat's history, so they always use
+   * the source chat's agent: absent means that agent, and a different value is
+   * rejected. Agent capability checks for this request use the chat's agent.
    * @stability 1.0
    */
   provider?: string;
@@ -201,14 +201,15 @@ export type ChatMoveDestination =
  * Rejection leaves ownership, catalog order, chat state, and root summaries
  * unchanged.
  *
- * A moved chat keeps its {@link ChatState.provider | `provider`}. Hosts MAY
- * refuse, as an unsupported destination, a move they cannot support, such as
- * one that changes whether the chat's agent matches its session's. No action
- * carries a changed `ChatConfigState.schema`, so when a move changes a chat's
- * `config`, clients SHOULD resubscribe to the chat to get it.
+ * A moved chat keeps its agent. After the move the host reports
+ * {@link ChatState.provider | `provider`} on the chat whenever it differs from
+ * the destination session's provider, including when the chat had none
+ * because it matched its old session. Hosts MAY refuse, as an unsupported
+ * destination, a move they cannot support, such as one that changes whether
+ * the chat's agent matches its session's.
  *
- * On success every moved chat keeps its URI, state (except `config`, as
- * above), and immutable `ChatOrigin`. The host commits ownership and catalog order before publishing
+ * On success every moved chat keeps its URI, state, and immutable
+ * `ChatOrigin`. The host commits ownership and catalog order before publishing
  * `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
  * root summary updates as applicable. Session and root snapshots are the
  * durable recovery path after reconnect or an uncertain response.

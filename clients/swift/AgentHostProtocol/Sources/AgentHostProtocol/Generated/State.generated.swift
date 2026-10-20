@@ -2693,20 +2693,12 @@ public struct SessionConfigState: Codable, Sendable {
 }
 
 public struct ChatConfigState: Codable, Sendable {
-    /// Config schema for this chat. Hosts set it when the chat's agent differs
-    /// from the session's; when present, clients use it instead of the session's
-    /// schema. No action changes it.
-    ///
-    /// Stability: 1.0 - Early development.
-    public var schema: SessionConfigSchema?
     /// Config values set on this chat, keyed by property id
     public var values: [String: AnyCodable]
 
     public init(
-        schema: SessionConfigSchema? = nil,
         values: [String: AnyCodable]
     ) {
-        self.schema = schema
         self.values = values
     }
 }

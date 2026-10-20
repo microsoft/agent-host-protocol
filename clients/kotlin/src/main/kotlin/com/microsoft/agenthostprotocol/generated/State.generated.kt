@@ -2570,14 +2570,6 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
-     * Config schema for this chat. Hosts set it when the chat's agent differs
-     * from the session's; when present, clients use it instead of the session's
-     * schema. No action changes it.
-     *
-     * Stability: 1.0 - Early development.
-     */
-    val schema: SessionConfigSchema? = null,
-    /**
      * Config values set on this chat, keyed by property id
      */
     val values: Map<String, JsonElement>
