@@ -2635,10 +2635,12 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil) {
+    public init(resource: String, side: String? = nil, nonce: String? = nil) {
         self.resource = resource
         self.side = side
+        self.nonce = nonce
     }
 
     // kind is the union discriminant: a fixed constant for this variant (so it
@@ -2646,14 +2648,15 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     // MUST be re-emitted on encode so the wire stays a decodable
     // discriminated-union value. Hence the custom encode and the decode-only
     // CodingKeys that omit kind.
-    private enum CodingKeys: String, CodingKey { case resource, side }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side }
+    private enum CodingKeys: String, CodingKey { case resource, side, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(kind, forKey: .kind)
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }
 
@@ -2662,17 +2665,19 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
     public var resource: String
     public var side: String?
     public var range: TextRange
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil, range: TextRange) {
+    public init(resource: String, side: String? = nil, range: TextRange, nonce: String? = nil) {
         self.resource = resource
         self.side = side
         self.range = range
+        self.nonce = nonce
     }
 
     // See ChangesetOperationResourceTarget: kind is re-emitted on encode but
     // not decoded (the union dispatches on it).
-    private enum CodingKeys: String, CodingKey { case resource, side, range }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range }
+    private enum CodingKeys: String, CodingKey { case resource, side, range, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
@@ -2680,5 +2685,6 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
         try container.encode(range, forKey: .range)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }

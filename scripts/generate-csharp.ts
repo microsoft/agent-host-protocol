@@ -2426,6 +2426,9 @@ public sealed record ChangesetOperationResourceTarget
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Side { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>Targets a range within a resource.</summary>
@@ -2439,6 +2442,9 @@ public sealed record ChangesetOperationRangeTarget
     public string? Side { get; init; }
 
     public required TextRange Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>System.Text.Json converter for the ChangesetOperationTarget union.</summary>

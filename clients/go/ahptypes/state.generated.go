@@ -3890,8 +3890,8 @@ type ChangesetFile struct {
 	// the server MAY also originate it (e.g. an agent self-reviewing its own
 	// output).
 	//
-	// There is no content version in the protocol, so review is **not** reset
-	// automatically when a file's contents change under a stable id. The server,
+	// Review is **not** reset automatically when a file's contents or nonce
+	// change under a stable id. The server,
 	// which is the authority on what changed, resets review explicitly — either
 	// by re-emitting the file (via {@link ChangesetFileSetAction} or
 	// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -3900,6 +3900,9 @@ type ChangesetFile struct {
 	// Server-defined opaque metadata, surfaced to operations and tooling
 	// but not interpreted by the protocol.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Optional, host-issued nonce identifying this file's current change.
+	// Clients MAY echo it in {@link ChangesetOperationTarget.nonce}.
+	Nonce *string `json:"nonce,omitempty"`
 }
 
 // A server-declared invokable verb the client can run against a

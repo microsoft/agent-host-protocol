@@ -1967,6 +1967,7 @@ type ChangesetOperationResourceTarget struct {
 \tKind     string  \`json:"kind"\`
 \tResource URI     \`json:"resource"\`
 \tSide     *string \`json:"side,omitempty"\`
+\tNonce    *string \`json:"nonce,omitempty"\`
 }
 
 func (*ChangesetOperationResourceTarget) isChangesetOperationTarget() {}
@@ -1977,6 +1978,7 @@ type ChangesetOperationRangeTarget struct {
 \tResource URI     \`json:"resource"\`
 \tSide     *string \`json:"side,omitempty"\`
 \tRange    TextRange \`json:"range"\`
+\tNonce    *string \`json:"nonce,omitempty"\`
 }
 
 func (*ChangesetOperationRangeTarget) isChangesetOperationTarget() {}

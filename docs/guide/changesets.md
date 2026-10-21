@@ -102,6 +102,7 @@ ChangesetFile {
   edit: FileEdit                           // reuses the existing FileEdit shape
   reviewed?: boolean                       // GitHub-style "Viewed" flag; absent ⇒ not reviewed
   _meta?: Record<string, unknown>
+  nonce?: string                           // optional host-issued token for this change
 }
 ```
 
@@ -195,15 +196,10 @@ all move to the same `reviewed` value.
 ```
 
 The reducer sets `reviewed` on every listed file that is present in the
-changeset, leaving each file's `edit` and `_meta` untouched. Ids that don't
+changeset, leaving each file's `edit`, `nonce`, and `_meta` untouched. Ids that don't
 match a current file are ignored; the action is a no-op when none match.
 
-**Reset on edit.** The protocol has no per-file content version, so review is
-**not** reset automatically when a file's contents change under a stable id. The
-server, which is the authority on what changed, resets review explicitly —
-either by re-emitting the file (via `changeset/fileSet` or
-`changeset/contentChanged`) without `reviewed: true`, or by dispatching
-`changeset/filesReviewChanged` with `reviewed: false`.
+**Reset on edit.** Review is **not** reset automatically when a file's contents or nonce change under a stable id. The server, which is the authority on what changed, resets review explicitly — either by re-emitting the file (via `changeset/fileSet` or `changeset/contentChanged`) without `reviewed: true`, or by dispatching `changeset/filesReviewChanged` with `reviewed: false`.
 
 ### Changeset Operations
 
@@ -255,8 +251,8 @@ invokeChangesetOperation(params: {
   channel: URI
   operationId: string
   target?:
-    | { kind: ChangesetOperationTargetKind.Resource; resource: URI; side?: 'before' | 'after' }
-    | { kind: ChangesetOperationTargetKind.Range; resource: URI; side?: 'before' | 'after'; range: TextRange }
+    | { kind: ChangesetOperationTargetKind.Resource; resource: URI; side?: 'before' | 'after'; nonce?: string }
+    | { kind: ChangesetOperationTargetKind.Range; resource: URI; side?: 'before' | 'after'; range: TextRange; nonce?: string }
 }) → {
   message?: StringOrMarkdown
   followUp?: {
@@ -271,6 +267,30 @@ The server validates that `operationId` exists in the changeset's
 current `operations` list and that the requested target's `kind` is
 contained in the operation's `scopes`. Invalid combinations result in
 a JSON-RPC error.
+
+### Optional operation nonces
+
+A host MAY attach an opaque `nonce` to a `ChangesetFile` and change it whenever that file's reviewable change changes. A client MAY echo the nonce of the file it displayed in a resource or range operation's `target.nonce`. Nonces are compared for equality, not interpreted as timestamps, ordered counters, tool identifiers, filesystem ETags, or parts of a URI.
+
+When both the current file and the target carry a nonce, the host MUST compare them at the point where it applies the operation, after any wait for concurrent work. A mismatch MUST reject the invocation with [`AhpErrorCodes.Conflict`](/reference/error-codes) (`-32011`) without applying the operation. The client should refresh the displayed changes and let the user decide again rather than automatically retrying with a newer nonce.
+
+No capability or protocol version change is required. If either side omits the nonce, no nonce precondition is imposed: existing operation validation and availability still apply. A nonce does not grant permission, lock a file, or imply that a host can safely run an operation while an agent writes it. Changeset-wide operations have no per-file target and are unchanged.
+
+```json
+{
+  "channel": "ahp-changeset:/opaque-review",
+  "operationId": "accept-changes",
+  "target": {
+    "kind": "resource",
+    "resource": "file:///src/example.ts",
+    "nonce": "opaque-change-token"
+  }
+}
+```
+
+State updates remain authoritative. If a newer file nonce arrives while an older invocation is pending, success for the older invocation must not mark the newer change decided in a client. The separate `reviewed`/Viewed flag retains its existing explicit reset semantics.
+
+The JSON addition is optional, but native SDK consumers should rebuild against regenerated types. Rust code constructing `ChangesetOperationTarget::Resource` or `::Range` must supply `nonce: None` (or `Some(...)`); patterns can use `..` to ignore it. Kotlin consumers must rebuild dependent binaries.
 
 ## Lifecycle
 
