@@ -272,9 +272,7 @@ a JSON-RPC error.
 
 A host MAY attach an opaque `nonce` to a `ChangesetFile`. Hosts SHOULD update a published nonce whenever the contents of the file change. A client MAY echo the nonce of the file it displayed in a resource or range operation's `target.nonce`. Nonces are compared for equality, not interpreted as timestamps, ordered counters, tool identifiers, filesystem ETags, or parts of a URI.
 
-When both the current file and the target carry a nonce, the host MUST compare them at the point where it applies the operation, after any wait for concurrent work. A mismatch MUST reject the invocation with [`AhpErrorCodes.Conflict`](/reference/error-codes) (`-32011`) without applying the operation. The client should refresh the displayed changes and let the user decide again rather than automatically retrying with a newer nonce.
-
-No capability or protocol version change is required. If either side omits the nonce, no nonce precondition is imposed: existing operation validation and availability still apply. A nonce does not grant permission, lock a file, or imply that a host can safely run an operation while an agent writes it. Changeset-wide operations have no per-file target and are unchanged.
+When both the current file and the target carry a nonce, the host MUST compare them at the point where it applies the operation, after any wait for concurrent work. A mismatch MAY reject the invocation with [`AhpErrorCodes.Conflict`](/reference/error-codes) (`-32011`), at the host's discretion. The client should refresh the displayed changes and let the user decide again rather than automatically retrying with a newer nonce.
 
 ```json
 {
@@ -288,9 +286,6 @@ No capability or protocol version change is required. If either side omits the n
 }
 ```
 
-State updates remain authoritative. If a newer file nonce arrives while an older invocation is pending, success for the older invocation must not mark the newer change decided in a client. The separate `reviewed`/Viewed flag retains its existing explicit reset semantics.
-
-The JSON addition is optional, but native SDK consumers should rebuild against regenerated types. Rust code constructing `ChangesetOperationTarget::Resource` or `::Range` must supply `nonce: None` (or `Some(...)`); patterns can use `..` to ignore it. Kotlin consumers must rebuild dependent binaries.
 
 ## Lifecycle
 
