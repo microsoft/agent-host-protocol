@@ -5398,8 +5398,8 @@ data class ChangesetFile(
      * the server MAY also originate it (e.g. an agent self-reviewing its own
      * output).
      *
-     * There is no content version in the protocol, so review is **not** reset
-     * automatically when a file's contents change under a stable id. The server,
+     * Review is **not** reset automatically when a file's contents or nonce
+     * change under a stable id. The server,
      * which is the authority on what changed, resets review explicitly — either
      * by re-emitting the file (via {@link ChangesetFileSetAction} or
      * {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -5411,7 +5411,13 @@ data class ChangesetFile(
      * but not interpreted by the protocol.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Optional host-issued token for this reviewable change, which clients MAY
+     * echo in {@link ChangesetOperationTarget.nonce}.
+     * Hosts SHOULD update a published nonce whenever contents of the file change.
+     */
+    val nonce: String? = null
 )
 
 @Serializable

@@ -2075,6 +2075,8 @@ pub enum ChangesetOperationTarget {
         resource: Uri,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(rename = "range")]
     Range {
@@ -2082,6 +2084,8 @@ pub enum ChangesetOperationTarget {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
         range: TextRange,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(untagged)]
     Unknown(serde_json::Value),

@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional changeset file and operation-target nonces let hosts reject operations on superseded changes without requiring a capability or a nonce from every client.",
+  "issues": [538]
+}

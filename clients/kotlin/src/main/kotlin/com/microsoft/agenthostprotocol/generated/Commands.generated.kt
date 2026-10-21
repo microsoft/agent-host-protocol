@@ -2200,6 +2200,7 @@ data class ChangesetOperationResourceTarget(
     val side: String? = null,
     /** Discriminator. Always "resource". */
     val kind: String = "resource",
+    val nonce: String? = null,
 )
 
 @Serializable
@@ -2209,6 +2210,7 @@ data class ChangesetOperationRangeTarget(
     val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
+    val nonce: String? = null,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {
