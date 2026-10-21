@@ -5447,8 +5447,7 @@ pub struct ChangesetFile {
     pub meta: Option<JsonObject>,
     /// Optional host-issued token for this reviewable change, which clients MAY
     /// echo in {@link ChangesetOperationTarget.nonce}.
-    /// Hosts MUST change a published nonce whenever the reviewable change changes
-    /// and MUST NOT reuse it for a different change.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
 }

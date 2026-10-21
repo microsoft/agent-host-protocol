@@ -6231,8 +6231,7 @@ public sealed record ChangesetFile
 
     /// <summary>Optional host-issued token for this reviewable change, which clients MAY
     /// echo in {@link ChangesetOperationTarget.nonce}.
-    /// Hosts MUST change a published nonce whenever the reviewable change changes
-    /// and MUST NOT reuse it for a different change.</summary>
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 }

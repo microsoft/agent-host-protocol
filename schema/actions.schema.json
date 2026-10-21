@@ -7764,7 +7764,7 @@
         },
         "nonce": {
           "type": "string",
-          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts MUST change a published nonce whenever the reviewable change changes\nand MUST NOT reuse it for a different change."
+          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
         }
       },
       "required": [
