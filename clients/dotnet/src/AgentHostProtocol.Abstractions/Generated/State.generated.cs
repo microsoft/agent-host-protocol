@@ -6234,6 +6234,11 @@ public sealed record ChangesetFile
     /// Hosts SHOULD update a published nonce whenever contents of the file change.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
+
+    /// <summary>Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsEditing { get; init; }
 }
 
 /// <summary>A server-declared invokable verb the client can run against a

@@ -5450,6 +5450,10 @@ pub struct ChangesetFile {
     /// Hosts SHOULD update a published nonce whenever contents of the file change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_editing: Option<bool>,
 }
 
 /// A server-declared invokable verb the client can run against a
