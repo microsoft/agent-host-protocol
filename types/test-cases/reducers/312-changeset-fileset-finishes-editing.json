@@ -1,0 +1,39 @@
+{
+  "description": "changeset/fileSet replaces the completed edit, nonce, and editing flag together without clearing another file's activity",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///a.txt",
+        "edit": { "after": { "uri": "file:///a.txt", "content": { "uri": "content:/a-1" } } },
+        "nonce": "a-1",
+        "isEditing": true
+      },
+      { "id": "file:///b.txt", "edit": {}, "nonce": "b-1", "isEditing": true }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/fileSet",
+      "file": {
+        "id": "file:///a.txt",
+        "edit": { "after": { "uri": "file:///a.txt", "content": { "uri": "content:/a-2" } } },
+        "nonce": "a-2",
+        "isEditing": false
+      }
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///a.txt",
+        "edit": { "after": { "uri": "file:///a.txt", "content": { "uri": "content:/a-2" } } },
+        "nonce": "a-2",
+        "isEditing": false
+      },
+      { "id": "file:///b.txt", "edit": {}, "nonce": "b-1", "isEditing": true }
+    ]
+  }
+}

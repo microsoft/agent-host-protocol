@@ -6300,6 +6300,9 @@ public struct ChangesetFile: Codable, Sendable {
     /// echo in {@link ChangesetOperationTarget.nonce}.
     /// Hosts SHOULD update a published nonce whenever contents of the file change.
     public var nonce: String?
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    public var isEditing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -6307,6 +6310,7 @@ public struct ChangesetFile: Codable, Sendable {
         case reviewed
         case meta = "_meta"
         case nonce
+        case isEditing
     }
 
     public init(
@@ -6314,13 +6318,15 @@ public struct ChangesetFile: Codable, Sendable {
         edit: FileEdit,
         reviewed: Bool? = nil,
         meta: [String: AnyCodable]? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        isEditing: Bool? = nil
     ) {
         self.id = id
         self.edit = edit
         self.reviewed = reviewed
         self.meta = meta
         self.nonce = nonce
+        self.isEditing = isEditing
     }
 }
 

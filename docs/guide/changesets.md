@@ -103,6 +103,7 @@ ChangesetFile {
   reviewed?: boolean                       // GitHub-style "Viewed" flag; absent ⇒ not reviewed
   _meta?: Record<string, unknown>
   nonce?: string                           // optional host-issued token for this change
+  isEditing?: boolean                      // optional indication of an ongoing edit
 }
 ```
 
@@ -126,6 +127,14 @@ of the changeset URI:
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
+
+### Per-file Editing Activity
+
+A host MAY set `ChangesetFile.isEditing` to `true` to report an ongoing edit to that file. Clients MAY use it to show progress or temporarily disable that file's review actions while other files remain reviewable. `false` or omission clears the editing indication; neither guarantees that the file is safe to modify. Hosts remain responsible for operation validation and write coordination.
+
+The field travels through existing snapshots, `changeset/fileSet`, and `changeset/contentChanged`; no new action, command, or capability is needed. Hosts SHOULD keep it set until the file entry reflects the completed edit, then clear it together with the refreshed `edit` and any updated `nonce`, or remove the file if it no longer belongs to the changeset. An older refresh should not clear the indication for a newer ongoing edit.
+
+This is distinct from changeset `computing`/`recomputing` status, which describes calculating the changeset, and from an operation's `running` status, which describes an invoked operation. The `reviewed` flag and nonce semantics are unchanged. Clients that do not understand the optional field can ignore it, and hosts that do not report editing activity can omit it.
 
 ### Typed file-edit models
 

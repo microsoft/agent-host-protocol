@@ -5417,7 +5417,12 @@ data class ChangesetFile(
      * echo in {@link ChangesetOperationTarget.nonce}.
      * Hosts SHOULD update a published nonce whenever contents of the file change.
      */
-    val nonce: String? = null
+    val nonce: String? = null,
+    /**
+     * Whether the host reports an ongoing edit to this file.
+     * This is advisory; false or absent does not guarantee that modifying the file is safe.
+     */
+    val isEditing: Boolean? = null
 )
 
 @Serializable
