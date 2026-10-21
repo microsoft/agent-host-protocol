@@ -5178,7 +5178,7 @@
         },
         "nonce": {
           "type": "string",
-          "description": "Optional, host-issued nonce identifying this file's current change.\nClients MAY echo it in {@link ChangesetOperationTarget.nonce}."
+          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts MUST change a published nonce whenever the reviewable change changes\nand MUST NOT reuse it for a different change."
         }
       },
       "required": [

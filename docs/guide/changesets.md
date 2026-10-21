@@ -270,7 +270,7 @@ a JSON-RPC error.
 
 ### Optional operation nonces
 
-A host MAY attach an opaque `nonce` to a `ChangesetFile` and change it whenever that file's reviewable change changes. A client MAY echo the nonce of the file it displayed in a resource or range operation's `target.nonce`. Nonces are compared for equality, not interpreted as timestamps, ordered counters, tool identifiers, filesystem ETags, or parts of a URI.
+A host MAY attach an opaque `nonce` to a `ChangesetFile`. A host that publishes a nonce MUST change it whenever that file's reviewable change changes and MUST NOT reuse it for a different change. A client MAY echo the nonce of the file it displayed in a resource or range operation's `target.nonce`. Nonces are compared for equality, not interpreted as timestamps, ordered counters, tool identifiers, filesystem ETags, or parts of a URI.
 
 When both the current file and the target carry a nonce, the host MUST compare them at the point where it applies the operation, after any wait for concurrent work. A mismatch MUST reject the invocation with [`AhpErrorCodes.Conflict`](/reference/error-codes) (`-32011`) without applying the operation. The client should refresh the displayed changes and let the user decide again rather than automatically retrying with a newer nonce.
 

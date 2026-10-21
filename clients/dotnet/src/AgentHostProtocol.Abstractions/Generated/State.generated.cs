@@ -6229,8 +6229,10 @@ public sealed record ChangesetFile
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Optional, host-issued nonce identifying this file's current change.
-    /// Clients MAY echo it in {@link ChangesetOperationTarget.nonce}.</summary>
+    /// <summary>Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts MUST change a published nonce whenever the reviewable change changes
+    /// and MUST NOT reuse it for a different change.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 }

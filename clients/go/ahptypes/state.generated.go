@@ -3900,8 +3900,10 @@ type ChangesetFile struct {
 	// Server-defined opaque metadata, surfaced to operations and tooling
 	// but not interpreted by the protocol.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Optional, host-issued nonce identifying this file's current change.
-	// Clients MAY echo it in {@link ChangesetOperationTarget.nonce}.
+	// Optional host-issued token for this reviewable change, which clients MAY
+	// echo in {@link ChangesetOperationTarget.nonce}.
+	// Hosts MUST change a published nonce whenever the reviewable change changes
+	// and MUST NOT reuse it for a different change.
 	Nonce *string `json:"nonce,omitempty"`
 }
 
