@@ -6286,8 +6286,8 @@ public struct ChangesetFile: Codable, Sendable {
     /// the server MAY also originate it (e.g. an agent self-reviewing its own
     /// output).
     ///
-    /// There is no content version in the protocol, so review is **not** reset
-    /// automatically when a file's contents change under a stable id. The server,
+    /// Review is **not** reset automatically when a file's contents or nonce
+    /// change under a stable id. The server,
     /// which is the authority on what changed, resets review explicitly — either
     /// by re-emitting the file (via {@link ChangesetFileSetAction} or
     /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -6296,24 +6296,37 @@ public struct ChangesetFile: Codable, Sendable {
     /// Server-defined opaque metadata, surfaced to operations and tooling
     /// but not interpreted by the protocol.
     public var meta: [String: AnyCodable]?
+    /// Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.
+    public var nonce: String?
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    public var isEditing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
         case edit
         case reviewed
         case meta = "_meta"
+        case nonce
+        case isEditing
     }
 
     public init(
         id: String,
         edit: FileEdit,
         reviewed: Bool? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        nonce: String? = nil,
+        isEditing: Bool? = nil
     ) {
         self.id = id
         self.edit = edit
         self.reviewed = reviewed
         self.meta = meta
+        self.nonce = nonce
+        self.isEditing = isEditing
     }
 }
 

@@ -952,6 +952,28 @@
       "description": "Result of the `resourceMkdir` command.\n\nAn empty object on success.",
       "properties": {}
     },
+    "McpServerAuthenticateTarget": {
+      "type": "object",
+      "description": "An MCP server identified by host-published session and customization state.",
+      "properties": {
+        "kind": {
+          "const": "mcpServer"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI whose `SessionState.customizations` contains the MCP server."
+        },
+        "customizationId": {
+          "type": "string",
+          "description": "The server's session-unique `McpServerCustomization.id`, echoed from the\ncustomization carrying `McpServerAuthRequiredState` or from\n`ToolCallAuthRequiredState.contributor.customizationId`."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "customizationId"
+      ]
+    },
     "AuthenticateParams": {
       "type": "object",
       "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (both surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth).\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these three mechanisms.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
@@ -986,6 +1008,10 @@
             "type": "string"
           },
           "description": "OAuth scopes the token grants, when known. Lets the server determine\nwhether a specific challenge — e.g. the `requiredScopes` on a live\n`McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is\nsatisfied without decoding the (opaque, server-specific) token itself.\nOmit when the client doesn't track granted scopes separately from the\ntoken."
+        },
+        "target": {
+          "$ref": "#/$defs/AuthenticateTarget",
+          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nWhen present, the host MUST apply the token only to that MCP server in\nthat session, never to sibling servers, other sessions, or agent-level\nresources, even if they share the resource and scopes. `resource` MUST\nstill equal that server's advertised `McpAuthRequirement.resource.resource`.\nThe host MUST reject an unknown session or customization, or a\ncustomization that is not an MCP server, with `InvalidParams` (-32602).\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
         }
       },
       "required": [
@@ -1881,6 +1907,10 @@
       ],
       "description": "Result of the `reconnect` command."
     },
+    "AuthenticateTarget": {
+      "$ref": "#/$defs/McpServerAuthenticateTarget",
+      "description": "Consumer of an authentication token, discriminated by `kind`.\nExtensible to support additional consumers, such as host-owned authentication."
+    },
     "ChatSource": {
       "oneOf": [
         {
@@ -1920,6 +1950,9 @@
                 "before",
                 "after"
               ]
+            },
+            "nonce": {
+              "type": "string"
             }
           },
           "required": [
@@ -1945,6 +1978,9 @@
             },
             "range": {
               "$ref": "#/$defs/TextRange"
+            },
+            "nonce": {
+              "type": "string"
             }
           },
           "required": [
@@ -1954,7 +1990,7 @@
           ]
         }
       ],
-      "description": "Identifies the file or range a {@link ChangesetOperation} should act on.\n\nThe `kind` MUST match one of the operation's declared\n{@link ChangesetOperation.scopes}."
+      "description": "Identifies the file or range a {@link ChangesetOperation} should act on.\n\nThe `kind` MUST match one of the operation's declared\n{@link ChangesetOperation.scopes}.\nClients MAY echo {@link ChangesetFile.nonce} from the displayed file.\nIf both nonces are present, a mismatch MUST fail with {@link AhpErrorCodes.Conflict};\nomission on either side adds no nonce precondition."
     },
     "ChannelReceiveLimits": {
       "type": "object",
@@ -7031,12 +7067,20 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nThere is no content version in the protocol, so review is **not** reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
+          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nReview is **not** reset automatically when a file's contents or nonce\nchange under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
         },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
           "description": "Server-defined opaque metadata, surfaced to operations and tooling\nbut not interpreted by the protocol."
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
+        },
+        "isEditing": {
+          "type": "boolean",
+          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
         }
       },
       "required": [
@@ -10023,7 +10067,7 @@
     },
     "ChangesetFilesReviewChangedAction": {
       "type": "object",
-      "description": "Set the {@link ChangesetFile.reviewed} flag for one or more files — the\nGitHub-style \"Viewed\" toggle, applied in a single batch.\n\nTargets files by their {@link ChangesetFile.id}. Ids in {@link files} that\ndo not match a file currently present in the changeset are ignored; if none\nmatch, the action is a no-op. Only the {@link ChangesetFile.reviewed} field\nof each matched file is affected; the files' {@link ChangesetFile.edit | edit}\nand {@link ChangesetFile._meta | _meta} are left untouched.\n\nOnly meaningful on a changeset that advertises\n{@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action\nthis one is **client-dispatchable**: a reviewer toggles review state directly,\napplying it optimistically through the write-ahead reducer and letting the\nserver echo it back on the normal `action` envelope stream. The server MAY\nalso originate it (e.g. an agent marking its own output reviewed).\n\nThere is no protocol-level content version, so review is not reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either by\nre-emitting the file without `reviewed: true`, or by dispatching this action\nwith `reviewed: false`.",
+      "description": "Set the {@link ChangesetFile.reviewed} flag for one or more files — the\nGitHub-style \"Viewed\" toggle, applied in a single batch.\n\nTargets files by their {@link ChangesetFile.id}. Ids in {@link files} that\ndo not match a file currently present in the changeset are ignored; if none\nmatch, the action is a no-op. Only the {@link ChangesetFile.reviewed} field\nof each matched file is affected; the files' {@link ChangesetFile.edit | edit},\n{@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}\nare left untouched.\n\nOnly meaningful on a changeset that advertises\n{@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action\nthis one is **client-dispatchable**: a reviewer toggles review state directly,\napplying it optimistically through the write-ahead reducer and letting the\nserver echo it back on the normal `action` envelope stream. The server MAY\nalso originate it (e.g. an agent marking its own output reviewed).\n\nReview is not reset automatically when a file's contents or nonce change\nunder a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either by\nre-emitting the file without `reviewed: true`, or by dispatching this action\nwith `reviewed: false`.",
       "properties": {
         "type": {
           "const": "changeset/filesReviewChanged"

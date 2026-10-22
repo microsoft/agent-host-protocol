@@ -2297,7 +2297,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'CreateTcpConnectionParams' },
@@ -2345,6 +2345,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
+  { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -2375,6 +2376,15 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   variants: [
     { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
     { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
+  ],
+};
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
+  variants: [
+    { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
   ],
 };
 
@@ -2416,6 +2426,9 @@ public sealed record ChangesetOperationResourceTarget
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Side { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>Targets a range within a resource.</summary>
@@ -2429,6 +2442,9 @@ public sealed record ChangesetOperationRangeTarget
     public string? Side { get; init; }
 
     public required TextRange Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>System.Text.Json converter for the ChangesetOperationTarget union.</summary>
@@ -2477,6 +2493,10 @@ function generateCommandsFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push('// ─── AuthenticateTarget Union ─────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
+  lines.push('');
 
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
@@ -2882,6 +2902,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI', 'JsonPrimitive', 'BaseParams', 'StringOrMarkdown', 'ToolCallState', 'StateAction',
     'ActionEnvelope', 'ActionOrigin', 'ResponsePart', 'ToolResultContent',
     'SessionToolCallApprovedAction', 'SessionToolCallDeniedAction',

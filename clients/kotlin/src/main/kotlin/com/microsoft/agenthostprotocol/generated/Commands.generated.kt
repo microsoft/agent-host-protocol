@@ -180,6 +180,27 @@ enum class ResourceWriteMode {
     INSERT
 }
 
+/**
+ * Identifies the consumer of an authentication token.
+ */
+@Serializable(with = AuthenticateTargetKindSerializer::class)
+@JvmInline
+value class AuthenticateTargetKind(val rawValue: String) {
+    companion object {
+        val MCP_SERVER: AuthenticateTargetKind = AuthenticateTargetKind("mcpServer")
+    }
+}
+
+internal object AuthenticateTargetKindSerializer : KSerializer<AuthenticateTargetKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthenticateTargetKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthenticateTargetKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthenticateTargetKind =
+        AuthenticateTargetKind(decoder.decodeString())
+}
+
 // ─── Command Types ──────────────────────────────────────────────────────────
 
 /**
@@ -1446,6 +1467,21 @@ data class DispatchActionParams(
 )
 
 @Serializable
+data class McpServerAuthenticateTarget(
+    val kind: AuthenticateTargetKind,
+    /**
+     * Session URI whose `SessionState.customizations` contains the MCP server.
+     */
+    val session: String,
+    /**
+     * The server's session-unique `McpServerCustomization.id`, echoed from the
+     * customization carrying `McpServerAuthRequiredState` or from
+     * `ToolCallAuthRequiredState.contributor.customizationId`.
+     */
+    val customizationId: String
+)
+
+@Serializable
 data class AuthenticateParams(
     /**
      * Channel URI this command targets.
@@ -1490,7 +1526,24 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Optional consumer of the token. Clients SHOULD include this when answering
+     * a specific MCP server's `McpServerAuthRequiredState` or
+     * `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+     * resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+     *
+     * When present, the host MUST apply the token only to that MCP server in
+     * that session, never to sibling servers, other sessions, or agent-level
+     * resources, even if they share the resource and scopes. `resource` MUST
+     * still equal that server's advertised `McpAuthRequirement.resource.resource`.
+     * The host MUST reject an unknown session or customization, or a
+     * customization that is not an MCP server, with `InvalidParams` (-32602).
+     *
+     * Without a target, resource/scope matching is unchanged; the token may
+     * satisfy every matching pending challenge. Older hosts ignore this field.
+     */
+    val target: AuthenticateTarget? = null
 )
 
 @Serializable
@@ -2037,6 +2090,59 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
     }
 }
 
+// ─── AuthenticateTarget Union ───────────────────────────────────────────────
+
+@Serializable(with = AuthenticateTargetSerializer::class)
+sealed interface AuthenticateTarget
+
+@JvmInline
+value class AuthenticateTargetMcpServer(val value: McpServerAuthenticateTarget) : AuthenticateTarget
+/**
+ * Forward-compat catch-all for unknown AuthenticateTarget discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AuthenticateTargetUnknown(val raw: JsonObject) : AuthenticateTarget
+
+internal object AuthenticateTargetSerializer : KSerializer<AuthenticateTarget> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AuthenticateTarget")
+
+    override fun deserialize(decoder: Decoder): AuthenticateTarget {
+        val input = decoder as? JsonDecoder
+            ?: error("AuthenticateTarget can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AuthenticateTarget")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AuthenticateTargetUnknown(obj)
+        return when (discriminant) {
+            "mcpServer" -> AuthenticateTargetMcpServer(input.json.decodeFromJsonElement(McpServerAuthenticateTarget.serializer(), element))
+            else -> AuthenticateTargetUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AuthenticateTarget) {
+        val output = encoder as? JsonEncoder
+            ?: error("AuthenticateTarget can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AuthenticateTargetMcpServer -> output.json.encodeToJsonElement(McpServerAuthenticateTarget.serializer(), value.value)
+            is AuthenticateTargetUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AuthenticateTargetMcpServer -> "mcpServer"
+            is AuthenticateTargetUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
 // ─── ReconnectResult Union ──────────────────────────────────────────────────
 
 @Serializable(with = ReconnectResultSerializer::class)
@@ -2094,6 +2200,7 @@ data class ChangesetOperationResourceTarget(
     val side: String? = null,
     /** Discriminator. Always "resource". */
     val kind: String = "resource",
+    val nonce: String? = null,
 )
 
 @Serializable
@@ -2103,6 +2210,7 @@ data class ChangesetOperationRangeTarget(
     val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
+    val nonce: String? = null,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {

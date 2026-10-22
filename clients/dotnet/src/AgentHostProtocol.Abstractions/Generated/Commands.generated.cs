@@ -270,6 +270,55 @@ public enum ResourceWriteMode
     Insert,
 }
 
+/// <summary>Identifies the consumer of an authentication token.</summary>
+[JsonConverter(typeof(AuthenticateTargetKindConverter))]
+public readonly struct AuthenticateTargetKind : IEquatable<AuthenticateTargetKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AuthenticateTargetKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly AuthenticateTargetKind McpServer = new AuthenticateTargetKind("mcpServer");
+
+    /// <inheritdoc />
+    public bool Equals(AuthenticateTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AuthenticateTargetKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AuthenticateTargetKind left, AuthenticateTargetKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AuthenticateTargetKind left, AuthenticateTargetKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AuthenticateTargetKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AuthenticateTargetKindConverter : JsonConverter<AuthenticateTargetKind>
+{
+    /// <inheritdoc />
+    public override AuthenticateTargetKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AuthenticateTargetKind(reader.GetString() ?? throw new JsonException("AuthenticateTargetKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AuthenticateTargetKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 /// <summary>Opens a TCP connection from the host to a destination on the host's network.
@@ -1639,6 +1688,20 @@ public sealed record DispatchActionParams
     public required StateAction Action { get; init; }
 }
 
+/// <summary>An MCP server identified by host-published session and customization state.</summary>
+public sealed record McpServerAuthenticateTarget
+{
+    public AuthenticateTargetKind Kind { get; init; } = AuthenticateTargetKind.McpServer;
+
+    /// <summary>Session URI whose `SessionState.customizations` contains the MCP server.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.</summary>
+    public required string CustomizationId { get; init; }
+}
+
 /// <summary>Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1693,6 +1756,23 @@ public sealed record AuthenticateParams
     /// token.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
+
+    /// <summary>Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AuthenticateTarget? Target { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.
@@ -2091,6 +2171,34 @@ public sealed record FetchAutomationRunsResult
 {
 }
 
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+/// <summary>AuthenticateTarget identifies the consumer of an authentication token.</summary>
+[JsonConverter(typeof(AuthenticateTargetConverter))]
+public sealed class AuthenticateTarget : AhpUnion
+{
+    /// <summary>Creates an empty AuthenticateTarget (no active variant).</summary>
+    public AuthenticateTarget() { }
+
+    /// <summary>Creates a AuthenticateTarget wrapping the given variant value.</summary>
+    public AuthenticateTarget(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AuthenticateTarget discriminated union.</summary>
+internal sealed class AuthenticateTargetConverter : UnionConverter<AuthenticateTarget>
+{
+    public AuthenticateTargetConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["mcpServer"] = typeof(McpServerAuthenticateTarget),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 /// <summary>ReconnectResult is the result of the `reconnect` command.</summary>
@@ -2193,6 +2301,9 @@ public sealed record ChangesetOperationResourceTarget
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Side { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>Targets a range within a resource.</summary>
@@ -2206,6 +2317,9 @@ public sealed record ChangesetOperationRangeTarget
     public string? Side { get; init; }
 
     public required TextRange Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>System.Text.Json converter for the ChangesetOperationTarget union.</summary>

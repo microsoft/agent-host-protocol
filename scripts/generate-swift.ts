@@ -1701,7 +1701,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
@@ -1731,6 +1731,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
+  'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
@@ -1744,6 +1745,15 @@ const COMMAND_STRUCTS = [
   'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
 ];
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'mcpServer', structName: 'McpServerAuthenticateTarget', discriminantValue: 'mcpServer' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
@@ -1818,6 +1828,10 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
+  lines.push('// MARK: - AuthenticateTarget Union\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
+  lines.push('');
+
   lines.push('// MARK: - ReconnectResult Union\n');
   lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
   lines.push('');
@@ -1928,10 +1942,12 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil) {
+    public init(resource: String, side: String? = nil, nonce: String? = nil) {
         self.resource = resource
         self.side = side
+        self.nonce = nonce
     }
 
     // kind is the union discriminant: a fixed constant for this variant (so it
@@ -1939,14 +1955,15 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     // MUST be re-emitted on encode so the wire stays a decodable
     // discriminated-union value. Hence the custom encode and the decode-only
     // CodingKeys that omit kind.
-    private enum CodingKeys: String, CodingKey { case resource, side }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side }
+    private enum CodingKeys: String, CodingKey { case resource, side, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(kind, forKey: .kind)
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }
 
@@ -1955,17 +1972,19 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
     public var resource: String
     public var side: String?
     public var range: TextRange
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil, range: TextRange) {
+    public init(resource: String, side: String? = nil, range: TextRange, nonce: String? = nil) {
         self.resource = resource
         self.side = side
         self.range = range
+        self.nonce = nonce
     }
 
     // See ChangesetOperationResourceTarget: kind is re-emitted on encode but
     // not decoded (the union dispatches on it).
-    private enum CodingKeys: String, CodingKey { case resource, side, range }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range }
+    private enum CodingKeys: String, CodingKey { case resource, side, range, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
@@ -1973,6 +1992,7 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
         try container.encode(range, forKey: .range)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }`;
 }
@@ -2444,6 +2464,7 @@ function checkExhaustiveness(project: Project): void {
 
   // Types that ARE generated but via explicit non-list code paths.
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI',                          // type alias for string
     'JsonPrimitive',                // primitive JSON value alias; mapped to AnyCodable
     'BaseParams',                    // marker base interface; flattened into each command params struct

@@ -1,0 +1,22 @@
+{
+  "description": "A full file replacement that omits isEditing clears the previous editing indication",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/fileSet",
+      "file": { "id": "file:///a.txt", "edit": {}, "nonce": "a-1" }
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1" }
+    ]
+  }
+}

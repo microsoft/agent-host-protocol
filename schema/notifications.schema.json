@@ -5471,12 +5471,20 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nThere is no content version in the protocol, so review is **not** reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
+          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nReview is **not** reset automatically when a file's contents or nonce\nchange under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
         },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
           "description": "Server-defined opaque metadata, surfaced to operations and tooling\nbut not interpreted by the protocol."
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
+        },
+        "isEditing": {
+          "type": "boolean",
+          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
         }
       },
       "required": [
