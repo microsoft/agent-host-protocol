@@ -2003,7 +2003,7 @@ public sealed class RootConfigState
 
 public sealed record AgentInfo
 {
-    /// <summary>Agent provider ID (e.g. `'copilot'`)</summary>
+    /// <summary>Agent harness ID (e.g. `'copilot'`), not a model provider or account ID.</summary>
     public required string Provider { get; init; }
 
     /// <summary>Human-readable name</summary>
@@ -2044,6 +2044,14 @@ public sealed record AgentInfo
     /// id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AgentCapabilities? Capabilities { get; init; }
+
+    /// <summary>Model providers exposed by this agent harness, including providers with
+    /// no currently available models. Together with {@link models}, this is one
+    /// atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
+    /// this agent; every model's `modelProviderId` MUST reference an entry here.
+    /// Absence preserves legacy discovery without inventing provider identity.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ModelProviderInfo>? ModelProviders { get; init; }
 }
 
 /// <summary>Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -2072,6 +2080,13 @@ public sealed record AgentCapabilities
     /// {@link CreateSessionParams.workingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleWorkingDirectoriesCapability? MultipleWorkingDirectories { get; init; }
+
+    /// <summary>The agent preserves and enforces exact provider-qualified model selections.
+    /// Clients MUST also declare `ClientCapabilities.modelProviderSelection`
+    /// before sending a `ModelSelection.modelProviderId`. Protocol version
+    /// negotiation alone does not establish support.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ModelProviderSelection { get; init; }
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleChats} capability.</summary>
@@ -2133,12 +2148,24 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
-public sealed record SessionModelInfo
+/// <summary>A model provider exposed by one agent harness. IDs are opaque and stable
+/// within that host and harness, not global identities, authorization proof,
+/// account or billing identities, or inherently telemetry-safe values.</summary>
+public sealed record ModelProviderInfo
 {
-    /// <summary>Model identifier</summary>
+    /// <summary>Opaque provider identifier. MUST NOT be derived from the display name.</summary>
     public required string Id { get; init; }
 
-    /// <summary>Agent provider that owns this model. Matches {@link AgentInfo.provider}.</summary>
+    /// <summary>Human-readable label; not an identifier and not necessarily unique.</summary>
+    public required string DisplayName { get; init; }
+}
+
+public sealed record SessionModelInfo
+{
+    /// <summary>Raw model identifier; different model providers may expose the same ID.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Owning agent harness. Matches {@link AgentInfo.provider}, not a model provider.</summary>
     public required string Provider { get; init; }
 
     /// <summary>Human-readable model name</summary>
@@ -2187,14 +2214,23 @@ public sealed record SessionModelInfo
     /// recognize.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Vendor { get; init; }
+
+    /// <summary>Provider of this model within the owning agent's {@link AgentInfo.modelProviders}.
+    /// The pair `(modelProviderId, id)` MUST be unique within that agent's catalog.
+    /// If a raw ID appears more than once, every such row MUST be qualified.
+    /// Absence is legacy, unqualified identity; it does not name a default provider.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ModelProviderId { get; init; }
 }
 
-/// <summary>A model selection: the chosen model ID together with any model-specific
-/// configuration values whose keys correspond to the model's
-/// {@link SessionModelInfo.configSchema}.</summary>
+/// <summary>A model selection: the raw model ID, an optional exact model provider, and
+/// configuration values whose keys correspond to {@link SessionModelInfo.configSchema}.
+/// A qualified selection is never a preference: hosts MUST preserve the pair
+/// or explicitly fail, never strip the qualifier or fall back to another provider.
+/// This selection is not per-call usage provenance.</summary>
 public sealed record ModelSelection
 {
-    /// <summary>Model identifier</summary>
+    /// <summary>Raw model identifier, unchanged by provider qualification or UI keys.</summary>
     public required string Id { get; init; }
 
     /// <summary>Model-specific configuration values. Values are JSON primitives: most
@@ -2202,6 +2238,13 @@ public sealed record ModelSelection
     /// produce numbers or booleans, which are carried through as-is.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
+
+    /// <summary>Exact model provider ID in the owning agent's advertised catalog.
+    /// Requires both client and agent `modelProviderSelection` capabilities.
+    /// MUST survive messages, drafts, queued work, persistence and replay.
+    /// Absence retains genuinely unqualified legacy selection behavior.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ModelProviderId { get; init; }
 }
 
 /// <summary>A selected custom agent for a session.
@@ -3612,13 +3655,16 @@ public sealed class Message
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<MessageAttachment>? Attachments { get; set; }
 
-    /// <summary>The model this message was, or will be, sent with.
+    /// <summary>The model selection associated with this message.
     ///
-    /// For historic user/agent messages this records the model actually used, so
-    /// a client editing or resending the message can retain that selection. For a
+    /// For historic user/agent messages this retains the host-accepted selection,
+    /// so a client editing or resending the message can preserve it. For a
     /// {@link ChatState.draft | draft} it carries the model the user picked for
     /// the message they are composing. Absent means the agent host's default
-    /// model applies.</summary>
+    /// model applies. A provider qualifier MUST be preserved exactly, including
+    /// through pending messages and restored history; it is not per-call usage
+    /// provenance. Accepting a message does not prove a deferred model switch
+    /// has activated.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSelection? Model { get; set; }
 
@@ -6666,13 +6712,23 @@ public sealed record AutomationTriggerDefinition
 /// carry credentials, confirmation decisions, or durable permission grants.</summary>
 public sealed record AutomationSessionTemplate
 {
-    /// <summary>Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.</summary>
+    /// <summary>Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
+    /// the host's default only for genuinely unqualified saved definitions.
+    ///
+    /// If this template's `model` or {@link AutomationDefinition.message}'s
+    /// `model` has a `modelProviderId`, the host MUST persist an explicit provider
+    /// when accepting a create or update. An omitted owner MUST be resolved and
+    /// stored at acceptance or the action rejected. Updates retaining a qualified
+    /// selection MUST preserve its saved owner when omitted, or reject; they MUST
+    /// NOT resolve it again from a changed host default.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Provider { get; init; }
 
-    /// <summary>Optional model selection resolved when a run starts. Its
-    /// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
-    /// by the selected provider.</summary>
+    /// <summary>Optional model selection revalidated when a run starts against the owning
+    /// agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
+    /// both its persisted {@link provider} and exact `(modelProviderId, id)` pair.
+    /// A missing or unavailable saved owner or pair fails the run rather than
+    /// resolving against the current default or falling back to another provider.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSelection? Model { get; init; }
 
@@ -6731,7 +6787,10 @@ public sealed record AutomationDefinition
     public required string Title { get; init; }
 
     /// <summary>Initial message sent to every newly created run session. Its
-    /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.</summary>
+    /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
+    /// A qualified `model` requires an explicit persisted
+    /// {@link AutomationSessionTemplate.provider | `session.provider`}, even
+    /// when the session template's own `model` is absent.</summary>
     public required Message Message { get; init; }
 
     /// <summary>Template used to create fresh sessions for each run.</summary>
@@ -6770,7 +6829,11 @@ public sealed record AutomationDefinition
 /// <summary>Partial replacement of editable {@link AutomationDefinition} fields.
 ///
 /// Omitted fields are unchanged. Supplied arrays and objects replace their
-/// corresponding values in full; they are not merged recursively.</summary>
+/// corresponding values in full; they are not merged recursively.
+/// The host MUST validate the resulting definition's qualified model ownership
+/// under {@link AutomationSessionTemplate.provider}. Replacing `session` while
+/// omitting its provider MUST NOT erase or rebind the owner of a retained
+/// qualified selection.</summary>
 public sealed record AutomationDefinitionPatch
 {
     /// <summary>Replacement {@link AutomationDefinition.title}.</summary>

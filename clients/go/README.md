@@ -73,6 +73,28 @@ npm run generate:go        # from the repo root
 CI verifies the committed generated files match the generator output and
 fails on drift.
 
+### Empty-object capability flags
+
+Optional `Record<string, never>` capability flags use pointer-to-map fields:
+`nil` omits the flag, while a non-nil pointer to an empty map encodes the
+required `{}` opt-in. For example:
+
+```go
+supported := map[string]json.RawMessage{}
+capabilities := ahptypes.ClientCapabilities{
+    ModelProviderSelection: &supported,
+}
+```
+
+This also corrects existing `McpApps`, `ChangesetCapabilities.Review`, and
+`AhpMcpUiHostCapabilities.Logging` flags that previously lost empty objects
+through `omitempty`. When upgrading, change map-valued initializers for these
+fields to pointers and rebuild consumers. `AgentInfo.ModelProviders` similarly
+uses a pointer to a slice to preserve an explicitly empty catalog.
+These wire-preservation fixes do not automatically opt a client into features.
+Ordinary optional maps and slices retain their existing omission behavior for
+nil or empty values; required collections still serialize, including when empty.
+
 ## Releasing
 
 See [`../../RELEASING.md`](../../RELEASING.md) for the full release flow.

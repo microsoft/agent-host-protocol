@@ -536,6 +536,14 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+
+    /// <summary>Client understands provider-qualified model catalogs and preserves exact
+    /// `ModelSelection.modelProviderId` values across every selection-bearing path.
+    /// Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
+    /// Clients MUST also check `AgentCapabilities.modelProviderSelection` before
+    /// sending a qualified selection; negotiating a protocol version is insufficient.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ModelProviderSelection { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.

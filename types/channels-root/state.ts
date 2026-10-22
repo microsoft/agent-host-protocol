@@ -54,7 +54,7 @@ export interface RootState {
  * @category Root State
  */
 export interface AgentInfo {
-  /** Agent provider ID (e.g. `'copilot'`) */
+  /** Agent harness ID (e.g. `'copilot'`), not a model provider or account ID. */
   provider: string;
   /** Human-readable name */
   displayName: string;
@@ -94,6 +94,16 @@ export interface AgentInfo {
    * id.
    */
   capabilities?: AgentCapabilities;
+  /**
+   * Model providers exposed by this agent harness, including providers with
+   * no currently available models. Together with {@link models}, this is one
+   * atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
+   * this agent; every model's `modelProviderId` MUST reference an entry here.
+   * Absence preserves legacy discovery without inventing provider identity.
+   *
+   * @see {@link /specification/root-channel#model-providers-and-selection | Model providers and selection}
+   */
+  modelProviders?: ModelProviderInfo[];
 }
 
 /**
@@ -126,6 +136,13 @@ export interface AgentCapabilities {
    * {@link CreateSessionParams.workingDirectories}.
    */
   multipleWorkingDirectories?: MultipleWorkingDirectoriesCapability;
+  /**
+   * The agent preserves and enforces exact provider-qualified model selections.
+   * Clients MUST also declare `ClientCapabilities.modelProviderSelection`
+   * before sending a `ModelSelection.modelProviderId`. Protocol version
+   * negotiation alone does not establish support.
+   */
+  modelProviderSelection?: Record<string, never>;
 }
 
 /**
@@ -196,12 +213,26 @@ export interface MultipleWorkingDirectoriesCapability {
 }
 
 /**
+ * A model provider exposed by one agent harness. IDs are opaque and stable
+ * within that host and harness, not global identities, authorization proof,
+ * account or billing identities, or inherently telemetry-safe values.
+ *
+ * @category Root State
+ */
+export interface ModelProviderInfo {
+  /** Opaque provider identifier. MUST NOT be derived from the display name. */
+  id: string;
+  /** Human-readable label; not an identifier and not necessarily unique. */
+  displayName: string;
+}
+
+/**
  * @category Root State
  */
 export interface SessionModelInfo {
-  /** Model identifier */
+  /** Raw model identifier; different model providers may expose the same ID. */
   id: string;
-  /** Agent provider that owns this model. Matches {@link AgentInfo.provider}. */
+  /** Owning agent harness. Matches {@link AgentInfo.provider}, not a model provider. */
   provider: string;
   /** Human-readable model name */
   name: string;
@@ -238,17 +269,26 @@ export interface SessionModelInfo {
    * recognize.
    */
   vendor?: string;
+  /**
+   * Provider of this model within the owning agent's {@link AgentInfo.modelProviders}.
+   * The pair `(modelProviderId, id)` MUST be unique within that agent's catalog.
+   * If a raw ID appears more than once, every such row MUST be qualified.
+   * Absence is legacy, unqualified identity; it does not name a default provider.
+   */
+  modelProviderId?: string;
 }
 
 /**
- * A model selection: the chosen model ID together with any model-specific
- * configuration values whose keys correspond to the model's
- * {@link SessionModelInfo.configSchema}.
+ * A model selection: the raw model ID, an optional exact model provider, and
+ * configuration values whose keys correspond to {@link SessionModelInfo.configSchema}.
+ * A qualified selection is never a preference: hosts MUST preserve the pair
+ * or explicitly fail, never strip the qualifier or fall back to another provider.
+ * This selection is not per-call usage provenance.
  *
  * @category Root State
  */
 export interface ModelSelection {
-  /** Model identifier */
+  /** Raw model identifier, unchanged by provider qualification or UI keys. */
   id: string;
   /**
    * Model-specific configuration values. Values are JSON primitives: most
@@ -256,6 +296,13 @@ export interface ModelSelection {
    * produce numbers or booleans, which are carried through as-is.
    */
   config?: Record<string, JsonPrimitive>;
+  /**
+   * Exact model provider ID in the owning agent's advertised catalog.
+   * Requires both client and agent `modelProviderSelection` capabilities.
+   * MUST survive messages, drafts, queued work, persistence and replay.
+   * Absence retains genuinely unqualified legacy selection behavior.
+   */
+  modelProviderId?: string;
 }
 
 // ─── Root Config Types ───────────────────────────────────────────────────────

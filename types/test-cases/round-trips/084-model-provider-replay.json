@@ -1,0 +1,76 @@
+{
+  "name": "model-provider-replay",
+  "group": "A",
+  "description": "Reconnect replay retains atomic catalog updates, draft/pending/turn selections, loaded history and automation updates through real action types.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay",
+    "missing": [],
+    "actions": [{
+      "channel": "ahp-root://",
+      "serverSeq": 2,
+      "action": {
+        "type": "root/agentsChanged",
+        "agents": [{
+          "provider": "example", "displayName": "Example", "description": "Updated catalog",
+          "capabilities": { "modelProviderSelection": {} },
+          "modelProviders": [{ "id": "source-a", "displayName": "Renamed A" }, { "id": "source-b", "displayName": "B" }],
+          "models": [
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelProviderId": "source-a" },
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelProviderId": "source-b" }
+          ]
+        }]
+      }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 3,
+      "action": { "type": "chat/draftChanged", "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 4,
+      "action": { "type": "chat/pendingMessageSet", "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 5, "origin": { "clientId": "qualified-client", "clientSeq": 1 },
+      "action": { "type": "chat/turnStarted", "turnId": "current", "queuedMessageId": "q", "startedAt": "2026-10-22T00:00:00.000Z", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 6,
+      "action": { "type": "chat/turnsLoaded", "turns": [{ "id": "past", "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } }, "responseParts": [], "state": "complete" }] }
+    }, {
+      "channel": "ahp-automations://", "serverSeq": 7,
+      "action": { "type": "automation/updateRequested", "resource": "ahp-automation:/qualified", "changes": { "session": { "provider": "example", "model": { "id": "shared-model", "modelProviderId": "source-b" } } } }
+    }]
+  },
+  "acceptableOutputs": [{
+    "type": "replay",
+    "missing": [],
+    "actions": [{
+      "channel": "ahp-root://",
+      "serverSeq": 2,
+      "action": {
+        "type": "root/agentsChanged",
+        "agents": [{
+          "provider": "example", "displayName": "Example", "description": "Updated catalog",
+          "capabilities": { "modelProviderSelection": {} },
+          "modelProviders": [{ "id": "source-a", "displayName": "Renamed A" }, { "id": "source-b", "displayName": "B" }],
+          "models": [
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelProviderId": "source-a" },
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelProviderId": "source-b" }
+          ]
+        }]
+      }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 3,
+      "action": { "type": "chat/draftChanged", "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 4,
+      "action": { "type": "chat/pendingMessageSet", "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 5, "origin": { "clientId": "qualified-client", "clientSeq": 1 },
+      "action": { "type": "chat/turnStarted", "turnId": "current", "queuedMessageId": "q", "startedAt": "2026-10-22T00:00:00.000Z", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+    }, {
+      "channel": "ahp-chat:/qualified", "serverSeq": 6,
+      "action": { "type": "chat/turnsLoaded", "turns": [{ "id": "past", "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } }, "responseParts": [], "state": "complete" }] }
+    }, {
+      "channel": "ahp-automations://", "serverSeq": 7,
+      "action": { "type": "automation/updateRequested", "resource": "ahp-automation:/qualified", "changes": { "session": { "provider": "example", "model": { "id": "shared-model", "modelProviderId": "source-b" } } } }
+    }]
+  }]
+}

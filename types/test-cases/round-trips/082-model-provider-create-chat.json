@@ -1,0 +1,24 @@
+{
+  "name": "model-provider-create-chat",
+  "group": "A",
+  "description": "Chat creation carries the exact provider and unchanged raw ID in the existing initialMessage.model, preserving primitive config values.",
+  "type": "CreateChatParams",
+  "input": {
+    "channel": "ahp-session:/example",
+    "chat": "ahp-chat:/qualified",
+    "initialMessage": {
+      "text": "Start with Service B",
+      "origin": { "kind": "user" },
+      "model": { "id": "shared-model", "modelProviderId": "source-b", "config": { "contextWindow": 8192, "enabled": true, "mode": "fast" } }
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/example",
+    "chat": "ahp-chat:/qualified",
+    "initialMessage": {
+      "text": "Start with Service B",
+      "origin": { "kind": "user" },
+      "model": { "id": "shared-model", "modelProviderId": "source-b", "config": { "contextWindow": 8192, "enabled": true, "mode": "fast" } }
+    }
+  }]
+}

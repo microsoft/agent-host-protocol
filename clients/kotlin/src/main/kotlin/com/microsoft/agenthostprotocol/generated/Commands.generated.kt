@@ -505,7 +505,15 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Client understands provider-qualified model catalogs and preserves exact
+     * `ModelSelection.modelProviderId` values across every selection-bearing path.
+     * Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
+     * Clients MUST also check `AgentCapabilities.modelProviderSelection` before
+     * sending a qualified selection; negotiating a protocol version is insufficient.
+     */
+    val modelProviderSelection: Map<String, JsonElement>? = null
 )
 
 @Serializable

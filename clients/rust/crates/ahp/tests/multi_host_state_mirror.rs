@@ -29,6 +29,7 @@ fn agent(provider: &str) -> AgentInfo {
         protected_resources: None,
         customizations: None,
         capabilities: None,
+        model_providers: None,
     }
 }
 

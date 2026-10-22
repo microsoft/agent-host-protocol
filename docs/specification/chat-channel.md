@@ -56,6 +56,17 @@ older turn).
 
 Clients MAY periodically sync their local input state into the draft by dispatching [`chat/draftChanged`](/reference/chat#actions). Eager syncing is not required — clients SHOULD debounce and MAY sync only at convenient points (for example, on blur). When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Dispatch `chat/draftChanged` with no `draft` to clear it once the message is sent.
 
+### Model selection
+
+`Message.model` uses the shared [`ModelSelection`](/reference/root#modelselection),
+including an optional exact `modelProviderId`. The [model-provider contract](./root-channel#model-providers-and-selection)
+defines mutual capability gating, catalog references, safe legacy projection
+and explicit failure. Preserve the whole selection through creation, turn
+actions, drafts, pending-message edits and consumption, history, forks and
+restoration. A saved qualifier MUST NOT be dropped on edit or resend. Accepted
+selection is neither proof of a deferred runtime switch's activation nor
+attribution of individual model calls.
+
 ### Per-chat working directory
 
 `ChatState.workingDirectories` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat inherits the session's full [`workingDirectories`](/reference/session#sessionsummary) set; when present it MUST be a subset of that set. Hosts MAY set a per-chat subset to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back.
@@ -231,9 +242,15 @@ unsupported destinations or transient source conditions. Failure has no
 observable effect on ownership or catalog order.
 
 Success preserves every moved chat URI, state, and origin, and converges the
-durable session catalogs. The protocol does not require provider equality,
-prohibit active turns universally, or otherwise expose host-specific storage
-and runtime constraints.
+durable session catalogs. For [qualified model selections](./root-channel#model-providers-and-selection),
+this includes preserving the owning host/harness namespace: a move MUST NOT
+strip or rebind a qualifier, or reinterpret saved provider IDs under a different
+harness. If that identity cannot be preserved, the host MUST return
+`InvalidParams` (`-32602`) without changing ownership or state.
+Identity-preserving same-harness moves remain subject to the ordinary
+validation rules; genuinely unqualified legacy behavior is unchanged. The
+protocol does not otherwise require provider equality, prohibit active turns
+universally, or expose host-specific storage and runtime constraints.
 
 #### Atomic synchronization
 

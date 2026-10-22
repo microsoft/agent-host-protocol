@@ -67,6 +67,19 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | Toolchain | Image | Notes |
 | --- | --- | --- |
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
+| .NET 10 SDK | `mcr.microsoft.com/dotnet/sdk:10.0.402-noble` | Match the full solution build/test gates in CI; include the .NET 8 runtime and Node.js below. Native AOT smoke tests also need `clang` and `zlib1g-dev`. |
+| .NET 8 test runtime | `mcr.microsoft.com/dotnet/runtime:8.0.32-noble` | Supply alongside the .NET 10 SDK so `net8.0` tests run on their intended runtime. |
+| Node.js for .NET interop tests | `docker.io/library/node:24-bookworm-slim` | The full .NET suite launches the repository-local TypeScript host; restore root npm dependencies in the container. |
+
+An already available Docker engine can run the same images; do not provision a
+second VM solely to change container CLIs. Check engine readiness and disk/memory
+headroom first. Keep verification containers and writable copies task-owned,
+and never prune unrelated images, volumes, or build caches.
+
+The full Swift client and tests import Apple-only `Network` and `CryptoKit`.
+Run them on macOS with a full Xcode/XCTest toolchain: Command Line Tools alone
+may lack XCTest, and a Linux Swift image is not a substitute for the full suite.
+Do not exclude transport targets or add platform shims just to obtain a test pass.
 
 Mount the **repo root** (the shared conformance fixtures under `types/test-cases/` are resolved by walking up from the working directory, so a client-dir-only mount fails) and keep build caches out of `$HOME`. Example — run the Kotlin client's tests:
 

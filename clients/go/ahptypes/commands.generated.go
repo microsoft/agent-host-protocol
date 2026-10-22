@@ -250,7 +250,13 @@ type ClientCapabilities struct {
 	// {@link McpServerCustomization.channel | `mcp://` channel}) when this
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
-	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client understands provider-qualified model catalogs and preserves exact
+	// `ModelSelection.modelProviderId` values across every selection-bearing path.
+	// Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
+	// Clients MUST also check `AgentCapabilities.modelProviderSelection` before
+	// sending a qualified selection; negotiating a protocol version is insufficient.
+	ModelProviderSelection *map[string]json.RawMessage `json:"modelProviderSelection,omitempty"`
 }
 
 // Automation features supported by this host authority.

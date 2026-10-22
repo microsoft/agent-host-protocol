@@ -17,6 +17,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
 import { typeAdmitsUndefined } from './generate-json-schema.js';
+import type { RootState } from '../types/channels-root/state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -188,6 +189,83 @@ describe('generated JSON schemas', () => {
           `${file} references ${dangling.length} undefined $def(s) (bug #302.2): ${dangling.slice(0, 10).join(', ')}`,
         );
       });
+
+      if (file === 'state.schema.json') {
+        it('keeps model-provider catalogs and qualifiers optional and typed', () => {
+          const defs = schema.$defs as Record<string, Record<string, unknown>>;
+          const model = { id: 'shared-model', provider: 'example', name: 'Shared model' };
+          const agent = { provider: 'example', displayName: 'Example', description: '', models: [model] };
+          const selection = { id: model.id, config: { contextWindow: 8192, enabled: true, mode: 'fast' } };
+          assert.deepEqual(defs.ModelProviderInfo.required, ['id', 'displayName']);
+          assert.deepEqual(Object.keys(defs.ModelProviderInfo.properties as object).sort(), ['displayName', 'id']);
+          assert.equal(schemaAccepts(schema, defs.AgentInfo, agent), true);
+          assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelProviders: [] }), true);
+          for (const [name, value] of [['SessionModelInfo', model], ['ModelSelection', selection]] as const) {
+            assert.equal(schemaAccepts(schema, defs[name], value), true, `${name}: legacy absence`);
+            assert.equal(schemaAccepts(schema, defs[name], { ...value, modelProviderId: 'source-b' }), true);
+            for (const invalid of [null, 17, false, {}]) {
+              assert.equal(schemaAccepts(schema, defs[name], { ...value, modelProviderId: invalid }), false);
+            }
+          }
+          for (const invalid of [null, {}, [{ id: 'source-a' }], [{ displayName: 'Service' }]]) {
+            assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelProviders: invalid }), false);
+          }
+        });
+
+        it('preserves a reference-complete model-provider catalog with duplicate raw IDs', () => {
+          const fixture: { input: { snapshots: { state: RootState }[] } } = JSON.parse(readFileSync(
+            resolve(root, 'types/test-cases/round-trips/081-model-provider-catalog.json'), 'utf-8',
+          ));
+          const catalog = fixture.input.snapshots[0].state;
+          const defs = schema.$defs as Record<string, Record<string, unknown>>;
+          assert.equal(schemaAccepts(schema, defs.RootState, catalog), true);
+          const agent = catalog.agents[0];
+          assert.ok(agent.modelProviders);
+          const providers = new Set(agent.modelProviders.map(provider => provider.id));
+          assert.equal(providers.size, agent.modelProviders.length);
+          assert.equal(agent.models.length, 2);
+          assert.equal(new Set(agent.models.map(model => model.id)).size, 1);
+          assert.equal(new Set(agent.models.map(model => JSON.stringify([model.modelProviderId, model.id]))).size, 2);
+          for (const model of agent.models) {
+            assert.equal(model.provider, agent.provider);
+            assert.ok(model.modelProviderId && providers.has(model.modelProviderId));
+          }
+          assert.ok(providers.has('source-c'));
+          assert.equal(agent.models.some(model => model.modelProviderId === 'source-c'), false);
+          assert.equal(catalog.agents[1].modelProviders, undefined);
+          assert.equal(catalog.agents[1].capabilities, undefined);
+          assert.equal(catalog.agents[1].models[0].modelProviderId, undefined);
+          assert.deepEqual(catalog.agents[2].modelProviders, []);
+          assert.deepEqual(catalog.agents[2].models, []);
+        });
+      }
+
+      if (file === 'state.schema.json' || file === 'commands.schema.json') {
+        it('uses independent optional model-provider capability presence flags without defaults', () => {
+          const defs = schema.$defs as Record<string, Record<string, unknown>>;
+          const name = file === 'state.schema.json' ? 'AgentCapabilities' : 'ClientCapabilities';
+          const capability = defs[name];
+          const properties = capability.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.modelProviderSelection.type, 'object');
+          assert.equal(properties.modelProviderSelection.default, undefined);
+          assert.equal(schemaAccepts(schema, capability, {}), true);
+          assert.equal(schemaAccepts(schema, capability, { modelProviderSelection: {} }), true);
+          for (const invalid of [false, true, null, '1.1.0']) {
+            assert.equal(schemaAccepts(schema, capability, { modelProviderSelection: invalid }), false);
+          }
+        });
+      }
+
+      if (file !== 'errors.schema.json') {
+        it('reuses the shared model selection on every reachable message and automation path', () => {
+          const defs = schema.$defs as Record<string, Record<string, unknown>>;
+          for (const name of ['Message', 'AutomationSessionTemplate']) {
+            assert.ok(defs[name], `${file}: ${name}`);
+            const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+            assert.equal(properties.model.$ref, '#/$defs/ModelSelection', `${file}: ${name}.model`);
+          }
+        });
+      }
 
       it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
         if (file !== 'notifications.schema.json') return;

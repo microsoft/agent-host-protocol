@@ -1,0 +1,102 @@
+{
+  "name": "model-provider-restored-snapshot",
+  "group": "A",
+  "description": "Restoration preserves exact pairs in active and historical messages, drafts, queued/steering work and saved automation templates; a legacy bare selection stays bare.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-chat:/qualified",
+      "fromSeq": 10,
+      "state": {
+        "resource": "ahp-chat:/qualified",
+        "title": "Qualified selections",
+        "status": 8,
+        "modifiedAt": "2026-10-22T00:00:00.000Z",
+        "turns": [
+          { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" }, "model": { "id": "shared-model" } }, "responseParts": [], "state": "complete" },
+          { "id": "past", "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } }, "responseParts": [], "state": "complete" }
+        ],
+        "activeTurn": {
+          "id": "current",
+          "startedAt": "2026-10-22T00:00:00.000Z",
+          "message": { "text": "Current", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+          "responseParts": []
+        },
+        "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b", "config": { "mode": "fast" } } },
+        "queuedMessages": [
+          { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } } },
+          { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+        ],
+        "steeringMessage": { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+      }
+    }, {
+      "resource": "ahp-automations://",
+      "fromSeq": 10,
+      "state": {
+        "entries": [{
+          "resource": "ahp-automation:/qualified",
+          "definition": {
+            "title": "Qualified run",
+            "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+            "session": { "provider": "example", "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+            "enabled": true,
+            "triggers": []
+          },
+          "runs": [],
+          "operations": ["update", "remove", "run"],
+          "createdAt": "2026-10-22T00:00:00.000Z",
+          "modifiedAt": "2026-10-22T00:00:00.000Z"
+        }]
+      }
+    }]
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-chat:/qualified",
+      "fromSeq": 10,
+      "state": {
+        "resource": "ahp-chat:/qualified",
+        "title": "Qualified selections",
+        "status": 8,
+        "modifiedAt": "2026-10-22T00:00:00.000Z",
+        "turns": [
+          { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" }, "model": { "id": "shared-model" } }, "responseParts": [], "state": "complete" },
+          { "id": "past", "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } }, "responseParts": [], "state": "complete" }
+        ],
+        "activeTurn": {
+          "id": "current",
+          "startedAt": "2026-10-22T00:00:00.000Z",
+          "message": { "text": "Current", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+          "responseParts": []
+        },
+        "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b", "config": { "mode": "fast" } } },
+        "queuedMessages": [
+          { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } } },
+          { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+        ],
+        "steeringMessage": { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } } }
+      }
+    }, {
+      "resource": "ahp-automations://",
+      "fromSeq": 10,
+      "state": {
+        "entries": [{
+          "resource": "ahp-automation:/qualified",
+          "definition": {
+            "title": "Qualified run",
+            "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+            "session": { "provider": "example", "model": { "id": "shared-model", "modelProviderId": "source-b" } },
+            "enabled": true,
+            "triggers": []
+          },
+          "runs": [],
+          "operations": ["update", "remove", "run"],
+          "createdAt": "2026-10-22T00:00:00.000Z",
+          "modifiedAt": "2026-10-22T00:00:00.000Z"
+        }]
+      }
+    }]
+  }]
+}

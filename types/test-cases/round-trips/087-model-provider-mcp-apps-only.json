@@ -1,0 +1,18 @@
+{
+  "name": "model-provider-mcp-apps-only",
+  "group": "A",
+  "description": "The existing mcpApps present-empty flag survives while the independent modelProviderSelection marker remains absent.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://",
+    "protocolVersions": ["1.1.0"],
+    "clientId": "mcp-apps-only",
+    "capabilities": { "mcpApps": {} }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "protocolVersions": ["1.1.0"],
+    "clientId": "mcp-apps-only",
+    "capabilities": { "mcpApps": {} }
+  }]
+}

@@ -34,6 +34,37 @@ The session template can select a provider, model, and custom agent, and carries
 the same schema-defined configuration values used for ordinary session
 creation. Hosts revalidate all selections when a run starts.
 
+### Qualified model ownership
+
+For [provider-qualified model selections](./root-channel#model-providers-and-selection),
+the owning harness is part of the identity, not just the pair of model-provider
+and model IDs. Whenever either `definition.session.model` **or**
+`definition.message.model` has a `modelProviderId`, the accepted definition
+MUST persist an explicit `definition.session.provider`.
+
+On create or update, the host MUST validate the resulting definition before
+persisting it and publishing `automation/set`. If a newly qualified definition
+omits its owner, the host MUST either resolve the owning harness at acceptance
+and store it in `session.provider`, or reject the action with
+`ActionEnvelope.rejectionReason`. Resolution cannot be deferred until a run.
+Both qualified selections, when present, belong to that same persisted harness.
+
+An update retaining a qualified selection MUST preserve the saved owner if
+the submitted template omits it, or reject the action. This applies even when
+the patch replaces `session` in full or changes only `message`; neither path
+may erase the owner or select a new one from the current host default.
+Clients MUST preserve the normalized `session.provider` when editing or
+resubmitting a qualified definition. An explicit owner change MUST NOT
+implicitly rebind retained qualified selections.
+
+At execution, the host MUST use and revalidate the persisted owner. A missing
+or unavailable owner or exact pair fails through the existing automation-run
+lifecycle, even if a different default harness advertises identical
+`(modelProviderId, id)` strings. A saved definition without an explicit owner
+MUST NOT become executable by guessing its qualified selection's namespace.
+Genuinely unqualified definitions, including updates that remove all qualifiers,
+retain the existing optional/default-provider behavior.
+
 ## Subscription and reconnect
 
 When `InitializeResult.automations` is present, clients subscribe to

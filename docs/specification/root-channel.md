@@ -32,6 +32,178 @@ RootState {
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
+### Model providers and selection
+
+One agent harness can expose models from several providers. `AgentInfo.provider`
+and `SessionModelInfo.provider` continue to identify that **harness**. They MUST
+NOT be repurposed as a model-provider, vendor, subscription, or authentication
+identity. `SessionModelInfo.vendor` remains a display-oriented vendor string.
+
+An agent MAY advertise `modelProviders: ModelProviderInfo[]` alongside `models`.
+A descriptor contains only an opaque `id` and a `displayName`. Its ID is stable
+within the host and owning harness; labels need not be unique and MUST NOT be
+used as identity. IDs MUST NOT be reassigned to a different provider. They are
+not global account or billing identities, authorization proof, or inherently
+safe telemetry values. Availability can depend on the host's current context;
+a session-scoped roster does not establish universal pre-session availability.
+
+The full identity of a qualified model is
+`(host, harness, modelProviderId, rawModelId)`. The raw `SessionModelInfo.id` and
+`ModelSelection.id` MUST remain unchanged: presentation keys MUST NOT be sent
+as model IDs to the runtime or its policy allowlists.
+
+#### Atomic catalog
+
+Descriptors and model rows form one catalog in each `AgentInfo`, delivered
+together in root snapshots and replaced together by `root/agentsChanged`:
+
+- Descriptor IDs MUST be unique within the owning agent.
+- Every `SessionModelInfo.modelProviderId` MUST reference a descriptor in that
+  same agent's `modelProviders`.
+- `(modelProviderId, id)` MUST be unique within the agent. If a raw ID occurs
+  more than once, every occurrence MUST be qualified with a different provider.
+  An unqualified row MUST NOT collide with another row's raw ID.
+- A known provider MAY have zero models. Missing or empty catalogs do not imply
+  that a user needs to sign in, supply an API key, or has a default subscription.
+- Missing provider fields retain legacy, unqualified identity. Peers MUST NOT
+  invent provenance from a vendor, display label, model name, or default.
+
+Hosts MUST NOT publish dangling references or duplicate identities. Clients
+encountering them MUST surface an invalid catalog rather than repair it by
+guessing a provider or offer the invalid entries for selection. Previously
+saved selections and history may reference providers no longer available;
+they MUST retain their identity, but are not evidence of current availability.
+
+#### Mutual capability gating and legacy projection
+
+The client opts in with
+`InitializeParams.capabilities.modelProviderSelection: {}`. An agent promises
+exact-pair handling with `AgentInfo.capabilities.modelProviderSelection: {}`.
+Both presence flags are required before a client sends a qualified selection.
+Negotiating `1.1.0` (or any other protocol version) alone establishes neither
+flag. Catalog fields alone also do not promise selection support.
+
+A host MUST expose an ambiguous-by-bare-ID catalog only to an acknowledging
+client and only for a supporting agent. For a client that did not opt in, the
+host MUST project a safe legacy catalog: omit **all** rows for each ambiguous
+raw ID, not choose the first provider, merge rows, or add a display suffix and
+leave indistinguishable selectable IDs. Remaining selectable rows MUST resolve
+safely under the host's established unqualified behavior. A host MAY omit all
+qualified rows. The same projection MUST apply to snapshots, updates and replay.
+
+Reconnect retains the original capability declarations and projection. A client
+whose capabilities changed MUST initialize afresh; a host unable to recover the
+declarations MUST require fresh initialization rather than assume support.
+Neither peer may downgrade a saved qualified selection to an unqualified one.
+For an incapable client, the host MUST reject operations that could execute or
+replace qualified message, draft, pending-work or automation selections without
+preserving their qualifier. Unrelated, non-model-affecting operations may
+continue. This does not change genuinely unqualified legacy selection behavior.
+
+For example, after mutual opt-in an agent can advertise this partial catalog
+(the labels are illustrative, not protocol-defined provider kinds):
+
+```json
+{
+  "provider": "example-harness",
+  "displayName": "Example agent",
+  "description": "One harness, multiple model providers",
+  "capabilities": { "modelProviderSelection": {} },
+  "modelProviders": [
+    { "id": "source-a", "displayName": "Service A" },
+    { "id": "source-b", "displayName": "Service B" },
+    { "id": "source-c", "displayName": "Service C" }
+  ],
+  "models": [
+    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelProviderId": "source-a" },
+    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelProviderId": "source-b" }
+  ]
+}
+```
+
+Selecting the second row is
+`{ "id": "shared-model", "modelProviderId": "source-b" }`, optionally with the
+existing `config` values. A client MUST qualify a selection made from a
+qualified row. For a legacy client, both `shared-model` rows are omitted.
+
+#### Exact selection and failure
+
+A qualified [`ModelSelection`](/reference/root#modelselection) is an exact pair,
+never a preference. The owning harness is determined by the session (or the
+automation's session template), not by changing `AgentInfo.provider`.
+Hosts MUST validate the exact pair when accepting a selection and revalidate
+before executing queued, restored or automated work. An unknown provider,
+unavailable pair, unsupported qualifier, or qualifier lost by a downstream
+adapter MUST explicitly fail. Peers MUST NOT strip it and retry a bare ID,
+silently choose another subscription, or remap it during policy reconciliation
+or resume. A raw-ID policy allowlist match does not authorize provider fallback.
+
+Use the existing failure paths: request validation failures return
+`InvalidParams` (`-32602`), and rejected dispatched actions carry
+`ActionEnvelope.rejectionReason`. `ProviderNotFound` (`-32002`) still refers to
+the **agent harness**, not a model-provider descriptor. Existing authorization
+errors apply when appropriate. If accepted work later becomes unavailable or
+switching fails, report failure through the existing chat or automation
+lifecycle rather than execute a different pair.
+
+The shared selection MUST be preserved through every applicable path:
+
+| Surface | Selection-bearing value |
+| --- | --- |
+| Chat creation and first/subsequent turns | `createChat.initialMessage.model`, `chat/turnStarted.message.model` |
+| Draft changes and saved drafts | `chat/draftChanged.draft.model`, `ChatState.draft.model` |
+| Queued/steering updates and consumption | `chat/pendingMessageSet.message.model`, `PendingMessage.message.model`, the consuming message |
+| Authoritative turn state, loaded history, resume, fork/copy/move, snapshot and reconnect | `Message.model` in active and retained turns |
+| Automation create/update, saved definitions and run creation | `AutomationSessionTemplate.model` and the run's message selection |
+
+An automation with a qualifier in either its session template or message MUST
+persist an explicit `session.provider` at acceptance, including on updates;
+see [qualified automation ownership](./automation-channel#qualified-model-ownership).
+A later change to the default harness MUST NOT reinterpret that saved selection.
+
+Moving or copying qualified state MUST also preserve its host/harness namespace.
+A host MUST reject a transfer request with the existing `InvalidParams`
+(`-32602`) error if it cannot preserve that namespace, leaving the source state
+unchanged. It MUST NOT strip or rebind the qualifier, or reinterpret a matching
+provider ID under the destination harness. Identity-preserving transfers within
+the same host and harness remain permitted subject to the operation's existing
+validation rules. Genuinely unqualified legacy transfers are unchanged.
+
+`createSession` itself has no model field; this feature adds no session-level
+selected-model state, switch command, or new acknowledgement. Host-accepted
+messages and their authoritative echoes MUST retain the exact pair. Acceptance
+of a command, draft, pending message, or turn request is **not** proof that a
+deferred runtime switch has activated. The host MUST wait for the exact pair to
+be effective before executing the affected work, or fail it; it MUST NOT claim
+activation while a switch is still deferred.
+
+Requested/accepted selection is not actual-call usage provenance. This contract
+does not add a usage ledger, billing or account binding; existing usage and
+metadata extension points remain unchanged.
+
+#### Implementation qualification
+
+Schema and shared wire/reducer tests establish representation and preservation,
+not deployment-level safe routing. Before advertising support, downstream
+hosts/adapters need runtime tests for duplicate raw IDs, unavailable sources,
+initial and subsequent selections, deferred switches, queued/steering work,
+restore/resume, unsafe cross-harness transfers, policy allowlists, and old/new
+client-host combinations.
+Automation qualification MUST also cover a default-harness change between
+create, update and run when both harnesses expose identical pair strings,
+including template-only and message-only qualifiers. Check normalization or
+rejection of omitted owners and preservation through whole-template updates.
+In particular, policy reconciliation MUST be tested for silent fallback even
+when the runtime accepted the original exact pair. Discovery also needs an
+authoritative catalog for the advertised context, not an invented global roster.
+
+The new optional fields are wire-compatible with absent-field legacy payloads,
+not a promise of native binary compatibility. Rebuild generated-client
+consumers; exhaustive Rust struct literals must initialize the new optional
+fields (or use `..Default::default()` where available). Existing named/default
+constructor calls can omit the fields; do not persist positional constructor
+layouts as a compatibility contract.
+
 ### Paginating the catalogue
 
 A large catalogue can be fetched incrementally. [`listSessions`](/reference/root#listsessions) accepts an optional `limit` (the maximum number of entries the client wants in the page — the server SHOULD respect it, but MAY return fewer and MAY impose its own upper cap) and an optional opaque `cursor`. The result carries the page in `items` plus an optional `nextCursor`:
