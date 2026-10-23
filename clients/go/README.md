@@ -82,14 +82,14 @@ required `{}` opt-in. For example:
 ```go
 supported := map[string]json.RawMessage{}
 capabilities := ahptypes.ClientCapabilities{
-    ModelProviderSelection: &supported,
+    ModelSourceSelection: &supported,
 }
 ```
 
 This also corrects existing `McpApps`, `ChangesetCapabilities.Review`, and
 `AhpMcpUiHostCapabilities.Logging` flags that previously lost empty objects
 through `omitempty`. When upgrading, change map-valued initializers for these
-fields to pointers and rebuild consumers. `AgentInfo.ModelProviders` similarly
+fields to pointers and rebuild consumers. `AgentInfo.ModelSources` similarly
 uses a pointer to a slice to preserve an explicitly empty catalog.
 These wire-preservation fixes do not automatically opt a client into features.
 Ordinary optional maps and slices retain their existing omission behavior for

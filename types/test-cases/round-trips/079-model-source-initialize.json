@@ -1,5 +1,5 @@
 {
-  "name": "model-provider-initialize",
+  "name": "model-source-initialize",
   "group": "A",
   "description": "Client opt-in is an explicit empty-object capability, independent of the offered version and existing capabilities.",
   "type": "InitializeParams",
@@ -8,13 +8,13 @@
     "protocolVersions": ["1.1.0"],
     "clientId": "qualified-client",
     "initialSubscriptions": ["ahp-root://"],
-    "capabilities": { "mcpApps": {}, "modelProviderSelection": {} }
+    "capabilities": { "mcpApps": {}, "modelSourceSelection": {} }
   },
   "acceptableOutputs": [{
     "channel": "ahp-root://",
     "protocolVersions": ["1.1.0"],
     "clientId": "qualified-client",
     "initialSubscriptions": ["ahp-root://"],
-    "capabilities": { "mcpApps": {}, "modelProviderSelection": {} }
+    "capabilities": { "mcpApps": {}, "modelSourceSelection": {} }
   }]
 }

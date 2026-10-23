@@ -1,5 +1,5 @@
 {
-  "name": "model-provider-automation-owner",
+  "name": "model-source-automation-owner",
   "group": "A",
   "description": "Host-normalized saved automations retain an explicit harness for template-only and message-only qualifiers; a genuinely unqualified template keeps its absent default owner. This tests representation, not host normalization or default-change enforcement.",
   "type": "Snapshot",
@@ -12,7 +12,7 @@
         "definition": {
           "title": "Template-qualified",
           "message": { "text": "Run", "origin": { "kind": "automation" } },
-          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelProviderId": "source-a" } },
+          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
           "enabled": true,
           "triggers": []
         },
@@ -24,7 +24,7 @@
         "resource": "ahp-automation:/message-qualified",
         "definition": {
           "title": "Message-qualified",
-          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } },
+          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
           "session": { "provider": "harness-a" },
           "enabled": true,
           "triggers": []
@@ -58,7 +58,7 @@
         "definition": {
           "title": "Template-qualified",
           "message": { "text": "Run", "origin": { "kind": "automation" } },
-          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelProviderId": "source-a" } },
+          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
           "enabled": true,
           "triggers": []
         },
@@ -70,7 +70,7 @@
         "resource": "ahp-automation:/message-qualified",
         "definition": {
           "title": "Message-qualified",
-          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } },
+          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
           "session": { "provider": "harness-a" },
           "enabled": true,
           "triggers": []

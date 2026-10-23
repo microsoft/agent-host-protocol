@@ -91,9 +91,9 @@ New behavior generally lands in two stages:
 1. **Capability-gated.** A new feature is introduced as an opt-in capability advertised by a host or clients. Implementors check for the capability before exercising the feature. This lets hosts and clients adopt the feature on independent schedules without a version bump.
 2. **Required.** Once a capability has matured, a future protocol version may promote it to baseline behavior and remove the capability flag. This reduces long-term implementation complexity.
 
-For example, [provider-qualified model selection](./root-channel#model-providers-and-selection)
-requires both `ClientCapabilities.modelProviderSelection` and the owning
-`AgentCapabilities.modelProviderSelection`. Negotiating `1.1.0` is not a
+For example, [source-qualified model selection](./root-channel#model-sources-and-selection)
+requires both `ClientCapabilities.modelSourceSelection` and the owning
+`AgentCapabilities.modelSourceSelection`. Negotiating `1.1.0` is not a
 substitute. A non-acknowledging client receives a safe legacy catalog, and a
 saved qualified selection cannot be written back or retried as an unqualified
 one merely because the other peer lacks support.

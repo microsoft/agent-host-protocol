@@ -32,23 +32,27 @@ RootState {
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
-### Model providers and selection
+### Model sources and selection
 
-One agent harness can expose models from several providers. `AgentInfo.provider`
+One agent harness can expose models from several sources. `AgentInfo.provider`
 and `SessionModelInfo.provider` continue to identify that **harness**. They MUST
-NOT be repurposed as a model-provider, vendor, subscription, or authentication
+NOT be repurposed as a model-source, vendor, subscription, or authentication
 identity. `SessionModelInfo.vendor` remains a display-oriented vendor string.
 
-An agent MAY advertise `modelProviders: ModelProviderInfo[]` alongside `models`.
+A **model source** is an independently selectable source of model access
+exposed by an agent harness. It describes availability and selection, not the
+provenance of individual inference calls.
+
+An agent MAY advertise `modelSources: ModelSourceInfo[]` alongside `models`.
 A descriptor contains only an opaque `id` and a `displayName`. Its ID is stable
 within the host and owning harness; labels need not be unique and MUST NOT be
-used as identity. IDs MUST NOT be reassigned to a different provider. They are
+used as identity. IDs MUST NOT be reassigned to a different source. They are
 not global account or billing identities, authorization proof, or inherently
 safe telemetry values. Availability can depend on the host's current context;
 a session-scoped roster does not establish universal pre-session availability.
 
 The full identity of a qualified model is
-`(host, harness, modelProviderId, rawModelId)`. The raw `SessionModelInfo.id` and
+`(host, harness, modelSourceId, rawModelId)`. The raw `SessionModelInfo.id` and
 `ModelSelection.id` MUST remain unchanged: presentation keys MUST NOT be sent
 as model IDs to the runtime or its policy allowlists.
 
@@ -58,27 +62,27 @@ Descriptors and model rows form one catalog in each `AgentInfo`, delivered
 together in root snapshots and replaced together by `root/agentsChanged`:
 
 - Descriptor IDs MUST be unique within the owning agent.
-- Every `SessionModelInfo.modelProviderId` MUST reference a descriptor in that
-  same agent's `modelProviders`.
-- `(modelProviderId, id)` MUST be unique within the agent. If a raw ID occurs
-  more than once, every occurrence MUST be qualified with a different provider.
+- Every `SessionModelInfo.modelSourceId` MUST reference a descriptor in that
+  same agent's `modelSources`.
+- `(modelSourceId, id)` MUST be unique within the agent. If a raw ID occurs
+  more than once, every occurrence MUST be qualified with a different source.
   An unqualified row MUST NOT collide with another row's raw ID.
-- A known provider MAY have zero models. Missing or empty catalogs do not imply
+- A known source MAY have zero models. Missing or empty catalogs do not imply
   that a user needs to sign in, supply an API key, or has a default subscription.
-- Missing provider fields retain legacy, unqualified identity. Peers MUST NOT
+- Missing source fields retain legacy, unqualified identity. Peers MUST NOT
   invent provenance from a vendor, display label, model name, or default.
 
 Hosts MUST NOT publish dangling references or duplicate identities. Clients
 encountering them MUST surface an invalid catalog rather than repair it by
-guessing a provider or offer the invalid entries for selection. Previously
-saved selections and history may reference providers no longer available;
+guessing a source or offer the invalid entries for selection. Previously
+saved selections and history may reference sources no longer available;
 they MUST retain their identity, but are not evidence of current availability.
 
 #### Mutual capability gating and legacy projection
 
 The client opts in with
-`InitializeParams.capabilities.modelProviderSelection: {}`. An agent promises
-exact-pair handling with `AgentInfo.capabilities.modelProviderSelection: {}`.
+`InitializeParams.capabilities.modelSourceSelection: {}`. An agent promises
+exact-pair handling with `AgentInfo.capabilities.modelSourceSelection: {}`.
 Both presence flags are required before a client sends a qualified selection.
 Negotiating `1.1.0` (or any other protocol version) alone establishes neither
 flag. Catalog fields alone also do not promise selection support.
@@ -86,7 +90,7 @@ flag. Catalog fields alone also do not promise selection support.
 A host MUST expose an ambiguous-by-bare-ID catalog only to an acknowledging
 client and only for a supporting agent. For a client that did not opt in, the
 host MUST project a safe legacy catalog: omit **all** rows for each ambiguous
-raw ID, not choose the first provider, merge rows, or add a display suffix and
+raw ID, not choose the first source, merge rows, or add a display suffix and
 leave indistinguishable selectable IDs. Remaining selectable rows MUST resolve
 safely under the host's established unqualified behavior. A host MAY omit all
 qualified rows. The same projection MUST apply to snapshots, updates and replay.
@@ -101,28 +105,28 @@ preserving their qualifier. Unrelated, non-model-affecting operations may
 continue. This does not change genuinely unqualified legacy selection behavior.
 
 For example, after mutual opt-in an agent can advertise this partial catalog
-(the labels are illustrative, not protocol-defined provider kinds):
+(the labels are illustrative, not protocol-defined source kinds):
 
 ```json
 {
   "provider": "example-harness",
   "displayName": "Example agent",
-  "description": "One harness, multiple model providers",
-  "capabilities": { "modelProviderSelection": {} },
-  "modelProviders": [
+  "description": "One harness, multiple model sources",
+  "capabilities": { "modelSourceSelection": {} },
+  "modelSources": [
     { "id": "source-a", "displayName": "Service A" },
     { "id": "source-b", "displayName": "Service B" },
     { "id": "source-c", "displayName": "Service C" }
   ],
   "models": [
-    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelProviderId": "source-a" },
-    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelProviderId": "source-b" }
+    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelSourceId": "source-a" },
+    { "id": "shared-model", "provider": "example-harness", "name": "Shared model", "modelSourceId": "source-b" }
   ]
 }
 ```
 
 Selecting the second row is
-`{ "id": "shared-model", "modelProviderId": "source-b" }`, optionally with the
+`{ "id": "shared-model", "modelSourceId": "source-b" }`, optionally with the
 existing `config` values. A client MUST qualify a selection made from a
 qualified row. For a legacy client, both `shared-model` rows are omitted.
 
@@ -132,16 +136,16 @@ A qualified [`ModelSelection`](/reference/root#modelselection) is an exact pair,
 never a preference. The owning harness is determined by the session (or the
 automation's session template), not by changing `AgentInfo.provider`.
 Hosts MUST validate the exact pair when accepting a selection and revalidate
-before executing queued, restored or automated work. An unknown provider,
+before executing queued, restored or automated work. An unknown source,
 unavailable pair, unsupported qualifier, or qualifier lost by a downstream
 adapter MUST explicitly fail. Peers MUST NOT strip it and retry a bare ID,
 silently choose another subscription, or remap it during policy reconciliation
-or resume. A raw-ID policy allowlist match does not authorize provider fallback.
+or resume. A raw-ID policy allowlist match does not authorize source fallback.
 
 Use the existing failure paths: request validation failures return
 `InvalidParams` (`-32602`), and rejected dispatched actions carry
 `ActionEnvelope.rejectionReason`. `ProviderNotFound` (`-32002`) still refers to
-the **agent harness**, not a model-provider descriptor. Existing authorization
+the **agent harness**, not a model-source descriptor. Existing authorization
 errors apply when appropriate. If accepted work later becomes unavailable or
 switching fails, report failure through the existing chat or automation
 lifecycle rather than execute a different pair.
@@ -165,7 +169,7 @@ Moving or copying qualified state MUST also preserve its host/harness namespace.
 A host MUST reject a transfer request with the existing `InvalidParams`
 (`-32602`) error if it cannot preserve that namespace, leaving the source state
 unchanged. It MUST NOT strip or rebind the qualifier, or reinterpret a matching
-provider ID under the destination harness. Identity-preserving transfers within
+source ID under the destination harness. Identity-preserving transfers within
 the same host and harness remain permitted subject to the operation's existing
 validation rules. Genuinely unqualified legacy transfers are unchanged.
 

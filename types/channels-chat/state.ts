@@ -853,7 +853,7 @@ export interface Message {
    * so a client editing or resending the message can preserve it. For a
    * {@link ChatState.draft | draft} it carries the model the user picked for
    * the message they are composing. Absent means the agent host's default
-   * model applies. A provider qualifier MUST be preserved exactly, including
+   * model applies. A source qualifier MUST be preserved exactly, including
    * through pending messages and restored history; it is not per-call usage
    * provenance. Accepting a message does not prove a deferred model switch
    * has activated.

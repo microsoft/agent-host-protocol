@@ -1,5 +1,5 @@
 {
-  "name": "model-provider-rejected-selection",
+  "name": "model-source-rejected-selection",
   "group": "A",
   "description": "The existing rejection envelope retains the attempted exact pair instead of converting it to an unqualified selection. This is a wire test, not host routing enforcement.",
   "type": "ActionEnvelope",
@@ -7,24 +7,24 @@
     "channel": "ahp-chat:/qualified",
     "serverSeq": 11,
     "origin": { "clientId": "qualified-client", "clientSeq": 2 },
-    "rejectionReason": "Model provider source-b is unavailable",
+    "rejectionReason": "Model source 'source-b' is unavailable",
     "action": {
       "type": "chat/turnStarted",
       "turnId": "unavailable",
       "startedAt": "2026-10-22T00:01:00.000Z",
-      "message": { "text": "Do not fall back", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } }
+      "message": { "text": "Do not fall back", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b" } }
     }
   },
   "acceptableOutputs": [{
     "channel": "ahp-chat:/qualified",
     "serverSeq": 11,
     "origin": { "clientId": "qualified-client", "clientSeq": 2 },
-    "rejectionReason": "Model provider source-b is unavailable",
+    "rejectionReason": "Model source 'source-b' is unavailable",
     "action": {
       "type": "chat/turnStarted",
       "turnId": "unavailable",
       "startedAt": "2026-10-22T00:01:00.000Z",
-      "message": { "text": "Do not fall back", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelProviderId": "source-b" } }
+      "message": { "text": "Do not fall back", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b" } }
     }
   }]
 }

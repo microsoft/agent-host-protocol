@@ -1458,7 +1458,7 @@ data class RootConfigState(
 @Serializable
 data class AgentInfo(
     /**
-     * Agent harness ID (e.g. `'copilot'`), not a model provider or account ID.
+     * Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
      */
     val provider: String,
     /**
@@ -1504,13 +1504,13 @@ data class AgentInfo(
      */
     val capabilities: AgentCapabilities? = null,
     /**
-     * Model providers exposed by this agent harness, including providers with
+     * Model sources exposed by this agent harness, including sources with
      * no currently available models. Together with {@link models}, this is one
      * atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
-     * this agent; every model's `modelProviderId` MUST reference an entry here.
-     * Absence preserves legacy discovery without inventing provider identity.
+     * this agent; every model's `modelSourceId` MUST reference an entry here.
+     * Absence preserves legacy discovery without inventing source identity.
      */
-    val modelProviders: List<ModelProviderInfo>? = null
+    val modelSources: List<ModelSourceInfo>? = null
 )
 
 @Serializable
@@ -1536,12 +1536,12 @@ data class AgentCapabilities(
      */
     val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null,
     /**
-     * The agent preserves and enforces exact provider-qualified model selections.
-     * Clients MUST also declare `ClientCapabilities.modelProviderSelection`
-     * before sending a `ModelSelection.modelProviderId`. Protocol version
+     * The agent preserves and enforces exact source-qualified model selections.
+     * Clients MUST also declare `ClientCapabilities.modelSourceSelection`
+     * before sending a `ModelSelection.modelSourceId`. Protocol version
      * negotiation alone does not establish support.
      */
-    val modelProviderSelection: Map<String, JsonElement>? = null
+    val modelSourceSelection: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1604,9 +1604,9 @@ data class MultipleWorkingDirectoriesCapability(
 )
 
 @Serializable
-data class ModelProviderInfo(
+data class ModelSourceInfo(
     /**
-     * Opaque provider identifier. MUST NOT be derived from the display name.
+     * Opaque source identifier. MUST NOT be derived from the display name.
      */
     val id: String,
     /**
@@ -1618,11 +1618,11 @@ data class ModelProviderInfo(
 @Serializable
 data class SessionModelInfo(
     /**
-     * Raw model identifier; different model providers may expose the same ID.
+     * Raw model identifier; different model sources may expose the same ID.
      */
     val id: String,
     /**
-     * Owning agent harness. Matches {@link AgentInfo.provider}, not a model provider.
+     * Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
      */
     val provider: String,
     /**
@@ -1674,18 +1674,18 @@ data class SessionModelInfo(
      */
     val vendor: String? = null,
     /**
-     * Provider of this model within the owning agent's {@link AgentInfo.modelProviders}.
-     * The pair `(modelProviderId, id)` MUST be unique within that agent's catalog.
+     * Source of this model within the owning agent's {@link AgentInfo.modelSources}.
+     * The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
      * If a raw ID appears more than once, every such row MUST be qualified.
-     * Absence is legacy, unqualified identity; it does not name a default provider.
+     * Absence is legacy, unqualified identity; it does not name a default source.
      */
-    val modelProviderId: String? = null
+    val modelSourceId: String? = null
 )
 
 @Serializable
 data class ModelSelection(
     /**
-     * Raw model identifier, unchanged by provider qualification or UI keys.
+     * Raw model identifier, unchanged by source qualification or UI keys.
      */
     val id: String,
     /**
@@ -1695,12 +1695,12 @@ data class ModelSelection(
      */
     val config: Map<String, JsonElement>? = null,
     /**
-     * Exact model provider ID in the owning agent's advertised catalog.
-     * Requires both client and agent `modelProviderSelection` capabilities.
+     * Exact model source ID in the owning agent's advertised catalog.
+     * Requires both client and agent `modelSourceSelection` capabilities.
      * MUST survive messages, drafts, queued work, persistence and replay.
      * Absence retains genuinely unqualified legacy selection behavior.
      */
-    val modelProviderId: String? = null
+    val modelSourceId: String? = null
 )
 
 @Serializable
@@ -2676,7 +2676,7 @@ data class Message(
      * so a client editing or resending the message can preserve it. For a
      * {@link ChatState.draft | draft} it carries the model the user picked for
      * the message they are composing. Absent means the agent host's default
-     * model applies. A provider qualifier MUST be preserved exactly, including
+     * model applies. A source qualifier MUST be preserved exactly, including
      * through pending messages and restored history; it is not per-call usage
      * provenance. Accepting a message does not prove a deferred model switch
      * has activated.
@@ -5832,7 +5832,7 @@ data class AutomationSessionTemplate(
      * the host's default only for genuinely unqualified saved definitions.
      *
      * If this template's `model` or {@link AutomationDefinition.message}'s
-     * `model` has a `modelProviderId`, the host MUST persist an explicit provider
+     * `model` has a `modelSourceId`, the host MUST persist an explicit provider
      * when accepting a create or update. An omitted owner MUST be resolved and
      * stored at acceptance or the action rejected. Updates retaining a qualified
      * selection MUST preserve its saved owner when omitted, or reject; they MUST
@@ -5842,9 +5842,9 @@ data class AutomationSessionTemplate(
     /**
      * Optional model selection revalidated when a run starts against the owning
      * agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
-     * both its persisted {@link provider} and exact `(modelProviderId, id)` pair.
+     * both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
      * A missing or unavailable saved owner or pair fails the run rather than
-     * resolving against the current default or falling back to another provider.
+     * resolving against the current default or falling back to another source or harness.
      */
     val model: ModelSelection? = null,
     /**

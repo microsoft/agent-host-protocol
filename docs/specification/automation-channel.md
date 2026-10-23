@@ -30,16 +30,16 @@ five-field AHP cron format plus an IANA time zone. Event triggers use a
 host-defined type plus schema-defined configuration returned by
 `listAutomationTriggerDefinitions`.
 
-The session template can select a provider, model, and custom agent, and carries
+The session template can select an agent harness, model, and custom agent, and carries
 the same schema-defined configuration values used for ordinary session
 creation. Hosts revalidate all selections when a run starts.
 
 ### Qualified model ownership
 
-For [provider-qualified model selections](./root-channel#model-providers-and-selection),
-the owning harness is part of the identity, not just the pair of model-provider
+For [source-qualified model selections](./root-channel#model-sources-and-selection),
+the owning harness is part of the identity, not just the pair of model-source
 and model IDs. Whenever either `definition.session.model` **or**
-`definition.message.model` has a `modelProviderId`, the accepted definition
+`definition.message.model` has a `modelSourceId`, the accepted definition
 MUST persist an explicit `definition.session.provider`.
 
 On create or update, the host MUST validate the resulting definition before
@@ -60,10 +60,10 @@ implicitly rebind retained qualified selections.
 At execution, the host MUST use and revalidate the persisted owner. A missing
 or unavailable owner or exact pair fails through the existing automation-run
 lifecycle, even if a different default harness advertises identical
-`(modelProviderId, id)` strings. A saved definition without an explicit owner
+`(modelSourceId, id)` strings. A saved definition without an explicit owner
 MUST NOT become executable by guessing its qualified selection's namespace.
 Genuinely unqualified definitions, including updates that remove all qualifiers,
-retain the existing optional/default-provider behavior.
+retain the existing optional/default-harness behavior.
 
 ## Subscription and reconnect
 

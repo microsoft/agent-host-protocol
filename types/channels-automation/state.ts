@@ -298,7 +298,7 @@ export interface AutomationSessionTemplate {
    * the host's default only for genuinely unqualified saved definitions.
    *
    * If this template's `model` or {@link AutomationDefinition.message}'s
-   * `model` has a `modelProviderId`, the host MUST persist an explicit provider
+   * `model` has a `modelSourceId`, the host MUST persist an explicit provider
    * when accepting a create or update. An omitted owner MUST be resolved and
    * stored at acceptance or the action rejected. Updates retaining a qualified
    * selection MUST preserve its saved owner when omitted, or reject; they MUST
@@ -308,9 +308,9 @@ export interface AutomationSessionTemplate {
   /**
    * Optional model selection revalidated when a run starts against the owning
    * agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
-   * both its persisted {@link provider} and exact `(modelProviderId, id)` pair.
+   * both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
    * A missing or unavailable saved owner or pair fails the run rather than
-   * resolving against the current default or falling back to another provider.
+   * resolving against the current default or falling back to another source or harness.
    */
   model?: ModelSelection;
   /** Optional custom agent selection identified by {@link AgentSelection.uri}. */

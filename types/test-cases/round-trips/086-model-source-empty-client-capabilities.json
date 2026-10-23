@@ -1,7 +1,7 @@
 {
-  "name": "model-provider-empty-client-capabilities",
+  "name": "model-source-empty-client-capabilities",
   "group": "A",
-  "description": "Present-empty client capabilities preserve the container without inventing either mcpApps or modelProviderSelection support.",
+  "description": "Present-empty client capabilities preserve the container without inventing either mcpApps or modelSourceSelection support.",
   "type": "InitializeParams",
   "input": {
     "channel": "ahp-root://",

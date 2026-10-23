@@ -502,19 +502,19 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
-    /// Client understands provider-qualified model catalogs and preserves exact
-    /// `ModelSelection.modelProviderId` values across every selection-bearing path.
+    /// Client understands source-qualified model catalogs and preserves exact
+    /// `ModelSelection.modelSourceId` values across every selection-bearing path.
     /// Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
-    /// Clients MUST also check `AgentCapabilities.modelProviderSelection` before
+    /// Clients MUST also check `AgentCapabilities.modelSourceSelection` before
     /// sending a qualified selection; negotiating a protocol version is insufficient.
-    public var modelProviderSelection: [String: AnyCodable]?
+    public var modelSourceSelection: [String: AnyCodable]?
 
     public init(
         mcpApps: [String: AnyCodable]? = nil,
-        modelProviderSelection: [String: AnyCodable]? = nil
+        modelSourceSelection: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
-        self.modelProviderSelection = modelProviderSelection
+        self.modelSourceSelection = modelSourceSelection
     }
 }
 

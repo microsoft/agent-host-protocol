@@ -59,7 +59,7 @@ Clients MAY periodically sync their local input state into the draft by dispatch
 ### Model selection
 
 `Message.model` uses the shared [`ModelSelection`](/reference/root#modelselection),
-including an optional exact `modelProviderId`. The [model-provider contract](./root-channel#model-providers-and-selection)
+including an optional exact `modelSourceId`. The [model-source contract](./root-channel#model-sources-and-selection)
 defines mutual capability gating, catalog references, safe legacy projection
 and explicit failure. Preserve the whole selection through creation, turn
 actions, drafts, pending-message edits and consumption, history, forks and
@@ -242,9 +242,9 @@ unsupported destinations or transient source conditions. Failure has no
 observable effect on ownership or catalog order.
 
 Success preserves every moved chat URI, state, and origin, and converges the
-durable session catalogs. For [qualified model selections](./root-channel#model-providers-and-selection),
+durable session catalogs. For [qualified model selections](./root-channel#model-sources-and-selection),
 this includes preserving the owning host/harness namespace: a move MUST NOT
-strip or rebind a qualifier, or reinterpret saved provider IDs under a different
+strip or rebind a qualifier, or reinterpret saved source IDs under a different
 harness. If that identity cannot be preserved, the host MUST return
 `InvalidParams` (`-32602`) without changing ownership or state.
 Identity-preserving same-harness moves remain subject to the ordinary

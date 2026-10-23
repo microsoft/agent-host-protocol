@@ -6,8 +6,8 @@
       "resource": "ahp-automation:/owned",
       "definition": {
         "title": "Owned",
-        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } },
-        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelProviderId": "source-a" } },
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
         "enabled": true,
         "triggers": []
       },
@@ -20,15 +20,15 @@
   "actions": [{
     "type": "automation/updateRequested",
     "resource": "ahp-automation:/owned",
-    "changes": { "session": { "model": { "id": "shared-model", "modelProviderId": "source-a", "config": { "mode": "fast" } } } }
+    "changes": { "session": { "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } } }
   }, {
     "type": "automation/set",
     "automation": {
       "resource": "ahp-automation:/owned",
       "definition": {
         "title": "Owned",
-        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } },
-        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelProviderId": "source-a", "config": { "mode": "fast" } } },
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } },
         "enabled": true,
         "triggers": []
       },
@@ -40,15 +40,15 @@
   }, {
     "type": "automation/updateRequested",
     "resource": "ahp-automation:/owned",
-    "changes": { "message": { "text": "Edited", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } } }
+    "changes": { "message": { "text": "Edited", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } } }
   }],
   "expected": {
     "entries": [{
       "resource": "ahp-automation:/owned",
       "definition": {
         "title": "Owned",
-        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelProviderId": "source-a" } },
-        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelProviderId": "source-a", "config": { "mode": "fast" } } },
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } },
         "enabled": true,
         "triggers": []
       },

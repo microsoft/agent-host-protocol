@@ -191,67 +191,67 @@ describe('generated JSON schemas', () => {
       });
 
       if (file === 'state.schema.json') {
-        it('keeps model-provider catalogs and qualifiers optional and typed', () => {
+        it('keeps model-source catalogs and qualifiers optional and typed', () => {
           const defs = schema.$defs as Record<string, Record<string, unknown>>;
           const model = { id: 'shared-model', provider: 'example', name: 'Shared model' };
           const agent = { provider: 'example', displayName: 'Example', description: '', models: [model] };
           const selection = { id: model.id, config: { contextWindow: 8192, enabled: true, mode: 'fast' } };
-          assert.deepEqual(defs.ModelProviderInfo.required, ['id', 'displayName']);
-          assert.deepEqual(Object.keys(defs.ModelProviderInfo.properties as object).sort(), ['displayName', 'id']);
+          assert.deepEqual(defs.ModelSourceInfo.required, ['id', 'displayName']);
+          assert.deepEqual(Object.keys(defs.ModelSourceInfo.properties as object).sort(), ['displayName', 'id']);
           assert.equal(schemaAccepts(schema, defs.AgentInfo, agent), true);
-          assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelProviders: [] }), true);
+          assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelSources: [] }), true);
           for (const [name, value] of [['SessionModelInfo', model], ['ModelSelection', selection]] as const) {
             assert.equal(schemaAccepts(schema, defs[name], value), true, `${name}: legacy absence`);
-            assert.equal(schemaAccepts(schema, defs[name], { ...value, modelProviderId: 'source-b' }), true);
+            assert.equal(schemaAccepts(schema, defs[name], { ...value, modelSourceId: 'source-b' }), true);
             for (const invalid of [null, 17, false, {}]) {
-              assert.equal(schemaAccepts(schema, defs[name], { ...value, modelProviderId: invalid }), false);
+              assert.equal(schemaAccepts(schema, defs[name], { ...value, modelSourceId: invalid }), false);
             }
           }
           for (const invalid of [null, {}, [{ id: 'source-a' }], [{ displayName: 'Service' }]]) {
-            assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelProviders: invalid }), false);
+            assert.equal(schemaAccepts(schema, defs.AgentInfo, { ...agent, modelSources: invalid }), false);
           }
         });
 
-        it('preserves a reference-complete model-provider catalog with duplicate raw IDs', () => {
+        it('preserves a reference-complete model-source catalog with duplicate raw IDs', () => {
           const fixture: { input: { snapshots: { state: RootState }[] } } = JSON.parse(readFileSync(
-            resolve(root, 'types/test-cases/round-trips/081-model-provider-catalog.json'), 'utf-8',
+            resolve(root, 'types/test-cases/round-trips/081-model-source-catalog.json'), 'utf-8',
           ));
           const catalog = fixture.input.snapshots[0].state;
           const defs = schema.$defs as Record<string, Record<string, unknown>>;
           assert.equal(schemaAccepts(schema, defs.RootState, catalog), true);
           const agent = catalog.agents[0];
-          assert.ok(agent.modelProviders);
-          const providers = new Set(agent.modelProviders.map(provider => provider.id));
-          assert.equal(providers.size, agent.modelProviders.length);
+          assert.ok(agent.modelSources);
+          const sources = new Set(agent.modelSources.map(source => source.id));
+          assert.equal(sources.size, agent.modelSources.length);
           assert.equal(agent.models.length, 2);
           assert.equal(new Set(agent.models.map(model => model.id)).size, 1);
-          assert.equal(new Set(agent.models.map(model => JSON.stringify([model.modelProviderId, model.id]))).size, 2);
+          assert.equal(new Set(agent.models.map(model => JSON.stringify([model.modelSourceId, model.id]))).size, 2);
           for (const model of agent.models) {
             assert.equal(model.provider, agent.provider);
-            assert.ok(model.modelProviderId && providers.has(model.modelProviderId));
+            assert.ok(model.modelSourceId && sources.has(model.modelSourceId));
           }
-          assert.ok(providers.has('source-c'));
-          assert.equal(agent.models.some(model => model.modelProviderId === 'source-c'), false);
-          assert.equal(catalog.agents[1].modelProviders, undefined);
+          assert.ok(sources.has('source-c'));
+          assert.equal(agent.models.some(model => model.modelSourceId === 'source-c'), false);
+          assert.equal(catalog.agents[1].modelSources, undefined);
           assert.equal(catalog.agents[1].capabilities, undefined);
-          assert.equal(catalog.agents[1].models[0].modelProviderId, undefined);
-          assert.deepEqual(catalog.agents[2].modelProviders, []);
+          assert.equal(catalog.agents[1].models[0].modelSourceId, undefined);
+          assert.deepEqual(catalog.agents[2].modelSources, []);
           assert.deepEqual(catalog.agents[2].models, []);
         });
       }
 
       if (file === 'state.schema.json' || file === 'commands.schema.json') {
-        it('uses independent optional model-provider capability presence flags without defaults', () => {
+        it('uses independent optional model-source capability presence flags without defaults', () => {
           const defs = schema.$defs as Record<string, Record<string, unknown>>;
           const name = file === 'state.schema.json' ? 'AgentCapabilities' : 'ClientCapabilities';
           const capability = defs[name];
           const properties = capability.properties as Record<string, Record<string, unknown>>;
-          assert.equal(properties.modelProviderSelection.type, 'object');
-          assert.equal(properties.modelProviderSelection.default, undefined);
+          assert.equal(properties.modelSourceSelection.type, 'object');
+          assert.equal(properties.modelSourceSelection.default, undefined);
           assert.equal(schemaAccepts(schema, capability, {}), true);
-          assert.equal(schemaAccepts(schema, capability, { modelProviderSelection: {} }), true);
+          assert.equal(schemaAccepts(schema, capability, { modelSourceSelection: {} }), true);
           for (const invalid of [false, true, null, '1.1.0']) {
-            assert.equal(schemaAccepts(schema, capability, { modelProviderSelection: invalid }), false);
+            assert.equal(schemaAccepts(schema, capability, { modelSourceSelection: invalid }), false);
           }
         });
       }

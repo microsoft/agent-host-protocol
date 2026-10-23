@@ -1,5 +1,5 @@
 {
-  "description": "chat/turnResume reopens the latest resumable error with its exact provider-qualified model and config",
+  "description": "chat/turnResume reopens the latest resumable error with its exact source-qualified model and config",
   "reducer": "chat",
   "initial": {
     "turns": [
@@ -14,7 +14,7 @@
           },
           "model": {
             "id": "shared-model",
-            "modelProviderId": "source-b",
+            "modelSourceId": "source-b",
             "config": { "mode": "fast" }
           }
         },
@@ -60,7 +60,7 @@
         },
         "model": {
           "id": "shared-model",
-          "modelProviderId": "source-b",
+          "modelSourceId": "source-b",
           "config": { "mode": "fast" }
         }
       },

@@ -507,13 +507,13 @@ data class ClientCapabilities(
      */
     val mcpApps: Map<String, JsonElement>? = null,
     /**
-     * Client understands provider-qualified model catalogs and preserves exact
-     * `ModelSelection.modelProviderId` values across every selection-bearing path.
+     * Client understands source-qualified model catalogs and preserves exact
+     * `ModelSelection.modelSourceId` values across every selection-bearing path.
      * Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
-     * Clients MUST also check `AgentCapabilities.modelProviderSelection` before
+     * Clients MUST also check `AgentCapabilities.modelSourceSelection` before
      * sending a qualified selection; negotiating a protocol version is insufficient.
      */
-    val modelProviderSelection: Map<String, JsonElement>? = null
+    val modelSourceSelection: Map<String, JsonElement>? = null
 )
 
 @Serializable

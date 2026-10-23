@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Capability-gated model-provider catalogs and exact provider-qualified model selections, preserving legacy unqualified selection."
-}

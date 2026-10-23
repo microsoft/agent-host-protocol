@@ -1,7 +1,7 @@
 {
-  "name": "model-provider-agent-capability-presence",
+  "name": "model-source-agent-capability-presence",
   "group": "A",
-  "description": "Absent, present-empty and model-provider-supporting agent capabilities remain distinct; a negotiated version cannot invent support.",
+  "description": "Absent, present-empty and model-source-supporting agent capabilities remain distinct; a negotiated version cannot invent support.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "1.1.0",
@@ -13,7 +13,7 @@
         "agents": [
           { "provider": "absent", "displayName": "Absent", "description": "", "models": [] },
           { "provider": "empty", "displayName": "Empty", "description": "", "models": [], "capabilities": {} },
-          { "provider": "supported", "displayName": "Supported", "description": "", "models": [], "capabilities": { "modelProviderSelection": {} } }
+          { "provider": "supported", "displayName": "Supported", "description": "", "models": [], "capabilities": { "modelSourceSelection": {} } }
         ]
       }
     }]
@@ -28,7 +28,7 @@
         "agents": [
           { "provider": "absent", "displayName": "Absent", "description": "", "models": [] },
           { "provider": "empty", "displayName": "Empty", "description": "", "models": [], "capabilities": {} },
-          { "provider": "supported", "displayName": "Supported", "description": "", "models": [], "capabilities": { "modelProviderSelection": {} } }
+          { "provider": "supported", "displayName": "Supported", "description": "", "models": [], "capabilities": { "modelSourceSelection": {} } }
         ]
       }
     }]
