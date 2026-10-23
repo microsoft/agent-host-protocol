@@ -3521,8 +3521,8 @@ public sealed class SessionConfigState
 /// of the effective schema. For a chat without its own `schema`, other
 /// properties are session-wide and come from the session's config; a chat with
 /// its own `schema` does not use the session's config. It does not inherit
-/// from the session: changing the session's config never changes a chat's
-/// `chatMutable` values.
+/// from the session: a chat's `values` change only through
+/// `chat/configChanged` on the chat.
 ///
 /// Only `chatMutable` properties can be changed with `chat/configChanged`;
 /// hosts reject other keys. Hosts set the initial `values` when they create

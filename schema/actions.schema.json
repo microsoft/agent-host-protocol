@@ -5492,7 +5492,7 @@
     },
     "ChatConfigState": {
       "type": "object",
-      "description": "A chat's configuration. `values` holds the chat's `chatMutable` properties\nof the effective schema. For a chat without its own `schema`, other\nproperties are session-wide and come from the session's config; a chat with\nits own `schema` does not use the session's config. It does not inherit\nfrom the session: changing the session's config never changes a chat's\n`chatMutable` values.\n\nOnly `chatMutable` properties can be changed with `chat/configChanged`;\nhosts reject other keys. Hosts set the initial `values` when they create\nthe chat. When the session has a config, hosts set `config` on every chat.",
+      "description": "A chat's configuration. `values` holds the chat's `chatMutable` properties\nof the effective schema. For a chat without its own `schema`, other\nproperties are session-wide and come from the session's config; a chat with\nits own `schema` does not use the session's config. It does not inherit\nfrom the session: a chat's `values` change only through\n`chat/configChanged` on the chat.\n\nOnly `chatMutable` properties can be changed with `chat/configChanged`;\nhosts reject other keys. Hosts set the initial `values` when they create\nthe chat. When the session has a config, hosts set `config` on every chat.",
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",

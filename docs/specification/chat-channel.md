@@ -83,8 +83,9 @@ the [`chatMutable`](/reference/session#sessionconfigpropertyschema) properties
 of its effective schema. For a chat without its own `config.schema`, other
 properties are session-wide and come from the session's config; a chat with its
 own `config.schema` does not use the session's config. The host sets the initial `values` when it creates the chat,
-and when the session has a config, it sets `config` on every chat. Changing the
-session's config never changes a chat's `chatMutable` values. A key missing
+and when the session has a config, it sets `config` on every chat. A chat's
+`values` change only through `chat/configChanged` on the chat; they do not
+inherit from the session. A key missing
 from `values` takes that property's `default`.
 
 The effective schema is `config.schema` when present, otherwise the session's
