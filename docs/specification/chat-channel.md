@@ -78,19 +78,19 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 ### Per-chat configuration
 
-[`ChatState.config`](/reference/chat#chatstate) is the chat's own
-configuration. `values` is always its complete config, set by the host when it
-creates the chat; it does not inherit from the session, so changing the
-session's config never changes a chat's. A key missing from `values` takes the
-effective schema's `default`.
+[`ChatState.config`](/reference/chat#chatstate) holds the chat's own values for
+the [`chatMutable`](/reference/session#sessionconfigpropertyschema) properties
+of its effective schema; other properties are session-wide and come from the
+session's config. The host sets the initial `values` when it creates the chat,
+and when the session has a config, it sets `config` on every chat. Changing the
+session's config never changes a chat's `chatMutable` values. A key missing
+from `values` takes that property's `default`.
 
 The effective schema is `config.schema` when present, otherwise the session's
-schema. Hosts set `config.schema` only for a chat whose `provider` differs from
-the session's.
+schema. Hosts set `config.schema`, the chat's own schema for its `chatMutable`
+properties, only for a chat whose `provider` differs from the session's.
 
-Clients change a chat's
-[`chatMutable`](/reference/session#sessionconfigpropertyschema) properties by
-dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
+Clients change a chat's `chatMutable` properties by dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
 which merges into `values` or replaces them when `replace` is `true`. Hosts
 reject keys that are not `chatMutable` in the effective schema.
 
@@ -256,9 +256,9 @@ when the chat had none because it matched its old session. Hosts MAY refuse, as
 an unsupported destination, a move they cannot support.
 
 A moved chat's `config.values` move with it unchanged. If a move changes whether
-the chat needs its own `config.schema`, the host either sets or clears it
-(clients SHOULD resubscribe, since no action carries a schema change) or
-refuses the move as an unsupported destination.
+the chat needs its own `config.schema`, the host sets or clears it, or refuses
+the move as an unsupported destination. Clients SHOULD resubscribe to a moved
+chat whose `config.schema` changed.
 
 #### Atomic synchronization
 

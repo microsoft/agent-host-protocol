@@ -2568,17 +2568,18 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
-     * Config schema for this chat. Absent means the session's schema. Hosts set
-     * it when the chat's {@link ChatState.provider | `provider`} differs from
-     * the session's; when present, clients use it instead of the session's
-     * schema.
+     * Config schema for this chat's `chatMutable` properties. Absent means the
+     * session's schema. Hosts set it, as the chat's own schema, when the chat's
+     * {@link ChatState.provider | `provider`} differs from the session's; when
+     * present, clients use it instead of the session's schema.
      *
      * Stability: 1.0 - Early development.
      */
     val schema: SessionConfigSchema? = null,
     /**
-     * The chat's complete config, keyed by property id. A missing key takes the
-     * effective schema's `default`.
+     * The chat's values for the `chatMutable` properties of the effective
+     * schema, keyed by property id. A missing key takes that property's
+     * `default`.
      */
     val values: Map<String, JsonElement>
 )

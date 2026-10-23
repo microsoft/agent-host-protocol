@@ -195,7 +195,7 @@ ChatState {
   provider?: string        // chat's agent; absent = session's provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
-  config?: ChatConfigState        // chat's complete config (+ optional schema)
+  config?: ChatConfigState        // chat's chatMutable values (+ optional schema)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -213,10 +213,9 @@ changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
 
-`config.values` is the chat's complete config; it does not inherit from the
-session. `config.schema` is present only when the chat's agent differs from the
-session's; otherwise the session's schema applies. Only `chatMutable`
-properties can be changed, with `chat/configChanged`. See
+`config.values` holds the chat's own values for its `chatMutable` settings;
+`config.schema` is present only when the chat's agent differs from the
+session's. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
 `provider` names the chat's agent when it differs from the session's. Hosts

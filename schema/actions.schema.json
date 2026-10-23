@@ -1714,7 +1714,7 @@
     },
     "ChatConfigChangedAction": {
       "type": "object",
-      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or sets the complete\nvalues when `replace` is `true`; keys missing after a replace take the\neffective schema's `default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.",
       "properties": {
         "type": {
           "const": "chat/configChanged"
@@ -5492,16 +5492,16 @@
     },
     "ChatConfigState": {
       "type": "object",
-      "description": "A chat's configuration. It does not inherit from the session: changing the\nsession's config never changes a chat's.\n\nOnly properties with `chatMutable: true` in the effective schema can be\nchanged with `chat/configChanged`; hosts reject other keys. Hosts set the\ninitial `values` when they create the chat.",
+      "description": "A chat's configuration. `values` holds the chat's `chatMutable` properties\nof the effective schema; other properties are session-wide and come from\nthe session's config. It does not inherit from the session: changing the\nsession's config never changes a chat's `chatMutable` values.\n\nOnly `chatMutable` properties can be changed with `chat/configChanged`;\nhosts reject other keys. Hosts set the initial `values` when they create\nthe chat. When the session has a config, hosts set `config` on every chat.",
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
-          "description": "Config schema for this chat. Absent means the session's schema. Hosts set\nit when the chat's {@link ChatState.provider | `provider`} differs from\nthe session's; when present, clients use it instead of the session's\nschema.\n\nStability: 1.0 - Early development."
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
         },
         "values": {
           "type": "object",
           "additionalProperties": {},
-          "description": "The chat's complete config, keyed by property id. A missing key takes the\neffective schema's `default`."
+          "description": "The chat's values for the `chatMutable` properties of the effective\nschema, keyed by property id. A missing key takes that property's\n`default`."
         }
       },
       "required": [

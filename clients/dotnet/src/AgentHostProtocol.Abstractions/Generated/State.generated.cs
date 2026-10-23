@@ -3517,25 +3517,28 @@ public sealed class SessionConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>A chat's configuration. It does not inherit from the session: changing the
-/// session's config never changes a chat's.
+/// <summary>A chat's configuration. `values` holds the chat's `chatMutable` properties
+/// of the effective schema; other properties are session-wide and come from
+/// the session's config. It does not inherit from the session: changing the
+/// session's config never changes a chat's `chatMutable` values.
 ///
-/// Only properties with `chatMutable: true` in the effective schema can be
-/// changed with `chat/configChanged`; hosts reject other keys. Hosts set the
-/// initial `values` when they create the chat.</summary>
+/// Only `chatMutable` properties can be changed with `chat/configChanged`;
+/// hosts reject other keys. Hosts set the initial `values` when they create
+/// the chat. When the session has a config, hosts set `config` on every chat.</summary>
 public sealed class ChatConfigState
 {
-    /// <summary>Config schema for this chat. Absent means the session's schema. Hosts set
-    /// it when the chat's {@link ChatState.provider | `provider`} differs from
-    /// the session's; when present, clients use it instead of the session's
-    /// schema.
+    /// <summary>Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigSchema? Schema { get; set; }
 
-    /// <summary>The chat's complete config, keyed by property id. A missing key takes the
-    /// effective schema's `default`.</summary>
+    /// <summary>The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
