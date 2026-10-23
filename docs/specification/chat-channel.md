@@ -78,26 +78,21 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 ### Per-chat configuration
 
-[`ChatState.config`](/reference/chat#chatstate) is an overlay on the owning
-session's [`SessionState.config`](/reference/session#sessionstate). It carries
-only the values set on this chat; the session's config schema applies. A
-chat's effective config is the session's values with the chat's values
-applied over them. Hosts do not mirror session config into chats.
+[`ChatState.config`](/reference/chat#chatstate) is the chat's own
+configuration. `values` is always its complete config, set by the host when it
+creates the chat; it does not inherit from the session, so changing the
+session's config never changes a chat's. A key missing from `values` takes the
+effective schema's `default`.
 
-A host opts a property in to per-chat values by setting
-[`chatMutable: true`](/reference/session#sessionconfigpropertyschema) on it in
-the session's config schema. Clients set such properties for one chat by
+The effective schema is `config.schema` when present, otherwise the session's
+schema. Hosts set `config.schema` only for a chat whose `provider` differs from
+the session's.
+
+Clients change a chat's
+[`chatMutable`](/reference/session#sessionconfigpropertyschema) properties by
 dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
-which merges into the chat's overlay or replaces it when `replace` is `true`.
-To reset a property to the session's value, replace the overlay with one that
-omits the property. Every other property is changed on the session with
-`session/configChanged`.
-
-For a chat whose `provider` differs from the session's, the session's config
-does not apply: its properties come from that agent's schema, which clients
-obtain with [`resolveSessionConfig`](/reference/root#resolvesessionconfig) for
-the chat's `provider`, and `values` overlays that agent's resolved values. Only
-`chatMutable` properties can be set.
+which merges into `values` or replaces them when `replace` is `true`. Hosts
+reject keys that are not `chatMutable` in the effective schema.
 
 ### Chat providers
 
@@ -259,6 +254,11 @@ A moved chat keeps its agent. After the move the host reports `provider` on the
 chat whenever it differs from the destination session's provider, including
 when the chat had none because it matched its old session. Hosts MAY refuse, as
 an unsupported destination, a move they cannot support.
+
+A moved chat's `config.values` move with it unchanged. If a move changes whether
+the chat needs its own `config.schema`, the host either sets or clears it
+(clients SHOULD resubscribe, since no action carries a schema change) or
+refuses the move as an unsupported destination.
 
 #### Atomic synchronization
 

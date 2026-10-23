@@ -1866,9 +1866,7 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
-    /// Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.
+    /// This chat's configuration. See {@link ChatConfigState}.
     public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
@@ -2693,12 +2691,22 @@ public struct SessionConfigState: Codable, Sendable {
 }
 
 public struct ChatConfigState: Codable, Sendable {
-    /// Config values set on this chat, keyed by property id
+    /// Config schema for this chat. Absent means the session's schema. Hosts set
+    /// it when the chat's {@link ChatState.provider | `provider`} differs from
+    /// the session's; when present, clients use it instead of the session's
+    /// schema.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var schema: SessionConfigSchema?
+    /// The chat's complete config, keyed by property id. A missing key takes the
+    /// effective schema's `default`.
     public var values: [String: AnyCodable]
 
     public init(
+        schema: SessionConfigSchema? = nil,
         values: [String: AnyCodable]
     ) {
+        self.schema = schema
         self.values = values
     }
 }

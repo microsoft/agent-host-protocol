@@ -2552,9 +2552,7 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
-    /// <summary>Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.</summary>
+    /// <summary>This chat's configuration. See {@link ChatConfigState}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
@@ -3486,8 +3484,8 @@ public sealed record SessionConfigPropertySchema
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SessionMutable { get; init; }
 
-    /// <summary>When `true`, the property may be set per chat with `chat/configChanged`.
-    /// The chat's value overrides the session's value for that chat only.</summary>
+    /// <summary>When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? ChatMutable { get; init; }
 }
@@ -3519,22 +3517,25 @@ public sealed class SessionConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>Configuration values set on a chat: an overlay on the owning session's
-/// {@link SessionState.config | `SessionState.config`}.
+/// <summary>A chat's configuration. It does not inherit from the session: changing the
+/// session's config never changes a chat's.
 ///
-/// It carries only the chat's own values; the session's config schema
-/// applies. The effective config of a chat is the session's values with
-/// these values applied over them. Only properties with `chatMutable: true`
-/// in the session's config schema can be set on a chat.
-///
-/// For a chat whose {@link ChatState.provider | `provider`} differs from the
-/// session's, the session's config does not apply: its properties come from
-/// that agent's schema, which clients obtain with `resolveSessionConfig` for
-/// the chat's `provider`, and `values` overlays that agent's resolved values.
-/// Only `chatMutable` properties can be set.</summary>
+/// Only properties with `chatMutable: true` in the effective schema can be
+/// changed with `chat/configChanged`; hosts reject other keys. Hosts set the
+/// initial `values` when they create the chat.</summary>
 public sealed class ChatConfigState
 {
-    /// <summary>Config values set on this chat, keyed by property id</summary>
+    /// <summary>Config schema for this chat. Absent means the session's schema. Hosts set
+    /// it when the chat's {@link ChatState.provider | `provider`} differs from
+    /// the session's; when present, clients use it instead of the session's
+    /// schema.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; set; }
+
+    /// <summary>The chat's complete config, keyed by property id. A missing key takes the
+    /// effective schema's `default`.</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
