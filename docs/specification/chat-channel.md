@@ -80,8 +80,9 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 [`ChatState.config`](/reference/chat#chatstate) holds the chat's own values for
 the [`chatMutable`](/reference/session#sessionconfigpropertyschema) properties
-of its effective schema; other properties are session-wide and come from the
-session's config. The host sets the initial `values` when it creates the chat,
+of its effective schema. For a chat without its own `config.schema`, other
+properties are session-wide and come from the session's config; a chat with its
+own `config.schema` does not use the session's config. The host sets the initial `values` when it creates the chat,
 and when the session has a config, it sets `config` on every chat. Changing the
 session's config never changes a chat's `chatMutable` values. A key missing
 from `values` takes that property's `default`.

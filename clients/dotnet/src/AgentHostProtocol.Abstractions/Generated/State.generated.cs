@@ -3518,9 +3518,11 @@ public sealed class SessionConfigState
 }
 
 /// <summary>A chat's configuration. `values` holds the chat's `chatMutable` properties
-/// of the effective schema; other properties are session-wide and come from
-/// the session's config. It does not inherit from the session: changing the
-/// session's config never changes a chat's `chatMutable` values.
+/// of the effective schema. For a chat without its own `schema`, other
+/// properties are session-wide and come from the session's config; a chat with
+/// its own `schema` does not use the session's config. It does not inherit
+/// from the session: changing the session's config never changes a chat's
+/// `chatMutable` values.
 ///
 /// Only `chatMutable` properties can be changed with `chat/configChanged`;
 /// hosts reject other keys. Hosts set the initial `values` when they create
