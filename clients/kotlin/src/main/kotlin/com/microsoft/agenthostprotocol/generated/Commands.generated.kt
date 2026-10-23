@@ -996,6 +996,32 @@ data class MoveChatResult(
 )
 
 @Serializable
+data class OpenCanvasParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Exact chat URI that owns the canvas instance.
+     */
+    val chat: String,
+    /**
+     * Stable identifier of the extension that declares the canvas.
+     */
+    val extensionId: String,
+    /**
+     * Provider-local canvas type identifier.
+     */
+    val canvasId: String
+)
+
+@Serializable
 data class ListSessionsParams(
     /**
      * Channel URI this command targets.

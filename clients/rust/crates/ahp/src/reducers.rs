@@ -1194,6 +1194,11 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.canvases = a.canvases.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatCanvasRegistryRequested(_) => ReduceOutcome::NoOp,
+        StateAction::ChatCanvasRegistryChanged(a) => {
+            state.canvas_registry = a.canvas_registry.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatWorkingDirectorySet(a) => {
             let list = state.working_directories.get_or_insert_with(Vec::new);
             if list.contains(&a.directory) {
@@ -2326,6 +2331,7 @@ mod tests {
             interactivity: None,
             working_directories: None,
             changesets: None,
+            canvas_registry: None,
             canvases: None,
             config: None,
             turns: Vec::new(),

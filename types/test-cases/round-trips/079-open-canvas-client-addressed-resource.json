@@ -1,0 +1,20 @@
+{
+  "name": "open-canvas-client-addressed-resource",
+  "group": "A",
+  "description": "openCanvas targets a client-chosen ahp-canvas resource and names its exact owning chat and declaration.",
+  "type": "OpenCanvasParams",
+  "input": {
+    "channel": "ahp-canvas:/diagram",
+    "chat": "ahp-chat:/peer",
+    "extensionId": "opaque-provider-id",
+    "canvasId": "diagram"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-canvas:/diagram",
+      "chat": "ahp-chat:/peer",
+      "extensionId": "opaque-provider-id",
+      "canvasId": "diagram"
+    }
+  ]
+}

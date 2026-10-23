@@ -247,6 +247,14 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.canvases = a.canvases
         return next
 
+    case .chatCanvasRegistryRequested:
+        return state
+
+    case .chatCanvasRegistryChanged(let a):
+        var next = state
+        next.canvasRegistry = a.canvasRegistry
+        return next
+
     case .chatWorkingDirectorySet(let a):
         if (state.workingDirectories ?? []).contains(a.directory) { return state }
         var next = state

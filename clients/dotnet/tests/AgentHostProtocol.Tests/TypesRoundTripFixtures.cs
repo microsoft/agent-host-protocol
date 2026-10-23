@@ -188,6 +188,8 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<TcpResetParams>(inputJson));
             case "CreateTcpConnectionParams":
                 return Wrap(Ser.Deserialize<CreateTcpConnectionParams>(inputJson));
+            case "OpenCanvasParams":
+                return Wrap(Ser.Deserialize<OpenCanvasParams>(inputJson));
             default:
                 throw new Xunit.Sdk.XunitException(
                     $"round-trip fixture: unknown wire type \"{type}\". "
