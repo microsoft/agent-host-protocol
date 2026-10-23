@@ -1320,6 +1320,10 @@ type SessionChatSummary struct {
 	// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
 	// backward compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	// Agent provider ID backing this chat. See {@link ChatState.provider}.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 	// Current chat status, matching {@link ChatSummary.status}.
 	//
 	// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -1392,6 +1396,14 @@ type ChatState struct {
 	// Absence defaults to {@link ChatInteractivity.Full} for backward
 	// compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	// Agent provider ID backing this chat. Absent means the session's
+	// {@link SessionMetadata.provider | `provider`}; hosts set it when it
+	// differs. It never changes: like `resource`, it is an identity field and is
+	// omitted from `session/chatUpdated` changes. Forks and side chats use the
+	// source chat's agent.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 	// The subset of the session's
 	// {@link SessionState.workingDirectories | `workingDirectories`} that this
 	// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1428,9 +1440,7 @@ type ChatState struct {
 	// Clients subscribe to each resource for the experimental presentation
 	// state, including its current live source URL.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
-	// Configuration values set on this chat, applied over the owning session's
-	// {@link SessionState.config | `SessionState.config`}. See
-	// {@link ChatConfigState}.
+	// This chat's configuration. See {@link ChatConfigState}.
 	Config *ChatConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
@@ -1535,6 +1545,10 @@ type ChatSummary struct {
 	// Absence defaults to {@link ChatInteractivity.Full} for backward
 	// compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	// Agent provider ID backing this chat. See {@link ChatState.provider}.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 	// The subset of the session's working directories this chat uses.
 	// See {@link ChatState.workingDirectories} for the full semantics.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
@@ -1666,8 +1680,8 @@ type SessionConfigPropertySchema struct {
 	EnumDynamic *bool `json:"enumDynamic,omitempty"`
 	// When `true`, the user may change this property after session creation
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
-	// When `true`, the property may be set per chat with `chat/configChanged`.
-	// The chat's value overrides the session's value for that chat only.
+	// When `true`, the property may be changed per chat with
+	// `chat/configChanged`, affecting only that chat.
 	ChatMutable *bool `json:"chatMutable,omitempty"`
 }
 
@@ -1692,15 +1706,27 @@ type SessionConfigState struct {
 	Values map[string]json.RawMessage `json:"values"`
 }
 
-// Configuration values set on a chat: an overlay on the owning session's
-// {@link SessionState.config | `SessionState.config`}.
+// A chat's configuration. `values` holds the chat's `chatMutable` properties
+// of the effective schema. For a chat without its own `schema`, other
+// properties are session-wide and come from the session's config; a chat with
+// its own `schema` does not use the session's config. It does not inherit
+// from the session: a chat's `values` change only through
+// `chat/configChanged` on the chat.
 //
-// It carries only the chat's own values; the session's config schema
-// applies. The effective config of a chat is the session's values with
-// these values applied over them. Only properties with `chatMutable: true`
-// in the session's config schema can be set on a chat.
+// Only `chatMutable` properties can be changed with `chat/configChanged`;
+// hosts reject other keys. Hosts set the initial `values` when they create
+// the chat. When the session has a config, hosts set `config` on every chat.
 type ChatConfigState struct {
-	// Config values set on this chat, keyed by property id
+	// Config schema for this chat's `chatMutable` properties. Absent means the
+	// session's schema. Hosts set it, as the chat's own schema, when the chat's
+	// {@link ChatState.provider | `provider`} differs from the session's; when
+	// present, clients use it instead of the session's schema.
+	//
+	// Stability: 1.0 - Early development.
+	Schema *SessionConfigSchema `json:"schema,omitempty"`
+	// The chat's values for the `chatMutable` properties of the effective
+	// schema, keyed by property id. A missing key takes that property's
+	// `default`.
 	Values map[string]json.RawMessage `json:"values"`
 }
 

@@ -1421,6 +1421,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatConfigChanged(a) => {
             let config = state.config.get_or_insert_with(|| ChatConfigState {
+                schema: None,
                 values: Default::default(),
             });
             if a.replace.unwrap_or(false) {
@@ -2324,6 +2325,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
             changesets: None,
             canvases: None,
@@ -2485,6 +2487,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
         };
         let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {

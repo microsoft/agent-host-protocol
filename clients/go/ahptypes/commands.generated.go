@@ -231,6 +231,12 @@ type InitializeResult struct {
 	//
 	// Stability: 1.0 - Early development.
 	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
+	// Present when chats in one session may be backed by different agents
+	// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+	// Clients MUST NOT send `CreateChatParams.provider` without it.
+	//
+	// Stability: 1.0 - Early development.
+	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -312,6 +318,12 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Presence capability for {@link InitializeResult.multipleChatProviders}.
+//
+// Stability: 1.0 - Early development.
+type MultipleChatProvidersCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -652,6 +664,17 @@ type CreateChatParams struct {
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Client-selected initial display title for the new chat.
 	Title *string `json:"title,omitempty"`
+	// Agent provider ID for the new chat. Absent means the session's provider.
+	//
+	// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+	// `InvalidParams` a provider that is not in the root state's `agents` or
+	// whose agent does not advertise `multipleChats`. Forks and side chats
+	// (`source` present) continue the source chat's history, so they always use
+	// the source chat's agent: absent means that agent, and a different value is
+	// rejected. Agent capability checks for this request use the chat's agent.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 }
 
 // Disposes a chat and cleans up server-side resources.
@@ -706,6 +729,18 @@ type ChatMoveToNewSessionDestination struct {
 // optional anchor MUST resolve; and the source MUST NOT anchor itself.
 // Rejection leaves ownership, catalog order, chat state, and root summaries
 // unchanged.
+//
+// A moved chat keeps its agent. After the move the host reports
+// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+// the destination session's provider, including when the chat had none
+// because it matched its old session. Hosts MAY refuse, as an unsupported
+// destination, a move they cannot support, such as one that changes whether
+// the chat's agent matches its session's.
+//
+// A moved chat's `config.values` move with it unchanged. If a move changes
+// whether the chat needs its own `config.schema`, the host sets or clears it,
+// or refuses the move as an unsupported destination. Clients SHOULD
+// resubscribe to a moved chat whose `config.schema` changed.
 //
 // On success every moved chat keeps its URI, state, and immutable
 // `ChatOrigin`. The host commits ownership and catalog order before publishing

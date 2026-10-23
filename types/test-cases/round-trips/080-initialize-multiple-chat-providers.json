@@ -1,0 +1,20 @@
+{
+  "name": "initialize-multiple-chat-providers",
+  "group": "A",
+  "description": "InitializeResult advertises host support for chats backed by different agents through multipleChatProviders.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "multipleChatProviders": {}
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 1,
+      "snapshots": [],
+      "multipleChatProviders": {}
+    }
+  ]
+}

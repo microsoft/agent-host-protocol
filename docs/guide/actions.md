@@ -218,7 +218,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/isReadChanged` | Marks the session as read or unread |
 | `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats; refreshes the compact `SessionChatSummary.status` projection |
 | `session/isArchivedChanged` | Archives or unarchives the session |
-| `chat/configChanged` | Sets `chatMutable` config values for this chat, overriding the session's values for this chat only |
+| `chat/configChanged` | Sets `chatMutable` config values for this chat only |
 
 ## Reducers
 

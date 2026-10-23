@@ -1232,6 +1232,10 @@
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
         },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
+        },
         "status": {
           "$ref": "#/$defs/SessionStatus",
           "description": "Current chat status, matching {@link ChatSummary.status}.\n\nIncludes the activity bits and the orthogonal {@link SessionStatus.IsRead}\nand {@link SessionStatus.IsArchived} flags. Generic clients use these bits\nto present read, unread, or archived chats in session lists without\nsubscribing to the session or chat channel. Absence means the host did\nnot provide the status; clients MUST treat it as unknown, not as unread\nor unarchived."
@@ -1370,7 +1374,7 @@
         },
         "chatMutable": {
           "type": "boolean",
-          "description": "When `true`, the property may be set per chat with `chat/configChanged`.\nThe chat's value overrides the session's value for that chat only."
+          "description": "When `true`, the property may be changed per chat with\n`chat/configChanged`, affecting only that chat."
         }
       },
       "required": [
@@ -2545,6 +2549,10 @@
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. It never changes: like `resource`, it is an identity field and is\nomitted from `session/chatUpdated` changes. Forks and side chats use the\nsource chat's agent.\n\nStability: 1.0 - Early development."
+        },
         "workingDirectories": {
           "type": "array",
           "items": {
@@ -2575,7 +2583,7 @@
         },
         "config": {
           "$ref": "#/$defs/ChatConfigState",
-          "description": "Configuration values set on this chat, applied over the owning session's\n{@link SessionState.config | `SessionState.config`}. See\n{@link ChatConfigState}."
+          "description": "This chat's configuration. See {@link ChatConfigState}."
         },
         "turns": {
           "type": "array",
@@ -2660,6 +2668,10 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -2801,12 +2813,16 @@
     },
     "ChatConfigState": {
       "type": "object",
-      "description": "Configuration values set on a chat: an overlay on the owning session's\n{@link SessionState.config | `SessionState.config`}.\n\nIt carries only the chat's own values; the session's config schema\napplies. The effective config of a chat is the session's values with\nthese values applied over them. Only properties with `chatMutable: true`\nin the session's config schema can be set on a chat.",
+      "description": "A chat's configuration. `values` holds the chat's `chatMutable` properties\nof the effective schema. For a chat without its own `schema`, other\nproperties are session-wide and come from the session's config; a chat with\nits own `schema` does not use the session's config. It does not inherit\nfrom the session: a chat's `values` change only through\n`chat/configChanged` on the chat.\n\nOnly `chatMutable` properties can be changed with `chat/configChanged`;\nhosts reject other keys. Hosts set the initial `values` when they create\nthe chat. When the session has a config, hosts set `config` on every chat.",
       "properties": {
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
+        },
         "values": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Config values set on this chat, keyed by property id"
+          "description": "The chat's values for the `chatMutable` properties of the effective\nschema, keyed by property id. A missing key takes that property's\n`default`."
         }
       },
       "required": [

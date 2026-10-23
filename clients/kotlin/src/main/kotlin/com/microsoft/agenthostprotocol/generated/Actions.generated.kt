@@ -231,7 +231,7 @@ data class SessionChatUpdatedAction(
     /**
      * Mutable summary fields that changed; omitted fields are unchanged.
      *
-     * Identity fields (`resource`) never change and MUST be omitted by
+     * Identity fields (`resource`, `provider`) never change and MUST be omitted by
      * senders; receivers SHOULD ignore them if present.
      */
     val changes: PartialChatSummary
@@ -1686,6 +1686,12 @@ data class PartialChatSummary(
      * compatibility.
      */
     val interactivity: ChatInteractivity? = null,
+    /**
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
     /**
      * The subset of the session's working directories this chat uses.
      * See {@link ChatState.workingDirectories} for the full semantics.

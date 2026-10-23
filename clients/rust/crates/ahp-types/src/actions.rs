@@ -558,7 +558,7 @@ pub struct SessionChatUpdatedAction {
     pub chat: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.
     pub changes: PartialChatSummary,
 }
@@ -1554,10 +1554,10 @@ pub struct ChatIsArchivedChangedAction {
 /// Config values set on a chat changed.
 ///
 /// Merges `config` into the chat's
-/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-/// in the session's config schema may be set. To reset a property to the
-/// session's value, replace the overlay with one that omits the property.
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatConfigChangedAction {
@@ -2396,6 +2396,11 @@ pub struct PartialChatSummary {
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]

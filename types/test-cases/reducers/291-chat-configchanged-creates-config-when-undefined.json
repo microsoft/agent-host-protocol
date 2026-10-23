@@ -1,5 +1,5 @@
 {
-  "description": "chat/configChanged creates the chat's config overlay when the chat has none",
+  "description": "chat/configChanged creates the chat's config when the chat has none",
   "reducer": "chat",
   "initial": {
     "turns": [],

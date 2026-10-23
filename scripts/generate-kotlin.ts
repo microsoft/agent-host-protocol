@@ -1788,6 +1788,7 @@ const COMMAND_STRUCTS = [
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'ChannelDeliveryResumeParams', 'ChannelDeliveryResumeOptions',

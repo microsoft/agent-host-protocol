@@ -1,0 +1,28 @@
+{
+  "name": "chat-summary-provider",
+  "group": "A",
+  "description": "A session/chatAdded action preserves a chat's agent provider when it differs from the session's provider.",
+  "type": "StateAction",
+  "input": {
+    "type": "session/chatAdded",
+    "summary": {
+      "resource": "ahp-chat:/c2",
+      "title": "Other agent",
+      "status": 1,
+      "modifiedAt": "2026-10-19T12:00:00.000Z",
+      "provider": "other-agent"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "session/chatAdded",
+      "summary": {
+        "resource": "ahp-chat:/c2",
+        "title": "Other agent",
+        "status": 1,
+        "modifiedAt": "2026-10-19T12:00:00.000Z",
+        "provider": "other-agent"
+      }
+    }
+  ]
+}

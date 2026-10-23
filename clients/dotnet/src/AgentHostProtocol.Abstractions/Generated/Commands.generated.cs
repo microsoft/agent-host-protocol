@@ -485,6 +485,14 @@ public sealed record InitializeResult
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TcpConnectionsCapability? TcpConnections { get; init; }
+
+    /// <summary>Present when chats in one session may be backed by different agents
+    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MultipleChatProvidersCapability? MultipleChatProviders { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -611,6 +619,13 @@ public sealed record AutomationRunCancellationCapability
 /// The empty object means "supported"; fields are reserved for future
 /// capture options and limits.</summary>
 public sealed record AutomationCustomizationsCapability
+{
+}
+
+/// <summary>Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record MultipleChatProvidersCapability
 {
 }
 
@@ -1015,6 +1030,19 @@ public sealed record CreateChatParams
     /// <summary>Client-selected initial display title for the new chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
+
+    /// <summary>Agent provider ID for the new chat. Absent means the session's provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
 }
 
 /// <summary>Disposes a chat and cleans up server-side resources.</summary>
@@ -1078,6 +1106,18 @@ public sealed record ChatMoveToNewSessionDestination
 /// optional anchor MUST resolve; and the source MUST NOT anchor itself.
 /// Rejection leaves ownership, catalog order, chat state, and root summaries
 /// unchanged.
+///
+/// A moved chat keeps its agent. After the move the host reports
+/// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+/// the destination session's provider, including when the chat had none
+/// because it matched its old session. Hosts MAY refuse, as an unsupported
+/// destination, a move they cannot support, such as one that changes whether
+/// the chat's agent matches its session's.
+///
+/// A moved chat's `config.values` move with it unchanged. If a move changes
+/// whether the chat needs its own `config.schema`, the host sets or clears it,
+/// or refuses the move as an unsupported destination. Clients SHOULD
+/// resubscribe to a moved chat whose `config.schema` changed.
 ///
 /// On success every moved chat keeps its URI, state, and immutable
 /// `ChatOrigin`. The host commits ownership and catalog order before publishing

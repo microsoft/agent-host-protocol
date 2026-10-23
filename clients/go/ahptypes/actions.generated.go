@@ -224,7 +224,7 @@ type SessionChatUpdatedAction struct {
 	Chat URI `json:"chat"`
 	// Mutable summary fields that changed; omitted fields are unchanged.
 	//
-	// Identity fields (`resource`) never change and MUST be omitted by
+	// Identity fields (`resource`, `provider`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
 }
@@ -877,10 +877,10 @@ type ChatIsArchivedChangedAction struct {
 // Config values set on a chat changed.
 //
 // Merges `config` into the chat's
-// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-// in the session's config schema may be set. To reset a property to the
-// session's value, replace the overlay with one that omits the property.
+// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+// `replace` is `true`; keys missing after a replace take their property's
+// `default`. Only properties with `chatMutable: true` in
+// the effective schema may be set.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Config values to set on the chat

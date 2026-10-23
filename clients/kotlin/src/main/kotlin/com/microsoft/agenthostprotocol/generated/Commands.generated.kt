@@ -487,7 +487,15 @@ data class InitializeResult(
      *
      * Stability: 1.0 - Early development.
      */
-    val tcpConnections: TcpConnectionsCapability? = null
+    val tcpConnections: TcpConnectionsCapability? = null,
+    /**
+     * Present when chats in one session may be backed by different agents
+     * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+     * Clients MUST NOT send `CreateChatParams.provider` without it.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val multipleChatProviders: MultipleChatProvidersCapability? = null
 )
 
 @Serializable
@@ -554,6 +562,14 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+/**
+ * Presence capability for {@link InitializeResult.multipleChatProviders}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class MultipleChatProvidersCapability
 
 @Serializable
 data class Implementation(
@@ -925,7 +941,20 @@ data class CreateChatParams(
     /**
      * Client-selected initial display title for the new chat.
      */
-    val title: String? = null
+    val title: String? = null,
+    /**
+     * Agent provider ID for the new chat. Absent means the session's provider.
+     *
+     * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+     * `InvalidParams` a provider that is not in the root state's `agents` or
+     * whose agent does not advertise `multipleChats`. Forks and side chats
+     * (`source` present) continue the source chat's history, so they always use
+     * the source chat's agent: absent means that agent, and a different value is
+     * rejected. Agent capability checks for this request use the chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null
 )
 
 @Serializable
@@ -1705,8 +1734,8 @@ data class SessionConfigPropertySchema(
      */
     val sessionMutable: Boolean? = null,
     /**
-     * When `true`, the property may be set per chat with `chat/configChanged`.
-     * The chat's value overrides the session's value for that chat only.
+     * When `true`, the property may be changed per chat with
+     * `chat/configChanged`, affecting only that chat.
      */
     val chatMutable: Boolean? = null
 )

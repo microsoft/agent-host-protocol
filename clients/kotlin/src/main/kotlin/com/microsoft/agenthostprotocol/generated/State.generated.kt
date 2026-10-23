@@ -1812,6 +1812,16 @@ data class ChatState(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. Absent means the session's
+     * {@link SessionMetadata.provider | `provider`}; hosts set it when it
+     * differs. It never changes: like `resource`, it is an identity field and is
+     * omitted from `session/chatUpdated` changes. Forks and side chats use the
+     * source chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * The subset of the session's
      * {@link SessionState.workingDirectories | `workingDirectories`} that this
      * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1856,9 +1866,7 @@ data class ChatState(
      */
     val canvases: List<CanvasReference>? = null,
     /**
-     * Configuration values set on this chat, applied over the owning session's
-     * {@link SessionState.config | `SessionState.config`}. See
-     * {@link ChatConfigState}.
+     * This chat's configuration. See {@link ChatConfigState}.
      */
     val config: ChatConfigState? = null,
     /**
@@ -1959,6 +1967,12 @@ data class ChatSummary(
      * compatibility.
      */
     val interactivity: ChatInteractivity? = null,
+    /**
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
     /**
      * The subset of the session's working directories this chat uses.
      * See {@link ChatState.workingDirectories} for the full semantics.
@@ -2485,6 +2499,12 @@ data class SessionChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * Current chat status, matching {@link ChatSummary.status}.
      *
      * Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -2548,7 +2568,18 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
-     * Config values set on this chat, keyed by property id
+     * Config schema for this chat's `chatMutable` properties. Absent means the
+     * session's schema. Hosts set it, as the chat's own schema, when the chat's
+     * {@link ChatState.provider | `provider`} differs from the session's; when
+     * present, clients use it instead of the session's schema.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val schema: SessionConfigSchema? = null,
+    /**
+     * The chat's values for the `chatMutable` properties of the effective
+     * schema, keyed by property id. A missing key takes that property's
+     * `default`.
      */
     val values: Map<String, JsonElement>
 )
