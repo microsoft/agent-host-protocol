@@ -1,0 +1,7 @@
+{
+  "type": "added",
+  "message": "Windowed delivery for subscriptions: configure with `ClientConfig.Windowing` and opt in with `SubscribeWindowedAsync`. Credit follows the consumer, sends wait for the host window (`WaitWritableAsync`), queued `terminal/data`, `chat/delta`, and `tcp/data` are coalesced, and flow control is reported through the existing `Meter`. Off by default.",
+  "targets": [
+    "dotnet"
+  ]
+}

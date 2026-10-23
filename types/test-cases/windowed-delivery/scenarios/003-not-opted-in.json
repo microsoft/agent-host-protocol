@@ -1,0 +1,25 @@
+{
+  "description": "Without a window option, subscribe carries no flowControl offer.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1"
+        }
+      },
+      "absent": [
+        "params.flowControl"
+      ]
+    }
+  ]
+}

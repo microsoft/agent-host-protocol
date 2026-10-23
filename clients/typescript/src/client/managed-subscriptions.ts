@@ -9,7 +9,8 @@ import type { Snapshot, URI } from '../types/common/state.js';
 import { AsyncBroadcastQueue } from './async-queue.js';
 import { type AhpClient, type SubscribeOptions, type Subscription } from './client.js';
 import { ClientClosedError } from './error.js';
-import type { SubscriptionEvent } from './events.js';
+import type { SubscriptionEvent, DeliveryEvent, ReceivedDelivery } from './events.js';
+import type { FlowControlStatus } from './flow-control.js';
 
 /** Lifecycle state of a shared managed subscription. */
 export type ManagedSubscriptionStatus = 'pending' | 'active' | 'failed' | 'closed';
@@ -59,6 +60,11 @@ export interface ManagedSubscription<
   readonly result: ManagedSubscribeResult<TState> | undefined;
   /** Subscribe failure, when {@link status} is `failed`. */
   readonly error: Error | undefined;
+  /** One reliable owner stream, shared by leases; unlike lease.events it is not fan-out. */
+  deliveries(): AsyncIterableIterator<ReceivedDelivery>;
+  readonly flowControl: FlowControlStatus;
+  flowControlChanges(): AsyncIterableIterator<FlowControlStatus>;
+  waitWritable(options?: { signal?: AbortSignal }): Promise<void>;
 }
 
 class ManagedSubscriptionState implements ManagedSubscription {
@@ -67,6 +73,7 @@ class ManagedSubscriptionState implements ManagedSubscription {
   private statusValue: ManagedSubscriptionStatus = 'pending';
   private resultValue: SubscribeResult | undefined;
   private errorValue: Error | undefined;
+  private source?: Subscription<DeliveryEvent>;
   private readonly resolveReady: (result: SubscribeResult) => void;
   private readonly rejectReady: (error: Error) => void;
 
@@ -97,11 +104,30 @@ class ManagedSubscriptionState implements ManagedSubscription {
     return this.errorValue;
   }
 
-  activate(result: SubscribeResult): void {
+  activate(result: SubscribeResult, source: Subscription<DeliveryEvent>): void {
     if (this.statusValue !== 'pending') return;
     this.resultValue = result;
+    this.source = source;
     this.statusValue = 'active';
     this.resolveReady(result);
+  }
+
+  async *deliveries(): AsyncIterableIterator<ReceivedDelivery> {
+    await this.ready;
+    yield* this.source!.deliveries();
+  }
+  get flowControl(): FlowControlStatus {
+    return this.source?.flowControl ?? {
+      mode: 'ordinary', outstandingSendBytes: 0, bufferedSendBytes: 0, bufferedReceiveBytes: 0, writable: false,
+    };
+  }
+  async *flowControlChanges(): AsyncIterableIterator<FlowControlStatus> {
+    await this.ready;
+    yield* this.source!.flowControlChanges();
+  }
+  async waitWritable(options: { signal?: AbortSignal } = {}): Promise<void> {
+    await this.ready;
+    await this.source!.waitWritable(options);
   }
 
   fail(error: Error): void {
@@ -111,12 +137,13 @@ class ManagedSubscriptionState implements ManagedSubscription {
     this.rejectReady(error);
   }
 
-  close(message = 'managed subscription closed'): void {
+  close(message = 'managed subscription closed', error?: Error): void {
     if (this.statusValue === 'failed' || this.statusValue === 'closed') return;
     if (this.statusValue === 'pending') {
       this.rejectReady(new ClientClosedError(message));
     }
     this.statusValue = 'closed';
+    this.errorValue = error;
   }
 }
 
@@ -133,6 +160,8 @@ export interface ManagedSubscriptionLease<
 > extends Disposable {
   readonly subscription: ManagedSubscription<TState>;
   readonly events: AsyncIterableIterator<TEvent>;
+  /** Consume the shared owner queue; choose one lease to own this stream. */
+  deliveries(): AsyncIterableIterator<ReceivedDelivery>;
 }
 
 interface Entry {
@@ -141,7 +170,9 @@ interface Entry {
   readonly subscription: ManagedSubscriptionState;
   readonly events: AsyncBroadcastQueue<SubscriptionEvent>;
   readonly holders: Map<number, string>;
-  source?: Subscription;
+  source?: Subscription<DeliveryEvent>;
+  observer?: Subscription;
+  removeListeners?: () => void;
 }
 
 /**
@@ -153,7 +184,7 @@ interface Entry {
  * lease tears down both local fan-out and the server subscription.
  */
 export class ManagedSubscriptionManager {
-  private readonly client: AhpClient;
+  private client: AhpClient;
   private readonly eventBuffer: number;
   private readonly entries = new Map<URI, Entry>();
   private nextHolderId = 1;
@@ -257,6 +288,7 @@ export class ManagedSubscriptionManager {
     return {
       subscription: entry.subscription as ManagedSubscription<TState>,
       events: events as AsyncIterableIterator<TEvent>,
+      deliveries: () => entry.subscription.deliveries(),
       [Symbol.dispose]: () => {
         if (released) return;
         released = true;
@@ -272,14 +304,35 @@ export class ManagedSubscriptionManager {
 
   private async start(entry: Entry, options: SubscribeOptions): Promise<void> {
     try {
+      if (options.windowed) entry.observer = this.client.attachSubscription(entry.uri);
       const { result, subscription } = await this.client.subscribe(entry.uri, options);
       if (this.entries.get(entry.uri) !== entry || entry.holders.size === 0) {
         await subscription.close();
         return;
       }
       entry.source = subscription;
-      entry.subscription.activate(result);
-      void this.pump(entry, subscription);
+      entry.subscription.activate(result, subscription);
+      if (subscription.windowChannel) {
+        const channel = subscription.windowChannel;
+        const rebound = (client: AhpClient) => {
+          this.client = client;
+          entry.observer = client.attachSubscription(entry.uri);
+          void this.pump(entry, entry.observer);
+        };
+        const closed = (error?: Error) => {
+          if (this.entries.get(entry.uri) !== entry) return;
+          this.entries.delete(entry.uri);
+          entry.subscription.close('managed subscription closed', error);
+          entry.events.close();
+          void entry.observer?.close();
+          entry.removeListeners?.();
+        };
+        channel.rebound.add(rebound); channel.closed.add(closed);
+        entry.removeListeners = () => {
+          channel.rebound.delete(rebound); channel.closed.delete(closed);
+        };
+      }
+      void this.pump(entry, entry.observer ?? subscription);
     } catch (cause) {
       if (this.entries.get(entry.uri) !== entry) return;
       this.entries.delete(entry.uri);
@@ -297,9 +350,12 @@ export class ManagedSubscriptionManager {
       }
     } finally {
       if (this.entries.get(entry.uri) === entry) {
+        const channel = entry.source?.windowChannel;
+        if (channel && !channel.isClosed && (!channel.connected || source !== entry.observer)) return;
         this.entries.delete(entry.uri);
         entry.subscription.close('managed subscription event stream closed');
         entry.events.close();
+        entry.removeListeners?.();
       }
     }
   }
@@ -309,13 +365,20 @@ export class ManagedSubscriptionManager {
     entry.events.close();
     await this.client.unsubscribe(entry.uri);
     await entry.source?.close();
+    await entry.observer?.close();
   }
 }
 
 function subscriptionOptionsKey(options: SubscribeOptions): string {
+  const window = typeof options.windowed === 'object' ? options.windowed : {};
   return JSON.stringify({
     maxLatencyMs: options.delivery?.maxLatencyMs ?? null,
     turns: options.view?.turns ?? null,
+    windowed: !!options.windowed,
+    windowBytes: window.windowBytes ?? null,
+    maximumFrameBytes: window.maximumFrameBytes ?? null,
+    receive: window.receive ?? 'auto',
+    coalescing: window.coalescing ?? true,
   });
 }
 

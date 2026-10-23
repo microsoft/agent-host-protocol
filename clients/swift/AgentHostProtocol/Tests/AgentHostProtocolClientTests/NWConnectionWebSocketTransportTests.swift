@@ -5,6 +5,22 @@ import XCTest
 @testable import AgentHostProtocolClient
 
 final class NWConnectionWebSocketTransportTests: XCTestCase {
+    func testNativeTransportDrainsBufferedWebSocketContinuations() async throws {
+        let server = try await LoopbackWebSocketServer.start()
+        let transport = NWConnectionWebSocketTransport(url: await server.url(path: "/fragments"))
+        let watchdog = Task {
+            try? await Task.sleep(for: .seconds(2))
+            if !Task.isCancelled { try? await transport.close() }
+        }
+        try await transport.send(.text("connect"))
+        try await server.sendFragmentedText("one", "two")
+        let response = try await withTimeout { try await transport.recv() }
+        XCTAssertEqual(stringPayload(of: response), "onetwo")
+        watchdog.cancel()
+        try await transport.close()
+        await server.stop()
+    }
+
     func testNativeTransportPerformsHandshakeAndRoundTripsText() async throws {
         let server = try await LoopbackWebSocketServer.start()
         let transport = NWConnectionWebSocketTransport(
@@ -131,6 +147,14 @@ private actor LoopbackWebSocketServer {
     func sendText(_ text: String) async throws {
         guard let connection else { throw TransportError.closed }
         try await sendRaw(makeServerFrame(opcode: 0x1, payload: Data(text.utf8)), on: connection)
+    }
+
+    func sendFragmentedText(_ first: String, _ second: String) async throws {
+        guard let connection else { throw TransportError.closed }
+        var frames = makeServerFrame(opcode: 0x1, payload: Data(first.utf8))
+        frames[0] = 0x01
+        frames.append(makeServerFrame(opcode: 0x0, payload: Data(second.utf8)))
+        try await sendRaw(frames, on: connection)
     }
 
     func stop() {

@@ -138,6 +138,14 @@ pub struct HostConfig {
 }
 
 impl HostConfig {
+    /// Set per-host window defaults without extending the public-field struct.
+    pub fn with_windowing(mut self, windowing: crate::WindowingConfig) -> Self {
+        self.transport_factory = Arc::new(super::factory::ConfiguredFactory {
+            inner: self.transport_factory,
+            windowing,
+        });
+        self
+    }
     /// Build a [`HostConfig`] with sensible defaults.
     ///
     /// Leaves `client_id` as `None` so the multi-host client resolves
@@ -404,6 +412,24 @@ pub struct HostSubscriptionEvent {
     pub event: SubscriptionEvent,
 }
 
+/// Observe-only flow telemetry tagged with its host.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct HostFlowControlEvent {
+    /// Originating host.
+    pub host_id: HostId,
+    /// Connection event.
+    pub event: crate::FlowControlEvent,
+}
+impl Default for HostFlowControlEvent {
+    fn default() -> Self {
+        Self {
+            host_id: HostId::new(""),
+            event: crate::FlowControlEvent::default(),
+        }
+    }
+}
+
 /// Stream of [`HostSubscriptionEvent`]s.
 ///
 /// Returned by [`super::MultiHostClient::events`]. Each call returns a
@@ -533,6 +559,11 @@ impl HostShared {
     pub(super) async fn lock(&self) -> tokio::sync::MutexGuard<'_, HostInternal> {
         self.inner.lock().await
     }
+    pub(super) fn try_lock(
+        &self,
+    ) -> Result<tokio::sync::MutexGuard<'_, HostInternal>, tokio::sync::TryLockError> {
+        self.inner.try_lock()
+    }
 }
 
 /// Mutable per-host state. Updated by the runtime task; read on the
@@ -550,6 +581,8 @@ pub(super) struct HostInternal {
     pub(super) automations: Option<AutomationCapabilities>,
     pub(super) root_state: RootState,
     pub(super) subscriptions: Vec<String>,
+    pub(super) owning_channels:
+        std::collections::HashMap<String, std::sync::Weak<crate::windowing::Channel>>,
     pub(super) completion_trigger_characters: Vec<String>,
     pub(super) session_summaries: std::collections::BTreeMap<String, SessionSummary>,
     pub(super) generation: u64,

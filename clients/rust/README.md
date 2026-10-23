@@ -85,3 +85,18 @@ cargo test --workspace
 ## Multi-host clients
 
 See [MULTI_HOST.md](MULTI_HOST.md) for the Rust SDK's multi-host registry, reconnect supervision, fan-in events, aggregated views, and single-host convenience API.
+## Consumer-driven windowing
+
+The `ahp` client now supports opt-in windowed subscriptions. Existing
+`ClientConfig`, `Client::connect`, ordinary subscription and observer APIs remain
+source-compatible. Use `Client::builder().windowing(WindowingConfig::default())`
+for connection defaults and `subscribe_windowed(uri, WindowOptions::default())`
+for opt-in. Keep a `Delivery` alive while processing; Drop or `release()` returns
+credit. The returned sender exposes `wait_writable()`, awaited `send`/`dispatch`,
+and status watch streams. Default and custom connection-wide coalescers operate
+only on adjacent queued data.
+
+See [the ahp examples](crates/ahp/README.md#windowed-subscriptions) for automatic
+and manual release, send pressure, custom coalescers and managed reconnects, and
+[the websocket limits](crates/ahp-ws/README.md#windowing-defaults) for transport-safe
+UTF-16 frame defaults.

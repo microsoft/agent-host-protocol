@@ -1,0 +1,9 @@
+{
+  "type": "fixed",
+  "message": "Terminal snapshots no longer decode as session state. Both have a `lifecycle` member; a snapshot is now treated as session state only if it also has `provider`.",
+  "targets": [
+    "go",
+    "kotlin",
+    "dotnet"
+  ]
+}

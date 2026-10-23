@@ -19,6 +19,7 @@ import type {
   PingParams,
   ReconnectParams,
   ReconnectResult,
+  ChannelDeliveryResumeOptions,
   ResourceReadParams,
   ResourceReadResult,
   ResourceWriteParams,
@@ -75,7 +76,10 @@ import type { AuthRequiredParams } from '../types/common/notifications.js';
 import type { URI } from '../types/common/state.js';
 import { JsonRpcErrorCodes } from '../types/common/errors.js';
 import { AsyncBroadcastQueue } from './async-queue.js';
-import type { ClientEvent, ConnectionState, SubscriptionEvent } from './events.js';
+import type { ClientEvent, ClientDeliveryEvent, ConnectionState, SubscriptionEvent, DeliveryEvent, ReceivedDelivery } from './events.js';
+import { deliveryEvent } from './events.js';
+import { WindowEngine, type WindowChannel, type WindowingConfig, type WindowOptions,
+  type FlowControlStatus, type FlowControlEvent } from './flow-control.js';
 import {
   ClientClosedError,
   RpcError,
@@ -93,6 +97,8 @@ import {
 
 /** Configuration for an {@link AhpClient}. */
 export interface AhpClientConfig {
+  /** Defaults for opt-in subscriptions. This alone does not enable windowing. */
+  windowing?: WindowingConfig;
   /**
    * Maximum time in milliseconds to wait for a request to resolve before
    * failing with {@link RpcTimeoutError}. Default `30000`. Set to `0` or
@@ -109,6 +115,10 @@ export interface AhpClientConfig {
 
 /** Optional preferences for a `subscribe` request. */
 export interface SubscribeOptions {
+  /** Cancel the local subscribe; a late server acceptance is unsubscribed. */
+  signal?: AbortSignal;
+  /** Offer consumer-driven windowed delivery. Default false. */
+  windowed?: boolean | WindowOptions;
   /** Advisory delivery preferences for this subscription. */
   delivery?: SubscriptionDeliveryOptions;
   /** Optional client-requested shape for the returned snapshot. */
@@ -126,37 +136,97 @@ function noop(): void { /* intentionally empty */ }
 /**
  * Handle to a single resource subscription. Iterate to receive
  * {@link SubscriptionEvent}s. Call {@link Subscription.close} to terminate
- * this consumer's iterator (the server-side subscription is released only
- * when {@link AhpClient.unsubscribe} is called for this URI).
+ * this consumer's iterator. A windowed owner also unsubscribes; ordinary
+ * local observers require {@link AhpClient.unsubscribe} for server release.
  */
-export class Subscription implements AsyncIterableIterator<SubscriptionEvent> {
+export class Subscription<TEvent extends DeliveryEvent = SubscriptionEvent> implements AsyncIterableIterator<TEvent> {
   /** Channel URI this subscription is bound to. */
   readonly uri: URI;
   /** @internal */
-  private readonly inner: AsyncIterableIterator<SubscriptionEvent>;
+  private readonly inner: AsyncIterableIterator<TEvent>;
+  private readMode?: 'events' | 'deliveries';
+  private detached = false;
 
   /** @internal */
-  constructor(uri: URI, inner: AsyncIterableIterator<SubscriptionEvent>) {
+  constructor(uri: URI, inner: AsyncIterableIterator<TEvent>, readonly windowChannel?: WindowChannel) {
     this.uri = uri;
     this.inner = inner;
   }
 
-  next(): Promise<IteratorResult<SubscriptionEvent>> {
+  next(): Promise<IteratorResult<TEvent>> {
+    if (this.detached) return Promise.resolve({ value: undefined, done: true });
+    if (this.windowChannel) {
+      if (this.windowChannel.options.receive === 'manual') {
+        return Promise.reject(new TypeError('manual receive requires deliveries() and release()'));
+      }
+      if (this.readMode === 'deliveries') return Promise.reject(new TypeError('cannot mix events and deliveries'));
+      this.readMode = 'events';
+      return this.windowChannel.next().then(result => result.done
+        ? { value: undefined, done: true }
+        : { value: result.value.event as TEvent, done: false });
+    }
     return this.inner.next();
   }
 
-  return(): Promise<IteratorResult<SubscriptionEvent>> {
-    return this.inner.return ? this.inner.return() : Promise.resolve({ value: undefined as unknown as SubscriptionEvent, done: true });
+  return(): Promise<IteratorResult<TEvent>> {
+    this.detached = true;
+    this.windowChannel?.close();
+    return this.inner.return ? this.inner.return() : Promise.resolve({ value: undefined, done: true });
   }
 
   [Symbol.asyncIterator](): this {
     return this;
   }
 
-  /** Terminate this consumer's iterator. Does not unsubscribe server-side. */
+  /** Terminate this iterator; a windowed owner also releases the server subscription. */
   async close(): Promise<void> {
     await this.return();
   }
+
+  /** Full typed delivery surface, including snapshots, TCP and unknown methods. */
+  deliveries(): AsyncIterableIterator<ReceivedDelivery> {
+    if (this.readMode === 'events') throw new TypeError('cannot mix events and deliveries');
+    this.readMode = 'deliveries';
+    const subscription = this;
+    return {
+      [Symbol.asyncIterator]() { return this; },
+      next: () => {
+        if (subscription.detached) return Promise.resolve({ value: undefined, done: true });
+        if (subscription.windowChannel) return subscription.windowChannel.next(
+          subscription.windowChannel.options.receive === 'manual');
+        return subscription.inner.next().then(value => value.done ? { value: undefined, done: true } : {
+          value: { event: value.value, notification: eventNotification(value.value), bytes: 0, release() {} },
+          done: false,
+        });
+      },
+      return: async () => { await subscription.close(); return { value: undefined, done: true }; },
+    };
+  }
+
+  /** Current send/receive accounting. Observer streams never release credit. */
+  get flowControl(): FlowControlStatus { return this.windowChannel?.status ?? ordinaryStatus; }
+  /** @internal */
+  get isClosed(): boolean { return this.detached; }
+  flowControlChanges(): AsyncIterableIterator<FlowControlStatus> {
+    if (this.windowChannel) return this.windowChannel.changes.reader();
+    const ordinary = new AsyncBroadcastQueue<FlowControlStatus>(1);
+    ordinary.close();
+    return ordinary.reader();
+  }
+  waitWritable(options: { signal?: AbortSignal } = {}): Promise<void> {
+    return this.windowChannel?.waitWritable(options.signal) ?? Promise.resolve();
+  }
+}
+
+const ordinaryStatus: FlowControlStatus = Object.freeze({
+  mode: 'ordinary', outstandingSendBytes: 0, bufferedSendBytes: 0, bufferedReceiveBytes: 0, writable: true,
+});
+function eventNotification(event: DeliveryEvent): JsonRpcNotification {
+  if (event.type === 'notification') return event.notification;
+  const methods = { action: 'action', sessionAdded: 'root/sessionAdded', sessionRemoved: 'root/sessionRemoved',
+    sessionSummaryChanged: 'root/sessionSummaryChanged', authRequired: 'auth/required', snapshot: 'channel/snapshot',
+    tcpData: 'tcp/data', tcpEof: 'tcp/eof', tcpReset: 'tcp/reset' };
+  return { jsonrpc: '2.0', method: methods[event.type], params: event.params };
 }
 
 /** Result of {@link AhpClient.dispatch}. */
@@ -222,6 +292,11 @@ interface PendingRequest {
   reject(error: Error): void;
   method: string;
   timer: ReturnType<typeof setTimeout> | null;
+  onResult?: (result: unknown) => void;
+  channels?: readonly URI[];
+  channel?: WindowChannel;
+  cleanup?: () => void;
+  subscribe?: SubscribeParams;
 }
 
 // ─── Client ──────────────────────────────────────────────────────────────────
@@ -235,6 +310,11 @@ interface PendingRequest {
  * down.
  */
 export class AhpClient {
+  private readonly windowEngine: WindowEngine;
+  private readonly windowOwners = new Map<URI, Subscription<DeliveryEvent>>();
+  private readonly subscribePreferences = new WeakMap<SubscribeParams, WindowOptions>();
+  private readonly unsubscribedWindowed = new Set<URI>();
+  private readonly lateRequests = new Map<number, { channels: readonly URI[]; subscribe?: SubscribeParams }>();
   private readonly transport: AhpTransport;
   private readonly requestTimeoutMs: number;
   private readonly subscriptionBuffer: number;
@@ -248,6 +328,7 @@ export class AhpClient {
   private nextClientSeq = 1;
   private state: ConnectionState = { status: 'idle' };
   private receiveLoop: Promise<void> | null = null;
+  private tornDown = false;
   private serverRequestHandler: ServerRequestHandler | null = null;
 
   constructor(transport: AhpTransport, config: AhpClientConfig = {}) {
@@ -258,6 +339,11 @@ export class AhpClient {
     // Clamp to >= 1 so the queue can deliver at least one value to
     // already-parked readers without immediately being trimmed.
     this.subscriptionBuffer = buffer >= 1 ? Math.floor(buffer) : 1;
+    this.windowEngine = new WindowEngine(transport, config.windowing ?? {}, this.subscriptionBuffer,
+      error => {
+        this.tearDown({ type: 'transport', error });
+        void Promise.resolve(this.transport.close()).catch(noop);
+      }, notification => this.handleNotification(notification), this);
   }
 
   /** Current connection state. */
@@ -320,7 +406,7 @@ export class AhpClient {
    * subscription and event streams.
    */
   async shutdown(): Promise<void> {
-    if (this.state.status === 'closing' || this.state.status === 'closed') return;
+    if (this.tornDown) return;
     this.setState({ status: 'closing' });
     // Tear down first so pending requests reject with ClientClosedError
     // rather than racing against the receive loop seeing the transport
@@ -369,14 +455,17 @@ export class AhpClient {
     clientId: string;
     lastSeenServerSeq: number;
     subscriptions: readonly URI[];
+    windows?: ChannelDeliveryResumeOptions;
+    signal?: AbortSignal;
   }): Promise<ReconnectResult> {
     const params: ReconnectParams = {
       channel: 'ahp-root://',
       clientId: args.clientId,
       lastSeenServerSeq: args.lastSeenServerSeq,
       subscriptions: [...args.subscriptions],
+      ...(args.windows ? { windows: args.windows } : {}),
     };
-    return this.request('reconnect', params);
+    return this.request('reconnect', params, { signal: args.signal });
   }
 
   /**
@@ -385,23 +474,128 @@ export class AhpClient {
    * before the `subscribe` request is sent, so no events delivered during
    * the round-trip are missed.
    */
+  subscribe(uri: URI, options: SubscribeOptions & { windowed: true | WindowOptions }):
+    Promise<{ result: SubscribeResult; subscription: Subscription<DeliveryEvent> }>;
+  subscribe(uri: URI, options?: SubscribeOptions):
+    Promise<{ result: SubscribeResult; subscription: Subscription }>;
   async subscribe(
     uri: URI,
     options: SubscribeOptions = {},
-  ): Promise<{ result: SubscribeResult; subscription: Subscription }> {
-    const subscription = this.attachSubscription(uri);
+  ): Promise<{ result: SubscribeResult; subscription: Subscription<DeliveryEvent> }> {
+    const windowed = !!options.windowed;
+    const windowOptions = typeof options.windowed === 'object' ? { ...options.windowed } : {};
+    const existing = this.windowEngine.channels.get(uri);
+    const subscription = windowed || existing
+      ? this.windowOwner(this.windowEngine.ensure(uri, windowOptions))
+      : this.attachSubscription(uri);
     try {
+      const receive = windowed ? this.windowEngine.offer(windowOptions) : undefined;
+      if (uri.startsWith('ahp-tcp:') && (!windowed || !this.transport.supportsWindowedDelivery)) {
+        throw new TypeError('TCP requires a raw-text transport and windowed subscription');
+      }
       const params: SubscribeParams = {
         channel: uri,
         ...(options.delivery ? { delivery: options.delivery } : {}),
         ...(options.view ? { view: options.view } : {}),
+        ...(receive && this.transport.supportsWindowedDelivery ? { flowControl: { receive } } : {}),
       };
-      const result = await this.request('subscribe', params);
+      this.subscribePreferences.set(params, windowOptions);
+      if (windowed && !this.transport.supportsWindowedDelivery) {
+        subscription.windowChannel!.fallbackReason = 'transport';
+      }
+      const result = await this.request('subscribe', params, { signal: options.signal });
+      if (subscription.windowChannel) subscription.windowChannel.options = windowOptions;
       return { result, subscription };
     } catch (err) {
-      await subscription.close();
+      if (!existing && !subscription.windowChannel) {
+        await subscription.close();
+      } else if (!existing && subscription.windowChannel && !subscription.windowChannel.hasInstalled
+        && ![...this.pending.values()].some(request => request.channel === subscription.windowChannel)) {
+        subscription.windowChannel.close(err as Error, false);
+      }
       throw err;
     }
+  }
+
+  private windowOwner(channel: WindowChannel): Subscription<DeliveryEvent> {
+    let owner = channel.owner ?? this.windowOwners.get(channel.uri);
+    if (!owner || owner.isClosed || owner.windowChannel !== channel) {
+      if (owner?.isClosed && owner.windowChannel === channel) channel.prepareNewOwner();
+      const empty = new AsyncBroadcastQueue<DeliveryEvent>();
+      owner = new Subscription(channel.uri, empty.reader(), channel);
+      channel.owner = owner;
+      this.windowOwners.set(channel.uri, owner);
+    }
+    return owner;
+  }
+
+  /** Borrow the reliable owner; re-subscribing returns this same handle. */
+  windowedSubscription(uri: URI): Subscription<DeliveryEvent> | undefined {
+    const channel = this.windowEngine.channels.get(uri);
+    return channel ? this.windowOwner(channel) : undefined;
+  }
+
+  flowControl(uri: URI): FlowControlStatus { return this.windowEngine.channels.get(uri)?.status ?? ordinaryStatus; }
+  flowControlEvents(): AsyncIterableIterator<FlowControlEvent> { return this.windowEngine.events.reader(); }
+  /** Extended observe-only stream; reliable consumption belongs to the subscription owner. */
+  deliveryEvents(): AsyncIterableIterator<ClientDeliveryEvent> { return this.windowEngine.observations.reader(); }
+  waitWritable(uri: URI, options: { signal?: AbortSignal } = {}): Promise<void> {
+    this.assertOpen();
+    return this.windowEngine.channels.get(uri)?.waitWritable(options.signal) ?? Promise.resolve();
+  }
+  /** @internal Host-owned queues survive a connection, but its sends and fragments do not. */
+  retainWindowedSubscriptions(): Map<URI, WindowChannel> { return this.windowEngine.retainChannels(); }
+  /** @internal */
+  restoreWindowedSubscriptions(channels: ReadonlyMap<URI, WindowChannel>): void {
+    this.windowEngine.restore(channels);
+  }
+  /** @internal */
+  windowedResumeOptions(): ChannelDeliveryResumeOptions { return this.windowEngine.resumeOptions(); }
+
+  /** @internal Complete a channel lifecycle without retaining dead scheduler entries. */
+  retireWindowedSubscription(channel: WindowChannel, error?: Error, notify = true): void {
+    if (this.windowOwners.get(channel.uri)?.windowChannel === channel) this.windowOwners.delete(channel.uri);
+    this.ignoreWindowedChannel(channel.uri);
+    let hadPending = false;
+    for (const [id, pending] of this.pending) {
+      if (pending.channel !== channel) continue;
+      hadPending = true;
+      this.abandonRequest(id, error ?? new ClientClosedError('subscription closed'), false);
+    }
+    if (notify && !this.isClosed() && (channel.hasInstalled || hadPending)) {
+      this.sendMessage({ jsonrpc: '2.0', method: 'unsubscribe', params: { channel: channel.uri } }).catch(noop);
+    }
+  }
+
+  private ignoreWindowedChannel(uri: URI): void {
+    this.unsubscribedWindowed.delete(uri);
+    this.unsubscribedWindowed.add(uri);
+    if (this.unsubscribedWindowed.size > 4096) {
+      this.unsubscribedWindowed.delete(this.unsubscribedWindowed.values().next().value!);
+    }
+  }
+
+  private abandonRequest(id: number, error: Error, notify = true): void {
+    const pending = this.pending.get(id);
+    if (!pending) return;
+    this.pending.delete(id);
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.cleanup?.();
+    const unsent = this.windowEngine.cancelRequest(id, error);
+    if (pending.channels && !unsent) {
+      this.lateRequests.set(id, { channels: pending.channels, subscribe: pending.subscribe });
+      if (this.lateRequests.size > 4096) this.lateRequests.delete(this.lateRequests.keys().next().value!);
+    }
+    for (const uri of pending.channels ?? []) {
+      this.subscriptions.get(uri)?.close();
+      this.subscriptions.delete(uri);
+      this.ignoreWindowedChannel(uri);
+      this.windowEngine.channels.get(uri)?.close(error, false);
+      if (notify && !unsent && !this.isClosed()) {
+        this.sendMessage({ jsonrpc: '2.0', method: 'unsubscribe', params: { channel: uri } }).catch(noop);
+      }
+    }
+    pending.reject(error);
   }
 
   /**
@@ -435,6 +629,7 @@ export class AhpClient {
       this.subscriptions.delete(uri);
       queue.close();
     }
+    this.forgetWindowedSubscription(uri);
     const params: UnsubscribeParams = { channel: uri };
     this.notify('unsubscribe', params);
     return Promise.resolve();
@@ -458,8 +653,18 @@ export class AhpClient {
     } else {
       this.nextClientSeq = seq + 1;
     }
+
     const params: DispatchActionParams = { channel, clientSeq: seq, action };
     this.notify('dispatchAction', params);
+    return { clientSeq: seq };
+  }
+
+  async dispatchAsync(channel: URI, action: StateAction,
+    options: { clientSeq?: number; signal?: AbortSignal } = {}): Promise<DispatchHandle> {
+    this.assertOpen();
+    const seq = options.clientSeq ?? this.nextClientSeq;
+    this.nextClientSeq = Math.max(this.nextClientSeq, seq + 1);
+    await this.notifyAsync('dispatchAction', { channel, clientSeq: seq, action }, options);
     return { clientSeq: seq };
   }
 
@@ -593,7 +798,31 @@ export class AhpClient {
   async request<M extends keyof CommandMap>(
     method: M,
     params: CommandMap[M]['params'],
+    options: { signal?: AbortSignal } = {},
   ): Promise<CommandMap[M]['result']> {
+    this.assertOpen();
+    if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
+    let pausedChannel: WindowChannel | undefined;
+    if (method === 'initialize' && (params as InitializeParams).initialSubscriptions?.some(uri => uri.startsWith('ahp-tcp:'))) {
+      throw new TypeError('TCP cannot be an initial subscription');
+    }
+    if (method === 'subscribe' && (params as SubscribeParams).channel.startsWith('ahp-tcp:')
+      && !(params as SubscribeParams).flowControl) throw new TypeError('TCP requires a windowed subscription');
+    if (method === 'reconnect' && (params as ReconnectParams).subscriptions.some(uri => uri.startsWith('ahp-tcp:'))) {
+      throw new TypeError('TCP subscriptions cannot reconnect');
+    }
+    if (method === 'subscribe' && !(params as SubscribeParams).flowControl) {
+      pausedChannel = this.windowEngine.channels.get((params as SubscribeParams).channel);
+      if (pausedChannel?.limits) {
+        pausedChannel.pauseNewMessages = true;
+        pausedChannel.changed();
+        try { await pausedChannel.waitForFragment(); }
+        catch (error) {
+          pausedChannel.pauseNewMessages = false; pausedChannel.changed(); this.windowEngine.schedule();
+          throw error;
+        }
+      }
+    }
     this.assertOpen();
     const id = this.nextRequestId++;
     const msg: JsonRpcRequest = {
@@ -602,28 +831,87 @@ export class AhpClient {
       method: method as string,
       params,
     };
+    let onResult: PendingRequest['onResult'];
+    let channels: readonly URI[] | undefined;
+    let requestChannel: WindowChannel | undefined;
+    if (method === 'subscribe') {
+      const p = params as SubscribeParams;
+      if (p.flowControl) {
+        if (!this.transport.supportsWindowedDelivery) throw new TypeError('transport must retain raw text for windowing');
+        this.windowEngine.offer(p.flowControl.receive);
+        this.windowEngine.ensure(p.channel);
+      }
+      channels = [p.channel];
+      requestChannel = this.windowEngine.channels.get(p.channel);
+      onResult = result => {
+        this.unsubscribedWindowed.delete(p.channel);
+        const channel = this.windowEngine.channels.get(p.channel);
+        const preferences = this.subscribePreferences.get(p);
+        if (channel && preferences) channel.options = preferences;
+        this.windowEngine.installSubscribe(p, result as SubscribeResult,
+          channel?.fallbackReason === 'transport');
+      };
+    } else if (method === 'reconnect') {
+      const p = params as ReconnectParams;
+      channels = [...p.subscriptions];
+      if (p.windows) {
+        if (!this.transport.supportsWindowedDelivery) throw new TypeError('transport must retain raw text for reconnect windows');
+        const channels = new Set<string>();
+        for (const item of p.windows.items) {
+          if (channels.has(item.channel) || !p.subscriptions.includes(item.channel) || item.channel.startsWith('ahp-tcp:')) {
+            throw new TypeError('invalid reconnect window channel');
+          }
+          channels.add(item.channel);
+          this.windowEngine.offer(item.flowControl.receive);
+        }
+      }
+      onResult = result => {
+        const resumed = result as ReconnectResult;
+        if (p.windows) this.windowEngine.installReconnect(p.windows, resumed);
+        else if (resumed.windows !== undefined) throw new TransportError('protocol', 'unsolicited reconnect windows');
+        this.windowEngine.installOrdinaryReconnect(p, resumed);
+      };
+    }
 
     return new Promise<CommandMap[M]['result']>((resolve, reject) => {
       const pending: PendingRequest = {
         resolve: value => resolve(value as CommandMap[M]['result']),
-        reject,
+        reject: error => {
+          if (pausedChannel) {
+            pausedChannel.pauseNewMessages = false;
+            pausedChannel.changed(); this.windowEngine.schedule();
+          }
+          if (requestChannel && !requestChannel.hasInstalled
+            && ![...this.pending.values()].some(request => request.channel === requestChannel)) {
+            requestChannel.close(error, false);
+          }
+          reject(error);
+        },
         method: method as string,
         timer: null,
+        onResult,
+        channels,
+        channel: requestChannel,
+        subscribe: method === 'subscribe' ? params as SubscribeParams : undefined,
       };
       this.pending.set(id, pending);
 
       if (this.requestTimeoutMs > 0) {
         pending.timer = setTimeout(() => {
-          if (this.pending.delete(id)) {
-            reject(new RpcTimeoutError(method as string, this.requestTimeoutMs));
-          }
+          this.abandonRequest(id, new RpcTimeoutError(method as string, this.requestTimeoutMs));
         }, this.requestTimeoutMs);
+      }
+      if (options.signal) {
+        const abort = () => this.abandonRequest(id, options.signal!.reason ?? new DOMException('Aborted', 'AbortError'));
+        options.signal.addEventListener('abort', abort, { once: true });
+        pending.cleanup = () => options.signal!.removeEventListener('abort', abort);
       }
 
       this.sendMessage(msg).catch(err => {
         if (this.pending.delete(id)) {
           if (pending.timer) clearTimeout(pending.timer);
-          reject(err);
+          pending.cleanup?.();
+          pending.reject(err);
         }
       });
     });
@@ -642,6 +930,7 @@ export class AhpClient {
     params: ClientNotificationMap[M]['params'],
   ): void {
     this.assertOpen();
+    if (method === 'unsubscribe') this.forgetWindowedSubscription((params as UnsubscribeParams).channel);
     const msg: JsonRpcNotification = {
       jsonrpc: '2.0',
       method: method as string,
@@ -653,26 +942,35 @@ export class AhpClient {
     this.sendMessage(msg).catch(noop);
   }
 
+  async notifyAsync<M extends keyof ClientNotificationMap>(
+    method: M, params: ClientNotificationMap[M]['params'], options: { signal?: AbortSignal } = {},
+  ): Promise<void> {
+    this.assertOpen();
+    if (method === 'unsubscribe') this.forgetWindowedSubscription((params as UnsubscribeParams).channel);
+    await this.windowEngine.send({ jsonrpc: '2.0', method: method as string, params }, options.signal);
+  }
+
   // ─── Internals ─────────────────────────────────────────────────────────────
 
   private isClosed(): boolean {
     return this.state.status === 'closing' || this.state.status === 'closed';
   }
 
+  private forgetWindowedSubscription(uri: URI): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.channels?.includes(uri)) this.abandonRequest(id, new ClientClosedError('subscription unsubscribed'), false);
+    }
+    const channel = this.windowEngine.channels.get(uri);
+    channel?.close(undefined, false);
+    this.ignoreWindowedChannel(uri);
+  }
+
   private assertOpen(): void {
     if (this.isClosed()) throw new ClientClosedError();
   }
 
-  private async sendMessage(msg: JsonRpcMessage): Promise<void> {
-    try {
-      await this.transport.send(msg);
-    } catch (err) {
-      const te = err instanceof TransportError
-        ? err
-        : new TransportError('io', `transport send failed: ${(err as Error).message}`, { cause: err });
-      this.tearDown({ type: 'transport', error: te });
-      throw te;
-    }
+  private sendMessage(msg: JsonRpcMessage): Promise<void> {
+    return this.windowEngine.send(msg);
   }
 
   private setState(next: ConnectionState): void {
@@ -681,13 +979,19 @@ export class AhpClient {
   }
 
   private tearDown(reason: { type: 'shutdown' } | { type: 'transport'; error: TransportError }): void {
-    if (this.state.status === 'closed') return;
+    if (this.tornDown) return;
+    this.tornDown = true;
     this.setState({ status: 'closed', reason });
 
     // Fail every pending request.
     const failure = reason.type === 'shutdown' ? new ClientClosedError() : reason.error;
+    this.windowEngine.stop(failure);
+    if (reason.type === 'transport') {
+      try { void Promise.resolve(this.transport.close()).catch(noop); } catch { /* best effort */ }
+    }
     for (const [id, pending] of this.pending) {
       if (pending.timer) clearTimeout(pending.timer);
+      pending.cleanup?.();
       try {
         pending.reject(failure);
       } catch {
@@ -698,6 +1002,8 @@ export class AhpClient {
 
     for (const queue of this.subscriptions.values()) queue.close();
     this.subscriptions.clear();
+    this.lateRequests.clear();
+    this.unsubscribedWindowed.clear();
     this.allEvents.close();
     this.stateQueue.close();
   }
@@ -706,6 +1012,7 @@ export class AhpClient {
     try {
       while (this.state.status === 'connected') {
         const frame = await this.transport.recv();
+        if (this.state.status !== 'connected') return;
         if (frame === null) {
           this.tearDown({ type: 'transport', error: new TransportError('closed', 'transport closed') });
           return;
@@ -722,21 +1029,28 @@ export class AhpClient {
 
   private handleFrame(frame: TransportFrame): void {
     let message: ProtocolMessage;
+    let rawText: string | undefined;
     try {
       switch (frame.kind) {
         case 'parsed':
           message = frame.message;
+          rawText = frame.rawText;
           break;
         case 'text':
+          rawText = frame.text;
           message = decodeMessage(frame.text);
           break;
         case 'binary': {
           const text = new TextDecoder('utf-8').decode(frame.data);
+          rawText = text;
           message = decodeMessage(text);
           break;
         }
       }
     } catch (err) {
+      if ([...this.windowEngine.channels.values()].some(channel => channel.limits)) {
+        throw new TransportError('protocol', 'malformed JSON on windowed connection', { cause: err });
+      }
       // A single malformed frame doesn't tear down the channel — a
       // well-behaved server should not send them, and a transient bad
       // frame from a peer that recovers shouldn't kill in-flight
@@ -747,10 +1061,10 @@ export class AhpClient {
       return;
     }
 
-    this.dispatchInbound(message);
+    this.dispatchInbound(message, rawText === undefined ? undefined : rawText.length * 2);
   }
 
-  private dispatchInbound(message: ProtocolMessage): void {
+  private dispatchInbound(message: ProtocolMessage, size?: number): void {
     // Response: { id, result } or { id, error }
     if ('id' in message && 'result' in message) {
       const success = message as JsonRpcSuccessResponse;
@@ -758,7 +1072,28 @@ export class AhpClient {
       if (pending) {
         this.pending.delete(success.id);
         if (pending.timer) clearTimeout(pending.timer);
-        pending.resolve(success.result);
+        pending.cleanup?.();
+        try { pending.onResult?.(success.result); pending.resolve(success.result); }
+        catch (error) { pending.reject(error as Error); throw error; }
+      } else {
+        const late = this.lateRequests.get(success.id);
+        this.lateRequests.delete(success.id);
+        for (const channel of late?.channels ?? []) {
+          const replacement = [...this.pending.values()].some(request => request.method === 'subscribe'
+            && request.channels?.includes(channel));
+          const result = success.result as SubscribeResult;
+          if (late?.subscribe && replacement) {
+            if (result.flowControl) {
+              const current = this.windowEngine.ensure(channel);
+              current.install(result, late.subscribe.flowControl?.receive);
+              this.unsubscribedWindowed.delete(channel);
+            }
+            continue;
+          }
+          if (late?.subscribe && !result.flowControl && this.subscriptions.has(channel)
+            && !this.windowEngine.channels.get(channel)?.limits) continue;
+          void this.unsubscribe(channel);
+        }
       }
       return;
     }
@@ -768,8 +1103,10 @@ export class AhpClient {
       if (pending) {
         this.pending.delete(failure.id);
         if (pending.timer) clearTimeout(pending.timer);
+        pending.cleanup?.();
         pending.reject(new RpcError(failure.error.code, failure.error.message, failure.error.data));
       }
+      this.lateRequests.delete(failure.id);
       return;
     }
     // Server-initiated request: { id, method }
@@ -779,7 +1116,19 @@ export class AhpClient {
     }
     // Notification: { method } no id
     if ('method' in message) {
-      this.handleNotification(message as JsonRpcNotification);
+      const n = message as JsonRpcNotification;
+      const channel = (n.params as { channel?: URI })?.channel;
+      if (channel && this.unsubscribedWindowed.has(channel)) return;
+      const controller = channel && this.windowEngine.channels.get(channel);
+      if (controller) controller.receive(n, size);
+      else if (n.method === 'channel/frame' || n.method === 'channel/credit' || n.method === 'channel/snapshot') {
+        if (channel && !this.subscriptions.has(channel)) return;
+        throw new TransportError('protocol', 'windowed notification has no accepted subscription');
+      }
+      if (!controller) {
+        if (channel) this.windowEngine.observations.publish({ channel, event: deliveryEvent(n) });
+        this.handleNotification(n);
+      }
       return;
     }
   }

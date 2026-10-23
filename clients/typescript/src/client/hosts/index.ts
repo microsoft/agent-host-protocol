@@ -33,6 +33,7 @@ export {
 export type {
   HostConfig,
   HostEvent,
+  HostFlowControlEvent,
   HostHandle,
   HostId,
   HostState,

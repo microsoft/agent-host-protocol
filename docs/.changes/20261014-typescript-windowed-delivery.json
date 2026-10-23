@@ -1,0 +1,7 @@
+{
+  "type": "added",
+  "message": "Windowed delivery for subscriptions: opt in with `subscribe(uri, { windowed: true })`. Credit follows the consumer (`deliveries()` and `release()` in manual mode), sends wait for the host window (`notifyAsync`, `dispatchAsync`, `waitWritable()`), and queued `terminal/data`, `chat/delta`, and `tcp/data` are coalesced. Off by default.",
+  "targets": [
+    "typescript"
+  ]
+}

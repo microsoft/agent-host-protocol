@@ -27,9 +27,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 jiff = { workspace = true }
+base64 = "0.22"
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["full", "test-util"] }
 serde_json = { workspace = true }
 ahp-ws = { path = "../ahp-ws" }
 tracing-subscriber = "0.3"

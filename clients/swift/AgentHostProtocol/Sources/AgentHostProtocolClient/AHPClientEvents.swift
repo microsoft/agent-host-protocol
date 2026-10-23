@@ -45,7 +45,8 @@ public enum ConnectionState: Sendable, Equatable {
 
 /// Handle returned from `AHPClient.dispatch`.
 ///
-/// Dispatch is fire-and-forget by design; the handle records the
+/// Ordinary dispatch is fire-and-forget; windowed dispatch waits for the
+/// transport. The handle records the
 /// client-assigned `clientSeq` so callers can correlate optimistic local
 /// updates with server echoes (`ActionEnvelope.origin.clientSeq`).
 public struct DispatchHandle: Sendable, Equatable {

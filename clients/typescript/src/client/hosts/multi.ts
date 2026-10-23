@@ -7,7 +7,10 @@
 import type { URI } from '../../types/common/state.js';
 import type { StateAction } from '../../types/common/actions.js';
 import type { SubscribeResult } from '../../types/common/commands.js';
-import type { DispatchHandle } from '../client.js';
+import type { DispatchHandle, SubscribeOptions, Subscription } from '../client.js';
+import type { DeliveryEvent } from '../events.js';
+import type { FlowControlEvent, FlowControlStatus, WindowOptions } from '../flow-control.js';
+import type { ClientNotificationMap } from '../../types/common/messages.js';
 import { AsyncBroadcastQueue } from '../async-queue.js';
 import { HostClientHandle } from './host-client-handle.js';
 import {
@@ -59,6 +62,7 @@ export class MultiHostClient {
   private readonly pendingHostIds = new Set<HostId>();
   private readonly fanOut: AsyncBroadcastQueue<HostSubscriptionEvent>;
   private readonly hostEventsQueue: AsyncBroadcastQueue<HostEvent>;
+  private readonly flowEventsQueue: AsyncBroadcastQueue<FlowControlEvent & { readonly hostId: HostId }>;
   private readonly clientIdStore: ClientIdStore;
   /**
    * Aborted by {@link shutdown}. Passed into {@link ClientIdStore.load}
@@ -85,6 +89,7 @@ export class MultiHostClient {
     const buffer = options.eventBuffer ?? DEFAULT_EVENT_BUFFER;
     this.fanOut = new AsyncBroadcastQueue<HostSubscriptionEvent>(buffer);
     this.hostEventsQueue = new AsyncBroadcastQueue<HostEvent>(buffer);
+    this.flowEventsQueue = new AsyncBroadcastQueue<FlowControlEvent & { readonly hostId: HostId }>(buffer);
   }
 
   /**
@@ -155,7 +160,7 @@ export class MultiHostClient {
       if (this.hosts.has(id)) {
         throw new DuplicateHostError(id);
       }
-      const runtime = new HostRuntime(resolved, clientId, this.fanOut, this.hostEventsQueue);
+      const runtime = new HostRuntime(resolved, clientId, this.fanOut, this.hostEventsQueue, this.flowEventsQueue);
       this.hosts.set(id, runtime);
       runtime.start();
       return snapshotHandle(runtime.shared);
@@ -258,10 +263,41 @@ export class MultiHostClient {
   }
 
   /** Convenience: subscribe to `uri` on `hostId`. */
-  async subscribe(hostId: HostId, uri: URI): Promise<SubscribeResult> {
+  subscribe(hostId: HostId, uri: URI, options: SubscribeOptions & { windowed: true | WindowOptions }):
+    Promise<{ result: SubscribeResult; subscription: Subscription<DeliveryEvent> }>;
+  subscribe(hostId: HostId, uri: URI, options?: SubscribeOptions): Promise<SubscribeResult>;
+  async subscribe(hostId: HostId, uri: URI, options: SubscribeOptions = {}):
+    Promise<SubscribeResult | { result: SubscribeResult; subscription: Subscription<DeliveryEvent> }> {
     const runtime = this.hosts.get(hostId);
     if (!runtime) throw new UnknownHostError(hostId);
-    return runtime.subscribe(uri);
+    const subscribed = await runtime.subscribe(uri, options);
+    return options.windowed ? subscribed : subscribed.result;
+  }
+
+  flowControl(hostId: HostId, uri: URI): FlowControlStatus {
+    const runtime = this.hosts.get(hostId);
+    if (!runtime) throw new UnknownHostError(hostId);
+    return runtime.flowControl(uri);
+  }
+  flowControlEvents(): AsyncIterableIterator<FlowControlEvent & { readonly hostId: HostId }> {
+    return this.flowEventsQueue.reader();
+  }
+  waitWritable(hostId: HostId, uri: URI, options: { signal?: AbortSignal } = {}): Promise<void> {
+    const runtime = this.hosts.get(hostId);
+    if (!runtime) throw new UnknownHostError(hostId);
+    return runtime.waitWritable(uri, options);
+  }
+  notifyAsync<M extends keyof ClientNotificationMap>(hostId: HostId, method: M,
+    params: ClientNotificationMap[M]['params'], options: { signal?: AbortSignal } = {}): Promise<void> {
+    const runtime = this.hosts.get(hostId);
+    if (!runtime) throw new UnknownHostError(hostId);
+    return runtime.notifyAsync(method, params, options);
+  }
+  dispatchAsync(hostId: HostId, uri: URI, action: StateAction,
+    options: { clientSeq?: number; signal?: AbortSignal } = {}): Promise<DispatchHandle> {
+    const runtime = this.hosts.get(hostId);
+    if (!runtime) throw new UnknownHostError(hostId);
+    return runtime.dispatchAsync(uri, action, options);
   }
 
   /** Convenience: unsubscribe from `uri` on `hostId`. */
@@ -357,6 +393,7 @@ export class MultiHostClient {
     await Promise.all(runtimes.map(r => r.shutdown('shutdown')));
     this.fanOut.close();
     this.hostEventsQueue.close();
+    this.flowEventsQueue.close();
   }
 
   private assertOpen(): void {

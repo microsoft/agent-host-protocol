@@ -25,6 +25,14 @@ public actor AHPStateMirror {
 
     public init() {}
 
+    public func apply(delivery: AHPDelivery) {
+        switch delivery.payload {
+        case .snapshot(let snapshot): applySnapshot(snapshot)
+        case .event(.action(let envelope)): apply(envelope)
+        default: break
+        }
+    }
+
     /// Apply a single action envelope, routing by `envelope.channel`.
     ///
     /// - Root state lives at `RootResourceURI`; all other channels are

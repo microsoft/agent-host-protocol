@@ -76,10 +76,71 @@ internal static class Program
             "Generated AHP metadata resolver did not provide ActionEnvelope metadata.");
 
         await RunTransportScenarioAsync(serializer);
+        await RunWindowScenarioAsync(serializer);
 
         Console.WriteLine(
             "Native AOT smoke passed: initialize, reconnect, ping, subscribe/action/reducer/unsubscribe, "
             + "custom request/notification metadata, and typed/raw/null inbound request results.");
+    }
+
+    static async Task RunWindowScenarioAsync(SystemTextJsonAhpSerializer serializer)
+    {
+        const string channel = "ahp-test:/aot-window";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var (clientTransport, server) = DuplexTransport.CreatePair();
+        await using var serverOwner = server;
+        await using var client = AhpClient.Connect(clientTransport, serializer: serializer);
+        var limits = new ChannelReceiveLimits { WindowBytes = 256, MaximumFrameBytes = 1024 };
+        var response = RespondToRequestAsync(server, serializer, "subscribe",
+            new SubscribeResult { FlowControl = new ChannelFlowControl { ClientReceive = limits, HostReceive = limits } },
+            timeout.Token);
+        var (_, subscription) = await client.SubscribeWindowedAsync(channel,
+            new WindowOptions { Receive = ReceiveMode.Manual }, timeout.Token);
+        await response;
+        var snapshot = serializer.EncodeMessage(new JsonRpcMessage
+        {
+            Notification = new JsonRpcNotification
+            {
+                Method = "channel/snapshot",
+                Params = serializer.SerializeToElement(new ChannelSnapshotParams
+                {
+                    Channel = channel,
+                    Snapshot = new Snapshot
+                    {
+                        Resource = channel,
+                        FromSeq = 1,
+                        State = new SnapshotState { Empty = new EmptyState() },
+                    },
+                }),
+            },
+        }).Text!;
+        var split = snapshot.Length / 2;
+        for (var part = 0; part < 2; part++)
+        {
+            await server.SendAsync(serializer.EncodeMessage(new JsonRpcMessage
+            {
+                Notification = new JsonRpcNotification
+                {
+                    Method = "channel/frame",
+                    Params = serializer.SerializeToElement(new ChannelFrameParams
+                    {
+                        Channel = channel,
+                        Data = part == 0 ? snapshot.Substring(0, split) : snapshot.Substring(split),
+                        Final = part == 1 ? true : null,
+                    }),
+                },
+            }), timeout.Token);
+            if (part == 0)
+            {
+                var credit = await ReceiveMessageAsync(server, serializer, timeout.Token);
+                Ensure(credit.Notification?.Method == "channel/credit", "Nonfinal fragment was not credited.");
+            }
+        }
+        using var delivery = await subscription.Deliveries.ReadAsync(timeout.Token);
+        Ensure(delivery.Event is SubscriptionEventSnapshot, "Window snapshot was not reassembled.");
+        delivery.Release();
+        var finalCredit = await ReceiveMessageAsync(server, serializer, timeout.Token);
+        Ensure(finalCredit.Notification?.Method == "channel/credit", "Final fragment was not credited on release.");
     }
 
     static async Task RunTransportScenarioAsync(SystemTextJsonAhpSerializer serializer)

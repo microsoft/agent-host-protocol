@@ -171,8 +171,21 @@ impl MultiHostStateMirror {
     /// notifications and auth challenges) are ignored — they don't move any of
     /// the reducer-tracked state shapes.
     pub fn apply_event(&mut self, event: &HostSubscriptionEvent) {
+        if let SubscriptionEvent::Snapshot(snapshot) = &event.event {
+            self.apply_snapshot(&event.host_id, snapshot);
+        }
+
         if let SubscriptionEvent::Action(envelope) = &event.event {
             self.apply_envelope(&event.host_id, envelope);
+        }
+    }
+
+    /// Apply a reliable owning delivery. Its caller retains release/Drop control.
+    pub fn apply_delivery(&mut self, host: &HostId, delivery: &crate::Delivery) {
+        match delivery.event() {
+            SubscriptionEvent::Snapshot(snapshot) => self.apply_snapshot(host, snapshot),
+            SubscriptionEvent::Action(envelope) => self.apply_envelope(host, envelope),
+            _ => {}
         }
     }
 

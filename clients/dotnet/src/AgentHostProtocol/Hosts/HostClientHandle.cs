@@ -57,6 +57,18 @@ public sealed class HostClientHandle
     /// </summary>
     public void CheckAliveOrThrow() => CheckAlive();
 
+    /// <summary>Returns the authoritative windowed owner on this connection, if any.</summary>
+    public WindowedSubscription? GetWindowedSubscription(string channel) => CheckAlive().GetWindowedSubscription(channel);
+
+    /// <summary>Waits for channel credit and queue capacity on this connection.</summary>
+    public ValueTask WaitWritableAsync(string channel, CancellationToken cancellationToken = default) =>
+        (CheckAlive().GetWindowedSubscription(channel)
+            ?? throw new InvalidOperationException("The channel has no windowed owner.")).WaitWritableAsync(cancellationToken);
+
+    /// <summary>Sends a notification through the connection's flow-controlled scheduler.</summary>
+    public Task NotifyAsync<T>(string method, T parameters, CancellationToken cancellationToken = default) =>
+        CheckAlive().NotifyAsync(method, parameters, cancellationToken);
+
     /// <summary>
     /// Dispatches an action through this connection on <paramref name="channel"/>,
     /// refusing (throwing) if the host was removed or the connection has been

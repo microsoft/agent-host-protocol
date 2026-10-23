@@ -41,6 +41,7 @@ public actor MultiHostClient {
     private var nextListenerId: UInt64 = 1
     private var subscriptionListeners: [UInt64: AsyncStream<HostSubscriptionEvent>.Continuation] = [:]
     private var hostEventListeners: [UInt64: AsyncStream<HostEvent>.Continuation] = [:]
+    private var flowListeners: [UInt64: AsyncStream<AHPHostedFlowControlEvent>.Continuation] = [:]
     /// Per-`(hostId, uri)` listener registry for `events(host:uri:)`.
     /// Lives on this actor (rather than inside `HostRuntime`) so listeners
     /// outlive any single `AHPClient` instance and survive reconnects —
@@ -111,7 +112,8 @@ public actor MultiHostClient {
             config: config,
             clientIdStore: clientIdStore,
             fanOut: fanOut,
-            hostEventSink: hostEventSink
+            hostEventSink: hostEventSink,
+            flowEventSink: { [weak self] event in await self?.broadcastFlowEvent(event) }
         )
 
         // We may have been shut down while awaiting the runtime init; bail
@@ -256,6 +258,24 @@ public actor MultiHostClient {
         }
         return try await runtime.subscribe(uri)
     }
+
+    public func subscribe(host: HostId, uri: String, options: AHPSubscriptionOptions)
+        async throws -> AHPSubscription {
+        guard let runtime = hosts[host] else { throw HostError.unknownHost(host) }
+        return try await runtime.subscribe(uri, options: options)
+    }
+
+    public func flowControlEvents() -> AsyncStream<AHPHostedFlowControlEvent> {
+        let id = bumpListenerId()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(defaultFanInBuffer)) { continuation in
+            flowListeners[id] = continuation
+            continuation.onTermination = { [weak self] _ in Task { await self?.removeFlowListener(id) } }
+        }
+    }
+    private func broadcastFlowEvent(_ event: AHPHostedFlowControlEvent) {
+        for continuation in flowListeners.values { continuation.yield(event) }
+    }
+    private func removeFlowListener(_ id: UInt64) { flowListeners.removeValue(forKey: id) }
 
     /// Unsubscribe from `uri` on `host`. Drops the URI from the replay set.
     public func unsubscribe(host: HostId, uri: String) async throws {
@@ -697,6 +717,8 @@ public actor MultiHostClient {
         subscriptionListeners.removeAll()
         for cont in hostEventListeners.values { cont.finish() }
         hostEventListeners.removeAll()
+        for continuation in flowListeners.values { continuation.finish() }
+        flowListeners.removeAll()
         for bucket in perResourceListeners.values {
             for listener in bucket.values { listener.continuation.finish() }
         }

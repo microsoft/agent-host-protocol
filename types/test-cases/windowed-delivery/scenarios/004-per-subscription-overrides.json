@@ -1,0 +1,31 @@
+{
+  "description": "Per-subscription window options override the connection defaults in the offer.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {
+        "windowBytes": 4096
+      }
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 4096,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    }
+  ]
+}

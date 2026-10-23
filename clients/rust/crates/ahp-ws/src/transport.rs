@@ -44,6 +44,16 @@ pub struct WebSocketTransport {
 }
 
 impl WebSocketTransport {
+    /// Connect with explicit websocket limits/TLS-independent protocol settings.
+    pub async fn connect_with_config(
+        url: &str,
+        config: tokio_tungstenite::tungstenite::protocol::WebSocketConfig,
+    ) -> Result<Self, WebSocketTransportError> {
+        let _parsed = Url::parse(url)?;
+        let (inner, _) =
+            tokio_tungstenite::connect_async_with_config(url, Some(config), false).await?;
+        Ok(Self { inner })
+    }
     /// Open a new WebSocket connection to `url`.
     ///
     /// Both `ws://` and `wss://` schemes are accepted; the `wss://` TLS
@@ -68,6 +78,18 @@ impl WebSocketTransport {
 }
 
 impl Transport for WebSocketTransport {
+    fn window_capabilities(&self) -> ahp::WindowTransportCapabilities {
+        let config = self.inner.get_config();
+        let maximum = [config.max_frame_size, config.max_message_size]
+            .into_iter()
+            .flatten()
+            .min()
+            .map(|limit| 2 * (limit as u64 / 3))
+            .unwrap_or(1_048_576);
+        ahp::WindowTransportCapabilities::default()
+            .raw_text(true)
+            .maximum_frame_bytes(maximum)
+    }
     async fn send(&mut self, msg: TransportMessage) -> Result<(), TransportError> {
         let frame = match msg {
             TransportMessage::Parsed(m) => {

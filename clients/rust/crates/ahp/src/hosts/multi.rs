@@ -51,6 +51,7 @@ struct MultiInner {
     pending_host_ids: StdMutex<HashSet<HostId>>,
     fan_out: broadcast::Sender<HostSubscriptionEvent>,
     host_events: broadcast::Sender<HostEvent>,
+    flow_events: broadcast::Sender<super::HostFlowControlEvent>,
     client_id_store: Arc<dyn ClientIdStore>,
 }
 
@@ -72,12 +73,14 @@ impl MultiHostClient {
     pub fn with_client_id_store(client_id_store: Arc<dyn ClientIdStore>) -> Self {
         let (fan_out, _) = broadcast::channel(DEFAULT_EVENT_BUFFER);
         let (host_events, _) = broadcast::channel(DEFAULT_EVENT_BUFFER);
+        let (flow_events, _) = broadcast::channel(DEFAULT_EVENT_BUFFER);
         Self {
             inner: Arc::new(MultiInner {
                 hosts: RwLock::new(HashMap::new()),
                 pending_host_ids: StdMutex::new(HashSet::new()),
                 fan_out,
                 host_events,
+                flow_events,
                 client_id_store,
             }),
         }
@@ -174,6 +177,7 @@ impl MultiHostClient {
                 resolved,
                 self.inner.fan_out.clone(),
                 self.inner.host_events.clone(),
+                self.inner.flow_events.clone(),
             );
             let shared = tx.shared.clone();
             hosts.insert(id.clone(), tx);
@@ -421,6 +425,42 @@ impl MultiHostClient {
     ) -> Result<ahp_types::commands::SubscribeResult, HostError> {
         let entry = self.host_entry(host_id).await?;
         entry.subscribe(uri).await
+    }
+
+    /// Convenience: unsubscribe from `uri` on `host_id`.
+    pub async fn subscribe_windowed(
+        &self,
+        host_id: &HostId,
+        uri: impl Into<String>,
+        options: crate::WindowOptions,
+    ) -> Result<
+        (
+            ahp_types::commands::SubscribeResult,
+            crate::WindowedSubscription,
+        ),
+        HostError,
+    > {
+        let entry = self.host_entry(host_id).await?;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        entry
+            .cmd_tx
+            .send(super::runtime::HostCommand::SubscribeWindowed {
+                uri: uri.into(),
+                options,
+                reply: tx,
+            })
+            .await
+            .map_err(|_| HostError::HostShutDown(host_id.clone()))?;
+        let (result, mut subscription) = rx
+            .await
+            .map_err(|_| HostError::HostShutDown(host_id.clone()))??;
+        subscription.host_id = Some(host_id.clone());
+        Ok((result, subscription))
+    }
+
+    /// Observe lossy flow telemetry from every host; never releases credit.
+    pub fn flow_control_events(&self) -> broadcast::Receiver<super::HostFlowControlEvent> {
+        self.inner.flow_events.subscribe()
     }
 
     /// Convenience: unsubscribe from `uri` on `host_id`.

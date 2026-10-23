@@ -1,0 +1,7 @@
+{
+  "type": "added",
+  "message": "Windowed delivery for subscriptions: configure with `Client::builder().windowing(...)` and opt in with `subscribe_windowed`. Dropping or releasing a `Delivery` returns credit, sends wait for the host window (`wait_writable`), and queued `terminal/data`, `chat/delta`, and `tcp/data` are coalesced. Off by default.",
+  "targets": [
+    "rust"
+  ]
+}

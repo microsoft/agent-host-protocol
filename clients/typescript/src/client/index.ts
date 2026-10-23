@@ -13,6 +13,9 @@ export type {
   ServerRequestHandler,
   SubscribeOptions,
 } from './client.js';
+export type { WindowOptions, WindowingConfig, FlowControlStatus, FlowControlEvent,
+  ChannelCoalescer, CoalescerContext } from './flow-control.js';
+export type { DeliveryEvent, ReceivedDelivery, ClientDeliveryEvent } from './events.js';
 export type { ClientEvent, ClosedReason, ConnectionState, SubscriptionEvent } from './events.js';
 export {
   AhpClientError,
@@ -20,6 +23,7 @@ export {
   RpcError,
   RpcTimeoutError,
   TransportError,
+  BackpressureError,
 } from './error.js';
 export type { TransportErrorKind } from './error.js';
 export { InMemoryTransport } from './transport.js';
