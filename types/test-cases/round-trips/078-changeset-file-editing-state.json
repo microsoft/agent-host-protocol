@@ -1,0 +1,50 @@
+{
+  "name": "changeset-file-editing-state",
+  "group": "A",
+  "description": "Changeset file editing state preserves true, explicit false, and omission through native action decoding and encoding.",
+  "type": "StateAction",
+  "input": {
+    "type": "changeset/contentChanged",
+    "files": [
+      {
+        "id": "file:///a.txt",
+        "edit": { "after": { "uri": "file:///a.txt", "content": { "uri": "content:/a" } } },
+        "nonce": "a-1",
+        "isEditing": true
+      },
+      {
+        "id": "file:///b.txt",
+        "edit": { "after": { "uri": "file:///b.txt", "content": { "uri": "content:/b" } } },
+        "nonce": "b-1",
+        "isEditing": false
+      },
+      {
+        "id": "file:///c.txt",
+        "edit": { "after": { "uri": "file:///c.txt", "content": { "uri": "content:/c" } } }
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "changeset/contentChanged",
+      "files": [
+        {
+          "id": "file:///a.txt",
+          "edit": { "after": { "uri": "file:///a.txt", "content": { "uri": "content:/a" } } },
+          "nonce": "a-1",
+          "isEditing": true
+        },
+        {
+          "id": "file:///b.txt",
+          "edit": { "after": { "uri": "file:///b.txt", "content": { "uri": "content:/b" } } },
+          "nonce": "b-1",
+          "isEditing": false
+        },
+        {
+          "id": "file:///c.txt",
+          "edit": { "after": { "uri": "file:///c.txt", "content": { "uri": "content:/c" } } }
+        }
+      ]
+    }
+  ]
+}

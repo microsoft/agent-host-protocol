@@ -156,6 +156,30 @@ public enum ResourceWriteMode: String, Codable, Sendable {
     case insert = "insert"
 }
 
+/// Identifies the consumer of an authentication token.
+public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
+    case mcpServer
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "mcpServer": self = .mcpServer
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .mcpServer: try container.encode("mcpServer")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - Command Types
 
 /// Copies source history through a completed turn into the new chat.
@@ -1776,6 +1800,26 @@ public struct DispatchActionParams: Codable, Sendable {
     }
 }
 
+public struct McpServerAuthenticateTarget: Codable, Sendable {
+    public var kind: AuthenticateTargetKind
+    /// Session URI whose `SessionState.customizations` contains the MCP server.
+    public var session: String
+    /// The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.
+    public var customizationId: String
+
+    public init(
+        kind: AuthenticateTargetKind,
+        session: String,
+        customizationId: String
+    ) {
+        self.kind = kind
+        self.session = session
+        self.customizationId = customizationId
+    }
+}
+
 public struct AuthenticateParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -1808,6 +1852,21 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
+    /// Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.
+    public var target: AuthenticateTarget?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1816,6 +1875,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
+        case target
     }
 
     public init(
@@ -1824,7 +1884,8 @@ public struct AuthenticateParams: Codable, Sendable {
         resource: String,
         token: String,
         expiresIn: Int? = nil,
-        scopes: [String]? = nil
+        scopes: [String]? = nil,
+        target: AuthenticateTarget? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1832,6 +1893,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
+        self.target = target
     }
 }
 
@@ -2504,6 +2566,42 @@ public enum ChatMoveDestination: Codable, Sendable {
     }
 }
 
+// MARK: - AuthenticateTarget Union
+
+public enum AuthenticateTarget: Codable, Sendable {
+    case mcpServer(McpServerAuthenticateTarget)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "mcpServer":
+            self = .mcpServer(try McpServerAuthenticateTarget(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .mcpServer(var value):
+            value.kind = .mcpServer
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 // MARK: - ReconnectResult Union
 
 public enum ReconnectResult: Codable, Sendable {
@@ -2571,10 +2669,12 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil) {
+    public init(resource: String, side: String? = nil, nonce: String? = nil) {
         self.resource = resource
         self.side = side
+        self.nonce = nonce
     }
 
     // kind is the union discriminant: a fixed constant for this variant (so it
@@ -2582,14 +2682,15 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     // MUST be re-emitted on encode so the wire stays a decodable
     // discriminated-union value. Hence the custom encode and the decode-only
     // CodingKeys that omit kind.
-    private enum CodingKeys: String, CodingKey { case resource, side }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side }
+    private enum CodingKeys: String, CodingKey { case resource, side, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(kind, forKey: .kind)
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }
 
@@ -2598,17 +2699,19 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
     public var resource: String
     public var side: String?
     public var range: TextRange
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil, range: TextRange) {
+    public init(resource: String, side: String? = nil, range: TextRange, nonce: String? = nil) {
         self.resource = resource
         self.side = side
         self.range = range
+        self.nonce = nonce
     }
 
     // See ChangesetOperationResourceTarget: kind is re-emitted on encode but
     // not decoded (the union dispatches on it).
-    private enum CodingKeys: String, CodingKey { case resource, side, range }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range }
+    private enum CodingKeys: String, CodingKey { case resource, side, range, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
@@ -2616,5 +2719,6 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
         try container.encode(range, forKey: .range)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }

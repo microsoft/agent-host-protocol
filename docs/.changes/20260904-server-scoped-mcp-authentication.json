@@ -1,0 +1,4 @@
+{
+  "type": "security",
+  "message": "Add an optional `authenticate.target` identifying an MCP server by session URI and customization ID, preventing tokens from reaching other consumers that share a protected resource and scopes."
+}

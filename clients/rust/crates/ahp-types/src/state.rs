@@ -5458,8 +5458,8 @@ pub struct ChangesetFile {
     /// the server MAY also originate it (e.g. an agent self-reviewing its own
     /// output).
     ///
-    /// There is no content version in the protocol, so review is **not** reset
-    /// automatically when a file's contents change under a stable id. The server,
+    /// Review is **not** reset automatically when a file's contents or nonce
+    /// change under a stable id. The server,
     /// which is the authority on what changed, resets review explicitly — either
     /// by re-emitting the file (via {@link ChangesetFileSetAction} or
     /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -5470,6 +5470,15 @@ pub struct ChangesetFile {
     /// but not interpreted by the protocol.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_editing: Option<bool>,
 }
 
 /// A server-declared invokable verb the client can run against a

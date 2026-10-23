@@ -222,6 +222,39 @@ pub enum ResourceWriteMode {
     Insert,
 }
 
+/// Identifies the consumer of an authentication token.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AuthenticateTargetKind {
+    McpServer,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AuthenticateTargetKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::McpServer => serializer.serialize_str("mcpServer"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AuthenticateTargetKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "mcpServer" => Self::McpServer,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 /// Opens a TCP connection from the host to a destination on the host's network.
@@ -1561,6 +1594,18 @@ pub struct DispatchActionParams {
     pub action: StateAction,
 }
 
+/// An MCP server identified by host-published session and customization state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerAuthenticateTarget {
+    /// Session URI whose `SessionState.customizations` contains the MCP server.
+    pub session: Uri,
+    /// The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.
+    pub customization_id: String,
+}
+
 /// Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1611,6 +1656,22 @@ pub struct AuthenticateParams {
     /// token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<AuthenticateTarget>,
 }
 
 /// Result of the `authenticate` command.
@@ -2010,6 +2071,20 @@ pub enum ChatMoveDestination {
     Unknown(serde_json::Value),
 }
 
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+/// AuthenticateTarget identifies the consumer of an authentication token.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AuthenticateTarget {
+    #[serde(rename = "mcpServer")]
+    McpServer(McpServerAuthenticateTarget),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 /// Result of the `reconnect` command.
@@ -2033,6 +2108,8 @@ pub enum ChangesetOperationTarget {
         resource: Uri,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(rename = "range")]
     Range {
@@ -2040,6 +2117,8 @@ pub enum ChangesetOperationTarget {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
         range: TextRange,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(untagged)]
     Unknown(serde_json::Value),
