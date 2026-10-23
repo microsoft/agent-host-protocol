@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Raw CLI extension requests preserve implementation-defined parameters without requiring a `channel`, including retained controller requests.",
+  "targets": ["cli"]
+}

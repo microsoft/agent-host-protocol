@@ -1,0 +1,5 @@
+{
+  "type": "security",
+  "message": "`watch` bounds pre-snapshot data by bytes and avoids retaining unread SDK subscription queues.",
+  "targets": ["cli"]
+}

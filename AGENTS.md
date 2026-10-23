@@ -10,14 +10,14 @@ are in [`RELEASING.md`](RELEASING.md).
 
 ## Adding changelog fragments
 
-This repo ships seven independently-versioned artifacts (the spec plus
-the Rust / Kotlin / Swift / TypeScript / Go / .NET clients), each with its
+This repo ships eight independently-versioned artifacts (the spec, the
+Rust / Kotlin / Swift / TypeScript / Go / .NET clients, and the CLI), each with its
 own `CHANGELOG.md` in Keep-a-Changelog format. The publish workflows
 refuse to release a tag whose matching `## [X.Y.Z]` heading is
 missing. To avoid merge conflicts in shared `CHANGELOG.md` files,
 normal PRs add JSON changelog fragments under `docs/.changes/` instead
 of editing the changelogs directly. Release PRs collapse those fragments
-into the seven changelogs with `npm run changelog:release`.
+into the selected changelogs with `npm run changelog:release`.
 
 ### When to add an entry
 
@@ -45,7 +45,9 @@ Add a one-line fragment whenever your change is
 
 Each fragment may specify a `targets` array. Omit `targets` when the same
 entry applies to the spec and all clients (the common case for protocol
-surface changes). Set `targets` to a subset when the change is only visible
+surface changes). The independently released CLI is excluded from this
+default; CLI entries explicitly use `"targets": ["cli"]`.
+Set `targets` to a subset when the change is only visible
 to specific artifacts.
 
 Map source paths to fragment targets:
@@ -59,6 +61,7 @@ Map source paths to fragment targets:
 | `clients/typescript/**` (non-generated) | `"targets": ["typescript"]` |
 | `clients/go/**` (non-generated) | `"targets": ["go"]` |
 | `clients/dotnet/**` (non-generated) | `"targets": ["dotnet"]` |
+| `cli/**` | `"targets": ["cli"]` |
 | `schema/**` | `"targets": ["spec"]` |
 | `scripts/generate*.ts` that changes any client's generated output | Omit `targets` or list every affected target. |
 

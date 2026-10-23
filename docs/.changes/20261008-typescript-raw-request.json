@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`AhpClient.requestRaw` for untyped protocol and host-extension requests using the SDK's existing correlation, timeout, and error handling.",
+  "targets": ["typescript"]
+}

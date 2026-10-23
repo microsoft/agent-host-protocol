@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Persistent agent-oriented `ahp` controllers with explicit instance targeting, observer-only listening, durable operation tracking, cursor-based events, and guarded send/steer/cancel commands.",
+  "targets": ["cli"]
+}

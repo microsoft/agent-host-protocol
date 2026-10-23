@@ -7,6 +7,10 @@ TypeScript client for the [Agent Host Protocol (AHP)](https://microsoft.github.i
 Browser-friendly client built on the global `WebSocket` API. Works in
 modern browsers and Node 21+ without additional runtime dependencies.
 
+For the `ahp` command-line tool, use the separate
+[`@microsoft/agent-host-protocol-cli` package](../../cli/README.md).
+This SDK package does not include an executable or CLI/controller modules.
+
 ## Entry points
 
 The package exposes four subpath exports:
@@ -17,6 +21,11 @@ The package exposes four subpath exports:
 | `@microsoft/agent-host-protocol/client` | `AhpClient`, `Subscription`, `ManagedSubscriptionManager`, `AhpStateMirror`, the `AhpTransport` interface, `InMemoryTransport`, and the error taxonomy. |
 | `@microsoft/agent-host-protocol/hosts`  | `MultiHostClient`, `HostClientHandle`, `ReconnectPolicy`, `ClientIdStore` (with `InMemoryClientIdStore`), `MultiHostStateMirror`, and the `Host*Error` family. Builds on `/client` to manage one or more host connections with reconnect, generation-checked handles, and fan-in events. |
 | `@microsoft/agent-host-protocol/ws`     | `WebSocketTransport` — an `AhpTransport` implementation backed by the global `WebSocket`. |
+
+`WebSocketTransport.fromSocket` also wraps compatible third-party sockets via
+the minimal `WebSocketTransportSocket` interface. This lets Node adapters reuse
+the SDK's framing and receive semantics without DOM-specific casts; the SDK
+itself remains browser-friendly and adds no runtime dependency.
 
 The split mirrors the Rust SDK (`ahp-types`, `ahp`, `ahp::hosts`,
 `ahp-ws`) — wire types and reducers are decoupled from the client,
@@ -143,6 +152,11 @@ state and call the reducers directly.
 | `AhpClientError`     | Base class for every error this SDK throws — use `instanceof` to catch them all. |
 
 Malformed inbound frames don't throw — they're logged via `console.warn` and the channel stays alive (matching the Rust client's `tracing::warn!` behavior). Pending requests still time out via `RpcTimeoutError` if the dropped frame would have been their reply.
+
+For protocol diagnostics or extension methods, `client.requestRaw(method,
+params)` uses the same request IDs, timeout, and error handling as `request`,
+but accepts and returns `unknown`. It does not validate the payload. Prefer the
+typed `request` method for standard application code.
 
 ## Server-initiated requests
 

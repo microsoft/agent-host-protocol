@@ -13,13 +13,20 @@ with its own release cadence. Each client release advertises which protocol
 versions it supports via a generated `SUPPORTED_PROTOCOL_VERSIONS` constant
 and a checked-in `clients/<lang>/release-metadata.json`.
 
+The CLI is an eighth artifact, published as the separate
+`@microsoft/agent-host-protocol-cli` npm package. Its version and release cadence
+are independent of the spec and SDKs. It bundles the shared TypeScript client
+and generated protocol sources, so it does not require a corresponding SDK
+npm release.
+
 ## Changelog fragments
 
 Normal feature/fix PRs do **not** edit `CHANGELOG.md` files directly. They add
 one or more JSON fragments under `docs/.changes/`; omitting `targets` applies
 the entry to the spec and all six clients, while `targets` can scope an entry
 to any subset of `spec`, `rust`, `kotlin`, `typescript`, `swift`, `go`, and
-`dotnet`.
+`dotnet`. CLI entries explicitly use `"targets": ["cli"]`; they are excluded
+from the default spec/client target set.
 
 Before tagging a coordinated release, collapse those fragments into the seven
 Keep-a-Changelog files:
@@ -39,6 +46,10 @@ rewrites that fragment with the remaining targets so a later release can still
 consume it. Run `npm run verify:change-fragments` before release if you only
 want to validate fragment JSON without consuming it.
 
+For a CLI release, pass `--targets cli`. This consumes only CLI fragments into
+`cli/CHANGELOG.md`, labels the CLI version rather than claiming it is an AHP
+protocol version, and leaves spec/client fragments for their own releases.
+
 ## Tag conventions
 
 | Artifact   | Tag pattern         | Workflow                          | Registry / discovery |
@@ -47,6 +58,7 @@ want to validate fragment JSON without consuming it.
 | Rust       | `rust/vX.Y.Z`       | `.github/workflows/publish-rust.yml` | crates.io (`ahp-types`, `ahp`, `ahp-ws`). |
 | Kotlin     | `kotlin/vX.Y.Z`     | `clients/kotlin/pipeline.yml` (Azure DevOps) | Maven Central (`com.microsoft.agenthostprotocol:agent-host-protocol`) via ESRP. |
 | TypeScript | `typescript/vX.Y.Z` | `clients/typescript/pipeline.yml` (Azure DevOps) | npm (`@microsoft/agent-host-protocol`) via ESRP. |
+| CLI        | `cli/vX.Y.Z`        | `cli/pipeline.yml` (Azure DevOps) | npm (`@microsoft/agent-host-protocol-cli`) via ESRP. |
 | Swift      | `vX.Y.Z` (bare)     | `.github/workflows/publish-swift.yml` | SwiftPM resolves the tag directly. |
 | Go         | `clients/go/vX.Y.Z` | `.github/workflows/publish-go.yml` | Go module proxy resolves the tag directly. |
 | .NET       | `dotnet/vX.Y.Z`     | `clients/dotnet/pipeline.yml` (Azure DevOps) | NuGet.org (`Microsoft.VisualStudioCode.AgentHostProtocol`, `.Abstractions`). |
@@ -76,6 +88,32 @@ want to validate fragment JSON without consuming it.
 > triggered manually from the ADO UI as a hotfix escape hatch.
 
 ## Per-client release flow
+
+### CLI (`cli/vX.Y.Z`)
+
+The CLI has its own ESRP-backed Azure DevOps pipeline at `cli/pipeline.yml`.
+Register this YAML as a separate pipeline in Azure DevOps and authorize the
+shared template/service connection and npm publishing permissions for the new
+package before its first release. No SDK release or SDK tag publishes the CLI.
+
+The initial `0.0.0` manifest is an unpublished placeholder. CI requires its
+`[Unreleased]` changelog; the publish pipeline rejects this version, including
+manual runs. The release maintainer selects the first real version.
+
+1. Bump `version` in `cli/package.json` and run `npm install --prefix cli`.
+2. Collapse CLI fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets cli`.
+3. Run `npm run test:cli` and `npm run verify:changelog`.
+4. Merge to `main`.
+5. Tag: `git tag cli/vX.Y.Z && git push origin cli/vX.Y.Z`.
+6. The CLI pipeline checks tag/manifest/changelog agreement, validates the shared
+   SDK metadata, generates the TypeScript protocol sources, builds/tests the
+   standalone bundle, and publishes only `@microsoft/agent-host-protocol-cli`.
+
+Manual ADO runs use the same release checks. Protocol-supported versions come
+from the generated SDK registry; the CLI package version is not a protocol
+version. Coordinated spec/client releases leave the CLI untouched unless the
+maintainer explicitly schedules a separate CLI release.
 
 ### Rust (`rust/vX.Y.Z`)
 

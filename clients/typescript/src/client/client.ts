@@ -594,6 +594,15 @@ export class AhpClient {
     method: M,
     params: CommandMap[M]['params'],
   ): Promise<CommandMap[M]['result']> {
+    return this.requestRaw(method, params) as Promise<CommandMap[M]['result']>;
+  }
+
+  /**
+   * Send an explicitly untyped request, for protocol diagnostics and
+   * host-specific extension methods. Parameters and results are not validated.
+   * Prefer {@link AhpClient.request} for standard typed commands.
+   */
+  async requestRaw(method: string, params: unknown): Promise<unknown> {
     this.assertOpen();
     const id = this.nextRequestId++;
     const msg: JsonRpcRequest = {
@@ -603,9 +612,9 @@ export class AhpClient {
       params,
     };
 
-    return new Promise<CommandMap[M]['result']>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       const pending: PendingRequest = {
-        resolve: value => resolve(value as CommandMap[M]['result']),
+        resolve,
         reject,
         method: method as string,
         timer: null,
