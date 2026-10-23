@@ -425,6 +425,13 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Client understands source-qualified model catalogs and preserves exact
+    /// `ModelSelection.modelSourceId` values across every selection-bearing path.
+    /// Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
+    /// Clients MUST also check `AgentCapabilities.modelSourceSelection` before
+    /// sending a qualified selection; negotiating a protocol version is insufficient.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_selection: Option<JsonObject>,
 }
 
 /// Automation features supported by this host authority.

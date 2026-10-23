@@ -1728,7 +1728,7 @@ pub struct RootConfigState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentInfo {
-    /// Agent provider ID (e.g. `'copilot'`)
+    /// Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
     pub provider: String,
     /// Human-readable name
     pub display_name: String,
@@ -1763,6 +1763,13 @@ pub struct AgentInfo {
     /// id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<AgentCapabilities>,
+    /// Model sources exposed by this agent harness, including sources with
+    /// no currently available models. Together with {@link models}, this is one
+    /// atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
+    /// this agent; every model's `modelSourceId` MUST reference an entry here.
+    /// Absence preserves legacy discovery without inventing source identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_sources: Option<Vec<ModelSourceInfo>>,
 }
 
 /// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -1791,6 +1798,12 @@ pub struct AgentCapabilities {
     /// {@link CreateSessionParams.workingDirectories}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
+    /// The agent preserves and enforces exact source-qualified model selections.
+    /// Clients MUST also declare `ClientCapabilities.modelSourceSelection`
+    /// before sending a `ModelSelection.modelSourceId`. Protocol version
+    /// negotiation alone does not establish support.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_selection: Option<JsonObject>,
 }
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1852,12 +1865,25 @@ pub struct MultipleWorkingDirectoriesCapability {
     pub primary_replacement: Option<bool>,
 }
 
+/// An independently selectable source of model access exposed by one agent
+/// harness. IDs are opaque and stable within that host and harness, not global
+/// identities, authorization proof, account or billing identities, or inherently
+/// telemetry-safe values. Selection does not establish per-call usage provenance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSourceInfo {
+    /// Opaque source identifier. MUST NOT be derived from the display name.
+    pub id: String,
+    /// Human-readable label; not an identifier and not necessarily unique.
+    pub display_name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionModelInfo {
-    /// Model identifier
+    /// Raw model identifier; different model sources may expose the same ID.
     pub id: String,
-    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
+    /// Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
     pub provider: String,
     /// Human-readable model name
     pub name: String,
@@ -1896,21 +1922,35 @@ pub struct SessionModelInfo {
     /// recognize.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vendor: Option<String>,
+    /// Source of this model within the owning agent's {@link AgentInfo.modelSources}.
+    /// The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
+    /// If a raw ID appears more than once, every such row MUST be qualified.
+    /// Absence is legacy, unqualified identity; it does not name a default source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_id: Option<String>,
 }
 
-/// A model selection: the chosen model ID together with any model-specific
-/// configuration values whose keys correspond to the model's
-/// {@link SessionModelInfo.configSchema}.
+/// A model selection: the raw model ID, an optional exact model source, and
+/// configuration values whose keys correspond to {@link SessionModelInfo.configSchema}.
+/// A qualified selection is never a preference: hosts MUST preserve the pair
+/// or explicitly fail, never strip the qualifier or fall back to another source.
+/// This selection is not per-call usage provenance.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSelection {
-    /// Model identifier
+    /// Raw model identifier, unchanged by source qualification or UI keys.
     pub id: String,
     /// Model-specific configuration values. Values are JSON primitives: most
     /// pickers produce strings, but some (e.g. a numeric context-size picker)
     /// produce numbers or booleans, which are carried through as-is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<std::collections::HashMap<String, AnyValue>>,
+    /// Exact model source ID in the owning agent's advertised catalog.
+    /// Requires both client and agent `modelSourceSelection` capabilities.
+    /// MUST survive messages, drafts, queued work, persistence and replay.
+    /// Absence retains genuinely unqualified legacy selection behavior.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_id: Option<String>,
 }
 
 /// A selected custom agent for a session.
@@ -2949,13 +2989,16 @@ pub struct Message {
     /// File/selection attachments
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
-    /// The model this message was, or will be, sent with.
+    /// The model selection associated with this message.
     ///
-    /// For historic user/agent messages this records the model actually used, so
-    /// a client editing or resending the message can retain that selection. For a
+    /// For historic user/agent messages this retains the host-accepted selection,
+    /// so a client editing or resending the message can preserve it. For a
     /// {@link ChatState.draft | draft} it carries the model the user picked for
     /// the message they are composing. Absent means the agent host's default
-    /// model applies.
+    /// model applies. A source qualifier MUST be preserved exactly, including
+    /// through pending messages and restored history; it is not per-call usage
+    /// provenance. Accepting a message does not prove a deferred model switch
+    /// has activated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
     /// The custom agent this message was, or will be, sent with.
@@ -5832,12 +5875,22 @@ pub struct AutomationTriggerDefinition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionTemplate {
-    /// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
+    /// Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
+    /// the host's default only for genuinely unqualified saved definitions.
+    ///
+    /// If this template's `model` or {@link AutomationDefinition.message}'s
+    /// `model` has a `modelSourceId`, the host MUST persist an explicit provider
+    /// when accepting a create or update. An omitted owner MUST be resolved and
+    /// stored at acceptance or the action rejected. Updates retaining a qualified
+    /// selection MUST preserve its saved owner when omitted, or reject; they MUST
+    /// NOT resolve it again from a changed host default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    /// Optional model selection resolved when a run starts. Its
-    /// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
-    /// by the selected provider.
+    /// Optional model selection revalidated when a run starts against the owning
+    /// agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
+    /// both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
+    /// A missing or unavailable saved owner or pair fails the run rather than
+    /// resolving against the current default or falling back to another source or harness.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
     /// Optional custom agent selection identified by {@link AgentSelection.uri}.
@@ -5893,6 +5946,9 @@ pub struct AutomationDefinition {
     pub title: String,
     /// Initial message sent to every newly created run session. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
+    /// A qualified `model` requires an explicit persisted
+    /// {@link AutomationSessionTemplate.provider | `session.provider`}, even
+    /// when the session template's own `model` is absent.
     pub message: Message,
     /// Template used to create fresh sessions for each run.
     pub session: AutomationSessionTemplate,
@@ -5926,6 +5982,10 @@ pub struct AutomationDefinition {
 ///
 /// Omitted fields are unchanged. Supplied arrays and objects replace their
 /// corresponding values in full; they are not merged recursively.
+/// The host MUST validate the resulting definition's qualified model ownership
+/// under {@link AutomationSessionTemplate.provider}. Replacing `session` while
+/// omitting its provider MUST NOT erase or rebind the owner of a retained
+/// qualified selection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationDefinitionPatch {

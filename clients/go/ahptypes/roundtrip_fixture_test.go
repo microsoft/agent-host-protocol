@@ -136,6 +136,66 @@ func TestReconnectResultNilVariant(t *testing.T) {
 	}
 }
 
+func TestOptionalCollectionOmission(t *testing.T) {
+	cases := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{
+			name:  "nil optional collections",
+			value: RootState{Agents: []AgentInfo{}},
+			want:  `{"agents":[]}`,
+		},
+		{
+			name: "empty optional collections",
+			value: RootState{
+				Agents:    []AgentInfo{},
+				Terminals: []TerminalInfo{},
+				Meta:      map[string]json.RawMessage{},
+			},
+			want: `{"agents":[]}`,
+		},
+		{
+			name: "nonempty optional metadata",
+			value: RootState{
+				Agents: []AgentInfo{},
+				Meta:   map[string]json.RawMessage{"enabled": json.RawMessage(`true`)},
+			},
+			want: `{"agents":[],"_meta":{"enabled":true}}`,
+		},
+		{
+			name:  "nil model config",
+			value: ModelSelection{Id: "raw-model"},
+			want:  `{"id":"raw-model"}`,
+		},
+		{
+			name:  "empty model config",
+			value: ModelSelection{Id: "raw-model", Config: map[string]json.RawMessage{}},
+			want:  `{"id":"raw-model"}`,
+		},
+		{
+			name: "nonempty model config",
+			value: ModelSelection{
+				Id:     "raw-model",
+				Config: map[string]json.RawMessage{"contextWindow": json.RawMessage(`8192`)},
+			},
+			want: `{"id":"raw-model","config":{"contextWindow":8192}}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data, err := json.Marshal(tc.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !canonicalJSONEqualRaw(t, tc.name, string(data), tc.want) {
+				t.Fatalf("optional collection semantics changed: got %s, want %s", data, tc.want)
+			}
+		})
+	}
+}
+
 func runRoundTripFixture(t *testing.T, name string, raw []byte) {
 	t.Helper()
 
@@ -256,6 +316,10 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		return enc(&v)
 	case "InitializeResult":
 		var v InitializeResult
+		dec(&v)
+		return enc(&v)
+	case "InitializeParams":
+		var v InitializeParams
 		dec(&v)
 		return enc(&v)
 	case "CreateChatParams":

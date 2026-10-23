@@ -1,0 +1,80 @@
+{
+  "name": "model-source-catalog",
+  "group": "A",
+  "description": "One harness advertises two exact pairs with the same raw model ID, non-unique display labels and a known source with zero models. Legacy absence remains intact on another harness.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [{
+      "resource": "ahp-root://",
+      "fromSeq": 1,
+      "state": {
+        "agents": [{
+          "provider": "example",
+          "displayName": "Example",
+          "description": "One harness",
+          "capabilities": { "modelSourceSelection": {} },
+          "modelSources": [
+            { "id": "source-a", "displayName": "Service" },
+            { "id": "source-b", "displayName": "Service" },
+            { "id": "source-c", "displayName": "Known empty source" }
+          ],
+          "models": [
+            { "id": "shared-model", "provider": "example", "name": "Shared", "vendor": "Example vendor", "modelSourceId": "source-a" },
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelSourceId": "source-b" }
+          ]
+        }, {
+          "provider": "legacy",
+          "displayName": "Legacy",
+          "description": "No source identity inferred",
+          "models": [{ "id": "shared-model", "provider": "legacy", "name": "Shared" }]
+        }, {
+          "provider": "empty",
+          "displayName": "Empty",
+          "description": "No authentication requirement inferred",
+          "capabilities": { "modelSourceSelection": {} },
+          "modelSources": [],
+          "models": []
+        }]
+      }
+    }]
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [{
+      "resource": "ahp-root://",
+      "fromSeq": 1,
+      "state": {
+        "agents": [{
+          "provider": "example",
+          "displayName": "Example",
+          "description": "One harness",
+          "capabilities": { "modelSourceSelection": {} },
+          "modelSources": [
+            { "id": "source-a", "displayName": "Service" },
+            { "id": "source-b", "displayName": "Service" },
+            { "id": "source-c", "displayName": "Known empty source" }
+          ],
+          "models": [
+            { "id": "shared-model", "provider": "example", "name": "Shared", "vendor": "Example vendor", "modelSourceId": "source-a" },
+            { "id": "shared-model", "provider": "example", "name": "Shared", "modelSourceId": "source-b" }
+          ]
+        }, {
+          "provider": "legacy",
+          "displayName": "Legacy",
+          "description": "No source identity inferred",
+          "models": [{ "id": "shared-model", "provider": "legacy", "name": "Shared" }]
+        }, {
+          "provider": "empty",
+          "displayName": "Empty",
+          "description": "No authentication requirement inferred",
+          "capabilities": { "modelSourceSelection": {} },
+          "modelSources": [],
+          "models": []
+        }]
+      }
+    }]
+  }]
+}

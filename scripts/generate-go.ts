@@ -364,7 +364,9 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
       && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
         && tsName === 'disableConditions')
-      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
+      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState')
+      || (tsName === 'modelSources' && iface.getName() === 'AgentInfo')
+      || /^Record<string,\s*never>(?:\s*\|\s*undefined)?$/.test(tsType);
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -751,6 +753,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
+  { name: 'ModelSourceInfo' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
