@@ -1021,7 +1021,7 @@ function generateCanvasChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Canvas Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and HTTP(S) source URL. A missing URL means the source is unavailable. Source URLs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
+  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and HTTP(S) source URL. A missing URL means the source is unavailable. Source URLs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart. A host can also serve canvas content through `resourceRead`; see the [Canvas Channel specification](/specification/canvas-channel).\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {

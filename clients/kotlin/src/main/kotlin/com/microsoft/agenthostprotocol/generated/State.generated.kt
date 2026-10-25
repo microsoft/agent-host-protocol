@@ -2265,6 +2265,10 @@ data class CanvasState(
      *
      * Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
      * from persisted state after a provider or host restart.
+     *
+     * A client that can't reach this URL can read the source through
+     * `resourceRead` on the canvas URI when the host serves canvas content.
+     * See the Canvas Channel specification.
      */
     val url: String? = null
 )

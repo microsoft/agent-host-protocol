@@ -1077,6 +1077,9 @@ pub struct ListSessionsResult {
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
 /// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A host MAY also serve the live source of a canvas, and paths relative to
+/// it, on `ahp-canvas:` URIs. See the Canvas Channel specification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadParams {
