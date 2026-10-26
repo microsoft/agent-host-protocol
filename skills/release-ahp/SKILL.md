@@ -187,6 +187,8 @@ The six tag schemes are deliberate and not interchangeable. Bare
 `clients/go/vX.Y.Z` is required by the Go module proxy's sub-module
 resolution.
 
+- After pushing the tags, prepend `X.Y.Z` to `STABLE_DOC_VERSIONS` in `docs/.vitepress/versions.ts` and merge that change to `main` so it becomes the default documentation version.
+
 ### 6. Confirm publish runs started
 
 For each tag, verify the corresponding workflow run is queued or in

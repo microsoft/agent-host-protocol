@@ -5,6 +5,7 @@ docs/.vitepress/cache
 
 # Generated files (npm run generate)
 docs/reference/
+docs/versions/
 docs/public/schema/
 
 # SwiftPM build artifacts
