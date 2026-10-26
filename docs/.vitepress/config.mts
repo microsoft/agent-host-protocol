@@ -1,10 +1,36 @@
-import { defineConfig } from 'vitepress'
+import { defineConfigWithTheme } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
+import {
+  createVersionedSidebar,
+  docVersions,
+  prefixDocLink,
+  rewriteDocPath,
+  versionForSource,
+  type DocThemeConfig,
+} from './doc-versions'
 
-export default withMermaid(defineConfig({
+export default withMermaid(defineConfigWithTheme<DocThemeConfig>({
   title: 'Agent Host Protocol',
   description: 'Documentation for the Agent Host Protocol — a synchronized, multi-client state protocol for AI agent sessions',
   base: '/agent-host-protocol/',
+  rewrites: rewriteDocPath,
+  markdown: {
+    config(md) {
+      md.core.ruler.push('doc-version-links', (state) => {
+        // Page rendering rewrites env.path; local search provides only the source path.
+        const prefix = versionForSource(state.env.realPath ?? state.env.path)?.prefix
+        if (!prefix) return
+        for (const token of state.tokens) {
+          if (token.type !== 'inline') continue
+          for (const child of token.children ?? []) {
+            if (child.type !== 'link_open') continue
+            const href = child.attrGet('href')
+            if (href) child.attrSet('href', prefixDocLink(href, prefix))
+          }
+        }
+      })
+    },
+  },
   mermaid: {
     theme: 'neutral',
     fontFamily: '"Helvetica Neue", Arial, Helvetica, sans-serif',
@@ -15,13 +41,15 @@ export default withMermaid(defineConfig({
   ],
 
   themeConfig: {
+    docVersions,
     nav: [
-      { text: 'Guide', link: '/guide/what-is-ahp', activeMatch: '^/guide/' },
-      { text: 'Specification', link: '/specification/overview', activeMatch: '^/specification/' },
-      { text: 'Reference', link: '/reference/common', activeMatch: '^/reference/' },
+      { text: 'Guide', link: '/guide/what-is-ahp', activeMatch: '^/(?:draft/|v[^/]+/)?guide/' },
+      { text: 'Specification', link: '/specification/overview', activeMatch: '^/(?:draft/|v[^/]+/)?specification/' },
+      { text: 'Reference', link: '/reference/common', activeMatch: '^/(?:draft/|v[^/]+/)?reference/' },
+      { component: 'VersionSwitcher' },
     ],
 
-    sidebar: {
+    sidebar: createVersionedSidebar({
       '/guide/': [
         {
           text: 'Introduction',
@@ -109,7 +137,7 @@ export default withMermaid(defineConfig({
           ],
         },
       ],
-    },
+    }),
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/microsoft/agent-host-protocol' },
@@ -122,10 +150,19 @@ export default withMermaid(defineConfig({
 
     search: {
       provider: 'local',
+      options: {
+        _render(src, env, md) {
+          if (versionForSource(env.realPath ?? env.path)?.prefix) return ''
+          const html = md.render(src, env)
+          return env.frontmatter?.search === false ? '' : html
+        },
+      },
     },
 
     editLink: {
-      pattern: 'https://github.com/microsoft/agent-host-protocol/edit/main/docs/:path',
+      // Serialized to the client, so it can't reference imports. Released pages edit main's copy.
+      pattern: ({ filePath }) => 'https://github.com/microsoft/agent-host-protocol/edit/main/docs/'
+        + filePath.replace(/^versions\/[^/]+\//, ''),
       text: 'Edit this page on GitHub',
     },
   },

@@ -210,6 +210,12 @@ trigger started the run.
    tagged commit, captures a `registry-snapshot.json` of the introduced-in
    maps, and creates a GitHub Release with all of the above as assets.
 
+## Updating published documentation
+
+After pushing the release's `vX.Y.Z` tag, prepend `X.Y.Z` to
+`STABLE_DOC_VERSIONS` in `docs/.vitepress/versions.ts` and merge that change
+to `main` so the new release becomes the default documentation version.
+
 ## What CI guards against
 
 | Drift caught by | How |

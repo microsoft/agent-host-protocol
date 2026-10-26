@@ -57,6 +57,12 @@ npm run docs:build
 npm run docs:preview
 ```
 
+The guide, specification, and reference are versioned. `npm run docs:versions`
+(run automatically by `docs:dev` and `docs:build`) materializes the released
+versions listed in `docs/.vitepress/versions.ts` from their git tags into
+`docs/versions/` (gitignored). The first listed version is served at the root
+URLs; `main` is served under `/draft/`.
+
 ## License
 
 MIT
