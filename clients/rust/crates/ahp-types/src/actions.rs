@@ -20,10 +20,10 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
-    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
-    ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionConfigSchema,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -83,6 +83,7 @@ pub enum ActionType {
     ChatIsReadChanged,
     ChatIsArchivedChanged,
     ChatConfigChanged,
+    ChatMoved,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -228,6 +229,7 @@ impl serde::Serialize for ActionType {
             Self::ChatIsReadChanged => serializer.serialize_str("chat/isReadChanged"),
             Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
             Self::ChatConfigChanged => serializer.serialize_str("chat/configChanged"),
+            Self::ChatMoved => serializer.serialize_str("chat/moved"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -383,6 +385,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/isReadChanged" => Self::ChatIsReadChanged,
             "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
             "chat/configChanged" => Self::ChatConfigChanged,
+            "chat/moved" => Self::ChatMoved,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -1568,6 +1571,28 @@ pub struct ChatConfigChangedAction {
     pub replace: Option<bool>,
 }
 
+/// The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | `provider`} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMovedAction {
+    /// The new owning session URI.
+    pub session: Uri,
+    /// The chat's provider in the new session; absent clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// The chat's config schema in the new session; absent clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<SessionConfigSchema>,
+}
+
 /// A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2527,6 +2552,8 @@ pub enum StateAction {
     ChatIsArchivedChanged(ChatIsArchivedChangedAction),
     #[serde(rename = "chat/configChanged")]
     ChatConfigChanged(ChatConfigChangedAction),
+    #[serde(rename = "chat/moved")]
+    ChatMoved(ChatMovedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

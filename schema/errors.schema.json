@@ -2640,7 +2640,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. It never changes: like `resource`, it is an identity field and is\nomitted from `session/chatUpdated` changes. Forks and side chats use the\nsource chat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. The chat's agent never changes, but `provider` is reported\nrelative to its session, so `chat/moved` may set or clear it. Like\n`resource`, it is omitted from `session/chatUpdated` changes. Forks and\nside chats use the source chat's agent.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -7619,7 +7619,7 @@
     },
     "MoveChatParams": {
       "type": "object",
-      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nA moved chat keeps its agent. After the move the host reports\n{@link ChatState.provider | `provider`} on the chat whenever it differs from\nthe destination session's provider, including when the chat had none\nbecause it matched its old session. Hosts MAY refuse, as an unsupported\ndestination, a move they cannot support, such as one that changes whether\nthe chat's agent matches its session's.\n\nA moved chat's `config.values` move with it unchanged. If a move changes\nwhether the chat needs its own `config.schema`, the host sets or clears it,\nor refuses the move as an unsupported destination. Clients SHOULD\nresubscribe to a moved chat whose `config.schema` changed.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
+      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nA moved chat keeps its agent. After the move the host reports\n{@link ChatState.provider | `provider`} on the chat whenever it differs from\nthe destination session's provider, including when the chat had none\nbecause it matched its old session. Hosts MAY refuse, as an unsupported\ndestination, a move they cannot support, such as one that changes whether\nthe chat's agent matches its session's.\n\nA moved chat's `config.values` move with it unchanged. If a move changes\nwhether the chat needs its own `config.schema`, the host sets or clears it,\nor refuses the move as an unsupported destination. After a cross-session\nmove the host dispatches `chat/moved` on the chat's channel with its new\nsession, `provider` and `config.schema`.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -9004,6 +9004,9 @@
         },
         {
           "$ref": "#/$defs/ChatConfigChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -10809,6 +10812,31 @@
       "required": [
         "type",
         "config"
+      ]
+    },
+    "ChatMovedAction": {
+      "type": "object",
+      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | `provider`} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.",
+      "properties": {
+        "type": {
+          "const": "chat/moved"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "The new owning session URI."
+        },
+        "provider": {
+          "type": "string",
+          "description": "The chat's provider in the new session; absent clears it."
+        },
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "The chat's config schema in the new session; absent clears it."
+        }
+      },
+      "required": [
+        "type",
+        "session"
       ]
     },
     "ChatInputRequestedAction": {

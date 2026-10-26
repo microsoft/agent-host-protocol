@@ -101,7 +101,8 @@ reject keys that are not `chatMutable` in the effective schema.
 Every chat is backed by one agent. `SessionState.provider` is the session's
 agent, and [`ChatSummary.provider`](/reference/chat#chatsummary) names a chat's
 agent when it differs; absence means the session's agent. A chat's agent never
-changes.
+changes, but `provider` is relative to its session, so `chat/moved` may set or
+clear it.
 
 Hosts that advertise
 [`multipleChatProviders`](/reference/common#initializeresult) accept a
@@ -259,8 +260,9 @@ an unsupported destination, a move they cannot support.
 
 A moved chat's `config.values` move with it unchanged. If a move changes whether
 the chat needs its own `config.schema`, the host sets or clears it, or refuses
-the move as an unsupported destination. Clients SHOULD resubscribe to a moved
-chat whose `config.schema` changed.
+the move as an unsupported destination. After a cross-session move the host
+dispatches [`chat/moved`](/reference/chat#chatmovedaction) on the chat's channel
+with its new session, `provider` and `config.schema`.
 
 #### Atomic synchronization
 

@@ -8,7 +8,7 @@ import { ActionType } from '../common/actions.js';
 import type { StringOrMarkdown, FileEditCollection, UsageInfo, URI } from '../common/state.js';
 import type { CanvasReference } from '../channels-canvas/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
-import type { McpAuthRequirement } from '../channels-session/state.js';
+import type { McpAuthRequirement, SessionConfigSchema } from '../channels-session/state.js';
 import type {
   BackgroundWork,
   Message,
@@ -922,6 +922,30 @@ export interface ChatConfigChangedAction {
   replace?: boolean;
 }
 
+/**
+ * The chat moved to another session.
+ *
+ * Dispatched by the host on the moved chat's channel after a cross-session
+ * `moveChat`. `provider` and `schema` are the chat's
+ * {@link ChatState.provider | `provider`} and
+ * {@link ChatConfigState.schema | `config.schema`} relative to the new
+ * session; absent clears them. `ChatState` has no session field, so the
+ * reducer does not store `session`; it tells subscribers which session now
+ * owns the chat.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatMovedAction {
+  type: ActionType.ChatMoved;
+  /** The new owning session URI. */
+  session: URI;
+  /** The chat's provider in the new session; absent clears it. */
+  provider?: string;
+  /** The chat's config schema in the new session; absent clears it. */
+  schema?: SessionConfigSchema;
+}
+
 // ─── Session Input Actions ──────────────────────────────────────────────────
 
 /**
@@ -1017,6 +1041,7 @@ export type ChatAction =
   | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
   | ChatConfigChangedAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

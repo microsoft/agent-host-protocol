@@ -1144,6 +1144,17 @@ public static class Reducers
                 state.Config ??= new ChatConfigState { Values = chatValues };
                 state.Config.Values = chatValues;
                 return ReduceOutcome.Applied;
+            case ChatMovedAction a:
+                state.Provider = a.Provider;
+                if (state.Config is not null)
+                {
+                    state.Config.Schema = a.Schema;
+                }
+                else if (a.Schema is not null)
+                {
+                    state.Config = new ChatConfigState { Schema = a.Schema, Values = new Dictionary<string, JsonElement>() };
+                }
+                return ReduceOutcome.Applied;
         }
 
         return ReduceOutcome.OutOfScope;

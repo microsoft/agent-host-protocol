@@ -1637,6 +1637,19 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         state.copy(config = current?.copy(values = newValues) ?: ChatConfigState(values = newValues))
     }
 
+    is StateActionChatMoved -> {
+        val a = action.value
+        val current = state.config
+        state.copy(
+            provider = a.provider,
+            config = when {
+                current != null -> current.copy(schema = a.schema)
+                a.schema != null -> ChatConfigState(schema = a.schema, values = emptyMap())
+                else -> null
+            },
+        )
+    }
+
     else -> state
 
 }

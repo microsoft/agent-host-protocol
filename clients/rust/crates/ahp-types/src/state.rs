@@ -2065,9 +2065,10 @@ pub struct ChatState {
     pub interactivity: Option<ChatInteractivity>,
     /// Agent provider ID backing this chat. Absent means the session's
     /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-    /// differs. It never changes: like `resource`, it is an identity field and is
-    /// omitted from `session/chatUpdated` changes. Forks and side chats use the
-    /// source chat's agent.
+    /// differs. The chat's agent never changes, but `provider` is reported
+    /// relative to its session, so `chat/moved` may set or clear it. Like
+    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+    /// side chats use the source chat's agent.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]

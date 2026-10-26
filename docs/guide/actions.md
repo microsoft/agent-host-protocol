@@ -109,6 +109,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |
 | `chat/configChanged` | **Yes** | Config values set on a chat (`chatMutable` properties) changed |
+| `chat/moved` | No | The chat moved to another session; carries its new session, `provider` and `config.schema` |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
 ### Server & Active-Client Tools (session channel)

@@ -1433,6 +1433,20 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             }
             ReduceOutcome::Applied
         }
+        StateAction::ChatMoved(a) => {
+            state.provider = a.provider.clone();
+            match state.config.as_mut() {
+                Some(config) => config.schema = a.schema.clone(),
+                None if a.schema.is_some() => {
+                    state.config = Some(ChatConfigState {
+                        schema: a.schema.clone(),
+                        values: Default::default(),
+                    });
+                }
+                None => {}
+            }
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }

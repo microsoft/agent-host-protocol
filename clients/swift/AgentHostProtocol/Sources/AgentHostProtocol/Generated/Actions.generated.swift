@@ -58,6 +58,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatIsReadChanged
     case chatIsArchivedChanged
     case chatConfigChanged
+    case chatMoved
     case chatInputRequested
     case chatInputAnswerChanged
     case chatInputCompleted
@@ -172,6 +173,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/isReadChanged": self = .chatIsReadChanged
         case "chat/isArchivedChanged": self = .chatIsArchivedChanged
         case "chat/configChanged": self = .chatConfigChanged
+        case "chat/moved": self = .chatMoved
         case "chat/inputRequested": self = .chatInputRequested
         case "chat/inputAnswerChanged": self = .chatInputAnswerChanged
         case "chat/inputCompleted": self = .chatInputCompleted
@@ -286,6 +288,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatIsReadChanged: try container.encode("chat/isReadChanged")
         case .chatIsArchivedChanged: try container.encode("chat/isArchivedChanged")
         case .chatConfigChanged: try container.encode("chat/configChanged")
+        case .chatMoved: try container.encode("chat/moved")
         case .chatInputRequested: try container.encode("chat/inputRequested")
         case .chatInputAnswerChanged: try container.encode("chat/inputAnswerChanged")
         case .chatInputCompleted: try container.encode("chat/inputCompleted")
@@ -1711,6 +1714,28 @@ public struct ChatConfigChangedAction: Codable, Sendable {
     }
 }
 
+public struct ChatMovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The new owning session URI.
+    public var session: String
+    /// The chat's provider in the new session; absent clears it.
+    public var provider: String?
+    /// The chat's config schema in the new session; absent clears it.
+    public var schema: SessionConfigSchema?
+
+    public init(
+        type: ActionType,
+        session: String,
+        provider: String? = nil,
+        schema: SessionConfigSchema? = nil
+    ) {
+        self.type = type
+        self.session = session
+        self.provider = provider
+        self.schema = schema
+    }
+}
+
 public struct ChatInputRequestedAction: Codable, Sendable {
     public var type: ActionType
     /// Input request to create or replace
@@ -2661,6 +2686,7 @@ public enum StateAction: Codable, Sendable {
     case chatIsReadChanged(ChatIsReadChangedAction)
     case chatIsArchivedChanged(ChatIsArchivedChangedAction)
     case chatConfigChanged(ChatConfigChangedAction)
+    case chatMoved(ChatMovedAction)
     case chatInputRequested(ChatInputRequestedAction)
     case chatInputAnswerChanged(ChatInputAnswerChangedAction)
     case chatInputCompleted(ChatInputCompletedAction)
@@ -2836,6 +2862,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatIsArchivedChanged(try ChatIsArchivedChangedAction(from: decoder))
         case "chat/configChanged":
             self = .chatConfigChanged(try ChatConfigChangedAction(from: decoder))
+        case "chat/moved":
+            self = .chatMoved(try ChatMovedAction(from: decoder))
         case "chat/inputRequested":
             self = .chatInputRequested(try ChatInputRequestedAction(from: decoder))
         case "chat/inputAnswerChanged":
@@ -3001,6 +3029,7 @@ public enum StateAction: Codable, Sendable {
         case .chatIsReadChanged(let v): try v.encode(to: encoder)
         case .chatIsArchivedChanged(let v): try v.encode(to: encoder)
         case .chatConfigChanged(let v): try v.encode(to: encoder)
+        case .chatMoved(let v): try v.encode(to: encoder)
         case .chatInputRequested(let v): try v.encode(to: encoder)
         case .chatInputAnswerChanged(let v): try v.encode(to: encoder)
         case .chatInputCompleted(let v): try v.encode(to: encoder)

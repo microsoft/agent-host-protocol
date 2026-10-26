@@ -129,6 +129,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
 
+    public static readonly ActionType ChatMoved = new ActionType("chat/moved");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -2108,6 +2110,31 @@ public sealed record ChatConfigChangedAction
     public bool? Replace { get; init; }
 }
 
+/// <summary>The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | `provider`} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.</summary>
+public sealed record ChatMovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatMoved;
+
+    /// <summary>The new owning session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The chat's provider in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
+    /// <summary>The chat's config schema in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; init; }
+}
+
 /// <summary>A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2903,6 +2930,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
         ["chat/configChanged"] = typeof(ChatConfigChangedAction),
+        ["chat/moved"] = typeof(ChatMovedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),
