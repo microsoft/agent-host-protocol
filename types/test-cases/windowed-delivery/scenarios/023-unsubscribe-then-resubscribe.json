@@ -1,0 +1,186 @@
+{
+  "description": "After unsubscribe, releasing a delivery from the old subscription sends no credit. A new subscription on the same URI starts its counters at zero.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {},
+      "receive": "manual"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 4096,
+            "maximumFrameBytes": 1024
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "state": {
+              "title": "Shell",
+              "content": [],
+              "lifecycle": {
+                "status": "running"
+              },
+              "claim": {
+                "kind": "client",
+                "clientId": "client-1"
+              }
+            },
+            "fromSeq": 5
+          }
+        }
+      },
+      "expectBytes": 520
+    },
+    {
+      "op": "unsubscribe",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "unsubscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1"
+        }
+      }
+    },
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {},
+      "receive": "manual"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 4096,
+            "maximumFrameBytes": 1024
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "state": {
+              "title": "Shell",
+              "content": [],
+              "lifecycle": {
+                "status": "running"
+              },
+              "claim": {
+                "kind": "client",
+                "clientId": "client-1"
+              }
+            },
+            "fromSeq": 5
+          }
+        }
+      },
+      "expectBytes": 520
+    },
+    {
+      "op": "release",
+      "channel": "ahp-terminal:/t1",
+      "index": 0
+    },
+    {
+      "op": "expectNotSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1"
+        }
+      },
+      "withinMs": 150
+    },
+    {
+      "op": "release",
+      "channel": "ahp-terminal:/t1",
+      "index": 1
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 520
+        }
+      }
+    }
+  ]
+}

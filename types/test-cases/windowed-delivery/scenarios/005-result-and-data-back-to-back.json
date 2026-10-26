@@ -1,0 +1,109 @@
+{
+  "description": "The host sends the result, the snapshot and an action without waiting. The client must count both data messages.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {}
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 4096,
+            "maximumFrameBytes": 1024
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}"
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"Hello\\r\\n\"},\"serverSeq\":6}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "state": {
+              "title": "Shell",
+              "content": [],
+              "lifecycle": {
+                "status": "running"
+              },
+              "claim": {
+                "kind": "client",
+                "clientId": "client-1"
+              }
+            },
+            "fromSeq": 5
+          }
+        }
+      },
+      "expectBytes": 520
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "action",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "action": {
+            "type": "terminal/data",
+            "data": "Hello\r\n"
+          },
+          "serverSeq": 6
+        }
+      },
+      "expectBytes": 284
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 804
+        }
+      }
+    }
+  ]
+}

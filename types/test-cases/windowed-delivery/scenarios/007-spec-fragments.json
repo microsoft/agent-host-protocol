@@ -1,0 +1,138 @@
+{
+  "description": "The spec example: the 284-byte action arrives as fragments of 360 and 374 bytes. The non-final fragment is credited once stored; the joined message is not charged again.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {},
+      "receive": "auto"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          },
+          "hostReceive": {
+            "windowBytes": 512,
+            "maximumFrameBytes": 1024
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "state": {
+              "title": "Shell",
+              "content": [],
+              "lifecycle": {
+                "status": "running"
+              },
+              "claim": {
+                "kind": "client",
+                "clientId": "client-1"
+              }
+            },
+            "fromSeq": 5
+          }
+        }
+      },
+      "expectBytes": 520
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 520
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/frame\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"data\":\"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"method\\\":\\\"action\\\",\\\"params\\\":{\\\"channel\\\":\\\"ahp-terminal:/t1\\\",\"}}"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 880
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/frame\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"data\":\"\\\"action\\\":{\\\"type\\\":\\\"terminal/data\\\",\\\"data\\\":\\\"Hello\\\\r\\\\n\\\"},\\\"serverSeq\\\":6}}\",\"final\":true}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "action",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "action": {
+            "type": "terminal/data",
+            "data": "Hello\r\n"
+          },
+          "serverSeq": 6
+        }
+      },
+      "expectBytes": 734
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 1254
+        }
+      }
+    }
+  ]
+}

@@ -151,6 +151,12 @@ pub mod hosts;
 pub mod multi_host_state_mirror;
 pub mod reducers;
 pub mod transport;
+pub mod windowing;
+pub use windowing::{
+    ChannelSender, ClientBuilder, Coalescer, CoalescingContext, Delivery, Direction,
+    FlowControlEvent, FlowControlStatus, WindowError, WindowOptions, WindowTransportCapabilities,
+    WindowedSubscription, WindowingConfig,
+};
 
 pub use ahp_types;
 

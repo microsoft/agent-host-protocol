@@ -26,7 +26,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Weak,
 };
 use std::time::Duration;
 
@@ -45,8 +45,8 @@ use ahp_types::commands::{
 use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::errors::json_rpc_error_codes;
 use ahp_types::messages::{
-    ActionNotificationParams, JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage,
-    JsonRpcNotification, JsonRpcRequest, JsonRpcSuccessResponse, JsonRpcVersion,
+    JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest,
+    JsonRpcSuccessResponse, JsonRpcVersion,
 };
 use ahp_types::notifications::{
     AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
@@ -91,6 +91,16 @@ impl Default for ClientConfig {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum SubscriptionEvent {
+    /// Initial or replacement channel state.
+    Snapshot(ahp_types::state::Snapshot),
+    /// TCP bytes received.
+    TcpData(ahp_types::notifications::TcpDataParams),
+    /// TCP half-close received.
+    TcpEof(ahp_types::notifications::TcpEofParams),
+    /// TCP abort received.
+    TcpReset(ahp_types::notifications::TcpResetParams),
+    /// Future notification unknown to this SDK.
+    Other(JsonRpcNotification),
     /// A write-ahead action envelope for this subscription's channel.
     Action(ActionEnvelope),
     /// `root/sessionAdded`: a new session was created on the root channel.
@@ -189,7 +199,34 @@ pub struct DispatchHandle {
 
 type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
 
+struct ControlRate {
+    since: tokio::time::Instant,
+    count: usize,
+}
+impl ControlRate {
+    fn new() -> Self {
+        Self {
+            since: tokio::time::Instant::now(),
+            count: 0,
+        }
+    }
+    async fn wait(&mut self) {
+        let period = Duration::from_millis(5);
+        if self.since.elapsed() >= period {
+            self.since = tokio::time::Instant::now();
+            self.count = 0;
+        }
+        if self.count >= 64 {
+            tokio::time::sleep(period.saturating_sub(self.since.elapsed())).await;
+            self.since = tokio::time::Instant::now();
+            self.count = 0;
+        }
+        self.count += 1;
+    }
+}
+
 struct Shared {
+    windowing: crate::windowing::Engine,
     pending: Mutex<PendingMap>,
     subscriptions: Mutex<HashMap<String, broadcast::Sender<SubscriptionEvent>>>,
     /// Top-level all-events broadcast.
@@ -211,7 +248,45 @@ struct Shared {
 
 enum Outbound {
     Message(JsonRpcMessage),
+    Request(JsonRpcMessage, bool),
+    AwaitedMessage(
+        JsonRpcMessage,
+        oneshot::Sender<Result<(), crate::WindowError>>,
+    ),
     Shutdown,
+}
+
+struct RequestGuard {
+    shared: Arc<Shared>,
+    id: u64,
+    armed: bool,
+}
+impl Drop for RequestGuard {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        self.shared.windowing.expire_request(self.id);
+        if let Ok(mut pending) = self.shared.pending.try_lock() {
+            pending.remove(&self.id);
+        } else if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            let shared = self.shared.clone();
+            let id = self.id;
+            runtime.spawn(async move {
+                shared.pending.lock().await.remove(&id);
+            });
+        }
+    }
+}
+
+struct AcquiringSubscription {
+    channel: Arc<crate::windowing::Channel>,
+    client: Client,
+}
+impl Drop for AcquiringSubscription {
+    fn drop(&mut self) {
+        self.channel.end_acquisition(self.client.clone());
+    }
 }
 
 // ─── Server-initiated request handling ───────────────────────────────────────
@@ -356,6 +431,19 @@ struct DriveHandle {
     handle: Mutex<Option<JoinHandle<()>>>,
 }
 
+pub(crate) struct ClientBinding {
+    shared: Weak<Shared>,
+    reader: Weak<DriveHandle>,
+}
+impl ClientBinding {
+    pub(crate) fn upgrade(&self) -> Option<Client> {
+        Some(Client {
+            shared: self.shared.upgrade()?,
+            _reader: self.reader.upgrade()?,
+        })
+    }
+}
+
 impl Drop for DriveHandle {
     fn drop(&mut self) {
         if let Ok(mut guard) = self.handle.try_lock() {
@@ -367,15 +455,33 @@ impl Drop for DriveHandle {
 }
 
 impl Client {
+    /// Configure a client without changing public ClientConfig struct literals.
+    pub fn builder() -> crate::ClientBuilder {
+        crate::ClientBuilder::default()
+    }
     /// Connect a client to the given transport. Spawns a background task
     /// that drives the transport until shutdown.
     pub async fn connect<T: Transport>(
         transport: T,
         config: ClientConfig,
     ) -> Result<Self, ClientError> {
+        Self::connect_configured(transport, config, crate::WindowingConfig::default()).await
+    }
+
+    pub(crate) async fn connect_configured<T: Transport>(
+        transport: T,
+        config: ClientConfig,
+        windowing: crate::WindowingConfig,
+    ) -> Result<Self, ClientError> {
+        let capabilities = transport.window_capabilities();
         let (outbound_tx, outbound_rx) = mpsc::channel::<Outbound>(64);
         let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
         let shared = Arc::new(Shared {
+            windowing: crate::windowing::Engine::new(
+                windowing,
+                capabilities,
+                config.subscription_buffer,
+            ),
             pending: Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
             all_events: std::sync::Mutex::new(Some(all_events_tx)),
@@ -398,16 +504,26 @@ impl Client {
     /// Gracefully shut down the client, aborting any in-flight requests
     /// with [`ClientError::Shutdown`].
     pub async fn shutdown(&self) {
-        let _ = self.shared.outbound.send(Outbound::Shutdown).await;
-        // Fail any pending in-flight requests.
-        let mut pending = self.shared.pending.lock().await;
-        for (_, tx) in pending.drain() {
-            let _ = tx.send(Err(JsonRpcError {
-                code: -32000,
-                message: "client shut down".into(),
-                data: None,
-            }));
+        self.shared.windowing.close(None);
+        let must_abort = tokio::time::timeout(
+            Duration::from_secs(10),
+            self.shared.outbound.send(Outbound::Shutdown),
+        )
+        .await
+        .is_err();
+        if let Some(mut reader) = self._reader.handle.lock().await.take() {
+            if must_abort {
+                reader.abort();
+            }
+            if tokio::time::timeout(Duration::from_secs(10), &mut reader)
+                .await
+                .is_err()
+            {
+                reader.abort();
+                let _ = reader.await;
+            }
         }
+        teardown(&self.shared, None).await;
     }
 
     /// Send a JSON-RPC request and await its result.
@@ -416,8 +532,48 @@ impl Client {
         P: Serialize,
         R: DeserializeOwned,
     {
+        self.request_inner(method, params, None).await
+    }
+
+    async fn request_inner<P: Serialize, R: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: P,
+        options: Option<(crate::WindowOptions, Arc<crate::windowing::Channel>)>,
+    ) -> Result<R, ClientError> {
+        if self.shared.outbound.is_closed() {
+            return Err(ClientError::Shutdown);
+        }
         let id = self.shared.next_id.fetch_add(1, Ordering::Relaxed);
-        let params_val = serde_json::to_value(&params)?;
+        let mut params_val = serde_json::to_value(&params)?;
+        let expected = options.as_ref().map(|(_, channel)| channel.clone());
+        let registration = if let Some((options, channel)) = options {
+            self.shared
+                .windowing
+                .register_owned(id, &channel, options, &params_val)
+        } else {
+            self.shared
+                .windowing
+                .register_request(id, method, &mut params_val)
+        };
+        if let Err(error) = registration {
+            if let Some(channel) = expected.or_else(|| {
+                params_val["channel"]
+                    .as_str()
+                    .and_then(|uri| self.shared.windowing.subscription(uri))
+            }) {
+                self.shared.windowing.cleanup_unaccepted(&channel);
+            }
+            return Err(ClientError::Transport(crate::TransportError::Protocol(
+                error.to_string(),
+            )));
+        }
+        let mut guard = RequestGuard {
+            shared: self.shared.clone(),
+            id,
+            armed: true,
+        };
+        let tracked = self.shared.windowing.has_request(id);
         let params_any = if params_val.is_null() {
             None
         } else {
@@ -439,7 +595,7 @@ impl Client {
         if self
             .shared
             .outbound
-            .send(Outbound::Message(req))
+            .send(Outbound::Request(req, tracked))
             .await
             .is_err()
         {
@@ -451,13 +607,13 @@ impl Client {
             Some(dur) => match tokio::time::timeout(dur, rx).await {
                 Ok(r) => r,
                 Err(_) => {
-                    self.shared.pending.lock().await.remove(&id);
                     return Err(ClientError::Cancelled);
                 }
             },
             None => rx.await,
         };
 
+        guard.armed = false;
         match result {
             Ok(Ok(value)) => Ok(serde_json::from_value(value)?),
             Ok(Err(e)) => Err(ClientError::Rpc(e)),
@@ -467,17 +623,40 @@ impl Client {
 
     /// Send a JSON-RPC notification (fire-and-forget).
     pub async fn notify<P: Serialize>(&self, method: &str, params: P) -> Result<(), ClientError> {
+        if self.shared.outbound.is_closed() {
+            return Err(ClientError::Shutdown);
+        }
         let params_val = serde_json::to_value(&params)?;
         let params_any = if params_val.is_null() {
             None
         } else {
             Some(ahp_types::common::AnyValue::from(params_val))
         };
-        let msg = JsonRpcMessage::Notification(JsonRpcNotification {
+        let notification = JsonRpcNotification {
             jsonrpc: JsonRpcVersion::V2,
             method: method.into(),
             params: params_any,
-        });
+        };
+        if !ahp_types::notifications::counts_against_window(method)
+            && self.shared.windowing.has_windowed()
+            && crate::windowing::utf16_bytes(&serde_json::to_string(&notification)?)
+                > crate::windowing::MAX_CONTROL_BYTES
+        {
+            return Err(ClientError::Transport(crate::TransportError::Protocol(
+                "control message exceeds size limit".into(),
+            )));
+        }
+        if self.is_window_notification(&notification) {
+            return self
+                .shared
+                .windowing
+                .enqueue(notification, None)
+                .await
+                .map_err(|e| {
+                    ClientError::Transport(crate::TransportError::Protocol(e.to_string()))
+                });
+        }
+        let msg = JsonRpcMessage::Notification(notification);
         self.shared
             .outbound
             .send(Outbound::Message(msg))
@@ -614,12 +793,68 @@ impl Client {
     /// this URI. In-flight [`SessionSubscription`] handles will see the
     /// channel close.
     pub async fn unsubscribe(&self, uri: String) -> Result<(), ClientError> {
-        {
-            let mut subs = self.shared.subscriptions.lock().await;
-            subs.remove(&uri);
+        self.unsubscribe_impl(&uri, None).await
+    }
+
+    pub(crate) async fn unsubscribe_if_current(
+        &self,
+        uri: &str,
+        expected: &Arc<crate::windowing::Channel>,
+    ) -> Result<(), ClientError> {
+        self.unsubscribe_impl(uri, Some(expected)).await
+    }
+
+    async fn unsubscribe_impl(
+        &self,
+        uri: &str,
+        expected: Option<&Arc<crate::windowing::Channel>>,
+    ) -> Result<(), ClientError> {
+        let mut client = self.clone();
+        loop {
+            if let Some(current) = expected.and_then(|channel| {
+                channel
+                    .binding
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .as_ref()
+                    .and_then(ClientBinding::upgrade)
+            }) {
+                client = current;
+            }
+            let sender = client.shared.outbound.clone();
+            let permit = sender.reserve().await.ok();
+            if let Some(current) = expected.and_then(|channel| {
+                channel
+                    .binding
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .as_ref()
+                    .and_then(ClientBinding::upgrade)
+            }) {
+                if !Arc::ptr_eq(&current.shared, &client.shared) {
+                    drop(permit);
+                    client = current;
+                    continue;
+                }
+            }
+            let message = JsonRpcMessage::Notification(JsonRpcNotification {
+                jsonrpc: JsonRpcVersion::V2,
+                method: "unsubscribe".into(),
+                params: Some(serde_json::to_value(UnsubscribeParams {
+                    channel: uri.into(),
+                })?),
+            });
+            let removed = client.shared.windowing.remove_and(uri, expected, || {
+                if let Some(permit) = permit {
+                    permit.send(Outbound::Message(message));
+                }
+            });
+            if removed {
+                client.shared.subscriptions.lock().await.remove(uri);
+            }
+            break;
         }
-        self.notify("unsubscribe", UnsubscribeParams { channel: uri })
-            .await
+        Ok(())
     }
 
     /// Subscribe to a top-level stream of every inbound event from this
@@ -669,6 +904,215 @@ impl Client {
                 client_seq,
                 action,
             },
+        )
+        .await?;
+        Ok(DispatchHandle { client_seq })
+    }
+
+    /// Subscribe with consumer-driven window credit. A second call updates the same queue.
+    pub async fn subscribe_windowed(
+        &self,
+        uri: impl Into<String>,
+        options: crate::WindowOptions,
+    ) -> Result<(SubscribeResult, crate::WindowedSubscription), crate::WindowError> {
+        if self.shared.outbound.is_closed() {
+            return Err(crate::WindowError::new("connection closed"));
+        }
+        let uri = uri.into();
+        let offer = self.shared.windowing.prepare(&uri, options.clone())?;
+        let channel = self
+            .shared
+            .windowing
+            .subscription(&uri)
+            .ok_or_else(|| crate::WindowError::new("subscription cancelled"))?;
+        channel.begin_acquisition();
+        let _acquiring = AcquiringSubscription {
+            channel: channel.clone(),
+            client: self.clone(),
+        };
+        if uri.starts_with("ahp-tcp:") && offer.is_none() {
+            self.shared.windowing.cleanup_unaccepted(&channel);
+            return Err(crate::WindowError::new("TCP requires raw-text transport"));
+        }
+        let result = self
+            .request_inner(
+                "subscribe",
+                SubscribeParams {
+                    channel: uri.clone(),
+                    meta: None,
+                    delivery: None,
+                    view: None,
+                    flow_control: offer.map(|receive| {
+                        ahp_types::commands::SubscriptionFlowControlOptions { receive }
+                    }),
+                },
+                Some((options, channel.clone())),
+            )
+            .await;
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                self.shared.windowing.cleanup_unaccepted(&channel);
+                return Err(error.into());
+            }
+        };
+        if !self
+            .shared
+            .windowing
+            .subscription(&uri)
+            .is_some_and(|current| Arc::ptr_eq(&current, &channel))
+        {
+            return Err(crate::WindowError::new("subscription cancelled"));
+        }
+        *channel.binding.lock().unwrap_or_else(|e| e.into_inner()) = Some(self.binding());
+        Ok((
+            result,
+            crate::WindowedSubscription::new(channel, self.clone()),
+        ))
+    }
+
+    fn binding(&self) -> ClientBinding {
+        ClientBinding {
+            shared: Arc::downgrade(&self.shared),
+            reader: Arc::downgrade(&self._reader),
+        }
+    }
+
+    /// Obtain the owning queue after an advanced raw subscribe request.
+    ///
+    /// Handles for the same URI share one queue, rather than duplicating credit.
+    pub fn windowed_subscription(
+        &self,
+        uri: &str,
+    ) -> Result<crate::WindowedSubscription, crate::WindowError> {
+        if self.shared.outbound.is_closed() {
+            return Err(crate::WindowError::new("connection closed"));
+        }
+        let channel = self
+            .shared
+            .windowing
+            .subscription(uri)
+            .ok_or_else(|| crate::WindowError::new("unknown window subscription"))?;
+        *channel.binding.lock().unwrap_or_else(|e| e.into_inner()) = Some(self.binding());
+        Ok(crate::WindowedSubscription::new(channel, self.clone()))
+    }
+
+    pub(crate) fn managed_channels(&self) -> Vec<Arc<crate::windowing::Channel>> {
+        self.shared.windowing.managed_channels()
+    }
+
+    pub(crate) fn restore_channels(
+        &self,
+        channels: &[Arc<crate::windowing::Channel>],
+    ) -> Result<(), crate::WindowError> {
+        for channel in channels {
+            if channel.dropped() || channel.unowned_drop() {
+                continue;
+            }
+            self.shared.windowing.adopt(channel.clone())?;
+            *channel.binding.lock().unwrap_or_else(|e| e.into_inner()) = Some(self.binding());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn fail_subscription(
+        &self,
+        channel: &Arc<crate::windowing::Channel>,
+        error: crate::WindowError,
+    ) {
+        self.shared.windowing.fail_subscription(channel, error);
+    }
+
+    pub(crate) fn is_connected(&self) -> bool {
+        !self.shared.outbound.is_closed()
+    }
+
+    pub(crate) fn resume_windows(
+        &self,
+    ) -> Option<ahp_types::commands::ChannelDeliveryResumeOptions> {
+        self.shared.windowing.resume_windows()
+    }
+
+    /// Observe lossy connection flow-control telemetry without releasing credit.
+    pub fn flow_control_events(&self) -> broadcast::Receiver<crate::FlowControlEvent> {
+        self.shared.windowing.events.subscribe()
+    }
+
+    /// Reconnect with explicit generated window resume parameters.
+    pub async fn reconnect_with_windows(
+        &self,
+        params: ReconnectParams,
+    ) -> Result<ReconnectResult, crate::WindowError> {
+        Ok(self.request("reconnect", params).await?)
+    }
+
+    fn is_window_notification(&self, n: &JsonRpcNotification) -> bool {
+        ahp_types::notifications::counts_against_window(&n.method)
+            && n.params
+                .as_ref()
+                .and_then(|p| p["channel"].as_str())
+                .is_some_and(|uri| self.shared.windowing.subscription(uri).is_some())
+    }
+
+    pub(crate) async fn window_send(
+        &self,
+        method: &str,
+        params: Value,
+    ) -> Result<(), crate::WindowError> {
+        if self.shared.outbound.is_closed() {
+            return Err(crate::WindowError::new("connection closed"));
+        }
+        let notification = JsonRpcNotification {
+            jsonrpc: JsonRpcVersion::V2,
+            method: method.into(),
+            params: Some(params),
+        };
+        if !self.is_window_notification(&notification) {
+            if crate::windowing::utf16_bytes(
+                &serde_json::to_string(&notification)
+                    .map_err(|e| crate::WindowError::new(e.to_string()))?,
+            ) > crate::windowing::MAX_CONTROL_BYTES
+            {
+                return Err(crate::WindowError::new(
+                    "control message exceeds size limit",
+                ));
+            }
+            let (tx, rx) = oneshot::channel();
+            self.shared
+                .outbound
+                .send(Outbound::AwaitedMessage(
+                    JsonRpcMessage::Notification(notification),
+                    tx,
+                ))
+                .await
+                .map_err(|_| crate::WindowError::new("connection closed"))?;
+            return rx
+                .await
+                .map_err(|_| crate::WindowError::new("connection closed"))?;
+        }
+        let (tx, rx) = oneshot::channel();
+        self.shared
+            .windowing
+            .enqueue(notification, Some(tx))
+            .await?;
+        rx.await
+            .map_err(|_| crate::WindowError::new("connection closed"))?
+    }
+
+    pub(crate) async fn window_dispatch(
+        &self,
+        channel: String,
+        action: StateAction,
+    ) -> Result<DispatchHandle, crate::WindowError> {
+        let client_seq = self.shared.next_client_seq.fetch_add(1, Ordering::Relaxed) as i64;
+        self.window_send(
+            "dispatchAction",
+            serde_json::to_value(DispatchActionParams {
+                channel,
+                client_seq,
+                action,
+            })
+            .map_err(|e| crate::WindowError::new(e.to_string()))?,
         )
         .await?;
         Ok(DispatchHandle { client_seq })
@@ -844,11 +1288,32 @@ async fn drive_transport<T: Transport>(
     shared: Arc<Shared>,
     mut outbound: mpsc::Receiver<Outbound>,
 ) {
+    let mut tick = tokio::time::interval(Duration::from_millis(5));
+    let mut failure = None;
+    let mut send_controls = ControlRate::new();
+    let mut receive_controls = ControlRate::new();
     loop {
         tokio::select! {
             outbound_msg = outbound.recv() => {
                 match outbound_msg {
-                    Some(Outbound::Message(msg)) => {
+                    Some(outbound @ (Outbound::Message(_) | Outbound::Request(..))) => {
+                        let (msg, tracked) = match outbound {
+                            Outbound::Message(message) => (message, false),
+                            Outbound::Request(message, tracked) => (message, tracked),
+                            _ => unreachable!(),
+                        };
+                        if let JsonRpcMessage::Request(request) = &msg {
+                            let pending = shared.pending.lock().await;
+                            if pending.get(&request.id).map_or(true, oneshot::Sender::is_closed) {
+                                shared.windowing.failed_request(request.id);
+                                continue;
+                            }
+                            if tracked && !shared.windowing.request_sent(request.id) {
+                                continue;
+                            }
+                        }
+                        if matches!(&msg, JsonRpcMessage::Notification(n) if !ahp_types::notifications::counts_against_window(&n.method))
+                            && shared.windowing.has_windowed() { send_controls.wait().await; }
                         if let Ok(wire) = TransportMessage::encode(&msg) {
                             if let Err(err) = transport.send(wire).await {
                                 tracing::warn!(?err, "transport send failed");
@@ -860,14 +1325,77 @@ async fn drive_transport<T: Transport>(
                         let _ = transport.close().await;
                         break;
                     }
+                    Some(Outbound::AwaitedMessage(msg, completion)) => {
+                        if completion.is_closed() { continue; }
+                        send_controls.wait().await;
+                        let result = match TransportMessage::encode(&msg) {
+                            Ok(wire) => transport.send(wire).await.map_err(|e| crate::WindowError::new(e.to_string())),
+                            Err(error) => Err(crate::WindowError::new(error.to_string())),
+                        };
+                        let _ = completion.send(result.clone());
+                        if let Err(error) = result {
+                            failure = Some(error); let _ = transport.close().await; break;
+                        }
+                    }
                 }
             }
             inbound = transport.recv() => {
                 match inbound {
                     Ok(Some(wire)) => {
-                        match wire.into_parsed() {
-                            Ok(msg) => dispatch_inbound(&shared, msg).await,
-                            Err(err) => tracing::warn!(?err, "malformed frame"),
+                        let (size, parsed) = match wire {
+                            TransportMessage::Text(text) => (Some(crate::windowing::utf16_bytes(&text)),
+                                serde_json::from_str(&text).map_err(|error| crate::TransportError::Protocol(error.to_string()))),
+                            TransportMessage::Binary(bytes) => match std::str::from_utf8(&bytes) {
+                                Ok(text) => (Some(crate::windowing::utf16_bytes(text)),
+                                    serde_json::from_str(text).map_err(|error| crate::TransportError::Protocol(error.to_string()))),
+                                Err(error) => (None, Err(crate::TransportError::Protocol(error.to_string()))),
+                            },
+                            TransportMessage::Parsed(message) => (None, Ok(message)),
+                        };
+                        match parsed {
+                            Ok(msg) => {
+                                let result = match msg {
+                                    JsonRpcMessage::Notification(notification) => {
+                                        if !ahp_types::notifications::counts_against_window(&notification.method) && shared.windowing.has_windowed() {
+                                            receive_controls.wait().await;
+                                        }
+                                        shared.windowing.inbound(notification, size).map(|n| n.map(JsonRpcMessage::Notification))
+                                    },
+                                    JsonRpcMessage::SuccessResponse(response) => {
+                                        match shared.windowing.response(response.id, &response.result) {
+                                            Ok(cleanup) => {
+                                                for uri in cleanup {
+                                                    let text = serde_json::json!({"jsonrpc":"2.0","method":"unsubscribe","params":{"channel":uri}}).to_string();
+                                                    if let Err(error) = transport.send(TransportMessage::Text(text)).await {
+                                                        failure = Some(crate::WindowError::new(error.to_string()));
+                                                        break;
+                                                    }
+                                                }
+                                                Ok(Some(JsonRpcMessage::SuccessResponse(response)))
+                                            }
+                                            Err(error) => Err(error),
+                                        }
+                                    },
+                                    JsonRpcMessage::ErrorResponse(response) => {
+                                        shared.windowing.failed_request(response.id);
+                                        Ok(Some(JsonRpcMessage::ErrorResponse(response)))
+                                    }
+                                    other => Ok(Some(other)),
+                                };
+                                match result {
+                                    Ok(Some(msg)) => dispatch_inbound(&shared, msg).await,
+                                    Ok(None) => {},
+                                    Err(error) => { failure = Some(error); let _ = transport.close().await; break; }
+                                }
+                            }
+                            Err(err) => {
+                                if shared.windowing.has_windowed() {
+                                    failure = Some(crate::WindowError::new(err.to_string()));
+                                    let _ = transport.close().await;
+                                    break;
+                                }
+                                tracing::warn!(?err, "malformed frame");
+                            }
                         }
                     }
                     Ok(None) => break,
@@ -877,10 +1405,38 @@ async fn drive_transport<T: Transport>(
                     }
                 }
             }
+            _ = shared.windowing.wake.notified() => {
+                match shared.windowing.next_send() {
+                    Ok(Some(send)) => {
+                        if send.control { send_controls.wait().await; }
+                        if !send.is_live() {
+                            send.complete(Err(crate::WindowError::new("subscription closed")));
+                            continue;
+                        }
+                        let result = tokio::time::timeout(Duration::from_secs(10), transport.send(TransportMessage::Text(send.text.clone()))).await;
+                        match result {
+                            Ok(Ok(())) => send.complete(Ok(())),
+                            other => {
+                                let error = crate::WindowError::new(format!("windowed transport send failed: {other:?}"));
+                                send.complete(Err(error.clone()));
+                                failure = Some(error); let _ = transport.close().await; break;
+                            }
+                        }
+                        shared.windowing.wake.notify_one();
+                    }
+                    Ok(None) => {},
+                    Err(error) => { failure = Some(error); let _ = transport.close().await; break; }
+                }
+            }
+            _ = tick.tick(), if shared.windowing.has_subscriptions() => { shared.windowing.wake.notify_one(); }
         }
     }
 
-    // Teardown: close everything so waiters see Shutdown.
+    teardown(&shared, failure).await;
+}
+
+async fn teardown(shared: &Shared, failure: Option<crate::WindowError>) {
+    shared.windowing.close(failure);
     let mut pending = shared.pending.lock().await;
     for (_, tx) in pending.drain() {
         let _ = tx.send(Err(JsonRpcError {
@@ -960,47 +1516,64 @@ async fn handle_server_request(shared: &Shared, req: JsonRpcRequest) {
 }
 
 async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
-    let params_val: Value = n.params.unwrap_or(Value::Null);
+    let tracked = n
+        .params
+        .as_ref()
+        .and_then(|params| params["channel"].as_str())
+        .is_some_and(|uri| shared.windowing.subscription(uri).is_some());
+    if !tracked
+        && !matches!(
+            n.method.as_str(),
+            "action"
+                | "root/sessionAdded"
+                | "root/sessionRemoved"
+                | "root/sessionSummaryChanged"
+                | "auth/required"
+        )
+    {
+        return;
+    }
+    if let Ok(event) = decode_notification(n.clone()) {
+        if let Some(channel) = n.params.as_ref().and_then(|p| p["channel"].as_str()) {
+            fan_out(shared, &channel.to_string(), event).await;
+        }
+    }
+}
 
+pub(crate) fn decode_notification(n: JsonRpcNotification) -> Result<SubscriptionEvent, String> {
+    let value = n.params.clone().unwrap_or(Value::Null);
+    let decode = |error: serde_json::Error| error.to_string();
     match n.method.as_str() {
-        "action" => {
-            if let Ok(envelope) = serde_json::from_value::<ActionNotificationParams>(params_val) {
-                let channel = envelope.channel.clone();
-                fan_out(shared, &channel, SubscriptionEvent::Action(envelope)).await;
-            }
+        "channel/snapshot" => {
+            serde_json::from_value::<ahp_types::notifications::ChannelSnapshotParams>(value)
+                .map(|p| SubscriptionEvent::Snapshot(p.snapshot))
+                .map_err(decode)
         }
-        "root/sessionAdded" => {
-            if let Ok(params) = serde_json::from_value::<SessionAddedParams>(params_val) {
-                let channel = params.channel.clone();
-                fan_out(shared, &channel, SubscriptionEvent::SessionAdded(params)).await;
-            }
-        }
-        "root/sessionRemoved" => {
-            if let Ok(params) = serde_json::from_value::<SessionRemovedParams>(params_val) {
-                let channel = params.channel.clone();
-                fan_out(shared, &channel, SubscriptionEvent::SessionRemoved(params)).await;
-            }
-        }
-        "root/sessionSummaryChanged" => {
-            if let Ok(params) = serde_json::from_value::<SessionSummaryChangedParams>(params_val) {
-                let channel = params.channel.clone();
-                fan_out(
-                    shared,
-                    &channel,
-                    SubscriptionEvent::SessionSummaryChanged(params),
-                )
-                .await;
-            }
-        }
-        "auth/required" => {
-            if let Ok(params) = serde_json::from_value::<AuthRequiredParams>(params_val) {
-                let channel = params.channel.clone();
-                fan_out(shared, &channel, SubscriptionEvent::AuthRequired(params)).await;
-            }
-        }
-        other => {
-            tracing::debug!(method = %other, "unhandled notification");
-        }
+        "tcp/data" => serde_json::from_value(value)
+            .map(SubscriptionEvent::TcpData)
+            .map_err(decode),
+        "tcp/eof" => serde_json::from_value(value)
+            .map(SubscriptionEvent::TcpEof)
+            .map_err(decode),
+        "tcp/reset" => serde_json::from_value(value)
+            .map(SubscriptionEvent::TcpReset)
+            .map_err(decode),
+        "action" => serde_json::from_value(value)
+            .map(SubscriptionEvent::Action)
+            .map_err(decode),
+        "root/sessionAdded" => serde_json::from_value(value)
+            .map(SubscriptionEvent::SessionAdded)
+            .map_err(decode),
+        "root/sessionRemoved" => serde_json::from_value(value)
+            .map(SubscriptionEvent::SessionRemoved)
+            .map_err(decode),
+        "root/sessionSummaryChanged" => serde_json::from_value(value)
+            .map(SubscriptionEvent::SessionSummaryChanged)
+            .map_err(decode),
+        "auth/required" => serde_json::from_value(value)
+            .map(SubscriptionEvent::AuthRequired)
+            .map_err(decode),
+        _ => Ok(SubscriptionEvent::Other(n)),
     }
 }
 

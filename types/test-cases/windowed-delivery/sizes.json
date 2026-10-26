@@ -1,0 +1,77 @@
+{
+  "description": "Raw JSON texts and their size in UTF-16 bytes (2 bytes per UTF-16 code unit of the text exactly as received).",
+  "cases": [
+    {
+      "name": "ascii",
+      "text": "{\"a\":\"A\"}",
+      "utf16Bytes": 18,
+      "utf8Bytes": 9
+    },
+    {
+      "name": "whitespace and member order are measured as received",
+      "text": "{ \"b\" : 1,\n  \"a\" : [ ] }",
+      "utf16Bytes": 48,
+      "utf8Bytes": 24
+    },
+    {
+      "name": "latin-1 é is one code unit",
+      "text": "{\"t\":\"é\"}",
+      "utf16Bytes": 18,
+      "utf8Bytes": 10
+    },
+    {
+      "name": "escaped é counts its escape text",
+      "text": "{\"t\":\"\\u00e9\"}",
+      "utf16Bytes": 28,
+      "utf8Bytes": 14
+    },
+    {
+      "name": "CJK is one code unit per character",
+      "text": "{\"t\":\"漢字\"}",
+      "utf16Bytes": 20,
+      "utf8Bytes": 14
+    },
+    {
+      "name": "emoji is a surrogate pair",
+      "text": "{\"t\":\"😀\"}",
+      "utf16Bytes": 20,
+      "utf8Bytes": 12
+    },
+    {
+      "name": "escaped surrogate pair",
+      "text": "{\"t\":\"\\ud83d\\ude00\"}",
+      "utf16Bytes": 40,
+      "utf8Bytes": 20
+    },
+    {
+      "name": "escaped control characters",
+      "text": "{\"t\":\"a\\r\\n\\t\\\"\\\\b\"}",
+      "utf16Bytes": 40,
+      "utf8Bytes": 20
+    },
+    {
+      "name": "spec snapshot example",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}",
+      "utf16Bytes": 520,
+      "utf8Bytes": 260
+    },
+    {
+      "name": "spec action example",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"Hello\\r\\n\"},\"serverSeq\":6}}",
+      "utf16Bytes": 284,
+      "utf8Bytes": 142
+    },
+    {
+      "name": "spec first fragment",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/frame\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"data\":\"{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"method\\\":\\\"action\\\",\\\"params\\\":{\\\"channel\\\":\\\"ahp-terminal:/t1\\\",\"}}",
+      "utf16Bytes": 360,
+      "utf8Bytes": 180
+    },
+    {
+      "name": "spec last fragment",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/frame\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"data\":\"\\\"action\\\":{\\\"type\\\":\\\"terminal/data\\\",\\\"data\\\":\\\"Hello\\\\r\\\\n\\\"},\\\"serverSeq\\\":6}}\",\"final\":true}}",
+      "utf16Bytes": 374,
+      "utf8Bytes": 187
+    }
+  ]
+}

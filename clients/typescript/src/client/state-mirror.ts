@@ -37,12 +37,27 @@ import { terminalReducer } from '../types/channels-terminal/reducer.js';
 import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
 import { isCanvasState } from './canvas-state.js';
+import type { ReceivedDelivery } from './events.js';
 
 const ROOT_URI = 'ahp-root://' as const;
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
 
 const INITIAL_ROOT: RootState = { agents: [] };
 const INITIAL_AUTOMATION_CATALOG: AutomationState = { entries: [] };
+
+/** Guards the new ingestion surface without changing legacy applySnapshot behavior. @internal */
+export function isKnownSnapshot(snapshot: Snapshot): boolean {
+  const state = snapshot.state as unknown as Record<string, unknown>;
+  if (!state || typeof state !== 'object') return false;
+  if (snapshot.resource === ROOT_URI) return Array.isArray(state.agents);
+  if (snapshot.resource.startsWith('ahp-session:')) return typeof state.provider === 'string' && Array.isArray(state.chats);
+  if (snapshot.resource.startsWith('ahp-terminal:')) return Array.isArray(state.content) && typeof state.title === 'string';
+  if (snapshot.resource.startsWith('ahp-canvas:')) return isCanvasState(snapshot.state);
+  if (snapshot.resource === AUTOMATIONS_URI) return Array.isArray(state.entries);
+  if (snapshot.resource.startsWith('ahp-changeset:')) return Array.isArray(state.files) && typeof state.status === 'string';
+  if (snapshot.resource.startsWith('ahp-automation-run:')) return Array.isArray(state.sessions) && typeof state.automation === 'string';
+  return false;
+}
 
 /** Reducer-driven state container synchronised with server events. */
 export class AhpStateMirror {
@@ -54,6 +69,15 @@ export class AhpStateMirror {
   private automationCatalogState: AutomationState = INITIAL_AUTOMATION_CATALOG;
   private readonly automationsMap = new Map<URI, AutomationEntry>();
   private readonly automationRunsMap = new Map<URI, AutomationRunState>();
+
+  /** Apply a typed delivery before releasing its credit. Unknown snapshot state is ignored. */
+  applyDelivery(delivery: ReceivedDelivery): void {
+    const event = delivery.event;
+    if (event.type === 'snapshot') {
+      if (isKnownSnapshot(event.params.snapshot)) this.applySnapshot(event.params.snapshot);
+    } else if (event.type === 'action') this.apply(event.params);
+    delivery.release();
+  }
 
   /** Current root state. */
   get root(): RootState {

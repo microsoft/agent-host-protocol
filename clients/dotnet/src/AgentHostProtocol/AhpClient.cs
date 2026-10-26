@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
@@ -72,6 +73,8 @@ public sealed class KeepAlivePolicy
 /// <summary>Tuning knobs for an <see cref="AhpClient"/>.</summary>
 public sealed class ClientConfig
 {
+    /// <summary>Defaults for subscriptions explicitly opting into windowed delivery.</summary>
+    public WindowingConfig Windowing { get; set; } = new();
     /// <summary>
     /// How long <see cref="AhpClient.RequestAsync{TParams,TResult}"/> waits for a
     /// response. Zero disables the timeout. Defaults to 30 seconds.
@@ -112,6 +115,7 @@ public sealed class ClientConfig
                 ? source.SubscriptionBufferCapacity
                 : 256,
             KeepAlive = source.KeepAlive ?? KeepAlivePolicy.Disabled,
+            Windowing = (source.Windowing ?? new WindowingConfig()).Snapshot(),
         };
     }
 }
@@ -156,7 +160,7 @@ public delegate Task<object?> ServerRequestHandler(string method, JsonElement? p
 /// All public methods are safe to call from multiple threads.
 /// </para>
 /// </summary>
-public sealed class AhpClient : IAhpClient
+public sealed partial class AhpClient : IWindowedAhpClient
 {
     // ── State that lives for the client lifetime ──────────────────────────
 
@@ -240,6 +244,7 @@ public sealed class AhpClient : IAhpClient
 
     // Lifecycle
     private readonly TaskCompletionSource<bool> _doneTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> _teardownTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _lifetimeCts = new();
     private int _shutdownStarted;  // 0 = running, 1 = shut down
     private Exception? _closeErr;
@@ -254,6 +259,8 @@ public sealed class AhpClient : IAhpClient
         public JsonRpcMessage Message { get; }
         public TaskCompletionSource<bool>? Sent { get; }
         public CancellationToken CancellationToken { get; }
+        public bool IsBarrier { get; init; }
+        public WindowResponse? WindowRequest { get; init; }
 
         public OutboundMessage(
             JsonRpcMessage message,
@@ -329,9 +336,24 @@ public sealed class AhpClient : IAhpClient
     /// </summary>
     public async Task ShutdownAsync(CancellationToken cancellationToken = default)
     {
-        await ShutdownWithErrorAsync(null).ConfigureAwait(false);
+        try
+        {
+            if (Volatile.Read(ref _shutdownStarted) == 0)
+                await DrainOutboundAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested) { }
+        finally { await ShutdownWithErrorAsync(null).ConfigureAwait(false); }
+        await _teardownTcs.Task.ConfigureAwait(false);
         // Wait for both background tasks to exit.
         await Task.WhenAll(_readerTask, _writerTask).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // An uninstalled connection attempt has no application sends to drain.
+    internal async Task AbortAsync()
+    {
+        await ShutdownWithErrorAsync(null).ConfigureAwait(false);
+        await _teardownTcs.Task.ConfigureAwait(false);
+        await Task.WhenAll(_readerTask, _writerTask).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -360,6 +382,7 @@ public sealed class AhpClient : IAhpClient
 
         Volatile.Write(ref _closeErr, cause);
         _lifetimeCts.Cancel();
+        EndWindows(cause);
 
         // Signal the done task so Done-waiters unblock.
         _doneTcs.TrySetResult(true);
@@ -400,6 +423,7 @@ public sealed class AhpClient : IAhpClient
         var shutdownEx = cause is null
             ? new AhpClientClosedException()
             : new AhpClientClosedException($"ahp: client shut down: {cause.Message}");
+        while (_outbound.Reader.TryRead(out var queued)) queued.Sent?.TrySetException(shutdownEx);
 
         foreach (var kv in _pending)
         {
@@ -439,6 +463,17 @@ public sealed class AhpClient : IAhpClient
             _stateListeners.Clear();
         }
         foreach (var st in allStateListeners) st.Close();
+        _teardownTcs.TrySetResult(true);
+    }
+
+    private async Task DrainOutboundAsync(CancellationToken cancellationToken)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token, _lifetimeCts.Token);
+        var sent = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await _outbound.Writer.WriteAsync(new OutboundMessage(new JsonRpcMessage(), sent) { IsBarrier = true }, linked.Token).ConfigureAwait(false);
+        _writerWake.Release();
+        await sent.Task.WaitAsync(linked.Token).ConfigureAwait(false);
     }
 
     // ── Connection state ──────────────────────────────────────────────────
@@ -533,49 +568,65 @@ public sealed class AhpClient : IAhpClient
 
     private async Task RunWriterAsync()
     {
+        OutboundMessage? active = null;
         try
         {
-            await foreach (var item in _outbound.Reader.ReadAllAsync(_lifetimeCts.Token).ConfigureAwait(false))
+            var controlBurst = 0;
+            while (!_lifetimeCts.IsCancellationRequested)
             {
-                if (item.CancellationToken.IsCancellationRequested)
+                TransportMessage frame;
+                Action? sent = null;
+                active = null;
+                if ((controlBurst >= 8 || !_outbound.Reader.TryPeek(out _)) && TryWindowFrame(out frame, out sent))
                 {
-                    item.Sent?.TrySetCanceled(item.CancellationToken);
+                    controlBurst = 0;
+                }
+                else if (_outbound.Reader.TryRead(out var item))
+                {
+                    active = item;
+                    controlBurst++;
+                    if (item.IsBarrier)
+                    {
+                        item.Sent?.TrySetResult(true);
+                        continue;
+                    }
+                    if (item.CancellationToken.IsCancellationRequested)
+                    {
+                        item.Sent?.TrySetCanceled(item.CancellationToken);
+                        continue;
+                    }
+                    frame = _serializer.EncodeMessage(item.Message);
+                    if (item.CancellationToken.IsCancellationRequested)
+                    {
+                        item.Sent?.TrySetCanceled(item.CancellationToken);
+                        continue;
+                    }
+                    if (item.WindowRequest is { } response && !response.TryStart())
+                    {
+                        item.Sent?.TrySetException(response.Failure ?? new AhpClientClosedException());
+                        continue;
+                    }
+                }
+                else
+                {
+                    await _writerWake.WaitAsync(_lifetimeCts.Token).ConfigureAwait(false);
                     continue;
                 }
-
-                var frame = _serializer.EncodeMessage(item.Message);
-                if (item.CancellationToken.IsCancellationRequested)
-                {
-                    item.Sent?.TrySetCanceled(item.CancellationToken);
-                    continue;
-                }
-                try
-                {
-                    // Canceling ClientWebSocket.SendAsync aborts the shared connection,
-                    // so message cancellation only prevents writes that have not started.
-                    await _transport.SendAsync(frame, _lifetimeCts.Token).ConfigureAwait(false);
-                    item.Sent?.TrySetResult(true);
-                }
-                catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
-                {
-                    item.Sent?.TrySetException(new AhpClientClosedException());
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    item.Sent?.TrySetException(ex);
-                    await ShutdownWithErrorAsync(new AhpTransportException("io", $"ahp: transport send: {ex.Message}", ex)).ConfigureAwait(false);
-                    return;
-                }
+                await _transport.SendAsync(frame, _lifetimeCts.Token).ConfigureAwait(false);
+                sent?.Invoke();
+                active?.Sent?.TrySetResult(true);
             }
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
+            active?.Sent?.TrySetException(new AhpClientClosedException());
             // Normal teardown canceled the channel enumeration.
         }
         catch (Exception ex)
         {
-            await ShutdownWithErrorAsync(new AhpTransportException("io", $"ahp: writer: {ex.Message}", ex)).ConfigureAwait(false);
+            active?.Sent?.TrySetException(ex);
+            await ShutdownWithErrorAsync(ex is AhpTransportException ? ex
+                : new AhpTransportException("io", $"ahp: writer: {ex.Message}", ex)).ConfigureAwait(false);
         }
     }
 
@@ -617,24 +668,28 @@ public sealed class AhpClient : IAhpClient
                 }
                 catch
                 {
+                    lock (_windowGate)
+                        if (_windows.Values.Any(window => window.Limits is not null))
+                            throw Protocol("malformed JSON on a windowed connection");
                     // Skip malformed frames; protocol resync is the server's responsibility.
                     AhpTelemetry.MalformedFrames.Add(1);
                     continue;
                 }
 
                 AhpTelemetry.MessagesReceived.Add(1);
-                Dispatch(msg);
+                Dispatch(msg, msg.Notification is not null && RequiresWindowSizes ? RawWindowBytes(frame) : 0);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await ShutdownWithErrorAsync(new AhpTransportException("io", $"ahp: reader: {ex.Message}", ex)).ConfigureAwait(false);
+            await ShutdownWithErrorAsync(ex is AhpTransportException ? ex
+                : new AhpTransportException("protocol", $"ahp: reader: {ex.Message}", ex)).ConfigureAwait(false);
         }
     }
 
     // ── Dispatch ──────────────────────────────────────────────────────────
 
-    private void Dispatch(JsonRpcMessage msg)
+    private void Dispatch(JsonRpcMessage msg, long wireBytes)
     {
         if (msg.SuccessResponse is not null)
         {
@@ -647,7 +702,8 @@ public sealed class AhpClient : IAhpClient
         }
         else if (msg.Notification is not null)
         {
-            HandleNotification(msg.Notification);
+            if (!HandleWindowNotification(msg.Notification, wireBytes))
+                HandleNotification(msg.Notification);
         }
         else if (msg.Request is not null)
         {
@@ -660,6 +716,8 @@ public sealed class AhpClient : IAhpClient
 
     private void Deliver(ulong id, JsonElement result, AhpRpcException? rpcError)
     {
+        if (_windowResponses.TryRemove(id, out var hook))
+            hook.Apply(rpcError is null ? result : null, rpcError);
         if (_pending.TryRemove(id, out var tcs))
         {
             if (rpcError is not null)
@@ -734,6 +792,7 @@ public sealed class AhpClient : IAhpClient
         try
         {
             await _outbound.Writer.WriteAsync(new OutboundMessage(msg)).ConfigureAwait(false);
+            _writerWake.Release();
         }
         catch { /* shutting down — best effort */ }
     }
@@ -894,6 +953,9 @@ public sealed class AhpClient : IAhpClient
             }
 
             JsonElement? paramsEl = parameters is null ? null : _serializer.SerializeToElement(parameters);
+            WindowOptions? requestedOptions = null;
+            if (parameters is SubscribeParams subscribe) _windowRequestOptions.TryGetValue(subscribe, out requestedOptions);
+            PrepareWindowResponse(id, method, paramsEl, requestedOptions, requestCts.Token);
 
             var req = new JsonRpcMessage
             {
@@ -933,6 +995,7 @@ public sealed class AhpClient : IAhpClient
         }
         catch (Exception ex)
         {
+            AbandonWindowRequest(id, ex);
             // Distinguish caller cancellation (the caller's token) from a request
             // timeout (the configured default-timeout fired its linked token) from a
             // genuine error — the metric and the span status differ for each.
@@ -987,12 +1050,27 @@ public sealed class AhpClient : IAhpClient
 
     private async Task SendMessageAsync(JsonRpcMessage msg, CancellationToken cancellationToken)
     {
+        if (msg.Notification is { Params: { } p } notification && p.TryGetProperty("channel", out var channelEl)
+            && channelEl.GetString() is { } channel && GetWindowedSubscription(channel) is { } owner)
+        {
+            if (notification.Method is "channel/frame" or "channel/credit" or "channel/snapshot")
+                throw new InvalidOperationException("Window framing and credit are owned by the client.");
+            if ((owner.Limits is not null || owner.Negotiating) && WindowedDelivery.CountsAgainstWindow(notification.Method))
+            {
+                await SendWindowAsync(owner, notification, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
         var sentTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var item = new OutboundMessage(msg, sentTcs, cancellationToken);
+        var item = new OutboundMessage(msg, sentTcs, cancellationToken)
+        {
+            WindowRequest = msg.Request is { } request && _windowResponses.TryGetValue(request.Id, out var response) ? response : null,
+        };
 
         try
         {
             await _outbound.Writer.WriteAsync(item, cancellationToken).ConfigureAwait(false);
+            _writerWake.Release();
         }
         catch (OperationCanceledException)
         {
@@ -1190,6 +1268,7 @@ public sealed class AhpClient : IAhpClient
     public async Task UnsubscribeAsync(string uri, CancellationToken cancellationToken = default)
     {
         Guard.ThrowIfNull(uri, nameof(uri));
+        StopWindow(uri);
         List<Subscription> subs;
         lock (_subsLock)
         {

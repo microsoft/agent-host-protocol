@@ -59,3 +59,18 @@ With no TLS feature enabled, only `ws://` works; `wss://` fails at connect time.
 - [`ahp`](https://crates.io/crates/ahp) — the main client crate
 - [`ahp-types`](https://crates.io/crates/ahp-types) — wire types only
 - [Protocol documentation](https://microsoft.github.io/agent-host-protocol/)
+## Windowing defaults
+
+This transport preserves exact incoming text/binary JSON and sends the client's
+serialized text unchanged, so `Client::subscribe_windowed` can negotiate windowing.
+Configure the client with `Client::builder().windowing(WindowingConfig::default())`;
+configuration alone does not opt subscriptions in.
+
+Tungstenite 0.29 defaults to a 16 MiB incoming frame payload limit and a 64 MiB
+incoming message limit. AHP uses UTF-16 bytes, not these UTF-8 sizes. The offered
+default is `2 * floor(min(finite limits) / 3)`: **11,184,810** UTF-16 bytes.
+When both limits are unlimited, the default is **1,048,576**.
+`from_stream` inspects the stream's effective configuration, not library defaults.
+Use `WebSocketTransport::connect_with_config(url, WebSocketConfig)` to customize
+the actual websocket limits. Large accepted AHP data is fragmented automatically;
+RPC results and ordinary initialization snapshots are not windowed.

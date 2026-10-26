@@ -1,0 +1,124 @@
+{
+  "description": "Adjacent queued terminal/data actions are concatenated into one delivery that carries the last serverSeq and the sum of the original sizes.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {}
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "flowControl": {
+          "clientReceive": {
+            "windowBytes": 65536,
+            "maximumFrameBytes": 16384
+          },
+          "hostReceive": {
+            "windowBytes": 65536,
+            "maximumFrameBytes": 16384
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"channel/snapshot\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"snapshot\":{\"resource\":\"ahp-terminal:/t1\",\"state\":{\"title\":\"Shell\",\"content\":[],\"lifecycle\":{\"status\":\"running\"},\"claim\":{\"kind\":\"client\",\"clientId\":\"client-1\"}},\"fromSeq\":5}}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "state": {
+              "title": "Shell",
+              "content": [],
+              "lifecycle": {
+                "status": "running"
+              },
+              "claim": {
+                "kind": "client",
+                "clientId": "client-1"
+              }
+            },
+            "fromSeq": 5
+          }
+        }
+      },
+      "expectBytes": 520
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"ab\"},\"serverSeq\":6}}"
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"cd\"},\"serverSeq\":7}}"
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"ef\\r\\n\"},\"serverSeq\":8}}"
+    },
+    {
+      "op": "expectStatus",
+      "channel": "ahp-terminal:/t1",
+      "match": {
+        "bufferedReceiveBytes": 1338
+      }
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "action",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "action": {
+            "type": "terminal/data",
+            "data": "abcdef\r\n"
+          },
+          "serverSeq": 8
+        }
+      },
+      "expectBytes": 818
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "consumedBytes": 1338
+        }
+      }
+    }
+  ]
+}

@@ -2,6 +2,8 @@
   <Folder Name="/examples/">
     <Project Path="examples/ConnectWs/ConnectWs.csproj" />
     <Project Path="examples/ReducersDemo/ReducersDemo.csproj" />
+    <Project Path="examples/WindowingBackpressure/WindowingBackpressure.csproj" />
+    <Project Path="examples/WindowingBasic/WindowingBasic.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AgentHostProtocol.Abstractions/AgentHostProtocol.Abstractions.csproj" />

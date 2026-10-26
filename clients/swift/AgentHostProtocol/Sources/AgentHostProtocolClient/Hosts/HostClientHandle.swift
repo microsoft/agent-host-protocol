@@ -122,4 +122,20 @@ public struct HostClientHandle: Sendable {
     public func rawClient() async -> AHPClient {
         client
     }
+
+    public func send<P: Encodable & Sendable>(method: String, params: P) async throws {
+        try await checkAlive()
+        try await client.send(method: method, params: params)
+    }
+
+    public func flowControlStatus(channel: String) async throws -> AHPFlowControlStatus? {
+        try await checkAlive()
+        return await client.subscription(for: channel)?.status()
+    }
+
+    public func waitUntilWritable(channel: String) async throws {
+        try await checkAlive()
+        guard let subscription = await client.subscription(for: channel) else { throw AHPClientError.shutdown }
+        try await subscription.waitUntilWritable()
+    }
 }

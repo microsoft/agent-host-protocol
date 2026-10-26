@@ -17,6 +17,33 @@ namespace Microsoft.AgentHostProtocol.Hosts;
 
 internal sealed class HostEntry : IDisposable
 {
+    internal readonly ConcurrentDictionary<string, WindowedSubscription> WindowOwners = new(StringComparer.Ordinal);
+    internal void RegisterWindowOwner(WindowedSubscription owner)
+    {
+        lock (_gate)
+        {
+            WindowOwners[owner.Uri] = owner;
+            if (!_subscriptions.Contains(owner.Uri)) _subscriptions.Add(owner.Uri);
+        }
+    }
+
+    internal void ForgetWindowOwner(WindowedSubscription owner)
+    {
+        lock (_gate)
+            if (WindowOwners.TryGetValue(owner.Uri, out var current) && ReferenceEquals(current, owner))
+            {
+                WindowOwners.TryRemove(owner.Uri, out _);
+                _subscriptions.Remove(owner.Uri);
+            }
+    }
+    internal void ApplyWindowRoot(RootState root)
+    {
+        lock (_gate)
+        {
+            _agents = root.Agents is { } agents ? new List<AgentInfo>(agents) : new List<AgentInfo>();
+            _activeSessions = root.ActiveSessions;
+        }
+    }
     public HostId Id { get; }
     public HostConfig Config { get; }
     public string ClientId { get; set; }
@@ -437,7 +464,7 @@ internal sealed class HostEntry : IDisposable
 /// Multi-host registry + reconnect supervisor. Manages N independent AHP hosts,
 /// fans in their inbound events, and supervises reconnects per-host policy.
 /// </summary>
-public sealed class MultiHostClient : IMultiHostClient
+public sealed partial class MultiHostClient : IMultiHostWindowedClient
 {
     private readonly ConcurrentDictionary<string, HostEntry> _hosts = new(StringComparer.Ordinal);
     private volatile IClientIdStore _store;
@@ -580,6 +607,7 @@ public sealed class MultiHostClient : IMultiHostClient
         if (!_hosts.TryAdd(ownedConfig.Id.ToString(), entry))
         {
             entry.Dispose();
+            DropWindowOwners(entry);
             throw new DuplicateHostException(ownedConfig.Id);
         }
 
@@ -595,6 +623,7 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 entry.LifetimeCts.Cancel();
                 entry.Dispose();
+                DropWindowOwners(entry);
             }
             throw;
         }
@@ -660,6 +689,7 @@ public sealed class MultiHostClient : IMultiHostClient
         FinishPerHostListeners(id.ToString());
 
         entry!.LifetimeCts.Cancel();
+        DropWindowOwners(entry);
         await entry.ConnectionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
@@ -727,6 +757,7 @@ public sealed class MultiHostClient : IMultiHostClient
 
         var entries = new List<HostEntry>(_hosts.Values);
         _hosts.Clear();
+        FinishFlowEvents();
 
         // Finish per-host listener streams for every host so their consumers'
         // `await foreach` loops exit (mirrors the perResourceListeners finish in
@@ -736,6 +767,7 @@ public sealed class MultiHostClient : IMultiHostClient
         foreach (var entry in entries)
         {
             entry.LifetimeCts.Cancel();
+            DropWindowOwners(entry);
             // Wake a parked (failed/disabled) supervisor so it observes the
             // cancellation and exits rather than blocking on its manual-reconnect
             // wait forever.
@@ -805,6 +837,7 @@ public sealed class MultiHostClient : IMultiHostClient
                 await openTask.ConfigureAwait(false);
                 return;
             }
+            await attempt.AbortClientAsync().ConfigureAwait(false);
             if (openTask.IsCompleted)
             {
                 await openTask.ConfigureAwait(false);
@@ -838,7 +871,24 @@ public sealed class MultiHostClient : IMultiHostClient
                 transport,
                 entry.Config.ClientConfig,
                 null);
+            attempt.TrackClient(client, cancellationToken);
             transport = null;
+            client.RetainManagedWindows = true;
+            client.WindowHostId = entry.Id;
+            client.ManagedFlowEvent = BroadcastFlowEvent;
+            client.ManagedWindowEvent = (owner, notification, value) => ApplyManagedWindowEvent(entry, owner, notification, value);
+            foreach (var pair in entry.WindowOwners)
+            {
+                if (pair.Value.Closed)
+                    entry.ForgetWindowOwner(pair.Value);
+                else if (pair.Key.StartsWith("ahp-tcp:", StringComparison.Ordinal))
+                {
+                    pair.Value.End(new HostNotConnectedException(entry.Id));
+                    entry.WindowOwners.TryRemove(pair.Key, out _);
+                    entry.RemoveSubscription(pair.Key);
+                }
+                else if (!client.BindManagedWindow(pair.Value)) entry.ForgetWindowOwner(pair.Value);
+            }
             // Register before the first handshake request so notifications that
             // race initialize/reconnect are buffered rather than discarded.
             var stream = client.CreateEventStream();
@@ -856,9 +906,29 @@ public sealed class MultiHostClient : IMultiHostClient
                 ReconnectResult? reconnectResult = null;
                 try
                 {
-                    reconnectResult = await client.ReconnectAsync(
-                        snap.ClientId, snap.ServerSeq, subscriptions, cancellationToken)
-                        .ConfigureAwait(false);
+                    var items = new List<ChannelDeliveryResumeParams>();
+                    foreach (var pair in entry.WindowOwners)
+                        if (pair.Value.ResumeWindowed)
+                            items.Add(new ChannelDeliveryResumeParams
+                            {
+                                Channel = pair.Key,
+                                FlowControl = new SubscriptionFlowControlOptions { Receive = pair.Value.Offer },
+                                LastAppliedServerSeq = pair.Value.LastAppliedServerSeq,
+                            });
+                    reconnectResult = await client.ResumeAsync(new ReconnectParams
+                    {
+                        Channel = ProtocolVersion.RootResourceUri,
+                        ClientId = snap.ClientId,
+                        LastSeenServerSeq = snap.ServerSeq,
+                        Subscriptions = new List<string>(subscriptions),
+                        Windows = items.Count == 0 ? null : new ChannelDeliveryResumeOptions { Items = items },
+                    }, cancellationToken).ConfigureAwait(false);
+                    foreach (var pair in entry.WindowOwners)
+                        if (pair.Value.Closed)
+                        {
+                            entry.WindowOwners.TryRemove(pair.Key, out _);
+                            entry.RemoveSubscription(pair.Key);
+                        }
                 }
                 catch (Exception) when (!cancellationToken.IsCancellationRequested)
                 {
@@ -881,7 +951,7 @@ public sealed class MultiHostClient : IMultiHostClient
                             () =>
                             {
                                 if (summaries is not null) entry.SeedSessionSummaries(summaries);
-                                ApplyReconnectReplay(entry, replay);
+                                ApplyReconnectReplay(entry, replay, snap.ServerSeq);
                             });
                         installed = true;
                     }
@@ -919,9 +989,20 @@ public sealed class MultiHostClient : IMultiHostClient
             var result = await client.InitializeAsync(
                 entry.ClientId,
                 entry.Config.ProtocolVersions,
-                subscriptions,
+                subscriptions is null ? null : new List<string>(subscriptions).FindAll(uri =>
+                    !entry.WindowOwners.ContainsKey(uri) && !uri.StartsWith("ahp-tcp:", StringComparison.Ordinal)),
                 cancellationToken)
                 .ConfigureAwait(false);
+            foreach (var pair in entry.WindowOwners)
+            {
+                if (pair.Value.Closed) continue;
+                try { await client.SubscribeWindowedAsync(pair.Key, pair.Value.Options, cancellationToken).ConfigureAwait(false); }
+                catch (Exception error) when (!cancellationToken.IsCancellationRequested && !client.Completion.IsCompleted)
+                {
+                    pair.Value.End(error, true);
+                    client.DropManagedWindow(pair.Value);
+                }
+            }
 
             // Extract the root-state snapshot (agents + activeSessions) that the
             // server returned for the root channel, mirroring the
@@ -953,7 +1034,7 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 if (client is not null)
                 {
-                    try { await client.ShutdownAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+                    try { await client.AbortAsync().ConfigureAwait(false); } catch { }
                 }
                 else if (transport is not null)
                 {
@@ -1016,9 +1097,9 @@ public sealed class MultiHostClient : IMultiHostClient
     /// subscribed before the drop observe the actions missed while disconnected.
     /// URIs in <c>Missing</c> are pruned from the reconnect subscription set.
     /// </summary>
-    private ulong ApplyReconnectReplay(HostEntry entry, ReconnectReplayResult replay)
+    private ulong ApplyReconnectReplay(HostEntry entry, ReconnectReplayResult replay, long? previousServerSeq = null)
     {
-        var initialSeq = entry.Snapshot().ServerSeq;
+        var initialSeq = previousServerSeq ?? entry.Snapshot().ServerSeq;
         var previousSeq = initialSeq;
         if (replay.Actions is { } seqScan)
         {
@@ -1032,12 +1113,13 @@ public sealed class MultiHostClient : IMultiHostClient
             }
         }
 
-        var generation = entry.ApplyConnected(null, initialSeq);
+        var generation = entry.ApplyConnected(null, Math.Max(initialSeq, entry.Snapshot().ServerSeq));
 
         if (replay.Actions is { } actions)
         {
             foreach (var env in actions)
             {
+                if (entry.CurrentClient?.GetWindowedSubscription(env.Channel) is not null) continue;
                 var evt = new SubscriptionEventAction(env);
                 ApplyEventToHostState(entry, evt);
                 if (env.Channel == ProtocolVersion.RootResourceUri)
@@ -1074,9 +1156,12 @@ public sealed class MultiHostClient : IMultiHostClient
         {
             if (snapshot.FromSeq > lastSeq) lastSeq = snapshot.FromSeq;
         }
-        var generation = entry.ApplyConnected(ExtractRootSnapshot(result.Snapshots), lastSeq);
+        var generation = entry.ApplyConnected(
+            entry.CurrentClient?.GetWindowedSubscription(ProtocolVersion.RootResourceUri) is null
+                ? ExtractRootSnapshot(result.Snapshots) : null, lastSeq);
         foreach (var snapshot in result.Snapshots)
         {
+            if (entry.CurrentClient?.GetWindowedSubscription(snapshot.Resource) is not null) continue;
             var evt = new SubscriptionEventSnapshot(snapshot);
             var hostEv = new HostSubscriptionEvent(entry.Id, snapshot.Resource, evt);
             List<Channel<HostSubscriptionEvent>>? channels;
@@ -1155,6 +1240,7 @@ public sealed class MultiHostClient : IMultiHostClient
             // normal-shutdown path.
             await foreach (var ev in stream.Events.ReadAllAsync(entry.LifetimeCts.Token).ConfigureAwait(false))
             {
+                if (entry.CurrentClient?.GetWindowedSubscription(ev.Channel) is not null) continue;
                 // Update per-host observable state BEFORE broadcasting so any
                 // observer reading the next snapshot sees the post-event state
                 // (mirrors the ordering in Swift HostRuntime.handleEvent).
@@ -1858,6 +1944,11 @@ public sealed class MultiHostClient : IMultiHostClient
                 if (ReferenceEquals(client, entry.CurrentClient))
                 {
                     entry.RemoveSubscription(uri);
+                    if (entry.WindowOwners.TryGetValue(uri, out var window))
+                    {
+                        window.End();
+                        entry.WindowOwners.TryRemove(uri, out _);
+                    }
                     return;
                 }
             }
@@ -1893,16 +1984,44 @@ public sealed class MultiHostClient : IMultiHostClient
         private const int Active = 0;
         private const int Committing = 1;
         private const int Abandoned = 2;
+        private readonly object _gate = new();
         private int _state;
+        private AhpClient? _client;
 
-        public bool TryAbandon() =>
-            Interlocked.CompareExchange(ref _state, Abandoned, Active) == Active;
+        public bool TryAbandon()
+        {
+            lock (_gate)
+            {
+                if (_state != Active) return false;
+                _state = Abandoned;
+                return true;
+            }
+        }
+
+        public Task AbortClientAsync()
+        {
+            AhpClient? client;
+            lock (_gate) client = _client;
+            return client?.AbortAsync() ?? Task.CompletedTask;
+        }
+
+        public void TrackClient(AhpClient client, CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                if (_state == Abandoned) throw new OperationCanceledException(cancellationToken);
+                _client = client;
+            }
+        }
 
         public void BeginCommit(CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (Interlocked.CompareExchange(ref _state, Committing, Active) != Active)
-                throw new OperationCanceledException(cancellationToken);
+            lock (_gate)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_state != Active) throw new OperationCanceledException(cancellationToken);
+                _state = Committing;
+            }
         }
     }
 }

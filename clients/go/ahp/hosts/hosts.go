@@ -417,18 +417,21 @@ type hostState struct {
 	generation  uint64
 	cancel      context.CancelFunc
 	supervised  sync.WaitGroup
+	managed     map[string]*ManagedSubscription
 }
 
 // MultiHostClient is the public multi-host registry + reconnect
 // supervisor.
 type MultiHostClient struct {
-	mu       sync.RWMutex
-	hosts    map[HostID]*hostState
-	store    ClientIDStore
-	eventsMu sync.Mutex
-	events   []chan HostEvent
-	subMu    sync.Mutex
-	subs     []chan HostSubscriptionEvent
+	mu         sync.RWMutex
+	hosts      map[HostID]*hostState
+	store      ClientIDStore
+	eventsMu   sync.Mutex
+	events     []chan HostEvent
+	subMu      sync.Mutex
+	subs       []chan HostSubscriptionEvent
+	flowMu     sync.Mutex
+	flowEvents []chan HostFlowControlEvent
 
 	rootCtx    context.Context
 	rootCancel context.CancelFunc
@@ -529,6 +532,7 @@ func (m *MultiHostClient) AddHost(ctx context.Context, cfg HostConfig) (*HostHan
 		state:     HostState{Kind: HostStateDisconnected},
 		updatedAt: time.Now(),
 		cancel:    cancel,
+		managed:   make(map[string]*ManagedSubscription),
 	}
 
 	m.mu.Lock()
@@ -563,6 +567,7 @@ func (m *MultiHostClient) openHost(ctx context.Context, hs *hostState) error {
 
 	client, err := ahp.Connect(ctx, boxed, hs.cfg.ClientConfig)
 	if err != nil {
+		_ = boxed.Close(ctx)
 		return fmt.Errorf("hosts: connect: %w", err)
 	}
 
@@ -570,6 +575,21 @@ func (m *MultiHostClient) openHost(ctx context.Context, hs *hostState) error {
 	if err != nil {
 		_ = client.Shutdown(ctx)
 		return fmt.Errorf("hosts: initialize: %w", err)
+	}
+
+	hs.mu.RLock()
+	resuming := hs.client != nil
+	managed := make([]*ManagedSubscription, 0, len(hs.managed))
+	for _, sub := range hs.managed {
+		managed = append(managed, sub)
+	}
+	hs.mu.RUnlock()
+	go m.pumpFlowEvents(hs, client, resuming)
+	for _, sub := range managed {
+		if err := sub.resume(ctx, client); err != nil {
+			_ = client.Shutdown(ctx)
+			return fmt.Errorf("hosts: re-subscribe: %w", err)
+		}
 	}
 
 	hs.mu.Lock()
@@ -593,15 +613,14 @@ func (m *MultiHostClient) pumpEvents(hs *hostState, client *ahp.Client) {
 	defer stream.Close()
 	for ev := range stream.Events() {
 		m.subMu.Lock()
-		subs := append([]chan HostSubscriptionEvent(nil), m.subs...)
-		m.subMu.Unlock()
 		out := HostSubscriptionEvent{HostID: hs.id, Channel: ev.Channel, Event: ev.Event}
-		for _, ch := range subs {
+		for _, ch := range m.subs {
 			select {
 			case ch <- out:
 			default:
 			}
 		}
+		m.subMu.Unlock()
 	}
 }
 
@@ -632,7 +651,9 @@ func (m *MultiHostClient) supervise(ctx context.Context, hs *hostState) {
 			return
 		default:
 		}
+		m.dropManagedTCP(hs)
 		if policy.IsDisabled() {
+			m.closeManaged(hs, ErrHostNotConnected)
 			m.setHostState(hs, HostState{Kind: HostStateFailed, Err: errors.New("hosts: transport closed and reconnect disabled")})
 			return
 		}
@@ -661,6 +682,7 @@ func (m *MultiHostClient) supervise(ctx context.Context, hs *hostState) {
 			}
 			attempt++
 			if policy.MaxAttempts > 0 && attempt > policy.MaxAttempts {
+				m.closeManaged(hs, ErrHostNotConnected)
 				m.setHostState(hs, HostState{Kind: HostStateFailed, Err: fmt.Errorf("hosts: exceeded %d reconnect attempts", policy.MaxAttempts)})
 				return
 			}
@@ -677,14 +699,13 @@ func (m *MultiHostClient) setHostState(hs *hostState, state HostState) {
 	hs.mu.Unlock()
 
 	m.eventsMu.Lock()
-	subs := append([]chan HostEvent(nil), m.events...)
-	m.eventsMu.Unlock()
-	for _, ch := range subs {
+	for _, ch := range m.events {
 		select {
 		case ch <- HostEvent{HostID: hs.id, State: state}:
 		default:
 		}
 	}
+	m.eventsMu.Unlock()
 }
 
 // Host returns a fresh snapshot of the host with the given id, or
@@ -782,6 +803,7 @@ func (m *MultiHostClient) RemoveHost(ctx context.Context, id HostID) error {
 		return ErrUnknownHost
 	}
 	hs.cancel()
+	m.closeManaged(hs, ErrHostNotConnected)
 	hs.mu.RLock()
 	client := hs.client
 	hs.mu.RUnlock()
@@ -805,7 +827,12 @@ func (m *MultiHostClient) removeHostLocked(id HostID) error {
 func (m *MultiHostClient) Events() <-chan HostEvent {
 	ch := make(chan HostEvent, 64)
 	m.eventsMu.Lock()
-	m.events = append(m.events, ch)
+	select {
+	case <-m.rootCtx.Done():
+		close(ch)
+	default:
+		m.events = append(m.events, ch)
+	}
 	m.eventsMu.Unlock()
 	return ch
 }
@@ -815,7 +842,12 @@ func (m *MultiHostClient) Events() <-chan HostEvent {
 func (m *MultiHostClient) Subscriptions() <-chan HostSubscriptionEvent {
 	ch := make(chan HostSubscriptionEvent, 256)
 	m.subMu.Lock()
-	m.subs = append(m.subs, ch)
+	select {
+	case <-m.rootCtx.Done():
+		close(ch)
+	default:
+		m.subs = append(m.subs, ch)
+	}
 	m.subMu.Unlock()
 	return ch
 }
@@ -833,6 +865,7 @@ func (m *MultiHostClient) Shutdown(ctx context.Context) error {
 	m.mu.Unlock()
 	for _, hs := range hosts {
 		hs.cancel()
+		m.closeManaged(hs, ErrHostNotConnected)
 		hs.mu.RLock()
 		client := hs.client
 		hs.mu.RUnlock()
@@ -841,5 +874,23 @@ func (m *MultiHostClient) Shutdown(ctx context.Context) error {
 		}
 		hs.supervised.Wait()
 	}
+	m.eventsMu.Lock()
+	for _, ch := range m.events {
+		close(ch)
+	}
+	m.events = nil
+	m.eventsMu.Unlock()
+	m.subMu.Lock()
+	for _, ch := range m.subs {
+		close(ch)
+	}
+	m.subs = nil
+	m.subMu.Unlock()
+	m.flowMu.Lock()
+	for _, ch := range m.flowEvents {
+		close(ch)
+	}
+	m.flowEvents = nil
+	m.flowMu.Unlock()
 	return nil
 }

@@ -53,7 +53,8 @@ const defaultReadLimit int64 = 32 * 1024 * 1024
 // [github.com/coder/websocket.Conn]. Use [Connect] to dial or
 // [FromConn] to wrap an existing connection.
 type Transport struct {
-	conn *websocket.Conn
+	conn      *websocket.Conn
+	readLimit int64
 }
 
 // Connect dials the given URL and returns a ready-to-use
@@ -80,7 +81,7 @@ func Connect(ctx context.Context, url string, opts ...DialOptions) (*Transport, 
 		limit = defaultReadLimit
 	}
 	conn.SetReadLimit(limit)
-	return &Transport{conn: conn}, nil
+	return &Transport{conn: conn, readLimit: limit}, nil
 }
 
 // FromConn wraps an already-connected
@@ -89,6 +90,15 @@ func Connect(ctx context.Context, url string, opts ...DialOptions) (*Transport, 
 // reuse an existing socket.
 func FromConn(conn *websocket.Conn) *Transport {
 	return &Transport{conn: conn}
+}
+
+// TransportCapabilities reports a safe UTF-16 frame limit derived from the
+// configured UTF-8 message read limit. FromConn uses the unknown-limit fallback.
+func (t *Transport) TransportCapabilities() ahp.TransportCapabilities {
+	return ahp.TransportCapabilities{
+		SupportsWindowedDelivery: true,
+		MaximumFrameBytes:        ahp.MaximumFrameBytesForReadLimit(t.readLimit),
+	}
 }
 
 // Send writes a single message. Text frames are produced for

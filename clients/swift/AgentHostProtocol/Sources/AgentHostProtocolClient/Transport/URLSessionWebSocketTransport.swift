@@ -8,14 +8,22 @@
 import Foundation
 
 /// Default WebSocket transport built on `URLSessionWebSocketTask`.
-public final class URLSessionWebSocketTransport: AHPTransport, @unchecked Sendable {
+public final class URLSessionWebSocketTransport: AHPWindowingTransport, @unchecked Sendable {
     private let url: URL
     private let headers: [String: String]
     private let session: URLSession
 
     private let lock = NSLock()
     private var task: URLSessionWebSocketTask?
+    private var started = false
     private var closed = false
+
+    public var windowingCapabilities: AHPTransportCapabilities {
+        get async {
+            let limit = try? ensureTask(start: false).maximumMessageSize
+            return .init(preservesOriginalJSONText: true, maximumReceiveMessageUTF8Bytes: limit)
+        }
+    }
 
     /// Creates a new WebSocket transport. The connection is opened lazily on
     /// the first call to `send` or `recv`.
@@ -90,17 +98,20 @@ public final class URLSessionWebSocketTransport: AHPTransport, @unchecked Sendab
         return task
     }
 
-    private func ensureTask() throws -> URLSessionWebSocketTask {
+    private func ensureTask(start: Bool = true) throws -> URLSessionWebSocketTask {
         lock.lock()
         defer { lock.unlock() }
         if closed { throw TransportError.closed }
-        if let task { return task }
+        if let task {
+            if start && !started { task.resume(); started = true }
+            return task
+        }
         var request = URLRequest(url: url)
         for (k, v) in headers {
             request.setValue(v, forHTTPHeaderField: k)
         }
         let task = session.webSocketTask(with: request)
-        task.resume()
+        if start { task.resume(); started = true }
         self.task = task
         return task
     }

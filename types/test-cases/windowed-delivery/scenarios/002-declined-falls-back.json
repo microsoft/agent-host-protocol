@@ -1,0 +1,105 @@
+{
+  "description": "A result without flowControl declines windowed delivery. The subscription uses ordinary delivery and never sends credit. The result snapshot is still the first delivery.",
+  "windowing": {
+    "windowBytes": 262144,
+    "maximumFrameBytes": 16384
+  },
+  "steps": [
+    {
+      "op": "subscribe",
+      "channel": "ahp-terminal:/t1",
+      "window": {}
+    },
+    {
+      "op": "expectSent",
+      "match": {
+        "method": "subscribe",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "respond",
+      "to": "subscribe",
+      "result": {
+        "snapshot": {
+          "resource": "ahp-terminal:/t1",
+          "state": {
+            "title": "Shell",
+            "content": [],
+            "lifecycle": {
+              "status": "running"
+            },
+            "claim": {
+              "kind": "client",
+              "clientId": "client-1"
+            }
+          },
+          "fromSeq": 5
+        }
+      }
+    },
+    {
+      "op": "expectStatus",
+      "channel": "ahp-terminal:/t1",
+      "match": {
+        "mode": "ordinary",
+        "fallbackReason": "declined"
+      }
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "channel/snapshot",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "snapshot": {
+            "resource": "ahp-terminal:/t1",
+            "fromSeq": 5
+          }
+        }
+      }
+    },
+    {
+      "op": "hostSends",
+      "text": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"Hello\\r\\n\"},\"serverSeq\":6}}"
+    },
+    {
+      "op": "next",
+      "channel": "ahp-terminal:/t1",
+      "expect": {
+        "method": "action",
+        "params": {
+          "channel": "ahp-terminal:/t1",
+          "action": {
+            "type": "terminal/data",
+            "data": "Hello\r\n"
+          },
+          "serverSeq": 6
+        }
+      }
+    },
+    {
+      "op": "advance",
+      "channel": "ahp-terminal:/t1"
+    },
+    {
+      "op": "expectNotSent",
+      "match": {
+        "method": "channel/credit",
+        "params": {
+          "channel": "ahp-terminal:/t1"
+        }
+      },
+      "withinMs": 150
+    }
+  ]
+}

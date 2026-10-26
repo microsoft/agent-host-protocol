@@ -1503,11 +1503,10 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
         }
-        else if (root.TryGetProperty("lifecycle", out _))
+        else if (root.TryGetProperty("lifecycle", out _) && root.TryGetProperty("provider", out _))
         {
-            // SessionState is discriminated on its required \`lifecycle\` field.
-            // (It no longer carries \`summary\`; that field was removed when the
-            // session state was flattened.)
+            // SessionState is discriminated on its required \`lifecycle\` and
+            // \`provider\` fields; TerminalState also has \`lifecycle\`.
             result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
         }
         else if (root.TryGetProperty("instanceId", out _) &&

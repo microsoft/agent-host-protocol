@@ -56,6 +56,14 @@ public actor MultiHostStateMirror {
 
     public init() {}
 
+    public func apply(host: HostId, delivery: AHPDelivery) {
+        switch delivery.payload {
+        case .snapshot(let snapshot): applySnapshot(host: host, snapshot: snapshot)
+        case .event(.action(let envelope)): apply(host: host, envelope: envelope)
+        default: break
+        }
+    }
+
     /// Convenience: apply a `HostSubscriptionEvent` produced by
     /// `MultiHostClient.events()`. Action envelopes are routed through
     /// the reducer; non-action events are dropped (they don't affect
