@@ -71,6 +71,8 @@ import type {
   ChatMovableChangedAction,
   ChatChangesetsChangedAction,
   ChatCanvasesChangedAction,
+  ChatCanvasRegistryRequestedAction,
+  ChatCanvasRegistryChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -183,6 +185,8 @@ export const enum ActionType {
   ChatMovableChanged = 'chat/movableChanged',
   ChatChangesetsChanged = 'chat/changesetsChanged',
   ChatCanvasesChanged = 'chat/canvasesChanged',
+  ChatCanvasRegistryRequested = 'chat/canvasRegistryRequested',
+  ChatCanvasRegistryChanged = 'chat/canvasRegistryChanged',
   CanvasStateChanged = 'canvas/stateChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
@@ -351,6 +355,8 @@ export type StateAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
+  | ChatCanvasRegistryRequestedAction
+  | ChatCanvasRegistryChangedAction
   | CanvasStateChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

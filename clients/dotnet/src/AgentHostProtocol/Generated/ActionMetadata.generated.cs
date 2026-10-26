@@ -94,6 +94,12 @@ internal static class GeneratedActionMetadata
             case ChatCanvasesChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatCanvasRegistryChangedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatCanvasRegistryRequestedAction value:
+                actionType = value.Type;
+                return true;
             case ChatChangesetsChangedAction value:
                 actionType = value.Type;
                 return true;

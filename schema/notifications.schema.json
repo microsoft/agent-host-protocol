@@ -1014,6 +1014,11 @@
       "type": "object",
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
+        "canvases": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Experimental Canvas API.\n\nThe agent can materialize an exact chat's\n{@link ChatState.canvasRegistry | Canvas registry} through\n`chat/canvasRegistryRequested` and open a declared type with `openCanvas`.\nLive instances are published through the chat's canvas references and\ntheir `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\nregistry metadata while the Canvas channel remains experimental. This\ncapability does not gate server-published Canvas references."
+        },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding\ncreation mode."
@@ -2956,6 +2961,10 @@
             "$ref": "#/$defs/BackgroundWork"
           },
           "description": "Work running in the background for this chat, such as shells and\nsubagents. Only active work is listed: hosts remove an entry once the work\nends. An entry may have been started by an earlier turn rather than the\n{@link ChatState.activeTurn | activeTurn}.\n\nLike {@link ChatState.changesets | changesets}, this is intentionally\nabsent from {@link ChatSummary}; clients obtain it by subscribing to the\nchat channel."
+        },
+        "canvasRegistry": {
+          "$ref": "#/$defs/CanvasRegistry",
+          "description": "Canvas types currently registered for this exact chat.\n\nAbsence means the registry has not been materialized or is not currently\navailable. Clients that need it MAY dispatch\n`chat/canvasRegistryRequested`; the host publishes the authoritative\nregistry through `chat/canvasRegistryChanged`. An empty\n{@link CanvasRegistry.extensions} array is a loaded registry with no\navailable canvas types."
         },
         "canvases": {
           "type": "array",
@@ -5107,6 +5116,80 @@
         "title"
       ]
     },
+    "CanvasExtensionDeclaration": {
+      "type": "object",
+      "description": "One extension/provider that declares canvas types for an exact chat.\n\nThe extension metadata is normalized here instead of repeated on every\n{@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT\ninfer its source or management behavior by parsing it.",
+      "properties": {
+        "extensionId": {
+          "type": "string",
+          "description": "Stable opaque identifier of the extension/provider."
+        },
+        "extensionSource": {
+          "$ref": "#/$defs/CanvasExtensionSource",
+          "description": "Where the runtime discovered the extension/provider."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Human-readable extension/provider name, when available."
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasTypeDeclaration"
+          },
+          "description": "Canvas types declared by this extension/provider. `canvasId` MUST be\nunique within this array."
+        }
+      },
+      "required": [
+        "extensionId",
+        "extensionSource",
+        "canvases"
+      ]
+    },
+    "CanvasTypeDeclaration": {
+      "type": "object",
+      "description": "One canvas type currently available to open.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
+      "properties": {
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas type identifier."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable canvas type name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what the canvas type does."
+        },
+        "requiresInput": {
+          "type": "boolean",
+          "description": "Whether opening this canvas requires an input flow."
+        }
+      },
+      "required": [
+        "canvasId",
+        "displayName",
+        "description",
+        "requiresInput"
+      ]
+    },
+    "CanvasRegistry": {
+      "type": "object",
+      "description": "Canvas types currently registered for one exact chat.\n\nThis is a compact presentation registry, not extension installation state\nand not the list of live instances. The host replaces the complete registry\nthrough `chat/canvasRegistryChanged` whenever provider registration changes.",
+      "properties": {
+        "extensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasExtensionDeclaration"
+          },
+          "description": "Declaring extensions/providers. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
+        }
+      },
+      "required": [
+        "extensions"
+      ]
+    },
     "CanvasReference": {
       "type": "object",
       "description": "Stable reference to a subscribable canvas channel.\n\nChat state intentionally carries only this reference so the experimental\ncanvas presentation model can evolve without changing the stable chat\nchannel shape.",
@@ -5126,7 +5209,7 @@
       "properties": {
         "instanceId": {
           "type": "string",
-          "description": "Stable caller-supplied instance identifier."
+          "description": "Provider-facing instance identifier.\n\nAHP clients address this instance by the subscribed `ahp-canvas:` channel\nURI. They MUST NOT treat this provider identifier as a second resource\nidentity."
         },
         "extensionId": {
           "type": "string",
@@ -7020,6 +7103,17 @@
       ],
       "type": "string",
       "description": "Why a tool call was cancelled."
+    },
+    "CanvasExtensionSource": {
+      "enum": [
+        "user",
+        "project",
+        "session",
+        "plugin",
+        "unknown"
+      ],
+      "type": "string",
+      "description": "Where the runtime discovered an extension that declares a canvas type."
     },
     "TerminalClaim": {
       "oneOf": [
