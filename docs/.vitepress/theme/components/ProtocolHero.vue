@@ -1,1011 +1,577 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-
-import type { ChatAction } from '../../../../types/action-origin.generated.js'
-import { chatReducer } from '../../../../types/channels-chat/reducer.js'
-import type { ChatState, ToolCallState } from '../../../../types/channels-chat/state.js'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
+import { withBase } from 'vitepress'
+import { STABLE_DOC_VERSIONS } from '../../versions'
+import AutomationView from './AutomationView.vue'
+import ChannelsView from './ChannelsView.vue'
+import ChatView from './ChatView.vue'
+import DeviceScreen from './DeviceScreen.vue'
+import TerminalView from './TerminalView.vue'
+import { checkpoints, clientIds, deviceIds, pickActiveStep, stateDigest } from '../notebook.js'
+import type { DeviceId, Subject } from '../notebook.js'
 import {
-  MessageKind,
-  ResponsePartKind,
-  ToolCallConfirmationReason,
-} from '../../../../types/channels-chat/state.js'
-import { ActionType } from '../../../../types/common/actions.js'
-import { SessionStatus } from '../../../../types/channels-session/state.js'
+  automationFrame, baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, desktopApps, finalChapter,
+  deviceSeq, features, hostSeq, planeSize, receivedBy, sceneBoxes, stopDiff, stops, stopWire,
+  subjectLabel, terminalFrame, visibleDevices,
+} from '../notebook-story.js'
+import type { Layout, Stop } from '../notebook-story.js'
 
-type FlowPhase = 'action' | 'reducer' | 'state'
-type InspectorTab = 'action' | 'diff'
+const step = ref(0)
+const stop = computed(() => stops[step.value])
+const chapter = computed(() => chapters.find(entry => entry.number === stop.value.chapter))
 
-interface VisualDiffLine {
-  kind: 'add' | 'remove' | 'context'
-  text: string
-}
+const reveal = ref(0)
+const reducedMotion = ref(false)
+const wide = ref(true)
+const fit = ref(1)
+/** Space left below the cover so the first chapter peeks above the fold. */
+const peek = computed(() => wide.value ? 150 : 104)
+/** Spare vertical space in the wide figure, split evenly so the devices sit centred. */
+const slack = ref(0)
+const layout = computed<Layout>(() => wide.value ? 'full' : 'compact')
 
-interface FakeTool {
-  name: 'read_file' | 'write_file'
-  displayName: string
-  intention: string
-  path: string
-  invocationMessage: string
-  pastTenseMessage: string
-}
+const pad = (value: number) => String(value).padStart(2, '0')
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const jsonToken = /("(?:\\.|[^\\"])*")(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g
+/** Pretty-printed JSON as escaped HTML with token classes for highlighting. */
+const json = (value: unknown) => escapeHtml(JSON.stringify(value, null, 2)).replace(jsonToken, (token, string?: string, colon?: string) => {
+  if (string) return colon ? `<span class="j-key">${string}</span>${colon}` : `<span class="j-str">${string}</span>`
+  return `<span class="${/^-?\d/.test(token) ? 'j-num' : 'j-lit'}">${token}</span>`
+})
+const messageCount = (count: number) => `${count} ${count === 1 ? 'message' : 'messages'}`
 
-const CHANNEL = 'ahp-chat:/demo'
-const MAX_REMOVED_DIFF_LINES = 4
-const MAX_ADDED_DIFF_LINES = 7
+// ─── Copy ──────────────────────────────────────────────────────────────────
 
-const tools: readonly FakeTool[] = [
-  {
-    name: 'read_file',
-    displayName: 'Read file',
-    intention: 'Inspect the current chat reducer',
-    path: 'types/channels-chat/reducer.ts',
-    invocationMessage: 'Reading types/channels-chat/reducer.ts',
-    pastTenseMessage: 'Read the chat reducer',
+/** `wire` explains the messages shown when the step's message list is expanded. */
+interface StepCopy { body: string; aside?: string; wire?: string }
+const copy: Record<string, StepCopy> = {
+  optimistic: {
+    body: 'AHP drives the UI by applying actions to state through pure reducers. A client sends a message by issuing <code>chat/turnStarted</code> as a <code>dispatchAction</code>, and can naturally show it in a pending state until the server acknowledges it.\n\nOther clients stay in sync by seeing the stream of actions echoed and broadcast by the agent host. The host is the arbiter of state and can choose to reject or reconcile concurrent conflicting actions.',
+    wire: 'The client numbers each write with its own <code>clientSeq</code> and keeps it in <code>pending</code>, drawing the confirmed state with pending actions applied on top. When the host broadcasts the action back with an <code>origin</code> naming this client and <code>clientSeq</code>, it moves from pending into confirmed state.',
   },
-  {
-    name: 'write_file',
-    displayName: 'Write file',
-    intention: 'Update the protocol walkthrough',
-    path: 'docs/guide/state-model.md',
-    invocationMessage: 'Writing docs/guide/state-model.md',
-    pastTenseMessage: 'Updated the state model guide',
+  'link-drops': {
+    body: 'Because actions are pure, sequenced envelopes, AHP behaves well under network interruptions. Clients can keep letting the user work and reconcile their pending actions when the network reconnects. Here, the phone approves a tool call just as it loses signal.',
+    wire: 'The host accepted the approval, stamped it <code>#46</code> and broadcast it with the phone’s <code>origin</code>. Only the desktop and tablet were still connected to receive it, so the phone keeps the approval pending. It isn’t lost, just not yet confirmed.',
   },
-]
-
-const autoplayPrompts = [
-  'Show me how chat state changes',
-  'Inspect the reducer lifecycle',
-  'Demonstrate a tool call',
-]
-
-const loremResponses = [
-  'Lorem ipsum dolor sit amet; the resulting state remains deterministic.',
-  'Lorem ipsum dolor sit amet, reduced through the same immutable state path.',
-  'Lorem ipsum dolor sit amet. Every subscriber now sees the same turn.',
-]
-
-function compactDiffLines(
-  lines: string[],
-  limit: number,
-  kind: VisualDiffLine['kind'],
-): VisualDiffLine[] {
-  if (lines.length <= limit) {
-    return lines.map(text => ({ kind, text }))
-  }
-
-  return [
-    ...lines.slice(0, limit - 1).map(text => ({ kind, text }) satisfies VisualDiffLine),
-    { kind: 'context', text: `  … ${lines.length - limit + 1} more lines` },
-  ]
+  'host-advances': {
+    body: 'The host can keep working too. When a client reconnects, the host sends either the actions it missed or simply a snapshot of the current state.',
+    wire: 'These actions carry no <code>origin</code>: they come from the host itself as the agent makes progress. Each takes the next <code>serverSeq</code>, which is how a client that falls behind knows exactly what it missed.',
+  },
+  replay: {
+    body: 'The client then reconciles its pending actions with the current state. Each one is applied, or rejected if it would conflict. The phone’s approval already reached the host before the link dropped, so it’s simply confirmed, and the phone matches every other screen.',
+    wire: 'The phone tells the host the last <code>serverSeq</code> it saw, and the host answers with every action after it, in order, inside the response. The first replayed action carries the phone’s own <code>origin</code>, so the phone treats it as the echo of its pending approval.',
+  },
+  'run-running': {
+    body: 'Chat is just one channel, and AHP is designed to be extended with more. Automations, for example, are scheduled tasks that live on the host. Any client can start a run and follow it into the session it creates.',
+    wire: 'Subscribing to the run returns a snapshot of its current state, and later changes stream in as actions on the same channel. The desktop’s catalogue updates separately on <code>ahp-automations://</code>. Each client only receives actions for the channels it subscribes to.',
+  },
+  'take-over': {
+    body: 'Terminals are another optional capability. The agent can run a command, and you can take over the same terminal from any client. The host tracks who’s in control, and output always comes from the host, so every screen sees the same thing.',
+    wire: 'Claiming the terminal and typing into it are ordinary dispatched actions, echoed back like any other. The echoed <code>terminal/input</code> changes no state; the output only appears once the host’s shell answers with <code>terminal/data</code>.',
+  },
+  'host-offers-less': {
+    body: 'It’s important that AHP be expressive enough to implement powerful, featureful agent hosts. But it’s just as important that it’s easy to build a simple, useful integration that runs wherever developers want it.\n\nFeatures beyond basic conversations are optionally implemented and negotiated by clients and hosts when they connect, so you can start with just chat and add more as you go. This host doesn’t offer automations, so the client simply leaves them out.',
+    wire: 'The client lists the protocol versions it speaks, and the host picks one. Capabilities come back with the result: terminals are listed in the root state’s <code>terminals</code>, and automations would appear as an <code>automations</code> field on the result. This host leaves that field out, so the client hides the feature.',
+  },
+  'any-client': {
+    body: 'There are ready-to-use clients in several languages, so it’s easy to build AHP-compatible clients and hosts. If you’d rather implement your own, there are language-independent test suites too. We’ve found that most agents can build fully functional clients and hosts with these packages and minimal prompting.',
+  },
 }
 
-function visualJsonDiff(before: unknown, after: unknown): VisualDiffLine[] {
-  const beforeLines = JSON.stringify(before, null, 2).split('\n')
-  const afterLines = JSON.stringify(after, null, 2).split('\n')
-  let prefixLength = 0
-  let suffixLength = 0
-
-  while (
-    prefixLength < beforeLines.length
-    && prefixLength < afterLines.length
-    && beforeLines[prefixLength] === afterLines[prefixLength]
-  ) {
-    prefixLength += 1
-  }
-
-  while (
-    suffixLength < beforeLines.length - prefixLength
-    && suffixLength < afterLines.length - prefixLength
-    && beforeLines[beforeLines.length - suffixLength - 1]
-      === afterLines[afterLines.length - suffixLength - 1]
-  ) {
-    suffixLength += 1
-  }
-
-  const beforeEnd = beforeLines.length - suffixLength
-  const afterEnd = afterLines.length - suffixLength
-  const lines: VisualDiffLine[] = []
-
-  if (prefixLength > 0) {
-    lines.push({
-      kind: 'context',
-      text: `  ${beforeLines[prefixLength - 1]}`,
-    })
-  }
-  lines.push(...compactDiffLines(
-    beforeLines.slice(prefixLength, beforeEnd),
-    MAX_REMOVED_DIFF_LINES,
-    'remove',
-  ))
-  lines.push(...compactDiffLines(
-    afterLines.slice(prefixLength, afterEnd),
-    MAX_ADDED_DIFF_LINES,
-    'add',
-  ))
-  if (suffixLength > 0) {
-    lines.push({
-      kind: 'context',
-      text: `  ${afterLines[afterEnd]}`,
-    })
-  }
-
-  return lines
+const chapterLinks: Record<number, [string, string][]> = {
+  1: [['Actions', '/guide/actions'], ['Client-side state', '/guide/reconciliation#client-side-state']],
+  2: [['Reconciliation', '/guide/reconciliation#reconnection'], ['Reconnection', '/specification/lifecycle#reconnection']],
+  3: [['Automations', '/guide/automations'], ['Terminals', '/guide/terminals'], ['Connection handshake', '/specification/lifecycle#connection-handshake']],
+  4: [['Choosing a client', '/guide/clients'], ['Test suites', 'https://github.com/microsoft/agent-host-protocol/tree/main/types/test-cases'], ['Specification', '/specification/overview']],
 }
 
-const initialState: ChatState = {
-  resource: CHANNEL,
-  title: 'Interactive protocol demo',
-  status: SessionStatus.Idle,
-  modifiedAt: '2026-01-01T00:00:00.000Z',
-  turns: [],
+const libraries = [['TypeScript', 'typescript'], ['Rust', 'rust'], ['Kotlin', 'kotlin'], ['Swift', 'swift'], ['Go', 'go'], ['.NET', 'dotnet']] as const
+
+// ─── Scene ─────────────────────────────────────────────────────────────────
+
+type Variant = DeviceId
+interface Screen {
+  id: DeviceId
+  stop: Stop
+  view: NonNullable<Stop['views'][DeviceId]>
 }
 
-const initialAction = {
-  type: ActionType.ChatActivityChanged,
-  activity: 'Waiting for input',
-} satisfies ChatAction
+/** A device off the desk keeps showing its last scene while it slides away. */
+function screenFor(index: number, id: DeviceId): Screen {
+  for (let cursor = index; cursor >= 0; cursor--) {
+    const view = stops[cursor].views[id]
+    if (view) return { id, stop: stops[cursor], view }
+  }
+  const later = stops.slice(index).find(candidate => candidate.views[id])!
+  return { id, stop: later, view: later.views[id]! }
+}
 
-const initialReducedState = chatReducer(initialState, initialAction)
+const screens = computed(() => deviceIds.map(id => screenFor(step.value, id)))
+const visible = computed(() => new Set(visibleDevices(stop.value)))
+const boxes = computed(() => sceneBoxes(stop.value.scene, layout.value, visibleDevices(stop.value)))
+const received = computed(() => receivedBy(stop.value))
+const plane = computed(() => planeSize[layout.value])
+const host = computed(() => hostSeq(stop.value))
 
-const chatState = ref<ChatState>(initialReducedState)
-const inputText = ref('')
-const lastAction = ref<ChatAction>(initialAction)
-const lastDiff = ref<VisualDiffLine[]>(visualJsonDiff(initialState, initialReducedState))
-const serverSeq = ref(1)
-const flowPhase = ref<FlowPhase>('state')
-const inspectorTab = ref<InspectorTab>('action')
-const userInteracted = ref(false)
-
-const responderTimers = new Set<number>()
-const autoplayTimers = new Set<number>()
-const flowTimers = new Set<number>()
-let activeRunToken = 0
-let autoplayPromptIndex = 0
-
-const displayedTurn = computed(
-  () => chatState.value.activeTurn ?? chatState.value.turns.at(-1),
-)
-
-const userMessage = computed(
-  () => displayedTurn.value?.message.text ?? 'The autoplay demo will send a message...',
-)
-
-const assistantText = computed(() => {
-  const turn = displayedTurn.value
-  if (!turn) return 'Actions and reducer output will appear here.'
-
-  const text = turn.responseParts
-    .flatMap(part => part.kind === ResponsePartKind.Markdown ? [part.content] : [])
-    .join('')
-
-  if (text) return text
-  return chatState.value.activeTurn ? 'Waiting for the fake responder...' : 'No assistant text.'
+const delays = ref<Record<DeviceId, number>>({ desktop: 0, tablet: 0, phone: 0 })
+watch(step, (now, before) => {
+  const was = new Set(visibleDevices(stops[before]))
+  const is = new Set(visibleDevices(stops[now]))
+  const exits = [...was].some(id => !is.has(id))
+  const moves = stops[before].scene !== stops[now].scene
+  // Exits first, then the remaining devices settle, then newcomers slide in.
+  delays.value = Object.fromEntries(deviceIds.map(id => [id,
+    was.has(id) && !is.has(id) ? 0 : !was.has(id) && is.has(id) ? (exits || moves ? 200 : 100) : exits ? 80 : 0,
+  ])) as Record<DeviceId, number>
 })
 
-const toolCalls = computed<ToolCallState[]>(() => {
-  const turn = displayedTurn.value
-  if (!turn) return []
-  return turn.responseParts.flatMap(
-    part => part.kind === ResponsePartKind.ToolCall ? [part.toolCall] : [],
-  )
+function deviceStyle(id: DeviceId) {
+  const box = boxes.value.devices[id]
+  const base = baseSize[layout.value][id]
+  return {
+    width: `${base.width}px`,
+    height: `${base.height}px`,
+    transform: `translate3d(${box.x}px, ${box.y}px, 0) scale(${box.scale})`,
+    '--d': `${delays.value[id]}ms`,
+  }
+}
+
+const railStyle = computed(() => {
+  const rail = boxes.value.rail
+  return { transform: `translate3d(${rail.x}px, ${rail.y}px, 0)`, width: `${rail.width}px`, height: `${rail.height}px` }
 })
 
-const actionJson = computed(() => JSON.stringify({
-  channel: CHANNEL,
-  action: lastAction.value,
-  serverSeq: serverSeq.value,
-}, null, 2))
-
-function clearTimers(timers: Set<number>): void {
-  for (const timer of timers) window.clearTimeout(timer)
-  timers.clear()
-}
-
-function schedule(timers: Set<number>, delay: number, callback: () => void): void {
-  const timer = window.setTimeout(() => {
-    timers.delete(timer)
-    callback()
-  }, delay)
-  timers.add(timer)
-}
-
-function setFlowPhase(phase: FlowPhase): void {
-  clearTimers(flowTimers)
-  flowPhase.value = phase
-  schedule(flowTimers, 90, () => {
-    flowPhase.value = 'reducer'
+const wires = computed(() => {
+  const rail = boxes.value.rail
+  return visibleDevices(stop.value).map(id => {
+    const box = boxes.value.devices[id]
+    const y = Math.round(box.y + Math.min(box.height / 2, rail.height - 20))
+    const right = box.x > rail.x
+    const mirror = screens.value.find(screen => screen.id === id)!.view === 'chat' ? chatFrame(stop.value).devices[id] : undefined
+    return { id, x1: right ? rail.x + rail.width : box.x + box.width, x2: right ? box.x : rail.x, y, cut: mirror ? mirror.link !== 'connected' : false }
   })
-  schedule(flowTimers, 230, () => {
-    flowPhase.value = 'state'
-  })
+})
+
+function linkOf(screen: Screen) {
+  return screen.view === 'chat' && screen.stop.chapter !== finalChapter ? chatFrame(screen.stop).devices[screen.id].link : 'connected'
 }
 
-function publishAction(action: ChatAction): void {
-  const before = chatState.value
-  const after = chatReducer(before, action)
-
-  lastAction.value = action
-  lastDiff.value = visualJsonDiff(before, after)
-  chatState.value = after
-  serverSeq.value += 1
-  setFlowPhase('action')
+function bannerOf(screen: Screen): string | undefined {
+  if (screen.view !== 'chat' || screen.stop.chapter === finalChapter) return undefined
+  const mirror = chatFrame(screen.stop).devices[screen.id]
+  if (mirror.link === 'offline') return `Transport closed · last seen #${mirror.lastSeenServerSeq}`
+  if (mirror.link === 'reconnecting') return `reconnect → last seen #${mirror.lastSeenServerSeq}`
+  return undefined
 }
 
-function isCurrentRun(runToken: number, turnId: string): boolean {
-  return runToken === activeRunToken && chatState.value.activeTurn?.id === turnId
+const deviceSummary = computed(() => visibleDevices(stop.value).map(id => {
+  const seq = deviceSeq(stop.value, id)
+  return `${subjectLabel(id)} shows ${stop.value.views[id]}${seq === undefined ? '' : `, last seen #${seq}`}.`
+}).join(' '))
+const announcement = computed(() => stop.value.chapter === 0
+  ? 'Cover'
+  : `Chapter ${stop.value.chapter} of ${chapters.length}, ${chapter.value?.title}: ${stop.value.title}. ${stop.value.caption}`)
+
+const heroZoom = 0.06
+const planeStyle = computed(() => {
+  const zoom = wide.value && !reducedMotion.value ? 1 + heroZoom * (1 - reveal.value) : 1
+  const lift = wide.value && !reducedMotion.value ? (1 - reveal.value) * 14 : 0
+  return { width: `${plane.value.width}px`, height: `${plane.value.height}px`, transform: `translate3d(-50%, ${Math.round(slack.value + lift)}px, 0) scale(${(fit.value * zoom).toFixed(4)})` }
+})
+const figureStyle = computed(() => wide.value ? undefined : { height: `${Math.round(plane.value.height * fit.value)}px` })
+
+// ─── Details (rendered only while open) ────────────────────────────────────
+
+const open = reactive(new Set<string>())
+function onToggle(key: string, event: Event) {
+  if ((event.target as HTMLDetailsElement).open) open.add(key)
+  else open.delete(key)
+}
+const routeLabel = (from: Subject, to: readonly Subject[]) => `${subjectLabel(from)} → ${to.map(subjectLabel).join(', ')}`
+const snapshotFallback = () => {
+  const frame = checkpoints().find(candidate => candidate.slug === 'snapshot')!
+  return { record: frame.wire[0], seq: frame.devices.phone.lastSeenServerSeq, digest: stateDigest(frame.devices.phone.confirmed), host: stateDigest(frame.host), replayFrom: frame.replayFrom }
 }
 
-function scheduleResponder(turnId: string, startedAt: number): void {
-  clearTimers(responderTimers)
-  const runToken = ++activeRunToken
-  const tool = tools[Math.floor(Math.random() * tools.length)] ?? tools[0]
-  const lorem = loremResponses[Math.floor(Math.random() * loremResponses.length)]
-    ?? loremResponses[0]
-  const partId = `md-${turnId}`
-  const toolCallId = `tool-${turnId}`
+// ─── Scroll checkpoints ────────────────────────────────────────────────────
 
-  const dispatchIfCurrent = (action: ChatAction): void => {
-    if (isCurrentRun(runToken, turnId)) publishAction(action)
+const runEl = ref<HTMLElement>()
+const stageEl = ref<HTMLElement>()
+const stageHeight = ref(0)
+const figureEl = ref<HTMLElement>()
+const coverEl = ref<HTMLElement>()
+const markers: HTMLElement[] = []
+const setMarker = (index: number) => (el: Element | ComponentPublicInstance | null) => { if (el instanceof HTMLElement) markers[index] = el }
+
+let rafId = 0
+let unlockTimer: ReturnType<typeof setTimeout> | undefined
+let hashTimer: ReturnType<typeof setTimeout> | undefined
+let navigating = false
+let motionQuery: MediaQueryList | undefined
+let resizeObserver: ResizeObserver | undefined
+
+function readingLine(): number {
+  if (!wide.value && stageEl.value) {
+    // The stacked stage is pinned to the bottom; read in the space above it.
+    return (window.innerHeight - stageEl.value.getBoundingClientRect().height) * 0.45
   }
-
-  schedule(responderTimers, 380, () => dispatchIfCurrent({
-    type: ActionType.ChatResponsePart,
-    turnId,
-    part: {
-      kind: ResponsePartKind.Markdown,
-      id: partId,
-      content: '',
-    },
-  }))
-
-  schedule(responderTimers, 700, () => dispatchIfCurrent({
-    type: ActionType.ChatDelta,
-    turnId,
-    partId,
-    content: 'I will run this through the canonical chat reducer. ',
-  }))
-
-  schedule(responderTimers, 1080, () => dispatchIfCurrent({
-    type: ActionType.ChatToolCallStart,
-    turnId,
-    toolCallId,
-    toolName: tool.name,
-    displayName: tool.displayName,
-    intention: tool.intention,
-  }))
-
-  schedule(responderTimers, 1420, () => dispatchIfCurrent({
-    type: ActionType.ChatToolCallReady,
-    turnId,
-    toolCallId,
-    invocationMessage: tool.invocationMessage,
-    toolInput: JSON.stringify({ path: tool.path }),
-    confirmed: ToolCallConfirmationReason.NotNeeded,
-  }))
-
-  schedule(responderTimers, 1950, () => dispatchIfCurrent({
-    type: ActionType.ChatToolCallComplete,
-    turnId,
-    toolCallId,
-    result: {
-      success: true,
-      pastTenseMessage: tool.pastTenseMessage,
-    },
-  }))
-
-  schedule(responderTimers, 2260, () => dispatchIfCurrent({
-    type: ActionType.ChatDelta,
-    turnId,
-    partId,
-    content: lorem,
-  }))
-
-  schedule(responderTimers, 2920, () => {
-    if (!isCurrentRun(runToken, turnId)) return
-    publishAction({
-      type: ActionType.ChatTurnComplete,
-      turnId,
-      duration: Date.now() - startedAt,
-    })
-    scheduleAutoplay(4400)
-  })
+  return window.innerHeight * 0.42
 }
 
-function submitMessage(explicitInteraction: boolean): void {
-  const text = inputText.value.trim()
-  if (!text || chatState.value.activeTurn) return
-  if (explicitInteraction) markInputInteraction()
-
-  const startedAt = Date.now()
-  const turnId = `turn-${serverSeq.value}`
-  inputText.value = ''
-
-  publishAction({
-    type: ActionType.ChatTurnStarted,
-    turnId,
-    startedAt: new Date(startedAt).toISOString(),
-    message: {
-      text,
-      origin: { kind: MessageKind.User },
-    },
-  })
-  scheduleResponder(turnId, startedAt)
+function tops(): number[] {
+  return stops.map(entry => entry.index === 0 ? coverEl.value?.getBoundingClientRect().top ?? 0 : markers[entry.index]?.getBoundingClientRect().top ?? Infinity)
 }
 
-function cancelTurn(): void {
-  markInputInteraction()
-  const turn = chatState.value.activeTurn
-  if (!turn) return
-
-  clearTimers(responderTimers)
-  activeRunToken += 1
-  publishAction({
-    type: ActionType.ChatTurnCancelled,
-    turnId: turn.id,
-    duration: Math.max(0, Date.now() - Date.parse(turn.startedAt)),
-  })
+function measure(): void {
+  rafId = 0
+  reveal.value = reducedMotion.value || !wide.value ? 1 : Math.min(1, Math.max(0, window.scrollY / 320))
+  if (navigating || !markers.length) return
+  step.value = pickActiveStep(tops(), readingLine())
 }
 
-function markInputInteraction(): void {
-  if (userInteracted.value) return
-  userInteracted.value = true
-  clearTimers(autoplayTimers)
+function schedule(): void {
+  if (!rafId) rafId = requestAnimationFrame(measure)
 }
 
-function typeAutoplayPrompt(prompt: string, index = 0): void {
-  if (userInteracted.value) return
-
-  inputText.value = prompt.slice(0, index)
-  if (index <= prompt.length) {
-    schedule(autoplayTimers, 92, () => typeAutoplayPrompt(prompt, index + 1))
-    return
+function resize(): void {
+  wide.value = window.innerWidth >= 1024 && window.innerHeight >= 620
+  stageHeight.value = stageEl.value?.offsetHeight ?? 0
+  const box = figureEl.value
+  const size = planeSize[wide.value ? 'full' : 'compact']
+  if (box) {
+    fit.value = wide.value
+      ? Math.max(0.4, Math.min(box.clientWidth / size.width, box.clientHeight / size.height) / (1 + heroZoom))
+      : Math.max(0.4, Math.min(box.parentElement!.clientWidth / size.width, (window.innerHeight * 0.36) / size.height, 1.15))
+    slack.value = wide.value ? Math.max(0, (box.clientHeight - size.height * fit.value) / 2) : 0
   }
-
-  schedule(autoplayTimers, 720, () => submitMessage(false))
+  schedule()
 }
 
-function scheduleAutoplay(delay: number): void {
-  if (
-    userInteracted.value
-    || window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) return
+function release(): void {
+  navigating = false
+  clearTimeout(unlockTimer)
+  schedule()
+}
 
-  clearTimers(autoplayTimers)
-  const prompt = autoplayPrompts[autoplayPromptIndex % autoplayPrompts.length]
-    ?? autoplayPrompts[0]
-  autoplayPromptIndex += 1
-  schedule(autoplayTimers, delay, () => typeAutoplayPrompt(prompt))
+function goto(index: number, jump = false): void {
+  const target = clampStop(index)
+  step.value = target
+  const marker = target === 0 ? undefined : markers[target]
+  navigating = true
+  const instant = jump || (motionQuery?.matches ?? reducedMotion.value)
+  const top = marker ? window.scrollY + marker.getBoundingClientRect().top - readingLine() + 2 : 0
+  window.scrollTo({ top: Math.max(0, top), behavior: instant ? 'auto' : 'smooth' })
+  clearTimeout(unlockTimer)
+  unlockTimer = setTimeout(release, instant ? 60 : 1200)
+}
+
+function syncHash(): void {
+  const id = decodeURIComponent(window.location.hash.slice(1))
+  const target = id.startsWith('ch-') ? chapterBySlug(id.slice(3)) : undefined
+  if (target) goto(chapterStart(target.number), true)
+}
+
+function onScrollEnd(): void {
+  if (navigating) release()
+}
+
+function updateMotion(): void {
+  reducedMotion.value = motionQuery?.matches ?? false
+  schedule()
 }
 
 onMounted(() => {
-  scheduleAutoplay(2600)
+  motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  motionQuery.addEventListener('change', updateMotion)
+  reducedMotion.value = motionQuery.matches
+  window.addEventListener('scroll', schedule, { passive: true })
+  window.addEventListener('scrollend', onScrollEnd)
+  window.addEventListener('resize', resize)
+  window.addEventListener('hashchange', syncHash)
+  resizeObserver = new ResizeObserver(resize)
+  if (figureEl.value) resizeObserver.observe(figureEl.value)
+  if (runEl.value) resizeObserver.observe(runEl.value)
+  if (stageEl.value) resizeObserver.observe(stageEl.value)
+  resize()
+  // Let the router's own hash scroll land first, then align the linked chapter to the reading line.
+  hashTimer = setTimeout(syncHash, 120)
 })
 
 onBeforeUnmount(() => {
-  clearTimers(responderTimers)
-  clearTimers(autoplayTimers)
-  clearTimers(flowTimers)
+  cancelAnimationFrame(rafId)
+  clearTimeout(unlockTimer)
+  clearTimeout(hashTimer)
+  motionQuery?.removeEventListener('change', updateMotion)
+  window.removeEventListener('scroll', schedule)
+  window.removeEventListener('scrollend', onScrollEnd)
+  window.removeEventListener('resize', resize)
+  window.removeEventListener('hashchange', syncHash)
+  resizeObserver?.disconnect()
 })
+
+const variantOf = (id: DeviceId): Variant => id
 </script>
 
 <template>
-  <section
-    class="ph"
-    aria-label="Interactive Agent Host Protocol chat reducer demo"
-  >
-    <header class="ph-toolbar" aria-hidden="true">
-      <span class="ph-window-dot ph-window-dot--close"></span>
-      <span class="ph-window-dot ph-window-dot--minimize"></span>
-      <span class="ph-window-dot ph-window-dot--zoom"></span>
-    </header>
+  <div class="nb" :class="{ 'is-reduced': reducedMotion, 'is-wide': wide }" :style="{ '--nb-stage-h': `${stageHeight}px`, '--nb-peek': `${peek}px` }">
+    <div ref="runEl" class="nb-run">
+      <header ref="coverEl" class="nb-cover">
+        <h1>A protocol for synchronizing agent state across UIs</h1>
+        <p class="nb-intro">AHP is a display protocol built to let many interfaces operate on shared session state. It’s an extensible, bidirectional, state-based protocol that works well across a variety of modalities and network conditions.</p>
+        <div class="nb-cta">
+          <a class="nb-primary" :href="withBase('/guide/what-is-ahp')">Read the guide</a>
+          <a :href="withBase('/specification/overview')">Specification <span class="nb-version">v{{ STABLE_DOC_VERSIONS[0] }}</span> ↗</a>
+        </div>
+      </header>
 
-    <div class="ph-workspace">
-      <section class="ph-chat" aria-label="Demo chat">
-        <div class="ph-transcript" aria-live="polite">
-          <div class="ph-message ph-message--user">
-            <span class="ph-avatar">U</span>
-            <p>{{ userMessage }}</p>
-          </div>
-
-          <div class="ph-message ph-message--agent">
-            <span class="ph-avatar">A</span>
-            <div>
-              <p>{{ assistantText }}<span v-if="chatState.activeTurn" class="ph-cursor"></span></p>
+      <div class="nb-stage-col">
+        <section ref="stageEl" class="nb-stage" aria-label="Protocol notebook stage" :style="{ '--reveal': reveal }">
+          <figure ref="figureEl" class="nb-figure" :style="figureStyle">
+            <div class="nb-plane" :class="`is-${layout}`" :style="planeStyle" aria-hidden="true">
+              <svg class="nb-wires" :viewBox="`0 0 ${plane.width} ${plane.height}`" focusable="false">
+                <line v-for="wire in wires" :key="`${stop.scene}-${wire.id}`" :x1="wire.x1" :x2="wire.x2" :y1="wire.y" :y2="wire.y" :class="{ 'is-hot': received.has(wire.id), 'is-cut': wire.cut }" />
+              </svg>
+              <div class="nb-host-rail" :style="railStyle"><span>HOST</span><b>{{ host === undefined ? 'init' : `#${host}` }}</b></div>
               <div
-                v-for="toolCall in toolCalls"
-                :key="toolCall.toolCallId"
-                class="ph-tool"
+                v-for="screen in screens" :key="screen.id" class="nb-device" :class="{ 'is-out': !visible.has(screen.id) }"
+                :style="deviceStyle(screen.id)" :inert="!visible.has(screen.id) || undefined"
               >
-                <span class="ph-tool-icon" aria-hidden="true"></span>
-                <strong>{{ toolCall.displayName }}</strong>
-                <span>{{ toolCall.status }}</span>
+                <DeviceScreen
+                  :variant="variantOf(screen.id)" :link="linkOf(screen)" :seq="deviceSeq(screen.stop, screen.id)"
+                  :badge="screen.view === 'channels' ? `v${features(screen.stop)!.protocolVersion}` : undefined"
+                  :tag="screen.stop.tags?.[screen.id]" :focused="visible.size > 1 && stop.chapter > 0 && stop.chapter !== finalChapter && stop.focus === screen.id"
+                  :received="received.has(screen.id)" :banner="bannerOf(screen)"
+                  :apps="screen.id === 'desktop' && layout === 'full' ? desktopApps(screen.stop) : undefined"
+                >
+                  <Transition name="nb-swap" mode="out-in">
+                    <ChatView v-if="screen.view === 'chat'" key="chat" :mirror="chatFrame(screen.stop).devices[screen.id]" :variant="screen.id" />
+                    <AutomationView
+                      v-else-if="screen.view === 'automations'" key="automations" :variant="screen.id"
+                      :catalogue="automationFrame(screen.stop)!.desktop.catalogue" :requested="automationFrame(screen.stop)!.desktop.requested !== undefined"
+                    />
+                    <AutomationView
+                      v-else-if="screen.view === 'run'" key="run" :variant="screen.id"
+                      :run="automationFrame(screen.stop)!.tablet!.run" :origin="automationFrame(screen.stop)!.tablet!.origin"
+                    />
+                    <TerminalView v-else-if="screen.view === 'terminal'" key="terminal" :variant="screen.id" :state="terminalFrame(screen.stop)!.host" :me="clientIds.desktop" />
+                    <ChannelsView v-else key="channels" :rows="features(screen.stop)!.rows" :protocol-version="features(screen.stop)!.protocolVersion" />
+                  </Transition>
+                </DeviceScreen>
               </div>
             </div>
-          </div>
-        </div>
-
-        <form class="ph-composer" @submit.prevent="submitMessage(true)">
-          <label class="ph-input-wrap">
-            <span class="ph-visually-hidden">Send a chat message</span>
-            <input
-              v-model="inputText"
-              type="text"
-              placeholder="Send a protocol action..."
-              :disabled="Boolean(chatState.activeTurn)"
-              @focus="markInputInteraction"
-              @input="markInputInteraction"
-              @pointerdown="markInputInteraction"
-            />
-            <span v-if="!userInteracted && inputText" class="ph-autoplay">autoplay</span>
-          </label>
-          <button
-            v-if="chatState.activeTurn"
-            class="ph-send ph-send--cancel"
-            type="button"
-            @click="cancelTurn"
-          >
-            Cancel
-          </button>
-          <button
-            v-else
-            class="ph-send"
-            type="submit"
-            :disabled="!inputText.trim()"
-          >
-            Send
-          </button>
-        </form>
-      </section>
-
-      <aside class="ph-inspector" aria-label="Protocol action and state diff">
-        <div class="ph-flow">
-          <span :class="{ active: flowPhase === 'action' }">action</span>
-          <i></i>
-          <span :class="{ active: flowPhase === 'reducer' }">chatReducer</span>
-          <i></i>
-          <span :class="{ active: flowPhase === 'state' }">state</span>
-        </div>
-
-        <div class="ph-inspector-tabs" aria-label="Inspector view">
-          <button
-            type="button"
-            :aria-pressed="inspectorTab === 'action'"
-            @click="inspectorTab = 'action'"
-          >
-            Action
-          </button>
-          <button
-            type="button"
-            :aria-pressed="inspectorTab === 'diff'"
-            @click="inspectorTab = 'diff'"
-          >
-            State diff
-          </button>
-        </div>
-
-        <section
-          class="ph-json-panel"
-          :class="{ 'ph-json-panel--mobile-hidden': inspectorTab !== 'action' }"
-        >
-          <div class="ph-json-heading">
-            <span>published action</span>
-            <code>#{{ serverSeq }}</code>
-          </div>
-          <pre>{{ actionJson }}</pre>
+            <figcaption class="nb-sr">{{ deviceSummary }}</figcaption>
+          </figure>
+          <p class="nb-sr" aria-live="polite">{{ announcement }}</p>
         </section>
+      </div>
 
-        <section
-          class="ph-json-panel ph-json-panel--diff"
-          :class="{ 'ph-json-panel--mobile-hidden': inspectorTab !== 'diff' }"
-        >
-          <div class="ph-json-heading">
-            <span>state diff</span>
-            <code>reducer output</code>
+      <ol class="nb-notes" aria-label="Notebook chapters">
+        <li v-for="entry in chapters" :id="`ch-${entry.slug}`" :key="entry.slug" :ref="setMarker(chapterStart(entry.number))" class="nb-chapter" :class="{ 'is-active': entry.number === stop.chapter, 'is-past': entry.number < stop.chapter }">
+          <div class="nb-note-margin" aria-hidden="true">§{{ pad(entry.number) }}</div>
+          <div class="nb-chapter-body">
+            <h2><a class="nb-anchor" :href="`#ch-${entry.slug}`">{{ entry.title }}</a></h2>
+            <ol class="nb-steps">
+              <li
+                v-for="item in chapterStops(entry.number)" :key="item.slug" :ref="item.sub > 0 ? setMarker(item.index) : undefined"
+                class="nb-step" :class="{ 'is-active': item.index === step, 'is-sub': item.sub > 0 }"
+              >
+                <h3 v-if="chapterStops(entry.number).length > 1"><span>{{ item.sub + 1 }}</span> {{ item.title }}</h3>
+                <p v-for="(paragraph, index) in copy[item.slug].body.split('\n\n')" :key="index" v-html="paragraph"></p>
+                <p v-if="copy[item.slug].aside" class="nb-aside" v-html="copy[item.slug].aside"></p>
+                <details v-if="stopWire(item).length" class="nb-glass" @toggle="onToggle(item.slug, $event)">
+                  <summary><span>{{ messageCount(stopWire(item).length) }}</span></summary>
+                  <template v-if="open.has(item.slug)">
+                    <p v-if="copy[item.slug].wire" class="nb-glass-text" v-html="copy[item.slug].wire"></p>
+                    <section v-for="(record, index) in stopWire(item)" :key="index" class="nb-wire">
+                      <p><b>{{ record.label }}</b><i>{{ routeLabel(record.from, record.to) }}</i></p>
+                      <pre v-html="json(record.message)"></pre>
+                    </section>
+                    <section v-if="stopDiff(item)?.entries.length" class="nb-wire">
+                      <p><b>State diff</b><i>previous step → this step</i></p>
+                      <ul class="nb-diff">
+                        <li v-for="change in stopDiff(item)!.entries" :key="change.op + change.path" :class="`op-${change.op === '+' ? 'add' : change.op === '-' ? 'del' : 'mod'}`">
+                          <b>{{ change.op }}</b><span>{{ change.path }}</span><i>{{ change.op === '~' ? `${change.before} → ${change.after}` : change.after ?? change.before }}</i>
+                        </li>
+                        <li v-if="stopDiff(item)!.more" class="nb-quiet">… {{ stopDiff(item)!.more }} more paths</li>
+                      </ul>
+                    </section>
+                  </template>
+                </details>
+                <details v-if="item.slug === 'replay'" class="nb-glass" @toggle="onToggle('snapshot', $event)">
+                  <summary><span>If the gap is too old</span></summary>
+                  <template v-if="open.has('snapshot')">
+                    <p class="nb-glass-text">Had the host trimmed its replay buffer to <code>#{{ snapshotFallback().replayFrom }}</code>, it could not replay <code>#46</code>. It would answer the same request with <code>type: "snapshot"</code> and fresh state for every subscription at <code>fromSeq: {{ snapshotFallback().seq }}</code>. The phone replaces its confirmed state, clears pending and lands on the same digest, <code>{{ snapshotFallback().digest }}</code> ≡ <code>{{ snapshotFallback().host }}</code>.</p>
+                    <section class="nb-wire">
+                      <p><b>{{ snapshotFallback().record.label }}</b><i>{{ routeLabel(snapshotFallback().record.from, snapshotFallback().record.to) }}</i></p>
+                      <pre v-html="json(snapshotFallback().record.message)"></pre>
+                    </section>
+                  </template>
+                </details>
+              </li>
+            </ol>
+            <ul v-if="entry.number === finalChapter" class="nb-libraries" aria-label="Client libraries">
+              <li v-for="[name, directory] in libraries" :key="directory"><a :href="`https://github.com/microsoft/agent-host-protocol/tree/main/clients/${directory}`"><span>{{ name }}</span><span class="nb-lib-arrow" aria-hidden="true">↗</span></a></li>
+            </ul>
+            <p class="nb-more">Read more <a v-for="[label, link] in chapterLinks[entry.number]" :key="link" :href="withBase(link)">{{ label }} ↗</a></p>
           </div>
-          <div class="ph-diff" role="log" aria-label="JSON state line changes">
-            <div
-              v-for="(line, index) in lastDiff"
-              :key="`${serverSeq}-${index}`"
-              class="ph-diff-line"
-              :class="`ph-diff-line--${line.kind}`"
-            >
-              <span aria-hidden="true">{{ line.kind === 'add' ? '+' : line.kind === 'remove' ? '−' : ' ' }}</span>
-              <code>{{ line.text }}</code>
-            </div>
-          </div>
-        </section>
-      </aside>
+        </li>
+      </ol>
     </div>
-  </section>
+
+    <section class="nb-section nb-routes" aria-labelledby="nb-routes-title">
+      <div class="nb-section-margin" aria-hidden="true">→</div>
+      <div>
+        <h2 id="nb-routes-title">Learn more</h2>
+        <p>The guide walks through the concepts, and the specification has the full details.</p>
+      </div>
+      <nav class="nb-route-list" aria-label="Documentation">
+        <a :href="withBase('/guide/what-is-ahp')"><b>Guide</b><span>Concepts, state model and write-ahead reconciliation.</span></a>
+        <a :href="withBase('/specification/overview')"><b>Specification</b><span>Transport, lifecycle, channels and reconnection rules.</span></a>
+        <a :href="withBase('/reference/common')"><b>Reference</b><span>Every action, command and state type, generated from source.</span></a>
+        <a :href="withBase('/guide/clients')"><b>Clients</b><span>Pick a client library and wire it to a host.</span></a>
+        <a href="https://github.com/microsoft/agent-host-protocol"><b>GitHub</b><span>Canonical types, clients and conformance fixtures.</span></a>
+      </nav>
+    </section>
+  </div>
 </template>
 
 <style scoped>
-.ph {
-  --ph-blue: #4f73ed;
-  --ph-green: #138761;
-  --ph-purple: #7c57c2;
-  --ph-red: #b64747;
-  --ph-surface: color-mix(in srgb, var(--vp-c-bg) 95%, var(--vp-c-brand-1));
-  --ph-surface-soft: color-mix(in srgb, var(--vp-c-bg-soft) 95%, var(--vp-c-brand-1));
-  --ph-border: color-mix(in srgb, var(--vp-c-text-1) 13%, transparent);
-
-  position: relative;
-  width: min(100%, 610px);
-  overflow: hidden;
-  border: 1px solid var(--ph-border);
-  border-radius: 18px;
-  background: var(--ph-surface);
-  box-shadow:
-    0 28px 75px color-mix(in srgb, #000 20%, transparent),
-    inset 0 1px color-mix(in srgb, #fff 6%, transparent);
-  text-align: left;
-}
-
-:global(.dark) .ph {
-  --ph-blue: #7891f5;
-  --ph-green: #4ebd91;
-  --ph-purple: #a587e2;
-  --ph-red: #e06c75;
-  --ph-surface: #191b23;
-  --ph-surface-soft: #20232d;
-  --ph-border: color-mix(in srgb, #fff 12%, transparent);
-}
-
-.ph-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 27px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--ph-border);
-}
-
-.ph-window-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.ph-window-dot--close { background: #ed6a5e; }
-.ph-window-dot--minimize { background: #f4bf4f; }
-.ph-window-dot--zoom { background: #61c454; }
-
-.ph-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  height: 340px;
-  min-height: 0;
-}
-
-.ph-chat {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  border-right: 1px solid var(--ph-border);
-}
-
-.ph-transcript {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 14px 12px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.ph-message {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-}
-
-.ph-message p {
-  min-height: 31px;
-  margin: 0;
-  font-size: 10px;
-  line-height: 1.55;
-  color: var(--vp-c-text-2);
-}
-
-.ph-message--user p {
-  display: inline-block;
-  justify-self: start;
-  padding: 8px 10px;
-  border-radius: 4px 10px 10px 10px;
-  background: color-mix(in srgb, var(--ph-blue) 10%, transparent);
-  color: var(--vp-c-text-1);
-}
-
-.ph-avatar {
-  display: grid;
-  place-items: center;
-  width: 23px;
-  height: 23px;
-  border: 1px solid var(--ph-border);
-  border-radius: 6px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 8px;
-  color: var(--vp-c-text-2);
-  background: var(--ph-surface-soft);
-}
-
-.ph-message--agent .ph-avatar {
-  border-color: color-mix(in srgb, var(--ph-purple) 45%, var(--ph-border));
-  color: var(--ph-purple);
-}
-
-.ph-cursor {
-  display: inline-block;
-  width: 5px;
-  height: 10px;
-  margin-left: 3px;
-  vertical-align: -1px;
-  background: var(--ph-blue);
-  animation: phCursor 1s steps(1) infinite;
-}
-
-.ph-tool {
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  margin-top: 9px;
-  padding: 7px 8px;
-  border: 1px solid var(--ph-border);
-  border-radius: 7px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 8px;
-  color: var(--vp-c-text-3);
-  background: var(--ph-surface-soft);
-}
-
-.ph-tool strong {
-  overflow: hidden;
-  color: var(--vp-c-text-2);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ph-tool-icon {
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--ph-purple);
-  transform: rotate(45deg);
-}
-
-.ph-composer {
-  display: flex;
-  gap: 7px;
-  padding: 10px;
-  border-top: 1px solid var(--ph-border);
-}
-
-.ph-input-wrap {
-  position: relative;
-  min-width: 0;
-  flex: 1;
-}
-
-.ph-input-wrap input {
-  width: 100%;
-  height: 34px;
-  padding: 0 66px 0 10px;
-  border: 1px solid var(--ph-border);
-  border-radius: 8px;
-  outline: none;
-  color: var(--vp-c-text-1);
-  font-family: var(--vp-font-family-base);
-  font-size: 10px;
-  background: var(--ph-surface-soft);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
-.ph-input-wrap input:focus {
-  border-color: var(--ph-blue);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ph-blue) 12%, transparent);
-}
-
-.ph-input-wrap input:disabled {
-  opacity: .58;
-}
-
-.ph-autoplay {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  color: var(--vp-c-text-3);
-  font-family: var(--vp-font-family-mono);
-  font-size: 7px;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  transform: translateY(-50%);
-}
-
-.ph-send {
-  min-width: 54px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--ph-blue) 64%, transparent);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 600;
-  background: var(--ph-blue);
-  cursor: pointer;
-}
-
-.ph-send:disabled {
-  border-color: var(--ph-border);
-  color: var(--vp-c-text-3);
-  background: var(--ph-surface-soft);
-  cursor: default;
-}
-
-.ph-send--cancel {
-  border-color: color-mix(in srgb, var(--ph-red) 64%, transparent);
-  background: var(--ph-red);
-}
-
-.ph-inspector {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  flex-direction: column;
-  background: color-mix(in srgb, var(--ph-surface-soft) 72%, transparent);
-}
-
-.ph-flow {
-  display: flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 9px;
-  border-bottom: 1px solid var(--ph-border);
-}
-
-.ph-flow span {
-  font-family: var(--vp-font-family-mono);
-  font-size: 7px;
-  color: var(--vp-c-text-3);
-  transition: color 120ms ease;
-}
-
-.ph-flow span.active {
-  color: var(--ph-blue);
-}
-
-.ph-flow i {
-  flex: 1;
-  height: 1px;
-  margin: 0 5px;
-  background: var(--ph-border);
-}
-
-.ph-inspector-tabs {
-  display: none;
-}
-
-.ph-json-panel {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  padding: 9px;
-  border-bottom: 1px solid var(--ph-border);
-}
-
-.ph-json-panel:last-child {
-  border-bottom: 0;
-}
-
-.ph-json-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 7px;
-  color: var(--vp-c-text-3);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-}
-
-.ph-json-heading code {
-  color: var(--ph-blue);
-}
-
-.ph-json-panel--diff .ph-json-heading code {
-  color: var(--ph-green);
-}
-
-.ph-json-panel pre,
-.ph-diff {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 8px;
-  overflow: auto;
-  border-radius: 6px;
-  color: var(--vp-c-text-2);
-  font-family: var(--vp-font-family-mono);
-  font-size: 7px;
-  line-height: 1.45;
-  background: color-mix(in srgb, var(--vp-c-bg) 66%, transparent);
-  scrollbar-width: thin;
-}
-
-.ph-diff {
-  padding: 6px 0;
-}
-
-.ph-diff-line {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  min-height: 13px;
-  padding: 0 7px;
-  font-family: var(--vp-font-family-mono);
-  font-size: 7px;
-  line-height: 1.55;
-}
-
-.ph-diff-line > span {
-  user-select: none;
-}
-
-.ph-diff-line code {
-  overflow: hidden;
-  color: inherit;
-  text-overflow: ellipsis;
-  white-space: pre;
-}
-
-.ph-diff-line--add {
-  color: color-mix(in srgb, var(--ph-green) 82%, var(--vp-c-text-1));
-  background: color-mix(in srgb, var(--ph-green) 10%, transparent);
-}
-
-.ph-diff-line--remove {
-  color: color-mix(in srgb, var(--ph-red) 82%, var(--vp-c-text-1));
-  background: color-mix(in srgb, var(--ph-red) 10%, transparent);
-}
-
-.ph-diff-line--context {
-  color: var(--vp-c-text-3);
-}
-
-.ph-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-@keyframes phCursor {
-  0%, 45% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-@media (max-width: 959px) {
-  .ph {
-    width: min(100%, 560px);
-    margin: 22px auto 0;
-  }
-}
-
-@media (max-width: 639px) {
-  .ph {
-    width: 320px;
-    margin-top: 40px;
-  }
-
-  .ph-toolbar {
-    min-height: 25px;
-  }
-
-  .ph-workspace {
-    grid-template-columns: 1fr;
-    height: auto;
-    min-height: auto;
-  }
-
-  .ph-chat {
-    min-height: 188px;
-    border-right: 0;
-    border-bottom: 1px solid var(--ph-border);
-  }
-
-  .ph-transcript {
-    gap: 7px;
-    padding: 8px 10px;
-  }
-
-  .ph-message {
-    grid-template-columns: 20px minmax(0, 1fr);
-    gap: 6px;
-  }
-
-  .ph-avatar {
-    width: 19px;
-    height: 19px;
-  }
-
-  .ph-message p {
-    min-height: 0;
-    font-size: 9px;
-  }
-
-  .ph-message--user p {
-    padding: 6px 8px;
-  }
-
-  .ph-tool {
-    margin-top: 5px;
-    padding: 5px 7px;
-  }
-
-  .ph-composer {
-    padding: 7px;
-  }
-
-  .ph-input-wrap input,
-  .ph-send {
-    height: 31px;
-  }
-
-  .ph-flow {
-    min-height: 28px;
-  }
-
-  .ph-inspector-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 6px;
-  }
-
-  .ph-inspector-tabs button {
-    min-height: 25px;
-    border: 0;
-    border-radius: 5px;
-    color: var(--vp-c-text-3);
-    font-family: var(--vp-font-family-mono);
-    font-size: 8px;
-    background: transparent;
-  }
-
-  .ph-inspector-tabs button[aria-pressed='true'] {
-    color: var(--vp-c-text-1);
-    background: var(--ph-surface);
-  }
-
-  .ph-json-panel {
-    min-height: 92px;
-    max-height: 92px;
-    padding: 7px;
-  }
-
-  .ph-json-panel--mobile-hidden {
-    display: none;
-  }
-
-  .ph-json-panel pre,
-  .ph-diff-line {
-    font-size: 6.5px;
-  }
-}
-
+.nb { --nb-top:calc(var(--vp-nav-height, 64px) + 12px);
+  max-width:1440px; margin:0 auto; padding:0 48px; overflow-x:clip; background:var(--nb-paper); color:var(--nb-ink); font-family:var(--nb-sans); }
+.nb *, .nb *::before, .nb *::after { box-sizing:border-box; }
+.nb a { color:inherit; text-decoration:none; }
+.nb a:hover { color:var(--nb-red); }
+.nb :focus-visible { outline:2px solid var(--nb-red); outline-offset:2px; }
+.nb button { font:inherit; color:inherit; cursor:pointer; }
+.nb code { font-family:var(--nb-mono); font-size:.88em; }
+.nb-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+.nb-run { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr); grid-template-areas:"stage cover" "stage notes"; column-gap:48px; }
+.nb-cover { grid-area:cover; display:flex; flex-direction:column; justify-content:center; min-height:calc(100vh - var(--vp-nav-height, 64px) - var(--nb-peek, 0px)); padding:44px 0; border-bottom:1px solid var(--nb-line); }
+.nb-cover h1 { margin:0 0 18px; font:700 clamp(32px,3vw,44px)/1.08 var(--nb-sans); letter-spacing:-.03em; text-wrap:balance; }
+.nb-intro { margin:0; max-width:34em; font-size:16px; line-height:1.55; color:var(--nb-body); }
+.nb-cta { display:flex; flex-wrap:wrap; align-items:center; gap:22px; margin:22px 0 16px; font-weight:600; font-size:14px; }
+.nb-primary { padding:10px 16px; background:var(--nb-ink); color:var(--nb-paper) !important; border-radius:2px; }
+.nb-primary:hover { background:var(--nb-red); }
+.nb-version { margin-left:2px; color:var(--nb-muted); font-family:var(--nb-mono); font-size:12px; font-weight:400; }
+
+.nb-stage-col { grid-area:stage; position:relative; }
+.nb-stage { position:sticky; top:var(--nb-top); height:calc(100vh - var(--nb-top) - 12px); display:flex; flex-direction:column; padding:14px 0 24px; }
+
+.nb-figure { position:relative; flex:1 1 auto; min-height:0; margin:0; z-index:1; }
+.nb-plane { position:absolute; top:0; left:50%; transform-origin:50% 0; will-change:transform; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
+.nb-wires { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.nb-wires line { stroke:var(--nb-wire); stroke-width:1.25; transition:stroke .3s ease, stroke-width .3s ease; animation:nb-wire-in .3s ease .45s backwards; }
+.nb-wires line.is-hot { stroke:var(--nb-blue); stroke-width:1.75; }
+.nb-wires line.is-cut { stroke:var(--nb-red); stroke-dasharray:3 4; }
+@keyframes nb-wire-in { from { opacity:0; } }
+.nb-host-rail { position:absolute; left:0; top:0; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:12px 0; border:1px solid var(--nb-device-border); border-radius:999px; background:var(--nb-chrome); color:var(--nb-faint); font:600 8.5px/1 var(--nb-mono); box-shadow:var(--nb-device-shadow); transition:transform .5s cubic-bezier(.2,.7,.2,1) .08s, height .5s cubic-bezier(.2,.7,.2,1) .08s; }
+.nb-host-rail span, .nb-host-rail b { writing-mode:vertical-rl; }
+.nb-host-rail span { letter-spacing:.3em; }
+.nb-host-rail b { font-weight:600; color:var(--nb-ink); font-variant-numeric:tabular-nums; }
+.is-compact .nb-host-rail { font-size:7px; padding:8px 0; }
+.nb-device { position:absolute; left:0; top:0; transform-origin:0 0; transition:transform .5s cubic-bezier(.2,.7,.2,1) var(--d, 0ms), opacity .35s ease var(--d, 0ms), visibility 0s linear var(--d, 0ms); }
+.nb-device.is-out { opacity:0; visibility:hidden; transition:transform .4s ease var(--d, 0ms), opacity .25s ease var(--d, 0ms), visibility 0s linear calc(var(--d, 0ms) + .4s); }
+.nb-swap-enter-active, .nb-swap-leave-active { transition:opacity .2s ease; }
+.nb-swap-enter-from, .nb-swap-leave-to { opacity:0; }
+
+.nb-notes { grid-area:notes; margin:0; padding:0 0 48vh; list-style:none; background-image:linear-gradient(to right, transparent 43px, var(--nb-margin-line) 43px, var(--nb-margin-line) 44px, transparent 44px); }
+.nb-chapter { display:grid; grid-template-columns:44px minmax(0,1fr); column-gap:20px; padding:28px 0 40px; border-bottom:1px solid var(--nb-line); scroll-margin-top:40vh; color:var(--nb-muted); transition:color .3s ease; }
+.nb-chapter.is-active { color:var(--nb-ink); }
+.nb-note-margin { padding:2px 8px 0 0; font:500 12px/1 var(--nb-mono); color:var(--nb-faint); text-align:right; }
+.is-active > .nb-note-margin { color:var(--nb-red); font-weight:700; }
+.nb-chapter-body { min-width:0; max-width:36em; font-size:15px; line-height:1.6; }
+.nb-chapter h2 { margin:0 0 12px; padding:0; border:0; font:700 24px/1.2 var(--nb-sans); letter-spacing:-.015em; color:var(--nb-ink); }
+.nb-anchor:hover::after { content:" ¶"; color:var(--nb-faint); }
+.nb-steps { margin:0; padding:0; list-style:none; }
+.nb-step { min-height:46vh; padding:0 0 20px; }
+.nb-step.is-sub { padding-top:22px; border-top:1px dotted var(--nb-line); }
+.nb-step:last-child { min-height:0; }
+.nb-chapter .nb-step:only-child { min-height:40vh; }
+.nb-step h3 { display:flex; gap:10px; align-items:baseline; margin:0 0 8px; font:700 16px/1.3 var(--nb-sans); color:var(--nb-muted); transition:color .3s ease; }
+.nb-step h3 span { font:500 11px/1 var(--nb-mono); color:var(--nb-faint); }
+.nb-step.is-active h3 { color:var(--nb-ink); }
+.nb-step.is-active h3 span { color:var(--nb-red); }
+.nb-step > p { margin:0 0 12px; }
+.nb-step :deep(code) { padding:0 3px; background:var(--nb-code-bg); border-radius:2px; font-size:.86em; color:var(--nb-ink); }
+.nb-aside { padding-left:12px; border-left:2px solid var(--nb-line); font-size:13.5px; }
+.nb-glass { margin:0 -11px 2px; border:1px solid transparent; border-radius:2px; transition:background-color .2s ease, border-color .2s ease; }
+.nb-glass[open] { margin-bottom:8px; border-color:var(--nb-line); background:var(--nb-surface); }
+.nb-glass summary { display:flex; gap:10px; justify-content:space-between; padding:5px 10px; cursor:pointer; font:500 11.5px/1.35 var(--nb-mono); color:var(--nb-muted); list-style:none; }
+.nb-glass summary::-webkit-details-marker { display:none; }
+.nb-glass summary > span::before { content:"▸"; display:inline-block; width:1em; margin-right:.25em; text-align:center; transition:transform .15s ease; }
+.nb-glass[open] summary > span::before { transform:rotate(90deg); }
+.nb-glass summary:hover, .nb-glass[open] summary { color:var(--nb-ink); }
+.nb-glass-text { margin:0; padding:8px 10px; border-top:1px solid var(--nb-line); font-size:13.5px; line-height:1.55; }
+.nb-wire { border-top:1px solid var(--nb-line); }
+.nb-wire > p { display:flex; justify-content:space-between; gap:10px; margin:0; padding:6px 10px 0; font:600 11px/1.35 var(--nb-mono); }
+.nb-wire > p i { font-style:normal; font-weight:400; color:var(--nb-faint); }
+.nb-wire pre { margin:0; padding:6px 10px 10px; max-height:260px; overflow:auto; background:transparent; font:11px/1.45 var(--nb-mono); color:var(--nb-faint); }
+.nb-wire pre :deep(.j-key) { color:var(--nb-blue); }
+.nb-wire pre :deep(.j-str) { color:var(--nb-green); }
+.nb-wire pre :deep(.j-num) { color:var(--nb-amber); }
+.nb-wire pre :deep(.j-lit) { color:var(--nb-red); }
+.nb-diff { margin:0; padding:6px 10px 10px; list-style:none; font:11px/1.35 var(--nb-mono); }
+.nb-diff li { display:grid; grid-template-columns:12px 1fr; column-gap:4px; padding:2px 0; }
+.nb-diff li > span { overflow-wrap:anywhere; }
+.nb-diff i { grid-column:2; font-style:normal; color:var(--nb-muted); font-size:10px; overflow-wrap:anywhere; }
+.nb-diff .op-add b, .nb-diff .op-add > span { color:var(--nb-green); }
+.nb-diff .op-del b, .nb-diff .op-del > span { color:var(--nb-red); }
+.nb-diff .op-mod b { color:var(--nb-blue); }
+.nb-quiet { color:var(--nb-faint); }
+.nb-more { display:flex; flex-wrap:wrap; gap:6px 14px; margin:14px 0 0; font:600 12px/1.4 var(--nb-sans); color:var(--nb-faint); }
+.nb-more a { color:var(--nb-blue); border-bottom:1px solid var(--nb-link-line); }
+.nb-libraries { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; margin:16px 0 0; padding:0; list-style:none; }
+.nb-libraries a { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--nb-line); border-radius:8px; background:var(--nb-surface); font-weight:600; font-size:14px; transition:border-color .2s ease, background-color .2s ease; }
+.nb-libraries a:hover { border-color:var(--nb-device-border); background:var(--nb-raised); }
+.nb-lib-arrow { color:var(--nb-faint); font-weight:400; }
+
+.nb-section { display:grid; grid-template-columns:44px minmax(0,1fr) minmax(0,1.2fr); column-gap:20px; padding:56px 0; border-top:1px solid var(--nb-ink); }
+.nb-section-margin { font:700 12px/1 var(--nb-mono); color:var(--nb-red); text-align:right; padding:4px 8px 0 0; }
+.nb-section h2 { margin:8px 0 12px; font:700 30px/1.1 var(--nb-sans); letter-spacing:-.025em; border:0; padding:0; }
+.nb-section p { margin:0 0 14px; max-width:32em; color:var(--nb-body); line-height:1.55; }
+.nb-route-list { display:grid; border-top:1px solid var(--nb-line); align-self:start; }
+.nb-route-list a { display:grid; grid-template-columns:140px 1fr; gap:16px; padding:14px 4px; border-bottom:1px solid var(--nb-line); }
+.nb-route-list span { color:var(--nb-muted); font-size:14px; }
+
+/* Reduced motion: state changes are instant; nothing moves or scales. */
+.is-reduced .nb-plane, .is-reduced .nb-device, .is-reduced .nb-host-rail, .is-reduced .nb-chapter, .is-reduced .nb-step h3 { transition:none !important; }
+.is-reduced .nb-wires line { animation:none; }
+.is-reduced :deep(.nb-swap-enter-active), .is-reduced :deep(.nb-swap-leave-active) { transition:none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .ph-cursor {
-    animation: none;
-  }
+  .nb-plane, .nb-device, .nb-host-rail, .nb-chapter, .nb-step h3, .nb-swap-enter-active, .nb-swap-leave-active, .nb-wires line { transition:none !important; }
+  .nb-wires line { animation:none; }
+}
+
+@media (max-width:1279px) {
+  .nb-run { grid-template-columns:minmax(0,1.4fr) minmax(330px,1fr); column-gap:32px; }
+}
+
+/* Stacked layout: the compact stage holds only the devices and sticks to the bottom; details live in each note. */
+@media (max-width:1023px), (max-height:619px) {
+  .nb { padding:0 24px; }
+  .nb-run { grid-template-columns:minmax(0,1fr); grid-template-areas:"cover" "notes" "stage"; }
+  .nb-cover { min-height:calc(100svh - var(--vp-nav-height, 64px) - var(--nb-stage-h, 0px) - var(--nb-peek, 0px)); padding:28px 0; border-bottom:0; }
+  .nb-cover h1 { font-size:clamp(28px,6.5vw,40px); }
+  .nb-stage-col { display:contents; }
+  .nb-stage { grid-area:stage; align-self:end; top:auto; bottom:0; height:auto; z-index:5; padding:10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); background:var(--nb-paper); border-top:1px solid var(--nb-line); box-shadow:0 -12px 24px -20px var(--nb-shadow); }
+  .nb-figure { flex:none; }
+  .nb-plane { transition:none; }
+  .nb-notes { padding-bottom:24px; background-image:none; }
+  .nb-chapter:last-child { border-bottom:0; }
+  .nb-chapter { grid-template-columns:30px minmax(0,1fr); column-gap:10px; scroll-margin-top:16px; }
+  .nb-note-margin { padding-right:0; text-align:left; font-size:11px; }
+  .nb-step { min-height:40vh; }
+  .nb-section { grid-template-columns:minmax(0,1fr); row-gap:20px; padding:40px 0; }
+  .nb-section-margin { text-align:left; padding:0; }
+}
+@media (max-width:520px) {
+  .nb { padding:0 16px; }
+  .nb-chapter-body { font-size:14.5px; }
+  .nb-chapter h2 { font-size:21px; }
+  .nb-glass summary { flex-wrap:wrap; row-gap:2px; }
+  .nb-wire > p { flex-direction:column; gap:2px; }
+  .nb-route-list a { grid-template-columns:1fr; gap:4px; }
 }
 </style>
