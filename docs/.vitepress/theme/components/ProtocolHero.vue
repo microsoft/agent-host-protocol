@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { withBase } from 'vitepress'
+import { STABLE_DOC_VERSIONS } from '../../versions'
 import AutomationView from './AutomationView.vue'
 import ChannelsView from './ChannelsView.vue'
 import ChatView from './ChatView.vue'
@@ -11,7 +12,7 @@ import { checkpoints, clientIds, deviceIds, pickActiveStep, stateDigest } from '
 import type { DeviceId, Subject } from '../notebook.js'
 import {
   automationFrame, baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, desktopApps, finalChapter,
-  deviceSeq, features, hostSeq, insetFor, planeSize, receivedBy, sceneBoxes, stopDiff, stops, stopWire,
+  deviceSeq, features, hostSeq, planeSize, receivedBy, sceneBoxes, stopDiff, stops, stopWire,
   subjectLabel, terminalFrame, visibleDevices,
 } from '../notebook-story.js'
 import type { Layout, Stop } from '../notebook-story.js'
@@ -121,7 +122,7 @@ watch(step, (now, before) => {
   const moves = stops[before].scene !== stops[now].scene
   // Exits first, then the remaining devices settle, then newcomers slide in.
   delays.value = Object.fromEntries(deviceIds.map(id => [id,
-    was.has(id) && !is.has(id) ? 0 : !was.has(id) && is.has(id) ? (exits || moves ? 260 : 120) : exits ? 110 : 0,
+    was.has(id) && !is.has(id) ? 0 : !was.has(id) && is.has(id) ? (exits || moves ? 200 : 100) : exits ? 80 : 0,
   ])) as Record<DeviceId, number>
 })
 
@@ -164,7 +165,6 @@ function bannerOf(screen: Screen): string | undefined {
   return undefined
 }
 
-const inset = computed(() => insetFor(stop.value))
 const deviceSummary = computed(() => visibleDevices(stop.value).map(id => {
   const seq = deviceSeq(stop.value, id)
   return `${subjectLabel(id)} shows ${stop.value.views[id]}${seq === undefined ? '' : `, last seen #${seq}`}.`
@@ -321,7 +321,7 @@ const variantOf = (id: DeviceId): Variant => id
         <p class="nb-intro">AHP is a display protocol built to let many interfaces operate on shared session state. It’s an extensible, bidirectional, state-based protocol that works well across a variety of modalities and network conditions.</p>
         <div class="nb-cta">
           <a class="nb-primary" :href="withBase('/guide/what-is-ahp')">Read the guide</a>
-          <a :href="withBase('/specification/overview')">Specification ↗</a>
+          <a :href="withBase('/specification/overview')">Specification <span class="nb-version">v{{ STABLE_DOC_VERSIONS[0] }}</span> ↗</a>
         </div>
       </header>
 
@@ -330,7 +330,7 @@ const variantOf = (id: DeviceId): Variant => id
           <figure ref="figureEl" class="nb-figure" :style="figureStyle">
             <div class="nb-plane" :class="`is-${layout}`" :style="planeStyle" aria-hidden="true">
               <svg class="nb-wires" :viewBox="`0 0 ${plane.width} ${plane.height}`" focusable="false">
-                <line v-for="wire in wires" :key="`${step}-${wire.id}`" :x1="wire.x1" :x2="wire.x2" :y1="wire.y" :y2="wire.y" :class="{ 'is-hot': received.has(wire.id), 'is-cut': wire.cut }" />
+                <line v-for="wire in wires" :key="`${stop.scene}-${wire.id}`" :x1="wire.x1" :x2="wire.x2" :y1="wire.y" :y2="wire.y" :class="{ 'is-hot': received.has(wire.id), 'is-cut': wire.cut }" />
               </svg>
               <div class="nb-host-rail" :style="railStyle"><span>HOST</span><b>{{ host === undefined ? 'init' : `#${host}` }}</b></div>
               <div
@@ -340,7 +340,7 @@ const variantOf = (id: DeviceId): Variant => id
                 <DeviceScreen
                   :variant="variantOf(screen.id)" :link="linkOf(screen)" :seq="deviceSeq(screen.stop, screen.id)"
                   :badge="screen.view === 'channels' ? `v${features(screen.stop)!.protocolVersion}` : undefined"
-                  :tag="screen.stop.tags?.[screen.id]" :focused="visible.size > 1 && stop.focus === screen.id"
+                  :tag="screen.stop.tags?.[screen.id]" :focused="visible.size > 1 && stop.chapter > 0 && stop.chapter !== finalChapter && stop.focus === screen.id"
                   :received="received.has(screen.id)" :banner="bannerOf(screen)"
                   :apps="screen.id === 'desktop' && layout === 'full' ? desktopApps(screen.stop) : undefined"
                 >
@@ -362,18 +362,6 @@ const variantOf = (id: DeviceId): Variant => id
             </div>
             <figcaption class="nb-sr">{{ deviceSummary }}</figcaption>
           </figure>
-
-          <div class="nb-foot" :class="{ 'is-cover': stop.chapter === 0 }" :aria-hidden="stop.chapter === 0 || undefined">
-            <Transition name="nb-fade" mode="out-in">
-              <div :key="stop.slug" class="nb-foot-inner">
-                <p class="nb-caption">{{ stop.caption }}</p>
-                <div class="nb-inset" :aria-label="`Inset: ${inset.label}`">
-                  <p class="nb-label">{{ inset.label }}</p>
-                  <ul><li v-for="(line, index) in inset.lines" :key="index" :class="`op-${line.op === '+' ? 'add' : line.op === '-' ? 'del' : line.op === '~' ? 'mod' : line.op === '>' ? 'msg' : 'eq'}`"><b>{{ line.op }}</b>{{ line.text }}</li></ul>
-                </div>
-              </div>
-            </Transition>
-          </div>
           <p class="nb-sr" aria-live="polite">{{ announcement }}</p>
         </section>
       </div>
@@ -382,7 +370,6 @@ const variantOf = (id: DeviceId): Variant => id
         <li v-for="entry in chapters" :id="`ch-${entry.slug}`" :key="entry.slug" :ref="setMarker(chapterStart(entry.number))" class="nb-chapter" :class="{ 'is-active': entry.number === stop.chapter, 'is-past': entry.number < stop.chapter }">
           <div class="nb-note-margin" aria-hidden="true">§{{ pad(entry.number) }}</div>
           <div class="nb-chapter-body">
-            <p class="nb-kicker">{{ entry.kicker }}</p>
             <h2><a class="nb-anchor" :href="`#ch-${entry.slug}`">{{ entry.title }}</a></h2>
             <ol class="nb-steps">
               <li
@@ -392,12 +379,8 @@ const variantOf = (id: DeviceId): Variant => id
                 <h3 v-if="chapterStops(entry.number).length > 1"><span>{{ item.sub + 1 }}</span> {{ item.title }}</h3>
                 <p v-for="(paragraph, index) in copy[item.slug].body.split('\n\n')" :key="index" v-html="paragraph"></p>
                 <p v-if="copy[item.slug].aside" class="nb-aside" v-html="copy[item.slug].aside"></p>
-                <div class="nb-inset nb-narrow-only">
-                  <p class="nb-label">{{ insetFor(item).label }}</p>
-                  <ul><li v-for="(line, index) in insetFor(item).lines" :key="index" :class="`op-${line.op === '+' ? 'add' : line.op === '-' ? 'del' : line.op === '~' ? 'mod' : line.op === '>' ? 'msg' : 'eq'}`"><b>{{ line.op }}</b>{{ line.text }}</li></ul>
-                </div>
                 <details v-if="stopWire(item).length" class="nb-glass" @toggle="onToggle(item.slug, $event)">
-                  <summary><span>{{ messageCount(stopWire(item).length) }}</span><i v-if="stopDiff(item)">view diff</i></summary>
+                  <summary><span>{{ messageCount(stopWire(item).length) }}</span></summary>
                   <template v-if="open.has(item.slug)">
                     <p v-if="copy[item.slug].wire" class="nb-glass-text" v-html="copy[item.slug].wire"></p>
                     <section v-for="(record, index) in stopWire(item)" :key="index" class="nb-wire">
@@ -405,7 +388,7 @@ const variantOf = (id: DeviceId): Variant => id
                       <pre v-html="json(record.message)"></pre>
                     </section>
                     <section v-if="stopDiff(item)?.entries.length" class="nb-wire">
-                      <p><b>View diff</b><i>previous step → this step</i></p>
+                      <p><b>State diff</b><i>previous step → this step</i></p>
                       <ul class="nb-diff">
                         <li v-for="change in stopDiff(item)!.entries" :key="change.op + change.path" :class="`op-${change.op === '+' ? 'add' : change.op === '-' ? 'del' : 'mod'}`">
                           <b>{{ change.op }}</b><span>{{ change.path }}</span><i>{{ change.op === '~' ? `${change.before} → ${change.after}` : change.after ?? change.before }}</i>
@@ -416,7 +399,7 @@ const variantOf = (id: DeviceId): Variant => id
                   </template>
                 </details>
                 <details v-if="item.slug === 'replay'" class="nb-glass" @toggle="onToggle('snapshot', $event)">
-                  <summary><span>If the gap is too old</span><i>snapshot fallback</i></summary>
+                  <summary><span>If the gap is too old</span></summary>
                   <template v-if="open.has('snapshot')">
                     <p class="nb-glass-text">Had the host trimmed its replay buffer to <code>#{{ snapshotFallback().replayFrom }}</code>, it could not replay <code>#46</code>. It would answer the same request with <code>type: "snapshot"</code> and fresh state for every subscription at <code>fromSeq: {{ snapshotFallback().seq }}</code>. The phone replaces its confirmed state, clears pending and lands on the same digest, <code>{{ snapshotFallback().digest }}</code> ≡ <code>{{ snapshotFallback().host }}</code>.</p>
                     <section class="nb-wire">
@@ -428,7 +411,7 @@ const variantOf = (id: DeviceId): Variant => id
               </li>
             </ol>
             <ul v-if="entry.number === finalChapter" class="nb-libraries" aria-label="Client libraries">
-              <li v-for="[name, directory] in libraries" :key="directory"><a :href="`https://github.com/microsoft/agent-host-protocol/tree/main/clients/${directory}`"><span>{{ name }}</span><code>clients/{{ directory }}</code></a></li>
+              <li v-for="[name, directory] in libraries" :key="directory"><a :href="`https://github.com/microsoft/agent-host-protocol/tree/main/clients/${directory}`"><span>{{ name }}</span><span class="nb-lib-arrow" aria-hidden="true">↗</span></a></li>
             </ul>
             <p class="nb-more">Read more <a v-for="[label, link] in chapterLinks[entry.number]" :key="link" :href="withBase(link)">{{ label }} ↗</a></p>
           </div>
@@ -439,7 +422,6 @@ const variantOf = (id: DeviceId): Variant => id
     <section class="nb-section nb-routes" aria-labelledby="nb-routes-title">
       <div class="nb-section-margin" aria-hidden="true">→</div>
       <div>
-        <p class="nb-kicker">Keep reading</p>
         <h2 id="nb-routes-title">Learn more</h2>
         <p>The guide walks through the concepts, and the specification has the full details.</p>
       </div>
@@ -467,48 +449,32 @@ const variantOf = (id: DeviceId): Variant => id
 
 .nb-run { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr); grid-template-areas:"stage cover" "stage notes"; column-gap:48px; }
 .nb-cover { grid-area:cover; display:flex; flex-direction:column; justify-content:center; min-height:calc(100vh - var(--vp-nav-height, 64px) - var(--nb-peek, 0px)); padding:44px 0; border-bottom:1px solid var(--nb-line); }
-.nb-kicker, .nb-label { margin:0; font:600 10.5px/1.3 var(--nb-mono); letter-spacing:.1em; text-transform:uppercase; color:var(--nb-muted); }
 .nb-cover h1 { margin:0 0 18px; font:700 clamp(32px,3vw,44px)/1.08 var(--nb-sans); letter-spacing:-.03em; text-wrap:balance; }
 .nb-intro { margin:0; max-width:34em; font-size:16px; line-height:1.55; color:var(--nb-body); }
 .nb-cta { display:flex; flex-wrap:wrap; align-items:center; gap:22px; margin:22px 0 16px; font-weight:600; font-size:14px; }
 .nb-primary { padding:10px 16px; background:var(--nb-ink); color:var(--nb-paper) !important; border-radius:2px; }
 .nb-primary:hover { background:var(--nb-red); }
+.nb-version { margin-left:2px; color:var(--nb-muted); font-family:var(--nb-mono); font-size:12px; font-weight:400; }
 
 .nb-stage-col { grid-area:stage; position:relative; }
-.nb-stage { position:sticky; top:var(--nb-top); height:calc(100vh - var(--nb-top) - 12px); display:flex; flex-direction:column; gap:10px; padding-top:14px; }
+.nb-stage { position:sticky; top:var(--nb-top); height:calc(100vh - var(--nb-top) - 12px); display:flex; flex-direction:column; padding:14px 0 24px; }
 
 .nb-figure { position:relative; flex:1 1 auto; min-height:0; margin:0; z-index:1; }
 .nb-plane { position:absolute; top:0; left:50%; transform-origin:50% 0; will-change:transform; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
 .nb-wires { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
-.nb-wires line { stroke:var(--nb-ink); stroke-width:1.25; animation:nb-wire-in .3s ease .55s backwards; }
-.nb-wires line.is-hot { stroke:var(--nb-blue); stroke-width:2; }
-.nb-wires line.is-cut { stroke:var(--nb-red); stroke-dasharray:3 3; }
+.nb-wires line { stroke:var(--nb-wire); stroke-width:1.25; transition:stroke .3s ease, stroke-width .3s ease; animation:nb-wire-in .3s ease .45s backwards; }
+.nb-wires line.is-hot { stroke:var(--nb-blue); stroke-width:1.75; }
+.nb-wires line.is-cut { stroke:var(--nb-red); stroke-dasharray:3 4; }
 @keyframes nb-wire-in { from { opacity:0; } }
-.nb-host-rail { position:absolute; left:0; top:0; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:10px 0; border-radius:3px; background:var(--nb-ink); color:var(--nb-paper); font:700 9px/1 var(--nb-mono); transition:transform .6s cubic-bezier(.2,.7,.2,1) .1s, height .6s cubic-bezier(.2,.7,.2,1) .1s; }
+.nb-host-rail { position:absolute; left:0; top:0; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:12px 0; border:1px solid var(--nb-device-border); border-radius:999px; background:var(--nb-chrome); color:var(--nb-faint); font:600 8.5px/1 var(--nb-mono); box-shadow:var(--nb-device-shadow); transition:transform .5s cubic-bezier(.2,.7,.2,1) .08s, height .5s cubic-bezier(.2,.7,.2,1) .08s; }
 .nb-host-rail span, .nb-host-rail b { writing-mode:vertical-rl; }
 .nb-host-rail span { letter-spacing:.3em; }
-.nb-host-rail b { font-weight:500; }
-.is-compact .nb-host-rail { font-size:7.5px; padding:6px 0; }
-.nb-device { position:absolute; left:0; top:0; transform-origin:0 0; transition:transform .6s cubic-bezier(.2,.7,.2,1) var(--d, 0ms), opacity .4s ease var(--d, 0ms), visibility 0s linear var(--d, 0ms); }
-.nb-device.is-out { opacity:0; visibility:hidden; transition:transform .45s ease var(--d, 0ms), opacity .3s ease var(--d, 0ms), visibility 0s linear calc(var(--d, 0ms) + .45s); }
-.nb-swap-enter-active, .nb-swap-leave-active { transition:opacity .22s ease; }
+.nb-host-rail b { font-weight:600; color:var(--nb-ink); font-variant-numeric:tabular-nums; }
+.is-compact .nb-host-rail { font-size:7px; padding:8px 0; }
+.nb-device { position:absolute; left:0; top:0; transform-origin:0 0; transition:transform .5s cubic-bezier(.2,.7,.2,1) var(--d, 0ms), opacity .35s ease var(--d, 0ms), visibility 0s linear var(--d, 0ms); }
+.nb-device.is-out { opacity:0; visibility:hidden; transition:transform .4s ease var(--d, 0ms), opacity .25s ease var(--d, 0ms), visibility 0s linear calc(var(--d, 0ms) + .4s); }
+.nb-swap-enter-active, .nb-swap-leave-active { transition:opacity .2s ease; }
 .nb-swap-enter-from, .nb-swap-leave-to { opacity:0; }
-
-.nb-foot { flex:none; min-height:150px; padding-top:10px; border-top:1px solid var(--nb-ink); position:relative; z-index:2; background:var(--nb-paper); transition:opacity .3s ease, visibility 0s linear 0s; }
-.nb-foot.is-cover { opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s linear .3s; }
-.nb-foot-inner { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); gap:20px; align-items:start; }
-.nb-caption { margin:0; font:500 15px/1.45 var(--nb-sans); color:var(--nb-ink); }
-.nb-inset { min-width:0; padding:8px 12px; border:1px solid var(--nb-line); border-left:3px solid var(--nb-ink); background:var(--nb-surface); }
-.nb-inset ul { margin:6px 0 0; padding:0; list-style:none; font:11.5px/1.5 var(--nb-mono); }
-.nb-inset li { white-space:pre; overflow:hidden; text-overflow:ellipsis; }
-.nb-inset li b { display:inline-block; width:16px; font-weight:600; }
-.nb-inset .op-add b, .nb-inset .op-add { color:var(--nb-green); }
-.nb-inset .op-del b, .nb-inset .op-del { color:var(--nb-red); }
-.nb-inset .op-mod b { color:var(--nb-blue); }
-.nb-inset .op-msg b { color:var(--nb-faint); }
-.nb-inset .op-eq b { color:var(--nb-faint); }
-.nb-fade-enter-active, .nb-fade-leave-active { transition:opacity .2s ease; }
-.nb-fade-enter-from, .nb-fade-leave-to { opacity:0; }
 
 .nb-notes { grid-area:notes; margin:0; padding:0 0 48vh; list-style:none; background-image:linear-gradient(to right, transparent 43px, var(--nb-margin-line) 43px, var(--nb-margin-line) 44px, transparent 44px); }
 .nb-chapter { display:grid; grid-template-columns:44px minmax(0,1fr); column-gap:20px; padding:28px 0 40px; border-bottom:1px solid var(--nb-line); scroll-margin-top:40vh; color:var(--nb-muted); transition:color .3s ease; }
@@ -516,7 +482,7 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-note-margin { padding:2px 8px 0 0; font:500 12px/1 var(--nb-mono); color:var(--nb-faint); text-align:right; }
 .is-active > .nb-note-margin { color:var(--nb-red); font-weight:700; }
 .nb-chapter-body { min-width:0; max-width:36em; font-size:15px; line-height:1.6; }
-.nb-chapter h2 { margin:6px 0 12px; padding:0; border:0; font:700 24px/1.2 var(--nb-sans); letter-spacing:-.015em; color:var(--nb-ink); }
+.nb-chapter h2 { margin:0 0 12px; padding:0; border:0; font:700 24px/1.2 var(--nb-sans); letter-spacing:-.015em; color:var(--nb-ink); }
 .nb-anchor:hover::after { content:" ¶"; color:var(--nb-faint); }
 .nb-steps { margin:0; padding:0; list-style:none; }
 .nb-step { min-height:46vh; padding:0 0 20px; }
@@ -537,7 +503,6 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-glass summary > span::before { content:"▸"; display:inline-block; width:1em; margin-right:.25em; text-align:center; transition:transform .15s ease; }
 .nb-glass[open] summary > span::before { transform:rotate(90deg); }
 .nb-glass summary:hover, .nb-glass[open] summary { color:var(--nb-ink); }
-.nb-glass summary i { font-style:normal; font-weight:400; color:var(--nb-faint); white-space:nowrap; }
 .nb-glass-text { margin:0; padding:8px 10px; border-top:1px solid var(--nb-line); font-size:13.5px; line-height:1.55; }
 .nb-wire { border-top:1px solid var(--nb-line); }
 .nb-wire > p { display:flex; justify-content:space-between; gap:10px; margin:0; padding:6px 10px 0; font:600 11px/1.35 var(--nb-mono); }
@@ -555,14 +520,12 @@ const variantOf = (id: DeviceId): Variant => id
 .nb-diff .op-del b, .nb-diff .op-del > span { color:var(--nb-red); }
 .nb-diff .op-mod b { color:var(--nb-blue); }
 .nb-quiet { color:var(--nb-faint); }
-.nb-narrow-only { display:none; }
 .nb-more { display:flex; flex-wrap:wrap; gap:6px 14px; margin:14px 0 0; font:600 12px/1.4 var(--nb-sans); color:var(--nb-faint); }
 .nb-more a { color:var(--nb-blue); border-bottom:1px solid var(--nb-link-line); }
-.nb-libraries { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin:16px 0 0; padding:0; list-style:none; border-top:1px solid var(--nb-line); }
-.nb-libraries a { display:flex; justify-content:space-between; gap:10px; padding:12px 4px; border-bottom:1px solid var(--nb-line); font-weight:600; font-size:14px; }
-.nb-libraries li:nth-child(odd) a { border-right:1px solid var(--nb-line); padding-right:14px; }
-.nb-libraries li:nth-child(even) a { padding-left:14px; }
-.nb-libraries code { color:var(--nb-faint); font-size:11px; font-weight:400; }
+.nb-libraries { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; margin:16px 0 0; padding:0; list-style:none; }
+.nb-libraries a { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--nb-line); border-radius:8px; background:var(--nb-surface); font-weight:600; font-size:14px; transition:border-color .2s ease, background-color .2s ease; }
+.nb-libraries a:hover { border-color:var(--nb-device-border); background:var(--nb-raised); }
+.nb-lib-arrow { color:var(--nb-faint); font-weight:400; }
 
 .nb-section { display:grid; grid-template-columns:44px minmax(0,1fr) minmax(0,1.2fr); column-gap:20px; padding:56px 0; border-top:1px solid var(--nb-ink); }
 .nb-section-margin { font:700 12px/1 var(--nb-mono); color:var(--nb-red); text-align:right; padding:4px 8px 0 0; }
@@ -575,34 +538,31 @@ const variantOf = (id: DeviceId): Variant => id
 /* Reduced motion: state changes are instant; nothing moves or scales. */
 .is-reduced .nb-plane, .is-reduced .nb-device, .is-reduced .nb-host-rail, .is-reduced .nb-chapter, .is-reduced .nb-step h3 { transition:none !important; }
 .is-reduced .nb-wires line { animation:none; }
-.is-reduced :deep(.nb-swap-enter-active), .is-reduced :deep(.nb-swap-leave-active), .is-reduced .nb-foot, .is-reduced .nb-fade-enter-active, .is-reduced .nb-fade-leave-active { transition:none !important; }
+.is-reduced :deep(.nb-swap-enter-active), .is-reduced :deep(.nb-swap-leave-active) { transition:none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .nb-plane, .nb-device, .nb-host-rail, .nb-chapter, .nb-step h3, .nb-swap-enter-active, .nb-swap-leave-active, .nb-foot, .nb-fade-enter-active, .nb-fade-leave-active { transition:none !important; }
+  .nb-plane, .nb-device, .nb-host-rail, .nb-chapter, .nb-step h3, .nb-swap-enter-active, .nb-swap-leave-active, .nb-wires line { transition:none !important; }
   .nb-wires line { animation:none; }
 }
 
 @media (max-width:1279px) {
-  .nb-foot-inner { grid-template-columns:minmax(0,1fr); gap:8px; }
   .nb-run { grid-template-columns:minmax(0,1.4fr) minmax(330px,1fr); column-gap:32px; }
 }
 
-/* Stacked layout: the compact stage holds only the devices and sticks to the bottom; insets and details live in each note. */
+/* Stacked layout: the compact stage holds only the devices and sticks to the bottom; details live in each note. */
 @media (max-width:1023px), (max-height:619px) {
   .nb { padding:0 24px; }
   .nb-run { grid-template-columns:minmax(0,1fr); grid-template-areas:"cover" "notes" "stage"; }
   .nb-cover { min-height:calc(100svh - var(--vp-nav-height, 64px) - var(--nb-stage-h, 0px) - var(--nb-peek, 0px)); padding:28px 0; border-bottom:0; }
   .nb-cover h1 { font-size:clamp(28px,6.5vw,40px); }
   .nb-stage-col { display:contents; }
-  .nb-stage { grid-area:stage; align-self:end; top:auto; bottom:0; height:auto; z-index:5; gap:6px; padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); background:var(--nb-paper); border-top:1px solid var(--nb-ink); box-shadow:0 -10px 18px -16px var(--nb-shadow); }
+  .nb-stage { grid-area:stage; align-self:end; top:auto; bottom:0; height:auto; z-index:5; padding:10px 0 calc(10px + env(safe-area-inset-bottom, 0px)); background:var(--nb-paper); border-top:1px solid var(--nb-line); box-shadow:0 -12px 24px -20px var(--nb-shadow); }
   .nb-figure { flex:none; }
-  .nb-foot { display:none; }
   .nb-plane { transition:none; }
   .nb-notes { padding-bottom:24px; background-image:none; }
   .nb-chapter:last-child { border-bottom:0; }
   .nb-chapter { grid-template-columns:30px minmax(0,1fr); column-gap:10px; scroll-margin-top:16px; }
   .nb-note-margin { padding-right:0; text-align:left; font-size:11px; }
   .nb-step { min-height:40vh; }
-  .nb-narrow-only { display:block; margin:0 0 10px; }
   .nb-section { grid-template-columns:minmax(0,1fr); row-gap:20px; padding:40px 0; }
   .nb-section-margin { text-align:left; padding:0; }
 }
@@ -610,11 +570,8 @@ const variantOf = (id: DeviceId): Variant => id
   .nb { padding:0 16px; }
   .nb-chapter-body { font-size:14.5px; }
   .nb-chapter h2 { font-size:21px; }
-  .nb-inset li { white-space:pre-wrap; overflow-wrap:anywhere; }
   .nb-glass summary { flex-wrap:wrap; row-gap:2px; }
   .nb-wire > p { flex-direction:column; gap:2px; }
-  .nb-libraries { grid-template-columns:1fr; }
-  .nb-libraries li a { border-right:0 !important; padding:12px 0 !important; }
   .nb-route-list a { grid-template-columns:1fr; gap:4px; }
 }
 </style>

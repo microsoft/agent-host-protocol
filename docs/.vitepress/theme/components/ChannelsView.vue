@@ -4,7 +4,7 @@ import type { FeatureRow } from '../notebook-channels.js'
 
 defineProps<{ rows: FeatureRow[]; protocolVersion: string }>()
 
-const status = (row: FeatureRow) => enabledFeature(row) ? 'On' : !row.offered ? 'Host doesn’t offer it' : 'Not built yet'
+const status = (row: FeatureRow) => enabledFeature(row) ? 'On' : !row.offered ? 'Not offered' : 'Not built yet'
 </script>
 
 <template>

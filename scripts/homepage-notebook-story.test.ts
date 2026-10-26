@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { converged, deviceIds, optimisticState, pickActiveStep, stateDigest } from '../docs/.vitepress/theme/notebook.js'
 import {
-  baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, deviceSeq, features, finalChapter, hostSeq, insetFor,
+  baseSize, chapterBySlug, chapterStart, chapterStops, chapters, chatFrame, clampStop, deviceSeq, features, finalChapter, hostSeq,
   lastStop, planeSize, sceneBoxes, stopDiff, stops, stopWire, visibleDevices,
 } from '../docs/.vitepress/theme/notebook-story.js'
 import type { Layout } from '../docs/.vitepress/theme/notebook-story.js'
@@ -41,7 +41,7 @@ test('prev, next and direct jumps clamp and land on the same derived state in an
   assert.equal(clampStop(Number.NaN), 0)
   const derive = (index: number) => {
     const stop = stops[clampStop(index)]
-    return JSON.stringify({ stop, inset: insetFor(stop), wire: stopWire(stop), diff: stopDiff(stop), host: hostSeq(stop), seqs: deviceIds.map(id => deviceSeq(stop, id)), features: features(stop) })
+    return JSON.stringify({ stop, wire: stopWire(stop), diff: stopDiff(stop), host: hostSeq(stop), seqs: deviceIds.map(id => deviceSeq(stop, id)), features: features(stop) })
   }
   const reference = stops.map(stop => derive(stop.index))
   const path = [chapterStart(4), chapterStart(2) + 2, 0, chapterStart(3), chapterStart(3) - 1, chapterStart(3), lastStop, 2]
@@ -118,11 +118,8 @@ test('the reconnect chapter really replays the missed actions in order and conve
   assert.equal(deviceSeq(stops.find(stop => stop.slug === 'host-advances')!, 'phone'), 45)
 })
 
-test('each stop carries one small inset and opt-in wire details', () => {
+test('each chapter stop carries opt-in wire details', () => {
   for (const stop of stops) {
-    const inset = insetFor(stop)
-    assert.ok(inset.label.length > 0, stop.slug)
-    assert.ok(inset.lines.length >= 1 && inset.lines.length <= 6, `${stop.slug} has ${inset.lines.length} inset lines`)
     if (stop.chapter > 0 && stop.chapter < finalChapter) assert.ok(stopWire(stop).length >= 1, stop.slug)
   }
   const negotiation = features(stops.find(stop => stop.slug === 'host-offers-less')!)!

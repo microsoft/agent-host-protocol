@@ -1,14 +1,9 @@
-import type { ChatState } from '../../../types/channels-chat/state.js'
-import { ResponsePartKind } from '../../../types/channels-chat/state.js'
-import { AutomationTriggerKind } from '../../../types/channels-automation/state.js'
-import { TerminalClaimKind } from '../../../types/channels-terminal/state.js'
-import type { ReconnectParams, ReconnectResult } from '../../../types/common/commands.js'
 import {
-  automationFrames, automationUri, catalogueChannel, implemented, initializeParams, initializeResult,
+  automationFrames, implemented, initializeParams, initializeResult,
   negotiatedFeatures, enabledFeature, terminalFrames,
 } from './notebook-channels.js'
 import type { AutomationFrame, ChannelFamily, ChannelWire, FeatureRow, TerminalFrame } from './notebook-channels.js'
-import { checkpoints, deviceIds, diffJson, optimisticState, stateDigest } from './notebook.js'
+import { checkpoints, deviceIds, diffJson, optimisticState } from './notebook.js'
 import type { Checkpoint, DeviceId, Subject } from './notebook.js'
 
 /**
@@ -50,14 +45,13 @@ export interface Chapter {
   number: number
   slug: string
   title: string
-  kicker: string
 }
 
 export const chapters: readonly Chapter[] = [
-  { number: 1, slug: 'actions-and-state', title: 'actions + state = ui', kicker: 'dispatchAction · reducers' },
-  { number: 2, slug: 'reconnect', title: 'Reconnect and replay', kicker: 'reconnect · replay' },
-  { number: 3, slug: 'extensibility', title: 'Built to be extended', kicker: 'channels · capabilities' },
-  { number: 4, slug: 'clients', title: 'Shovel-ready in your language', kicker: 'client libraries · test suites' },
+  { number: 1, slug: 'actions-and-state', title: 'actions + state = ui' },
+  { number: 2, slug: 'reconnect', title: 'Reconnect and replay' },
+  { number: 3, slug: 'extensibility', title: 'Built to be extended' },
+  { number: 4, slug: 'clients', title: 'Shovel-ready in your language' },
 ]
 
 /** The closing chapter, where each device runs a different client. */
@@ -278,191 +272,6 @@ export function receivedBy(stop: Stop): Set<DeviceId> {
     for (const target of record.to) if (target !== 'host' && stop.views[target as DeviceId]) set.add(target as DeviceId)
   }
   return set
-}
-
-// ─── Insets ─────────────────────────────────────────────────────────────────
-
-export type InsetOp = '+' | '-' | '~' | '>' | '='
-export interface InsetLine { op: InsetOp; text: string }
-export interface Inset { label: string; lines: InsetLine[] }
-
-const short = (uri: string) => uri.length > 34 ? `${uri.slice(0, 33)}…` : uri
-const pendingList = (frame: Checkpoint, id: DeviceId) => frame.devices[id].pending.map(entry => `#${entry.clientSeq} ${entry.action.type}`).join(', ') || '[]'
-
-function toolStatus(state: ChatState): string {
-  const turn = state.activeTurn ?? state.turns.at(-1)
-  for (const part of turn?.responseParts ?? []) if (part.kind === ResponsePartKind.ToolCall) return part.toolCall.status
-  return 'none'
-}
-
-function hostApplied(frame: Checkpoint): InsetLine[] {
-  return (frame.applied.host ?? []).map(entry => ({ op: '>', text: `#${entry.serverSeq} ${entry.type}` }))
-}
-
-function chatInset(stop: Stop): Inset {
-  const frame = chatFrame(stop)
-  const d = frame.devices
-  switch (stop.slug) {
-    case 'cover': return {
-      label: 'three mirrors, one state',
-      lines: [
-        ...deviceIds.map(id => ({ op: '=' as const, text: `${id.padEnd(7)} #${d[id].lastSeenServerSeq}  ${stateDigest(optimisticState(d[id]))}` })),
-        { op: '~', text: `toolCall.status "${toolStatus(frame.host)}"` },
-      ],
-    }
-    case 'optimistic': {
-      const view = optimisticState(d.desktop)
-      const entries = diffJson(d.desktop.confirmed, view, 20).entries.filter(entry => entry.path === 'activeTurn')
-      return {
-        label: 'desktop · view = pending ∘ confirmed',
-        lines: [
-          { op: '>', text: `pending ${pendingList(frame, 'desktop')}` },
-          ...entries.map(entry => ({ op: entry.op, text: `${entry.path} "${view.activeTurn?.message.text}"` })),
-          { op: '=', text: `confirmed still #${d.desktop.lastSeenServerSeq}` },
-        ],
-      }
-    }
-    case 'link-drops': return {
-      label: 'phone · offline',
-      lines: [
-        { op: '>', text: `pending ${pendingList(frame, 'phone')}` },
-        { op: '=', text: `lastSeenServerSeq ${d.phone.lastSeenServerSeq}` },
-        { op: '~', text: `host accepted #${frame.serverSeq}` },
-      ],
-    }
-    case 'host-advances': return {
-      label: 'host · keeps the order',
-      lines: [...hostApplied(frame), { op: '-', text: `phone behind by ${frame.serverSeq - d.phone.lastSeenServerSeq}` }],
-    }
-    case 'replay': {
-      const asked = chatFrames().find(candidate => candidate.slug === 'reconnect-request')!
-      const request = asked.wire.find(record => 'method' in record.message && record.message.method === 'reconnect')
-      const params = request && 'params' in request.message ? request.message.params as ReconnectParams : undefined
-      const response = frame.wire.find(record => 'result' in record.message)
-      const result = response && 'result' in response.message ? response.message.result as ReconnectResult : undefined
-      const actions = result && result.type === 'replay' ? result.actions : []
-      return {
-        label: 'reconnect → result',
-        lines: [
-          { op: '>', text: `reconnect { lastSeenServerSeq: ${params?.lastSeenServerSeq} }` },
-          { op: '>', text: `type "${result?.type}" · actions #${actions[0]?.serverSeq} – #${actions.at(-1)?.serverSeq}` },
-          { op: '-', text: 'pending → []' },
-          { op: '+', text: `confirmed = actions.reduce(chatReducer, confirmed)` },
-          { op: '=', text: `phone ${stateDigest(d.phone.confirmed)} ≡ host ${stateDigest(frame.host)}` },
-        ],
-      }
-    }
-    default: return { label: '', lines: [] }
-  }
-}
-
-function automationInset(stop: Stop, frame: AutomationFrame): Inset {
-  const entry = frame.desktop.catalogue.entries[0]
-  switch (frame.slug) {
-    case 'catalogue': {
-      const trigger = entry.definition.triggers[0]
-      return {
-        label: `subscribe ${catalogueChannel}`,
-        lines: [
-          { op: '=', text: `entry ${short(automationUri)}` },
-          { op: '=', text: trigger.kind === AutomationTriggerKind.Schedule ? `schedule "${trigger.schedule.expression}" ${trigger.schedule.timeZone}` : trigger.kind },
-          { op: '~', text: `nextRunAt ${entry.nextRunAt} (host)` },
-        ],
-      }
-    }
-    case 'run-requested': return {
-      label: 'runAutomation',
-      lines: [
-        { op: '>', text: `requestId "${(frame.wire[0].message as { params: { requestId: string } }).params.requestId}"` },
-        { op: '+', text: `#${frame.serverSeq} automation/set · runs[0] ${entry.runs[0].lifecycle.status}` },
-        { op: '=', text: `→ { resource: "${short(frame.desktop.requested!.resource)}" }` },
-      ],
-    }
-    case 'run-running': {
-      const tablet = frame.tablet!
-      return {
-        label: `tablet · ${short(tablet.run.resource)}`,
-        lines: [
-          ...frame.wire.filter(record => record.to.includes('tablet') && record.label.startsWith('action')).map(record => {
-            const envelope = (record.message as { params: { serverSeq: number; action: { type: string } } }).params
-            return { op: '>' as const, text: `#${envelope.serverSeq} ${envelope.action.type}` }
-          }),
-          { op: '~', text: `session.origin.kind "${tablet.origin.kind}"` },
-        ],
-      }
-    }
-  }
-}
-
-function terminalInset(frame: TerminalFrame, previous?: TerminalFrame): Inset {
-  const state = frame.host
-  switch (frame.slug) {
-    case 'agent-runs': return {
-      label: 'ahp-terminal · tool claim',
-      lines: [
-        { op: '=', text: `claim ${state.claim.kind} · turnId ${'turnId' in state.claim ? state.claim.turnId : '—'} · toolCallId ${'toolCallId' in state.claim ? state.claim.toolCallId : '—'}` },
-        ...frame.wire.slice(2).map(record => {
-          const envelope = (record.message as { params: { serverSeq: number; action: { type: string; commandLine?: string } } }).params
-          return { op: '>' as const, text: `#${envelope.serverSeq} ${envelope.action.type}${envelope.action.commandLine ? ` "${envelope.action.commandLine}"` : ''}` }
-        }),
-      ],
-    }
-    case 'backgrounded': {
-      const { entries } = diffJson(previous!.host.claim, state.claim, 4)
-      return {
-        label: 'terminal/claimed · narrows',
-        lines: [
-          { op: '>', text: `#${frame.serverSeq - 1} terminal/commandFinished exit 0` },
-          ...entries.map(entry => ({ op: entry.op, text: `claim.${entry.path}${entry.op === '-' ? '' : ` ${entry.after}`}` })),
-        ],
-      }
-    }
-    case 'take-over': return {
-      label: 'desktop · dispatchAction',
-      lines: [
-        { op: '~', text: `claim → client ${state.claim.kind === TerminalClaimKind.Client ? state.claim.clientId : ''}` },
-        { op: '>', text: 'terminal/input "npm run lint\\r"  (reducer: no-op)' },
-        { op: '+', text: `#${frame.serverSeq - 1} terminal/data from the pty` },
-        { op: '=', text: `pending ${frame.desktop.pending.length} · seq #${frame.desktop.lastSeenServerSeq}` },
-      ],
-    }
-  }
-}
-
-function featureInset(stop: Stop): Inset {
-  const info = features(stop)!
-  return {
-    label: 'initialize → InitializeResult',
-    lines: [
-      { op: '>', text: `protocolVersions [${info.offered.map(version => `"${version}"`).join(', ')}]` },
-      { op: '=', text: `protocolVersion "${info.protocolVersion}"` },
-      ...info.rows.filter(row => row.family !== 'chat').map(row => ({
-        op: (enabledFeature(row) ? '+' : row.offered ? '~' : '-') as InsetOp,
-        text: `${row.label.toLowerCase()}: ${row.offered ? 'offered' : 'not offered'} · ${row.implemented ? 'built' : 'not built yet'}`,
-      })),
-    ],
-  }
-}
-
-function finalInset(stop: Stop): Inset {
-  const terminal = terminalFrame(stop)!
-  return {
-    label: `one host at #${terminal.serverSeq} · three clients`,
-    lines: visibleDevices(stop).map(id => ({ op: '=' as const, text: `${(stop.tags?.[id] ?? id).padEnd(10)} ${stop.views[id]?.padEnd(8)} #${deviceSeq(stop, id)}` })),
-  }
-}
-
-export function insetFor(stop: Stop): Inset {
-  if (stop.features) return featureInset(stop)
-  if (stop.chapter === finalChapter) return finalInset(stop)
-  if (stop.terminal) {
-    const frames = terminalFrames()
-    const index = frames.findIndex(frame => frame.slug === stop.terminal)
-    return terminalInset(frames[index], frames[index - 1])
-  }
-  const automation = automationFrame(stop)
-  if (automation) return automationInset(stop, automation)
-  return chatInset(stop)
 }
 
 /** Bounded diff of the focused device's view against the previous stop in the chapter. */

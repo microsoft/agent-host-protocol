@@ -33,7 +33,6 @@ const lines = computed(() => props.state.content.flatMap(part => part.type === '
       </TransitionGroup>
       <p class="term-cursor"><b>$</b> <span aria-hidden="true">▍</span></p>
     </div>
-    <p class="term-note">Illustrative output · no shell runs</p>
   </div>
 </template>
 
@@ -41,11 +40,11 @@ const lines = computed(() => props.state.content.flatMap(part => part.type === '
 .term { display:flex; flex-direction:column; gap:8px; height:100%; padding:14px 16px 12px; font:13px/1.45 var(--nb-sans); color:var(--nb-ink); }
 .term-title { display:flex; justify-content:space-between; margin:0; padding-bottom:8px; border-bottom:1px solid var(--nb-line-soft); font-weight:700; font-size:14px; }
 .term-title span { font:400 10.5px/1.4 var(--nb-mono); color:var(--nb-green); }
-.term-owner { margin:0; padding:5px 8px; border-left:3px solid var(--nb-blue); background:var(--nb-soft); font:11px/1.3 var(--nb-mono); transition:border-color .35s; }
+.term-owner { margin:0; padding:5px 8px; border-left:3px solid var(--nb-blue); border-radius:0 5px 5px 0; background:var(--nb-soft); font:11px/1.3 var(--nb-mono); transition:border-color .35s; }
 .term-owner span { color:var(--nb-faint); margin-right:6px; }
 .term-owner.is-session { border-left-color:var(--nb-amber); }
 .term-owner.is-client { border-left-color:var(--nb-red); }
-.term-screen { flex:1; min-height:0; overflow:hidden; padding:10px 12px; border-radius:5px; background:var(--nb-terminal-bg); color:var(--nb-terminal-text); font:11px/1.45 var(--nb-mono); display:flex; flex-direction:column; justify-content:flex-end; }
+.term-screen { flex:1; min-height:0; overflow:hidden; padding:10px 12px; border:1px solid var(--nb-line); border-radius:8px; background:var(--nb-terminal-bg); color:var(--nb-terminal-text); font:11px/1.45 var(--nb-mono); display:flex; flex-direction:column; justify-content:flex-end; }
 .term-cmd + .term-cmd { margin-top:8px; }
 .term-prompt { display:flex; gap:6px; margin:0; color:var(--nb-terminal-bright); }
 .term-prompt b, .term-cursor b { color:var(--nb-terminal-green); font-weight:500; }
@@ -54,14 +53,12 @@ const lines = computed(() => props.state.content.flatMap(part => part.type === '
 .term-cursor { margin:6px 0 0; }
 .term-cursor span { animation:term-blink 1.1s steps(1) infinite; }
 @keyframes term-blink { 50% { opacity:0; } }
-.term-note { margin:0; font:10px/1 var(--nb-mono); color:var(--nb-faint); }
 .term-line-enter-active { transition:opacity .4s ease .2s; }
 .term-line-enter-from { opacity:0; }
 .is-small { gap:5px; padding:8px 8px 6px; font-size:10px; }
 .is-small .term-title { font-size:10.5px; padding-bottom:4px; }
 .is-small .term-owner { font-size:8px; padding:3px 5px; }
 .is-small .term-owner span { display:none; }
-.is-small .term-screen { padding:6px; font-size:7.5px; }
-.is-small .term-note { font-size:7px; }
+.is-small .term-screen { padding:6px; font-size:7.5px; mask-image:linear-gradient(to bottom, transparent, black 20px); }
 @media (prefers-reduced-motion: reduce) { .term-cursor span { animation:none; } .term-owner, .term-line-enter-active { transition:none; } }
 </style>
