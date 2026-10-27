@@ -71,6 +71,7 @@ import type {
   ChatIsReadChangedAction,
   ChatIsArchivedChangedAction,
   ChatConfigChangedAction,
+  ChatMovedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
@@ -243,6 +244,7 @@ export type ChatAction =
   | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
   | ChatConfigChangedAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
@@ -292,6 +294,7 @@ export type ServerChatAction =
   | ChatCanvasesChangedAction
   | ChatUsageAction
   | ChatReasoningAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatTurnsLoadedAction
 ;
@@ -528,6 +531,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatIsReadChanged]: true,
   [ActionType.ChatIsArchivedChanged]: true,
   [ActionType.ChatConfigChanged]: true,
+  [ActionType.ChatMoved]: false,
   [ActionType.ChatInputRequested]: false,
   [ActionType.ChatInputAnswerChanged]: true,
   [ActionType.ChatInputCompleted]: true,

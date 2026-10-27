@@ -858,6 +858,14 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			state.Config.Values[k] = v
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatMovedAction:
+		state.Provider = a.Provider
+		if state.Config != nil {
+			state.Config.Schema = a.Schema
+		} else if a.Schema != nil {
+			state.Config = &ahptypes.ChatConfigState{Schema: a.Schema, Values: map[string]json.RawMessage{}}
+		}
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }

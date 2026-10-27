@@ -1421,6 +1421,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatConfigChanged(a) => {
             let config = state.config.get_or_insert_with(|| ChatConfigState {
+                schema: None,
                 values: Default::default(),
             });
             if a.replace.unwrap_or(false) {
@@ -1429,6 +1430,20 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 for (k, v) in &a.config {
                     config.values.insert(k.clone(), v.clone());
                 }
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatMoved(a) => {
+            state.provider = a.provider.clone();
+            match state.config.as_mut() {
+                Some(config) => config.schema = a.schema.clone(),
+                None if a.schema.is_some() => {
+                    state.config = Some(ChatConfigState {
+                        schema: a.schema.clone(),
+                        values: Default::default(),
+                    });
+                }
+                None => {}
             }
             ReduceOutcome::Applied
         }
@@ -2324,6 +2339,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
             changesets: None,
             canvases: None,
@@ -2485,6 +2501,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
         };
         let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {

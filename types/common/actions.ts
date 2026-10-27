@@ -82,6 +82,7 @@ import type {
   ChatIsReadChangedAction,
   ChatIsArchivedChangedAction,
   ChatConfigChangedAction,
+  ChatMovedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
@@ -204,6 +205,7 @@ export const enum ActionType {
   ChatIsReadChanged = 'chat/isReadChanged',
   ChatIsArchivedChanged = 'chat/isArchivedChanged',
   ChatConfigChanged = 'chat/configChanged',
+  ChatMoved = 'chat/moved',
   ChatInputRequested = 'chat/inputRequested',
   ChatInputAnswerChanged = 'chat/inputAnswerChanged',
   ChatInputCompleted = 'chat/inputCompleted',
@@ -363,6 +365,7 @@ export type StateAction =
   | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
   | ChatConfigChangedAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

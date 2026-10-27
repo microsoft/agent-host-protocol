@@ -734,6 +734,17 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.config = config
         return next
 
+    case .chatMoved(let a):
+        var next = state
+        next.provider = a.provider
+        if var config = next.config {
+            config.schema = a.schema
+            next.config = config
+        } else if let schema = a.schema {
+            next.config = ChatConfigState(schema: schema, values: [:])
+        }
+        return next
+
     default:
         return state
     }

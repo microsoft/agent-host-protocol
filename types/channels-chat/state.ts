@@ -12,6 +12,7 @@ import type {
   AgentSelection,
   ChangesSummary,
   McpAuthRequirement,
+  SessionConfigSchema,
   SessionStatus,
 } from '../channels-session/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -83,6 +84,16 @@ export interface ChatState {
    */
   interactivity?: ChatInteractivity;
   /**
+   * Agent provider ID backing this chat. Absent means the session's
+   * {@link SessionMetadata.provider | `provider`}; hosts set it when it
+   * differs. The chat's agent never changes, but `provider` is reported
+   * relative to its session, so `chat/moved` may set or clear it. Like
+   * `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+   * side chats use the source chat's agent.
+   * @stability 1.0
+   */
+  provider?: string;
+  /**
    * The subset of the session's
    * {@link SessionState.workingDirectories | `workingDirectories`} that this
    * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -127,9 +138,7 @@ export interface ChatState {
    */
   canvases?: CanvasReference[];
   /**
-   * Configuration values set on this chat, applied over the owning session's
-   * {@link SessionState.config | `SessionState.config`}. See
-   * {@link ChatConfigState}.
+   * This chat's configuration. See {@link ChatConfigState}.
    */
   config?: ChatConfigState;
 
@@ -223,6 +232,11 @@ export interface ChatSummary {
    * compatibility.
    */
   interactivity?: ChatInteractivity;
+  /**
+   * Agent provider ID backing this chat. See {@link ChatState.provider}.
+   * @stability 1.0
+   */
+  provider?: string;
   /**
    * The subset of the session's working directories this chat uses.
    * See {@link ChatState.workingDirectories} for the full semantics.
@@ -417,18 +431,33 @@ export const enum ChatInteractivity {
 // ─── Chat Config Types ───────────────────────────────────────────────────────
 
 /**
- * Configuration values set on a chat: an overlay on the owning session's
- * {@link SessionState.config | `SessionState.config`}.
+ * A chat's configuration. `values` holds the chat's `chatMutable` properties
+ * of the effective schema. For a chat without its own `schema`, other
+ * properties are session-wide and come from the session's config; a chat with
+ * its own `schema` does not use the session's config. It does not inherit
+ * from the session: a chat's `values` change only through
+ * `chat/configChanged` on the chat.
  *
- * It carries only the chat's own values; the session's config schema
- * applies. The effective config of a chat is the session's values with
- * these values applied over them. Only properties with `chatMutable: true`
- * in the session's config schema can be set on a chat.
+ * Only `chatMutable` properties can be changed with `chat/configChanged`;
+ * hosts reject other keys. Hosts set the initial `values` when they create
+ * the chat. When the session has a config, hosts set `config` on every chat.
  *
  * @category Chat Config Types
  */
 export interface ChatConfigState {
-  /** Config values set on this chat, keyed by property id */
+  /**
+   * Config schema for this chat's `chatMutable` properties. Absent means the
+   * session's schema. Hosts set it, as the chat's own schema, when the chat's
+   * {@link ChatState.provider | `provider`} differs from the session's; when
+   * present, clients use it instead of the session's schema.
+   * @stability 1.0
+   */
+  schema?: SessionConfigSchema;
+  /**
+   * The chat's values for the `chatMutable` properties of the effective
+   * schema, keyed by property id. A missing key takes that property's
+   * `default`.
+   */
   values: Record<string, unknown>;
 }
 

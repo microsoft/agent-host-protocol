@@ -1822,6 +1822,15 @@ public struct ChatState: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. Absent means the session's
+    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
+    /// differs. The chat's agent never changes, but `provider` is reported
+    /// relative to its session, so `chat/moved` may set or clear it. Like
+    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+    /// side chats use the source chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
     /// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1858,9 +1867,7 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
-    /// Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.
+    /// This chat's configuration. See {@link ChatConfigState}.
     public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
@@ -1907,6 +1914,7 @@ public struct ChatState: Codable, Sendable {
         case origin
         case movable
         case interactivity
+        case provider
         case workingDirectories
         case changesets
         case backgroundWork
@@ -1931,6 +1939,7 @@ public struct ChatState: Codable, Sendable {
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
@@ -1953,6 +1962,7 @@ public struct ChatState: Codable, Sendable {
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
         self.changesets = changesets
         self.backgroundWork = backgroundWork
@@ -1996,6 +2006,10 @@ public struct ChatSummary: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     public var workingDirectories: [String]?
@@ -2010,6 +2024,7 @@ public struct ChatSummary: Codable, Sendable {
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.resource = resource
@@ -2021,6 +2036,7 @@ public struct ChatSummary: Codable, Sendable {
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
     }
 }
@@ -2587,6 +2603,10 @@ public struct SessionChatSummary: Codable, Sendable {
     /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
     /// backward compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// Current chat status, matching {@link ChatSummary.status}.
     ///
     /// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -2608,6 +2628,7 @@ public struct SessionChatSummary: Codable, Sendable {
         title: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         status: SessionStatus? = nil,
         changes: ChangesSummary? = nil
     ) {
@@ -2615,6 +2636,7 @@ public struct SessionChatSummary: Codable, Sendable {
         self.title = title
         self.origin = origin
         self.interactivity = interactivity
+        self.provider = provider
         self.status = status
         self.changes = changes
     }
@@ -2670,12 +2692,23 @@ public struct SessionConfigState: Codable, Sendable {
 }
 
 public struct ChatConfigState: Codable, Sendable {
-    /// Config values set on this chat, keyed by property id
+    /// Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var schema: SessionConfigSchema?
+    /// The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.
     public var values: [String: AnyCodable]
 
     public init(
+        schema: SessionConfigSchema? = nil,
         values: [String: AnyCodable]
     ) {
+        self.schema = schema
         self.values = values
     }
 }

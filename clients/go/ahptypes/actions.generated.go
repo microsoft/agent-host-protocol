@@ -71,6 +71,7 @@ const (
 	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
 	ActionTypeChatIsArchivedChanged               ActionType = "chat/isArchivedChanged"
 	ActionTypeChatConfigChanged                   ActionType = "chat/configChanged"
+	ActionTypeChatMoved                           ActionType = "chat/moved"
 	ActionTypeChatInputRequested                  ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged              ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                  ActionType = "chat/inputCompleted"
@@ -224,7 +225,7 @@ type SessionChatUpdatedAction struct {
 	Chat URI `json:"chat"`
 	// Mutable summary fields that changed; omitted fields are unchanged.
 	//
-	// Identity fields (`resource`) never change and MUST be omitted by
+	// Identity fields (`resource`, `provider`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
 }
@@ -877,16 +878,35 @@ type ChatIsArchivedChangedAction struct {
 // Config values set on a chat changed.
 //
 // Merges `config` into the chat's
-// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-// in the session's config schema may be set. To reset a property to the
-// session's value, replace the overlay with one that omits the property.
+// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+// `replace` is `true`; keys missing after a replace take their property's
+// `default`. Only properties with `chatMutable: true` in
+// the effective schema may be set.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Config values to set on the chat
 	Config map[string]json.RawMessage `json:"config"`
 	// When `true`, replaces the chat's config values instead of merging
 	Replace *bool `json:"replace,omitempty"`
+}
+
+// The chat moved to another session.
+//
+// Dispatched by the host on the moved chat's channel after a cross-session
+// `moveChat`. `provider` and `schema` are the chat's
+// {@link ChatState.provider | `provider`} and
+// {@link ChatConfigState.schema | `config.schema`} relative to the new
+// session; absent clears them. `ChatState` has no session field, so the
+// reducer does not store `session`; it tells subscribers which session now
+// owns the chat.
+type ChatMovedAction struct {
+	Type ActionType `json:"type"`
+	// The new owning session URI.
+	Session URI `json:"session"`
+	// The chat's provider in the new session; absent clears it.
+	Provider *string `json:"provider,omitempty"`
+	// The chat's config schema in the new session; absent clears it.
+	Schema *SessionConfigSchema `json:"schema,omitempty"`
 }
 
 // A session requested input from the user.
@@ -1872,6 +1892,7 @@ func (*ChatDraftChangedAction) isStateAction()                    {}
 func (*ChatIsReadChangedAction) isStateAction()                   {}
 func (*ChatIsArchivedChangedAction) isStateAction()               {}
 func (*ChatConfigChangedAction) isStateAction()                   {}
+func (*ChatMovedAction) isStateAction()                           {}
 func (*ChatInputRequestedAction) isStateAction()                  {}
 func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
@@ -2205,6 +2226,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/configChanged":
 		var value ChatConfigChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/moved":
+		var value ChatMovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

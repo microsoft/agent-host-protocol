@@ -447,6 +447,12 @@ public struct InitializeResult: Codable, Sendable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
+    /// Present when chats in one session may be backed by different agents
+    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var multipleChatProviders: MultipleChatProvidersCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -460,6 +466,7 @@ public struct InitializeResult: Codable, Sendable {
         case telemetry
         case automations
         case tcpConnections
+        case multipleChatProviders
     }
 
     public init(
@@ -473,7 +480,8 @@ public struct InitializeResult: Codable, Sendable {
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil,
-        tcpConnections: TcpConnectionsCapability? = nil
+        tcpConnections: TcpConnectionsCapability? = nil,
+        multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -486,6 +494,7 @@ public struct InitializeResult: Codable, Sendable {
         self.telemetry = telemetry
         self.automations = automations
         self.tcpConnections = tcpConnections
+        self.multipleChatProviders = multipleChatProviders
     }
 }
 
@@ -571,6 +580,17 @@ public struct AutomationRunCancellationCapability: Codable, Sendable {
 }
 
 public struct AutomationCustomizationsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.
+public struct MultipleChatProvidersCapability: Codable, Sendable {
 
     public init(
 
@@ -999,6 +1019,17 @@ public struct CreateChatParams: Codable, Sendable {
     public var workingDirectories: [String]?
     /// Client-selected initial display title for the new chat.
     public var title: String?
+    /// Agent provider ID for the new chat. Absent means the session's provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1008,6 +1039,7 @@ public struct CreateChatParams: Codable, Sendable {
         case source
         case workingDirectories
         case title
+        case provider
     }
 
     public init(
@@ -1017,7 +1049,8 @@ public struct CreateChatParams: Codable, Sendable {
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
         workingDirectories: [String]? = nil,
-        title: String? = nil
+        title: String? = nil,
+        provider: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1026,6 +1059,7 @@ public struct CreateChatParams: Codable, Sendable {
         self.source = source
         self.workingDirectories = workingDirectories
         self.title = title
+        self.provider = provider
     }
 }
 
@@ -2025,8 +2059,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
-    /// When `true`, the property may be set per chat with `chat/configChanged`.
-    /// The chat's value overrides the session's value for that chat only.
+    /// When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.
     public var chatMutable: Bool?
 
     enum CodingKeys: String, CodingKey {

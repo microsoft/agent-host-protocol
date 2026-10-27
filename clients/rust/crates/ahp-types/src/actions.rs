@@ -20,10 +20,10 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
-    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
-    ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionConfigSchema,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -83,6 +83,7 @@ pub enum ActionType {
     ChatIsReadChanged,
     ChatIsArchivedChanged,
     ChatConfigChanged,
+    ChatMoved,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -228,6 +229,7 @@ impl serde::Serialize for ActionType {
             Self::ChatIsReadChanged => serializer.serialize_str("chat/isReadChanged"),
             Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
             Self::ChatConfigChanged => serializer.serialize_str("chat/configChanged"),
+            Self::ChatMoved => serializer.serialize_str("chat/moved"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -383,6 +385,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/isReadChanged" => Self::ChatIsReadChanged,
             "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
             "chat/configChanged" => Self::ChatConfigChanged,
+            "chat/moved" => Self::ChatMoved,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -558,7 +561,7 @@ pub struct SessionChatUpdatedAction {
     pub chat: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.
     pub changes: PartialChatSummary,
 }
@@ -1554,10 +1557,10 @@ pub struct ChatIsArchivedChangedAction {
 /// Config values set on a chat changed.
 ///
 /// Merges `config` into the chat's
-/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-/// in the session's config schema may be set. To reset a property to the
-/// session's value, replace the overlay with one that omits the property.
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatConfigChangedAction {
@@ -1566,6 +1569,28 @@ pub struct ChatConfigChangedAction {
     /// When `true`, replaces the chat's config values instead of merging
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replace: Option<bool>,
+}
+
+/// The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | `provider`} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMovedAction {
+    /// The new owning session URI.
+    pub session: Uri,
+    /// The chat's provider in the new session; absent clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// The chat's config schema in the new session; absent clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<SessionConfigSchema>,
 }
 
 /// A session requested input from the user.
@@ -2396,6 +2421,11 @@ pub struct PartialChatSummary {
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2522,6 +2552,8 @@ pub enum StateAction {
     ChatIsArchivedChanged(ChatIsArchivedChangedAction),
     #[serde(rename = "chat/configChanged")]
     ChatConfigChanged(ChatConfigChangedAction),
+    #[serde(rename = "chat/moved")]
+    ChatMoved(ChatMovedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

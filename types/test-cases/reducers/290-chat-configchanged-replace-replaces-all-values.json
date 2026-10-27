@@ -1,5 +1,5 @@
 {
-  "description": "chat/configChanged with replace replaces the chat's config overlay",
+  "description": "chat/configChanged with replace replaces the chat's config values",
   "reducer": "chat",
   "initial": {
     "turns": [],
