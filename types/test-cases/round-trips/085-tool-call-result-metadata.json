@@ -1,0 +1,62 @@
+{
+  "name": "tool-call-result-metadata",
+  "group": "A",
+  "description": "MCP tool result metadata preserves arbitrary JSON separately from host/provider _meta.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/toolCallComplete",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "_meta": {
+      "phase": "host-complete"
+    },
+    "result": {
+      "success": true,
+      "pastTenseMessage": "Completed tool",
+      "structuredContent": {
+        "value": 42
+      },
+      "resultMetadata": {
+        "phase": "server-result",
+        "ui": {
+          "resourceUri": "ui://test/result"
+        },
+        "items": [
+          "one",
+          2,
+          false
+        ],
+        "nullable": null
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/toolCallComplete",
+      "turnId": "t1",
+      "toolCallId": "tc1",
+      "_meta": {
+        "phase": "host-complete"
+      },
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Completed tool",
+        "structuredContent": {
+          "value": 42
+        },
+        "resultMetadata": {
+          "phase": "server-result",
+          "ui": {
+            "resourceUri": "ui://test/result"
+          },
+          "items": [
+            "one",
+            2,
+            false
+          ],
+          "nullable": null
+        }
+      }
+    }
+  ]
+}

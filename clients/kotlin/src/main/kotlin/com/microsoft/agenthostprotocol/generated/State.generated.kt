@@ -3433,6 +3433,12 @@ data class ToolCallResult(
      */
     val structuredContent: Map<String, JsonElement>? = null,
     /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
+    /**
      * Error details if the tool failed
      */
     val error: JsonElement? = null
@@ -3740,6 +3746,12 @@ data class ToolCallPendingResultConfirmationState(
      */
     val structuredContent: Map<String, JsonElement>? = null,
     /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
+    /**
      * Error details if the tool failed
      */
     val error: JsonElement? = null,
@@ -3818,6 +3830,12 @@ data class ToolCallCompletedState(
      * This mirrors the `structuredContent` field of MCP `CallToolResult`.
      */
     val structuredContent: Map<String, JsonElement>? = null,
+    /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
     /**
      * Error details if the tool failed
      */

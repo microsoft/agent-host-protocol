@@ -1,0 +1,122 @@
+{
+  "description": "tool call result metadata survives pending result confirmation separately from host metadata",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "toolName": "bash",
+      "displayName": "Run Command",
+      "_meta": {
+        "phase": "host-start"
+      }
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Run",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "chat/toolCallComplete",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Done",
+        "structuredContent": {
+          "value": 42
+        },
+        "resultMetadata": {
+          "phase": "server-result",
+          "ui": {
+            "resourceUri": "ui://test/result"
+          },
+          "items": [
+            "one",
+            2,
+            false
+          ]
+        }
+      },
+      "requiresResultConfirmation": true,
+      "_meta": {
+        "phase": "host-complete"
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "pending-result-confirmation",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "intention": null,
+            "contributor": null,
+            "_meta": {
+              "phase": "host-complete"
+            },
+            "invocationMessage": "Run",
+            "toolInput": null,
+            "confirmed": "not-needed",
+            "success": true,
+            "pastTenseMessage": "Done",
+            "structuredContent": {
+              "value": 42
+            },
+            "resultMetadata": {
+              "phase": "server-result",
+              "ui": {
+                "resourceUri": "ui://test/result"
+              },
+              "items": [
+                "one",
+                2,
+                false
+              ]
+            }
+          }
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

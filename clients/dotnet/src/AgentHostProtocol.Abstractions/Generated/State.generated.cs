@@ -4163,6 +4163,12 @@ public sealed record ToolCallResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
 
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
+
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Error { get; init; }
@@ -4520,6 +4526,12 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
 
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
+
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Error { get; init; }
@@ -4592,6 +4604,12 @@ public sealed record ToolCallCompletedState
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
+
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
 
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

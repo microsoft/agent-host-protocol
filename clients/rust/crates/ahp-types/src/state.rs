@@ -3645,6 +3645,11 @@ pub struct ToolCallResult {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,
@@ -3938,6 +3943,11 @@ pub struct ToolCallPendingResultConfirmationState {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,
@@ -3995,6 +4005,11 @@ pub struct ToolCallCompletedState {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,

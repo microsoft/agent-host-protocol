@@ -4403,6 +4403,11 @@
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
         },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
+        },
         "error": {
           "type": "object",
           "properties": {
@@ -4754,6 +4759,11 @@
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
         },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
+        },
         "error": {
           "type": "object",
           "properties": {
@@ -4848,6 +4858,11 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
         },
         "error": {
           "type": "object",
