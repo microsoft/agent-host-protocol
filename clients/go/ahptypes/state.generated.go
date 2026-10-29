@@ -2354,6 +2354,10 @@ type ToolCallResult struct {
 	//
 	// This mirrors the `structuredContent` field of MCP `CallToolResult`.
 	StructuredContent map[string]json.RawMessage `json:"structuredContent,omitempty"`
+	// Optional result metadata.
+	//
+	// This mirrors the `_meta` field of MCP `CallToolResult`.
+	ResultMetadata map[string]json.RawMessage `json:"resultMetadata,omitempty"`
 	// Error details if the tool failed
 	Error *json.RawMessage `json:"error,omitempty"`
 }
@@ -2602,6 +2606,10 @@ type ToolCallPendingResultConfirmationState struct {
 	//
 	// This mirrors the `structuredContent` field of MCP `CallToolResult`.
 	StructuredContent map[string]json.RawMessage `json:"structuredContent,omitempty"`
+	// Optional result metadata.
+	//
+	// This mirrors the `_meta` field of MCP `CallToolResult`.
+	ResultMetadata map[string]json.RawMessage `json:"resultMetadata,omitempty"`
 	// Error details if the tool failed
 	Error *json.RawMessage `json:"error,omitempty"`
 	// How the tool was confirmed for execution
@@ -2650,6 +2658,10 @@ type ToolCallCompletedState struct {
 	//
 	// This mirrors the `structuredContent` field of MCP `CallToolResult`.
 	StructuredContent map[string]json.RawMessage `json:"structuredContent,omitempty"`
+	// Optional result metadata.
+	//
+	// This mirrors the `_meta` field of MCP `CallToolResult`.
+	ResultMetadata map[string]json.RawMessage `json:"resultMetadata,omitempty"`
 	// Error details if the tool failed
 	Error *json.RawMessage `json:"error,omitempty"`
 	// How the tool was confirmed for execution

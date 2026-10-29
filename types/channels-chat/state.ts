@@ -1494,6 +1494,12 @@ export interface ToolCallResult {
    * This mirrors the `structuredContent` field of MCP `CallToolResult`.
    */
   structuredContent?: Record<string, unknown>;
+  /**
+   * Optional result metadata.
+   *
+   * This mirrors the `_meta` field of MCP `CallToolResult`.
+   */
+  resultMetadata?: Record<string, unknown>;
   /** Error details if the tool failed */
   error?: { message: string; code?: string };
 }

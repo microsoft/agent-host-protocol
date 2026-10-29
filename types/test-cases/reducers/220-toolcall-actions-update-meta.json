@@ -142,7 +142,21 @@
       "toolCallId": "tc-complete",
       "result": {
         "success": true,
-        "pastTenseMessage": "Completed"
+        "pastTenseMessage": "Completed",
+        "structuredContent": {
+          "value": 42
+        },
+        "resultMetadata": {
+          "phase": "server-result",
+          "ui": {
+            "resourceUri": "ui://test/result"
+          },
+          "items": [
+            "one",
+            2,
+            false
+          ]
+        }
       },
       "_meta": {
         "phase": "complete"
@@ -168,7 +182,21 @@
       "toolCallId": "tc-result-confirmed",
       "result": {
         "success": true,
-        "pastTenseMessage": "Produced result"
+        "pastTenseMessage": "Produced result",
+        "structuredContent": {
+          "value": 42
+        },
+        "resultMetadata": {
+          "phase": "server-result",
+          "ui": {
+            "resourceUri": "ui://test/result"
+          },
+          "items": [
+            "one",
+            2,
+            false
+          ]
+        }
       },
       "requiresResultConfirmation": true,
       "_meta": {
@@ -332,7 +360,21 @@
             "toolInput": null,
             "confirmed": "not-needed",
             "success": true,
-            "pastTenseMessage": "Completed"
+            "pastTenseMessage": "Completed",
+            "structuredContent": {
+              "value": 42
+            },
+            "resultMetadata": {
+              "phase": "server-result",
+              "ui": {
+                "resourceUri": "ui://test/result"
+              },
+              "items": [
+                "one",
+                2,
+                false
+              ]
+            }
           }
         },
         {
@@ -353,7 +395,20 @@
             "success": true,
             "pastTenseMessage": "Produced result",
             "content": null,
-            "structuredContent": null,
+            "structuredContent": {
+              "value": 42
+            },
+            "resultMetadata": {
+              "phase": "server-result",
+              "ui": {
+                "resourceUri": "ui://test/result"
+              },
+              "items": [
+                "one",
+                2,
+                false
+              ]
+            },
             "error": null
           }
         },

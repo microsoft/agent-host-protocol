@@ -41,7 +41,18 @@
       "toolCallId": "tc-1",
       "result": {
         "success": true,
-        "pastTenseMessage": "Done"
+        "pastTenseMessage": "Done",
+        "resultMetadata": {
+          "phase": "server-result",
+          "ui": {
+            "resourceUri": "ui://test/result"
+          },
+          "items": [
+            "one",
+            2,
+            false
+          ]
+        }
       },
       "requiresResultConfirmation": true
     },

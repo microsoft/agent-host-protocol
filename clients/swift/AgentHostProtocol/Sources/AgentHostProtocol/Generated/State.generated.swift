@@ -3744,6 +3744,10 @@ public struct ToolCallResult: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
 
@@ -3752,12 +3756,14 @@ public struct ToolCallResult: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil
     ) {
         self.success = success
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
     }
 }
@@ -4113,6 +4119,10 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
     /// How the tool was confirmed for execution
@@ -4134,6 +4144,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         case pastTenseMessage
         case content
         case structuredContent
+        case resultMetadata
         case error
         case confirmed
         case selectedOption
@@ -4153,6 +4164,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
@@ -4170,6 +4182,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
@@ -4215,6 +4228,10 @@ public struct ToolCallCompletedState: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
     /// How the tool was confirmed for execution
@@ -4236,6 +4253,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         case pastTenseMessage
         case content
         case structuredContent
+        case resultMetadata
         case error
         case confirmed
         case selectedOption
@@ -4255,6 +4273,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
@@ -4272,6 +4291,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
