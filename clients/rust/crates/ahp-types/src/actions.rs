@@ -590,8 +590,6 @@ pub struct SessionDefaultChatChangedAction {
 }
 
 /// A new message has been sent to the agent, and a new turn starts.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnStartedAction {
@@ -1461,8 +1459,6 @@ pub struct SessionInputNeededRemovedAction {
 ///
 /// If the chat is idle when a queued message is set, the server SHOULD
 /// immediately consume it and start a new turn.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatPendingMessageSetAction {

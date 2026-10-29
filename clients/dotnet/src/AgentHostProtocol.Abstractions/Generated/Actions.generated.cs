@@ -1212,9 +1212,7 @@ public sealed record SessionDefaultChatChangedAction
     public string? DefaultChat { get; init; }
 }
 
-/// <summary>A new message has been sent to the agent, and a new turn starts.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// <summary>A new message has been sent to the agent, and a new turn starts.</summary>
 public sealed record ChatTurnStartedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnStarted;
@@ -1988,9 +1986,7 @@ public sealed record ChatTurnsLoadedAction
 /// message and kind in place.
 ///
 /// If the chat is idle when a queued message is set, the server SHOULD
-/// immediately consume it and start a new turn.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// immediately consume it and start a new turn.</summary>
 public sealed record ChatPendingMessageSetAction
 {
     public ActionType Type { get; init; } = ActionType.ChatPendingMessageSet;

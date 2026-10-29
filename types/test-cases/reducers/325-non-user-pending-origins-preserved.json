@@ -1,0 +1,96 @@
+{
+  "description": "non-user queued and steering input preserves authorship through upserts and queued turn consumption",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/non-user",
+    "title": "Non-user input",
+    "status": 1,
+    "modifiedAt": "2026-10-29T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "queued",
+      "id": "agent-result",
+      "message": {
+        "text": "The worker finished its analysis.",
+        "origin": { "kind": "agent" },
+        "model": { "id": "model-1" },
+        "agent": { "uri": "ahp-agent:/reviewer" }
+      }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "queued",
+      "id": "tool-result",
+      "message": { "text": "Background work completed.", "origin": { "kind": "tool" } }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "notification",
+      "message": { "text": "Worker finishing.", "origin": { "kind": "systemNotification" } }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "notification",
+      "message": { "text": "Worker finished.", "origin": { "kind": "systemNotification" }, "_meta": { "workerId": "worker-1" } }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "notification",
+      "message": { "text": "Worker finished.", "origin": { "kind": "systemNotification" }, "_meta": { "workerId": "worker-1" } }
+    },
+    {
+      "type": "chat/turnStarted",
+      "turnId": "agent-turn",
+      "startedAt": "2026-10-29T00:00:01.000Z",
+      "queuedMessageId": "agent-result",
+      "message": {
+        "text": "The worker finished its analysis.",
+        "origin": { "kind": "agent" },
+        "model": { "id": "model-1" },
+        "agent": { "uri": "ahp-agent:/reviewer" }
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/non-user",
+    "title": "Non-user input",
+    "status": 8,
+    "modifiedAt": "2026-10-29T00:00:01.000Z",
+    "turns": [],
+    "activeTurn": {
+      "id": "agent-turn",
+      "startedAt": "2026-10-29T00:00:01.000Z",
+      "message": {
+        "text": "The worker finished its analysis.",
+        "origin": { "kind": "agent" },
+        "model": { "id": "model-1" },
+        "agent": { "uri": "ahp-agent:/reviewer" }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "queuedMessages": [
+      {
+        "id": "tool-result",
+        "kind": "queued",
+        "message": { "text": "Background work completed.", "origin": { "kind": "tool" } }
+      },
+      {
+        "id": "notification",
+        "kind": "steering",
+        "message": { "text": "Worker finished.", "origin": { "kind": "systemNotification" }, "_meta": { "workerId": "worker-1" } }
+      }
+    ],
+    "steeringMessage": {
+      "id": "notification",
+      "kind": "steering",
+      "message": { "text": "Worker finished.", "origin": { "kind": "systemNotification" }, "_meta": { "workerId": "worker-1" } }
+    }
+  }
+}
