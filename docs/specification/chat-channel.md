@@ -54,6 +54,10 @@ older turn).
 
 [`ReasoningResponsePart`](/reference/chat#reasoningresponsepart) may include a producer-recorded `startedAt` timestamp and a final `duration` in non-negative integer milliseconds. Timing is optional: an absent duration means unfinished or unknown, not zero. Clients MUST treat a supplied duration as producer-owned data rather than measuring replay, subtracting their local clock from `startedAt`, or substituting a minimum display value into stored state.
 
+The measured unit is one contiguous run of reasoning output, not an SDK block, assistant message, or UI group. It starts at the first nonempty reasoning text and ends when the next markdown or tool-call part begins, or when the turn terminates. Consecutive reasoning pieces belong to the same part even when the provider changes its internal reasoning ID or completes an SDK message. Sideband notifications and metadata do not end the run.
+
+For example, `tool -> reasoning (5s) -> markdown -> reasoning (12s) -> tool` has two reasoning parts with durations `5000` and `12000`, not one duration of `17000`. Hosts SHOULD preserve the run identities and intervening content when restoring history, even if the provider's transcript stores an aggregated message. Clients that group progress should retain access to each run's duration rather than substituting a group total.
+
 The host can publish timing with the initial `chat/responsePart` or update it through `chat/reasoning`. A timing-only update uses an empty `content`; omitted timing fields preserve their previous values. The host MUST send final timing before the turn's terminal action and SHOULD retain the same timing when restoring history, so subscriptions, reconnects and reloads show consistent values. Unknown historical or interrupted intervals remain untimed unless the producer has an authoritative measurement; time while a host is stopped is not reasoning time.
 
 ### Drafts

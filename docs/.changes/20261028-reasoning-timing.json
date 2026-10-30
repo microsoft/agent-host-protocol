@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Optional producer-recorded `startedAt` and `duration` fields on reasoning response parts and `chat/reasoning` updates preserve reasoning timing across state snapshots and history restoration."
+  "message": "Optional producer-recorded `startedAt` and `duration` fields on reasoning response parts and `chat/reasoning` updates preserve each contiguous reasoning run's timing across state snapshots and history restoration."
 }
