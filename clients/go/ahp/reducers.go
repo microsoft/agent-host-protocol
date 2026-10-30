@@ -717,6 +717,12 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if r, ok := p.Value.(*ahptypes.ReasoningResponsePart); ok {
 				r.Content += a.Content
+				if a.StartedAt != nil {
+					r.StartedAt = a.StartedAt
+				}
+				if a.Duration != nil {
+					r.Duration = a.Duration
+				}
 			}
 		})
 	case *ahptypes.ChatTruncatedAction:

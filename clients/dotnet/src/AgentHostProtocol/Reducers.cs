@@ -1112,6 +1112,8 @@ public static class Reducers
                     if (p.Value is ReasoningResponsePart r)
                     {
                         r.Content += a.Content;
+                        r.StartedAt = a.StartedAt ?? r.StartedAt;
+                        r.Duration = a.Duration ?? r.Duration;
                     }
                 });
             case ChatTruncatedAction a:

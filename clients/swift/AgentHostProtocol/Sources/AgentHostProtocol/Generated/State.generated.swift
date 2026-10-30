@@ -3648,15 +3648,23 @@ public struct ReasoningResponsePart: Codable, Sendable {
     public var id: String
     /// Accumulated reasoning text
     public var content: String
+    /// Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+    public var startedAt: String?
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+    public var duration: Int?
 
     public init(
         kind: ResponsePartKind,
         id: String,
-        content: String
+        content: String,
+        startedAt: String? = nil,
+        duration: Int? = nil
     ) {
         self.kind = kind
         self.id = id
         self.content = content
+        self.startedAt = startedAt
+        self.duration = duration
     }
 }
 

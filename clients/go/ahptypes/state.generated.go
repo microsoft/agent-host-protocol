@@ -2278,6 +2278,10 @@ type ReasoningResponsePart struct {
 	Id string `json:"id"`
 	// Accumulated reasoning text
 	Content string `json:"content"`
+	// Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+	StartedAt *string `json:"startedAt,omitempty"`
+	// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+	Duration *int64 `json:"duration,omitempty"`
 }
 
 // A system notification surfaced as part of the response stream.

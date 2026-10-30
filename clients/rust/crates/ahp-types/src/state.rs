@@ -3562,6 +3562,12 @@ pub struct ReasoningResponsePart {
     pub id: String,
     /// Accumulated reasoning text
     pub content: String,
+    /// Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
 }
 
 /// A system notification surfaced as part of the response stream.

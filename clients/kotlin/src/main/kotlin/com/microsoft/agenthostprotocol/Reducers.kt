@@ -1468,7 +1468,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartReasoning) {
-                ResponsePartReasoning(part.value.copy(content = part.value.content + a.content))
+                ResponsePartReasoning(part.value.copy(
+                    content = part.value.content + a.content,
+                    startedAt = a.startedAt ?: part.value.startedAt,
+                    duration = a.duration ?: part.value.duration,
+                ))
             } else {
                 part
             }

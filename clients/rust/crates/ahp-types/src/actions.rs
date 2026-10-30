@@ -1208,7 +1208,8 @@ pub struct ChatUsageAction {
 /// Reasoning/thinking text from the model, appended to a specific reasoning response part.
 ///
 /// The server MUST first emit a `chat/responsePart` to create the target
-/// reasoning part, then use this action to append text to it.
+/// reasoning part, then use this action to append text or record its timing.
+/// An empty `content` updates only the supplied timing fields.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatReasoningAction {
@@ -1218,6 +1219,12 @@ pub struct ChatReasoningAction {
     pub part_id: String,
     /// Reasoning text chunk
     pub content: String,
+    /// Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and

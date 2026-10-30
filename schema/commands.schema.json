@@ -5749,6 +5749,14 @@
         "content": {
           "type": "string",
           "description": "Accumulated reasoning text"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock."
         }
       },
       "required": [
@@ -9559,7 +9567,7 @@
     },
     "ChatReasoningAction": {
       "type": "object",
-      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
+      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text or record its timing.\nAn empty `content` updates only the supplied timing fields.",
       "properties": {
         "type": {
           "const": "chat/reasoning"
@@ -9575,6 +9583,14 @@
         "content": {
           "type": "string",
           "description": "Reasoning text chunk"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown."
         },
         "_meta": {
           "type": "object",

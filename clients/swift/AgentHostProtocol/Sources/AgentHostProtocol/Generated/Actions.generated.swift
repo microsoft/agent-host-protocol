@@ -1368,6 +1368,10 @@ public struct ChatReasoningAction: Codable, Sendable {
     public var partId: String
     /// Reasoning text chunk
     public var content: String
+    /// Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+    public var startedAt: String?
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+    public var duration: Int?
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1382,6 +1386,8 @@ public struct ChatReasoningAction: Codable, Sendable {
         case turnId
         case partId
         case content
+        case startedAt
+        case duration
         case meta = "_meta"
     }
 
@@ -1390,12 +1396,16 @@ public struct ChatReasoningAction: Codable, Sendable {
         turnId: String,
         partId: String,
         content: String,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
         self.partId = partId
         self.content = content
+        self.startedAt = startedAt
+        self.duration = duration
         self.meta = meta
     }
 }

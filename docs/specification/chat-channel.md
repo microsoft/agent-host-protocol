@@ -50,6 +50,12 @@ operation that references a turn outside the currently loaded window (for
 example, a fork, side-chat source, chat attachment, or truncation targeting an
 older turn).
 
+### Reasoning timing
+
+[`ReasoningResponsePart`](/reference/chat#reasoningresponsepart) may include a producer-recorded `startedAt` timestamp and a final `duration` in non-negative integer milliseconds. Timing is optional: an absent duration means unfinished or unknown, not zero. Clients MUST treat a supplied duration as producer-owned data rather than measuring replay, subtracting their local clock from `startedAt`, or substituting a minimum display value into stored state.
+
+The host can publish timing with the initial `chat/responsePart` or update it through `chat/reasoning`. A timing-only update uses an empty `content`; omitted timing fields preserve their previous values. The host MUST send final timing before the turn's terminal action and SHOULD retain the same timing when restoring history, so subscriptions, reconnects and reloads show consistent values. Unknown historical or interrupted intervals remain untimed unless the producer has an authoritative measurement; time while a host is stopped is not reasoning time.
+
 ### Drafts
 
 [`ChatState.draft`](/reference/chat#chatstate) is the user's in-progress input for a chat — the [`Message`](/reference/chat#message) they are composing but have not sent yet, including its model/agent selection and attachments. Unlike the fields above, `draft` is state-only and is **not** mirrored onto [`ChatSummary`](/reference/chat#chatsummary).
