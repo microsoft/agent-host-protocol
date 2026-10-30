@@ -1292,6 +1292,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         StateAction::ChatReasoning(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
             if let ResponsePart::Reasoning(r) = p {
                 r.content.push_str(&a.content);
+                if let Some(started_at) = &a.started_at {
+                    r.started_at = Some(started_at.clone());
+                }
+                if let Some(duration) = a.duration {
+                    r.duration = Some(duration);
+                }
             }
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),

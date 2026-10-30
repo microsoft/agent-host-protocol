@@ -1918,7 +1918,8 @@ public sealed record ChatUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.
 ///
 /// The server MUST first emit a `chat/responsePart` to create the target
-/// reasoning part, then use this action to append text to it.</summary>
+/// reasoning part, then use this action to append text or record its timing.
+/// An empty `content` updates only the supplied timing fields.</summary>
 public sealed record ChatReasoningAction
 {
     public ActionType Type { get; init; } = ActionType.ChatReasoning;
@@ -1931,6 +1932,14 @@ public sealed record ChatReasoningAction
 
     /// <summary>Reasoning text chunk</summary>
     public required string Content { get; init; }
+
+    /// <summary>Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
     ///

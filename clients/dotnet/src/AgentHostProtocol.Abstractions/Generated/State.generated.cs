@@ -4067,6 +4067,14 @@ public sealed class ReasoningResponsePart
 
     /// <summary>Accumulated reasoning text</summary>
     public required string Content { get; set; }
+
+    /// <summary>Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
 }
 
 /// <summary>A system notification surfaced as part of the response stream.

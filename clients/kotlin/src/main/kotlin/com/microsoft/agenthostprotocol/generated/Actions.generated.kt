@@ -851,6 +851,14 @@ data class ChatReasoningAction(
      */
     val content: String,
     /**
+     * Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+     */
+    val startedAt: String? = null,
+    /**
+     * Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+     */
+    val duration: Long? = null,
+    /**
      * Additional provider-specific metadata for this action.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI, and

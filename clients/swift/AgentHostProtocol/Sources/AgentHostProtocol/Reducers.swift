@@ -586,6 +586,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return updateResponsePart(state: state, turnId: a.turnId, partId: a.partId) { part in
             guard case .reasoning(var r) = part else { return part }
             r.content += a.content
+            r.startedAt = a.startedAt ?? r.startedAt
+            r.duration = a.duration ?? r.duration
             return .reasoning(r)
         }
 

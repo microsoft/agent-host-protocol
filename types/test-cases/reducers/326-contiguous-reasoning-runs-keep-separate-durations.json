@@ -1,0 +1,46 @@
+{
+  "description": "contiguous reasoning runs separated by markdown retain independent durations",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": { "text": "Hello", "origin": { "kind": "user" } },
+      "responseParts": [],
+      "usage": null
+    },
+    "resource": "custom-host://opaque/chat",
+    "title": "Test Chat",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    { "type": "chat/responsePart", "turnId": "turn", "part": { "kind": "reasoning", "id": "first", "content": "First", "startedAt": "1970-01-01T00:00:01.000Z" } },
+    { "type": "chat/reasoning", "turnId": "turn", "partId": "first", "content": "", "duration": 5000 },
+    { "type": "chat/responsePart", "turnId": "turn", "part": { "kind": "markdown", "id": "between", "content": "Between" } },
+    { "type": "chat/responsePart", "turnId": "turn", "part": { "kind": "reasoning", "id": "second", "content": "Second", "startedAt": "1970-01-01T00:00:09.000Z" } },
+    { "type": "chat/reasoning", "turnId": "turn", "partId": "second", "content": "", "duration": 12000 },
+    { "type": "chat/turnComplete", "turnId": "turn", "duration": 20000 }
+  ],
+  "expected": {
+    "activeTurn": null,
+    "turns": [{
+      "id": "turn",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "duration": 20000,
+      "message": { "text": "Hello", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "reasoning", "id": "first", "content": "First", "startedAt": "1970-01-01T00:00:01.000Z", "duration": 5000 },
+        { "kind": "markdown", "id": "between", "content": "Between" },
+        { "kind": "reasoning", "id": "second", "content": "Second", "startedAt": "1970-01-01T00:00:09.000Z", "duration": 12000 }
+      ],
+      "usage": null,
+      "state": "complete"
+    }],
+    "resource": "custom-host://opaque/chat",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:21.000Z"
+  }
+}

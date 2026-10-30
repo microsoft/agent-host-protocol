@@ -3350,7 +3350,15 @@ data class ReasoningResponsePart(
     /**
      * Accumulated reasoning text
      */
-    val content: String
+    val content: String,
+    /**
+     * Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+     */
+    val startedAt: String? = null,
+    /**
+     * Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+     */
+    val duration: Long? = null
 )
 
 @Serializable
