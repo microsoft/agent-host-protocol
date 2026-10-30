@@ -967,7 +967,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Agent provider ID (e.g. `'copilot'`)"
+          "description": "Agent harness ID (e.g. `'copilot'`), not a model source or account ID."
         },
         "displayName": {
           "type": "string",
@@ -1001,6 +1001,13 @@
         "capabilities": {
           "$ref": "#/$defs/AgentCapabilities",
           "description": "Static capabilities the agent advertises about itself. Clients use these\nto gate features (multi-chat, fork) instead of switching on the provider\nid."
+        },
+        "modelSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelSourceInfo"
+          },
+          "description": "Model sources exposed by this agent harness, including sources with\nno currently available models. Together with {@link models}, this is one\natomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within\nthis agent; every model's `modelSourceId` MUST reference an entry here.\nAbsence preserves legacy discovery without inventing source identity."
         }
       },
       "required": [
@@ -1021,6 +1028,11 @@
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
+        },
+        "modelSourceSelection": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The agent preserves and enforces exact source-qualified model selections.\nClients MUST also declare `ClientCapabilities.modelSourceSelection`\nbefore sending a `ModelSelection.modelSourceId`. Protocol version\nnegotiation alone does not establish support."
         }
       }
     },
@@ -1052,16 +1064,34 @@
         }
       }
     },
+    "ModelSourceInfo": {
+      "type": "object",
+      "description": "An independently selectable source of model access exposed by one agent\nharness. IDs are opaque and stable within that host and harness, not global\nidentities, authorization proof, account or billing identities, or inherently\ntelemetry-safe values. Selection does not establish per-call usage provenance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Opaque source identifier. MUST NOT be derived from the display name."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable label; not an identifier and not necessarily unique."
+        }
+      },
+      "required": [
+        "id",
+        "displayName"
+      ]
+    },
     "SessionModelInfo": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model identifier"
+          "description": "Raw model identifier; different model sources may expose the same ID."
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider that owns this model. Matches {@link AgentInfo.provider}."
+          "description": "Owning agent harness. Matches {@link AgentInfo.provider}, not a model source."
         },
         "name": {
           "type": "string",
@@ -1099,6 +1129,10 @@
         "vendor": {
           "type": "string",
           "description": "Vendor of this model as the provider reports it, for example `Anthropic`\nor `Azure OpenAI`. This is sometimes the company that serves the model\nrather than the one that built it. Not the same as {@link provider},\nwhich names the agent provider that owns this model. Absent when the\nprovider does not report a vendor. Providers MAY send any value; clients\nSHOULD fall back to a generic presentation for values they do not\nrecognize."
+        },
+        "modelSourceId": {
+          "type": "string",
+          "description": "Source of this model within the owning agent's {@link AgentInfo.modelSources}.\nThe pair `(modelSourceId, id)` MUST be unique within that agent's catalog.\nIf a raw ID appears more than once, every such row MUST be qualified.\nAbsence is legacy, unqualified identity; it does not name a default source."
         }
       },
       "required": [
@@ -1109,11 +1143,11 @@
     },
     "ModelSelection": {
       "type": "object",
-      "description": "A model selection: the chosen model ID together with any model-specific\nconfiguration values whose keys correspond to the model's\n{@link SessionModelInfo.configSchema}.",
+      "description": "A model selection: the raw model ID, an optional exact model source, and\nconfiguration values whose keys correspond to {@link SessionModelInfo.configSchema}.\nA qualified selection is never a preference: hosts MUST preserve the pair\nor explicitly fail, never strip the qualifier or fall back to another source.\nThis selection is not per-call usage provenance.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model identifier"
+          "description": "Raw model identifier, unchanged by source qualification or UI keys."
         },
         "config": {
           "type": "object",
@@ -1121,6 +1155,10 @@
             "$ref": "#/$defs/JsonPrimitive"
           },
           "description": "Model-specific configuration values. Values are JSON primitives: most\npickers produce strings, but some (e.g. a numeric context-size picker)\nproduce numbers or booleans, which are carried through as-is."
+        },
+        "modelSourceId": {
+          "type": "string",
+          "description": "Exact model source ID in the owning agent's advertised catalog.\nRequires both client and agent `modelSourceSelection` capabilities.\nMUST survive messages, drafts, queued work, persistence and replay.\nAbsence retains genuinely unqualified legacy selection behavior."
         }
       },
       "required": [
@@ -3797,7 +3835,7 @@
         },
         "model": {
           "$ref": "#/$defs/ModelSelection",
-          "description": "The model this message was, or will be, sent with.\n\nFor historic user/agent messages this records the model actually used, so\na client editing or resending the message can retain that selection. For a\n{@link ChatState.draft | draft} it carries the model the user picked for\nthe message they are composing. Absent means the agent host's default\nmodel applies."
+          "description": "The model selection associated with this message.\n\nFor historic user/agent messages this retains the host-accepted selection,\nso a client editing or resending the message can preserve it. For a\n{@link ChatState.draft | draft} it carries the model the user picked for\nthe message they are composing. Absent means the agent host's default\nmodel applies. A source qualifier MUST be preserved exactly, including\nthrough pending messages and restored history; it is not per-call usage\nprovenance. Accepting a message does not prove a deferred model switch\nhas activated."
         },
         "agent": {
           "$ref": "#/$defs/AgentSelection",
@@ -5979,11 +6017,11 @@
       "properties": {
         "provider": {
           "type": "string",
-          "description": "Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider."
+          "description": "Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses\nthe host's default only for genuinely unqualified saved definitions.\n\nIf this template's `model` or {@link AutomationDefinition.message}'s\n`model` has a `modelSourceId`, the host MUST persist an explicit provider\nwhen accepting a create or update. An omitted owner MUST be resolved and\nstored at acceptance or the action rejected. Updates retaining a qualified\nselection MUST preserve its saved owner when omitted, or reject; they MUST\nNOT resolve it again from a changed host default."
         },
         "model": {
           "$ref": "#/$defs/ModelSelection",
-          "description": "Optional model selection resolved when a run starts. Its\n{@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised\nby the selected provider."
+          "description": "Optional model selection revalidated when a run starts against the owning\nagent's {@link SessionModelInfo} catalog. A qualified selection MUST retain\nboth its persisted {@link provider} and exact `(modelSourceId, id)` pair.\nA missing or unavailable saved owner or pair fails the run rather than\nresolving against the current default or falling back to another source or harness."
         },
         "agent": {
           "$ref": "#/$defs/AgentSelection",
@@ -6020,7 +6058,7 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}.\nA qualified `model` requires an explicit persisted\n{@link AutomationSessionTemplate.provider | `session.provider`}, even\nwhen the session template's own `model` is absent."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",

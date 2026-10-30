@@ -746,7 +746,7 @@ type RootConfigState struct {
 }
 
 type AgentInfo struct {
-	// Agent provider ID (e.g. `'copilot'`)
+	// Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
 	Provider string `json:"provider"`
 	// Human-readable name
 	DisplayName string `json:"displayName"`
@@ -778,6 +778,12 @@ type AgentInfo struct {
 	// to gate features (multi-chat, fork) instead of switching on the provider
 	// id.
 	Capabilities *AgentCapabilities `json:"capabilities,omitempty"`
+	// Model sources exposed by this agent harness, including sources with
+	// no currently available models. Together with {@link models}, this is one
+	// atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
+	// this agent; every model's `modelSourceId` MUST reference an entry here.
+	// Absence preserves legacy discovery without inventing source identity.
+	ModelSources *[]ModelSourceInfo `json:"modelSources,omitempty"`
 }
 
 // Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -802,6 +808,11 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
+	// The agent preserves and enforces exact source-qualified model selections.
+	// Clients MUST also declare `ClientCapabilities.modelSourceSelection`
+	// before sending a `ModelSelection.modelSourceId`. Protocol version
+	// negotiation alone does not establish support.
+	ModelSourceSelection *map[string]json.RawMessage `json:"modelSourceSelection,omitempty"`
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -855,10 +866,21 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
-type SessionModelInfo struct {
-	// Model identifier
+// An independently selectable source of model access exposed by one agent
+// harness. IDs are opaque and stable within that host and harness, not global
+// identities, authorization proof, account or billing identities, or inherently
+// telemetry-safe values. Selection does not establish per-call usage provenance.
+type ModelSourceInfo struct {
+	// Opaque source identifier. MUST NOT be derived from the display name.
 	Id string `json:"id"`
-	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
+	// Human-readable label; not an identifier and not necessarily unique.
+	DisplayName string `json:"displayName"`
+}
+
+type SessionModelInfo struct {
+	// Raw model identifier; different model sources may expose the same ID.
+	Id string `json:"id"`
+	// Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
 	Provider string `json:"provider"`
 	// Human-readable model name
 	Name string `json:"name"`
@@ -889,18 +911,30 @@ type SessionModelInfo struct {
 	// SHOULD fall back to a generic presentation for values they do not
 	// recognize.
 	Vendor *string `json:"vendor,omitempty"`
+	// Source of this model within the owning agent's {@link AgentInfo.modelSources}.
+	// The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
+	// If a raw ID appears more than once, every such row MUST be qualified.
+	// Absence is legacy, unqualified identity; it does not name a default source.
+	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 
-// A model selection: the chosen model ID together with any model-specific
-// configuration values whose keys correspond to the model's
-// {@link SessionModelInfo.configSchema}.
+// A model selection: the raw model ID, an optional exact model source, and
+// configuration values whose keys correspond to {@link SessionModelInfo.configSchema}.
+// A qualified selection is never a preference: hosts MUST preserve the pair
+// or explicitly fail, never strip the qualifier or fall back to another source.
+// This selection is not per-call usage provenance.
 type ModelSelection struct {
-	// Model identifier
+	// Raw model identifier, unchanged by source qualification or UI keys.
 	Id string `json:"id"`
 	// Model-specific configuration values. Values are JSON primitives: most
 	// pickers produce strings, but some (e.g. a numeric context-size picker)
 	// produce numbers or booleans, which are carried through as-is.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
+	// Exact model source ID in the owning agent's advertised catalog.
+	// Requires both client and agent `modelSourceSelection` capabilities.
+	// MUST survive messages, drafts, queued work, persistence and replay.
+	// Absence retains genuinely unqualified legacy selection behavior.
+	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 
 // A selected custom agent for a session.
@@ -1783,13 +1817,16 @@ type Message struct {
 	Origin MessageOrigin `json:"origin"`
 	// File/selection attachments
 	Attachments []MessageAttachment `json:"attachments,omitempty"`
-	// The model this message was, or will be, sent with.
+	// The model selection associated with this message.
 	//
-	// For historic user/agent messages this records the model actually used, so
-	// a client editing or resending the message can retain that selection. For a
+	// For historic user/agent messages this retains the host-accepted selection,
+	// so a client editing or resending the message can preserve it. For a
 	// {@link ChatState.draft | draft} it carries the model the user picked for
 	// the message they are composing. Absent means the agent host's default
-	// model applies.
+	// model applies. A source qualifier MUST be preserved exactly, including
+	// through pending messages and restored history; it is not per-call usage
+	// provenance. Accepting a message does not prove a deferred model switch
+	// has activated.
 	Model *ModelSelection `json:"model,omitempty"`
 	// The custom agent this message was, or will be, sent with.
 	//
@@ -3467,7 +3504,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 }
@@ -3893,7 +3930,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review map[string]json.RawMessage `json:"review,omitempty"`
+	Review *map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to
@@ -4278,11 +4315,21 @@ type AutomationTriggerDefinition struct {
 // The host revalidates every selection when the run starts. Definitions never
 // carry credentials, confirmation decisions, or durable permission grants.
 type AutomationSessionTemplate struct {
-	// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
+	// Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
+	// the host's default only for genuinely unqualified saved definitions.
+	//
+	// If this template's `model` or {@link AutomationDefinition.message}'s
+	// `model` has a `modelSourceId`, the host MUST persist an explicit provider
+	// when accepting a create or update. An omitted owner MUST be resolved and
+	// stored at acceptance or the action rejected. Updates retaining a qualified
+	// selection MUST preserve its saved owner when omitted, or reject; they MUST
+	// NOT resolve it again from a changed host default.
 	Provider *string `json:"provider,omitempty"`
-	// Optional model selection resolved when a run starts. Its
-	// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
-	// by the selected provider.
+	// Optional model selection revalidated when a run starts against the owning
+	// agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
+	// both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
+	// A missing or unavailable saved owner or pair fails the run rather than
+	// resolving against the current default or falling back to another source or harness.
 	Model *ModelSelection `json:"model,omitempty"`
 	// Optional custom agent selection identified by {@link AgentSelection.uri}.
 	Agent *AgentSelection `json:"agent,omitempty"`
@@ -4331,6 +4378,9 @@ type AutomationDefinition struct {
 	Title string `json:"title"`
 	// Initial message sent to every newly created run session. Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
+	// A qualified `model` requires an explicit persisted
+	// {@link AutomationSessionTemplate.provider | `session.provider`}, even
+	// when the session template's own `model` is absent.
 	Message Message `json:"message"`
 	// Template used to create fresh sessions for each run.
 	Session AutomationSessionTemplate `json:"session"`
@@ -4362,6 +4412,10 @@ type AutomationDefinition struct {
 //
 // Omitted fields are unchanged. Supplied arrays and objects replace their
 // corresponding values in full; they are not merged recursively.
+// The host MUST validate the resulting definition's qualified model ownership
+// under {@link AutomationSessionTemplate.provider}. Replacing `session` while
+// omitting its provider MUST NOT erase or rebind the owner of a retained
+// qualified selection.
 type AutomationDefinitionPatch struct {
 	// Replacement {@link AutomationDefinition.title}.
 	Title *string `json:"title,omitempty"`

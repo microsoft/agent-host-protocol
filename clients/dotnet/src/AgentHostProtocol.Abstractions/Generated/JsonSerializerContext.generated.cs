@@ -285,6 +285,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(MessageOrigin))]
 [JsonSerializable(typeof(MessageResourceAttachment))]
 [JsonSerializable(typeof(ModelSelection))]
+[JsonSerializable(typeof(ModelSourceInfo))]
 [JsonSerializable(typeof(MoveChatParams))]
 [JsonSerializable(typeof(MoveChatResult))]
 [JsonSerializable(typeof(MultipleChatProvidersCapability))]
