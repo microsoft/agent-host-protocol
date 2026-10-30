@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Canvas content reads: a host MAY serve a canvas's live source, and paths relative to it, through `resourceRead` on the canvas's `ahp-canvas:` URI, so a client that can't reach `CanvasState.url` can still render the canvas."
+}

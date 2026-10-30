@@ -100,6 +100,7 @@ export default withMermaid(defineConfigWithTheme<DocThemeConfig>({
             { text: 'Root Channel', link: '/specification/root-channel' },
             { text: 'Session Channel', link: '/specification/session-channel' },
             { text: 'Chat Channel', link: '/specification/chat-channel' },
+            { text: 'Canvas Channel', link: '/specification/canvas-channel' },
             { text: 'Automation Catalogue Channel', link: '/specification/automation-channel' },
             { text: 'Automation Run Channel', link: '/specification/automation-run-channel' },
             { text: 'Terminal Channel', link: '/specification/terminal-channel' },

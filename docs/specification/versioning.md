@@ -39,7 +39,7 @@ protocol or package version numbers.
 | [Root](/specification/root-channel) | **2 - Stable** |
 | [Session](/specification/session-channel) | **2 - Stable** |
 | [Chat](/specification/chat-channel) | **2 - Stable** |
-| [Canvas](/reference/canvas) | **1 - Experimental** |
+| [Canvas](/specification/canvas-channel) | **1 - Experimental** |
 | [Terminal](/specification/terminal-channel) | **2 - Stable** |
 | [TCP](/specification/tcp-channel) | **1.0 - Early development** |
 | [Changeset](/reference/changeset) | **1.2 - Release candidate** |

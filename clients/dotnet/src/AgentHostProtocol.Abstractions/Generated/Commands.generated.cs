@@ -1209,7 +1209,10 @@ public sealed record ListSessionsResult
 /// sent in either direction. Hosts use it to fetch content from a
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
-/// same permission/`resourceRequest` flow regardless of which peer initiated.</summary>
+/// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A host MAY also serve the live source of a canvas, and paths relative to
+/// it, on `ahp-canvas:` URIs. See the Canvas Channel specification.</summary>
 public sealed record ResourceReadParams
 {
     public required string Channel { get; init; }
