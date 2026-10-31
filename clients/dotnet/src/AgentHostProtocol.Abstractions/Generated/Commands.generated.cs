@@ -1183,6 +1183,26 @@ public sealed record OpenCanvasParams
     public required string CanvasId { get; init; }
 }
 
+/// <summary>Closes and disposes one live canvas resource.
+///
+/// The server removes the resource from the owning chat's
+/// {@link ChatState.canvases} references and notifies the provider that owns the
+/// instance. Repeating this command after the resource is gone is a no-op.
+///
+/// Clients MUST NOT call this command unless the selected agent advertises
+/// {@link AgentCapabilities.canvases}.</summary>
+public sealed record DisposeCanvasParams
+{
+    /// <summary>Channel URI this command targets.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
 /// <summary>Returns a list of session summaries. Used to populate session lists and sidebars.
 ///
 /// The session list is **not** part of the state tree because it can be arbitrarily

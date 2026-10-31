@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Experimental exact-chat Canvas registry state, explicit cold-registry materialization, and URI-addressed `openCanvas` support."
+  "message": "Experimental exact-chat Canvas registry state, explicit cold-registry materialization, and URI-addressed `openCanvas` and `disposeCanvas` support."
 }

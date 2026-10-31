@@ -1051,6 +1051,20 @@ data class OpenCanvasParams(
 )
 
 @Serializable
+data class DisposeCanvasParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
 data class ListSessionsParams(
     /**
      * Channel URI this command targets.

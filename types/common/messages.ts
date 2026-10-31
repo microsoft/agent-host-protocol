@@ -60,7 +60,7 @@ import type {
   MoveChatResult,
   DisposeChatParams,
 } from '../channels-chat/commands.js';
-import type { OpenCanvasParams } from '../channels-canvas/commands.js';
+import type { DisposeCanvasParams, OpenCanvasParams } from '../channels-canvas/commands.js';
 import type {
   CreateTerminalParams,
   DisposeTerminalParams,
@@ -176,6 +176,7 @@ export interface CommandMap {
   'moveChat': { params: MoveChatParams; result: MoveChatResult };
   'disposeChat': { params: DisposeChatParams; result: null };
   'openCanvas': { params: OpenCanvasParams; result: null };
+  'disposeCanvas': { params: DisposeCanvasParams; result: null };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };

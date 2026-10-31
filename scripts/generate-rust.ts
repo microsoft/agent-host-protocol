@@ -1869,7 +1869,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
   { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
-  { name: 'OpenCanvasParams' },
+  { name: 'OpenCanvasParams' }, { name: 'DisposeCanvasParams' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },

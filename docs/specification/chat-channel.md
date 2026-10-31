@@ -124,6 +124,11 @@ To open a no-input declaration, the client sends
 that logical instance. Live membership and presentation then flow through
 `ChatState.canvases` and the Canvas channel.
 
+To close a live instance, the client sends
+[`disposeCanvas`](/reference/canvas#disposecanvas) with that instance's
+`ahp-canvas:` URI. The host removes the chat membership and disposes the
+provider-facing instance; disposing an already-removed resource is a no-op.
+
 ### Per-chat configuration
 
 [`ChatState.config`](/reference/chat#chatstate) holds the chat's own values for

@@ -48,3 +48,23 @@ export interface OpenCanvasParams extends BaseParams {
   /** Provider-local canvas type identifier. */
   canvasId: string;
 }
+
+// ─── disposeCanvas ───────────────────────────────────────────────────────────
+
+/**
+ * Closes and disposes one live canvas resource.
+ *
+ * The server removes the resource from the owning chat's
+ * {@link ChatState.canvases} references and notifies the provider that owns the
+ * instance. Repeating this command after the resource is gone is a no-op.
+ *
+ * Clients MUST NOT call this command unless the selected agent advertises
+ * {@link AgentCapabilities.canvases}.
+ *
+ * @category Commands
+ * @method disposeCanvas
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface DisposeCanvasParams extends BaseParams {}

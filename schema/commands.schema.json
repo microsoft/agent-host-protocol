@@ -1609,6 +1609,24 @@
         "canvasId"
       ]
     },
+    "DisposeCanvasParams": {
+      "type": "object",
+      "description": "Closes and disposes one live canvas resource.\n\nThe server removes the resource from the owning chat's\n{@link ChatState.canvases} references and notifies the provider that owns the\ninstance. Repeating this command after the resource is gone is a no-op.\n\nClients MUST NOT call this command unless the selected agent advertises\n{@link AgentCapabilities.canvases}.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
     "CreateTerminalParams": {
       "type": "object",
       "description": "Creates a new terminal on the server.\n\nAfter creation, the client should subscribe to the terminal URI to receive\nstate updates. The server dispatches `root/terminalsChanged` to update the\nroot terminal list.",

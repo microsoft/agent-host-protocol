@@ -61,6 +61,7 @@ type _ExpectedCommands =
   | 'moveChat'
   | 'disposeChat'
   | 'openCanvas'
+  | 'disposeCanvas'
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'

@@ -1,0 +1,14 @@
+{
+  "name": "dispose-canvas-client-addressed-resource",
+  "group": "A",
+  "description": "disposeCanvas targets the client-chosen ahp-canvas resource identity.",
+  "type": "DisposeCanvasParams",
+  "input": {
+    "channel": "ahp-canvas:/diagram"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-canvas:/diagram"
+    }
+  ]
+}

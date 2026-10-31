@@ -234,6 +234,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(DirectoryCustomization))]
 [JsonSerializable(typeof(DirectoryEntry))]
 [JsonSerializable(typeof(DispatchActionParams))]
+[JsonSerializable(typeof(DisposeCanvasParams))]
 [JsonSerializable(typeof(DisposeChatParams))]
 [JsonSerializable(typeof(DisposeSessionParams))]
 [JsonSerializable(typeof(DisposeTerminalParams))]

@@ -1190,6 +1190,27 @@ public struct OpenCanvasParams: Codable, Sendable {
     }
 }
 
+public struct DisposeCanvasParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
 public struct ListSessionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
