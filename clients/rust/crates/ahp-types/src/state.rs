@@ -1834,8 +1834,10 @@ pub struct AgentCapabilities {
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
     /// registry metadata while the Canvas channel remains experimental. This
     /// capability does not gate server-published Canvas references.
+    ///
+    /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canvases: Option<JsonObject>,
+    pub canvases: Option<CanvasesCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1855,6 +1857,14 @@ pub struct AgentCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
 }
+
+/// Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesCapability {}
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -2177,6 +2187,8 @@ pub struct ChatState {
     /// registry through `chat/canvasRegistryChanged`. An empty
     /// {@link CanvasRegistry.extensions} array is a loaded registry with no
     /// available canvas types.
+    ///
+    /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_registry: Option<CanvasRegistry>,
     /// Live canvases currently exposed by this chat.
@@ -2293,7 +2305,9 @@ pub struct CanvasRegistry {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasReference {
-    /// Canvas channel URI. Subscribe to this resource for the full state.
+    /// Canonical Canvas channel URI. Subscribe to this resource for the full
+    /// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
+    /// by `openCanvas`.
     pub resource: Uri,
 }
 

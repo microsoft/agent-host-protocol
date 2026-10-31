@@ -1024,6 +1024,29 @@ data class MoveChatResult(
     val session: String
 )
 
+/**
+ * Opens or focuses one client-addressed canvas resource in an exact chat.
+ *
+ * The resulting live instance is published through the chat's
+ * {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+ * Repeating this command with the same `channel` focuses or refreshes that
+ * logical instance rather than creating a duplicate. Reusing the channel for
+ * a different chat, extension, or canvas type MUST fail with `Conflict`.
+ * Canvas channels use the canonical form
+ * `ahp-canvas:/<segment>[/<segment>...]`: the lowercase scheme, no authority,
+ * query, or fragment, and one or more non-empty path segments containing only
+ * URI-unreserved characters (`A-Z a-z 0-9 - . _ ~`). Servers MUST reject
+ * non-canonical channels so URI parsing cannot change the resource identity.
+ *
+ * The null result is not presentation state. Clients MUST observe
+ * {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
+ * authoritative membership, availability, and presentation state.
+ *
+ * Clients MUST NOT call this command unless the selected agent advertises
+ * {@link AgentCapabilities.canvases}.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class OpenCanvasParams(
     /**
@@ -1050,6 +1073,20 @@ data class OpenCanvasParams(
     val canvasId: String
 )
 
+/**
+ * Closes and disposes one live canvas resource.
+ *
+ * The server removes the resource from the owning chat's
+ * {@link ChatState.canvases} references and notifies the provider that owns the
+ * instance. Repeating this command after the resource is gone is a no-op.
+ * The inherited `channel` MUST use the canonical Canvas URI form documented by
+ * {@link OpenCanvasParams}.
+ *
+ * Clients MUST NOT call this command unless the selected agent advertises
+ * {@link AgentCapabilities.canvases}.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class DisposeCanvasParams(
     /**

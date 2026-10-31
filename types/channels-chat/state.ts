@@ -138,6 +138,7 @@ export interface ChatState {
    * registry through `chat/canvasRegistryChanged`. An empty
    * {@link CanvasRegistry.extensions} array is a loaded registry with no
    * available canvas types.
+   * @stability 1.0
    */
   canvasRegistry?: CanvasRegistry;
   /**

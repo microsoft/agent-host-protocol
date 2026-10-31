@@ -118,8 +118,9 @@ export interface AgentCapabilities {
    * Clients MUST treat absence as unsupported and SHOULD tolerate additive
    * registry metadata while the Canvas channel remains experimental. This
    * capability does not gate server-published Canvas references.
+   * @stability 1.0
    */
-  canvases?: Record<string, never>;
+  canvases?: CanvasesCapability;
   /**
    * The agent can host more than one concurrent chat per session. When absent,
    * clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -141,6 +142,15 @@ export interface AgentCapabilities {
    */
   multipleWorkingDirectories?: MultipleWorkingDirectoriesCapability;
 }
+
+/**
+ * Presence capability for the experimental Canvas registry and lifecycle
+ * commands.
+ *
+ * @category Root State
+ * @stability 1.0
+ */
+export interface CanvasesCapability {}
 
 /**
  * Options for the {@link AgentCapabilities.multipleChats} capability.

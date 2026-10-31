@@ -524,6 +524,11 @@ public struct SessionDefaultChatChangedAction: Codable, Sendable {
     }
 }
 
+/// A new message has been sent to the agent, and a new turn starts.
+///
+/// A client is only allowed to send {@link MessageKind.User} messages.
+///
+/// Stability: 1.0 - Early development.
 public struct ChatTurnStartedAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier
@@ -570,6 +575,12 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     }
 }
 
+/// Streaming text chunk from the assistant, appended to a specific response part.
+///
+/// The server MUST first emit a `chat/responsePart` to create the target
+/// markdown part, then use this action to append text to it.
+///
+/// Stability: 1.0 - Early development.
 public struct ChatDeltaAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier

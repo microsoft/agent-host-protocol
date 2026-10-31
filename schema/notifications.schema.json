@@ -1015,9 +1015,8 @@
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
         "canvases": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Experimental Canvas API.\n\nThe agent can materialize an exact chat's\n{@link ChatState.canvasRegistry | Canvas registry} through\n`chat/canvasRegistryRequested` and open a declared type with `openCanvas`.\nLive instances are published through the chat's canvas references and\ntheir `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\nregistry metadata while the Canvas channel remains experimental. This\ncapability does not gate server-published Canvas references."
+          "$ref": "#/$defs/CanvasesCapability",
+          "description": "Experimental Canvas API.\n\nThe agent can materialize an exact chat's\n{@link ChatState.canvasRegistry | Canvas registry} through\n`chat/canvasRegistryRequested` and open a declared type with `openCanvas`.\nLive instances are published through the chat's canvas references and\ntheir `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\nregistry metadata while the Canvas channel remains experimental. This\ncapability does not gate server-published Canvas references.\n\nStability: 1.0 - Early development."
         },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
@@ -1028,6 +1027,11 @@
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
         }
       }
+    },
+    "CanvasesCapability": {
+      "type": "object",
+      "description": "Presence capability for the experimental Canvas registry and lifecycle\ncommands.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "MultipleChatsCapability": {
       "type": "object",
@@ -2979,7 +2983,7 @@
         },
         "canvasRegistry": {
           "$ref": "#/$defs/CanvasRegistry",
-          "description": "Canvas types currently registered for this exact chat.\n\nAbsence means the registry has not been materialized or is not currently\navailable. Clients that need it MAY dispatch\n`chat/canvasRegistryRequested`; the host publishes the authoritative\nregistry through `chat/canvasRegistryChanged`. An empty\n{@link CanvasRegistry.extensions} array is a loaded registry with no\navailable canvas types."
+          "description": "Canvas types currently registered for this exact chat.\n\nAbsence means the registry has not been materialized or is not currently\navailable. Clients that need it MAY dispatch\n`chat/canvasRegistryRequested`; the host publishes the authoritative\nregistry through `chat/canvasRegistryChanged`. An empty\n{@link CanvasRegistry.extensions} array is a loaded registry with no\navailable canvas types.\n\nStability: 1.0 - Early development."
         },
         "canvases": {
           "type": "array",
@@ -5242,7 +5246,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "Canvas channel URI. Subscribe to this resource for the full state."
+          "description": "Canonical Canvas channel URI. Subscribe to this resource for the full\nstate. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented\nby `openCanvas`."
         }
       },
       "required": [

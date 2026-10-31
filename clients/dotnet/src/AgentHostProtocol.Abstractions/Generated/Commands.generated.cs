@@ -1154,17 +1154,24 @@ public sealed record MoveChatResult
 /// Repeating this command with the same `channel` focuses or refreshes that
 /// logical instance rather than creating a duplicate. Reusing the channel for
 /// a different chat, extension, or canvas type MUST fail with `Conflict`.
+/// Canvas channels use the canonical form
+/// `ahp-canvas:/&lt;segment&gt;[/&lt;segment&gt;...]`: the lowercase scheme, no authority,
+/// query, or fragment, and one or more non-empty path segments containing only
+/// URI-unreserved characters (`A-Z a-z 0-9 - . _ ~`). Servers MUST reject
+/// non-canonical channels so URI parsing cannot change the resource identity.
 ///
 /// The null result is not presentation state. Clients MUST observe
 /// {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
 /// authoritative membership, availability, and presentation state.
 ///
 /// Clients MUST NOT call this command unless the selected agent advertises
-/// {@link AgentCapabilities.canvases}.</summary>
+/// {@link AgentCapabilities.canvases}.
+///
+/// Stability: 1.0 - Early development.</summary>
 public sealed record OpenCanvasParams
 {
-    /// <summary>Client-chosen URI for the canvas resource, for example
-    /// `ahp-canvas:/&lt;uuid&gt;`.</summary>
+    /// <summary>Client-chosen canonical URI for the canvas resource, for example
+    /// `ahp-canvas:/&lt;uuid&gt;`. See the command-level canonical-form requirement.</summary>
     public required string Channel { get; init; }
 
     /// <summary>Optional JSON-serializable metadata associated with this request.
@@ -1188,9 +1195,13 @@ public sealed record OpenCanvasParams
 /// The server removes the resource from the owning chat's
 /// {@link ChatState.canvases} references and notifies the provider that owns the
 /// instance. Repeating this command after the resource is gone is a no-op.
+/// The inherited `channel` MUST use the canonical Canvas URI form documented by
+/// {@link OpenCanvasParams}.
 ///
 /// Clients MUST NOT call this command unless the selected agent advertises
-/// {@link AgentCapabilities.canvases}.</summary>
+/// {@link AgentCapabilities.canvases}.
+///
+/// Stability: 1.0 - Early development.</summary>
 public sealed record DisposeCanvasParams
 {
     /// <summary>Channel URI this command targets.</summary>

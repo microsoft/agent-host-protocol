@@ -813,7 +813,9 @@ type AgentCapabilities struct {
 	// Clients MUST treat absence as unsupported and SHOULD tolerate additive
 	// registry metadata while the Canvas channel remains experimental. This
 	// capability does not gate server-published Canvas references.
-	Canvases map[string]json.RawMessage `json:"canvases,omitempty"`
+	//
+	// Stability: 1.0 - Early development.
+	Canvases *CanvasesCapability `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -830,6 +832,13 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
+}
+
+// Presence capability for the experimental Canvas registry and lifecycle
+// commands.
+//
+// Stability: 1.0 - Early development.
+type CanvasesCapability struct {
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1472,6 +1481,8 @@ type ChatState struct {
 	// registry through `chat/canvasRegistryChanged`. An empty
 	// {@link CanvasRegistry.extensions} array is a loaded registry with no
 	// available canvas types.
+	//
+	// Stability: 1.0 - Early development.
 	CanvasRegistry *CanvasRegistry `json:"canvasRegistry,omitempty"`
 	// Live canvases currently exposed by this chat.
 	//
@@ -1570,7 +1581,9 @@ type CanvasRegistry struct {
 // canvas presentation model can evolve without changing the stable chat
 // channel shape.
 type CanvasReference struct {
-	// Canvas channel URI. Subscribe to this resource for the full state.
+	// Canonical Canvas channel URI. Subscribe to this resource for the full
+	// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
+	// by `openCanvas`.
 	Resource URI `json:"resource"`
 }
 

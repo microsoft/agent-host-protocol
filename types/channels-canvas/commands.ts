@@ -21,6 +21,11 @@ import type { ChatState } from '../channels-chat/state.js';
  * Repeating this command with the same `channel` focuses or refreshes that
  * logical instance rather than creating a duplicate. Reusing the channel for
  * a different chat, extension, or canvas type MUST fail with `Conflict`.
+ * Canvas channels use the canonical form
+ * `ahp-canvas:/<segment>[/<segment>...]`: the lowercase scheme, no authority,
+ * query, or fragment, and one or more non-empty path segments containing only
+ * URI-unreserved characters (`A-Z a-z 0-9 - . _ ~`). Servers MUST reject
+ * non-canonical channels so URI parsing cannot change the resource identity.
  *
  * The null result is not presentation state. Clients MUST observe
  * {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
@@ -34,11 +39,12 @@ import type { ChatState } from '../channels-chat/state.js';
  * @direction Client → Server
  * @messageType Request
  * @version 1
+ * @stability 1.0
  */
 export interface OpenCanvasParams extends BaseParams {
   /**
-   * Client-chosen URI for the canvas resource, for example
-   * `ahp-canvas:/<uuid>`.
+   * Client-chosen canonical URI for the canvas resource, for example
+   * `ahp-canvas:/<uuid>`. See the command-level canonical-form requirement.
    */
   channel: URI;
   /** Exact chat URI that owns the canvas instance. */
@@ -57,6 +63,8 @@ export interface OpenCanvasParams extends BaseParams {
  * The server removes the resource from the owning chat's
  * {@link ChatState.canvases} references and notifies the provider that owns the
  * instance. Repeating this command after the resource is gone is a no-op.
+ * The inherited `channel` MUST use the canonical Canvas URI form documented by
+ * {@link OpenCanvasParams}.
  *
  * Clients MUST NOT call this command unless the selected agent advertises
  * {@link AgentCapabilities.canvases}.
@@ -66,5 +74,6 @@ export interface OpenCanvasParams extends BaseParams {
  * @direction Client → Server
  * @messageType Request
  * @version 1
+ * @stability 1.0
  */
 export interface DisposeCanvasParams extends BaseParams {}

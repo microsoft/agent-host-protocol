@@ -2645,6 +2645,7 @@ public static class Reducers
         "chat/isReadChanged",
         "chat/isArchivedChanged",
         "chat/configChanged",
+        "chat/canvasRegistryRequested",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

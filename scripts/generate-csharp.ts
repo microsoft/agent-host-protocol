@@ -781,6 +781,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'RootConfigState', mutable: true },
   { name: 'AgentInfo' },
   { name: 'AgentCapabilities' },
+  { name: 'CanvasesCapability' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'SessionModelInfo' },

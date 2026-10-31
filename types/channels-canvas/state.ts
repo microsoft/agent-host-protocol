@@ -101,7 +101,11 @@ export interface CanvasRegistry {
  * @category Canvas State
  */
 export interface CanvasReference {
-  /** Canvas channel URI. Subscribe to this resource for the full state. */
+  /**
+   * Canonical Canvas channel URI. Subscribe to this resource for the full
+   * state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
+   * by `openCanvas`.
+   */
   resource: URI;
 }
 

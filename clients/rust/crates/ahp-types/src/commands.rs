@@ -1062,6 +1062,11 @@ pub struct MoveChatResult {
 /// Repeating this command with the same `channel` focuses or refreshes that
 /// logical instance rather than creating a duplicate. Reusing the channel for
 /// a different chat, extension, or canvas type MUST fail with `Conflict`.
+/// Canvas channels use the canonical form
+/// `ahp-canvas:/<segment>[/<segment>...]`: the lowercase scheme, no authority,
+/// query, or fragment, and one or more non-empty path segments containing only
+/// URI-unreserved characters (`A-Z a-z 0-9 - . _ ~`). Servers MUST reject
+/// non-canonical channels so URI parsing cannot change the resource identity.
 ///
 /// The null result is not presentation state. Clients MUST observe
 /// {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
@@ -1069,6 +1074,8 @@ pub struct MoveChatResult {
 ///
 /// Clients MUST NOT call this command unless the selected agent advertises
 /// {@link AgentCapabilities.canvases}.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenCanvasParams {
@@ -1091,9 +1098,13 @@ pub struct OpenCanvasParams {
 /// The server removes the resource from the owning chat's
 /// {@link ChatState.canvases} references and notifies the provider that owns the
 /// instance. Repeating this command after the resource is gone is a no-op.
+/// The inherited `channel` MUST use the canonical Canvas URI form documented by
+/// {@link OpenCanvasParams}.
 ///
 /// Clients MUST NOT call this command unless the selected agent advertises
 /// {@link AgentCapabilities.canvases}.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisposeCanvasParams {

@@ -2125,9 +2125,11 @@ public sealed record AgentCapabilities
     ///
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
     /// registry metadata while the Canvas channel remains experimental. This
-    /// capability does not gate server-published Canvas references.</summary>
+    /// capability does not gate server-published Canvas references.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Canvases { get; init; }
+    public CanvasesCapability? Canvases { get; init; }
 
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -2148,6 +2150,14 @@ public sealed record AgentCapabilities
     /// {@link CreateSessionParams.workingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleWorkingDirectoriesCapability? MultipleWorkingDirectories { get; init; }
+}
+
+/// <summary>Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCapability
+{
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleChats} capability.</summary>
@@ -2628,7 +2638,9 @@ public sealed class ChatState
     /// `chat/canvasRegistryRequested`; the host publishes the authoritative
     /// registry through `chat/canvasRegistryChanged`. An empty
     /// {@link CanvasRegistry.extensions} array is a loaded registry with no
-    /// available canvas types.</summary>
+    /// available canvas types.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CanvasRegistry? CanvasRegistry { get; set; }
 
@@ -2757,7 +2769,9 @@ public sealed record CanvasRegistry
 /// channel shape.</summary>
 public sealed record CanvasReference
 {
-    /// <summary>Canvas channel URI. Subscribe to this resource for the full state.</summary>
+    /// <summary>Canonical Canvas channel URI. Subscribe to this resource for the full
+    /// state. It uses the `ahp-canvas:/&lt;segment&gt;[/&lt;segment&gt;...]` form documented
+    /// by `openCanvas`.</summary>
     public required string Resource { get; init; }
 }
 

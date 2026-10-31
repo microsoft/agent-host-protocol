@@ -64,6 +64,7 @@ interface ToolCallActionBase {
  *
  * @category Chat Actions
  * @version 1
+ * @stability 1.0
  * @clientDispatchable
  */
 export interface ChatTurnStartedAction {
@@ -99,6 +100,7 @@ export interface ChatTurnStartedAction {
  *
  * @category Chat Actions
  * @version 1
+ * @stability 1.0
  */
 export interface ChatDeltaAction {
   type: ActionType.ChatDelta;

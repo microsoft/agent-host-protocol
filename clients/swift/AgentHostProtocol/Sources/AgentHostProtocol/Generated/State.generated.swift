@@ -1531,7 +1531,9 @@ public struct AgentCapabilities: Codable, Sendable {
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
     /// registry metadata while the Canvas channel remains experimental. This
     /// capability does not gate server-published Canvas references.
-    public var canvases: [String: AnyCodable]?
+    ///
+    /// Stability: 1.0 - Early development.
+    public var canvases: CanvasesCapability?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1550,13 +1552,25 @@ public struct AgentCapabilities: Codable, Sendable {
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
 
     public init(
-        canvases: [String: AnyCodable]? = nil,
+        canvases: CanvasesCapability? = nil,
         multipleChats: MultipleChatsCapability? = nil,
         multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
     ) {
         self.canvases = canvases
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
+    }
+}
+
+/// Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -1924,6 +1938,8 @@ public struct ChatState: Codable, Sendable {
     /// registry through `chat/canvasRegistryChanged`. An empty
     /// {@link CanvasRegistry.extensions} array is a loaded registry with no
     /// available canvas types.
+    ///
+    /// Stability: 1.0 - Early development.
     public var canvasRegistry: CanvasRegistry?
     /// Live canvases currently exposed by this chat.
     ///
@@ -6324,7 +6340,9 @@ public struct CanvasRegistry: Codable, Sendable {
 }
 
 public struct CanvasReference: Codable, Sendable {
-    /// Canvas channel URI. Subscribe to this resource for the full state.
+    /// Canonical Canvas channel URI. Subscribe to this resource for the full
+    /// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
+    /// by `openCanvas`.
     public var resource: String
 
     public init(

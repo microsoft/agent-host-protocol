@@ -1017,6 +1017,7 @@ function generateCanvasChannelPage(project: Project): string {
   currentPage = 'canvas';
   const stateSf = findChannelSourceFile(project, 'channels-canvas', 'state.ts');
   const actionsSf = findChannelSourceFile(project, 'channels-canvas', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-canvas', 'commands.ts');
 
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Canvas Channel\n');
@@ -1033,6 +1034,11 @@ function generateCanvasChannelPage(project: Project): string {
     lines.push('Replace `CanvasState` through server-authoritative actions scoped to the canvas URI via `ActionEnvelope.channel`.\n');
     lines.push(schemaLink('actions.schema.json'));
     lines.push(emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
   }
   return lines.join('\n');
 }

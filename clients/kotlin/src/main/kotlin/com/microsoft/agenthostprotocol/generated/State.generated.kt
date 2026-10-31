@@ -1559,8 +1559,10 @@ data class AgentCapabilities(
      * Clients MUST treat absence as unsupported and SHOULD tolerate additive
      * registry metadata while the Canvas channel remains experimental. This
      * capability does not gate server-published Canvas references.
+     *
+     * Stability: 1.0 - Early development.
      */
-    val canvases: Map<String, JsonElement>? = null,
+    val canvases: CanvasesCapability? = null,
     /**
      * The agent can host more than one concurrent chat per session. When absent,
      * clients MUST NOT call `createChat` to open chats beyond the default one the
@@ -1582,6 +1584,15 @@ data class AgentCapabilities(
      */
     val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null
 )
+
+/**
+ * Presence capability for the experimental Canvas registry and lifecycle
+ * commands.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class CanvasesCapability
 
 @Serializable
 data class MultipleChatsCapability(
@@ -1921,6 +1932,8 @@ data class ChatState(
      * registry through `chat/canvasRegistryChanged`. An empty
      * {@link CanvasRegistry.extensions} array is a loaded registry with no
      * available canvas types.
+     *
+     * Stability: 1.0 - Early development.
      */
     val canvasRegistry: CanvasRegistry? = null,
     /**
@@ -2359,7 +2372,9 @@ data class CanvasRegistry(
 @Serializable
 data class CanvasReference(
     /**
-     * Canvas channel URI. Subscribe to this resource for the full state.
+     * Canonical Canvas channel URI. Subscribe to this resource for the full
+     * state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
+     * by `openCanvas`.
      */
     val resource: String
 )
