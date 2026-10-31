@@ -2359,6 +2359,12 @@ object AhpCommands {
     fun disposeTerminal(id: Long, params: DisposeTerminalParams): JsonRpcRequest<DisposeTerminalParams> =
         JsonRpcRequest(id = id, method = "disposeTerminal", params = params)
 
+    fun openCanvas(id: Long, params: OpenCanvasParams): JsonRpcRequest<OpenCanvasParams> =
+        JsonRpcRequest(id = id, method = "openCanvas", params = params)
+
+    fun disposeCanvas(id: Long, params: DisposeCanvasParams): JsonRpcRequest<DisposeCanvasParams> =
+        JsonRpcRequest(id = id, method = "disposeCanvas", params = params)
+
     fun resolveSessionConfig(id: Long, params: ResolveSessionConfigParams): JsonRpcRequest<ResolveSessionConfigParams> =
         JsonRpcRequest(id = id, method = "resolveSessionConfig", params = params)
 

@@ -1049,47 +1049,6 @@ public enum SessionOriginKind: Codable, Sendable, Equatable {
     }
 }
 
-/// Where the runtime discovered an extension that declares a canvas type.
-public enum CanvasExtensionSource: Codable, Sendable, Equatable {
-    /// Extension installed for the current user.
-    case user
-    /// Extension discovered in the current project.
-    case project
-    /// Extension installed only for the current session.
-    case session
-    /// Extension contributed by an installed plugin.
-    case plugin
-    /// Extension source is unavailable or not recognized by this protocol version.
-    case unspecified
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "user": self = .user
-        case "project": self = .project
-        case "session": self = .session
-        case "plugin": self = .plugin
-        case "unknown": self = .unspecified
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .user: try container.encode("user")
-        case .project: try container.encode("project")
-        case .session: try container.encode("session")
-        case .plugin: try container.encode("plugin")
-        case .unspecified: try container.encode("unknown")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
-}
-
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -6281,11 +6240,9 @@ public struct EmptyState: Codable, Sendable {
 }
 
 public struct CanvasExtensionDeclaration: Codable, Sendable {
-    /// Stable opaque identifier of the extension/provider.
+    /// Stable opaque declaration namespace.
     public var extensionId: String
-    /// Where the runtime discovered the extension/provider.
-    public var extensionSource: CanvasExtensionSource
-    /// Human-readable extension/provider name, when available.
+    /// Human-readable namespace title, when available.
     public var extensionName: String?
     /// Canvas types declared by this extension/provider. `canvasId` MUST be
     /// unique within this array.
@@ -6293,12 +6250,10 @@ public struct CanvasExtensionDeclaration: Codable, Sendable {
 
     public init(
         extensionId: String,
-        extensionSource: CanvasExtensionSource,
         extensionName: String? = nil,
         canvases: [CanvasTypeDeclaration]
     ) {
         self.extensionId = extensionId
-        self.extensionSource = extensionSource
         self.extensionName = extensionName
         self.canvases = canvases
     }
@@ -6307,8 +6262,8 @@ public struct CanvasExtensionDeclaration: Codable, Sendable {
 public struct CanvasTypeDeclaration: Codable, Sendable {
     /// Provider-local canvas type identifier.
     public var canvasId: String
-    /// Human-readable canvas type name.
-    public var displayName: String
+    /// Human-readable canvas type title.
+    public var title: String
     /// Description of what the canvas type does.
     public var description: String
     /// Whether opening this canvas requires an input flow.
@@ -6316,19 +6271,19 @@ public struct CanvasTypeDeclaration: Codable, Sendable {
 
     public init(
         canvasId: String,
-        displayName: String,
+        title: String,
         description: String,
         requiresInput: Bool
     ) {
         self.canvasId = canvasId
-        self.displayName = displayName
+        self.title = title
         self.description = description
         self.requiresInput = requiresInput
     }
 }
 
 public struct CanvasRegistry: Codable, Sendable {
-    /// Declaring extensions/providers. `extensionId` MUST be unique within this
+    /// Declaring namespaces. `extensionId` MUST be unique within this
     /// array. An empty array is an authoritative loaded registry with no types.
     public var extensions: [CanvasExtensionDeclaration]
 
@@ -6340,9 +6295,7 @@ public struct CanvasRegistry: Codable, Sendable {
 }
 
 public struct CanvasReference: Codable, Sendable {
-    /// Canonical Canvas channel URI. Subscribe to this resource for the full
-    /// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
-    /// by `openCanvas`.
+    /// Canvas channel URI. Subscribe to this resource for the full state.
     public var resource: String
 
     public init(
@@ -6359,9 +6312,9 @@ public struct CanvasState: Codable, Sendable {
     /// URI. They MUST NOT treat this provider identifier as a second resource
     /// identity.
     public var instanceId: String
-    /// Owning extension/provider identifier.
+    /// Owning declaration namespace.
     public var extensionId: String
-    /// Owning extension display name, when available.
+    /// Owning namespace title, when available.
     public var extensionName: String?
     /// Provider-local canvas type identifier.
     public var canvasId: String

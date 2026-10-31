@@ -2290,6 +2290,14 @@ public enum AHPCommands {
     public static func disposeTerminal(id: Int, params: DisposeTerminalParams) -> JsonRpcRequest<DisposeTerminalParams> {
         JsonRpcRequest(id: id, method: "disposeTerminal", params: params)
     }
+
+    public static func openCanvas(id: Int, params: OpenCanvasParams) -> JsonRpcRequest<OpenCanvasParams> {
+        JsonRpcRequest(id: id, method: "openCanvas", params: params)
+    }
+
+    public static func disposeCanvas(id: Int, params: DisposeCanvasParams) -> JsonRpcRequest<DisposeCanvasParams> {
+        JsonRpcRequest(id: id, method: "disposeCanvas", params: params)
+    }
 }
 
 /// Typed helper for constructing client → server notifications.

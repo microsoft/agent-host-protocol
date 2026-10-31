@@ -77,6 +77,14 @@ When a client dispatches an action, the server applies it to the state and also 
 | `chat/turnResume` | **Yes** | Resume the latest resumable errored turn without adding another message |
 | `chat/truncated` | **Yes** | Turn history truncated (with optional `turnId` cutoff) |
 
+### Canvases (chat channel)
+
+| Type | Client-dispatchable? | When |
+|---|---|---|
+| `chat/canvasesChanged` | No | The chat's live Canvas channel references changed |
+| `chat/canvasRegistryRequested` | **Yes** | A client asks the host to materialize the Canvas type registry |
+| `chat/canvasRegistryChanged` | No | The host replaces or clears the authoritative Canvas type registry |
+
 ### Tool Calls (chat channel)
 
 Tool calls follow a discriminated-union state machine — see [State Model — Tool Call Lifecycle](/guide/state-model#tool-call-lifecycle) for the full diagram.

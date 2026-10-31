@@ -5168,19 +5168,15 @@
     },
     "CanvasExtensionDeclaration": {
       "type": "object",
-      "description": "One extension/provider that declares canvas types for an exact chat.\n\nThe extension metadata is normalized here instead of repeated on every\n{@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT\ninfer its source or management behavior by parsing it.",
+      "description": "One namespace that declares canvas types for a chat.\n\n`extensionId` is opaque. Clients MUST NOT infer management behavior by\nparsing it.",
       "properties": {
         "extensionId": {
           "type": "string",
-          "description": "Stable opaque identifier of the extension/provider."
-        },
-        "extensionSource": {
-          "$ref": "#/$defs/CanvasExtensionSource",
-          "description": "Where the runtime discovered the extension/provider."
+          "description": "Stable opaque declaration namespace."
         },
         "extensionName": {
           "type": "string",
-          "description": "Human-readable extension/provider name, when available."
+          "description": "Human-readable namespace title, when available."
         },
         "canvases": {
           "type": "array",
@@ -5192,21 +5188,20 @@
       },
       "required": [
         "extensionId",
-        "extensionSource",
         "canvases"
       ]
     },
     "CanvasTypeDeclaration": {
       "type": "object",
-      "description": "One canvas type currently available to open.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
+      "description": "One canvas type currently available to open.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
       "properties": {
         "canvasId": {
           "type": "string",
           "description": "Provider-local canvas type identifier."
         },
-        "displayName": {
+        "title": {
           "type": "string",
-          "description": "Human-readable canvas type name."
+          "description": "Human-readable canvas type title."
         },
         "description": {
           "type": "string",
@@ -5219,21 +5214,21 @@
       },
       "required": [
         "canvasId",
-        "displayName",
+        "title",
         "description",
         "requiresInput"
       ]
     },
     "CanvasRegistry": {
       "type": "object",
-      "description": "Canvas types currently registered for one exact chat.\n\nThis is a compact presentation registry, not extension installation state\nand not the list of live instances. The host replaces the complete registry\nthrough `chat/canvasRegistryChanged` whenever provider registration changes.",
+      "description": "Canvas types currently registered for one chat.",
       "properties": {
         "extensions": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/CanvasExtensionDeclaration"
           },
-          "description": "Declaring extensions/providers. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
+          "description": "Declaring namespaces. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
         }
       },
       "required": [
@@ -5246,7 +5241,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "Canonical Canvas channel URI. Subscribe to this resource for the full\nstate. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented\nby `openCanvas`."
+          "description": "Canvas channel URI. Subscribe to this resource for the full state."
         }
       },
       "required": [
@@ -5263,11 +5258,11 @@
         },
         "extensionId": {
           "type": "string",
-          "description": "Owning extension/provider identifier."
+          "description": "Owning declaration namespace."
         },
         "extensionName": {
           "type": "string",
-          "description": "Owning extension display name, when available."
+          "description": "Owning namespace title, when available."
         },
         "canvasId": {
           "type": "string",
@@ -7153,17 +7148,6 @@
       ],
       "type": "string",
       "description": "Why a tool call was cancelled."
-    },
-    "CanvasExtensionSource": {
-      "enum": [
-        "user",
-        "project",
-        "session",
-        "plugin",
-        "unknown"
-      ],
-      "type": "string",
-      "description": "Where the runtime discovered an extension that declares a canvas type."
     },
     "TerminalClaim": {
       "oneOf": [

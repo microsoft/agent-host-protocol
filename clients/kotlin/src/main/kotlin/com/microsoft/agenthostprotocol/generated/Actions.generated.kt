@@ -258,13 +258,6 @@ data class SessionDefaultChatChangedAction(
     val defaultChat: String? = null
 )
 
-/**
- * A new message has been sent to the agent, and a new turn starts.
- *
- * A client is only allowed to send {@link MessageKind.User} messages.
- *
- * Stability: 1.0 - Early development.
- */
 @Serializable
 data class ChatTurnStartedAction(
     val type: ActionType,
@@ -298,14 +291,6 @@ data class ChatTurnStartedAction(
     val meta: Map<String, JsonElement>? = null
 )
 
-/**
- * Streaming text chunk from the assistant, appended to a specific response part.
- *
- * The server MUST first emit a `chat/responsePart` to create the target
- * markdown part, then use this action to append text to it.
- *
- * Stability: 1.0 - Early development.
- */
 @Serializable
 data class ChatDeltaAction(
     val type: ActionType,
@@ -810,11 +795,34 @@ data class ChatCanvasesChangedAction(
     val canvases: List<CanvasReference>? = null
 )
 
+/**
+ * Requests materialization of the chat's Canvas type registry.
+ *
+ * A host MUST reject the action when the chat's agent does not advertise
+ * {@link AgentCapabilities.canvases} or when the chat cannot materialize the
+ * registry. Materialization MUST NOT send a user message or invoke a model.
+ *
+ * The reducer is a no-op. The host remains authoritative and publishes the
+ * complete result through
+ * {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
+ * Clients do not need to dispatch this action when
+ * {@link ChatState.canvasRegistry} is already present.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class ChatCanvasRegistryRequestedAction(
     val type: ActionType
 )
 
+/**
+ * The Canvas type registry for this chat changed.
+ *
+ * Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
+ * Set to `undefined` when the registry is no longer materialized or available.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class ChatCanvasRegistryChangedAction(
     val type: ActionType,

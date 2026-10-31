@@ -1067,46 +1067,6 @@ internal object SessionOriginKindSerializer : KSerializer<SessionOriginKind> {
 }
 
 /**
- * Where the runtime discovered an extension that declares a canvas type.
- */
-@Serializable(with = CanvasExtensionSourceSerializer::class)
-@JvmInline
-value class CanvasExtensionSource(val rawValue: String) {
-    companion object {
-        /**
-         * Extension installed for the current user.
-         */
-        val USER: CanvasExtensionSource = CanvasExtensionSource("user")
-        /**
-         * Extension discovered in the current project.
-         */
-        val PROJECT: CanvasExtensionSource = CanvasExtensionSource("project")
-        /**
-         * Extension installed only for the current session.
-         */
-        val SESSION: CanvasExtensionSource = CanvasExtensionSource("session")
-        /**
-         * Extension contributed by an installed plugin.
-         */
-        val PLUGIN: CanvasExtensionSource = CanvasExtensionSource("plugin")
-        /**
-         * Extension source is unavailable or not recognized by this protocol version.
-         */
-        val UNSPECIFIED: CanvasExtensionSource = CanvasExtensionSource("unknown")
-    }
-}
-
-internal object CanvasExtensionSourceSerializer : KSerializer<CanvasExtensionSource> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("CanvasExtensionSource", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: CanvasExtensionSource) {
-        encoder.encodeString(value.rawValue)
-    }
-    override fun deserialize(decoder: Decoder): CanvasExtensionSource =
-        CanvasExtensionSource(decoder.decodeString())
-}
-
-/**
  * Operations the host currently permits for an automation.
  *
  * The list on {@link AutomationEntry.operations} is authoritative and may
@@ -2322,15 +2282,11 @@ data class BackgroundSubagentWork(
 @Serializable
 data class CanvasExtensionDeclaration(
     /**
-     * Stable opaque identifier of the extension/provider.
+     * Stable opaque declaration namespace.
      */
     val extensionId: String,
     /**
-     * Where the runtime discovered the extension/provider.
-     */
-    val extensionSource: CanvasExtensionSource,
-    /**
-     * Human-readable extension/provider name, when available.
+     * Human-readable namespace title, when available.
      */
     val extensionName: String? = null,
     /**
@@ -2347,9 +2303,9 @@ data class CanvasTypeDeclaration(
      */
     val canvasId: String,
     /**
-     * Human-readable canvas type name.
+     * Human-readable canvas type title.
      */
-    val displayName: String,
+    val title: String,
     /**
      * Description of what the canvas type does.
      */
@@ -2363,7 +2319,7 @@ data class CanvasTypeDeclaration(
 @Serializable
 data class CanvasRegistry(
     /**
-     * Declaring extensions/providers. `extensionId` MUST be unique within this
+     * Declaring namespaces. `extensionId` MUST be unique within this
      * array. An empty array is an authoritative loaded registry with no types.
      */
     val extensions: List<CanvasExtensionDeclaration>
@@ -2372,9 +2328,7 @@ data class CanvasRegistry(
 @Serializable
 data class CanvasReference(
     /**
-     * Canonical Canvas channel URI. Subscribe to this resource for the full
-     * state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
-     * by `openCanvas`.
+     * Canvas channel URI. Subscribe to this resource for the full state.
      */
     val resource: String
 )
@@ -2390,11 +2344,11 @@ data class CanvasState(
      */
     val instanceId: String,
     /**
-     * Owning extension/provider identifier.
+     * Owning declaration namespace.
      */
     val extensionId: String,
     /**
-     * Owning extension display name, when available.
+     * Owning namespace title, when available.
      */
     val extensionName: String? = null,
     /**

@@ -1354,56 +1354,6 @@ impl<'de> serde::Deserialize<'de> for SessionOriginKind {
     }
 }
 
-/// Where the runtime discovered an extension that declares a canvas type.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum CanvasExtensionSource {
-    /// Extension installed for the current user.
-    User,
-    /// Extension discovered in the current project.
-    Project,
-    /// Extension installed only for the current session.
-    Session,
-    /// Extension contributed by an installed plugin.
-    Plugin,
-    /// Extension source is unavailable or not recognized by this protocol version.
-    Unspecified,
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    Unknown(String),
-}
-
-impl serde::Serialize for CanvasExtensionSource {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::User => serializer.serialize_str("user"),
-            Self::Project => serializer.serialize_str("project"),
-            Self::Session => serializer.serialize_str("session"),
-            Self::Plugin => serializer.serialize_str("plugin"),
-            Self::Unspecified => serializer.serialize_str("unknown"),
-            Self::Unknown(value) => serializer.serialize_str(value),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CanvasExtensionSource {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            "user" => Self::User,
-            "project" => Self::Project,
-            "session" => Self::Session,
-            "plugin" => Self::Plugin,
-            "unknown" => Self::Unspecified,
-            _ => Self::Unknown(raw),
-        })
-    }
-}
-
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -2243,19 +2193,16 @@ pub struct ChatState {
     pub meta: Option<JsonObject>,
 }
 
-/// One extension/provider that declares canvas types for an exact chat.
+/// One namespace that declares canvas types for a chat.
 ///
-/// The extension metadata is normalized here instead of repeated on every
-/// {@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT
-/// infer its source or management behavior by parsing it.
+/// `extensionId` is opaque. Clients MUST NOT infer management behavior by
+/// parsing it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasExtensionDeclaration {
-    /// Stable opaque identifier of the extension/provider.
+    /// Stable opaque declaration namespace.
     pub extension_id: String,
-    /// Where the runtime discovered the extension/provider.
-    pub extension_source: CanvasExtensionSource,
-    /// Human-readable extension/provider name, when available.
+    /// Human-readable namespace title, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_name: Option<String>,
     /// Canvas types declared by this extension/provider. `canvasId` MUST be
@@ -2265,10 +2212,6 @@ pub struct CanvasExtensionDeclaration {
 
 /// One canvas type currently available to open.
 ///
-/// This is discovery metadata, not a live canvas instance. Live instances are
-/// represented by {@link CanvasReference} entries on chat state and their
-/// corresponding {@link CanvasState} channels.
-///
 /// This experimental object may gain optional discovery metadata. Clients
 /// SHOULD ignore fields they do not understand.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2276,23 +2219,19 @@ pub struct CanvasExtensionDeclaration {
 pub struct CanvasTypeDeclaration {
     /// Provider-local canvas type identifier.
     pub canvas_id: String,
-    /// Human-readable canvas type name.
-    pub display_name: String,
+    /// Human-readable canvas type title.
+    pub title: String,
     /// Description of what the canvas type does.
     pub description: String,
     /// Whether opening this canvas requires an input flow.
     pub requires_input: bool,
 }
 
-/// Canvas types currently registered for one exact chat.
-///
-/// This is a compact presentation registry, not extension installation state
-/// and not the list of live instances. The host replaces the complete registry
-/// through `chat/canvasRegistryChanged` whenever provider registration changes.
+/// Canvas types currently registered for one chat.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasRegistry {
-    /// Declaring extensions/providers. `extensionId` MUST be unique within this
+    /// Declaring namespaces. `extensionId` MUST be unique within this
     /// array. An empty array is an authoritative loaded registry with no types.
     pub extensions: Vec<CanvasExtensionDeclaration>,
 }
@@ -2305,9 +2244,7 @@ pub struct CanvasRegistry {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasReference {
-    /// Canonical Canvas channel URI. Subscribe to this resource for the full
-    /// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
-    /// by `openCanvas`.
+    /// Canvas channel URI. Subscribe to this resource for the full state.
     pub resource: Uri,
 }
 
@@ -2325,9 +2262,9 @@ pub struct CanvasState {
     /// URI. They MUST NOT treat this provider identifier as a second resource
     /// identity.
     pub instance_id: String,
-    /// Owning extension/provider identifier.
+    /// Owning declaration namespace.
     pub extension_id: String,
-    /// Owning extension display name, when available.
+    /// Owning namespace title, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_name: Option<String>,
     /// Provider-local canvas type identifier.

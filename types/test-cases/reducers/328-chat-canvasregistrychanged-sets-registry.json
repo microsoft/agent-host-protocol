@@ -15,12 +15,11 @@
         "extensions": [
           {
             "extensionId": "opaque-provider-id",
-            "extensionSource": "project",
             "extensionName": "Project Canvases",
             "canvases": [
               {
                 "canvasId": "diagram",
-                "displayName": "Diagram",
+                "title": "Diagram",
                 "description": "Visualize a diagram.",
                 "requiresInput": false
               }
@@ -40,12 +39,11 @@
       "extensions": [
         {
           "extensionId": "opaque-provider-id",
-          "extensionSource": "project",
           "extensionName": "Project Canvases",
           "canvases": [
             {
               "canvasId": "diagram",
-              "displayName": "Diagram",
+              "title": "Diagram",
               "description": "Visualize a diagram.",
               "requiresInput": false
             }

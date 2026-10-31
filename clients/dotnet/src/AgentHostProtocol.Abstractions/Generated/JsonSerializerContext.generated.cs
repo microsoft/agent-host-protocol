@@ -85,7 +85,6 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(BackgroundWorkKind))]
 [JsonSerializable(typeof(CanvasesCapability))]
 [JsonSerializable(typeof(CanvasExtensionDeclaration))]
-[JsonSerializable(typeof(CanvasExtensionSource))]
 [JsonSerializable(typeof(CanvasReference))]
 [JsonSerializable(typeof(CanvasRegistry))]
 [JsonSerializable(typeof(CanvasState))]

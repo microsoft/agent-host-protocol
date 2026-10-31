@@ -15,18 +15,17 @@
         "extensions": [
           {
             "extensionId": "opaque-provider-id",
-            "extensionSource": "plugin",
             "extensionName": "Diagram Tools",
             "canvases": [
               {
                 "canvasId": "diagram",
-                "displayName": "Diagram",
+                "title": "Diagram",
                 "description": "Visualize a diagram.",
                 "requiresInput": false
               },
               {
                 "canvasId": "form",
-                "displayName": "Form",
+                "title": "Form",
                 "description": "Collect structured input.",
                 "requiresInput": true
               }
@@ -50,18 +49,17 @@
           "extensions": [
             {
               "extensionId": "opaque-provider-id",
-              "extensionSource": "plugin",
               "extensionName": "Diagram Tools",
               "canvases": [
                 {
                   "canvasId": "diagram",
-                  "displayName": "Diagram",
+                  "title": "Diagram",
                   "description": "Visualize a diagram.",
                   "requiresInput": false
                 },
                 {
                   "canvasId": "form",
-                  "displayName": "Form",
+                  "title": "Form",
                   "description": "Collect structured input.",
                   "requiresInput": true
                 }

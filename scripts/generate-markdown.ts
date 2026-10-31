@@ -602,6 +602,10 @@ function renderActionInterfaceBlock(iface: InterfaceDeclaration): string {
   }
   const heading = `### \`${labelBase}${variantSuffix}\``;
   lines.push(heading + '\n');
+  const stability = readStability(iface);
+  if (stability) {
+    lines.push(`<StabilityIndex level="${stability.level}" />\n`);
+  }
   const isClientDispatchable = hasJsDocTag(iface, 'clientDispatchable');
   const desc = getJsDocDescription(iface);
   const prefix = isClientDispatchable ? '**Client-dispatchable.** ' : '';

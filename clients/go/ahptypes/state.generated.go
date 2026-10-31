@@ -503,22 +503,6 @@ const (
 	SessionOriginKindAutomation SessionOriginKind = "automation"
 )
 
-// Where the runtime discovered an extension that declares a canvas type.
-type CanvasExtensionSource string
-
-const (
-	// Extension installed for the current user.
-	CanvasExtensionSourceUser CanvasExtensionSource = "user"
-	// Extension discovered in the current project.
-	CanvasExtensionSourceProject CanvasExtensionSource = "project"
-	// Extension installed only for the current session.
-	CanvasExtensionSourceSession CanvasExtensionSource = "session"
-	// Extension contributed by an installed plugin.
-	CanvasExtensionSourcePlugin CanvasExtensionSource = "plugin"
-	// Extension source is unavailable or not recognized by this protocol version.
-	CanvasExtensionSourceUnspecified CanvasExtensionSource = "unknown"
-)
-
 // Operations the host currently permits for an automation.
 //
 // The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1528,17 +1512,14 @@ type ChatState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// One extension/provider that declares canvas types for an exact chat.
+// One namespace that declares canvas types for a chat.
 //
-// The extension metadata is normalized here instead of repeated on every
-// {@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT
-// infer its source or management behavior by parsing it.
+// `extensionId` is opaque. Clients MUST NOT infer management behavior by
+// parsing it.
 type CanvasExtensionDeclaration struct {
-	// Stable opaque identifier of the extension/provider.
+	// Stable opaque declaration namespace.
 	ExtensionId string `json:"extensionId"`
-	// Where the runtime discovered the extension/provider.
-	ExtensionSource CanvasExtensionSource `json:"extensionSource"`
-	// Human-readable extension/provider name, when available.
+	// Human-readable namespace title, when available.
 	ExtensionName *string `json:"extensionName,omitempty"`
 	// Canvas types declared by this extension/provider. `canvasId` MUST be
 	// unique within this array.
@@ -1547,30 +1528,22 @@ type CanvasExtensionDeclaration struct {
 
 // One canvas type currently available to open.
 //
-// This is discovery metadata, not a live canvas instance. Live instances are
-// represented by {@link CanvasReference} entries on chat state and their
-// corresponding {@link CanvasState} channels.
-//
 // This experimental object may gain optional discovery metadata. Clients
 // SHOULD ignore fields they do not understand.
 type CanvasTypeDeclaration struct {
 	// Provider-local canvas type identifier.
 	CanvasId string `json:"canvasId"`
-	// Human-readable canvas type name.
-	DisplayName string `json:"displayName"`
+	// Human-readable canvas type title.
+	Title string `json:"title"`
 	// Description of what the canvas type does.
 	Description string `json:"description"`
 	// Whether opening this canvas requires an input flow.
 	RequiresInput bool `json:"requiresInput"`
 }
 
-// Canvas types currently registered for one exact chat.
-//
-// This is a compact presentation registry, not extension installation state
-// and not the list of live instances. The host replaces the complete registry
-// through `chat/canvasRegistryChanged` whenever provider registration changes.
+// Canvas types currently registered for one chat.
 type CanvasRegistry struct {
-	// Declaring extensions/providers. `extensionId` MUST be unique within this
+	// Declaring namespaces. `extensionId` MUST be unique within this
 	// array. An empty array is an authoritative loaded registry with no types.
 	Extensions []CanvasExtensionDeclaration `json:"extensions"`
 }
@@ -1581,9 +1554,7 @@ type CanvasRegistry struct {
 // canvas presentation model can evolve without changing the stable chat
 // channel shape.
 type CanvasReference struct {
-	// Canonical Canvas channel URI. Subscribe to this resource for the full
-	// state. It uses the `ahp-canvas:/<segment>[/<segment>...]` form documented
-	// by `openCanvas`.
+	// Canvas channel URI. Subscribe to this resource for the full state.
 	Resource URI `json:"resource"`
 }
 
@@ -1599,9 +1570,9 @@ type CanvasState struct {
 	// URI. They MUST NOT treat this provider identifier as a second resource
 	// identity.
 	InstanceId string `json:"instanceId"`
-	// Owning extension/provider identifier.
+	// Owning declaration namespace.
 	ExtensionId string `json:"extensionId"`
-	// Owning extension display name, when available.
+	// Owning namespace title, when available.
 	ExtensionName *string `json:"extensionName,omitempty"`
 	// Provider-local canvas type identifier.
 	CanvasId string `json:"canvasId"`
