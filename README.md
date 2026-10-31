@@ -36,7 +36,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 - **[ahpd](https://github.com/softov/ahpd)** — An open-source, plugin-driven AHP server with users, permissions, and usage tracking. Plugins provide native Claude and pi agents, ACP agents, tools and MCP servers, sandboxed computers, a web UI ([ahpw](https://github.com/softov/ahpw)), and more. Includes [`@ahpd/sdk`](https://www.npmjs.com/package/@ahpd/sdk) for building your own host and plugins.
 - **[hydra-ahp](https://github.com/smagnuso/hydra-ahp)** — An open-source AHP host for [Hydra](https://github.com/smagnuso/hydra-acp), a multi-client ACP session daemon, exposing Hydra sessions to AHP clients such as VS Code's agent UI.
 - **[AHP-ACP Gateway](https://github.com/formulahendry/ahp-acp-gateway)** — A universal AHP WebSocket host that runs configured ACP agents, with persistent sessions, replay and reconnect, permissions, and cancellation.
-- **[AgentConnect](https://github.com/agentconnect-md/agentconnect)** — An open-source multi-agent platform that brings Claude Code, Codex and other ACP agents into Slack, Telegram, Discord and webchat, and serves each agent as an AHP 1.0 host over WebSocket, authenticated with a personal API key.
+- **[AgentConnect](https://github.com/agentconnect-md/agentconnect)** — An open-source multi-agent platform that brings Claude Code, Codex and other ACP agents into Slack, Telegram, Discord and webchat, and serves each agent as an AHP 1.0 host over WebSocket.
 
 ## Versioning and releases
 
