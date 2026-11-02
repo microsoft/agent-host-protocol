@@ -822,6 +822,27 @@ type ListSessionsResult struct {
 // content references and canvas sources. This includes HTTP(S) URLs that the
 // other peer might not be able to reach, such as a development server on the
 // host's loopback interface.
+//
+// A sender MAY read part of a resource by including
+// {@link ResourceReadParams.position | `position`} and/or
+// {@link ResourceReadParams.length | `length`}. There is no capability for
+// byte ranges; support is detected from the result. These rules apply in both
+// directions:
+//
+//   - A receiver that honors the range SHOULD return only the requested bytes
+//     and MUST include {@link ResourceReadResult.size | `size`}, the total size
+//     of the resource in bytes. Content that cannot be read partially (for
+//     example a git blob or an MCP resource) MAY be read whole and sliced.
+//   - A receiver that does not honor the range ignores `position` and `length`
+//     and returns the whole resource without `size`. A sender MUST treat a
+//     result without `size` as the whole resource.
+//   - A ranged result MUST use `base64` encoding, even if the sender requested
+//     `utf-8`, because a byte range can split a UTF-8 sequence.
+//   - A `position` at or past the end of the resource returns empty `data`.
+//   - A receiver that honors the range MUST reject a negative or non-integer
+//     `position` or `length` with `InvalidParams` (`-32602`).
+//   - More of the resource remains when `position` plus the decoded length of
+//     `data` is less than `size`.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -832,16 +853,25 @@ type ResourceReadParams struct {
 	Uri string `json:"uri"`
 	// Preferred encoding for the returned data (default: server-chosen)
 	Encoding *ContentEncoding `json:"encoding,omitempty"`
+	// Byte offset to start reading at. Defaults to `0`. A receiver that does
+	// not honor byte ranges ignores it and returns the whole resource.
+	Position *int64 `json:"position,omitempty"`
+	// Maximum number of bytes to return from {@link position}. Defaults to the
+	// rest of the resource. A receiver that does not honor byte ranges ignores
+	// it and returns the whole resource.
+	Length *int64 `json:"length,omitempty"`
 }
 
 // Result of the `resourceRead` command.
 //
 // The server SHOULD honor the `encoding` requested in the params. If the
 // server cannot provide the requested encoding, it MUST fall back to either
-// `base64` or `utf-8`.
+// `base64` or `utf-8`. A ranged result (one with {@link size}) MUST use
+// `base64`.
 //
-// The result contains the whole resource. Windowed delivery does not limit its
-// size, because it is a response and not part of a subscription.
+// Unless {@link size} is present, the result contains the whole resource.
+// Windowed delivery does not limit the size of the result, because it is a
+// response and not part of a subscription.
 type ResourceReadResult struct {
 	// Content encoded as a string
 	Data string `json:"data"`
@@ -849,6 +879,11 @@ type ResourceReadResult struct {
 	Encoding ContentEncoding `json:"encoding"`
 	// Content type (e.g. `"image/png"`, `"text/plain"`)
 	ContentType *string `json:"contentType,omitempty"`
+	// Total size of the resource in bytes. Present if and only if the receiver
+	// honored the byte range in {@link ResourceReadParams.position} and
+	// {@link ResourceReadParams.length}; when absent, `data` is the whole
+	// resource.
+	Size *int64 `json:"size,omitempty"`
 }
 
 // Writes content to a file on the server's filesystem.
