@@ -1318,8 +1318,6 @@ data class ResourceResolveResult(
     /**
      * Canonical URI after symlink resolution. Equal to the requested URI when
      * `followSymlinks` is `false` or the URI does not traverse a symlink.
-     * For an HTTP(S) URI, a redirect that the receiver follows is treated as a
-     * symlink.
      */
     val uri: String,
     /**

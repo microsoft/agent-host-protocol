@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`resourceRead` guidance for HTTP(S) URLs: a peer SHOULD serve reads of the URIs it publishes as content, including URLs that only it can reach, applying its own policy before contacting any target. `resourceResolve` treats a redirect that the receiver follows as a symlink."
+  "message": "`resourceRead` guidance: a peer SHOULD serve reads of the URIs it publishes as content, including HTTP(S) URLs that the other peer might not be able to reach."
 }

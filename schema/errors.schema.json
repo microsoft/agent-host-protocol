@@ -6675,7 +6675,7 @@
     },
     "ResourceReadParams": {
       "type": "object",
-      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nA peer SHOULD serve reads of the URIs that it publishes as content, such as\ncontent references and canvas sources. This includes HTTP(S) URLs that the\nother peer might not be able to reach, such as a development server on the\nhost's loopback interface. To read an HTTP(S) URL, the receiver sends a\n`GET` request from its own environment:\n\n- Before contacting the URL, or any redirect target, the receiver applies\n  its own policy to it, and fails a read that the policy doesn't allow with\n  `PermissionDenied`. It is not a general-purpose HTTP proxy.\n- The read fails unless the final response status is 2xx. A `404` or `410`\n  fails with `NotFound`.\n- `contentType` is the response's `Content-Type`.\n- A redirect that the receiver follows is treated as a symlink:\n  `resourceResolve` returns the URI that it leads to, which is the base for\n  relative references in the content.",
+      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nA peer SHOULD serve reads of the URIs that it publishes as content, such as\ncontent references and canvas sources. This includes HTTP(S) URLs that the\nother peer might not be able to reach, such as a development server on the\nhost's loopback interface.",
       "properties": {
         "channel": {
           "type": "string",
@@ -7032,7 +7032,7 @@
       "properties": {
         "uri": {
           "$ref": "#/$defs/URI",
-          "description": "Canonical URI after symlink resolution. Equal to the requested URI when\n`followSymlinks` is `false` or the URI does not traverse a symlink.\nFor an HTTP(S) URI, a redirect that the receiver follows is treated as a\nsymlink."
+          "description": "Canonical URI after symlink resolution. Equal to the requested URI when\n`followSymlinks` is `false` or the URI does not traverse a symlink."
         },
         "type": {
           "$ref": "#/$defs/ResourceType",

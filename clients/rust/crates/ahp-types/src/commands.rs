@@ -1120,18 +1120,7 @@ pub struct ListSessionsResult {
 /// A peer SHOULD serve reads of the URIs that it publishes as content, such as
 /// content references and canvas sources. This includes HTTP(S) URLs that the
 /// other peer might not be able to reach, such as a development server on the
-/// host's loopback interface. To read an HTTP(S) URL, the receiver sends a
-/// `GET` request from its own environment:
-///
-/// - Before contacting the URL, or any redirect target, the receiver applies
-///   its own policy to it, and fails a read that the policy doesn't allow with
-///   `PermissionDenied`. It is not a general-purpose HTTP proxy.
-/// - The read fails unless the final response status is 2xx. A `404` or `410`
-///   fails with `NotFound`.
-/// - `contentType` is the response's `Content-Type`.
-/// - A redirect that the receiver follows is treated as a symlink:
-///   `resourceResolve` returns the URI that it leads to, which is the base for
-///   relative references in the content.
+/// host's loopback interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadParams {
@@ -1404,8 +1393,6 @@ pub struct ResourceResolveParams {
 pub struct ResourceResolveResult {
     /// Canonical URI after symlink resolution. Equal to the requested URI when
     /// `followSymlinks` is `false` or the URI does not traverse a symlink.
-    /// For an HTTP(S) URI, a redirect that the receiver follows is treated as a
-    /// symlink.
     pub uri: Uri,
     /// Resource kind.
     pub r#type: ResourceType,
