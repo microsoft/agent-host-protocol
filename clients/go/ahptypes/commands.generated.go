@@ -201,6 +201,13 @@ type InitializeResult struct {
 	// understand. Capabilities needed for interoperable behavior SHOULD use typed
 	// fields on {@link InitializeResult} instead.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Accepts the client's Resource Reads offer and lists the schemes this host
+	// can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
+	// offered. Presence activates the contract in both directions; absence
+	// leaves existing resource-read behavior unchanged.
+	//
+	// Stability: 1.0 - Early development.
+	ResourceRead *ResourceReadCapabilities `json:"resourceRead,omitempty"`
 	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
 	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
@@ -241,10 +248,17 @@ type InitializeResult struct {
 
 // Optional capabilities a client declares during `initialize`.
 //
-// Each field is a presence flag: an empty object `{}` means "supported",
-// absence means "not supported". Sub-fields on individual capabilities
-// are reserved for future per-capability options.
+// Presence declares support; absence means "not supported". Each feature
+// defines its own options and negotiation rules. Capabilities without options
+// use an empty object `{}`; others carry required metadata such as URI schemes.
 type ClientCapabilities struct {
+	// Offers the Resource Reads contract, including effective content URIs and
+	// typed failures. `schemes` lists resources this client can serve in the
+	// reverse direction; an empty list still offers support as a reader.
+	// The contract is active only if `InitializeResult.resourceRead` is present.
+	//
+	// Stability: 1.0 - Early development.
+	ResourceRead *ResourceReadCapabilities `json:"resourceRead,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -804,6 +818,20 @@ type ListSessionsResult struct {
 	Items []SessionSummary `json:"items"`
 }
 
+// Support for the negotiated Resource Reads contract.
+//
+// Presence declares support for effective content URIs and typed read
+// failures, even when `schemes` is empty. It does not grant resource access.
+//
+// Stability: 1.0 - Early development.
+type ResourceReadCapabilities struct {
+	// URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
+	// names without `:`. An empty list means the peer offers no resources under
+	// this contract. A listed scheme does not promise access to every URI with
+	// that scheme.
+	Schemes []string `json:"schemes"`
+}
+
 // Reads the content of a resource by URI.
 //
 // Content references keep the state tree small by storing large data (images,
@@ -818,15 +846,25 @@ type ListSessionsResult struct {
 // use it to read host-side files. The receiver enforces access via the
 // same permission/`resourceRequest` flow regardless of which peer initiated.
 //
-// A host MAY also serve the live source of a canvas, and paths relative to
-// it, on `ahp-canvas:` URIs. See the Canvas Channel specification.
+// Hosts SHOULD also make advertised renderable resources, including HTTP(S)
+// sources, available through this method to clients that cannot reach them
+// directly. Reads target the advertised content URI, not a channel-derived
+// alias. This does not authorize fetching arbitrary client-supplied URLs.
+//
+// When both peers negotiate `resourceRead`, the Resource Reads specification
+// defines URI resolution, HTTP-backed reads, redirects, permission checks,
+// bounds, and typed failures. Without negotiation, existing behavior remains
+// unchanged; callers MUST NOT assume that an HTTP(S) URI is readable.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Content URI from a `ContentRef`
+	// Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
+	// Under the negotiated Resource Reads contract it MUST have no fragment.
+	// Resolve relative references against the containing resource's effective
+	// URI before sending the request.
 	Uri string `json:"uri"`
 	// Preferred encoding for the returned data (default: server-chosen)
 	Encoding *ContentEncoding `json:"encoding,omitempty"`
@@ -847,6 +885,14 @@ type ResourceReadResult struct {
 	Encoding ContentEncoding `json:"encoding"`
 	// Content type (e.g. `"image/png"`, `"text/plain"`)
 	ContentType *string `json:"contentType,omitempty"`
+	// Public absolute, fragment-free URI of the returned content after
+	// redirects. Required when a negotiated read changes the resource URI;
+	// otherwise omitted, meaning the requested URI. Readers MUST use this as
+	// the base for relative references. MUST NOT expose a private backing URI.
+	// Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+	//
+	// Stability: 1.0 - Early development.
+	EffectiveUri *URI `json:"effectiveUri,omitempty"`
 }
 
 // Writes content to a file on the server's filesystem.
@@ -1091,7 +1137,7 @@ type ResourceMkdirParams struct {
 type ResourceMkdirResult struct {
 }
 
-// Requests permission to access a resource on the receiver's filesystem.
+// Requests permission to access a resource mediated by the receiver.
 //
 // `resourceRequest` is symmetrical and MAY be sent in either direction: a
 // client asks the server to grant access to a server-side resource, or a

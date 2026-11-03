@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-too-large",
+  "group": "A",
+  "description": "The typed failure payload preserves the tooLarge kind.",
+  "type": "ResourceReadFailedErrorData",
+  "input": { "kind": "tooLarge" },
+  "acceptableOutputs": [{ "kind": "tooLarge" }]
+}

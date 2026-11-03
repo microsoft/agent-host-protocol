@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unsupported-scheme",
+  "group": "A",
+  "description": "Unsupported schemes have a distinct failure kind and do not masquerade as missing resources.",
+  "type": "ResourceReadFailedErrorData",
+  "input": { "kind": "unsupportedScheme" },
+  "acceptableOutputs": [{ "kind": "unsupportedScheme" }]
+}

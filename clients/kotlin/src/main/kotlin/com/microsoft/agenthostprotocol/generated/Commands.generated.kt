@@ -445,6 +445,15 @@ data class InitializeResult(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
+     * Accepts the client's Resource Reads offer and lists the schemes this host
+     * can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
+     * offered. Presence activates the contract in both directions; absence
+     * leaves existing resource-read behavior unchanged.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val resourceRead: ResourceReadCapabilities? = null,
+    /**
      * Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
      * channel whose state has no fields ({@link EmptyState}).
      */
@@ -500,6 +509,15 @@ data class InitializeResult(
 
 @Serializable
 data class ClientCapabilities(
+    /**
+     * Offers the Resource Reads contract, including effective content URIs and
+     * typed failures. `schemes` lists resources this client can serve in the
+     * reverse direction; an empty list still offers support as a reader.
+     * The contract is active only if `InitializeResult.resourceRead` is present.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val resourceRead: ResourceReadCapabilities? = null,
     /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -1066,6 +1084,25 @@ data class ListSessionsResult(
     val items: List<SessionSummary>
 )
 
+/**
+ * Support for the negotiated Resource Reads contract.
+ *
+ * Presence declares support for effective content URIs and typed read
+ * failures, even when `schemes` is empty. It does not grant resource access.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ResourceReadCapabilities(
+    /**
+     * URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
+     * names without `:`. An empty list means the peer offers no resources under
+     * this contract. A listed scheme does not promise access to every URI with
+     * that scheme.
+     */
+    val schemes: List<String>
+)
+
 @Serializable
 data class ResourceReadParams(
     /**
@@ -1079,7 +1116,10 @@ data class ResourceReadParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Content URI from a `ContentRef`
+     * Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
+     * Under the negotiated Resource Reads contract it MUST have no fragment.
+     * Resolve relative references against the containing resource's effective
+     * URI before sending the request.
      */
     val uri: String,
     /**
@@ -1101,7 +1141,17 @@ data class ResourceReadResult(
     /**
      * Content type (e.g. `"image/png"`, `"text/plain"`)
      */
-    val contentType: String? = null
+    val contentType: String? = null,
+    /**
+     * Public absolute, fragment-free URI of the returned content after
+     * redirects. Required when a negotiated read changes the resource URI;
+     * otherwise omitted, meaning the requested URI. Readers MUST use this as
+     * the base for relative references. MUST NOT expose a private backing URI.
+     * Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val effectiveUri: String? = null
 )
 
 @Serializable

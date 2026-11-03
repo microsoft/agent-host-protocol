@@ -106,14 +106,14 @@ test('API docs show stability on entrypoint fields and notification methods only
 
 test('native client docs preserve declaration and entrypoint stability', () => {
   const clients = [
-    ['clients/go/ahptypes', 'commands.generated.go', 'notifications.generated.go'],
-    ['clients/rust/crates/ahp-types/src', 'commands.rs', 'notifications.rs'],
-    ['clients/swift/AgentHostProtocol/Sources/AgentHostProtocol/Generated', 'Commands.generated.swift', 'Notifications.generated.swift'],
-    ['clients/kotlin/src/main/kotlin/com/microsoft/agenthostprotocol/generated', 'Commands.generated.kt', 'Notifications.generated.kt'],
-    ['clients/dotnet/src/AgentHostProtocol.Abstractions/Generated', 'Commands.generated.cs', 'Notifications.generated.cs'],
+    ['clients/go/ahptypes', 'commands.generated.go', 'notifications.generated.go', 'errors.generated.go'],
+    ['clients/rust/crates/ahp-types/src', 'commands.rs', 'notifications.rs', 'errors.rs'],
+    ['clients/swift/AgentHostProtocol/Sources/AgentHostProtocol/Generated', 'Commands.generated.swift', 'Notifications.generated.swift', 'Errors.generated.swift'],
+    ['clients/kotlin/src/main/kotlin/com/microsoft/agenthostprotocol/generated', 'Commands.generated.kt', 'Notifications.generated.kt', 'Errors.generated.kt'],
+    ['clients/dotnet/src/AgentHostProtocol.Abstractions/Generated', 'Commands.generated.cs', 'Notifications.generated.cs', 'Errors.generated.cs'],
   ];
-  for (const [directory, commands, notifications] of clients) {
-    for (const [file, expected] of [[commands, 14], [notifications, 6]] as const) {
+  for (const [directory, commands, notifications, errors] of clients) {
+    for (const [file, expected] of [[commands, 18], [notifications, 6], [errors, 2]] as const) {
       const content = readFileSync(resolve(root, directory, file), 'utf8');
       assert.equal(content.split(marker).length - 1, expected, `${directory}/${file}`);
     }

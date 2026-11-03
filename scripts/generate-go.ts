@@ -1818,7 +1818,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
-  { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
+  { name: 'ResourceReadCapabilities' }, { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
   { name: 'ResourceListParams' }, { name: 'ResourceListResult' },
   { name: 'DirectoryEntry' },
@@ -2171,7 +2171,9 @@ func CountsAgainstWindow(method string) bool {
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
 
-function generateErrorsFile(): string {
+function generateErrorsFile(project: Project): string {
+  const failureKind = findEnum(project, 'ResourceReadFailureKind');
+  if (!failureKind) throw new Error('ResourceReadFailureKind not found');
   return `${GENERATED_BANNER}
 // ─── Standard JSON-RPC Error Codes ─────────────────────────────────────────
 
@@ -2207,6 +2209,8 @@ const (
 \tErrorCodeAlreadyExists               int32 = -32010
 \t// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
 \tErrorCodeTcpConnectionOpenFailed     int32 = -32012
+\t// ErrorCodeResourceReadFailed carries ResourceReadFailedErrorData.
+\tErrorCodeResourceReadFailed          int32 = -32013
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -2234,6 +2238,10 @@ type PermissionDeniedErrorData struct {
 type UnsupportedProtocolVersionErrorData struct {
 \tSupportedVersions []string \`json:"supportedVersions"\`
 }
+
+${generateEnum(failureKind)}
+
+${generateStructFromInterface(project, 'ResourceReadFailedErrorData')}
 `;
 }
 
@@ -2541,6 +2549,8 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
+    'ResourceReadFailureKind',
+    'ResourceReadFailedErrorData',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',
@@ -2628,7 +2638,7 @@ export function generateGoModule(project: Project, outputDir: string, options: G
   fs.writeFileSync(path.join(srcDir, 'actions.generated.go'), generateActionsFile(project));
   fs.writeFileSync(path.join(srcDir, 'commands.generated.go'), generateCommandsFile(project));
   fs.writeFileSync(path.join(srcDir, 'notifications.generated.go'), generateNotificationsFile(project));
-  fs.writeFileSync(path.join(srcDir, 'errors.generated.go'), generateErrorsFile());
+  fs.writeFileSync(path.join(srcDir, 'errors.generated.go'), generateErrorsFile(project));
   fs.writeFileSync(path.join(srcDir, 'messages.generated.go'), generateMessagesFile());
   fs.writeFileSync(path.join(srcDir, 'version.generated.go'), generateVersionFile(project));
 

@@ -1,0 +1,26 @@
+{
+  "name": "canvas-indirect-content-uri",
+  "group": "A",
+  "description": "Negotiated canvas state keeps subscription identity independent of a hierarchical content URI.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-canvas:/group/panel",
+    "state": {
+      "instanceId": "panel",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "url": "canvas-content://c1/preview/index.html"
+    },
+    "fromSeq": 5
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-canvas:/group/panel",
+    "state": {
+      "instanceId": "panel",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "url": "canvas-content://c1/preview/index.html"
+    },
+    "fromSeq": 5
+  }]
+}

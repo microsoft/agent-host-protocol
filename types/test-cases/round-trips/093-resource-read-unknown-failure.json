@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unknown-failure",
+  "group": "A",
+  "description": "Unknown future failure kinds round-trip through native models without losing the failed-read result.",
+  "type": "ResourceReadFailedErrorData",
+  "input": { "kind": "futureFailure" },
+  "acceptableOutputs": [{ "kind": "futureFailure" }]
+}

@@ -89,6 +89,7 @@ export default withMermaid(defineConfigWithTheme<DocThemeConfig>({
             { text: 'Lifecycle', link: '/specification/lifecycle' },
             { text: 'Channels & Subscriptions', link: '/specification/subscriptions' },
             { text: 'Windowed Delivery', link: '/specification/windowed-delivery' },
+            { text: 'Resource Reads', link: '/specification/resource-reads' },
             { text: 'Authentication', link: '/specification/authentication' },
             { text: 'MCP Channel', link: '/specification/mcp-channel' },
             { text: 'Versioning', link: '/specification/versioning' },

@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-timeout",
+  "group": "A",
+  "description": "The typed failure payload preserves the timeout kind.",
+  "type": "ResourceReadFailedErrorData",
+  "input": { "kind": "timeout" },
+  "acceptableOutputs": [{ "kind": "timeout" }]
+}

@@ -1721,7 +1721,7 @@ const COMMAND_STRUCTS = [
   'CreateChatParams', 'DisposeChatParams',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
-  'ResourceReadParams', 'ResourceReadResult',
+  'ResourceReadCapabilities', 'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
   'ResourceListParams', 'ResourceListResult', 'DirectoryEntry',
   'ResourceCopyParams', 'ResourceCopyResult',
@@ -2118,10 +2118,18 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
+  lines.push('    /// A negotiated resource read failed; data is ResourceReadFailedErrorData');
+  lines.push('    public static let resourceReadFailed = -32013');
   lines.push('}');
   lines.push('');
 
   lines.push('// MARK: - Error Detail Payloads\n');
+  const failureKind = findEnum(project, 'ResourceReadFailureKind');
+  if (!failureKind) throw new Error('ResourceReadFailureKind not found');
+  lines.push(generateSwiftEnum(failureKind));
+  lines.push('');
+  lines.push(generateStructFromInterface(project, 'ResourceReadFailedErrorData'));
+  lines.push('');
   for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
     try {
       lines.push(generateStructFromInterface(project, ifaceName));
@@ -2513,6 +2521,8 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
+    'ResourceReadFailureKind',
+    'ResourceReadFailedErrorData',
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

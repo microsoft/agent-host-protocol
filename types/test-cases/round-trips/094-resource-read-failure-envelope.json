@@ -1,0 +1,24 @@
+{
+  "name": "resource-read-failure-envelope",
+  "group": "A",
+  "description": "ResourceReadFailed carries the named details in a JSON-RPC error envelope.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "error": {
+      "code": -32013,
+      "message": "Resource exceeds the read size limit",
+      "data": { "kind": "tooLarge" }
+    }
+  },
+  "acceptableOutputs": [{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "error": {
+      "code": -32013,
+      "message": "Resource exceeds the read size limit",
+      "data": { "kind": "tooLarge" }
+    }
+  }]
+}

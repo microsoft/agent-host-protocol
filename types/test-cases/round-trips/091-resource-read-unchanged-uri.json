@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unchanged-uri",
+  "group": "A",
+  "description": "Legacy and unredirected reads omit the optional effective URI rather than emitting null.",
+  "type": "ResourceReadResult",
+  "input": { "data": "Hello", "encoding": "utf-8", "contentType": "text/plain" },
+  "acceptableOutputs": [{ "data": "Hello", "encoding": "utf-8", "contentType": "text/plain" }]
+}

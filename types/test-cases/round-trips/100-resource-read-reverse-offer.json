@@ -1,0 +1,18 @@
+{
+  "name": "resource-read-reverse-offer",
+  "group": "A",
+  "description": "The client can serve virtual resources in the reverse direction under the same contract.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "reader-1",
+    "protocolVersions": ["1.0.0"],
+    "capabilities": { "resourceRead": { "schemes": ["virtual"] } }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "clientId": "reader-1",
+    "protocolVersions": ["1.0.0"],
+    "capabilities": { "resourceRead": { "schemes": ["virtual"] } }
+  }]
+}

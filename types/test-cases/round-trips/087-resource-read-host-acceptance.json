@@ -1,0 +1,18 @@
+{
+  "name": "resource-read-host-acceptance",
+  "group": "A",
+  "description": "Host acceptance retains the advertised public resource schemes.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.0.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "resourceRead": { "schemes": ["http", "https", "canvas-content"] }
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "1.0.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "resourceRead": { "schemes": ["http", "https", "canvas-content"] }
+  }]
+}

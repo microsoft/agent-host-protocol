@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-busy",
+  "group": "A",
+  "description": "Capacity exhaustion is a busy read failure, not an optimistic-concurrency Conflict.",
+  "type": "ResourceReadFailedErrorData",
+  "input": { "kind": "busy" },
+  "acceptableOutputs": [{ "kind": "busy" }]
+}

@@ -5189,7 +5189,7 @@
         },
         "url": {
           "$ref": "#/$defs/URI",
-          "description": "Current absolute HTTP(S) source URL; absent when the live source is unavailable.\nHosts MUST clear this field when the provider becomes unavailable.\n\nSource URLs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart.\n\nA client that can't reach this URL can read the source through\n`resourceRead` on the canvas URI when the host serves canvas content.\nSee the Canvas Channel specification."
+          "description": "Current absolute content URI; absent when the live source is unavailable.\nMAY be an HTTP(S) URL. Hosts SHOULD make the advertised resource readable\nthrough `resourceRead` for clients that cannot retrieve it directly.\nHosts MUST clear this field when the provider becomes unavailable.\n\nThe content URI is distinct from the canvas's opaque subscription URI.\nNon-HTTP(S) sources require the negotiated Resource Reads contract and a\nscheme the host advertises there. Without it, hosts MUST retain HTTP(S)\nsources or omit this field when no compatible source is available.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
         }
       },
       "required": [

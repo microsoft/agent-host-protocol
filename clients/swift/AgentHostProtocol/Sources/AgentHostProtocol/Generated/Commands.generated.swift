@@ -417,6 +417,13 @@ public struct InitializeResult: Codable, Sendable {
     /// understand. Capabilities needed for interoperable behavior SHOULD use typed
     /// fields on {@link InitializeResult} instead.
     public var meta: [String: AnyCodable]?
+    /// Accepts the client's Resource Reads offer and lists the schemes this host
+    /// can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
+    /// offered. Presence activates the contract in both directions; absence
+    /// leaves existing resource-read behavior unchanged.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var resourceRead: ResourceReadCapabilities?
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
@@ -459,6 +466,7 @@ public struct InitializeResult: Codable, Sendable {
         case serverSeq
         case serverInfo
         case meta = "_meta"
+        case resourceRead
         case snapshots
         case defaultDirectory
         case completionTriggerCharacters
@@ -474,6 +482,7 @@ public struct InitializeResult: Codable, Sendable {
         serverSeq: Int,
         serverInfo: Implementation? = nil,
         meta: [String: AnyCodable]? = nil,
+        resourceRead: ResourceReadCapabilities? = nil,
         snapshots: [Snapshot],
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
@@ -487,6 +496,7 @@ public struct InitializeResult: Codable, Sendable {
         self.serverSeq = serverSeq
         self.serverInfo = serverInfo
         self.meta = meta
+        self.resourceRead = resourceRead
         self.snapshots = snapshots
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
@@ -499,6 +509,13 @@ public struct InitializeResult: Codable, Sendable {
 }
 
 public struct ClientCapabilities: Codable, Sendable {
+    /// Offers the Resource Reads contract, including effective content URIs and
+    /// typed failures. `schemes` lists resources this client can serve in the
+    /// reverse direction; an empty list still offers support as a reader.
+    /// The contract is active only if `InitializeResult.resourceRead` is present.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var resourceRead: ResourceReadCapabilities?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -513,8 +530,10 @@ public struct ClientCapabilities: Codable, Sendable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
+        resourceRead: ResourceReadCapabilities? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
+        self.resourceRead = resourceRead
         self.mcpApps = mcpApps
     }
 }
@@ -1208,13 +1227,36 @@ public struct ListSessionsResult: Codable, Sendable {
     }
 }
 
+/// Support for the negotiated Resource Reads contract.
+///
+/// Presence declares support for effective content URIs and typed read
+/// failures, even when `schemes` is empty. It does not grant resource access.
+///
+/// Stability: 1.0 - Early development.
+public struct ResourceReadCapabilities: Codable, Sendable {
+    /// URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
+    /// names without `:`. An empty list means the peer offers no resources under
+    /// this contract. A listed scheme does not promise access to every URI with
+    /// that scheme.
+    public var schemes: [String]
+
+    public init(
+        schemes: [String]
+    ) {
+        self.schemes = schemes
+    }
+}
+
 public struct ResourceReadParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Content URI from a `ContentRef`
+    /// Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
+    /// Under the negotiated Resource Reads contract it MUST have no fragment.
+    /// Resolve relative references against the containing resource's effective
+    /// URI before sending the request.
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
@@ -1246,15 +1288,25 @@ public struct ResourceReadResult: Codable, Sendable {
     public var encoding: ContentEncoding
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     public var contentType: String?
+    /// Public absolute, fragment-free URI of the returned content after
+    /// redirects. Required when a negotiated read changes the resource URI;
+    /// otherwise omitted, meaning the requested URI. Readers MUST use this as
+    /// the base for relative references. MUST NOT expose a private backing URI.
+    /// Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var effectiveUri: String?
 
     public init(
         data: String,
         encoding: ContentEncoding,
-        contentType: String? = nil
+        contentType: String? = nil,
+        effectiveUri: String? = nil
     ) {
         self.data = data
         self.encoding = encoding
         self.contentType = contentType
+        self.effectiveUri = effectiveUri
     }
 }
 

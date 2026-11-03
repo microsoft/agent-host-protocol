@@ -1021,7 +1021,7 @@ function generateCanvasChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Canvas Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and HTTP(S) source URL. A missing URL means the source is unavailable. Source URLs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart. A host can also serve canvas content through `resourceRead`; see the [Canvas Channel specification](/specification/canvas-channel).\n');
+  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises opaque subscription URIs; clients subscribe for live presentation metadata and a distinct content URI. A missing source means the canvas is unavailable. Hosts should make content readable through the shared [Resource Reads contract](/specification/resource-reads). Non-HTTP(S) sources require negotiation. Source URIs must be redacted from diagnostics and must not be reused from persisted state after provider or host restart. See the [Canvas Channel specification](/specification/canvas-channel).\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {
@@ -1286,15 +1286,17 @@ function generateErrorCodesPage(project: Project): string {
   lines.push('  }');
   lines.push('}');
   lines.push('```\n');
-  lines.push('The `data` field is OPTIONAL and MAY contain additional structured information about the error. Its shape is not defined by the protocol.\n');
+  lines.push('The `data` field carries structured detail for the error codes listed below; other codes may carry an unspecified payload.\n');
 
   // Typed error-data shapes
   lines.push('## Typed Error Data\n');
   lines.push('A handful of error codes carry a typed `data` payload. The mapping is captured by `AhpErrorDetailsMap`; the typed `AhpError<C>` union narrows `data` based on the code.\n');
-  for (const name of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'AhpErrorDetailsMap']) {
+  for (const name of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'ResourceReadFailedErrorData', 'AhpErrorDetailsMap']) {
     const iface = errorsFile.getInterface(name);
     if (iface) lines.push(renderInterfaceBlock(iface));
   }
+  const resourceReadFailureKind = errorsFile.getEnum('ResourceReadFailureKind');
+  if (resourceReadFailureKind) lines.push(renderEnumBlock(resourceReadFailureKind));
   for (const name of ['AhpErrorCode', 'JsonRpcErrorCode', 'AhpErrorCodeWithData', 'AhpError']) {
     const ta = errorsFile.getTypeAlias(name);
     if (ta) lines.push(renderTypeAliasBlock(ta));
@@ -1302,7 +1304,7 @@ function generateErrorCodesPage(project: Project): string {
 
   // Version Introduction
   lines.push('## Version Introduction\n');
-  lines.push('All error codes listed above were introduced in protocol version **1**.\n');
+  lines.push('`ResourceReadFailed` requires the opt-in [Resource Reads contract](/specification/resource-reads). Other error codes apply to their corresponding protocol features.\n');
   return lines.join('\n');
 }
 

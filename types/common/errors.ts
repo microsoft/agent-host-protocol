@@ -95,6 +95,13 @@ export const AhpErrorCodes = {
   Conflict: -32011,
   /** The host could not open the requested TCP connection. */
   TcpConnectionOpenFailed: -32012,
+  /**
+   * A negotiated resource read failed. The required data is a
+   * ResourceReadFailedErrorData describing a machine-readable failure kind.
+   *
+   * @stability 1.0
+   */
+  ResourceReadFailed: -32013,
 } as const;
 
 /** Union type of all AHP application error codes. */
@@ -104,6 +111,44 @@ export type AhpErrorCode = (typeof AhpErrorCodes)[keyof typeof AhpErrorCodes];
 export type JsonRpcErrorCode = (typeof JsonRpcErrorCodes)[keyof typeof JsonRpcErrorCodes];
 
 // ─── Error Detail Types ──────────────────────────────────────────────────────
+
+/**
+ * Failure kinds for the negotiated Resource Reads contract.
+ *
+ * Unknown future kinds MUST be treated as a failed read, not as success or
+ * permission to retry automatically.
+ *
+ * @category Error Details
+ * @stability 1.0
+ * @nonexhaustive
+ */
+export const enum ResourceReadFailureKind {
+  /** The receiver does not serve this URI scheme. */
+  UnsupportedScheme = 'unsupportedScheme',
+  /** The body or encoded response exceeds the receiver's size limit. */
+  TooLarge = 'tooLarge',
+  /** The read exceeded its deadline. */
+  Timeout = 'timeout',
+  /** The receiver cannot admit the read within its bounded capacity. */
+  Busy = 'busy',
+  /** The backing source failed, including an unusable redirect or response. */
+  Upstream = 'upstream',
+}
+
+/**
+ * Required `data` for a `ResourceReadFailed` (-32013) error.
+ *
+ * The payload MUST NOT contain backing URLs, credentials, response headers,
+ * or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+ * `NotFound`, and `InvalidParams` errors retain their meanings.
+ *
+ * @category Error Details
+ * @stability 1.0
+ */
+export interface ResourceReadFailedErrorData {
+  /** Machine-readable reason the read failed. */
+  kind: ResourceReadFailureKind;
+}
 
 /**
  * Details carried in the `data` field of an `AuthRequired` (-32007) error.
@@ -173,6 +218,7 @@ export interface AhpErrorDetailsMap {
   [AhpErrorCodes.AuthRequired]: AuthRequiredErrorData;
   [AhpErrorCodes.PermissionDenied]: PermissionDeniedErrorData;
   [AhpErrorCodes.UnsupportedProtocolVersion]: UnsupportedProtocolVersionErrorData;
+  [AhpErrorCodes.ResourceReadFailed]: ResourceReadFailedErrorData;
 }
 
 /** AHP error codes that carry a structured `data` payload. */

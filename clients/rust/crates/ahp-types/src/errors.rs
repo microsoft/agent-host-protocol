@@ -57,6 +57,8 @@ pub mod ahp_error_codes {
     pub const CONFLICT: i32 = -32011;
     /// The host could not open the requested TCP connection.
     pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
+    /// A negotiated resource read failed; data is ResourceReadFailedErrorData.
+    pub const RESOURCE_READ_FAILED: i32 = -32013;
 }
 
 /// Type alias: AHP application error code.
@@ -94,4 +96,73 @@ pub struct UnsupportedProtocolVersionErrorData {
     /// either a SemVer `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`) or a
     /// SemVer range constraint (e.g. `">=0.1.0 <0.3.0"` or `"^0.2.0"`).
     pub supported_versions: Vec<String>,
+}
+
+/// Failure kinds for the negotiated Resource Reads contract.
+///
+/// Unknown future kinds MUST be treated as a failed read, not as success or
+/// permission to retry automatically.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ResourceReadFailureKind {
+    /// The receiver does not serve this URI scheme.
+    UnsupportedScheme,
+    /// The body or encoded response exceeds the receiver's size limit.
+    TooLarge,
+    /// The read exceeded its deadline.
+    Timeout,
+    /// The receiver cannot admit the read within its bounded capacity.
+    Busy,
+    /// The backing source failed, including an unusable redirect or response.
+    Upstream,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ResourceReadFailureKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::UnsupportedScheme => serializer.serialize_str("unsupportedScheme"),
+            Self::TooLarge => serializer.serialize_str("tooLarge"),
+            Self::Timeout => serializer.serialize_str("timeout"),
+            Self::Busy => serializer.serialize_str("busy"),
+            Self::Upstream => serializer.serialize_str("upstream"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceReadFailureKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "unsupportedScheme" => Self::UnsupportedScheme,
+            "tooLarge" => Self::TooLarge,
+            "timeout" => Self::Timeout,
+            "busy" => Self::Busy,
+            "upstream" => Self::Upstream,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Required `data` for a `ResourceReadFailed` (-32013) error.
+///
+/// The payload MUST NOT contain backing URLs, credentials, response headers,
+/// or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+/// `NotFound`, and `InvalidParams` errors retain their meanings.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceReadFailedErrorData {
+    /// Machine-readable reason the read failed.
+    pub kind: ResourceReadFailureKind,
 }

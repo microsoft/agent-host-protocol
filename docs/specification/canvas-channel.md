@@ -8,73 +8,87 @@ in `ChatState.canvases`. Each entry names an `ahp-canvas:` URI. Clients treat
 the URI as opaque and subscribe to it to receive the canvas's `CanvasState`.
 The type reference is on the [Canvas Channel reference](/reference/canvas) page.
 
-`CanvasState.url` is the canvas's live HTTP(S) source. It is often a loopback
-address in the host's environment, so a remote client usually can't load it.
-A host can let such a client read the source through `resourceRead` instead,
-as described below. The client never has to resolve or fetch the source URL
-itself.
+`CanvasState.url` is the canvas's live, absolute **content URI**, distinct from
+its opaque subscription URI. It MAY be an HTTP(S) URL, including a loopback
+address in the host's environment. Hosts SHOULD make the advertised content
+readable through [`resourceRead`](/specification/resource-reads) for clients
+that cannot retrieve it directly.
 
 ## Reading Canvas Content
 
-A host MAY serve canvas content through
-[`resourceRead`](/reference/common#resourceread). A host that does so accepts
-two forms of URI:
+After [negotiating Resource Reads](/specification/resource-reads#negotiation),
+a client reads `CanvasState.url` itself, retaining any navigation fragment
+locally rather than sending it in the read. The protocol does **not** define
+`resourceRead(<canvas channel URI>)` as an alias for the entry document or
+define a `<canvas channel URI>/<path>` convention.
 
-| URI | Reads |
-|---|---|
-| `<canvas>` | The source URL exactly as `CanvasState.url` gives it, including its query. |
-| `<canvas>/<path>` | `<path>` resolved against `CanvasState.url` as a relative reference ([RFC 3986, section 5](https://www.rfc-editor.org/rfc/rfc3986#section-5)). |
-
-`<canvas>` is the canvas's channel URI, for example `ahp-canvas:/9f2c…`. `<path>`
-is one or more `/`-separated segments. Each segment is non-empty,
-percent-encoded, and is neither `.` nor `..`. `<path>` contains no `?` or `#`.
-Because the reference is relative, the result keeps the source URL's scheme,
-host and port, replaces the last segment of its path, and drops its query and
-fragment. A browser that loaded the source would request the same URL for a
-relative subresource.
-
-For example, if `CanvasState.url` is
-`http://127.0.0.1:41234/preview/index.html?token=abc`:
-
-| `uri` | Host fetches |
-|---|---|
-| `ahp-canvas:/9f2c…` | `http://127.0.0.1:41234/preview/index.html?token=abc` |
-| `ahp-canvas:/9f2c…/assets/app.js` | `http://127.0.0.1:41234/preview/assets/app.js` |
+For example, a host may publish `canvas-content://c1/preview/index.html` as the
+content URI for a canvas subscribed at `ahp-canvas:/9f2c`. `canvas-content` is an
+illustrative host-defined scheme, not a new required AHP scheme. The host
+advertises it in `InitializeResult.resourceRead.schemes` and resolves it to its
+private source. The client reads:
 
 ```jsonc
 // Client → Server
 { "jsonrpc": "2.0", "id": 21, "method": "resourceRead",
-  "params": { "channel": "ahp-root://", "uri": "ahp-canvas:/9f2c…/assets/app.js", "encoding": "base64" } }
+  "params": { "channel": "ahp-root://", "uri": "canvas-content://c1/preview/index.html", "encoding": "base64" } }
 
 // Server → Client
 { "jsonrpc": "2.0", "id": 21, "result": {
-  "data": "Y29uc29sZS5sb2coImhpIik7",
+  "data": "PGgxPkhlbGxvPC9oMT4=",
   "encoding": "base64",
-  "contentType": "text/javascript"
+  "contentType": "text/html"
 }}
 ```
 
-A host that serves canvas content:
+The client resolves each document or stylesheet's references against that
+resource's effective URI, following the [shared resolution rules](/specification/resource-reads#uri-resolution).
+It does not append paths to the canvas's channel URI. An indirect content tree
+must preserve those rules, including root-relative paths and redirect bases.
+Publishing an indirect URI does not itself rewrite absolute URLs inside HTML.
 
-- MUST authorize the read as it would a subscription to the canvas channel.
-- MUST answer `NotFound` (`-32008`) when the canvas doesn't exist, or when its
-  state has no `url`.
-- MUST answer `InvalidParams` (`-32602`) for a `<path>` that doesn't follow
-  the rules above.
-- MUST send an HTTP `GET` and MUST NOT follow a redirect to a different origin.
-  If the source answers with a status other than 2xx, the host fails the read.
-  It SHOULD answer `NotFound` for `404` and `410`.
-- SHOULD report the response's `Content-Type` as `contentType`.
-- MAY bound the size of the content and the time it spends on the read, and
-  fail a read that exceeds either bound.
-- MUST NOT include the source URL, its query, or the response's headers in an
-  error message or a diagnostic log. The source URL often carries a
-  credential.
+Clients MAY load an HTTP(S) source directly when their environment and policy
+permit it. A remote host's loopback address refers to the **host**, not the
+client's machine; clients MUST NOT assume that fetching it locally reaches the
+same resource. A client need not implement a native fetcher for every scheme:
+it can use the host's negotiated resource reader or show an unavailable source.
+Content URIs MUST NOT be executed as commands or opened as arbitrary OS handlers.
 
-A host that doesn't serve canvas content rejects these URIs as it rejects any
-other URI it can't read, typically with `PermissionDenied` (`-32009`) or
-`NotFound`.
+## Authorization and Lifetime
 
-Canvas content comes from an extension in the host's environment. A client
-that displays it SHOULD isolate it from the client's own origin, for example in
-a sandboxed frame.
+The host MUST check that the caller may access the canvas **and** that the
+backing source is within the host's resource policy. Neither knowledge of the
+URI nor provider registration grants network or filesystem access. Loopback
+alone is not proof that an endpoint belongs to a canvas.
+
+A missing canvas, missing asset, or source that is no longer live returns
+`NotFound`. That error does not distinguish these cases; clients use the canvas
+and chat state to determine whether the canvas still exists and has a source.
+The host MUST clear `url` when the provider becomes unavailable. Old content
+URIs MUST NOT continue to grant access after their canvas or source is retired.
+An admitted read MUST be cancelled or have its authority rechecked before
+releasing content if that authority is revoked while the read is pending.
+
+Clients MUST NOT reuse source URIs from persisted state after a provider or
+host restart. They re-subscribe and use the current state. A source URI change
+invalidates the old document's resource-resolution base; clients reload from
+the new source rather than mixing assets from different source lifetimes.
+
+The shared [confidentiality rules](/specification/resource-reads#confidentiality-and-rendering)
+apply. A URI published in `CanvasState.url` is visible to authorized
+subscribers. To keep backing URLs or credentials from those subscribers, the
+host must publish an indirect URI rather than the private URL itself.
+
+## Compatibility and Scope
+
+Without negotiated Resource Reads, hosts MUST retain the existing HTTP(S)
+source shape. If no compatible source can be exposed, they omit `url` for that
+client; they MUST NOT send an unfamiliar content scheme to a legacy renderer.
+Non-HTTP(S) sources require negotiation and a scheme advertised by the host.
+The existence of a canvas or agreement on protocol 1.0 does not imply content
+read support.
+
+This contract retrieves finite documents and assets. It does not define
+canvas open/close requests, action invocation, provider registration, native
+client canvases, or live HTTP proxying. TCP channels are the separate mechanism
+for applications that need a full network stream.

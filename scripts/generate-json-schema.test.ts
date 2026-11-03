@@ -17,6 +17,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
 import { typeAdmitsUndefined } from './generate-json-schema.js';
+import { AhpErrorCodes } from '../types/common/errors.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -528,6 +529,46 @@ describe('generated JSON schemas', () => {
 
     });
   }
+});
+
+describe('Resource Reads schema', () => {
+  it('preserves legacy shapes and requires a real scheme list when offered', () => {
+    const schema = loadSchema('commands.schema.json');
+    const defs = schema.$defs as Record<string, Record<string, unknown>>;
+    assert.ok(schemaAccepts(schema, defs.ResourceReadCapabilities, { schemes: [] }));
+    assert.ok(schemaAccepts(schema, defs.ResourceReadCapabilities, { schemes: ['http', 'https'] }));
+    assert.equal(schemaAccepts(schema, defs.ResourceReadCapabilities, {}), false);
+    assert.equal(schemaAccepts(schema, defs.ResourceReadCapabilities, { schemes: 'http' }), false);
+    assert.ok(schemaAccepts(schema, defs.InitializeParams, {
+      channel: 'ahp-root://', clientId: 'legacy', protocolVersions: ['1.0.0'],
+    }));
+    assert.ok(schemaAccepts(schema, defs.InitializeResult, {
+      protocolVersion: '1.0.0', serverSeq: 1, snapshots: [],
+    }));
+    assert.ok(schemaAccepts(schema, defs.ResourceReadResult, {
+      data: 'Hello', encoding: 'utf-8',
+    }));
+    assert.ok(schemaAccepts(schema, defs.ResourceReadResult, {
+      data: 'Hello', encoding: 'utf-8', effectiveUri: 'canvas-content://c1/preview/',
+    }));
+    assert.equal(schemaAccepts(schema, defs.ResourceReadResult, {
+      data: 'Hello', encoding: 'utf-8', effectiveUri: 42,
+    }), false);
+  });
+
+  it('emits the canonical error codes and a named required failure kind', () => {
+    const schema = loadSchema('errors.schema.json');
+    const defs = schema.$defs as Record<string, Record<string, unknown>>;
+    assert.deepEqual(defs.AhpErrorCode.enum, Object.values(AhpErrorCodes));
+    assert.deepEqual(defs.ResourceReadFailedErrorData.required, ['kind']);
+    for (const kind of ['unsupportedScheme', 'tooLarge', 'timeout', 'busy', 'upstream']) {
+      assert.ok(schemaAccepts(schema, defs.ResourceReadFailedErrorData, { kind }));
+    }
+    assert.equal(schemaAccepts(schema, defs.ResourceReadFailedErrorData, {}), false);
+    assert.equal(schemaAccepts(schema, defs.ResourceReadFailedErrorData, { kind: 1 }), false);
+    const properties = defs.ResourceReadFailedErrorData.properties as Record<string, Record<string, unknown>>;
+    assert.equal(properties.kind.$ref, '#/$defs/ResourceReadFailureKind');
+  });
 });
 
 describe('typeAdmitsUndefined', () => {

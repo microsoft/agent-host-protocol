@@ -35,6 +35,10 @@ import com.microsoft.agenthostprotocol.generated.CreateChatParams
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeResult
+import com.microsoft.agenthostprotocol.generated.InitializeParams
+import com.microsoft.agenthostprotocol.generated.ResourceReadParams
+import com.microsoft.agenthostprotocol.generated.ResourceReadResult
+import com.microsoft.agenthostprotocol.generated.ResourceReadFailedErrorData
 import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
 import com.microsoft.agenthostprotocol.generated.ReconnectResult
@@ -264,6 +268,10 @@ class RoundTripCorpusTest {
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
+            "InitializeParams" -> rt(InitializeParams.serializer())
+            "ResourceReadParams" -> rt(ResourceReadParams.serializer())
+            "ResourceReadResult" -> rt(ResourceReadResult.serializer())
+            "ResourceReadFailedErrorData" -> rt(ResourceReadFailedErrorData.serializer())
             "CreateChatParams" -> rt(CreateChatParams.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())

@@ -1846,7 +1846,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
   { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
-  { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
+  { name: 'ResourceReadCapabilities' }, { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
   { name: 'ResourceListParams' }, { name: 'ResourceListResult' },
   { name: 'DirectoryEntry' },
@@ -2154,7 +2154,9 @@ pub fn counts_against_window(method: &str) -> bool {
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
 
-function generateErrorsFile(): string {
+function generateErrorsFile(project: Project): string {
+  const failureKind = findEnum(project, 'ResourceReadFailureKind');
+  if (!failureKind) throw new Error('ResourceReadFailureKind not found');
   return `${GENERATED_HEADER}
 use crate::commands::ResourceRequestParams;
 use crate::state::ProtectedResourceMetadata;
@@ -2202,6 +2204,8 @@ pub mod ahp_error_codes {
     pub const CONFLICT: i32 = -32011;
     /// The host could not open the requested TCP connection.
     pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
+    /// A negotiated resource read failed; data is ResourceReadFailedErrorData.
+    pub const RESOURCE_READ_FAILED: i32 = -32013;
 }
 
 /// Type alias: AHP application error code.
@@ -2240,6 +2244,10 @@ pub struct UnsupportedProtocolVersionErrorData {
     /// SemVer range constraint (e.g. \`">=0.1.0 <0.3.0"\` or \`"^0.2.0"\`).
     pub supported_versions: Vec<String>,
 }
+
+${generateRustEnum(failureKind)}
+
+${generateStructFromInterface(project, 'ResourceReadFailedErrorData')}
 `;
 }
 
@@ -2464,6 +2472,8 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
+    'ResourceReadFailureKind',
+    'ResourceReadFailedErrorData',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',
@@ -2504,7 +2514,7 @@ export function generateRustCrate(project: Project, outputDir: string, options: 
   fs.writeFileSync(path.join(srcDir, 'actions.rs'), generateActionsFile(project));
   fs.writeFileSync(path.join(srcDir, 'commands.rs'), generateCommandsFile(project));
   fs.writeFileSync(path.join(srcDir, 'notifications.rs'), generateNotificationsFile(project));
-  fs.writeFileSync(path.join(srcDir, 'errors.rs'), generateErrorsFile());
+  fs.writeFileSync(path.join(srcDir, 'errors.rs'), generateErrorsFile(project));
   fs.writeFileSync(path.join(srcDir, 'messages.rs'), generateMessagesFile());
   fs.writeFileSync(path.join(srcDir, 'version.rs'), generateVersionFile(project));
 

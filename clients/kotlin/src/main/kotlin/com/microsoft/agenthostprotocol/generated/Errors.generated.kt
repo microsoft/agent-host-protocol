@@ -57,9 +57,73 @@ object AhpErrorCodes {
     const val PERMISSION_DENIED: Int = -32009
     /** The target resource already exists and the operation does not allow overwriting */
     const val ALREADY_EXISTS: Int = -32010
+    /** A negotiated resource read failed; data is ResourceReadFailedErrorData */
+    const val RESOURCE_READ_FAILED: Int = -32013
 }
 
 // ─── Error Detail Payloads ──────────────────────────────────────────────────
+
+/**
+ * Failure kinds for the negotiated Resource Reads contract.
+ *
+ * Unknown future kinds MUST be treated as a failed read, not as success or
+ * permission to retry automatically.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ResourceReadFailureKindSerializer::class)
+@JvmInline
+value class ResourceReadFailureKind(val rawValue: String) {
+    companion object {
+        /**
+         * The receiver does not serve this URI scheme.
+         */
+        val UNSUPPORTED_SCHEME: ResourceReadFailureKind = ResourceReadFailureKind("unsupportedScheme")
+        /**
+         * The body or encoded response exceeds the receiver's size limit.
+         */
+        val TOO_LARGE: ResourceReadFailureKind = ResourceReadFailureKind("tooLarge")
+        /**
+         * The read exceeded its deadline.
+         */
+        val TIMEOUT: ResourceReadFailureKind = ResourceReadFailureKind("timeout")
+        /**
+         * The receiver cannot admit the read within its bounded capacity.
+         */
+        val BUSY: ResourceReadFailureKind = ResourceReadFailureKind("busy")
+        /**
+         * The backing source failed, including an unusable redirect or response.
+         */
+        val UPSTREAM: ResourceReadFailureKind = ResourceReadFailureKind("upstream")
+    }
+}
+
+internal object ResourceReadFailureKindSerializer : KSerializer<ResourceReadFailureKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ResourceReadFailureKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ResourceReadFailureKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ResourceReadFailureKind =
+        ResourceReadFailureKind(decoder.decodeString())
+}
+
+/**
+ * Required `data` for a `ResourceReadFailed` (-32013) error.
+ *
+ * The payload MUST NOT contain backing URLs, credentials, response headers,
+ * or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+ * `NotFound`, and `InvalidParams` errors retain their meanings.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ResourceReadFailedErrorData(
+    /**
+     * Machine-readable reason the read failed.
+     */
+    val kind: ResourceReadFailureKind
+)
 
 @Serializable
 data class AuthRequiredErrorData(

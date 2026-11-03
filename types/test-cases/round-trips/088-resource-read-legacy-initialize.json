@@ -1,0 +1,16 @@
+{
+  "name": "resource-read-legacy-initialize",
+  "group": "A",
+  "description": "A legacy offer remains valid without the resourceRead capability.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "legacy-1",
+    "protocolVersions": ["1.0.0"]
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "clientId": "legacy-1",
+    "protocolVersions": ["1.0.0"]
+  }]
+}

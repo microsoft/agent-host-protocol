@@ -47,6 +47,8 @@ public static class AhpErrorCodes
     public const int Conflict = -32011;
     /// <summary>The host could not open the requested TCP connection.</summary>
     public const int TcpConnectionOpenFailed = -32012;
+    /// <summary>A negotiated resource read failed. The required data is a ResourceReadFailedErrorData describing a machine-readable failure kind. @stability 1.0</summary>
+    public const int ResourceReadFailed = -32013;
 }
 
 /// <summary>Detail payload of an AuthRequired (-32007) error.</summary>
@@ -66,4 +68,84 @@ public sealed record PermissionDeniedErrorData
 public sealed record UnsupportedProtocolVersionErrorData
 {
     public required List<string> SupportedVersions { get; init; }
+}
+
+/// <summary>Failure kinds for the negotiated Resource Reads contract.
+///
+/// Unknown future kinds MUST be treated as a failed read, not as success or
+/// permission to retry automatically.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ResourceReadFailureKindConverter))]
+public readonly struct ResourceReadFailureKind : IEquatable<ResourceReadFailureKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ResourceReadFailureKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The receiver does not serve this URI scheme.</summary>
+    public static readonly ResourceReadFailureKind UnsupportedScheme = new ResourceReadFailureKind("unsupportedScheme");
+
+    /// <summary>The body or encoded response exceeds the receiver's size limit.</summary>
+    public static readonly ResourceReadFailureKind TooLarge = new ResourceReadFailureKind("tooLarge");
+
+    /// <summary>The read exceeded its deadline.</summary>
+    public static readonly ResourceReadFailureKind Timeout = new ResourceReadFailureKind("timeout");
+
+    /// <summary>The receiver cannot admit the read within its bounded capacity.</summary>
+    public static readonly ResourceReadFailureKind Busy = new ResourceReadFailureKind("busy");
+
+    /// <summary>The backing source failed, including an unusable redirect or response.</summary>
+    public static readonly ResourceReadFailureKind Upstream = new ResourceReadFailureKind("upstream");
+
+    /// <inheritdoc />
+    public bool Equals(ResourceReadFailureKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ResourceReadFailureKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ResourceReadFailureKind left, ResourceReadFailureKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ResourceReadFailureKind left, ResourceReadFailureKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ResourceReadFailureKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ResourceReadFailureKindConverter : JsonConverter<ResourceReadFailureKind>
+{
+    /// <inheritdoc />
+    public override ResourceReadFailureKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ResourceReadFailureKind(reader.GetString() ?? throw new JsonException("ResourceReadFailureKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ResourceReadFailureKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Required `data` for a `ResourceReadFailed` (-32013) error.
+///
+/// The payload MUST NOT contain backing URLs, credentials, response headers,
+/// or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+/// `NotFound`, and `InvalidParams` errors retain their meanings.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ResourceReadFailedErrorData
+{
+    /// <summary>Machine-readable reason the read failed.</summary>
+    public ResourceReadFailureKind Kind { get; init; }
 }

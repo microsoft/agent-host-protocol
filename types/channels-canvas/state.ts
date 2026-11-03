@@ -46,15 +46,21 @@ export interface CanvasState {
   /** Provider-supplied status text, when available. */
   status?: string;
   /**
-   * Current absolute HTTP(S) source URL; absent when the live source is unavailable.
+   * Current absolute content URI; absent when the live source is unavailable.
+   * MAY be an HTTP(S) URL. Hosts SHOULD make the advertised resource readable
+   * through `resourceRead` for clients that cannot retrieve it directly.
    * Hosts MUST clear this field when the provider becomes unavailable.
    *
-   * Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+   * The content URI is distinct from the canvas's opaque subscription URI.
+   * Non-HTTP(S) sources require the negotiated Resource Reads contract and a
+   * scheme the host advertises there. Without it, hosts MUST retain HTTP(S)
+   * sources or omit this field when no compatible source is available.
+   *
+   * Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
    * from persisted state after a provider or host restart.
    *
-   * A client that can't reach this URL can read the source through
-   * `resourceRead` on the canvas URI when the host serves canvas content.
-   * See the Canvas Channel specification.
+   * @see {@link /specification/canvas-channel | Canvas Channel}
+   * @see {@link /specification/resource-reads | Resource Reads}
    */
   url?: URI;
 }

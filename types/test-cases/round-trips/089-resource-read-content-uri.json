@@ -1,0 +1,16 @@
+{
+  "name": "resource-read-content-uri",
+  "group": "A",
+  "description": "Reads preserve percent escapes, asset queries, and the independent content namespace.",
+  "type": "ResourceReadParams",
+  "input": {
+    "channel": "ahp-root://",
+    "uri": "canvas-content://c1/preview/assets/app%20bundle.js?v=2",
+    "encoding": "base64"
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "uri": "canvas-content://c1/preview/assets/app%20bundle.js?v=2",
+    "encoding": "base64"
+  }]
+}

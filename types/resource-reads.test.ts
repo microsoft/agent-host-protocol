@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { describe, it } from 'node:test';
+import ts from 'typescript';
+import { ContentEncoding } from './common/commands.js';
+import { AhpErrorCodes, ResourceReadFailureKind } from './common/errors.js';
+import type { AhpErrorResponse, AhpRequest, AhpSuccessResponse } from './common/messages.js';
+
+const specification = readFileSync(new URL('../docs/specification/resource-reads.md', import.meta.url), 'utf8');
+const examples: unknown[] = [];
+for (const [, block] of specification.matchAll(/```jsonc?\n([\s\S]*?)\n```/g)) {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, block);
+  let depth = 0;
+  let start = 0;
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    if (token === ts.SyntaxKind.OpenBraceToken) {
+      if (depth === 0) start = scanner.getTokenPos();
+      depth++;
+    } else if (token === ts.SyntaxKind.CloseBraceToken) {
+      depth--;
+      if (depth === 0) examples.push(JSON.parse(block.slice(start, scanner.getTextPos())));
+    }
+  }
+  assert.equal(depth, 0, 'JSON examples must have balanced braces');
+}
+
+describe('resource-read specification examples', () => {
+  it('uses the canonical offer, acceptance, read, result, and error shapes', () => {
+    const offer: AhpRequest<'initialize'> = {
+      jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: {
+        channel: 'ahp-root://', clientId: 'reader-1', protocolVersions: ['1.0.0'],
+        capabilities: { resourceRead: { schemes: [] } },
+      },
+    };
+    const acceptance: AhpSuccessResponse<'initialize'> = {
+      jsonrpc: '2.0', id: 1,
+      result: {
+        protocolVersion: '1.0.0', serverSeq: 1, snapshots: [],
+        resourceRead: { schemes: ['http', 'https', 'canvas-content'] },
+      },
+    };
+    const request: AhpRequest<'resourceRead'> = {
+      jsonrpc: '2.0', id: 2, method: 'resourceRead',
+      params: {
+        channel: 'ahp-root://', uri: 'canvas-content://c1/preview', encoding: ContentEncoding.Base64,
+      },
+    };
+    const result: AhpSuccessResponse<'resourceRead'> = {
+      jsonrpc: '2.0', id: 2,
+      result: {
+        data: 'PGgxPkhlbGxvPC9oMT4=', encoding: ContentEncoding.Base64,
+        contentType: 'text/html', effectiveUri: 'canvas-content://c1/preview/',
+      },
+    };
+    const failure: AhpErrorResponse = {
+      jsonrpc: '2.0', id: 3,
+      error: {
+        code: AhpErrorCodes.ResourceReadFailed,
+        message: 'Resource exceeds the read size limit',
+        data: { kind: ResourceReadFailureKind.TooLarge },
+      },
+    };
+    assert.deepEqual(examples, [offer, acceptance, request, result, failure]);
+    assert.equal(Buffer.from(result.result.data, 'base64').toString('utf8'), '<h1>Hello</h1>');
+  });
+
+  it('preserves every URI-resolution example including queries and trailing slashes', () => {
+    const base = 'http://127.0.0.1:41234/preview/index.html?token=abc';
+    assert.ok(specification.includes(`\`${base}\``));
+    const rows = [...specification.matchAll(/^\| `([^`]+)` \| `([^`]+)` \|$/gm)];
+    assert.equal(rows.length, 6);
+    for (const [, reference, expected] of rows) {
+      const resolved = new URL(reference, base);
+      resolved.hash = '';
+      assert.equal(resolved.href, expected, reference);
+    }
+  });
+
+  it('uses each redirected document and stylesheet as its own public base', () => {
+    const requested = 'canvas-content://c1/preview';
+    const effective = 'canvas-content://c1/preview/';
+    assert.equal(new URL('app.js', requested).href, 'canvas-content://c1/app.js');
+    assert.equal(new URL('app.js', effective).href, 'canvas-content://c1/preview/app.js');
+    assert.equal(new URL('/assets/icon.svg', effective).href, 'canvas-content://c1/assets/icon.svg');
+    const stylesheet = 'canvas-content://c1/themes/dark/style.css';
+    assert.equal(new URL('../font.woff2?v=2', stylesheet).href, 'canvas-content://c1/themes/font.woff2?v=2');
+    const fragment = new URL('#details', effective);
+    fragment.hash = '';
+    assert.equal(fragment.href, effective);
+  });
+
+  it('keeps source queries out of independent subresource requests', () => {
+    const entry = 'https://source.example/preview/index.html?token=entry-secret';
+    assert.equal(new URL('app.js?v=2', entry).href, 'https://source.example/preview/app.js?v=2');
+    assert.equal(new URL('assets/', entry).search, '');
+    assert.equal(new URL('?view=2', entry).search, '?view=2');
+  });
+});

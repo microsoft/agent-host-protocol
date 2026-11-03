@@ -39,9 +39,75 @@ public enum AhpErrorCodes {
     public static let permissionDenied = -32009
     /// The target resource already exists and the operation does not allow overwriting
     public static let alreadyExists = -32010
+    /// A negotiated resource read failed; data is ResourceReadFailedErrorData
+    public static let resourceReadFailed = -32013
 }
 
 // MARK: - Error Detail Payloads
+
+/// Failure kinds for the negotiated Resource Reads contract.
+///
+/// Unknown future kinds MUST be treated as a failed read, not as success or
+/// permission to retry automatically.
+///
+/// Stability: 1.0 - Early development.
+public enum ResourceReadFailureKind: Codable, Sendable, Equatable {
+    /// The receiver does not serve this URI scheme.
+    case unsupportedScheme
+    /// The body or encoded response exceeds the receiver's size limit.
+    case tooLarge
+    /// The read exceeded its deadline.
+    case timeout
+    /// The receiver cannot admit the read within its bounded capacity.
+    case busy
+    /// The backing source failed, including an unusable redirect or response.
+    case upstream
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "unsupportedScheme": self = .unsupportedScheme
+        case "tooLarge": self = .tooLarge
+        case "timeout": self = .timeout
+        case "busy": self = .busy
+        case "upstream": self = .upstream
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .unsupportedScheme: try container.encode("unsupportedScheme")
+        case .tooLarge: try container.encode("tooLarge")
+        case .timeout: try container.encode("timeout")
+        case .busy: try container.encode("busy")
+        case .upstream: try container.encode("upstream")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Required `data` for a `ResourceReadFailed` (-32013) error.
+///
+/// The payload MUST NOT contain backing URLs, credentials, response headers,
+/// or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+/// `NotFound`, and `InvalidParams` errors retain their meanings.
+///
+/// Stability: 1.0 - Early development.
+public struct ResourceReadFailedErrorData: Codable, Sendable {
+    /// Machine-readable reason the read failed.
+    public var kind: ResourceReadFailureKind
+
+    public init(
+        kind: ResourceReadFailureKind
+    ) {
+        self.kind = kind
+    }
+}
 
 public struct AuthRequiredErrorData: Codable, Sendable {
     /// Protected resources that require authentication.

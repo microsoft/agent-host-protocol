@@ -440,6 +440,7 @@ async fn inbound_resource_request_routes_to_typed_handler() {
                 data: "server-data".into(),
                 encoding: ContentEncoding::Utf8,
                 content_type: None,
+                effective_uri: None,
             })
         },
     ));

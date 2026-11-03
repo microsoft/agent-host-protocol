@@ -366,6 +366,14 @@ pub struct InitializeResult {
     /// fields on {@link InitializeResult} instead.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Accepts the client's Resource Reads offer and lists the schemes this host
+    /// can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
+    /// offered. Presence activates the contract in both directions; absence
+    /// leaves existing resource-read behavior unchanged.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_read: Option<ResourceReadCapabilities>,
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
@@ -413,12 +421,20 @@ pub struct InitializeResult {
 
 /// Optional capabilities a client declares during `initialize`.
 ///
-/// Each field is a presence flag: an empty object `{}` means "supported",
-/// absence means "not supported". Sub-fields on individual capabilities
-/// are reserved for future per-capability options.
+/// Presence declares support; absence means "not supported". Each feature
+/// defines its own options and negotiation rules. Capabilities without options
+/// use an empty object `{}`; others carry required metadata such as URI schemes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
+    /// Offers the Resource Reads contract, including effective content URIs and
+    /// typed failures. `schemes` lists resources this client can serve in the
+    /// reverse direction; an empty list still offers support as a reader.
+    /// The contract is active only if `InitializeResult.resourceRead` is present.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_read: Option<ResourceReadCapabilities>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -1103,6 +1119,22 @@ pub struct ListSessionsResult {
     pub items: Vec<SessionSummary>,
 }
 
+/// Support for the negotiated Resource Reads contract.
+///
+/// Presence declares support for effective content URIs and typed read
+/// failures, even when `schemes` is empty. It does not grant resource access.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceReadCapabilities {
+    /// URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
+    /// names without `:`. An empty list means the peer offers no resources under
+    /// this contract. A listed scheme does not promise access to every URI with
+    /// that scheme.
+    pub schemes: Vec<String>,
+}
+
 /// Reads the content of a resource by URI.
 ///
 /// Content references keep the state tree small by storing large data (images,
@@ -1117,8 +1149,15 @@ pub struct ListSessionsResult {
 /// use it to read host-side files. The receiver enforces access via the
 /// same permission/`resourceRequest` flow regardless of which peer initiated.
 ///
-/// A host MAY also serve the live source of a canvas, and paths relative to
-/// it, on `ahp-canvas:` URIs. See the Canvas Channel specification.
+/// Hosts SHOULD also make advertised renderable resources, including HTTP(S)
+/// sources, available through this method to clients that cannot reach them
+/// directly. Reads target the advertised content URI, not a channel-derived
+/// alias. This does not authorize fetching arbitrary client-supplied URLs.
+///
+/// When both peers negotiate `resourceRead`, the Resource Reads specification
+/// defines URI resolution, HTTP-backed reads, redirects, permission checks,
+/// bounds, and typed failures. Without negotiation, existing behavior remains
+/// unchanged; callers MUST NOT assume that an HTTP(S) URI is readable.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadParams {
@@ -1128,7 +1167,10 @@ pub struct ResourceReadParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Content URI from a `ContentRef`
+    /// Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
+    /// Under the negotiated Resource Reads contract it MUST have no fragment.
+    /// Resolve relative references against the containing resource's effective
+    /// URI before sending the request.
     pub uri: String,
     /// Preferred encoding for the returned data (default: server-chosen)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1153,6 +1195,15 @@ pub struct ResourceReadResult {
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
+    /// Public absolute, fragment-free URI of the returned content after
+    /// redirects. Required when a negotiated read changes the resource URI;
+    /// otherwise omitted, meaning the requested URI. Readers MUST use this as
+    /// the base for relative references. MUST NOT expose a private backing URI.
+    /// Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effective_uri: Option<Uri>,
 }
 
 /// Writes content to a file on the server's filesystem.
@@ -1443,7 +1494,7 @@ pub struct ResourceMkdirParams {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceMkdirResult {}
 
-/// Requests permission to access a resource on the receiver's filesystem.
+/// Requests permission to access a resource mediated by the receiver.
 ///
 /// `resourceRequest` is symmetrical and MAY be sent in either direction: a
 /// client asks the server to grant access to a server-side resource, or a

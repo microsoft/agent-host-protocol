@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
+import { readErrorCodes } from './read-error-codes.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -673,6 +674,7 @@ function generateNotificationsSchema(project: Project): JsonSchema {
 }
 
 function generateErrorsSchema(project: Project): JsonSchema {
+  const codes = readErrorCodes(project);
   const schema: JsonSchema = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $comment: 'Generated from types/errors.ts — do not edit',
@@ -683,12 +685,12 @@ function generateErrorsSchema(project: Project): JsonSchema {
       JsonRpcErrorCode: {
         description: 'Standard JSON-RPC 2.0 error codes.',
         type: 'number',
-        enum: [-32700, -32600, -32601, -32602, -32603],
+        enum: codes.jsonRpc.map(({ code }) => code),
       },
       AhpErrorCode: {
         description: 'AHP application-specific error codes.',
         type: 'number',
-        enum: [-32001, -32002, -32003, -32004, -32005, -32007, -32008, -32009, -32010, -32011],
+        enum: codes.ahp.map(({ code }) => code),
       },
     },
   };

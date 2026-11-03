@@ -2334,7 +2334,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
-  { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
+  { name: 'ResourceReadCapabilities' }, { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
   { name: 'ResourceListParams' }, { name: 'ResourceListResult' },
   { name: 'DirectoryEntry' },
@@ -2605,6 +2605,8 @@ ${methods}
 // ─── Errors File Generator ───────────────────────────────────────────────────
 
 function generateErrorsFile(project: Project): string {
+  const failureKind = findEnum(project, 'ResourceReadFailureKind');
+  if (!failureKind) throw new Error('ResourceReadFailureKind not found');
   // Derive both code lists from types/common/errors.ts (the single source of
   // truth) rather than hand-maintaining a copy here — a new code added to
   // errors.ts then appears automatically instead of silently going missing
@@ -2648,6 +2650,10 @@ public sealed record UnsupportedProtocolVersionErrorData
 {
     public required List<string> SupportedVersions { get; init; }
 }
+
+${generateEnum(failureKind)}
+
+${generateClassFromInterface(project, 'ResourceReadFailedErrorData')}
 `;
 }
 
@@ -2870,7 +2876,7 @@ ${supportedLiteral}
 // ─── Exhaustiveness ─────────────────────────────────────────────────────────
 
 function collectEnumNames(project: Project): void {
-  for (const name of [...STATE_ENUMS, ...COMMAND_ENUMS, ...NOTIFICATION_ENUMS, 'ActionType']) {
+  for (const name of [...STATE_ENUMS, ...COMMAND_ENUMS, ...NOTIFICATION_ENUMS, 'ActionType', 'ResourceReadFailureKind']) {
     ALL_ENUM_NAMES.add(name);
   }
   // ChildCustomizationType is aliased to CustomizationType (already counted).
@@ -2918,6 +2924,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
+    'ResourceReadFailureKind', 'ResourceReadFailedErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',
     'ChatOrigin', 'ChatInputQuestion', 'ChatInputAnswerValue', 'ChatInputAnswer',

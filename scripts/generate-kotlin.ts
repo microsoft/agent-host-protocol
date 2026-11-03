@@ -1799,7 +1799,7 @@ const COMMAND_STRUCTS = [
   'CreateChatParams', 'DisposeChatParams',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
-  'ResourceReadParams', 'ResourceReadResult',
+  'ResourceReadCapabilities', 'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
   'ResourceListParams', 'ResourceListResult', 'DirectoryEntry',
   'ResourceCopyParams', 'ResourceCopyResult',
@@ -2213,10 +2213,18 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
+  lines.push('    /** A negotiated resource read failed; data is ResourceReadFailedErrorData */');
+  lines.push('    const val RESOURCE_READ_FAILED: Int = -32013');
   lines.push('}');
   lines.push('');
 
   lines.push('// ─── Error Detail Payloads ──────────────────────────────────────────────────');
+  lines.push('');
+  const failureKind = findEnum(project, 'ResourceReadFailureKind');
+  if (!failureKind) throw new Error('ResourceReadFailureKind not found');
+  lines.push(generateKotlinEnum(failureKind));
+  lines.push('');
+  lines.push(generateDataClassFromInterface(project, 'ResourceReadFailedErrorData'));
   lines.push('');
   for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
     try {
@@ -2482,6 +2490,8 @@ function checkExhaustiveness(project: Project): void {
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
+    'ResourceReadFailureKind',
+    'ResourceReadFailedErrorData',
     'AhpError',                     // typed via JsonRpcError; not a Kotlin data class
     'AhpErrorDetailsMap',           // type-level mapping; not a Kotlin type
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

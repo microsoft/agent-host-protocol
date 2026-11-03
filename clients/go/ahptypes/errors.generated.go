@@ -38,6 +38,8 @@ const (
 	ErrorCodeAlreadyExists    int32 = -32010
 	// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
 	ErrorCodeTcpConnectionOpenFailed int32 = -32012
+	// ErrorCodeResourceReadFailed carries ResourceReadFailedErrorData.
+	ErrorCodeResourceReadFailed int32 = -32013
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -64,4 +66,37 @@ type PermissionDeniedErrorData struct {
 // UnsupportedProtocolVersion (-32005) error.
 type UnsupportedProtocolVersionErrorData struct {
 	SupportedVersions []string `json:"supportedVersions"`
+}
+
+// Failure kinds for the negotiated Resource Reads contract.
+//
+// Unknown future kinds MUST be treated as a failed read, not as success or
+// permission to retry automatically.
+//
+// Stability: 1.0 - Early development.
+type ResourceReadFailureKind string
+
+const (
+	// The receiver does not serve this URI scheme.
+	ResourceReadFailureKindUnsupportedScheme ResourceReadFailureKind = "unsupportedScheme"
+	// The body or encoded response exceeds the receiver's size limit.
+	ResourceReadFailureKindTooLarge ResourceReadFailureKind = "tooLarge"
+	// The read exceeded its deadline.
+	ResourceReadFailureKindTimeout ResourceReadFailureKind = "timeout"
+	// The receiver cannot admit the read within its bounded capacity.
+	ResourceReadFailureKindBusy ResourceReadFailureKind = "busy"
+	// The backing source failed, including an unusable redirect or response.
+	ResourceReadFailureKindUpstream ResourceReadFailureKind = "upstream"
+)
+
+// Required `data` for a `ResourceReadFailed` (-32013) error.
+//
+// The payload MUST NOT contain backing URLs, credentials, response headers,
+// or raw upstream diagnostics. Existing `AuthRequired`, `PermissionDenied`,
+// `NotFound`, and `InvalidParams` errors retain their meanings.
+//
+// Stability: 1.0 - Early development.
+type ResourceReadFailedErrorData struct {
+	// Machine-readable reason the read failed.
+	Kind ResourceReadFailureKind `json:"kind"`
 }
