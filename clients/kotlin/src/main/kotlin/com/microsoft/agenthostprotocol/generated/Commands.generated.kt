@@ -445,10 +445,11 @@ data class InitializeResult(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Accepts the client's Resource Reads offer and lists the schemes this host
-     * can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
-     * offered. Presence activates the contract in both directions; absence
-     * leaves existing resource-read behavior unchanged.
+     * Accepts the client's Resource Reads offer and lists schemes this host
+     * serves under that contract. MUST be omitted for an absent or malformed
+     * offer. Each receiver's listed schemes use the contract; unlisted schemes
+     * retain existing behavior. Clients reject malformed or unsolicited
+     * acceptance rather than enabling an ambiguous contract.
      *
      * Stability: 1.0 - Early development.
      */
@@ -511,9 +512,12 @@ data class InitializeResult(
 data class ClientCapabilities(
     /**
      * Offers the Resource Reads contract, including effective content URIs and
-     * typed failures. `schemes` lists resources this client can serve in the
-     * reverse direction; an empty list still offers support as a reader.
+     * typed failures. `schemes` lists schemes this client serves under this
+     * contract in the reverse direction; unlisted schemes keep their existing
+     * behavior. An empty list still offers support as a reader.
      * The contract is active only if `InitializeResult.resourceRead` is present.
+     * A malformed offer is declined by omitting that result member, not by
+     * failing initialization solely because this optional feature is malformed.
      *
      * Stability: 1.0 - Early development.
      */
@@ -1088,17 +1092,18 @@ data class ListSessionsResult(
  * Support for the negotiated Resource Reads contract.
  *
  * Presence declares support for effective content URIs and typed read
- * failures, even when `schemes` is empty. It does not grant resource access.
+ * failures, even when `schemes` is empty. This scopes the new semantics, not
+ * the set of permitted reads. It does not grant or revoke resource access.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
 data class ResourceReadCapabilities(
     /**
-     * URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
-     * names without `:`. An empty list means the peer offers no resources under
-     * this contract. A listed scheme does not promise access to every URI with
-     * that scheme.
+     * URI schemes this peer serves under this contract, as distinct lowercase
+     * RFC 3986 scheme names without `:`. Unlisted schemes retain their existing
+     * resource-read behavior. An empty list opts in as a reader without changing
+     * any reverse-direction reads. A listed scheme is not an access grant.
      */
     val schemes: List<String>
 )
@@ -1117,7 +1122,7 @@ data class ResourceReadParams(
     val meta: Map<String, JsonElement>? = null,
     /**
      * Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
-     * Under the negotiated Resource Reads contract it MUST have no fragment.
+     * For a scheme covered by negotiated Resource Reads it MUST have no fragment.
      * Resolve relative references against the containing resource's effective
      * URI before sending the request.
      */
@@ -1144,10 +1149,11 @@ data class ResourceReadResult(
     val contentType: String? = null,
     /**
      * Public absolute, fragment-free URI of the returned content after
-     * redirects. Required when a negotiated read changes the resource URI;
+     * redirects. Required when a contract-covered read changes the resource URI;
      * otherwise omitted, meaning the requested URI. Readers MUST use this as
      * the base for relative references. MUST NOT expose a private backing URI.
-     * Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+     * Receivers MUST NOT rely on this field unless the read's scheme is covered
+     * by negotiated Resource Reads.
      *
      * Stability: 1.0 - Early development.
      */
@@ -1435,7 +1441,9 @@ data class ResourceRequestParams(
     /**
      * Resource URI being requested. Typically a `file:` URI on the receiver's
      * filesystem, but any URI scheme that the receiver mediates access to is
-     * allowed.
+     * allowed. May also be an opaque permission-request URI supplied in
+     * `PermissionDeniedErrorData.request`; callers MUST echo it unchanged rather
+     * than constructing an origin-wide grant from a content URI.
      */
     val uri: String,
     /**

@@ -217,9 +217,12 @@ export interface InitializeParams extends BaseParams {
 export interface ClientCapabilities {
   /**
    * Offers the Resource Reads contract, including effective content URIs and
-   * typed failures. `schemes` lists resources this client can serve in the
-   * reverse direction; an empty list still offers support as a reader.
+   * typed failures. `schemes` lists schemes this client serves under this
+   * contract in the reverse direction; unlisted schemes keep their existing
+   * behavior. An empty list still offers support as a reader.
    * The contract is active only if `InitializeResult.resourceRead` is present.
+   * A malformed offer is declined by omitting that result member, not by
+   * failing initialization solely because this optional feature is malformed.
    *
    * @stability 1.0
    * @see {@link /specification/resource-reads | Resource Reads}
@@ -278,10 +281,11 @@ export interface InitializeResult {
    */
   _meta?: Record<string, unknown>;
   /**
-   * Accepts the client's Resource Reads offer and lists the schemes this host
-   * can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
-   * offered. Presence activates the contract in both directions; absence
-   * leaves existing resource-read behavior unchanged.
+   * Accepts the client's Resource Reads offer and lists schemes this host
+   * serves under that contract. MUST be omitted for an absent or malformed
+   * offer. Each receiver's listed schemes use the contract; unlisted schemes
+   * retain existing behavior. Clients reject malformed or unsolicited
+   * acceptance rather than enabling an ambiguous contract.
    *
    * @stability 1.0
    * @see {@link /specification/resource-reads | Resource Reads}
@@ -768,17 +772,18 @@ export interface DispatchActionParams {
  * Support for the negotiated Resource Reads contract.
  *
  * Presence declares support for effective content URIs and typed read
- * failures, even when `schemes` is empty. It does not grant resource access.
+ * failures, even when `schemes` is empty. This scopes the new semantics, not
+ * the set of permitted reads. It does not grant or revoke resource access.
  *
  * @category Commands
  * @stability 1.0
  */
 export interface ResourceReadCapabilities {
   /**
-   * URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
-   * names without `:`. An empty list means the peer offers no resources under
-   * this contract. A listed scheme does not promise access to every URI with
-   * that scheme.
+   * URI schemes this peer serves under this contract, as distinct lowercase
+   * RFC 3986 scheme names without `:`. Unlisted schemes retain their existing
+   * resource-read behavior. An empty list opts in as a reader without changing
+   * any reverse-direction reads. A listed scheme is not an access grant.
    */
   schemes: string[];
 }
@@ -814,10 +819,12 @@ export const enum ContentEncoding {
  * directly. Reads target the advertised content URI, not a channel-derived
  * alias. This does not authorize fetching arbitrary client-supplied URLs.
  *
- * When both peers negotiate `resourceRead`, the Resource Reads specification
- * defines URI resolution, HTTP-backed reads, redirects, permission checks,
- * bounds, and typed failures. Without negotiation, existing behavior remains
- * unchanged; callers MUST NOT assume that an HTTP(S) URI is readable.
+ * When both peers negotiate `resourceRead`, reads of the receiver's listed
+ * schemes follow the Resource Reads specification: URI resolution,
+ * HTTP-backed reads, redirects, permission checks, bounds, and typed failures.
+ * Unlisted schemes and unnegotiated connections retain existing behavior.
+ * Omission from a scheme list MUST NOT disable an otherwise supported read;
+ * callers MUST NOT assume that an unlisted HTTP(S) URI has mediated reads.
  *
  * @see {@link /specification/resource-reads | Resource Reads}
  *
@@ -847,7 +854,7 @@ export interface ResourceReadParams extends BaseParams {
   channel: 'ahp-root://';
   /**
    * Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
-   * Under the negotiated Resource Reads contract it MUST have no fragment.
+   * For a scheme covered by negotiated Resource Reads it MUST have no fragment.
    * Resolve relative references against the containing resource's effective
    * URI before sending the request.
    */
@@ -875,10 +882,11 @@ export interface ResourceReadResult {
   contentType?: string;
   /**
    * Public absolute, fragment-free URI of the returned content after
-   * redirects. Required when a negotiated read changes the resource URI;
+   * redirects. Required when a contract-covered read changes the resource URI;
    * otherwise omitted, meaning the requested URI. Readers MUST use this as
    * the base for relative references. MUST NOT expose a private backing URI.
-   * Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+   * Receivers MUST NOT rely on this field unless the read's scheme is covered
+   * by negotiated Resource Reads.
    *
    * @stability 1.0
    * @see {@link /specification/resource-reads | Resource Reads}
@@ -1146,6 +1154,15 @@ export interface ResourceDeleteResult {
  * operation. Receivers MAY rescind access at any time by returning
  * `PermissionDenied` on subsequent operations.
  *
+ * For negotiated canvas reads, `PermissionDeniedErrorData.request` can name
+ * an opaque permission-request URI bound by the host to one caller, canvas
+ * source lifetime, and backing HTTP(S) origin. The client echoes that request;
+ * the host owns approval. Success authorizes retrying the original content
+ * read, not reading the permission-request URI. See Resource Reads for the
+ * read-only origin scope, prompt requirements, and expiry rules.
+ *
+ * @see {@link /specification/resource-reads#canvas-origin-grants | Canvas origin grants}
+ *
  * Either `read`, `write`, or both SHOULD be set to `true`. A request with
  * neither flag set is treated as `read: true` by receivers.
  *
@@ -1161,7 +1178,9 @@ export interface ResourceRequestParams extends BaseParams {
   /**
    * Resource URI being requested. Typically a `file:` URI on the receiver's
    * filesystem, but any URI scheme that the receiver mediates access to is
-   * allowed.
+   * allowed. May also be an opaque permission-request URI supplied in
+   * `PermissionDeniedErrorData.request`; callers MUST echo it unchanged rather
+   * than constructing an origin-wide grant from a content URI.
    */
   uri: URI;
   /** Whether the caller needs read access to the resource. */

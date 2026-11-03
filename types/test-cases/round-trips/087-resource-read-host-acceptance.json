@@ -1,7 +1,7 @@
 {
   "name": "resource-read-host-acceptance",
   "group": "A",
-  "description": "Host acceptance retains the advertised public resource schemes.",
+  "description": "Host acceptance names contract-covered schemes; unlisted file and changeset reads keep their existing behavior.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "1.0.0",

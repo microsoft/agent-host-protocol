@@ -274,6 +274,14 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v ResourceReadFailedErrorData
 		dec(&v)
 		return enc(&v)
+	case "PermissionDeniedErrorData":
+		var v PermissionDeniedErrorData
+		dec(&v)
+		return enc(&v)
+	case "ResourceRequestParams":
+		var v ResourceRequestParams
+		dec(&v)
+		return enc(&v)
 	case "CreateChatParams":
 		var v CreateChatParams
 		dec(&v)

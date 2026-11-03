@@ -172,6 +172,10 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<ResourceReadResult>(inputJson));
             case "ResourceReadFailedErrorData":
                 return Wrap(Ser.Deserialize<ResourceReadFailedErrorData>(inputJson));
+            case "PermissionDeniedErrorData":
+                return Wrap(Ser.Deserialize<PermissionDeniedErrorData>(inputJson));
+            case "ResourceRequestParams":
+                return Wrap(Ser.Deserialize<ResourceRequestParams>(inputJson));
             case "CreateChatParams":
                 return Wrap(Ser.Deserialize<CreateChatParams>(inputJson));
             case "Snapshot":

@@ -123,7 +123,10 @@ export type JsonRpcErrorCode = (typeof JsonRpcErrorCodes)[keyof typeof JsonRpcEr
  * @nonexhaustive
  */
 export const enum ResourceReadFailureKind {
-  /** The receiver does not serve this URI scheme. */
+  /**
+   * The receiver does not serve this URI scheme at all. Omission from the
+   * negotiated scheme list is not sufficient: unlisted legacy reads remain valid.
+   */
   UnsupportedScheme = 'unsupportedScheme',
   /** The body or encoded response exceeds the receiver's size limit. */
   TooLarge = 'tooLarge',

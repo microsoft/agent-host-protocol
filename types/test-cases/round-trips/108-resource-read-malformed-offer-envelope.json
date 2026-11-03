@@ -1,0 +1,28 @@
+{
+  "name": "resource-read-malformed-offer-envelope",
+  "group": "A",
+  "description": "The raw JSON-RPC envelope preserves a malformed optional offer so the host can decline it before typed initialization decoding.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 7,
+    "method": "initialize",
+    "params": {
+      "channel": "ahp-root://",
+      "clientId": "reader-1",
+      "protocolVersions": ["1.0.0"],
+      "capabilities": { "resourceRead": { "schemes": "http" } }
+    }
+  },
+  "acceptableOutputs": [{
+    "jsonrpc": "2.0",
+    "id": 7,
+    "method": "initialize",
+    "params": {
+      "channel": "ahp-root://",
+      "clientId": "reader-1",
+      "protocolVersions": ["1.0.0"],
+      "capabilities": { "resourceRead": { "schemes": "http" } }
+    }
+  }]
+}

@@ -1,7 +1,7 @@
 {
   "name": "resource-read-reader-offer",
   "group": "A",
-  "description": "An empty served-scheme list still offers the contract as a reader.",
+  "description": "An empty scheme list offers the contract as a reader without disabling existing reverse-resource reads.",
   "type": "InitializeParams",
   "input": {
     "channel": "ahp-root://",

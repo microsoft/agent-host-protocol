@@ -76,7 +76,8 @@ object AhpErrorCodes {
 value class ResourceReadFailureKind(val rawValue: String) {
     companion object {
         /**
-         * The receiver does not serve this URI scheme.
+         * The receiver does not serve this URI scheme at all. Omission from the
+         * negotiated scheme list is not sufficient: unlisted legacy reads remain valid.
          */
         val UNSUPPORTED_SCHEME: ResourceReadFailureKind = ResourceReadFailureKind("unsupportedScheme")
         /**

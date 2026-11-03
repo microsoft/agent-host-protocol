@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-declined-offer",
+  "group": "A",
+  "description": "A host declines a malformed optional offer by omitting acceptance, while initialization succeeds.",
+  "type": "InitializeResult",
+  "input": { "protocolVersion": "1.0.0", "serverSeq": 1, "snapshots": [] },
+  "acceptableOutputs": [{ "protocolVersion": "1.0.0", "serverSeq": 1, "snapshots": [] }]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unlisted-file",
+  "group": "A",
+  "description": "The existing file-read shape stays available even when file is absent from contract coverage.",
+  "type": "ResourceReadParams",
+  "input": { "channel": "ahp-root://", "uri": "file:///workspace/readme.md" },
+  "acceptableOutputs": [{ "channel": "ahp-root://", "uri": "file:///workspace/readme.md" }]
+}

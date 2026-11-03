@@ -569,6 +569,31 @@ describe('Resource Reads schema', () => {
     const properties = defs.ResourceReadFailedErrorData.properties as Record<string, Record<string, unknown>>;
     assert.equal(properties.kind.$ref, '#/$defs/ResourceReadFailureKind');
   });
+
+  it('keeps typed offers strict while accepting initialization after the optional field is discarded', () => {
+    const schema = loadSchema('commands.schema.json');
+    const defs = schema.$defs as Record<string, Record<string, unknown>>;
+    for (const malformed of [null, [], 'http', {}, { schemes: 'http' }, { schemes: [42] }]) {
+      const params = {
+        channel: 'ahp-root://', clientId: 'reader-1', protocolVersions: ['1.0.0'],
+        capabilities: { resourceRead: malformed, mcpApps: {} },
+      };
+      assert.equal(schemaAccepts(schema, defs.InitializeParams, params), false);
+      const normalized = { ...params, capabilities: { mcpApps: params.capabilities.mcpApps } };
+      assert.ok(schemaAccepts(schema, defs.InitializeParams, normalized));
+    }
+  });
+
+  it('uses existing named permission-request types for canvas origin grants', () => {
+    const schema = loadSchema('errors.schema.json');
+    const defs = schema.$defs as Record<string, Record<string, unknown>>;
+    const request = { channel: 'ahp-root://', uri: 'resource-grant:/g1', read: true };
+    assert.ok(schemaAccepts(schema, defs.ResourceRequestParams, request));
+    assert.ok(schemaAccepts(schema, defs.PermissionDeniedErrorData, { request }));
+    assert.ok(schemaAccepts(schema, defs.PermissionDeniedErrorData, {}));
+    assert.equal(schemaAccepts(schema, defs.ResourceRequestParams, { ...request, read: 'yes' }), false);
+    assert.equal(schemaAccepts(schema, defs.ResourceRequestParams, { channel: 'ahp-root://', read: true }), false);
+  });
 });
 
 describe('typeAdmitsUndefined', () => {

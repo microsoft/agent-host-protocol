@@ -1,0 +1,12 @@
+{
+  "name": "canvas-origin-grant-required",
+  "group": "A",
+  "description": "A permission denial carries an opaque read-only origin-grant request without a private backing URL.",
+  "type": "PermissionDeniedErrorData",
+  "input": {
+    "request": { "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true }
+  },
+  "acceptableOutputs": [{
+    "request": { "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true }
+  }]
+}

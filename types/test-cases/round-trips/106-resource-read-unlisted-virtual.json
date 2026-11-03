@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unlisted-virtual",
+  "group": "A",
+  "description": "Reverse virtual reads keep their existing wire shape when the client offers an empty scheme list.",
+  "type": "ResourceReadParams",
+  "input": { "channel": "ahp-root://", "uri": "virtual://client/plugin.json" },
+  "acceptableOutputs": [{ "channel": "ahp-root://", "uri": "virtual://client/plugin.json" }]
+}

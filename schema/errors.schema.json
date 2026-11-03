@@ -6278,7 +6278,7 @@
       "properties": {
         "resourceRead": {
           "$ref": "#/$defs/ResourceReadCapabilities",
-          "description": "Offers the Resource Reads contract, including effective content URIs and\ntyped failures. `schemes` lists resources this client can serve in the\nreverse direction; an empty list still offers support as a reader.\nThe contract is active only if `InitializeResult.resourceRead` is present.\n\nStability: 1.0 - Early development."
+          "description": "Offers the Resource Reads contract, including effective content URIs and\ntyped failures. `schemes` lists schemes this client serves under this\ncontract in the reverse direction; unlisted schemes keep their existing\nbehavior. An empty list still offers support as a reader.\nThe contract is active only if `InitializeResult.resourceRead` is present.\nA malformed offer is declined by omitting that result member, not by\nfailing initialization solely because this optional feature is malformed.\n\nStability: 1.0 - Early development."
         },
         "mcpApps": {
           "type": "object",
@@ -6310,7 +6310,7 @@
         },
         "resourceRead": {
           "$ref": "#/$defs/ResourceReadCapabilities",
-          "description": "Accepts the client's Resource Reads offer and lists the schemes this host\ncan serve. MUST be omitted unless `ClientCapabilities.resourceRead` was\noffered. Presence activates the contract in both directions; absence\nleaves existing resource-read behavior unchanged.\n\nStability: 1.0 - Early development."
+          "description": "Accepts the client's Resource Reads offer and lists schemes this host\nserves under that contract. MUST be omitted for an absent or malformed\noffer. Each receiver's listed schemes use the contract; unlisted schemes\nretain existing behavior. Clients reject malformed or unsolicited\nacceptance rather than enabling an ambiguous contract.\n\nStability: 1.0 - Early development."
         },
         "snapshots": {
           "type": "array",
@@ -6702,14 +6702,14 @@
     },
     "ResourceReadCapabilities": {
       "type": "object",
-      "description": "Support for the negotiated Resource Reads contract.\n\nPresence declares support for effective content URIs and typed read\nfailures, even when `schemes` is empty. It does not grant resource access.\n\nStability: 1.0 - Early development.",
+      "description": "Support for the negotiated Resource Reads contract.\n\nPresence declares support for effective content URIs and typed read\nfailures, even when `schemes` is empty. This scopes the new semantics, not\nthe set of permitted reads. It does not grant or revoke resource access.\n\nStability: 1.0 - Early development.",
       "properties": {
         "schemes": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme\nnames without `:`. An empty list means the peer offers no resources under\nthis contract. A listed scheme does not promise access to every URI with\nthat scheme."
+          "description": "URI schemes this peer serves under this contract, as distinct lowercase\nRFC 3986 scheme names without `:`. Unlisted schemes retain their existing\nresource-read behavior. An empty list opts in as a reader without changing\nany reverse-direction reads. A listed scheme is not an access grant."
         }
       },
       "required": [
@@ -6718,7 +6718,7 @@
     },
     "ResourceReadParams": {
       "type": "object",
-      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nHosts SHOULD also make advertised renderable resources, including HTTP(S)\nsources, available through this method to clients that cannot reach them\ndirectly. Reads target the advertised content URI, not a channel-derived\nalias. This does not authorize fetching arbitrary client-supplied URLs.\n\nWhen both peers negotiate `resourceRead`, the Resource Reads specification\ndefines URI resolution, HTTP-backed reads, redirects, permission checks,\nbounds, and typed failures. Without negotiation, existing behavior remains\nunchanged; callers MUST NOT assume that an HTTP(S) URI is readable.",
+      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nHosts SHOULD also make advertised renderable resources, including HTTP(S)\nsources, available through this method to clients that cannot reach them\ndirectly. Reads target the advertised content URI, not a channel-derived\nalias. This does not authorize fetching arbitrary client-supplied URLs.\n\nWhen both peers negotiate `resourceRead`, reads of the receiver's listed\nschemes follow the Resource Reads specification: URI resolution,\nHTTP-backed reads, redirects, permission checks, bounds, and typed failures.\nUnlisted schemes and unnegotiated connections retain existing behavior.\nOmission from a scheme list MUST NOT disable an otherwise supported read;\ncallers MUST NOT assume that an unlisted HTTP(S) URI has mediated reads.",
       "properties": {
         "channel": {
           "type": "string",
@@ -6733,7 +6733,7 @@
         },
         "uri": {
           "type": "string",
-          "description": "Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.\nUnder the negotiated Resource Reads contract it MUST have no fragment.\nResolve relative references against the containing resource's effective\nURI before sending the request."
+          "description": "Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.\nFor a scheme covered by negotiated Resource Reads it MUST have no fragment.\nResolve relative references against the containing resource's effective\nURI before sending the request."
         },
         "encoding": {
           "$ref": "#/$defs/ContentEncoding",
@@ -6763,7 +6763,7 @@
         },
         "effectiveUri": {
           "$ref": "#/$defs/URI",
-          "description": "Public absolute, fragment-free URI of the returned content after\nredirects. Required when a negotiated read changes the resource URI;\notherwise omitted, meaning the requested URI. Readers MUST use this as\nthe base for relative references. MUST NOT expose a private backing URI.\nReceivers MUST NOT rely on this field unless `resourceRead` was negotiated.\n\nStability: 1.0 - Early development."
+          "description": "Public absolute, fragment-free URI of the returned content after\nredirects. Required when a contract-covered read changes the resource URI;\notherwise omitted, meaning the requested URI. Readers MUST use this as\nthe base for relative references. MUST NOT expose a private backing URI.\nReceivers MUST NOT rely on this field unless the read's scheme is covered\nby negotiated Resource Reads.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6969,7 +6969,7 @@
     },
     "ResourceRequestParams": {
       "type": "object",
-      "description": "Requests permission to access a resource mediated by the receiver.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nEither `read`, `write`, or both SHOULD be set to `true`. A request with\nneither flag set is treated as `read: true` by receivers.",
+      "description": "Requests permission to access a resource mediated by the receiver.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nFor negotiated canvas reads, `PermissionDeniedErrorData.request` can name\nan opaque permission-request URI bound by the host to one caller, canvas\nsource lifetime, and backing HTTP(S) origin. The client echoes that request;\nthe host owns approval. Success authorizes retrying the original content\nread, not reading the permission-request URI. See Resource Reads for the\nread-only origin scope, prompt requirements, and expiry rules.",
       "properties": {
         "channel": {
           "type": "string",
@@ -6984,7 +6984,7 @@
         },
         "uri": {
           "$ref": "#/$defs/URI",
-          "description": "Resource URI being requested. Typically a `file:` URI on the receiver's\nfilesystem, but any URI scheme that the receiver mediates access to is\nallowed."
+          "description": "Resource URI being requested. Typically a `file:` URI on the receiver's\nfilesystem, but any URI scheme that the receiver mediates access to is\nallowed. May also be an opaque permission-request URI supplied in\n`PermissionDeniedErrorData.request`; callers MUST echo it unchanged rather\nthan constructing an origin-wide grant from a content URI."
         },
         "read": {
           "type": "boolean",

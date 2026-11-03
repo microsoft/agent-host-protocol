@@ -1,0 +1,8 @@
+{
+  "name": "canvas-origin-grant-unavailable",
+  "group": "A",
+  "description": "A denial with no grantable permission omits the actionable request rather than implying a fallback.",
+  "type": "PermissionDeniedErrorData",
+  "input": {},
+  "acceptableOutputs": [{}]
+}

@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Opt-in Resource Reads contract with scheme discovery, effective content URIs and typed failures; canvases can advertise non-HTTP(S) content URIs to negotiated clients."
+  "message": "Opt-in Resource Reads contract with per-scheme coverage that preserves legacy reads, effective content URIs, typed failures, and lifetime-bound canvas origin grants; canvases can advertise non-HTTP(S) content URIs to negotiated clients."
 }

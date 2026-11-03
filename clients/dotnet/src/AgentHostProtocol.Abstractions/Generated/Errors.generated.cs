@@ -91,7 +91,8 @@ public readonly struct ResourceReadFailureKind : IEquatable<ResourceReadFailureK
     /// <summary>The raw wire value.</summary>
     public string Value => _value ?? string.Empty;
 
-    /// <summary>The receiver does not serve this URI scheme.</summary>
+    /// <summary>The receiver does not serve this URI scheme at all. Omission from the
+    /// negotiated scheme list is not sufficient: unlisted legacy reads remain valid.</summary>
     public static readonly ResourceReadFailureKind UnsupportedScheme = new ResourceReadFailureKind("unsupportedScheme");
 
     /// <summary>The body or encoded response exceeds the receiver's size limit.</summary>

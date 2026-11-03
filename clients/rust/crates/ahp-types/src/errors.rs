@@ -106,7 +106,8 @@ pub struct UnsupportedProtocolVersionErrorData {
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceReadFailureKind {
-    /// The receiver does not serve this URI scheme.
+    /// The receiver does not serve this URI scheme at all. Omission from the
+    /// negotiated scheme list is not sufficient: unlisted legacy reads remain valid.
     UnsupportedScheme,
     /// The body or encoded response exceeds the receiver's size limit.
     TooLarge,

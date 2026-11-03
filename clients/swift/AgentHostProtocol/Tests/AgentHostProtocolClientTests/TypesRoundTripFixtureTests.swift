@@ -196,6 +196,10 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
         case "ResourceReadFailedErrorData":
             return try reencode(dec.decode(ResourceReadFailedErrorData.self, from: inputData))
+        case "PermissionDeniedErrorData":
+            return try reencode(dec.decode(PermissionDeniedErrorData.self, from: inputData))
+        case "ResourceRequestParams":
+            return try reencode(dec.decode(ResourceRequestParams.self, from: inputData))
         case "CreateChatParams":
             return try reencode(dec.decode(CreateChatParams.self, from: inputData))
         case "ChatSource":

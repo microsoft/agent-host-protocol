@@ -35,25 +35,72 @@ The host accepts in `InitializeResult.resourceRead`:
 } }
 ```
 
-Each list names the schemes **that peer serves**, as distinct lowercase
-RFC 3986 scheme names without `:` (`[a-z][a-z0-9+.-]*`). Hosts MUST reject
-malformed offers with `InvalidParams`; clients MUST fail initialization on a
-malformed or unsolicited acceptance rather than enable an ambiguous contract.
-The empty client list offers support as a reader without exposing
-reverse-direction resources. A client that also serves
-`virtual:` resources could offer `{"schemes":["virtual"]}`.
+Each list names the schemes **that peer serves under this contract**, as
+distinct lowercase RFC 3986 scheme names without `:` (`[a-z][a-z0-9+.-]*`).
+It is not an inventory or allowlist of every scheme the peer can read.
+The empty client list offers support as a reader without changing any
+reverse-direction reads. A client can keep serving `file:` and `virtual:`
+resources with its existing behavior while offering `{"schemes":[]}`. To
+apply the new semantics to its `virtual:` reads, it includes `virtual`.
 
-The host MUST NOT accept an absent offer. Presence on both sides activates this
-entire contract in both directions. The lists need not intersect: when the
-client reads, it uses the host's list; when the host reads, it uses the client's.
-A listed scheme advertises an implementation, not permission to read every URI
-with that scheme or a guarantee that a resource is still live.
+Hosts MUST decline an absent or malformed `resourceRead` offer by omitting
+`InitializeResult.resourceRead`. A malformed optional offer MUST NOT, by
+itself, fail `initialize`. Hosts SHOULD record a sanitized diagnostic naming
+the invalid capability, without echoing its values. This tolerance applies
+only to this optional member, not to malformed JSON-RPC or required initialize
+parameters. Hosts using strict native decoders must discard the invalid
+optional member before decoding the remaining `InitializeParams`; the
+generated model's typed `schemes` field is not weakened.
 
-With an active contract, callers MUST NOT request a scheme that the receiver
-does not advertise. Receivers nevertheless MUST reject such requests with
-`ResourceReadFailed` / `unsupportedScheme`. The offer and acceptance apply for
-the initialized connection and any continuation through `reconnect`; peers
-MUST retain both lists with that agreement. If either peer cannot recover the
+For example, this malformed offer leaves the optional feature off while the
+otherwise valid connection initializes:
+
+```jsonc
+// Client -> Server
+{ "jsonrpc": "2.0", "id": 7, "method": "initialize",
+  "params": { "channel": "ahp-root://", "clientId": "reader-1",
+    "protocolVersions": ["1.0.0"],
+    "capabilities": { "resourceRead": { "schemes": "http" } } } }
+
+// Server -> Client: no resourceRead acceptance.
+{ "jsonrpc": "2.0", "id": 7, "result": {
+  "protocolVersion": "1.0.0", "serverSeq": 1, "snapshots": []
+} }
+```
+
+Clients MUST fail initialization on a malformed or unsolicited acceptance
+rather than enable an ambiguously active contract. A valid capability is an
+object with a required array of distinct valid scheme strings; unknown fields
+are ignored for forward compatibility. Missing or non-array `schemes`,
+non-string members, invalid scheme names, and duplicates are malformed.
+
+The host MUST NOT accept an absent offer. Presence on both sides enables the
+contract **only for each receiver's listed schemes**. The lists need not
+intersect: client-to-host reads use the host's list; reverse reads use the
+client's. A listed scheme promises these semantics, not access to every URI
+or a guarantee that a resource is still live.
+
+Unlisted schemes retain their existing reads and permission policy. Callers
+MAY continue to request them, and receivers MUST NOT reject a supported read
+solely because its scheme is unlisted. Effective-URI handling, typed failures,
+and HTTP mediation are not promised for those reads. On a negotiated
+connection, a receiver MAY use `ResourceReadFailed` / `unsupportedScheme` when
+it does not serve a scheme **at all**; a missing advertisement alone is never
+sufficient to produce that error.
+
+With the offer and acceptance above:
+
+| Direction | Requested URI | Behavior |
+|---|---|---|
+| Client to host | `canvas-content://c1/preview` | Resource Reads contract |
+| Client to host | `file:///workspace/readme.md` | Existing file-read behavior |
+| Client to host | `ahp-changeset:/c1/content` | Existing changeset-read behavior |
+| Host to client | `file:///workspace/input.txt` | Existing reverse file-read behavior |
+| Host to client | `virtual://client/plugin.json` | Existing reverse virtual-read behavior |
+
+The offer and acceptance apply for the initialized connection and any
+continuation through `reconnect`; peers MUST retain both lists with that
+agreement. If either peer cannot recover the
 agreement, it must establish a fresh initialized connection before relying on
 these semantics.
 
@@ -65,6 +112,9 @@ details from the protocol version or the presence of a resource reference.
 Receivers MUST NOT introduce base-changing redirects that rely on
 `effectiveUri` for such callers. They must retain legacy behavior, reject the
 new read path, or advertise a compatible, directly addressable source.
+
+The following rules apply to reads covered by the receiver's scheme list.
+They do not impose new semantics on unlisted legacy schemes.
 
 ## URI Resolution
 
@@ -174,10 +224,12 @@ Before reading, the receiver MUST establish both:
    network authority.
 
 Neither provider registration, URI knowledge, a scheme advertisement, nor a
-loopback address proves source ownership. Implementations can bind resources
-to session-owned endpoints or explicit operator grants. AHP does not prescribe
-a deployment's address allowlist, but the receiver MUST NOT turn an untrusted
-provider's URL into a grant of access to unrelated host services.
+loopback address proves source ownership. A host may authorize a source it
+created and controls or use an applicable operator preauthorization.
+For a provider-supplied HTTP(S) canvas source without such authorization, it
+MUST use the [canvas origin-grant flow](#canvas-origin-grants) before fetching.
+This flow authorizes a destination; it does not require per-OS listener or
+process-ownership inspection.
 
 The receiver MUST enforce policy against the actual interpreted destination,
 including URI normalization, decoded paths, resolved network addresses,
@@ -191,6 +243,103 @@ for every asset when an applicable grant already exists. Grants remain
 revocable: pending reads MUST NOT release content under revoked authority.
 An implementation may conceal a resource's existence with `NotFound` instead
 of `PermissionDenied`, consistently with its privacy policy.
+
+### Canvas Origin Grants
+
+A canvas origin grant permits **read-only GET access to one backing HTTP(S)
+origin** (scheme, host, and effective port), for one authenticated caller and
+one live canvas source. It covers all paths and queries on that origin, not
+an implicit path prefix. It grants no writes, other origins, other canvases,
+or ambient host credentials. Public resource mappings and independent host
+policy may restrict access further; a grant does not expose unregistered
+content or override a denial that a user is not allowed to lift.
+
+When that grant could enable a denied canvas read, the host MUST return
+`PermissionDenied` with `PermissionDeniedErrorData.request` containing a
+read-only `ResourceRequestParams`. Its `uri` is an **opaque, host-issued
+permission-request URI**, not the backing origin or the content URI. The host
+registers it against the caller's security context, canvas registration
+incarnation, current source lifetime, and canonical backing origin. This
+keeps private backing URLs out of error data and makes a stale approval
+unable to authorize a different canvas or a replacement source.
+
+Public content URIs MUST resolve to an unambiguous canvas source registration
+for this check. If a backing URL is shared by different canvas lifetimes or
+callers with different grants, the host must publish distinct indirect content
+URIs rather than select a grant merely because the backing origin matches.
+
+The client MAY forward that exact request through `resourceRequest`. The
+host validates the binding and decides whether to grant, deny, or prompt
+through its trusted permission flow. Its UI MAY be rendered on a client; it
+does not require a GUI on the host. The host supplies and validates the scope.
+Forwarding the request is **not consent**.
+If a prompt is needed, the host MUST identify the owning canvas and backing
+origin and explain that access covers all paths and queries, is read-only,
+and lasts only while that canvas source remains live. The prompt MUST omit
+userinfo, source paths, queries, and credentials. A generic prompt containing
+only the opaque request URI is insufficient. The client need not infer a
+scope from a URL or implement a different grant flow per host.
+
+If the host cannot obtain the necessary trusted approval, it MUST retain the
+denial. A host with no grantable path omits `data.request`; clients MUST NOT
+construct a broader origin request, treat denial as permission to fetch
+locally, or automatically retry permission requests after refusal.
+
+For example, `resource-grant:/g1` below is an illustrative host-issued URI;
+its spelling and scheme are not prescribed. It is accepted by `resourceRequest`
+and is not a content resource or a scheme to put in `resourceRead.schemes`.
+
+```jsonc
+// Host denies a canvas content read pending an origin grant.
+{ "jsonrpc": "2.0", "id": 4, "error": {
+  "code": -32009, "message": "Canvas source access requires approval",
+  "data": { "request": {
+    "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true
+  } }
+} }
+
+// Client forwards the request; the host owns the approval decision.
+{ "jsonrpc": "2.0", "id": 5, "method": "resourceRequest",
+  "params": { "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true } }
+
+// Host approves, then the client retries the original content URI.
+{ "jsonrpc": "2.0", "id": 5, "result": {} }
+{ "jsonrpc": "2.0", "id": 6, "method": "resourceRead",
+  "params": { "channel": "ahp-root://",
+    "uri": "canvas-content://c1/preview/index.html", "encoding": "base64" } }
+{ "jsonrpc": "2.0", "id": 6, "result": {
+  "data": "PGgxPkhlbGxvPC9oMT4=", "encoding": "base64", "contentType": "text/html"
+} }
+```
+
+`resourceRequest` succeeds with its existing empty result only after approval
+or an applicable preauthorization. It grants access to retry the original
+content read and its authorized same-origin assets, not to fetch the
+permission-request URI. For these request URIs, `read` MUST be `true` and
+`write` MUST be absent or `false`; other values return `InvalidParams`. An
+unknown, expired, or foreign request URI MUST NOT grant anything and returns
+`NotFound`. A refused approval returns
+`PermissionDenied` without another automatically actionable grant request.
+Grant issuance must be bounded and idempotent for repeated reads of the same
+live scope, so concurrent asset requests do not create an unbounded prompt
+queue. Replaying an already-approved request while its binding is still live
+may return success without another prompt, but MUST NOT extend its lifetime.
+
+Both pending requests and issued grants MUST expire when the canvas closes,
+the provider becomes unavailable, the source is replaced (even on the same
+origin), the caller loses access, or the host restarts. A reused canvas URI,
+instance ID, or listening port MUST NOT resurrect the grant. The host rechecks
+the binding when approval completes and before releasing content; source
+retirement during a pending approval or read cannot grant or release content
+for its replacement. A reconnect may retain a grant only when the host
+verifies continuity of the authenticated caller and the same live canvas
+source; a claimed `clientId` alone is insufficient.
+
+This is explicitly stricter than direct local rendering: a client that loads
+`CanvasState.url` itself uses its own renderer/network policy and does not
+perform this host-side grant exchange. The added check protects the remote
+host's authority. A grant authorizes an origin during a bounded source
+lifetime; it is not an attestation about which process owns a listening socket.
 
 ## Bounds and Failures
 
@@ -228,7 +377,7 @@ limits.
 | Authentication required | Existing `AuthRequired` (`-32007`) and its data |
 | Resource missing, retired, or HTTP 404/410 | `NotFound` (`-32008`) |
 | Caller or source-policy denial, including an off-origin redirect | `PermissionDenied` (`-32009`), subject to the privacy rule above |
-| Scheme not served | `ResourceReadFailed` (`-32013`), `kind: "unsupportedScheme"` |
+| Scheme not served at all (not merely unlisted) | `ResourceReadFailed` (`-32013`), `kind: "unsupportedScheme"` |
 | Body or serialized response exceeds a size limit | `ResourceReadFailed`, `kind: "tooLarge"` |
 | Read deadline exceeded | `ResourceReadFailed`, `kind: "timeout"` |
 | Admission or response capacity unavailable | `ResourceReadFailed`, `kind: "busy"` |
@@ -258,6 +407,11 @@ without disclosing those values. This includes generic RPC tracing for
 requests, results, and errors; redacting only the HTTP fetcher's logs is not
 sufficient.
 
+The backing origin displayed in the trusted origin-grant prompt is an
+intentional disclosure to the approving user, not an exception for error
+payloads or logs. Indirect content URIs and opaque permission-request URIs
+continue to conceal the full backing URL from protocol consumers.
+
 An intentionally published content URI is visible to the authorized peer.
 If even that peer must not see a backing address or credential, the receiver
 must publish an indirect URI and keep effective URIs in that public namespace.
@@ -276,8 +430,10 @@ clients must not be assumed to understand new content schemes or redirect
 bases simply because they can deserialize a URI string.
 
 Clients adopting the feature must update to models that expose the new fields,
-offer the capability, check acceptance, and propagate each resource's effective
-URI to their renderer. Hosts must update their read implementation and publish
+offer the capability, check acceptance and per-scheme coverage, and propagate
+each covered resource's effective URI to their renderer. Opting in MUST NOT
+disable existing unlisted file, changeset, or reverse-resource reads.
+Hosts must update their read implementation and publish
 compatible canvas state per connection. Generated models alone do not perform
 negotiation, fetching, authorization, or renderer integration.
 

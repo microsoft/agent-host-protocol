@@ -1,0 +1,8 @@
+{
+  "name": "canvas-origin-grant-request",
+  "group": "A",
+  "description": "The client echoes the host-issued request unchanged through resourceRequest.",
+  "type": "ResourceRequestParams",
+  "input": { "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true },
+  "acceptableOutputs": [{ "channel": "ahp-root://", "uri": "resource-grant:/g1", "read": true }]
+}

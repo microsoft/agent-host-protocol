@@ -39,6 +39,8 @@ import com.microsoft.agenthostprotocol.generated.InitializeParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadResult
 import com.microsoft.agenthostprotocol.generated.ResourceReadFailedErrorData
+import com.microsoft.agenthostprotocol.generated.PermissionDeniedErrorData
+import com.microsoft.agenthostprotocol.generated.ResourceRequestParams
 import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
 import com.microsoft.agenthostprotocol.generated.ReconnectResult
@@ -272,6 +274,8 @@ class RoundTripCorpusTest {
             "ResourceReadParams" -> rt(ResourceReadParams.serializer())
             "ResourceReadResult" -> rt(ResourceReadResult.serializer())
             "ResourceReadFailedErrorData" -> rt(ResourceReadFailedErrorData.serializer())
+            "PermissionDeniedErrorData" -> rt(PermissionDeniedErrorData.serializer())
+            "ResourceRequestParams" -> rt(ResourceRequestParams.serializer())
             "CreateChatParams" -> rt(CreateChatParams.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())

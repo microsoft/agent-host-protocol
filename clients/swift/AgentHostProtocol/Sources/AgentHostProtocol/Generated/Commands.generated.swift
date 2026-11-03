@@ -417,10 +417,11 @@ public struct InitializeResult: Codable, Sendable {
     /// understand. Capabilities needed for interoperable behavior SHOULD use typed
     /// fields on {@link InitializeResult} instead.
     public var meta: [String: AnyCodable]?
-    /// Accepts the client's Resource Reads offer and lists the schemes this host
-    /// can serve. MUST be omitted unless `ClientCapabilities.resourceRead` was
-    /// offered. Presence activates the contract in both directions; absence
-    /// leaves existing resource-read behavior unchanged.
+    /// Accepts the client's Resource Reads offer and lists schemes this host
+    /// serves under that contract. MUST be omitted for an absent or malformed
+    /// offer. Each receiver's listed schemes use the contract; unlisted schemes
+    /// retain existing behavior. Clients reject malformed or unsolicited
+    /// acceptance rather than enabling an ambiguous contract.
     ///
     /// Stability: 1.0 - Early development.
     public var resourceRead: ResourceReadCapabilities?
@@ -510,9 +511,12 @@ public struct InitializeResult: Codable, Sendable {
 
 public struct ClientCapabilities: Codable, Sendable {
     /// Offers the Resource Reads contract, including effective content URIs and
-    /// typed failures. `schemes` lists resources this client can serve in the
-    /// reverse direction; an empty list still offers support as a reader.
+    /// typed failures. `schemes` lists schemes this client serves under this
+    /// contract in the reverse direction; unlisted schemes keep their existing
+    /// behavior. An empty list still offers support as a reader.
     /// The contract is active only if `InitializeResult.resourceRead` is present.
+    /// A malformed offer is declined by omitting that result member, not by
+    /// failing initialization solely because this optional feature is malformed.
     ///
     /// Stability: 1.0 - Early development.
     public var resourceRead: ResourceReadCapabilities?
@@ -1230,14 +1234,15 @@ public struct ListSessionsResult: Codable, Sendable {
 /// Support for the negotiated Resource Reads contract.
 ///
 /// Presence declares support for effective content URIs and typed read
-/// failures, even when `schemes` is empty. It does not grant resource access.
+/// failures, even when `schemes` is empty. This scopes the new semantics, not
+/// the set of permitted reads. It does not grant or revoke resource access.
 ///
 /// Stability: 1.0 - Early development.
 public struct ResourceReadCapabilities: Codable, Sendable {
-    /// URI schemes this peer can serve, as distinct lowercase RFC 3986 scheme
-    /// names without `:`. An empty list means the peer offers no resources under
-    /// this contract. A listed scheme does not promise access to every URI with
-    /// that scheme.
+    /// URI schemes this peer serves under this contract, as distinct lowercase
+    /// RFC 3986 scheme names without `:`. Unlisted schemes retain their existing
+    /// resource-read behavior. An empty list opts in as a reader without changing
+    /// any reverse-direction reads. A listed scheme is not an access grant.
     public var schemes: [String]
 
     public init(
@@ -1254,7 +1259,7 @@ public struct ResourceReadParams: Codable, Sendable {
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
     /// Absolute content URI, for example from a `ContentRef` or `CanvasState.url`.
-    /// Under the negotiated Resource Reads contract it MUST have no fragment.
+    /// For a scheme covered by negotiated Resource Reads it MUST have no fragment.
     /// Resolve relative references against the containing resource's effective
     /// URI before sending the request.
     public var uri: String
@@ -1289,10 +1294,11 @@ public struct ResourceReadResult: Codable, Sendable {
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     public var contentType: String?
     /// Public absolute, fragment-free URI of the returned content after
-    /// redirects. Required when a negotiated read changes the resource URI;
+    /// redirects. Required when a contract-covered read changes the resource URI;
     /// otherwise omitted, meaning the requested URI. Readers MUST use this as
     /// the base for relative references. MUST NOT expose a private backing URI.
-    /// Receivers MUST NOT rely on this field unless `resourceRead` was negotiated.
+    /// Receivers MUST NOT rely on this field unless the read's scheme is covered
+    /// by negotiated Resource Reads.
     ///
     /// Stability: 1.0 - Early development.
     public var effectiveUri: String?
@@ -1687,7 +1693,9 @@ public struct ResourceRequestParams: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Resource URI being requested. Typically a `file:` URI on the receiver's
     /// filesystem, but any URI scheme that the receiver mediates access to is
-    /// allowed.
+    /// allowed. May also be an opaque permission-request URI supplied in
+    /// `PermissionDeniedErrorData.request`; callers MUST echo it unchanged rather
+    /// than constructing an origin-wide grant from a content URI.
     public var uri: String
     /// Whether the caller needs read access to the resource.
     public var read: Bool?

@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import ts from 'typescript';
 import { ContentEncoding } from './common/commands.js';
 import { AhpErrorCodes, ResourceReadFailureKind } from './common/errors.js';
-import type { AhpErrorResponse, AhpRequest, AhpSuccessResponse } from './common/messages.js';
+import type { AhpErrorResponse, AhpRequest, AhpSuccessResponse, JsonRpcRequest } from './common/messages.js';
 
 const specification = readFileSync(new URL('../docs/specification/resource-reads.md', import.meta.url), 'utf8');
 const examples: unknown[] = [];
@@ -40,6 +40,17 @@ describe('resource-read specification examples', () => {
         resourceRead: { schemes: ['http', 'https', 'canvas-content'] },
       },
     };
+    const malformedOffer: JsonRpcRequest = {
+      jsonrpc: '2.0', id: 7, method: 'initialize',
+      params: {
+        channel: 'ahp-root://', clientId: 'reader-1', protocolVersions: ['1.0.0'],
+        capabilities: { resourceRead: { schemes: 'http' } },
+      },
+    };
+    const declined: AhpSuccessResponse<'initialize'> = {
+      jsonrpc: '2.0', id: 7,
+      result: { protocolVersion: '1.0.0', serverSeq: 1, snapshots: [] },
+    };
     const request: AhpRequest<'resourceRead'> = {
       jsonrpc: '2.0', id: 2, method: 'resourceRead',
       params: {
@@ -61,8 +72,57 @@ describe('resource-read specification examples', () => {
         data: { kind: ResourceReadFailureKind.TooLarge },
       },
     };
-    assert.deepEqual(examples, [offer, acceptance, request, result, failure]);
+    const denied: AhpErrorResponse = {
+      jsonrpc: '2.0', id: 4,
+      error: {
+        code: AhpErrorCodes.PermissionDenied,
+        message: 'Canvas source access requires approval',
+        data: { request: { channel: 'ahp-root://', uri: 'resource-grant:/g1', read: true } },
+      },
+    };
+    const grant: AhpRequest<'resourceRequest'> = {
+      jsonrpc: '2.0', id: 5, method: 'resourceRequest',
+      params: { channel: 'ahp-root://', uri: 'resource-grant:/g1', read: true },
+    };
+    const granted: AhpSuccessResponse<'resourceRequest'> = {
+      jsonrpc: '2.0', id: 5, result: {},
+    };
+    const retry: AhpRequest<'resourceRead'> = {
+      jsonrpc: '2.0', id: 6, method: 'resourceRead',
+      params: {
+        channel: 'ahp-root://', uri: 'canvas-content://c1/preview/index.html',
+        encoding: ContentEncoding.Base64,
+      },
+    };
+    const content: AhpSuccessResponse<'resourceRead'> = {
+      jsonrpc: '2.0', id: 6,
+      result: { data: 'PGgxPkhlbGxvPC9oMT4=', encoding: ContentEncoding.Base64, contentType: 'text/html' },
+    };
+    assert.deepEqual(examples, [
+      offer, acceptance, malformedOffer, declined, request, result,
+      denied, grant, granted, retry, content, failure,
+    ]);
+    assert.deepEqual(grant.params, denied.error.data.request);
+    assert.notEqual(retry.params.uri, grant.params.uri);
+    assert.equal(declined.result.resourceRead, undefined);
     assert.equal(Buffer.from(result.result.data, 'base64').toString('utf8'), '<h1>Hello</h1>');
+  });
+
+  it('limits scheme coverage without disabling unlisted reads in either direction', () => {
+    const rows = [...specification.matchAll(/^\| (Client to host|Host to client) \| `([^`]+)` \| ([^|]+) \|$/gm)];
+    assert.equal(rows.length, 5);
+    for (const [, direction, uri, behavior] of rows) {
+      const schemes = direction === 'Client to host' ? ['http', 'https', 'canvas-content'] : [];
+      const covered = schemes.includes(new URL(uri).protocol.slice(0, -1));
+      if (covered) {
+        assert.equal(behavior, 'Resource Reads contract');
+      } else {
+        assert.match(behavior, /^Existing (reverse )?(file|changeset|virtual)-read behavior$/);
+      }
+    }
+    assert.ok(rows.some(([, direction, uri]) => direction === 'Host to client' && uri.startsWith('file:')));
+    assert.ok(rows.some(([, direction, uri]) => direction === 'Host to client' && uri.startsWith('virtual:')));
+    assert.ok(rows.some(([, direction, uri]) => direction === 'Client to host' && uri.startsWith('ahp-changeset:')));
   });
 
   it('preserves every URI-resolution example including queries and trailing slashes', () => {

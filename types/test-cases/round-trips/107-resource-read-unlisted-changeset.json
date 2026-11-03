@@ -1,0 +1,8 @@
+{
+  "name": "resource-read-unlisted-changeset",
+  "group": "A",
+  "description": "Changeset reads remain valid outside the advertised resource-read contract schemes.",
+  "type": "ResourceReadParams",
+  "input": { "channel": "ahp-root://", "uri": "ahp-changeset:/c1/content" },
+  "acceptableOutputs": [{ "channel": "ahp-root://", "uri": "ahp-changeset:/c1/content" }]
+}

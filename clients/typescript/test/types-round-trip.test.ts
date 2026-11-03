@@ -61,9 +61,9 @@ import type {
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
 import type {
   Implementation, InitializeParams, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
-  ResourceReadParams, ResourceReadResult,
+  ResourceReadParams, ResourceReadResult, ResourceRequestParams,
 } from '../src/types/common/commands.js';
-import type { ResourceReadFailedErrorData } from '../src/types/common/errors.js';
+import type { PermissionDeniedErrorData, ResourceReadFailedErrorData } from '../src/types/common/errors.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
@@ -254,6 +254,8 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'ResourceReadParams': void (parsed as ResourceReadParams); break;
     case 'ResourceReadResult': void (parsed as ResourceReadResult); break;
     case 'ResourceReadFailedErrorData': void (parsed as ResourceReadFailedErrorData); break;
+    case 'PermissionDeniedErrorData': void (parsed as PermissionDeniedErrorData); break;
+    case 'ResourceRequestParams': void (parsed as ResourceRequestParams); break;
     case 'CreateChatParams':    void (parsed as CreateChatParams); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;

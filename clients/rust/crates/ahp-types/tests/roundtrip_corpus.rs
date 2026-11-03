@@ -31,10 +31,11 @@ use ahp_types::{
     commands::{
         ChangesetOperationTarget, ChatSource, CreateChatParams, CreateTcpConnectionParams,
         Implementation, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
-        ResourceReadParams, ResourceReadResult, SubscribeParams, SubscribeResult,
+        ResourceReadParams, ResourceReadResult, ResourceRequestParams, SubscribeParams,
+        SubscribeResult,
     },
     common::StringOrMarkdown,
-    errors::ResourceReadFailedErrorData,
+    errors::{PermissionDeniedErrorData, ResourceReadFailedErrorData},
     messages::JsonRpcMessage,
     notifications::{
         ChannelCreditParams, ChannelFrameParams, PartialSessionSummary, SessionAddedParams,
@@ -235,6 +236,8 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "ResourceReadParams" => round_trip!(ResourceReadParams),
         "ResourceReadResult" => round_trip!(ResourceReadResult),
         "ResourceReadFailedErrorData" => round_trip!(ResourceReadFailedErrorData),
+        "PermissionDeniedErrorData" => round_trip!(PermissionDeniedErrorData),
+        "ResourceRequestParams" => round_trip!(ResourceRequestParams),
         "CreateChatParams" => round_trip!(CreateChatParams),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),

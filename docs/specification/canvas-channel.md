@@ -61,6 +61,15 @@ backing source is within the host's resource policy. Neither knowledge of the
 URI nor provider registration grants network or filesystem access. Loopback
 alone is not proof that an endpoint belongs to a canvas.
 
+For an HTTP(S) source without applicable host authorization, the host uses
+the shared [canvas origin-grant flow](/specification/resource-reads#canvas-origin-grants):
+`PermissionDenied` carries a host-issued `resourceRequest`, the client may
+forward it, and the host obtains approval for read-only access to that backing
+origin for the current canvas source lifetime. Approval is not inferred from
+the client's retry. Pending grants and issued grants expire when the source
+changes or the canvas is retired, even if a later canvas reuses the same URI.
+Direct local rendering uses the client's own policy, not this host-side grant.
+
 A missing canvas, missing asset, or source that is no longer live returns
 `NotFound`. That error does not distinguish these cases; clients use the canvas
 and chat state to determine whether the canvas still exists and has a source.
