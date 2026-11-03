@@ -1079,7 +1079,7 @@ data class ResourceReadParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Content URI from a `ContentRef`
+     * Content URI to read, such as one from a `ContentRef`
      */
     val uri: String,
     /**
@@ -1318,6 +1318,8 @@ data class ResourceResolveResult(
     /**
      * Canonical URI after symlink resolution. Equal to the requested URI when
      * `followSymlinks` is `false` or the URI does not traverse a symlink.
+     * For an HTTP(S) URI, a redirect that the receiver follows is treated as a
+     * symlink.
      */
     val uri: String,
     /**

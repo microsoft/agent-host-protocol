@@ -1214,7 +1214,7 @@ public struct ResourceReadParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Content URI from a `ContentRef`
+    /// Content URI to read, such as one from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
@@ -1557,6 +1557,8 @@ public struct ResourceResolveParams: Codable, Sendable {
 public struct ResourceResolveResult: Codable, Sendable {
     /// Canonical URI after symlink resolution. Equal to the requested URI when
     /// `followSymlinks` is `false` or the URI does not traverse a symlink.
+    /// For an HTTP(S) URI, a redirect that the receiver follows is treated as a
+    /// symlink.
     public var uri: String
     /// Resource kind.
     public var type: ResourceType

@@ -1209,7 +1209,23 @@ public sealed record ListSessionsResult
 /// sent in either direction. Hosts use it to fetch content from a
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
-/// same permission/`resourceRequest` flow regardless of which peer initiated.</summary>
+/// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+/// content references and canvas sources. This includes HTTP(S) URLs that the
+/// other peer might not be able to reach, such as a development server on the
+/// host's loopback interface. To read an HTTP(S) URL, the receiver sends a
+/// `GET` request from its own environment:
+///
+/// - Before contacting the URL, or any redirect target, the receiver applies
+///   its own policy to it, and fails a read that the policy doesn't allow with
+///   `PermissionDenied`. It is not a general-purpose HTTP proxy.
+/// - The read fails unless the final response status is 2xx. A `404` or `410`
+///   fails with `NotFound`.
+/// - `contentType` is the response's `Content-Type`.
+/// - A redirect that the receiver follows is treated as a symlink:
+///   `resourceResolve` returns the URI that it leads to, which is the base for
+///   relative references in the content.</summary>
 public sealed record ResourceReadParams
 {
     public required string Channel { get; init; }
@@ -1220,7 +1236,7 @@ public sealed record ResourceReadParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Content URI from a `ContentRef`</summary>
+    /// <summary>Content URI to read, such as one from a `ContentRef`</summary>
     public required string Uri { get; init; }
 
     /// <summary>Preferred encoding for the returned data (default: server-chosen)</summary>
@@ -1501,7 +1517,9 @@ public sealed record ResourceResolveParams
 public sealed record ResourceResolveResult
 {
     /// <summary>Canonical URI after symlink resolution. Equal to the requested URI when
-    /// `followSymlinks` is `false` or the URI does not traverse a symlink.</summary>
+    /// `followSymlinks` is `false` or the URI does not traverse a symlink.
+    /// For an HTTP(S) URI, a redirect that the receiver follows is treated as a
+    /// symlink.</summary>
     public required string Uri { get; init; }
 
     /// <summary>Resource kind.</summary>
