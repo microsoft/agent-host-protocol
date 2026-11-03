@@ -1079,7 +1079,7 @@ data class ResourceReadParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Content URI from a `ContentRef`
+     * Content URI to read, such as one from a `ContentRef`
      */
     val uri: String,
     /**
