@@ -1649,7 +1649,10 @@ public sealed record ResourceMkdirResult
 /// source lifetime, and backing HTTP(S) origin. The client echoes that request;
 /// the host owns approval. Success authorizes retrying the original content
 /// read, not reading the permission-request URI. See Resource Reads for the
-/// read-only origin scope, prompt requirements, and expiry rules.</summary>
+/// read-only origin scope, prompt requirements, and expiry rules.
+///
+/// Either `read`, `write`, or both SHOULD be set to `true`. A request with
+/// neither flag set is treated as `read: true` by receivers.</summary>
 public sealed record ResourceRequestParams
 {
     public required string Channel { get; init; }

@@ -1161,11 +1161,10 @@ export interface ResourceDeleteResult {
  * read, not reading the permission-request URI. See Resource Reads for the
  * read-only origin scope, prompt requirements, and expiry rules.
  *
- * @see {@link /specification/resource-reads#canvas-origin-grants | Canvas origin grants}
- *
  * Either `read`, `write`, or both SHOULD be set to `true`. A request with
  * neither flag set is treated as `read: true` by receivers.
  *
+ * @see {@link /specification/resource-reads#canvas-origin-grants | Canvas origin grants}
  * @category Commands
  * @method resourceRequest
  * @direction Client ↔ Server

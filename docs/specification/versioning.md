@@ -116,6 +116,8 @@ wire type. Generated JSON Schemas constrain that type and list known values as
 `examples`, not a closed `enum`. Declarations marked `@exhaustive` retain a
 closed value set. A property typed as a specific enum member (for example a
 known action's discriminator) remains constrained to that member's value.
+Integer-valued numeric enums use JSON Schema `integer`, not `number`; bitset
+enums retain their unsigned 32-bit bounds even when unknown bits are allowed.
 
 ## Backward Compatibility
 

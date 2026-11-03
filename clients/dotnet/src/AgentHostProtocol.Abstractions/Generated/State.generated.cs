@@ -106,6 +106,9 @@ internal sealed class SessionLifecycleConverter : JsonConverter<SessionLifecycle
 
 /// <summary>Bitset of summary-level session status flags.
 ///
+/// The wire value is an unsigned 32-bit integer (0 through 4294967295).
+/// Unknown bits and combinations of flags are preserved.
+///
 /// Use bitwise checks instead of equality for non-terminal activity. For example,
 /// `status &amp; SessionStatus.InProgress` matches both ordinary in-progress turns
 /// and turns that are paused waiting for input.</summary>

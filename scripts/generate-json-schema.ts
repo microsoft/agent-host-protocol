@@ -163,10 +163,17 @@ function enumToSchema(en: EnumDeclaration): JsonSchema {
   const values = en.getMembers().map(m => m.getValue());
   const defined = values.filter((v): v is string | number => v !== undefined);
   const schema: JsonSchema = isNonexhaustiveEnum(en) ? { examples: defined } : { enum: defined };
-  if (defined.every(v => typeof v === 'string')) schema.type = 'string';
-  else if (defined.every(v => typeof v === 'number')) schema.type = 'number';
   const rawDesc = en.getJsDocs()[0]?.getDescription();
   const desc = rawDesc ? normalizeDescription(rawDesc) : '';
+  if (defined.every(v => typeof v === 'string')) schema.type = 'string';
+  else if (defined.every(v => typeof v === 'number')) {
+    schema.type = defined.every(Number.isInteger) ? 'integer' : 'number';
+    // The native generators use uint32 for enums with the "Bitset" convention.
+    if (/^bitset\b/i.test(desc)) {
+      schema.minimum = 0;
+      schema.maximum = 0xFFFF_FFFF;
+    }
+  }
   if (desc) schema.description = desc;
   return schema;
 }

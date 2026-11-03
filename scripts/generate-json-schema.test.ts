@@ -640,7 +640,8 @@ describe('enum schema compatibility', () => {
         const type = typeof values[0];
         assert.ok(values.every(value => typeof value === type), label);
         assert.ok(type === 'string' || type === 'number', label);
-        assert.equal(definition.type, type, label);
+        const integerValues = type === 'number' && values.every(Number.isInteger);
+        assert.equal(definition.type, integerValues ? 'integer' : type, label);
         for (const value of values) {
           assert.ok(schemaAccepts(schema, definition, value), label);
         }
@@ -659,9 +660,40 @@ describe('enum schema compatibility', () => {
         }
         assert.equal(schemaAccepts(schema, definition, type === 'string' ? 42 : '42'), false, label);
         assert.equal(schemaAccepts(schema, definition, null), false, label);
+        if (integerValues) {
+          for (const fraction of [-0.5, 0.5, 1.5, 1_000_000.5]) {
+            assert.equal(schemaAccepts(schema, definition, fraction), false, label);
+          }
+        }
       }
     }
     assert.ok(openStrings > 0 && openNumbers > 0 && closed > 0);
+  });
+
+  it('accepts known and unknown uint32 masks but rejects fractions and out-of-range bitsets', () => {
+    const fixtures = [
+      '004-session-status-bitset-flags.json',
+      '005-session-status-unknown-bits-preserved.json',
+      '109-session-status-zero-mask.json',
+      '110-session-status-all-bits.json',
+    ].map(file => {
+      const fixture: { type: string; input: number } = JSON.parse(
+        readFileSync(resolve(root, 'types/test-cases/round-trips', file), 'utf8'),
+      );
+      assert.equal(fixture.type, 'SessionStatus');
+      return fixture;
+    });
+    for (const file of SCHEMA_FILES) {
+      const schema = loadSchema(file);
+      const defs = schema.$defs as Record<string, Record<string, unknown>>;
+      assert.ok(defs.SessionStatus, file);
+      for (const fixture of fixtures) {
+        assert.ok(schemaAccepts(schema, defs.SessionStatus, fixture.input), `${file}: ${fixture.input}`);
+      }
+      for (const value of [-1, -0.5, 0.5, 1.5, 4_294_967_296, '72', null]) {
+        assert.equal(schemaAccepts(schema, defs.SessionStatus, value), false, `${file}: ${value}`);
+      }
+    }
   });
 
   it('keeps exhaustive result encodings and individual open-enum discriminants strict', () => {

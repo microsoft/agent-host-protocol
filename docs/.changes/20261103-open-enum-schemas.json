@@ -1,5 +1,5 @@
 {
   "type": "fixed",
-  "message": "JSON Schemas accept unknown values of the declared wire type for `@nonexhaustive` enums, including resource-read failure kinds, while keeping exhaustive enums and specific member discriminants strict.",
+  "message": "JSON Schemas accept unknown values of the declared wire type for `@nonexhaustive` enums, including resource-read failure kinds, while preserving numeric integrality, unsigned 32-bit bitset bounds, and strict exhaustive enums and member discriminants.",
   "targets": ["spec"]
 }

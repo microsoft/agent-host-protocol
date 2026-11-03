@@ -1,0 +1,8 @@
+{
+  "name": "session-status-zero-mask",
+  "group": "A",
+  "description": "SessionStatus accepts an empty unsigned 32-bit mask even though zero is not a named member.",
+  "type": "SessionStatus",
+  "input": 0,
+  "acceptableOutputs": [0]
+}

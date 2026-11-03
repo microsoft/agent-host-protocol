@@ -76,6 +76,7 @@ test('API docs show stability on entrypoint fields and notification methods only
     const project = new Project({ tsConfigFilePath: resolve(root, 'types/tsconfig.json') });
     generateMarkdownDocs(project, out);
     const common = readFileSync(join(out, 'common.md'), 'utf8');
+    assert.ok(common.includes('neither flag set is treated as `read: true` by receivers.'));
     for (const method of ['channel/frame', 'channel/credit', 'channel/snapshot']) {
       assert.ok(common.includes(`### \`${method}\`\n\n<StabilityIndex level="1.0" />`));
     }
@@ -101,6 +102,27 @@ test('API docs show stability on entrypoint fields and notification methods only
     assert.ok(tcp.includes('## `createTcpConnection`\n\n<StabilityIndex level="1.0" />'));
   } finally {
     rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('resource-request default documentation survives JSDoc tags in schemas and native docs', () => {
+  const expected = 'neither flag set is treated as `read: true` by receivers.';
+  const project = new Project({ tsConfigFilePath: resolve(root, 'types/tsconfig.json') });
+  const declaration = project.getSourceFileOrThrow(resolve(root, 'types/common/commands.ts'))
+    .getInterfaceOrThrow('ResourceRequestParams');
+  assert.ok(getDocumentation(declaration).includes(expected));
+
+  for (const file of ['commands.schema.json', 'errors.schema.json']) {
+    const schema: { $defs: { ResourceRequestParams: { description: string } } } =
+      JSON.parse(readFileSync(resolve(root, 'schema', file), 'utf8'));
+    assert.ok(schema.$defs.ResourceRequestParams.description.includes(expected), file);
+  }
+  for (const file of [
+    'clients/go/ahptypes/commands.generated.go',
+    'clients/rust/crates/ahp-types/src/commands.rs',
+    'clients/dotnet/src/AgentHostProtocol.Abstractions/Generated/Commands.generated.cs',
+  ]) {
+    assert.ok(readFileSync(resolve(root, file), 'utf8').includes(expected), file);
   }
 });
 

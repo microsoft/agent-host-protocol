@@ -9676,8 +9676,10 @@
         32,
         64
       ],
-      "type": "number",
-      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset of summary-level session status flags.\n\nThe wire value is an unsigned 32-bit integer (0 through 4294967295).\nUnknown bits and combinations of flags are preserved.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
     },
     "ChatInteractivity": {
       "enum": [

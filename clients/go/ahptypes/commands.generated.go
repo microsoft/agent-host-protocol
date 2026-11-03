@@ -1170,6 +1170,9 @@ type ResourceMkdirResult struct {
 // the host owns approval. Success authorizes retrying the original content
 // read, not reading the permission-request URI. See Resource Reads for the
 // read-only origin scope, prompt requirements, and expiry rules.
+//
+// Either `read`, `write`, or both SHOULD be set to `true`. A request with
+// neither flag set is treated as `read: true` by receivers.
 type ResourceRequestParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`

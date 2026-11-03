@@ -817,7 +817,7 @@
     },
     "ResourceRequestParams": {
       "type": "object",
-      "description": "Requests permission to access a resource mediated by the receiver.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nFor negotiated canvas reads, `PermissionDeniedErrorData.request` can name\nan opaque permission-request URI bound by the host to one caller, canvas\nsource lifetime, and backing HTTP(S) origin. The client echoes that request;\nthe host owns approval. Success authorizes retrying the original content\nread, not reading the permission-request URI. See Resource Reads for the\nread-only origin scope, prompt requirements, and expiry rules.",
+      "description": "Requests permission to access a resource mediated by the receiver.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nFor negotiated canvas reads, `PermissionDeniedErrorData.request` can name\nan opaque permission-request URI bound by the host to one caller, canvas\nsource lifetime, and backing HTTP(S) origin. The client echoes that request;\nthe host owns approval. Success authorizes retrying the original content\nread, not reading the permission-request URI. See Resource Reads for the\nread-only origin scope, prompt requirements, and expiry rules.\n\nEither `read`, `write`, or both SHOULD be set to `true`. A request with\nneither flag set is treated as `read: true` by receivers.",
       "properties": {
         "channel": {
           "type": "string",
@@ -11134,8 +11134,10 @@
         32,
         64
       ],
-      "type": "number",
-      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset of summary-level session status flags.\n\nThe wire value is an unsigned 32-bit integer (0 through 4294967295).\nUnknown bits and combinations of flags are preserved.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
     },
     "SessionOrigin": {
       "$ref": "#/$defs/AutomationSessionOrigin",

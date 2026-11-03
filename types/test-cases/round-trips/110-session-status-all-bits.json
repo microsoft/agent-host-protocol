@@ -1,0 +1,8 @@
+{
+  "name": "session-status-all-bits",
+  "group": "A",
+  "description": "SessionStatus preserves every unsigned 32-bit flag, including unknown bits, at the maximum wire value.",
+  "type": "SessionStatus",
+  "input": 4294967295,
+  "acceptableOutputs": [4294967295]
+}
