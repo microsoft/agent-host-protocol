@@ -6445,7 +6445,7 @@
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
     },
     "AuthRequiredReason": {
-      "enum": [
+      "examples": [
         "required",
         "expired"
       ],
@@ -6453,7 +6453,7 @@
       "description": "Reason why authentication is required."
     },
     "SessionStatus": {
-      "enum": [
+      "examples": [
         1,
         2,
         8,
@@ -6518,7 +6518,7 @@
       "description": "Policy configuration state for a model."
     },
     "SessionLifecycle": {
-      "enum": [
+      "examples": [
         "creating",
         "ready",
         "failed"
@@ -6777,7 +6777,7 @@
       "description": "Discriminated union of all MCP server lifecycle states.\nDiscriminated by `kind` (a {@link McpServerStatus} value)."
     },
     "McpAuthRequiredReason": {
-      "enum": [
+      "examples": [
         "required",
         "expired",
         "insufficientScope"
@@ -6889,7 +6889,7 @@
       "description": "How a turn ended."
     },
     "MessageKind": {
-      "enum": [
+      "examples": [
         "user",
         "agent",
         "tool",
@@ -6974,14 +6974,14 @@
       "description": "A string that may optionally be rendered as Markdown.\n\n- A plain `string` is rendered as-is (no Markdown processing).\n- An object with `{ markdown: string }` is rendered with Markdown formatting."
     },
     "ToolCallRiskAssessmentKind": {
-      "enum": [
+      "examples": [
         "judge"
       ],
       "type": "string",
       "description": "Identifies a model judge as the source of a confirmation requirement."
     },
     "ConfirmationOptionKind": {
-      "enum": [
+      "examples": [
         "approve",
         "deny"
       ],
@@ -7043,7 +7043,7 @@
       ]
     },
     "ToolCallConfirmationReason": {
-      "enum": [
+      "examples": [
         "not-needed",
         "user-action",
         "setting"
@@ -7094,7 +7094,7 @@
       "description": "A content part within terminal output."
     },
     "ChangesetStatus": {
-      "enum": [
+      "examples": [
         "computing",
         "recomputing",
         "ready",
@@ -7104,7 +7104,7 @@
       "description": "Computation lifecycle of a {@link ChangesetState}."
     },
     "ChangesetOperationScope": {
-      "enum": [
+      "examples": [
         "changeset",
         "resource",
         "range"
@@ -7113,7 +7113,7 @@
       "description": "Where a {@link ChangesetOperation} can be invoked."
     },
     "ChangesetOperationStatus": {
-      "enum": [
+      "examples": [
         "idle",
         "running",
         "error",
@@ -7132,7 +7132,7 @@
       "description": "Discriminant for {@link ResourceChange.type}."
     },
     "AutomationMisfirePolicy": {
-      "enum": [
+      "examples": [
         "skip",
         "runOnce"
       ],
@@ -7162,7 +7162,7 @@
       "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
     },
     "AutomationOperation": {
-      "enum": [
+      "examples": [
         "update",
         "remove",
         "run"

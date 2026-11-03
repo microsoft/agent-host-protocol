@@ -6639,7 +6639,7 @@
       "description": "Policy configuration state for a model."
     },
     "SessionStatus": {
-      "enum": [
+      "examples": [
         1,
         2,
         8,
@@ -6651,7 +6651,7 @@
       "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
     },
     "SessionLifecycle": {
-      "enum": [
+      "examples": [
         "creating",
         "ready",
         "failed"
@@ -6669,7 +6669,7 @@
       "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
     },
     "McpAuthRequiredReason": {
-      "enum": [
+      "examples": [
         "required",
         "expired",
         "insufficientScope"
@@ -6695,7 +6695,7 @@
       "description": "How a turn ended."
     },
     "MessageKind": {
-      "enum": [
+      "examples": [
         "user",
         "agent",
         "tool",
@@ -6715,14 +6715,14 @@
       "description": "How a client completed an input request."
     },
     "ToolCallRiskAssessmentKind": {
-      "enum": [
+      "examples": [
         "judge"
       ],
       "type": "string",
       "description": "Identifies a model judge as the source of a confirmation requirement."
     },
     "ConfirmationOptionKind": {
-      "enum": [
+      "examples": [
         "approve",
         "deny"
       ],
@@ -6730,7 +6730,7 @@
       "description": "Whether a confirmation option represents an approval or denial action."
     },
     "ToolCallConfirmationReason": {
-      "enum": [
+      "examples": [
         "not-needed",
         "user-action",
         "setting"
@@ -6748,7 +6748,7 @@
       "description": "Why a tool call was cancelled."
     },
     "ChangesetStatus": {
-      "enum": [
+      "examples": [
         "computing",
         "recomputing",
         "ready",
@@ -6758,7 +6758,7 @@
       "description": "Computation lifecycle of a {@link ChangesetState}."
     },
     "ChangesetOperationScope": {
-      "enum": [
+      "examples": [
         "changeset",
         "resource",
         "range"
@@ -6767,7 +6767,7 @@
       "description": "Where a {@link ChangesetOperation} can be invoked."
     },
     "ChangesetOperationStatus": {
-      "enum": [
+      "examples": [
         "idle",
         "running",
         "error",
@@ -6786,7 +6786,7 @@
       "description": "Discriminant for {@link ResourceChange.type}."
     },
     "AutomationMisfirePolicy": {
-      "enum": [
+      "examples": [
         "skip",
         "runOnce"
       ],
@@ -6794,7 +6794,7 @@
       "description": "How a host handles schedule occurrences missed while automatic execution was\nunavailable."
     },
     "AutomationOperation": {
-      "enum": [
+      "examples": [
         "update",
         "remove",
         "run"

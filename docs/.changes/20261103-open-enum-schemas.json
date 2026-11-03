@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "JSON Schemas accept unknown values of the declared wire type for `@nonexhaustive` enums, including resource-read failure kinds, while keeping exhaustive enums and specific member discriminants strict.",
+  "targets": ["spec"]
+}

@@ -18,6 +18,7 @@ import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readErrorCodes } from './read-error-codes.js';
+import { isNonexhaustiveEnum } from './enum-compatibility.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ interface JsonSchema {
   minContains?: number;
   maxContains?: number;
   enum?: Array<string | number | boolean>;
+  examples?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
   maximum?: number;
@@ -154,13 +156,13 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
   return undefined;
 }
 
-// A whole `const enum` → a JSON Schema `enum` of its members' evaluated values.
+// Open enums constrain the wire type; their known values are examples, not limits.
 // ts-morph evaluates const-enum initializers (including bitwise expressions like
 // `(1 << 3) | (1 << 4)`), so numeric flag enums resolve to concrete numbers.
 function enumToSchema(en: EnumDeclaration): JsonSchema {
   const values = en.getMembers().map(m => m.getValue());
   const defined = values.filter((v): v is string | number => v !== undefined);
-  const schema: JsonSchema = { enum: defined };
+  const schema: JsonSchema = isNonexhaustiveEnum(en) ? { examples: defined } : { enum: defined };
   if (defined.every(v => typeof v === 'string')) schema.type = 'string';
   else if (defined.every(v => typeof v === 'number')) schema.type = 'number';
   const rawDesc = en.getJsDocs()[0]?.getDescription();

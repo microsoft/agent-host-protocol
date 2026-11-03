@@ -111,6 +111,12 @@ When a newer client connects to an older host:
 4. If a feature is unavailable, the client degrades gracefully — disabling UI affordances, falling back to older code paths, or surfacing a clear message to the user.
 5. The host only sends action types known to the negotiated version. As a safety net, clients SHOULD silently ignore actions with unrecognized `type` values.
 
+Whole enum declarations marked `@nonexhaustive` admit unknown values of their
+wire type. Generated JSON Schemas constrain that type and list known values as
+`examples`, not a closed `enum`. Declarations marked `@exhaustive` retain a
+closed value set. A property typed as a specific enum member (for example a
+known action's discriminator) remains constrained to that member's value.
+
 ## Backward Compatibility
 
 When an older client connects to a newer host:

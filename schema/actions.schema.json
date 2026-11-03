@@ -9668,7 +9668,7 @@
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
     },
     "SessionStatus": {
-      "enum": [
+      "examples": [
         1,
         2,
         8,
@@ -9689,7 +9689,7 @@
       "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
     },
     "ToolCallConfirmationReason": {
-      "enum": [
+      "examples": [
         "not-needed",
         "user-action",
         "setting"
@@ -9715,7 +9715,7 @@
       "description": "How a client completed an input request."
     },
     "ChangesetStatus": {
-      "enum": [
+      "examples": [
         "computing",
         "recomputing",
         "ready",
@@ -9725,7 +9725,7 @@
       "description": "Computation lifecycle of a {@link ChangesetState}."
     },
     "ChangesetOperationStatus": {
-      "enum": [
+      "examples": [
         "idle",
         "running",
         "error",
@@ -9753,7 +9753,7 @@
       "description": "Policy configuration state for a model."
     },
     "SessionLifecycle": {
-      "enum": [
+      "examples": [
         "creating",
         "ready",
         "failed"
@@ -9762,7 +9762,7 @@
       "description": "Session initialization state."
     },
     "McpAuthRequiredReason": {
-      "enum": [
+      "examples": [
         "required",
         "expired",
         "insufficientScope"
@@ -9780,7 +9780,7 @@
       "description": "How a turn ended."
     },
     "MessageKind": {
-      "enum": [
+      "examples": [
         "user",
         "agent",
         "tool",
@@ -9791,14 +9791,14 @@
       "description": "Discriminant for {@link MessageOrigin} — identifies who produced a message."
     },
     "ToolCallRiskAssessmentKind": {
-      "enum": [
+      "examples": [
         "judge"
       ],
       "type": "string",
       "description": "Identifies a model judge as the source of a confirmation requirement."
     },
     "ConfirmationOptionKind": {
-      "enum": [
+      "examples": [
         "approve",
         "deny"
       ],
@@ -9815,7 +9815,7 @@
       "description": "Why a tool call was cancelled."
     },
     "ChangesetOperationScope": {
-      "enum": [
+      "examples": [
         "changeset",
         "resource",
         "range"
@@ -9833,7 +9833,7 @@
       "description": "Discriminant for {@link ResourceChange.type}."
     },
     "AutomationMisfirePolicy": {
-      "enum": [
+      "examples": [
         "skip",
         "runOnce"
       ],
@@ -9841,7 +9841,7 @@
       "description": "How a host handles schedule occurrences missed while automatic execution was\nunavailable."
     },
     "AutomationOperation": {
-      "enum": [
+      "examples": [
         "update",
         "remove",
         "run"

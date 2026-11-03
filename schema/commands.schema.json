@@ -11011,7 +11011,7 @@
       "description": "How {@link ResourceWriteParams.data} is placed within the target file.\n\nEach mode interprets {@link ResourceWriteParams.position} differently:\n\n- `truncate` (default): rooted at the **start** of the file. The file is\n  truncated at `position` (0 by default) and `data` is written from that\n  offset, so the resulting file is `existing[0..position] + data`. With\n  `position` omitted this is a full overwrite.\n- `append`: rooted at the **end** of the file. `position` counts bytes\n  backwards from EOF, so `position: 0` (the default) writes at EOF —\n  POSIX append — and `position: 5` inserts `data` 5 bytes before the\n  current EOF, shifting those trailing 5 bytes after the inserted region.\n  The server MUST evaluate the effective EOF and write atomically with\n  respect to other appenders so concurrent `append` writes do not\n  clobber each other.\n- `insert`: rooted at the **start** of the file. `position` (0 by default)\n  is the byte offset at which `data` is spliced in; bytes at or after\n  `position` are shifted right by `data.length`. `insert` always grows\n  the file — use `truncate` to overwrite bytes in place."
     },
     "ResourceType": {
-      "enum": [
+      "examples": [
         "file",
         "directory",
         "symlink"
@@ -11020,7 +11020,7 @@
       "description": "Discriminant for {@link ResourceResolveResult.type}."
     },
     "CompletionItemKind": {
-      "enum": [
+      "examples": [
         "userMessage"
       ],
       "type": "string",
@@ -11126,7 +11126,7 @@
       "description": "Policy configuration state for a model."
     },
     "SessionStatus": {
-      "enum": [
+      "examples": [
         1,
         2,
         8,
@@ -11142,7 +11142,7 @@
       "description": "Durable provenance for sessions created by a higher-level AHP workflow."
     },
     "SessionLifecycle": {
-      "enum": [
+      "examples": [
         "creating",
         "ready",
         "failed"
@@ -11401,7 +11401,7 @@
       "description": "Discriminated union of all MCP server lifecycle states.\nDiscriminated by `kind` (a {@link McpServerStatus} value)."
     },
     "McpAuthRequiredReason": {
-      "enum": [
+      "examples": [
         "required",
         "expired",
         "insufficientScope"
@@ -11513,7 +11513,7 @@
       "description": "How a turn ended."
     },
     "MessageKind": {
-      "enum": [
+      "examples": [
         "user",
         "agent",
         "tool",
@@ -11559,14 +11559,14 @@
       "description": "How a client completed an input request."
     },
     "ToolCallRiskAssessmentKind": {
-      "enum": [
+      "examples": [
         "judge"
       ],
       "type": "string",
       "description": "Identifies a model judge as the source of a confirmation requirement."
     },
     "ConfirmationOptionKind": {
-      "enum": [
+      "examples": [
         "approve",
         "deny"
       ],
@@ -11628,7 +11628,7 @@
       ]
     },
     "ToolCallConfirmationReason": {
-      "enum": [
+      "examples": [
         "not-needed",
         "user-action",
         "setting"
@@ -11668,7 +11668,7 @@
       "description": "A content part within terminal output."
     },
     "ChangesetStatus": {
-      "enum": [
+      "examples": [
         "computing",
         "recomputing",
         "ready",
@@ -11678,7 +11678,7 @@
       "description": "Computation lifecycle of a {@link ChangesetState}."
     },
     "ChangesetOperationScope": {
-      "enum": [
+      "examples": [
         "changeset",
         "resource",
         "range"
@@ -11687,7 +11687,7 @@
       "description": "Where a {@link ChangesetOperation} can be invoked."
     },
     "ChangesetOperationStatus": {
-      "enum": [
+      "examples": [
         "idle",
         "running",
         "error",
@@ -11706,7 +11706,7 @@
       "description": "Discriminant for {@link ResourceChange.type}."
     },
     "AutomationMisfirePolicy": {
-      "enum": [
+      "examples": [
         "skip",
         "runOnce"
       ],
@@ -11736,7 +11736,7 @@
       "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
     },
     "AutomationOperation": {
-      "enum": [
+      "examples": [
         "update",
         "remove",
         "run"

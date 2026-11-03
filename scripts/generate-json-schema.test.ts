@@ -17,6 +17,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
 import { typeAdmitsUndefined } from './generate-json-schema.js';
+import { getEnumCompatibility } from './enum-compatibility.js';
 import { AhpErrorCodes } from '../types/common/errors.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -115,6 +116,10 @@ function schemaAccepts(
 
   if ('const' in schema) {
     return value === schema.const;
+  }
+
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return false;
   }
 
   if (schema.contains && Array.isArray(value)) {
@@ -532,6 +537,19 @@ describe('generated JSON schemas', () => {
 });
 
 describe('Resource Reads schema', () => {
+  it('accepts the shared unknown-failure fixture without accepting non-string kinds', () => {
+    const schema = loadSchema('errors.schema.json');
+    const defs = schema.$defs as Record<string, Record<string, unknown>>;
+    const fixture: { type: string; input: unknown } = JSON.parse(
+      readFileSync(resolve(root, 'types/test-cases/round-trips/093-resource-read-unknown-failure.json'), 'utf8'),
+    );
+    assert.equal(fixture.type, 'ResourceReadFailedErrorData');
+    assert.ok(schemaAccepts(schema, defs[fixture.type], fixture.input));
+    for (const kind of [1, null, false, {}, []]) {
+      assert.equal(schemaAccepts(schema, defs[fixture.type], { kind }), false);
+    }
+  });
+
   it('preserves legacy shapes and requires a real scheme list when offered', () => {
     const schema = loadSchema('commands.schema.json');
     const defs = schema.$defs as Record<string, Record<string, unknown>>;
@@ -593,6 +611,69 @@ describe('Resource Reads schema', () => {
     assert.ok(schemaAccepts(schema, defs.PermissionDeniedErrorData, {}));
     assert.equal(schemaAccepts(schema, defs.ResourceRequestParams, { ...request, read: 'yes' }), false);
     assert.equal(schemaAccepts(schema, defs.ResourceRequestParams, { channel: 'ahp-root://', read: true }), false);
+  });
+});
+
+describe('enum schema compatibility', () => {
+  it('checks enum constraints in the schema test evaluator', () => {
+    const schema = { type: 'string', enum: ['known'] };
+    assert.ok(schemaAccepts({}, schema, 'known'));
+    assert.equal(schemaAccepts({}, schema, 'unknown'), false);
+    assert.equal(schemaAccepts({}, schema, 1), false);
+    assert.equal(schemaAccepts({}, { enum: [1, 2] }, 3), false);
+  });
+
+  it('follows canonical compatibility annotations for every emitted whole enum', () => {
+    const project = new Project({ tsConfigFilePath: resolve(root, 'types/tsconfig.json') });
+    const enums = project.getSourceFiles().flatMap(source => source.getEnums());
+    let openStrings = 0;
+    let openNumbers = 0;
+    let closed = 0;
+    for (const file of SCHEMA_FILES) {
+      const schema = loadSchema(file);
+      const defs = schema.$defs as Record<string, Record<string, unknown>>;
+      for (const declaration of enums) {
+        const definition = defs[declaration.getName()];
+        if (!definition) continue;
+        const label = `${file}: ${declaration.getName()}`;
+        const values = declaration.getMembers().map(member => member.getValue());
+        const type = typeof values[0];
+        assert.ok(values.every(value => typeof value === type), label);
+        assert.ok(type === 'string' || type === 'number', label);
+        assert.equal(definition.type, type, label);
+        for (const value of values) {
+          assert.ok(schemaAccepts(schema, definition, value), label);
+        }
+        const unknown = type === 'string' ? '__future_value__' : 1_000_000;
+        assert.ok(!values.includes(unknown), label);
+        if (getEnumCompatibility(declaration) === 'nonexhaustive') {
+          assert.ok(schemaAccepts(schema, definition, unknown), label);
+          assert.equal(Object.hasOwn(definition, 'enum'), false, label);
+          assert.deepEqual(definition.examples, values, label);
+          if (type === 'string') openStrings++;
+          else openNumbers++;
+        } else {
+          assert.equal(schemaAccepts(schema, definition, unknown), false, label);
+          assert.deepEqual(definition.enum, values, label);
+          closed++;
+        }
+        assert.equal(schemaAccepts(schema, definition, type === 'string' ? 42 : '42'), false, label);
+        assert.equal(schemaAccepts(schema, definition, null), false, label);
+      }
+    }
+    assert.ok(openStrings > 0 && openNumbers > 0 && closed > 0);
+  });
+
+  it('keeps exhaustive result encodings and individual open-enum discriminants strict', () => {
+    const commands = loadSchema('commands.schema.json');
+    const commandDefs = commands.$defs as Record<string, Record<string, unknown>>;
+    assert.ok(schemaAccepts(commands, commandDefs.ResourceReadResult, { data: 'hello', encoding: 'utf-8' }));
+    assert.equal(schemaAccepts(commands, commandDefs.ResourceReadResult, { data: 'hello', encoding: 'futureEncoding' }), false);
+    const actions = loadSchema('actions.schema.json');
+    const actionDefs = actions.$defs as Record<string, Record<string, unknown>>;
+    const properties = actionDefs.ChatTurnStartedAction.properties as Record<string, JsonNode>;
+    assert.ok(schemaAccepts(actions, properties.type, 'chat/turnStarted'));
+    assert.equal(schemaAccepts(actions, properties.type, 'chat/futureAction'), false);
   });
 });
 
