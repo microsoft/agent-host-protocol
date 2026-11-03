@@ -1292,6 +1292,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         StateAction::ChatReasoning(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
             if let ResponsePart::Reasoning(r) = p {
                 r.content.push_str(&a.content);
+                if let Some(started_at) = &a.started_at {
+                    r.started_at = Some(started_at.clone());
+                }
+                if let Some(duration) = a.duration {
+                    r.duration = Some(duration);
+                }
             }
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
@@ -1421,6 +1427,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatConfigChanged(a) => {
             let config = state.config.get_or_insert_with(|| ChatConfigState {
+                schema: None,
                 values: Default::default(),
             });
             if a.replace.unwrap_or(false) {
@@ -1429,6 +1436,20 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 for (k, v) in &a.config {
                     config.values.insert(k.clone(), v.clone());
                 }
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatMoved(a) => {
+            state.provider = a.provider.clone();
+            match state.config.as_mut() {
+                Some(config) => config.schema = a.schema.clone(),
+                None if a.schema.is_some() => {
+                    state.config = Some(ChatConfigState {
+                        schema: a.schema.clone(),
+                        values: Default::default(),
+                    });
+                }
+                None => {}
             }
             ReduceOutcome::Applied
         }
@@ -1688,6 +1709,7 @@ fn apply_tool_call_complete(
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
                 structured_content: a.result.structured_content.clone(),
+                result_metadata: a.result.result_metadata.clone(),
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
@@ -1706,6 +1728,7 @@ fn apply_tool_call_complete(
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
                 structured_content: a.result.structured_content.clone(),
+                result_metadata: a.result.result_metadata.clone(),
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
@@ -1736,6 +1759,7 @@ fn apply_tool_call_result_confirmed(
                 past_tense_message: s.past_tense_message,
                 content: s.content,
                 structured_content: s.structured_content,
+                result_metadata: s.result_metadata,
                 error: s.error,
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
@@ -2324,6 +2348,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
             changesets: None,
             canvases: None,
@@ -2485,6 +2510,7 @@ mod tests {
             origin: None,
             movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
         };
         let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {

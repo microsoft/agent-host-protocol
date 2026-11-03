@@ -21,7 +21,7 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue and the chat's [`config`](#per-chat-configuration) overlay. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue and the chat's own [`config`](#per-chat-configuration). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 Clients mark any known chat, including the owning session's default chat, as
 read or unread by dispatching
@@ -49,6 +49,16 @@ Hosts MUST also eagerly load older turns into state before applying any
 operation that references a turn outside the currently loaded window (for
 example, a fork, side-chat source, chat attachment, or truncation targeting an
 older turn).
+
+### Reasoning timing
+
+[`ReasoningResponsePart`](/reference/chat#reasoningresponsepart) may include a producer-recorded `startedAt` timestamp and a final `duration` in non-negative integer milliseconds. Timing is optional: an absent duration means unfinished or unknown, not zero. Clients MUST treat a supplied duration as producer-owned data rather than measuring replay, subtracting their local clock from `startedAt`, or substituting a minimum display value into stored state.
+
+The measured unit is one contiguous run of reasoning output, not an SDK block, assistant message, or UI group. It starts at the first nonempty reasoning text and ends when the next markdown or tool-call part begins, or when the turn terminates. Consecutive reasoning pieces belong to the same part even when the provider changes its internal reasoning ID or completes an SDK message. Sideband notifications and metadata do not end the run.
+
+For example, `tool -> reasoning (5s) -> markdown -> reasoning (12s) -> tool` has two reasoning parts with durations `5000` and `12000`, not one duration of `17000`. Hosts SHOULD preserve the run identities and intervening content when restoring history, even if the provider's transcript stores an aggregated message. Clients that group progress should retain access to each run's duration rather than substituting a group total.
+
+The host can publish timing with the initial `chat/responsePart` or update it through `chat/reasoning`. A timing-only update uses an empty `content`; omitted timing fields preserve their previous values. The host MUST send final timing before the turn's terminal action and SHOULD retain the same timing when restoring history, so subscriptions, reconnects and reloads show consistent values. Unknown historical or interrupted intervals remain untimed unless the producer has an authoritative measurement; time while a host is stopped is not reasoning time.
 
 ### Drafts
 
@@ -78,20 +88,37 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 ### Per-chat configuration
 
-[`ChatState.config`](/reference/chat#chatstate) is an overlay on the owning
-session's [`SessionState.config`](/reference/session#sessionstate). It carries
-only the values set on this chat; the session's config schema applies. A
-chat's effective config is the session's values with the chat's values
-applied over them. Hosts do not mirror session config into chats.
+[`ChatState.config`](/reference/chat#chatstate) holds the chat's own values for
+the [`chatMutable`](/reference/session#sessionconfigpropertyschema) properties
+of its effective schema. For a chat without its own `config.schema`, other
+properties are session-wide and come from the session's config; a chat with its
+own `config.schema` does not use the session's config. The host sets the initial `values` when it creates the chat,
+and when the session has a config, it sets `config` on every chat. A chat's
+`values` change only through `chat/configChanged` on the chat; they do not
+inherit from the session. A key missing
+from `values` takes that property's `default`.
 
-A host opts a property in to per-chat values by setting
-[`chatMutable: true`](/reference/session#sessionconfigpropertyschema) on it in
-the session's config schema. Clients set such properties for one chat by
-dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
-which merges into the chat's overlay or replaces it when `replace` is `true`.
-To reset a property to the session's value, replace the overlay with one that
-omits the property. Every other property is changed on the session with
-`session/configChanged`.
+The effective schema is `config.schema` when present, otherwise the session's
+schema. Hosts set `config.schema`, the chat's own schema for its `chatMutable`
+properties, only for a chat whose `provider` differs from the session's.
+
+Clients change a chat's `chatMutable` properties by dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
+which merges into `values` or replaces them when `replace` is `true`. Hosts
+reject keys that are not `chatMutable` in the effective schema.
+
+### Chat providers
+
+Every chat is backed by one agent. `SessionState.provider` is the session's
+agent, and [`ChatSummary.provider`](/reference/chat#chatsummary) names a chat's
+agent when it differs; absence means the session's agent. A chat's agent never
+changes, but `provider` is relative to its session, so `chat/moved` may set or
+clear it.
+
+Hosts that advertise
+[`multipleChatProviders`](/reference/common#initializeresult) accept a
+`provider` on `createChat`, letting one session mix agents. Forks and side
+chats continue the source chat's history, so they always use the source chat's
+agent.
 
 ## Relationship to the session channel
 
@@ -113,6 +140,8 @@ omits the property. Every other property is changed on the session with
 
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
+- a `title` containing the client-selected initial display title for the target chat,
+- a `provider` selecting the chat's agent (see [Chat providers](#chat-providers)),
 - an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatSource`](/reference/chat#chatsource), either
   `{ kind: "fork", chat, turnId }` or `{ kind: "sideChat", chat, turnId }`,
@@ -233,6 +262,17 @@ Success preserves every moved chat URI, state, and origin, and converges the
 durable session catalogs. The protocol does not require provider equality,
 prohibit active turns universally, or otherwise expose host-specific storage
 and runtime constraints.
+
+A moved chat keeps its agent. After the move the host reports `provider` on the
+chat whenever it differs from the destination session's provider, including
+when the chat had none because it matched its old session. Hosts MAY refuse, as
+an unsupported destination, a move they cannot support.
+
+A moved chat's `config.values` move with it unchanged. If a move changes whether
+the chat needs its own `config.schema`, the host sets or clears it, or refuses
+the move as an unsupported destination. After a cross-session move the host
+dispatches [`chat/moved`](/reference/chat#chatmovedaction) on the chat's channel
+with its new session, `provider` and `config.schema`.
 
 #### Atomic synchronization
 

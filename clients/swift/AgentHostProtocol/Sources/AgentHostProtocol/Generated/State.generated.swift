@@ -1822,6 +1822,15 @@ public struct ChatState: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. Absent means the session's
+    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
+    /// differs. The chat's agent never changes, but `provider` is reported
+    /// relative to its session, so `chat/moved` may set or clear it. Like
+    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+    /// side chats use the source chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
     /// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1858,9 +1867,7 @@ public struct ChatState: Codable, Sendable {
     /// Clients subscribe to each resource for the experimental presentation
     /// state, including its current live source URL.
     public var canvases: [CanvasReference]?
-    /// Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.
+    /// This chat's configuration. See {@link ChatConfigState}.
     public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
@@ -1907,6 +1914,7 @@ public struct ChatState: Codable, Sendable {
         case origin
         case movable
         case interactivity
+        case provider
         case workingDirectories
         case changesets
         case backgroundWork
@@ -1931,6 +1939,7 @@ public struct ChatState: Codable, Sendable {
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
@@ -1953,6 +1962,7 @@ public struct ChatState: Codable, Sendable {
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
         self.changesets = changesets
         self.backgroundWork = backgroundWork
@@ -1996,6 +2006,10 @@ public struct ChatSummary: Codable, Sendable {
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     public var workingDirectories: [String]?
@@ -2010,6 +2024,7 @@ public struct ChatSummary: Codable, Sendable {
         origin: ChatOrigin? = nil,
         movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.resource = resource
@@ -2021,6 +2036,7 @@ public struct ChatSummary: Codable, Sendable {
         self.origin = origin
         self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
     }
 }
@@ -2587,6 +2603,10 @@ public struct SessionChatSummary: Codable, Sendable {
     /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
     /// backward compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// Current chat status, matching {@link ChatSummary.status}.
     ///
     /// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -2608,6 +2628,7 @@ public struct SessionChatSummary: Codable, Sendable {
         title: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         status: SessionStatus? = nil,
         changes: ChangesSummary? = nil
     ) {
@@ -2615,6 +2636,7 @@ public struct SessionChatSummary: Codable, Sendable {
         self.title = title
         self.origin = origin
         self.interactivity = interactivity
+        self.provider = provider
         self.status = status
         self.changes = changes
     }
@@ -2670,12 +2692,23 @@ public struct SessionConfigState: Codable, Sendable {
 }
 
 public struct ChatConfigState: Codable, Sendable {
-    /// Config values set on this chat, keyed by property id
+    /// Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var schema: SessionConfigSchema?
+    /// The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.
     public var values: [String: AnyCodable]
 
     public init(
+        schema: SessionConfigSchema? = nil,
         values: [String: AnyCodable]
     ) {
+        self.schema = schema
         self.values = values
     }
 }
@@ -3615,15 +3648,23 @@ public struct ReasoningResponsePart: Codable, Sendable {
     public var id: String
     /// Accumulated reasoning text
     public var content: String
+    /// Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+    public var startedAt: String?
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+    public var duration: Int?
 
     public init(
         kind: ResponsePartKind,
         id: String,
-        content: String
+        content: String,
+        startedAt: String? = nil,
+        duration: Int? = nil
     ) {
         self.kind = kind
         self.id = id
         self.content = content
+        self.startedAt = startedAt
+        self.duration = duration
     }
 }
 
@@ -3711,6 +3752,10 @@ public struct ToolCallResult: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
 
@@ -3719,12 +3764,14 @@ public struct ToolCallResult: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil
     ) {
         self.success = success
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
     }
 }
@@ -4080,6 +4127,10 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
     /// How the tool was confirmed for execution
@@ -4101,6 +4152,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         case pastTenseMessage
         case content
         case structuredContent
+        case resultMetadata
         case error
         case confirmed
         case selectedOption
@@ -4120,6 +4172,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
@@ -4137,6 +4190,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
@@ -4182,6 +4236,10 @@ public struct ToolCallCompletedState: Codable, Sendable {
     ///
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     public var structuredContent: [String: AnyCodable]?
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    public var resultMetadata: [String: AnyCodable]?
     /// Error details if the tool failed
     public var error: AnyCodable?
     /// How the tool was confirmed for execution
@@ -4203,6 +4261,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         case pastTenseMessage
         case content
         case structuredContent
+        case resultMetadata
         case error
         case confirmed
         case selectedOption
@@ -4222,6 +4281,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
         structuredContent: [String: AnyCodable]? = nil,
+        resultMetadata: [String: AnyCodable]? = nil,
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
@@ -4239,6 +4299,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         self.pastTenseMessage = pastTenseMessage
         self.content = content
         self.structuredContent = structuredContent
+        self.resultMetadata = resultMetadata
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
@@ -6286,8 +6347,8 @@ public struct ChangesetFile: Codable, Sendable {
     /// the server MAY also originate it (e.g. an agent self-reviewing its own
     /// output).
     ///
-    /// There is no content version in the protocol, so review is **not** reset
-    /// automatically when a file's contents change under a stable id. The server,
+    /// Review is **not** reset automatically when a file's contents or nonce
+    /// change under a stable id. The server,
     /// which is the authority on what changed, resets review explicitly — either
     /// by re-emitting the file (via {@link ChangesetFileSetAction} or
     /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -6296,24 +6357,37 @@ public struct ChangesetFile: Codable, Sendable {
     /// Server-defined opaque metadata, surfaced to operations and tooling
     /// but not interpreted by the protocol.
     public var meta: [String: AnyCodable]?
+    /// Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.
+    public var nonce: String?
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    public var isEditing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
         case edit
         case reviewed
         case meta = "_meta"
+        case nonce
+        case isEditing
     }
 
     public init(
         id: String,
         edit: FileEdit,
         reviewed: Bool? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        nonce: String? = nil,
+        isEditing: Bool? = nil
     ) {
         self.id = id
         self.edit = edit
         self.reviewed = reviewed
         self.meta = meta
+        self.nonce = nonce
+        self.isEditing = isEditing
     }
 }
 

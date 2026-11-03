@@ -180,6 +180,27 @@ enum class ResourceWriteMode {
     INSERT
 }
 
+/**
+ * Identifies the consumer of an authentication token.
+ */
+@Serializable(with = AuthenticateTargetKindSerializer::class)
+@JvmInline
+value class AuthenticateTargetKind(val rawValue: String) {
+    companion object {
+        val MCP_SERVER: AuthenticateTargetKind = AuthenticateTargetKind("mcpServer")
+    }
+}
+
+internal object AuthenticateTargetKindSerializer : KSerializer<AuthenticateTargetKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthenticateTargetKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthenticateTargetKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthenticateTargetKind =
+        AuthenticateTargetKind(decoder.decodeString())
+}
+
 // ─── Command Types ──────────────────────────────────────────────────────────
 
 /**
@@ -466,7 +487,15 @@ data class InitializeResult(
      *
      * Stability: 1.0 - Early development.
      */
-    val tcpConnections: TcpConnectionsCapability? = null
+    val tcpConnections: TcpConnectionsCapability? = null,
+    /**
+     * Present when chats in one session may be backed by different agents
+     * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+     * Clients MUST NOT send `CreateChatParams.provider` without it.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val multipleChatProviders: MultipleChatProvidersCapability? = null
 )
 
 @Serializable
@@ -533,6 +562,14 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+/**
+ * Presence capability for {@link InitializeResult.multipleChatProviders}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class MultipleChatProvidersCapability
 
 @Serializable
 data class Implementation(
@@ -900,7 +937,24 @@ data class CreateChatParams(
      * A client MUST NOT supply this field unless the agent advertises
      * {@link AgentCapabilities.multipleWorkingDirectories}.
      */
-    val workingDirectories: List<String>? = null
+    val workingDirectories: List<String>? = null,
+    /**
+     * Client-selected initial display title for the new chat.
+     */
+    val title: String? = null,
+    /**
+     * Agent provider ID for the new chat. Absent means the session's provider.
+     *
+     * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+     * `InvalidParams` a provider that is not in the root state's `agents` or
+     * whose agent does not advertise `multipleChats`. Forks and side chats
+     * (`source` present) continue the source chat's history, so they always use
+     * the source chat's agent: absent means that agent, and a different value is
+     * rejected. Agent capability checks for this request use the chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null
 )
 
 @Serializable
@@ -1442,6 +1496,21 @@ data class DispatchActionParams(
 )
 
 @Serializable
+data class McpServerAuthenticateTarget(
+    val kind: AuthenticateTargetKind,
+    /**
+     * Session URI whose `SessionState.customizations` contains the MCP server.
+     */
+    val session: String,
+    /**
+     * The server's session-unique `McpServerCustomization.id`, echoed from the
+     * customization carrying `McpServerAuthRequiredState` or from
+     * `ToolCallAuthRequiredState.contributor.customizationId`.
+     */
+    val customizationId: String
+)
+
+@Serializable
 data class AuthenticateParams(
     /**
      * Channel URI this command targets.
@@ -1486,7 +1555,24 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Optional consumer of the token. Clients SHOULD include this when answering
+     * a specific MCP server's `McpServerAuthRequiredState` or
+     * `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+     * resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+     *
+     * When present, the host MUST apply the token only to that MCP server in
+     * that session, never to sibling servers, other sessions, or agent-level
+     * resources, even if they share the resource and scopes. `resource` MUST
+     * still equal that server's advertised `McpAuthRequirement.resource.resource`.
+     * The host MUST reject an unknown session or customization, or a
+     * customization that is not an MCP server, with `InvalidParams` (-32602).
+     *
+     * Without a target, resource/scope matching is unchanged; the token may
+     * satisfy every matching pending challenge. Older hosts ignore this field.
+     */
+    val target: AuthenticateTarget? = null
 )
 
 @Serializable
@@ -1648,8 +1734,8 @@ data class SessionConfigPropertySchema(
      */
     val sessionMutable: Boolean? = null,
     /**
-     * When `true`, the property may be set per chat with `chat/configChanged`.
-     * The chat's value overrides the session's value for that chat only.
+     * When `true`, the property may be changed per chat with
+     * `chat/configChanged`, affecting only that chat.
      */
     val chatMutable: Boolean? = null
 )
@@ -2033,6 +2119,59 @@ internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination>
     }
 }
 
+// ─── AuthenticateTarget Union ───────────────────────────────────────────────
+
+@Serializable(with = AuthenticateTargetSerializer::class)
+sealed interface AuthenticateTarget
+
+@JvmInline
+value class AuthenticateTargetMcpServer(val value: McpServerAuthenticateTarget) : AuthenticateTarget
+/**
+ * Forward-compat catch-all for unknown AuthenticateTarget discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AuthenticateTargetUnknown(val raw: JsonObject) : AuthenticateTarget
+
+internal object AuthenticateTargetSerializer : KSerializer<AuthenticateTarget> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AuthenticateTarget")
+
+    override fun deserialize(decoder: Decoder): AuthenticateTarget {
+        val input = decoder as? JsonDecoder
+            ?: error("AuthenticateTarget can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AuthenticateTarget")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AuthenticateTargetUnknown(obj)
+        return when (discriminant) {
+            "mcpServer" -> AuthenticateTargetMcpServer(input.json.decodeFromJsonElement(McpServerAuthenticateTarget.serializer(), element))
+            else -> AuthenticateTargetUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AuthenticateTarget) {
+        val output = encoder as? JsonEncoder
+            ?: error("AuthenticateTarget can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AuthenticateTargetMcpServer -> output.json.encodeToJsonElement(McpServerAuthenticateTarget.serializer(), value.value)
+            is AuthenticateTargetUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AuthenticateTargetMcpServer -> "mcpServer"
+            is AuthenticateTargetUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
 // ─── ReconnectResult Union ──────────────────────────────────────────────────
 
 @Serializable(with = ReconnectResultSerializer::class)
@@ -2090,6 +2229,7 @@ data class ChangesetOperationResourceTarget(
     val side: String? = null,
     /** Discriminator. Always "resource". */
     val kind: String = "resource",
+    val nonce: String? = null,
 )
 
 @Serializable
@@ -2099,6 +2239,7 @@ data class ChangesetOperationRangeTarget(
     val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
+    val nonce: String? = null,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {

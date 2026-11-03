@@ -1112,6 +1112,8 @@ public static class Reducers
                     if (p.Value is ReasoningResponsePart r)
                     {
                         r.Content += a.Content;
+                        r.StartedAt = a.StartedAt ?? r.StartedAt;
+                        r.Duration = a.Duration ?? r.Duration;
                     }
                 });
             case ChatTruncatedAction a:
@@ -1143,6 +1145,17 @@ public static class Reducers
                 Dictionary<string, JsonElement> chatValues = MergeConfig(state.Config?.Values, a.Config, a.Replace);
                 state.Config ??= new ChatConfigState { Values = chatValues };
                 state.Config.Values = chatValues;
+                return ReduceOutcome.Applied;
+            case ChatMovedAction a:
+                state.Provider = a.Provider;
+                if (state.Config is not null)
+                {
+                    state.Config.Schema = a.Schema;
+                }
+                else if (a.Schema is not null)
+                {
+                    state.Config = new ChatConfigState { Schema = a.Schema, Values = new Dictionary<string, JsonElement>() };
+                }
                 return ReduceOutcome.Applied;
         }
 
@@ -1458,6 +1471,7 @@ public static class Reducers
                     PastTenseMessage = a.Result.PastTenseMessage,
                     Content = CopyList(a.Result.Content)!,
                     StructuredContent = a.Result.StructuredContent,
+                    ResultMetadata = a.Result.ResultMetadata,
                     Error = a.Result.Error,
                     Confirmed = confirmed,
                     SelectedOption = selectedOption,
@@ -1479,6 +1493,7 @@ public static class Reducers
                 PastTenseMessage = a.Result.PastTenseMessage,
                 Content = CopyList(a.Result.Content) ?? CopyList(preAuthContent),
                 StructuredContent = a.Result.StructuredContent,
+                ResultMetadata = a.Result.ResultMetadata,
                 Error = a.Result.Error,
                 Confirmed = confirmed,
                 SelectedOption = selectedOption,
@@ -1590,6 +1605,7 @@ public static class Reducers
                     PastTenseMessage = s.PastTenseMessage,
                     Content = s.Content,
                     StructuredContent = s.StructuredContent,
+                    ResultMetadata = s.ResultMetadata,
                     Error = s.Error,
                     Confirmed = s.Confirmed,
                     SelectedOption = s.SelectedOption,

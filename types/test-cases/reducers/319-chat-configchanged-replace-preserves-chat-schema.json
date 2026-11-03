@@ -1,0 +1,57 @@
+{
+  "description": "chat/configChanged with replace replaces the chat's config values and preserves its config schema",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Other agent",
+    "status": 1,
+    "modifiedAt": "2026-10-19T12:00:00.000Z",
+    "provider": "other-agent",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      },
+      "values": {
+        "autoApprove": true
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/configChanged",
+      "config": {},
+      "replace": true
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Other agent",
+    "status": 1,
+    "modifiedAt": "2026-10-19T12:00:00.000Z",
+    "provider": "other-agent",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      },
+      "values": {}
+    }
+  }
+}

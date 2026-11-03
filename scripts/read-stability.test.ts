@@ -113,7 +113,7 @@ test('native client docs preserve declaration and entrypoint stability', () => {
     ['clients/dotnet/src/AgentHostProtocol.Abstractions/Generated', 'Commands.generated.cs', 'Notifications.generated.cs'],
   ];
   for (const [directory, commands, notifications] of clients) {
-    for (const [file, expected] of [[commands, 11], [notifications, 6]] as const) {
+    for (const [file, expected] of [[commands, 14], [notifications, 6]] as const) {
       const content = readFileSync(resolve(root, directory, file), 'utf8');
       assert.equal(content.split(marker).length - 1, expected, `${directory}/${file}`);
     }

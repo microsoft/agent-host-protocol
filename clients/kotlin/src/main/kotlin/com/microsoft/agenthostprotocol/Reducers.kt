@@ -1296,6 +1296,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.PENDING_RESULT_CONFIRMATION,
                             confirmed = confirmed,
@@ -1317,6 +1318,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.COMPLETED,
                             confirmed = confirmed,
@@ -1349,6 +1351,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 pastTenseMessage = tc.value.pastTenseMessage,
                                 content = tc.value.content,
                                 structuredContent = tc.value.structuredContent,
+                                resultMetadata = tc.value.resultMetadata,
                                 error = tc.value.error,
                                 status = ToolCallStatus.COMPLETED,
                                 confirmed = tc.value.confirmed,
@@ -1465,7 +1468,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartReasoning) {
-                ResponsePartReasoning(part.value.copy(content = part.value.content + a.content))
+                ResponsePartReasoning(part.value.copy(
+                    content = part.value.content + a.content,
+                    startedAt = a.startedAt ?: part.value.startedAt,
+                    duration = a.duration ?: part.value.duration,
+                ))
             } else {
                 part
             }
@@ -1634,7 +1641,20 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         val current = state.config
         val newValues = if (a.replace == true || current == null) a.config else current.values + a.config
-        state.copy(config = ChatConfigState(values = newValues))
+        state.copy(config = current?.copy(values = newValues) ?: ChatConfigState(values = newValues))
+    }
+
+    is StateActionChatMoved -> {
+        val a = action.value
+        val current = state.config
+        state.copy(
+            provider = a.provider,
+            config = when {
+                current != null -> current.copy(schema = a.schema)
+                a.schema != null -> ChatConfigState(schema = a.schema, values = emptyMap())
+                else -> null
+            },
+        )
     }
 
     else -> state

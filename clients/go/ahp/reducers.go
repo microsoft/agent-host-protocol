@@ -717,6 +717,12 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if r, ok := p.Value.(*ahptypes.ReasoningResponsePart); ok {
 				r.Content += a.Content
+				if a.StartedAt != nil {
+					r.StartedAt = a.StartedAt
+				}
+				if a.Duration != nil {
+					r.Duration = a.Duration
+				}
 			}
 		})
 	case *ahptypes.ChatTruncatedAction:
@@ -856,6 +862,14 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		}
 		for k, v := range a.Config {
 			state.Config.Values[k] = v
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatMovedAction:
+		state.Provider = a.Provider
+		if state.Config != nil {
+			state.Config.Schema = a.Schema
+		} else if a.Schema != nil {
+			state.Config = &ahptypes.ChatConfigState{Schema: a.Schema, Values: map[string]json.RawMessage{}}
 		}
 		return ReduceOutcomeApplied
 	}
@@ -1465,6 +1479,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				PastTenseMessage:  a.Result.PastTenseMessage,
 				Content:           append([]ahptypes.ToolResultContent(nil), content...),
 				StructuredContent: a.Result.StructuredContent,
+				ResultMetadata:    a.Result.ResultMetadata,
 				Error:             a.Result.Error,
 				Confirmed:         confirmed,
 				SelectedOption:    selectedOption,
@@ -1484,6 +1499,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			PastTenseMessage:  a.Result.PastTenseMessage,
 			Content:           append([]ahptypes.ToolResultContent(nil), content...),
 			StructuredContent: a.Result.StructuredContent,
+			ResultMetadata:    a.Result.ResultMetadata,
 			Error:             a.Result.Error,
 			Confirmed:         confirmed,
 			SelectedOption:    selectedOption,
@@ -1516,6 +1532,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				PastTenseMessage:  s.PastTenseMessage,
 				Content:           s.Content,
 				StructuredContent: s.StructuredContent,
+				ResultMetadata:    s.ResultMetadata,
 				Error:             s.Error,
 				Confirmed:         s.Confirmed,
 				SelectedOption:    s.SelectedOption,

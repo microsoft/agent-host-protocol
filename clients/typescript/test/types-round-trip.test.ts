@@ -65,7 +65,7 @@ import type {
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
-import type { ChatSource } from '../src/types/channels-chat/commands.js';
+import type { ChatSource, CreateChatParams } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
 
@@ -248,6 +248,7 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'PartialSessionSummary': void (parsed as Partial<SessionSummary>); break;
     case 'Implementation':     void (parsed as Implementation); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
+    case 'CreateChatParams':    void (parsed as CreateChatParams); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;
     case 'SubscribeParams':     void (parsed as SubscribeParams); break;

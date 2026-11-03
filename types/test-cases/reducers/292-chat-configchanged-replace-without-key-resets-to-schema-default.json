@@ -1,5 +1,5 @@
 {
-  "description": "chat/configChanged with replace and the overlay minus a key resets that key to the session's value",
+  "description": "chat/configChanged with replace and the values minus a key drops that key, which then takes its schema default",
   "reducer": "chat",
   "initial": {
     "turns": [],

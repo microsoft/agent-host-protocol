@@ -97,6 +97,13 @@ const (
 	ResourceWriteModeInsert   ResourceWriteMode = "insert"
 )
 
+// Identifies the consumer of an authentication token.
+type AuthenticateTargetKind string
+
+const (
+	AuthenticateTargetKindMcpServer AuthenticateTargetKind = "mcpServer"
+)
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 // Opens a TCP connection from the host to a destination on the host's network.
@@ -224,6 +231,12 @@ type InitializeResult struct {
 	//
 	// Stability: 1.0 - Early development.
 	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
+	// Present when chats in one session may be backed by different agents
+	// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+	// Clients MUST NOT send `CreateChatParams.provider` without it.
+	//
+	// Stability: 1.0 - Early development.
+	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -305,6 +318,12 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Presence capability for {@link InitializeResult.multipleChatProviders}.
+//
+// Stability: 1.0 - Early development.
+type MultipleChatProvidersCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -643,6 +662,19 @@ type CreateChatParams struct {
 	// A client MUST NOT supply this field unless the agent advertises
 	// {@link AgentCapabilities.multipleWorkingDirectories}.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Client-selected initial display title for the new chat.
+	Title *string `json:"title,omitempty"`
+	// Agent provider ID for the new chat. Absent means the session's provider.
+	//
+	// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+	// `InvalidParams` a provider that is not in the root state's `agents` or
+	// whose agent does not advertise `multipleChats`. Forks and side chats
+	// (`source` present) continue the source chat's history, so they always use
+	// the source chat's agent: absent means that agent, and a different value is
+	// rejected. Agent capability checks for this request use the chat's agent.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 }
 
 // Disposes a chat and cleans up server-side resources.
@@ -697,6 +729,19 @@ type ChatMoveToNewSessionDestination struct {
 // optional anchor MUST resolve; and the source MUST NOT anchor itself.
 // Rejection leaves ownership, catalog order, chat state, and root summaries
 // unchanged.
+//
+// A moved chat keeps its agent. After the move the host reports
+// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+// the destination session's provider, including when the chat had none
+// because it matched its old session. Hosts MAY refuse, as an unsupported
+// destination, a move they cannot support, such as one that changes whether
+// the chat's agent matches its session's.
+//
+// A moved chat's `config.values` move with it unchanged. If a move changes
+// whether the chat needs its own `config.schema`, the host sets or clears it,
+// or refuses the move as an unsupported destination. After a cross-session
+// move the host dispatches `chat/moved` on the chat's channel with its new
+// session, `provider` and `config.schema`.
 //
 // On success every moved chat keeps its URI, state, and immutable
 // `ChatOrigin`. The host commits ownership and catalog order before publishing
@@ -1180,6 +1225,17 @@ type DispatchActionParams struct {
 	Action StateAction `json:"action"`
 }
 
+// An MCP server identified by host-published session and customization state.
+type McpServerAuthenticateTarget struct {
+	Kind AuthenticateTargetKind `json:"kind"`
+	// Session URI whose `SessionState.customizations` contains the MCP server.
+	Session URI `json:"session"`
+	// The server's session-unique `McpServerCustomization.id`, echoed from the
+	// customization carrying `McpServerAuthRequiredState` or from
+	// `ToolCallAuthRequiredState.contributor.customizationId`.
+	CustomizationId string `json:"customizationId"`
+}
+
 // Pushes a Bearer token for a protected resource. The `resource` field MUST
 // match a protected-resource identifier the client has discovered from the
 // server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1225,6 +1281,21 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Optional consumer of the token. Clients SHOULD include this when answering
+	// a specific MCP server's `McpServerAuthRequiredState` or
+	// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+	// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+	//
+	// When present, the host MUST apply the token only to that MCP server in
+	// that session, never to sibling servers, other sessions, or agent-level
+	// resources, even if they share the resource and scopes. `resource` MUST
+	// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+	// The host MUST reject an unknown session or customization, or a
+	// customization that is not an MCP server, with `InvalidParams` (-32602).
+	//
+	// Without a target, resource/scope matching is unchanged; the token may
+	// satisfy every matching pending challenge. Older hosts ignore this field.
+	Target *AuthenticateTarget `json:"target,omitempty"`
 }
 
 // Result of the `authenticate` command.
@@ -1759,6 +1830,76 @@ func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+// AuthenticateTarget identifies the consumer of an authentication token.
+type AuthenticateTarget struct {
+	Value isAuthenticateTarget
+}
+
+// isAuthenticateTarget is the marker interface implemented by every
+// concrete variant of AuthenticateTarget.
+type isAuthenticateTarget interface{ isAuthenticateTarget() }
+
+func (*McpServerAuthenticateTarget) isAuthenticateTarget() {}
+
+// AuthenticateTargetUnknown carries an unrecognized AuthenticateTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AuthenticateTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AuthenticateTargetUnknown) isAuthenticateTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AuthenticateTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "mcpServer":
+		var value McpServerAuthenticateTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AuthenticateTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AuthenticateTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AuthenticateTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *McpServerAuthenticateTarget:
+		object["kind"] = json.RawMessage("\"mcpServer\"")
+	}
+	return json.Marshal(object)
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 // ReconnectResult is the result of the `reconnect` command.
@@ -1842,6 +1983,7 @@ type ChangesetOperationResourceTarget struct {
 	Kind     string  `json:"kind"`
 	Resource URI     `json:"resource"`
 	Side     *string `json:"side,omitempty"`
+	Nonce    *string `json:"nonce,omitempty"`
 }
 
 func (*ChangesetOperationResourceTarget) isChangesetOperationTarget() {}
@@ -1852,6 +1994,7 @@ type ChangesetOperationRangeTarget struct {
 	Resource URI       `json:"resource"`
 	Side     *string   `json:"side,omitempty"`
 	Range    TextRange `json:"range"`
+	Nonce    *string   `json:"nonce,omitempty"`
 }
 
 func (*ChangesetOperationRangeTarget) isChangesetOperationTarget() {}

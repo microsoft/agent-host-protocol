@@ -127,6 +127,9 @@ internal static class GeneratedActionMetadata
             case ChatMovableChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatMovedAction value:
+                actionType = value.Type;
+                return true;
             case ChatPendingMessageRemovedAction value:
                 actionType = value.Type;
                 return true;

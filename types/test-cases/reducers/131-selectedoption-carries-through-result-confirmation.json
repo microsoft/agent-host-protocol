@@ -102,6 +102,7 @@
             "pastTenseMessage": "Ran echo hello",
             "content": null,
             "structuredContent": null,
+            "resultMetadata": null,
             "error": null
           }
         }

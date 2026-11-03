@@ -33,6 +33,22 @@ When the client receives an `ActionEnvelope` from the server:
 
 ## Example
 
+The [homepage](/) walks through this flow in a short, scripted demo that runs
+entirely in your browser: the "host" and every client mirror run through the
+canonical reducers, the agent and terminal output are scripted, and no network
+requests are made. An optimistic message renders faded until the host
+acknowledges it. The phone then approves a tool call and loses its connection
+while the host keeps going. When it reconnects, it sends one `reconnect`
+request with `lastSeenServerSeq` and its subscriptions, and the missed
+envelopes arrive in order inside the **response**. The client drops its pending
+queue and applies them to its confirmed state to converge. An opt-in detail
+shows the snapshot fallback for a gap too old to replay. The demo then shows
+automations, terminals and capability negotiation as examples of extending AHP
+with more channels. With reduced motion enabled, the steps are identical, but
+devices swap in place without sliding or zooming. The navigation's theme switch
+applies to the demo, device screens and the rest of the documentation; your
+light or dark preference persists between pages.
+
 ```
 Time  Server                          Client A                        Client B
 ─────────────────────────────────────────────────────────────────────────────────

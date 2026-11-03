@@ -129,6 +129,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
 
+    public static readonly ActionType ChatMoved = new ActionType("chat/moved");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -1180,7 +1182,7 @@ public sealed record SessionChatUpdatedAction
 
     /// <summary>Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.</summary>
     public required PartialChatSummary Changes { get; init; }
 }
@@ -1916,7 +1918,8 @@ public sealed record ChatUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.
 ///
 /// The server MUST first emit a `chat/responsePart` to create the target
-/// reasoning part, then use this action to append text to it.</summary>
+/// reasoning part, then use this action to append text or record its timing.
+/// An empty `content` updates only the supplied timing fields.</summary>
 public sealed record ChatReasoningAction
 {
     public ActionType Type { get; init; } = ActionType.ChatReasoning;
@@ -1929,6 +1932,14 @@ public sealed record ChatReasoningAction
 
     /// <summary>Reasoning text chunk</summary>
     public required string Content { get; init; }
+
+    /// <summary>Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
     ///
@@ -2092,10 +2103,10 @@ public sealed record ChatIsArchivedChangedAction
 /// <summary>Config values set on a chat changed.
 ///
 /// Merges `config` into the chat's
-/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-/// in the session's config schema may be set. To reset a property to the
-/// session's value, replace the overlay with one that omits the property.</summary>
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.</summary>
 public sealed record ChatConfigChangedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
@@ -2106,6 +2117,31 @@ public sealed record ChatConfigChangedAction
     /// <summary>When `true`, replaces the chat's config values instead of merging</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Replace { get; init; }
+}
+
+/// <summary>The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | `provider`} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.</summary>
+public sealed record ChatMovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatMoved;
+
+    /// <summary>The new owning session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The chat's provider in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
+    /// <summary>The chat's config schema in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; init; }
 }
 
 /// <summary>A session requested input from the user.
@@ -2203,8 +2239,9 @@ public sealed record ChangesetFileRemovedAction
 /// Targets files by their {@link ChangesetFile.id}. Ids in {@link files} that
 /// do not match a file currently present in the changeset are ignored; if none
 /// match, the action is a no-op. Only the {@link ChangesetFile.reviewed} field
-/// of each matched file is affected; the files' {@link ChangesetFile.edit | edit}
-/// and {@link ChangesetFile._meta | _meta} are left untouched.
+/// of each matched file is affected; the files' {@link ChangesetFile.edit | edit},
+/// {@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}
+/// are left untouched.
 ///
 /// Only meaningful on a changeset that advertises
 /// {@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action
@@ -2213,8 +2250,8 @@ public sealed record ChangesetFileRemovedAction
 /// server echo it back on the normal `action` envelope stream. The server MAY
 /// also originate it (e.g. an agent marking its own output reviewed).
 ///
-/// There is no protocol-level content version, so review is not reset
-/// automatically when a file's contents change under a stable id. The server,
+/// Review is not reset automatically when a file's contents or nonce change
+/// under a stable id. The server,
 /// which is the authority on what changed, resets review explicitly — either by
 /// re-emitting the file without `reviewed: true`, or by dispatching this action
 /// with `reviewed: false`.</summary>
@@ -2781,6 +2818,12 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
 
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2896,6 +2939,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
         ["chat/configChanged"] = typeof(ChatConfigChangedAction),
+        ["chat/moved"] = typeof(ChatMovedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

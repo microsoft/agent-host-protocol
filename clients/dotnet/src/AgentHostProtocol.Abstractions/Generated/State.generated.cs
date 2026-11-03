@@ -2365,6 +2365,12 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; set; }
 
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; set; }
+
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2492,6 +2498,17 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; set; }
 
+    /// <summary>Agent provider ID backing this chat. Absent means the session's
+    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
+    /// differs. The chat's agent never changes, but `provider` is reported
+    /// relative to its session, so `chat/moved` may set or clear it. Like
+    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+    /// side chats use the source chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; set; }
+
     /// <summary>The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
     /// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -2536,9 +2553,7 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
-    /// <summary>Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.</summary>
+    /// <summary>This chat's configuration. See {@link ChatConfigState}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
@@ -3343,6 +3358,12 @@ public sealed record SessionChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
 
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
     /// <summary>Current chat status, matching {@link ChatSummary.status}.
     ///
     /// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -3464,8 +3485,8 @@ public sealed record SessionConfigPropertySchema
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SessionMutable { get; init; }
 
-    /// <summary>When `true`, the property may be set per chat with `chat/configChanged`.
-    /// The chat's value overrides the session's value for that chat only.</summary>
+    /// <summary>When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? ChatMutable { get; init; }
 }
@@ -3497,16 +3518,30 @@ public sealed class SessionConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>Configuration values set on a chat: an overlay on the owning session's
-/// {@link SessionState.config | `SessionState.config`}.
+/// <summary>A chat's configuration. `values` holds the chat's `chatMutable` properties
+/// of the effective schema. For a chat without its own `schema`, other
+/// properties are session-wide and come from the session's config; a chat with
+/// its own `schema` does not use the session's config. It does not inherit
+/// from the session: a chat's `values` change only through
+/// `chat/configChanged` on the chat.
 ///
-/// It carries only the chat's own values; the session's config schema
-/// applies. The effective config of a chat is the session's values with
-/// these values applied over them. Only properties with `chatMutable: true`
-/// in the session's config schema can be set on a chat.</summary>
+/// Only `chatMutable` properties can be changed with `chat/configChanged`;
+/// hosts reject other keys. Hosts set the initial `values` when they create
+/// the chat. When the session has a config, hosts set `config` on every chat.</summary>
 public sealed class ChatConfigState
 {
-    /// <summary>Config values set on this chat, keyed by property id</summary>
+    /// <summary>Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; set; }
+
+    /// <summary>The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
@@ -4032,6 +4067,14 @@ public sealed class ReasoningResponsePart
 
     /// <summary>Accumulated reasoning text</summary>
     public required string Content { get; set; }
+
+    /// <summary>Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
 }
 
 /// <summary>A system notification surfaced as part of the response stream.
@@ -4127,6 +4170,12 @@ public sealed record ToolCallResult
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
+
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
 
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4485,6 +4534,12 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
 
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
+
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Error { get; init; }
@@ -4557,6 +4612,12 @@ public sealed record ToolCallCompletedState
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
+
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
 
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -6214,8 +6275,8 @@ public sealed record ChangesetFile
     /// the server MAY also originate it (e.g. an agent self-reviewing its own
     /// output).
     ///
-    /// There is no content version in the protocol, so review is **not** reset
-    /// automatically when a file's contents change under a stable id. The server,
+    /// Review is **not** reset automatically when a file's contents or nonce
+    /// change under a stable id. The server,
     /// which is the authority on what changed, resets review explicitly — either
     /// by re-emitting the file (via {@link ChangesetFileSetAction} or
     /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -6228,6 +6289,17 @@ public sealed record ChangesetFile
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
+
+    /// <summary>Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsEditing { get; init; }
 }
 
 /// <summary>A server-declared invokable verb the client can run against a

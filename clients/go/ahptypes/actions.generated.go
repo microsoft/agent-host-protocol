@@ -71,6 +71,7 @@ const (
 	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
 	ActionTypeChatIsArchivedChanged               ActionType = "chat/isArchivedChanged"
 	ActionTypeChatConfigChanged                   ActionType = "chat/configChanged"
+	ActionTypeChatMoved                           ActionType = "chat/moved"
 	ActionTypeChatInputRequested                  ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged              ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                  ActionType = "chat/inputCompleted"
@@ -224,7 +225,7 @@ type SessionChatUpdatedAction struct {
 	Chat URI `json:"chat"`
 	// Mutable summary fields that changed; omitted fields are unchanged.
 	//
-	// Identity fields (`resource`) never change and MUST be omitted by
+	// Identity fields (`resource`, `provider`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
 }
@@ -761,7 +762,8 @@ type ChatUsageAction struct {
 // Reasoning/thinking text from the model, appended to a specific reasoning response part.
 //
 // The server MUST first emit a `chat/responsePart` to create the target
-// reasoning part, then use this action to append text to it.
+// reasoning part, then use this action to append text or record its timing.
+// An empty `content` updates only the supplied timing fields.
 type ChatReasoningAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
@@ -770,6 +772,10 @@ type ChatReasoningAction struct {
 	PartId string `json:"partId"`
 	// Reasoning text chunk
 	Content string `json:"content"`
+	// Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+	StartedAt *string `json:"startedAt,omitempty"`
+	// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+	Duration *int64 `json:"duration,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -877,16 +883,35 @@ type ChatIsArchivedChangedAction struct {
 // Config values set on a chat changed.
 //
 // Merges `config` into the chat's
-// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-// in the session's config schema may be set. To reset a property to the
-// session's value, replace the overlay with one that omits the property.
+// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+// `replace` is `true`; keys missing after a replace take their property's
+// `default`. Only properties with `chatMutable: true` in
+// the effective schema may be set.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Config values to set on the chat
 	Config map[string]json.RawMessage `json:"config"`
 	// When `true`, replaces the chat's config values instead of merging
 	Replace *bool `json:"replace,omitempty"`
+}
+
+// The chat moved to another session.
+//
+// Dispatched by the host on the moved chat's channel after a cross-session
+// `moveChat`. `provider` and `schema` are the chat's
+// {@link ChatState.provider | `provider`} and
+// {@link ChatConfigState.schema | `config.schema`} relative to the new
+// session; absent clears them. `ChatState` has no session field, so the
+// reducer does not store `session`; it tells subscribers which session now
+// owns the chat.
+type ChatMovedAction struct {
+	Type ActionType `json:"type"`
+	// The new owning session URI.
+	Session URI `json:"session"`
+	// The chat's provider in the new session; absent clears it.
+	Provider *string `json:"provider,omitempty"`
+	// The chat's config schema in the new session; absent clears it.
+	Schema *SessionConfigSchema `json:"schema,omitempty"`
 }
 
 // A session requested input from the user.
@@ -1377,8 +1402,9 @@ type ChangesetFileRemovedAction struct {
 // Targets files by their {@link ChangesetFile.id}. Ids in {@link files} that
 // do not match a file currently present in the changeset are ignored; if none
 // match, the action is a no-op. Only the {@link ChangesetFile.reviewed} field
-// of each matched file is affected; the files' {@link ChangesetFile.edit | edit}
-// and {@link ChangesetFile._meta | _meta} are left untouched.
+// of each matched file is affected; the files' {@link ChangesetFile.edit | edit},
+// {@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}
+// are left untouched.
 //
 // Only meaningful on a changeset that advertises
 // {@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action
@@ -1387,8 +1413,8 @@ type ChangesetFileRemovedAction struct {
 // server echo it back on the normal `action` envelope stream. The server MAY
 // also originate it (e.g. an agent marking its own output reviewed).
 //
-// There is no protocol-level content version, so review is not reset
-// automatically when a file's contents change under a stable id. The server,
+// Review is not reset automatically when a file's contents or nonce change
+// under a stable id. The server,
 // which is the authority on what changed, resets review explicitly — either by
 // re-emitting the file without `reviewed: true`, or by dispatching this action
 // with `reviewed: false`.
@@ -1871,6 +1897,7 @@ func (*ChatDraftChangedAction) isStateAction()                    {}
 func (*ChatIsReadChangedAction) isStateAction()                   {}
 func (*ChatIsArchivedChangedAction) isStateAction()               {}
 func (*ChatConfigChangedAction) isStateAction()                   {}
+func (*ChatMovedAction) isStateAction()                           {}
 func (*ChatInputRequestedAction) isStateAction()                  {}
 func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
@@ -2204,6 +2231,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/configChanged":
 		var value ChatConfigChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/moved":
+		var value ChatMovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

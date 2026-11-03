@@ -1812,6 +1812,17 @@ data class ChatState(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. Absent means the session's
+     * {@link SessionMetadata.provider | `provider`}; hosts set it when it
+     * differs. The chat's agent never changes, but `provider` is reported
+     * relative to its session, so `chat/moved` may set or clear it. Like
+     * `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+     * side chats use the source chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * The subset of the session's
      * {@link SessionState.workingDirectories | `workingDirectories`} that this
      * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1856,9 +1867,7 @@ data class ChatState(
      */
     val canvases: List<CanvasReference>? = null,
     /**
-     * Configuration values set on this chat, applied over the owning session's
-     * {@link SessionState.config | `SessionState.config`}. See
-     * {@link ChatConfigState}.
+     * This chat's configuration. See {@link ChatConfigState}.
      */
     val config: ChatConfigState? = null,
     /**
@@ -1959,6 +1968,12 @@ data class ChatSummary(
      * compatibility.
      */
     val interactivity: ChatInteractivity? = null,
+    /**
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
     /**
      * The subset of the session's working directories this chat uses.
      * See {@link ChatState.workingDirectories} for the full semantics.
@@ -2485,6 +2500,12 @@ data class SessionChatSummary(
      */
     val interactivity: ChatInteractivity? = null,
     /**
+     * Agent provider ID backing this chat. See {@link ChatState.provider}.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null,
+    /**
      * Current chat status, matching {@link ChatSummary.status}.
      *
      * Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
@@ -2548,7 +2569,18 @@ data class SessionConfigState(
 @Serializable
 data class ChatConfigState(
     /**
-     * Config values set on this chat, keyed by property id
+     * Config schema for this chat's `chatMutable` properties. Absent means the
+     * session's schema. Hosts set it, as the chat's own schema, when the chat's
+     * {@link ChatState.provider | `provider`} differs from the session's; when
+     * present, clients use it instead of the session's schema.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val schema: SessionConfigSchema? = null,
+    /**
+     * The chat's values for the `chatMutable` properties of the effective
+     * schema, keyed by property id. A missing key takes that property's
+     * `default`.
      */
     val values: Map<String, JsonElement>
 )
@@ -3318,7 +3350,15 @@ data class ReasoningResponsePart(
     /**
      * Accumulated reasoning text
      */
-    val content: String
+    val content: String,
+    /**
+     * Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+     */
+    val startedAt: String? = null,
+    /**
+     * Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+     */
+    val duration: Long? = null
 )
 
 @Serializable
@@ -3400,6 +3440,12 @@ data class ToolCallResult(
      * This mirrors the `structuredContent` field of MCP `CallToolResult`.
      */
     val structuredContent: Map<String, JsonElement>? = null,
+    /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
     /**
      * Error details if the tool failed
      */
@@ -3708,6 +3754,12 @@ data class ToolCallPendingResultConfirmationState(
      */
     val structuredContent: Map<String, JsonElement>? = null,
     /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
+    /**
      * Error details if the tool failed
      */
     val error: JsonElement? = null,
@@ -3786,6 +3838,12 @@ data class ToolCallCompletedState(
      * This mirrors the `structuredContent` field of MCP `CallToolResult`.
      */
     val structuredContent: Map<String, JsonElement>? = null,
+    /**
+     * Optional result metadata.
+     *
+     * This mirrors the `_meta` field of MCP `CallToolResult`.
+     */
+    val resultMetadata: Map<String, JsonElement>? = null,
     /**
      * Error details if the tool failed
      */
@@ -5398,8 +5456,8 @@ data class ChangesetFile(
      * the server MAY also originate it (e.g. an agent self-reviewing its own
      * output).
      *
-     * There is no content version in the protocol, so review is **not** reset
-     * automatically when a file's contents change under a stable id. The server,
+     * Review is **not** reset automatically when a file's contents or nonce
+     * change under a stable id. The server,
      * which is the authority on what changed, resets review explicitly — either
      * by re-emitting the file (via {@link ChangesetFileSetAction} or
      * {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -5411,7 +5469,18 @@ data class ChangesetFile(
      * but not interpreted by the protocol.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Optional host-issued token for this reviewable change, which clients MAY
+     * echo in {@link ChangesetOperationTarget.nonce}.
+     * Hosts SHOULD update a published nonce whenever contents of the file change.
+     */
+    val nonce: String? = null,
+    /**
+     * Whether the host reports an ongoing edit to this file.
+     * This is advisory; false or absent does not guarantee that modifying the file is safe.
+     */
+    val isEditing: Boolean? = null
 )
 
 @Serializable

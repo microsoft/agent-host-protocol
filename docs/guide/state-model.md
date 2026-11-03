@@ -192,9 +192,10 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
+  provider?: string        // chat's agent; absent = session's provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
-  config?: ChatConfigState        // config values set on this chat (overlay)
+  config?: ChatConfigState        // chat's chatMutable values (+ optional schema)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -212,12 +213,14 @@ changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
 
-`config` is an overlay on `SessionState.config`: it carries only the values set
-on this chat, and the session's config schema applies. A chat's effective
-config is the session's values with the chat's values applied over them. Only
-properties marked `chatMutable: true` in the session's schema can be set per
-chat, with `chat/configChanged`. See
+`config.values` holds the chat's own values for its `chatMutable` settings;
+`config.schema` is present only when the chat's agent differs from the
+session's. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
+
+`provider` names the chat's agent when it differs from the session's. Hosts
+advertising `multipleChatProviders` let one session mix agents. See
+[Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

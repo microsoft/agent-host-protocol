@@ -19,15 +19,21 @@ The Agent Host Protocol (AHP) defines how a portable, standalone sessions server
 | **Swift** | [SwiftPM: `microsoft/agent-host-protocol`](https://github.com/microsoft/agent-host-protocol) | [![Tag](https://img.shields.io/github/v/tag/microsoft/agent-host-protocol?filter=v*&label=SwiftPM&logo=swift)](https://github.com/microsoft/agent-host-protocol/tags) | [package README](clients/swift/AgentHostProtocol/README.md) · [CHANGELOG](clients/swift/CHANGELOG.md) |
 | **.NET** | [`Microsoft.VisualStudioCode.AgentHostProtocol`](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol) · [`Microsoft.VisualStudioCode.AgentHostProtocol.Abstractions`](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol.Abstractions) | [![NuGet](https://img.shields.io/nuget/v/Microsoft.VisualStudioCode.AgentHostProtocol.svg?logo=nuget)](https://www.nuget.org/packages/Microsoft.VisualStudioCode.AgentHostProtocol) | [`clients/dotnet/`](clients/dotnet/) · [CHANGELOG](clients/dotnet/CHANGELOG.md) |
 
-Other clients: [**AHPX**](https://github.com/TylerLeonhardt/ahpx) (CLI + Node.js client), [**VS Code**](https://github.com/microsoft/vscode) (built-in Agent Sessions client), [**ahpc**](https://github.com/softov/ahpc) (terminal client) and [**WeChat AHP**](https://github.com/formulahendry/vscode-wechat-ahp) (VS Code extension connecting WeChat to an existing local Agent Host chat).
-
 The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two or more hosts at once (single-host consumers use the same API via `MultiHostClient::single` / `.single(...)` / `hosts.Single(...)` / `MultiHostClient.SingleAsync(...)`). See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host).
+
+## Clients
+
+- **[VS Code](https://github.com/microsoft/vscode)** — The built-in Agent Sessions client.
+- **[AHPX](https://github.com/TylerLeonhardt/ahpx)** — A CLI and Node.js client.
+- **[ahpc](https://github.com/softov/ahpc)** — A terminal client: CLI, interactive TUI, and an MCP server for agents and humans.
+- **[WeChat AHP](https://github.com/formulahendry/vscode-wechat-ahp)** — A VS Code extension that connects WeChat to an existing local Agent Host chat.
+- **[ahpw](https://github.com/softov/ahpw)** — A web client for any AHP server, run as an ahpd plugin or on its own.
 
 ## Servers
 
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation ([`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node)).
 - **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
-- **[ahpd](https://github.com/softov/ahpd)** — An open-source AHP host over WebSocket, that runs plugins: the agent, the ports and the server tools are all installed rather than built in, and `@ahpd/sdk` is the library to build a host of your own.
+- **[ahpd](https://github.com/softov/ahpd)** — An open-source, plugin-driven AHP server with users, permissions, and usage tracking. Plugins provide native Claude and pi agents, ACP agents, tools and MCP servers, sandboxed computers, a web UI ([ahpw](https://github.com/softov/ahpw)), and more. Includes [`@ahpd/sdk`](https://www.npmjs.com/package/@ahpd/sdk) for building your own host and plugins.
 - **[hydra-ahp](https://github.com/smagnuso/hydra-ahp)** — An open-source AHP host for [Hydra](https://github.com/smagnuso/hydra-acp), a multi-client ACP session daemon, exposing Hydra sessions to AHP clients such as VS Code's agent UI.
 - **[AHP-ACP Gateway](https://github.com/formulahendry/ahp-acp-gateway)** — A universal AHP WebSocket host that runs configured ACP agents, with persistent sessions, replay and reconnect, permissions, and cancellation.
 
@@ -50,6 +56,12 @@ npm run docs:build
 # Preview production build
 npm run docs:preview
 ```
+
+The guide, specification, and reference are versioned. `npm run docs:versions`
+(run automatically by `docs:dev` and `docs:build`) materializes the released
+versions listed in `docs/.vitepress/versions.ts` from their git tags into
+`docs/versions/` (gitignored). The first listed version is served at the root
+URLs; `main` is served under `/draft/`.
 
 ## License
 
