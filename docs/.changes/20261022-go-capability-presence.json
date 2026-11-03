@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Go preserves empty-object capability opt-ins on the wire; generated optional capability flags now use pointer-to-map fields instead of dropping `{}` through `omitempty`.",
+  "targets": ["go"]
+}

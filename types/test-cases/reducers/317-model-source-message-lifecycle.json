@@ -1,0 +1,60 @@
+{
+  "description": "exact source pairs survive same-raw-ID draft and queue edits, steering, consumption, turn completion and history loading",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/qualified",
+    "title": "Qualified selections",
+    "status": 1,
+    "modifiedAt": "2026-10-21T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [{
+    "type": "chat/draftChanged",
+    "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } }
+  }, {
+    "type": "chat/draftChanged",
+    "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b", "config": { "mode": "fast" } } }
+  }, {
+    "type": "chat/pendingMessageSet", "id": "q", "kind": "queued",
+    "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } }
+  }, {
+    "type": "chat/pendingMessageSet", "id": "q", "kind": "queued",
+    "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b", "config": { "contextWindow": 8192, "enabled": true } } }
+  }, {
+    "type": "chat/pendingMessageSet", "id": "s", "kind": "steering",
+    "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } }
+  }, {
+    "type": "chat/queuedMessagesReordered", "order": ["s", "q"]
+  }, {
+    "type": "chat/turnStarted", "turnId": "current", "queuedMessageId": "q", "startedAt": "2026-10-22T00:00:00.000Z",
+    "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b", "config": { "contextWindow": 8192, "enabled": true } } }
+  }, {
+    "type": "chat/turnComplete", "turnId": "current", "duration": 100
+  }, {
+    "type": "chat/turnsLoaded",
+    "turns": [{
+      "id": "past", "state": "complete", "responseParts": [], "usage": null,
+      "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } }
+    }]
+  }],
+  "expected": {
+    "resource": "ahp-chat:/qualified",
+    "title": "Qualified selections",
+    "status": 1,
+    "modifiedAt": "2026-10-22T00:00:00.100Z",
+    "draft": { "text": "Draft", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b", "config": { "mode": "fast" } } },
+    "queuedMessages": [
+      { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } } }
+    ],
+    "steeringMessage": { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } } },
+    "activeTurn": null,
+    "turnsNextCursor": null,
+    "turns": [{
+      "id": "past", "state": "complete", "responseParts": [], "usage": null,
+      "message": { "text": "Past", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } }
+    }, {
+      "id": "current", "startedAt": "2026-10-22T00:00:00.000Z", "duration": 100, "state": "complete", "responseParts": [], "usage": null,
+      "message": { "text": "Queued", "origin": { "kind": "user" }, "model": { "id": "shared-model", "modelSourceId": "source-b", "config": { "contextWindow": 8192, "enabled": true } } }
+    }]
+  }
+}

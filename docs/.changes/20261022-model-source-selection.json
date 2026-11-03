@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Capability-gated model-source catalogs and exact source-qualified model selections, preserving legacy unqualified selection."
+}

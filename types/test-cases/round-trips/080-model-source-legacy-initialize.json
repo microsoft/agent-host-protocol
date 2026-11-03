@@ -1,0 +1,16 @@
+{
+  "name": "model-source-legacy-initialize",
+  "group": "A",
+  "description": "Offering 1.1.0 without capabilities round-trips without inventing modelSourceSelection support.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://",
+    "protocolVersions": ["1.1.0"],
+    "clientId": "legacy-client"
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "protocolVersions": ["1.1.0"],
+    "clientId": "legacy-client"
+  }]
+}

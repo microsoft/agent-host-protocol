@@ -1426,7 +1426,7 @@ public struct RootConfigState: Codable, Sendable {
 }
 
 public struct AgentInfo: Codable, Sendable {
-    /// Agent provider ID (e.g. `'copilot'`)
+    /// Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
     public var provider: String
     /// Human-readable name
     public var displayName: String
@@ -1458,6 +1458,12 @@ public struct AgentInfo: Codable, Sendable {
     /// to gate features (multi-chat, fork) instead of switching on the provider
     /// id.
     public var capabilities: AgentCapabilities?
+    /// Model sources exposed by this agent harness, including sources with
+    /// no currently available models. Together with {@link models}, this is one
+    /// atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
+    /// this agent; every model's `modelSourceId` MUST reference an entry here.
+    /// Absence preserves legacy discovery without inventing source identity.
+    public var modelSources: [ModelSourceInfo]?
 
     public init(
         provider: String,
@@ -1466,7 +1472,8 @@ public struct AgentInfo: Codable, Sendable {
         models: [SessionModelInfo],
         protectedResources: [ProtectedResourceMetadata]? = nil,
         customizations: [Customization]? = nil,
-        capabilities: AgentCapabilities? = nil
+        capabilities: AgentCapabilities? = nil,
+        modelSources: [ModelSourceInfo]? = nil
     ) {
         self.provider = provider
         self.displayName = displayName
@@ -1475,6 +1482,7 @@ public struct AgentInfo: Codable, Sendable {
         self.protectedResources = protectedResources
         self.customizations = customizations
         self.capabilities = capabilities
+        self.modelSources = modelSources
     }
 }
 
@@ -1495,13 +1503,20 @@ public struct AgentCapabilities: Codable, Sendable {
     /// set and MUST NOT set more than one entry in
     /// {@link CreateSessionParams.workingDirectories}.
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
+    /// The agent preserves and enforces exact source-qualified model selections.
+    /// Clients MUST also declare `ClientCapabilities.modelSourceSelection`
+    /// before sending a `ModelSelection.modelSourceId`. Protocol version
+    /// negotiation alone does not establish support.
+    public var modelSourceSelection: [String: AnyCodable]?
 
     public init(
         multipleChats: MultipleChatsCapability? = nil,
-        multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
+        multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil,
+        modelSourceSelection: [String: AnyCodable]? = nil
     ) {
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
+        self.modelSourceSelection = modelSourceSelection
     }
 }
 
@@ -1570,10 +1585,25 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
     }
 }
 
-public struct SessionModelInfo: Codable, Sendable {
-    /// Model identifier
+public struct ModelSourceInfo: Codable, Sendable {
+    /// Opaque source identifier. MUST NOT be derived from the display name.
     public var id: String
-    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
+    /// Human-readable label; not an identifier and not necessarily unique.
+    public var displayName: String
+
+    public init(
+        id: String,
+        displayName: String
+    ) {
+        self.id = id
+        self.displayName = displayName
+    }
+}
+
+public struct SessionModelInfo: Codable, Sendable {
+    /// Raw model identifier; different model sources may expose the same ID.
+    public var id: String
+    /// Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
     public var provider: String
     /// Human-readable model name
     public var name: String
@@ -1604,6 +1634,11 @@ public struct SessionModelInfo: Codable, Sendable {
     /// SHOULD fall back to a generic presentation for values they do not
     /// recognize.
     public var vendor: String?
+    /// Source of this model within the owning agent's {@link AgentInfo.modelSources}.
+    /// The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
+    /// If a raw ID appears more than once, every such row MUST be qualified.
+    /// Absence is legacy, unqualified identity; it does not name a default source.
+    public var modelSourceId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1617,6 +1652,7 @@ public struct SessionModelInfo: Codable, Sendable {
         case configSchema
         case meta = "_meta"
         case vendor
+        case modelSourceId
     }
 
     public init(
@@ -1630,7 +1666,8 @@ public struct SessionModelInfo: Codable, Sendable {
         policyState: PolicyState? = nil,
         configSchema: ConfigSchema? = nil,
         meta: [String: AnyCodable]? = nil,
-        vendor: String? = nil
+        vendor: String? = nil,
+        modelSourceId: String? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -1643,23 +1680,31 @@ public struct SessionModelInfo: Codable, Sendable {
         self.configSchema = configSchema
         self.meta = meta
         self.vendor = vendor
+        self.modelSourceId = modelSourceId
     }
 }
 
 public struct ModelSelection: Codable, Sendable {
-    /// Model identifier
+    /// Raw model identifier, unchanged by source qualification or UI keys.
     public var id: String
     /// Model-specific configuration values. Values are JSON primitives: most
     /// pickers produce strings, but some (e.g. a numeric context-size picker)
     /// produce numbers or booleans, which are carried through as-is.
     public var config: [String: AnyCodable]?
+    /// Exact model source ID in the owning agent's advertised catalog.
+    /// Requires both client and agent `modelSourceSelection` capabilities.
+    /// MUST survive messages, drafts, queued work, persistence and replay.
+    /// Absence retains genuinely unqualified legacy selection behavior.
+    public var modelSourceId: String?
 
     public init(
         id: String,
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        modelSourceId: String? = nil
     ) {
         self.id = id
         self.config = config
+        self.modelSourceId = modelSourceId
     }
 }
 
@@ -2787,13 +2832,16 @@ public struct Message: Codable, Sendable {
     public var origin: MessageOrigin
     /// File/selection attachments
     public var attachments: [MessageAttachment]?
-    /// The model this message was, or will be, sent with.
+    /// The model selection associated with this message.
     ///
-    /// For historic user/agent messages this records the model actually used, so
-    /// a client editing or resending the message can retain that selection. For a
+    /// For historic user/agent messages this retains the host-accepted selection,
+    /// so a client editing or resending the message can preserve it. For a
     /// {@link ChatState.draft | draft} it carries the model the user picked for
     /// the message they are composing. Absent means the agent host's default
-    /// model applies.
+    /// model applies. A source qualifier MUST be preserved exactly, including
+    /// through pending messages and restored history; it is not per-call usage
+    /// provenance. Accepting a message does not prove a deferred model switch
+    /// has activated.
     public var model: ModelSelection?
     /// The custom agent this message was, or will be, sent with.
     ///
@@ -6813,11 +6861,21 @@ public struct AutomationTriggerDefinition: Codable, Sendable {
 }
 
 public struct AutomationSessionTemplate: Codable, Sendable {
-    /// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
+    /// Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
+    /// the host's default only for genuinely unqualified saved definitions.
+    ///
+    /// If this template's `model` or {@link AutomationDefinition.message}'s
+    /// `model` has a `modelSourceId`, the host MUST persist an explicit provider
+    /// when accepting a create or update. An omitted owner MUST be resolved and
+    /// stored at acceptance or the action rejected. Updates retaining a qualified
+    /// selection MUST preserve its saved owner when omitted, or reject; they MUST
+    /// NOT resolve it again from a changed host default.
     public var provider: String?
-    /// Optional model selection resolved when a run starts. Its
-    /// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
-    /// by the selected provider.
+    /// Optional model selection revalidated when a run starts against the owning
+    /// agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
+    /// both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
+    /// A missing or unavailable saved owner or pair fails the run rather than
+    /// resolving against the current default or falling back to another source or harness.
     public var model: ModelSelection?
     /// Optional custom agent selection identified by {@link AgentSelection.uri}.
     public var agent: AgentSelection?
@@ -6876,6 +6934,9 @@ public struct AutomationDefinition: Codable, Sendable {
     public var title: String
     /// Initial message sent to every newly created run session. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
+    /// A qualified `model` requires an explicit persisted
+    /// {@link AutomationSessionTemplate.provider | `session.provider`}, even
+    /// when the session template's own `model` is absent.
     public var message: Message
     /// Template used to create fresh sessions for each run.
     public var session: AutomationSessionTemplate

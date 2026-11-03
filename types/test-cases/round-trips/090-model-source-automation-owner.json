@@ -1,0 +1,98 @@
+{
+  "name": "model-source-automation-owner",
+  "group": "A",
+  "description": "Host-normalized saved automations retain an explicit harness for template-only and message-only qualifiers; a genuinely unqualified template keeps its absent default owner. This tests representation, not host normalization or default-change enforcement.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automations://",
+    "fromSeq": 12,
+    "state": {
+      "entries": [{
+        "resource": "ahp-automation:/template-qualified",
+        "definition": {
+          "title": "Template-qualified",
+          "message": { "text": "Run", "origin": { "kind": "automation" } },
+          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }, {
+        "resource": "ahp-automation:/message-qualified",
+        "definition": {
+          "title": "Message-qualified",
+          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+          "session": { "provider": "harness-a" },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }, {
+        "resource": "ahp-automation:/unqualified-default",
+        "definition": {
+          "title": "Unqualified default",
+          "message": { "text": "Run", "origin": { "kind": "automation" } },
+          "session": { "model": { "id": "shared-model" } },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-automations://",
+    "fromSeq": 12,
+    "state": {
+      "entries": [{
+        "resource": "ahp-automation:/template-qualified",
+        "definition": {
+          "title": "Template-qualified",
+          "message": { "text": "Run", "origin": { "kind": "automation" } },
+          "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }, {
+        "resource": "ahp-automation:/message-qualified",
+        "definition": {
+          "title": "Message-qualified",
+          "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+          "session": { "provider": "harness-a" },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }, {
+        "resource": "ahp-automation:/unqualified-default",
+        "definition": {
+          "title": "Unqualified default",
+          "message": { "text": "Run", "origin": { "kind": "automation" } },
+          "session": { "model": { "id": "shared-model" } },
+          "enabled": true,
+          "triggers": []
+        },
+        "runs": [],
+        "operations": ["update", "run"],
+        "createdAt": "2026-10-22T00:00:00.000Z",
+        "modifiedAt": "2026-10-22T00:00:00.000Z"
+      }]
+    }
+  }]
+}

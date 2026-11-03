@@ -1,0 +1,61 @@
+{
+  "description": "qualified automation update requests leave saved ownership unchanged and host-normalized automation/set preserves it; normalization and default-change enforcement belong to the host",
+  "reducer": "automation",
+  "initial": {
+    "entries": [{
+      "resource": "ahp-automation:/owned",
+      "definition": {
+        "title": "Owned",
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "enabled": true,
+        "triggers": []
+      },
+      "runs": [],
+      "operations": ["update", "run"],
+      "createdAt": "2026-10-22T00:00:00.000Z",
+      "modifiedAt": "2026-10-22T00:00:00.000Z"
+    }]
+  },
+  "actions": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/owned",
+    "changes": { "session": { "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } } }
+  }, {
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/owned",
+      "definition": {
+        "title": "Owned",
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } },
+        "enabled": true,
+        "triggers": []
+      },
+      "runs": [],
+      "operations": ["update", "run"],
+      "createdAt": "2026-10-22T00:00:00.000Z",
+      "modifiedAt": "2026-10-22T00:01:00.000Z"
+    }
+  }, {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/owned",
+    "changes": { "message": { "text": "Edited", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } } }
+  }],
+  "expected": {
+    "entries": [{
+      "resource": "ahp-automation:/owned",
+      "definition": {
+        "title": "Owned",
+        "message": { "text": "Run", "origin": { "kind": "automation" }, "model": { "id": "shared-model", "modelSourceId": "source-a" } },
+        "session": { "provider": "harness-a", "model": { "id": "shared-model", "modelSourceId": "source-a", "config": { "mode": "fast" } } },
+        "enabled": true,
+        "triggers": []
+      },
+      "runs": [],
+      "operations": ["update", "run"],
+      "createdAt": "2026-10-22T00:00:00.000Z",
+      "modifiedAt": "2026-10-22T00:01:00.000Z"
+    }]
+  }
+}
