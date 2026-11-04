@@ -34,6 +34,8 @@ import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
 import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
+  CustomizationType,
+  McpServerStatus,
   SessionStatus,
   SessionLifecycle,
   TurnState,
@@ -143,6 +145,49 @@ describe('reducer fixtures', () => {
       }
       assert.deepStrictEqual(state, fixture.expected);
     });
+  }
+});
+
+describe('session/customizationToggled identity', () => {
+  const skill = {
+    type: CustomizationType.Skill,
+    id: 'mcp-skill',
+    uri: 'mcp://server/skills/lint',
+    name: 'lint',
+    enabled: false,
+  } as const;
+
+  for (const children of [undefined, [], [skill]]) {
+    for (const nested of [false, true]) {
+      it(`preserves state for an unknown skill id with ${children?.length ?? 'absent'} MCP children (${nested ? 'nested' : 'top-level'})`, () => {
+        const server = {
+          type: CustomizationType.McpServer,
+          id: 'server',
+          uri: 'https://mcp.example/server',
+          name: 'Server',
+          state: { kind: McpServerStatus.Ready },
+          ...(children ? { children } : {}),
+        } as const;
+        const state: SessionState = {
+          provider: 'copilot',
+          title: 'Test Session',
+          status: SessionStatus.Idle,
+          lifecycle: SessionLifecycle.Ready,
+          activeClients: [],
+          chats: [],
+          customizations: [
+            { type: CustomizationType.Plugin, id: 'unparsed', uri: 'file:///unparsed', name: 'Unparsed' },
+            { type: CustomizationType.Plugin, id: 'empty', uri: 'file:///empty', name: 'Empty', children: [] },
+            nested ? { type: CustomizationType.Plugin, id: 'plugin', uri: 'file:///plugin', name: 'Plugin', children: [server] } : server,
+          ],
+        };
+        assert.strictEqual(sessionReducer(state, {
+          type: ActionType.SessionCustomizationToggled,
+          id: 'unknown',
+          enablement: [],
+        }), state);
+      });
+    }
   }
 });
 

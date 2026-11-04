@@ -1,0 +1,80 @@
+{
+  "description": "session/customizationToggled disables a skill served by a top-level MCP server",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server",
+        "uri": "https://mcp.example/server",
+        "name": "Server",
+        "state": { "kind": "ready" },
+        "enablement": [{ "kind": "session", "enabled": false }],
+        "children": [
+          {
+            "type": "skill",
+            "id": "other-skill",
+            "uri": "mcp://server/skills/other",
+            "name": "other"
+          },
+          {
+            "type": "skill",
+            "id": "mcp-skill",
+            "uri": "mcp://server/skills/lint",
+            "name": "lint",
+            "description": "Lint the project",
+            "disableUserInvocation": true
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "id": "mcp-skill",
+      "enablement": [{ "kind": "session", "enabled": false }]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server",
+        "uri": "https://mcp.example/server",
+        "name": "Server",
+        "state": { "kind": "ready" },
+        "enablement": [{ "kind": "session", "enabled": false }],
+        "children": [
+          {
+            "type": "skill",
+            "id": "other-skill",
+            "uri": "mcp://server/skills/other",
+            "name": "other"
+          },
+          {
+            "type": "skill",
+            "id": "mcp-skill",
+            "uri": "mcp://server/skills/lint",
+            "name": "lint",
+            "description": "Lint the project",
+            "disableUserInvocation": true,
+            "enabled": false
+          }
+        ]
+      }
+    ]
+  }
+}

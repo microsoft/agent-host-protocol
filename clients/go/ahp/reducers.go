@@ -417,6 +417,17 @@ func applyChildEnablement(c *ahptypes.ChildCustomization, enablement []ahptypes.
 	}
 }
 
+func toggleMcpServerSkill(server *ahptypes.McpServerCustomization, id string, enablement []ahptypes.CustomizationEnablement) bool {
+	for i := range server.Children {
+		if server.Children[i].Id == id {
+			enabled := effectiveEnablement(enablement)
+			server.Children[i].Enabled = &enabled
+			return true
+		}
+	}
+	return false
+}
+
 func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes.CustomizationEnablement) bool {
 	for i := range list {
 		got, ok := customizationID(list[i])
@@ -426,6 +437,12 @@ func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes
 		}
 	}
 	for i := range list {
+		if server, ok := list[i].Value.(*ahptypes.McpServerCustomization); ok {
+			if toggleMcpServerSkill(server, id, enablement) {
+				return true
+			}
+			continue
+		}
 		children := containerChildren(&list[i])
 		if children == nil {
 			continue
@@ -434,6 +451,11 @@ func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes
 			got, ok := childCustomizationID((*children)[j])
 			if ok && got == id {
 				applyChildEnablement(&(*children)[j], enablement)
+				return true
+			}
+		}
+		for _, child := range *children {
+			if server, ok := child.Value.(*ahptypes.McpServerCustomization); ok && toggleMcpServerSkill(server, id, enablement) {
 				return true
 			}
 		}

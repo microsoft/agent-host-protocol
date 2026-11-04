@@ -323,6 +323,37 @@ private fun withChildCustomizationEnablement(c: ChildCustomization, enablement: 
     }
 }
 
+private fun toggleMcpServerSkill(server: McpServerCustomization, id: String, enablement: List<CustomizationEnablement>): McpServerCustomization? {
+    val skills = server.children ?: return null
+    val index = skills.indexOfFirst { it.id == id }
+    if (index < 0) return null
+    val updated = skills.toMutableList()
+    updated[index] = skills[index].copy(enabled = effectiveEnablement(enablement))
+    return server.copy(children = updated)
+}
+
+private fun toggleContainerChild(container: Customization, id: String, enablement: List<CustomizationEnablement>): Customization? {
+    if (container is CustomizationMcpServer) {
+        return toggleMcpServerSkill(container.value, id, enablement)?.let { CustomizationMcpServer(it) }
+    }
+    val children = customizationChildren(container) ?: return null
+    val childIndex = children.indexOfFirst { childCustomizationId(it) == id }
+    val updated = children.toMutableList()
+    if (childIndex >= 0) {
+        updated[childIndex] = withChildCustomizationEnablement(children[childIndex], enablement)
+        return withCustomizationChildren(container, updated)
+    }
+    for (i in children.indices) {
+        val child = children[i]
+        if (child is ChildCustomizationMcpServer) {
+            val toggled = toggleMcpServerSkill(child.value, id, enablement) ?: continue
+            updated[i] = ChildCustomizationMcpServer(toggled)
+            return withCustomizationChildren(container, updated)
+        }
+    }
+    return null
+}
+
 private fun childCustomizationId(c: ChildCustomization): String? = when (c) {
     is ChildCustomizationAgent -> c.value.id
     is ChildCustomizationSkill -> c.value.id
@@ -762,13 +793,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 state.copy(customizations = updated)
             } else run {
                 for (i in list.indices) {
-                    val children = customizationChildren(list[i]) ?: continue
-                    val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
-                    if (childIdx < 0) continue
-                    val newChildren = children.toMutableList()
-                    newChildren[childIdx] = withChildCustomizationEnablement(newChildren[childIdx], a.enablement)
+                    val toggled = toggleContainerChild(list[i], a.id, a.enablement) ?: continue
                     val updated = list.toMutableList()
-                    updated[i] = withCustomizationChildren(list[i], newChildren)
+                    updated[i] = toggled
                     return@run state.copy(customizations = updated)
                 }
                 state

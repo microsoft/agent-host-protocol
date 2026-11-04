@@ -886,8 +886,8 @@ impl<'de> serde::Deserialize<'de> for ToolResultContentType {
 /// ({@link CustomizationType.Plugin | `Plugin`} or
 /// {@link CustomizationType.Directory | `Directory`}) or
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
-/// directly by the host. The remaining types appear only as children of
-/// a container.
+/// directly by the host. The remaining types appear as children of a
+/// container; skills may also be served by an MCP server.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CustomizationType {
     Plugin,
@@ -2417,7 +2417,8 @@ pub struct SessionState {
     /// - Top-level {@link McpServerCustomization} entries the host
     ///   surfaces directly (for example a globally-configured MCP server
     ///   that isn't bundled in a plugin or directory). MCP servers may
-    ///   also appear as children of a container.
+    ///   also appear as children of a container, and may serve skills in
+    ///   their own {@link McpServerCustomization.children | `children`} array.
     ///
     /// Client-published plugins arrive via
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -4528,7 +4529,8 @@ pub struct AgentCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4564,7 +4566,7 @@ pub struct AgentCustomization {
     pub disable_user_invocation: Option<bool>,
 }
 
-/// A skill contributed by a plugin or directory.
+/// A skill contributed by a plugin, directory, or MCP server.
 ///
 /// Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
 /// — the `skills/` directory layout (one subdirectory per skill, each with
@@ -4611,7 +4613,8 @@ pub struct SkillCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4675,7 +4678,8 @@ pub struct PromptCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4736,7 +4740,8 @@ pub struct RuleCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4798,7 +4803,8 @@ pub struct HookCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4887,6 +4893,73 @@ pub struct McpServerCustomization {
     /// which support apps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_app: Option<McpServerCustomizationApps>,
+    /// Skills served by this MCP server, for example through the MCP skills
+    /// extension (SEP-2640).
+    ///
+    /// Absent means the host has not discovered skills for this server, or
+    /// does not support MCP-served skills. An empty array means the server
+    /// was queried and serves none.
+    ///
+    /// A skill's effective enabled state is the server's effective enabled
+    /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+    /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_mcp_server_skills",
+        deserialize_with = "deserialize_mcp_server_skills"
+    )]
+    pub children: Option<Vec<SkillCustomization>>,
+}
+
+fn serialize_mcp_server_skills<S>(
+    value: &Option<Vec<SkillCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom(
+                "skill customization must serialize to an object",
+            ));
+        };
+        object.insert(
+            "type".to_owned(),
+            serde_json::Value::String("skill".to_owned()),
+        );
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_mcp_server_skills<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<SkillCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("skill") {
+                return Err(serde::de::Error::custom(
+                    "expected skill customization type",
+                ));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Information from the agent host needed to render MCP Apps served

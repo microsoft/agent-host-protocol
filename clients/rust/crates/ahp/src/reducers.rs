@@ -564,6 +564,20 @@ fn apply_child_enablement(c: &mut ChildCustomization, enablement: &[Customizatio
     }
 }
 
+fn toggle_mcp_server_skill(
+    server: &mut McpServerCustomization,
+    id: &str,
+    enablement: &[CustomizationEnablement],
+) -> bool {
+    if let Some(skills) = server.children.as_mut() {
+        if let Some(skill) = skills.iter_mut().find(|skill| skill.id == id) {
+            skill.enabled = Some(effective_enablement(enablement));
+            return true;
+        }
+    }
+    false
+}
+
 fn apply_toggle(
     list: &mut [Customization],
     id: &str,
@@ -574,10 +588,23 @@ fn apply_toggle(
         return true;
     }
     for container in list.iter_mut() {
+        if let Customization::McpServer(server) = container {
+            if toggle_mcp_server_skill(server, id, enablement) {
+                return true;
+            }
+            continue;
+        }
         if let Some(children) = container_children_mut(container) {
             if let Some(child) = children.iter_mut().find(|c| child_id_of(c) == Some(id)) {
                 apply_child_enablement(child, enablement);
                 return true;
+            }
+            for child in children.iter_mut() {
+                if let ChildCustomization::McpServer(server) = child {
+                    if toggle_mcp_server_skill(server, id, enablement) {
+                        return true;
+                    }
+                }
             }
         }
     }
