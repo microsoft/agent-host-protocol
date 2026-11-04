@@ -825,24 +825,16 @@ type ListSessionsResult struct {
 //
 // A sender MAY read part of a resource by including
 // {@link ResourceReadParams.position | `position`} and/or
-// {@link ResourceReadParams.length | `length`}. There is no capability for
-// byte ranges; support is detected from the result. These rules apply in both
-// directions:
+// {@link ResourceReadParams.length | `length`}.
 //
 //   - A receiver that honors the range SHOULD return only the requested bytes
 //     and MUST include {@link ResourceReadResult.size | `size`}, the total size
-//     of the resource in bytes. Content that cannot be read partially (for
-//     example a git blob or an MCP resource) MAY be read whole and sliced.
+//     of the resource in bytes.
 //   - A receiver that does not honor the range ignores `position` and `length`
 //     and returns the whole resource without `size`. A sender MUST treat a
 //     result without `size` as the whole resource.
-//   - A ranged result MUST use `base64` encoding, even if the sender requested
-//     `utf-8`, because a byte range can split a UTF-8 sequence.
+//   - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
 //   - A `position` at or past the end of the resource returns empty `data`.
-//   - A receiver that honors the range MUST reject a negative or non-integer
-//     `position` or `length` with `InvalidParams` (`-32602`).
-//   - More of the resource remains when `position` plus the decoded length of
-//     `data` is less than `size`.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -866,12 +858,9 @@ type ResourceReadParams struct {
 //
 // The server SHOULD honor the `encoding` requested in the params. If the
 // server cannot provide the requested encoding, it MUST fall back to either
-// `base64` or `utf-8`. A ranged result (one with {@link size}) MUST use
-// `base64`.
+// `base64` or `utf-8`.
 //
 // Unless {@link size} is present, the result contains the whole resource.
-// Windowed delivery does not limit the size of the result, because it is a
-// response and not part of a subscription.
 type ResourceReadResult struct {
 	// Content encoded as a string
 	Data string `json:"data"`

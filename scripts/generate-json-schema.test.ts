@@ -261,7 +261,7 @@ describe('generated JSON schemas', () => {
           assert.equal(schemaAccepts(schema, params as JsonNode, value), false, JSON.stringify(value));
         }
         const whole = { data: 'aGVsbG8=', encoding: 'base64' };
-        for (const value of [whole, { ...whole, size: 52341 }, { data: '', encoding: 'base64', size: 0 }]) {
+        for (const value of [whole, { ...whole, size: 52341 }, { data: '', encoding: 'base64', size: 0 }, { data: 'Aé😀', encoding: 'utf-8', size: 1024 }]) {
           assert.equal(schemaAccepts(schema, result as JsonNode, value), true, JSON.stringify(value));
         }
         for (const size of [-1, 1.5]) {

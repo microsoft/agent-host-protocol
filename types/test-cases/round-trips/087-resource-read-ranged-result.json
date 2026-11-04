@@ -1,7 +1,7 @@
 {
   "name": "resource-read-ranged-result",
   "group": "A",
-  "description": "A receiver that honored the byte range returns base64 data and the total size of the resource. Here 16 bytes of a 52341-byte resource.",
+  "description": "A receiver that honored the byte range returns the requested bytes and the total size of the resource. Here 16 bytes of a 52341-byte resource, as base64.",
   "type": "ResourceReadResult",
   "input": {
     "data": "iVBORw0KGgoAAAANSUhEUg==",
