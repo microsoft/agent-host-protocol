@@ -1214,7 +1214,20 @@ public sealed record ListSessionsResult
 /// A peer SHOULD serve reads of the URIs that it publishes as content, such as
 /// content references and canvas sources. This includes HTTP(S) URLs that the
 /// other peer might not be able to reach, such as a development server on the
-/// host's loopback interface.</summary>
+/// host's loopback interface.
+///
+/// A sender MAY read part of a resource by including
+/// {@link ResourceReadParams.position | `position`} and/or
+/// {@link ResourceReadParams.length | `length`}.
+///
+/// - A receiver that honors the range SHOULD return only the requested bytes
+///   and MUST include {@link ResourceReadResult.size | `size`}, the total size
+///   of the resource in bytes.
+/// - A receiver that does not honor the range ignores `position` and `length`
+///   and returns the whole resource without `size`. A sender MUST treat a
+///   result without `size` as the whole resource.
+/// - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
+/// - A `position` at or past the end of the resource returns empty `data`.</summary>
 public sealed record ResourceReadParams
 {
     public required string Channel { get; init; }
@@ -1231,6 +1244,17 @@ public sealed record ResourceReadParams
     /// <summary>Preferred encoding for the returned data (default: server-chosen)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentEncoding? Encoding { get; init; }
+
+    /// <summary>Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Position { get; init; }
+
+    /// <summary>Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Length { get; init; }
 }
 
 /// <summary>Result of the `resourceRead` command.
@@ -1239,8 +1263,7 @@ public sealed record ResourceReadParams
 /// server cannot provide the requested encoding, it MUST fall back to either
 /// `base64` or `utf-8`.
 ///
-/// The result contains the whole resource. Windowed delivery does not limit its
-/// size, because it is a response and not part of a subscription.</summary>
+/// Unless {@link size} is present, the result contains the whole resource.</summary>
 public sealed record ResourceReadResult
 {
     /// <summary>Content encoded as a string</summary>
@@ -1252,6 +1275,13 @@ public sealed record ResourceReadResult
     /// <summary>Content type (e.g. `"image/png"`, `"text/plain"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ContentType { get; init; }
+
+    /// <summary>Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Size { get; init; }
 }
 
 /// <summary>Writes content to a file on the server's filesystem.

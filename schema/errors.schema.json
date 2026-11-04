@@ -6675,7 +6675,7 @@
     },
     "ResourceReadParams": {
       "type": "object",
-      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nA peer SHOULD serve reads of the URIs that it publishes as content, such as\ncontent references and canvas sources. This includes HTTP(S) URLs that the\nother peer might not be able to reach, such as a development server on the\nhost's loopback interface.",
+      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nLike all `resource*` methods, `resourceRead` is symmetrical and MAY be\nsent in either direction. Hosts use it to fetch content from a\nclient-published URI (e.g. `virtual://my-client/...` plugins); clients\nuse it to read host-side files. The receiver enforces access via the\nsame permission/`resourceRequest` flow regardless of which peer initiated.\n\nA peer SHOULD serve reads of the URIs that it publishes as content, such as\ncontent references and canvas sources. This includes HTTP(S) URLs that the\nother peer might not be able to reach, such as a development server on the\nhost's loopback interface.\n\nA sender MAY read part of a resource by including\n{@link ResourceReadParams.position | `position`} and/or\n{@link ResourceReadParams.length | `length`}.\n\n- A receiver that honors the range SHOULD return only the requested bytes\n  and MUST include {@link ResourceReadResult.size | `size`}, the total size\n  of the resource in bytes.\n- A receiver that does not honor the range ignores `position` and `length`\n  and returns the whole resource without `size`. A sender MUST treat a\n  result without `size` as the whole resource.\n- A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.\n- A `position` at or past the end of the resource returns empty `data`.",
       "properties": {
         "channel": {
           "type": "string",
@@ -6695,6 +6695,16 @@
         "encoding": {
           "$ref": "#/$defs/ContentEncoding",
           "description": "Preferred encoding for the returned data (default: server-chosen)"
+        },
+        "position": {
+          "type": "integer",
+          "description": "Byte offset to start reading at. Defaults to `0`. A receiver that does\nnot honor byte ranges ignores it and returns the whole resource.",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "description": "Maximum number of bytes to return from {@link position}. Defaults to the\nrest of the resource. A receiver that does not honor byte ranges ignores\nit and returns the whole resource.",
+          "minimum": 0
         }
       },
       "required": [
@@ -6704,7 +6714,7 @@
     },
     "ResourceReadResult": {
       "type": "object",
-      "description": "Result of the `resourceRead` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.\n\nThe result contains the whole resource. Windowed delivery does not limit its\nsize, because it is a response and not part of a subscription.",
+      "description": "Result of the `resourceRead` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.\n\nUnless {@link size} is present, the result contains the whole resource.",
       "properties": {
         "data": {
           "type": "string",
@@ -6717,6 +6727,11 @@
         "contentType": {
           "type": "string",
           "description": "Content type (e.g. `\"image/png\"`, `\"text/plain\"`)"
+        },
+        "size": {
+          "type": "integer",
+          "description": "Total size of the resource in bytes. Present if and only if the receiver\nhonored the byte range in {@link ResourceReadParams.position} and\n{@link ResourceReadParams.length}; when absent, `data` is the whole\nresource.",
+          "minimum": 0
         }
       },
       "required": [

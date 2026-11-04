@@ -1,0 +1,20 @@
+{
+  "name": "resource-read-utf8-ranged-result",
+  "group": "A",
+  "description": "A receiver that honored the byte range returns utf-8 data without splitting a UTF-8 sequence, and the total size of the resource. Here the 7 bytes of \"Aé😀\" from a 1024-byte resource.",
+  "type": "ResourceReadResult",
+  "input": {
+    "data": "Aé😀",
+    "encoding": "utf-8",
+    "contentType": "text/plain",
+    "size": 1024
+  },
+  "acceptableOutputs": [
+    {
+      "data": "Aé😀",
+      "encoding": "utf-8",
+      "contentType": "text/plain",
+      "size": 1024
+    }
+  ]
+}

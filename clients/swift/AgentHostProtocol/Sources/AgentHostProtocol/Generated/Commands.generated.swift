@@ -1218,24 +1218,37 @@ public struct ResourceReadParams: Codable, Sendable {
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
+    /// Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.
+    public var position: Int?
+    /// Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.
+    public var length: Int?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case uri
         case encoding
+        case position
+        case length
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         uri: String,
-        encoding: ContentEncoding? = nil
+        encoding: ContentEncoding? = nil,
+        position: Int? = nil,
+        length: Int? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.uri = uri
         self.encoding = encoding
+        self.position = position
+        self.length = length
     }
 }
 
@@ -1246,15 +1259,22 @@ public struct ResourceReadResult: Codable, Sendable {
     public var encoding: ContentEncoding
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     public var contentType: String?
+    /// Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.
+    public var size: Int?
 
     public init(
         data: String,
         encoding: ContentEncoding,
-        contentType: String? = nil
+        contentType: String? = nil,
+        size: Int? = nil
     ) {
         self.data = data
         self.encoding = encoding
         self.contentType = contentType
+        self.size = size
     }
 }
 

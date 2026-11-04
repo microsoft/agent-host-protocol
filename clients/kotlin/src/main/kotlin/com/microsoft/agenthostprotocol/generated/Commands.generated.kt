@@ -1085,7 +1085,18 @@ data class ResourceReadParams(
     /**
      * Preferred encoding for the returned data (default: server-chosen)
      */
-    val encoding: ContentEncoding? = null
+    val encoding: ContentEncoding? = null,
+    /**
+     * Byte offset to start reading at. Defaults to `0`. A receiver that does
+     * not honor byte ranges ignores it and returns the whole resource.
+     */
+    val position: Long? = null,
+    /**
+     * Maximum number of bytes to return from {@link position}. Defaults to the
+     * rest of the resource. A receiver that does not honor byte ranges ignores
+     * it and returns the whole resource.
+     */
+    val length: Long? = null
 )
 
 @Serializable
@@ -1101,7 +1112,14 @@ data class ResourceReadResult(
     /**
      * Content type (e.g. `"image/png"`, `"text/plain"`)
      */
-    val contentType: String? = null
+    val contentType: String? = null,
+    /**
+     * Total size of the resource in bytes. Present if and only if the receiver
+     * honored the byte range in {@link ResourceReadParams.position} and
+     * {@link ResourceReadParams.length}; when absent, `data` is the whole
+     * resource.
+     */
+    val size: Long? = null
 )
 
 @Serializable

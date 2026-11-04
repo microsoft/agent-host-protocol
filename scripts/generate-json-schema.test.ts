@@ -239,6 +239,36 @@ describe('generated JSON schemas', () => {
         }
       });
 
+      it('accepts resourceRead byte ranges and rejects invalid ranges', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const params = defs.ResourceReadParams;
+        const result = defs.ResourceReadResult;
+        const base = { channel: 'ahp-root://', uri: 'file:///workspace/logo.png' };
+        assert.equal((params.required as string[]).some(name => name === 'position' || name === 'length'), false);
+        assert.equal((result.required as string[]).includes('size'), false);
+        for (const value of [base, { ...base, position: 0 }, { ...base, length: 0 }, { ...base, position: 16, length: 16 }]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const value of [
+          { ...base, position: -1 },
+          { ...base, position: 1.5 },
+          { ...base, length: -1 },
+          { ...base, length: 2.5 },
+        ]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), false, JSON.stringify(value));
+        }
+        const whole = { data: 'aGVsbG8=', encoding: 'base64' };
+        for (const value of [whole, { ...whole, size: 52341 }, { data: '', encoding: 'base64', size: 0 }, { data: 'Aé😀', encoding: 'utf-8', size: 1024 }]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const size of [-1, 1.5]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, { ...whole, size }), false, `size ${size}`);
+        }
+      });
+
       it('preserves automation schedule restrictions', () => {
         if (file !== 'commands.schema.json') {
           return;
