@@ -203,7 +203,7 @@ func setCustomizationChildren(_ c: inout Customization, _ children: [ChildCustom
     case .directory(var d):
         d.children = children
         c = .directory(d)
-    // mcpServer has no typed children; unknown/future customization is an
+    // mcpServer skills are handled separately; unknown/future customization is an
     // opaque payload — nothing to mutate in either case.
     case .mcpServer, .unknown:
         break
@@ -266,6 +266,14 @@ func applyChildCustomizationEnablement(_ c: inout ChildCustomization, _ enableme
     }
 }
 
+func toggleMcpServerSkill(_ server: inout McpServerCustomization, id: String, enablement: [CustomizationEnablement]) -> Bool {
+    guard var skills = server.children,
+          let index = skills.firstIndex(where: { $0.id == id }) else { return false }
+    skills[index].enabled = effectiveEnablement(enablement)
+    server.children = skills
+    return true
+}
+
 func toggleCustomization(in list: inout [Customization], id: String, enablement: [CustomizationEnablement]) -> Bool {
     for i in list.indices {
         if customizationId(list[i]) == id {
@@ -277,11 +285,29 @@ func toggleCustomization(in list: inout [Customization], id: String, enablement:
     }
     for containerIdx in list.indices {
         var container = list[containerIdx]
+        if case .mcpServer(var server) = container {
+            if toggleMcpServerSkill(&server, id: id, enablement: enablement) {
+                list[containerIdx] = .mcpServer(server)
+                return true
+            }
+            continue
+        }
         guard var children = customizationChildren(container) else { continue }
-        guard let childIdx = children.firstIndex(where: { childId($0) == id }) else { continue }
-        var child = children[childIdx]
-        applyChildCustomizationEnablement(&child, enablement)
-        children[childIdx] = child
+        if let childIdx = children.firstIndex(where: { childId($0) == id }) {
+            var child = children[childIdx]
+            applyChildCustomizationEnablement(&child, enablement)
+            children[childIdx] = child
+        } else {
+            var toggled = false
+            for childIdx in children.indices {
+                guard case .mcpServer(var server) = children[childIdx],
+                      toggleMcpServerSkill(&server, id: id, enablement: enablement) else { continue }
+                children[childIdx] = .mcpServer(server)
+                toggled = true
+                break
+            }
+            guard toggled else { continue }
+        }
         setCustomizationChildren(&container, children)
         list[containerIdx] = container
         return true

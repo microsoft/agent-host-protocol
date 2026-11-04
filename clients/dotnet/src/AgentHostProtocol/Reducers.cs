@@ -499,6 +499,27 @@ public static class Reducers
         }
     }
 
+    private static bool ToggleMcpServerSkill(
+        McpServerCustomization server,
+        string id,
+        List<CustomizationEnablement> enablement)
+    {
+        List<SkillCustomization>? skills = server.Children;
+        if (skills is null)
+        {
+            return false;
+        }
+
+        int index = skills.FindIndex(skill => skill.Id == id);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        skills[index] = skills[index] with { Enabled = EffectiveEnabled(enablement) };
+        return true;
+    }
+
     private static bool ApplyToggle(
         List<Customization> list,
         string id,
@@ -530,6 +551,15 @@ public static class Reducers
         // Otherwise descend into container children and toggle the matched child.
         foreach (Customization c in list)
         {
+            if (c.Value is McpServerCustomization server)
+            {
+                if (ToggleMcpServerSkill(server, id, enablement))
+                {
+                    return true;
+                }
+                continue;
+            }
+
             List<ChildCustomization>? children = ContainerChildren(c);
             if (children is null)
             {
@@ -541,6 +571,15 @@ public static class Reducers
                 if (TryChildCustomizationId(children[i], out string childGot) && childGot == id)
                 {
                     children[i] = WithChildEnablement(children[i], enablement);
+                    return true;
+                }
+            }
+
+            foreach (ChildCustomization child in children)
+            {
+                if (child.Value is McpServerCustomization nestedServer &&
+                    ToggleMcpServerSkill(nestedServer, id, enablement))
+                {
                     return true;
                 }
             }

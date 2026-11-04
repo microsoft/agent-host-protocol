@@ -904,7 +904,7 @@
           "items": {
             "$ref": "#/$defs/Customization"
           },
-          "description": "Top-level customizations active in this session.\n\nAlways one of the {@link Customization} variants:\n\n- Container customizations ({@link PluginCustomization},\n  {@link DirectoryCustomization}) whose children — agents, skills,\n  prompts, rules, hooks, MCP servers — live in each container's\n  {@link ContainerCustomizationBase.children | `children`} array.\n- Top-level {@link McpServerCustomization} entries the host\n  surfaces directly (for example a globally-configured MCP server\n  that isn't bundled in a plugin or directory). MCP servers may\n  also appear as children of a container.\n\nClient-published plugins arrive via\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}\nand the host propagates them into this list (typically with the\ncontainer's `clientId` set and `children` populated). Clients\npublish in container shape only; bare MCP servers at the top level\nare server-originated."
+          "description": "Top-level customizations active in this session.\n\nAlways one of the {@link Customization} variants:\n\n- Container customizations ({@link PluginCustomization},\n  {@link DirectoryCustomization}) whose children — agents, skills,\n  prompts, rules, hooks, MCP servers — live in each container's\n  {@link ContainerCustomizationBase.children | `children`} array.\n- Top-level {@link McpServerCustomization} entries the host\n  surfaces directly (for example a globally-configured MCP server\n  that isn't bundled in a plugin or directory). MCP servers may\n  also appear as children of a container, and may serve skills in\n  their own {@link McpServerCustomization.children | `children`} array.\n\nClient-published plugins arrive via\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}\nand the host propagates them into this list (typically with the\ncontainer's `clientId` set and `children` populated). Clients\npublish in container shape only; bare MCP servers at the top level\nare server-originated."
         },
         "changesets": {
           "type": "array",
@@ -1920,7 +1920,7 @@
     },
     "ChildCustomizationBase": {
       "type": "object",
-      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
+      "description": "Fields shared by the leaf child customizations that live inside a container\n(or, for skills, an MCP server) — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
       "properties": {
         "id": {
           "type": "string",
@@ -1952,7 +1952,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         }
       },
       "required": [
@@ -1995,7 +1995,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "agent"
@@ -2033,7 +2033,7 @@
     },
     "SkillCustomization": {
       "type": "object",
-      "description": "A skill contributed by a plugin or directory.\n\nCovers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)\n— the `skills/` directory layout (one subdirectory per skill, each with\na `SKILL.md`) and the flatter `commands/` directory of slash-command\nskills.",
+      "description": "A skill contributed by a plugin, directory, or MCP server.\n\nCovers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)\n— the `skills/` directory layout (one subdirectory per skill, each with\na `SKILL.md`) and the flatter `commands/` directory of slash-command\nskills.",
       "properties": {
         "id": {
           "type": "string",
@@ -2065,7 +2065,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "skill"
@@ -2124,7 +2124,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "prompt"
@@ -2175,7 +2175,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "rule"
@@ -2237,7 +2237,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "hook"
@@ -2303,6 +2303,13 @@
         "mcpApp": {
           "$ref": "#/$defs/McpServerCustomizationApps",
           "description": "MCP App support. This property SHOULD be advertised for MCP servers\nwhich support apps."
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillCustomization"
+          },
+          "description": "Skills served by this MCP server, for example through the MCP skills\nextension (SEP-2640).\n\nAbsent means the host has not discovered skills for this server, or\ndoes not support MCP-served skills. An empty array means the server\nwas queried and serves none.\n\nA skill's effective enabled state is the server's effective enabled\nvalue and `(skill.enabled ?? true)`. A skill is turned on or off by id\nwith [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction)."
         }
       },
       "required": [
@@ -6235,7 +6242,7 @@
           "$ref": "#/$defs/McpServerCustomization"
         }
       ],
-      "description": "A top-level customization active in a session. Either a container\n({@link PluginCustomization} or {@link DirectoryCustomization}) whose\nleaf customizations live in its\n{@link ContainerCustomizationBase.children | `children`} array, or a\nbare {@link McpServerCustomization} surfaced directly by the host."
+      "description": "A top-level customization active in a session. Either a container\n({@link PluginCustomization} or {@link DirectoryCustomization}) whose\nchild customizations live in its\n{@link ContainerCustomizationBase.children | `children`} array, or a\nbare {@link McpServerCustomization} surfaced directly by the host."
     },
     "McpServerState": {
       "oneOf": [

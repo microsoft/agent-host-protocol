@@ -677,8 +677,8 @@ public enum ToolResultContentType: Codable, Sendable, Equatable {
 /// ({@link CustomizationType.Plugin | `Plugin`} or
 /// {@link CustomizationType.Directory | `Directory`}) or
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
-/// directly by the host. The remaining types appear only as children of
-/// a container.
+/// directly by the host. The remaining types appear as children of a
+/// container; skills may also be served by an MCP server.
 public enum CustomizationType: Codable, Sendable, Equatable {
     case plugin
     case directory
@@ -2129,7 +2129,8 @@ public struct SessionState: Codable, Sendable {
     /// - Top-level {@link McpServerCustomization} entries the host
     /// surfaces directly (for example a globally-configured MCP server
     /// that isn't bundled in a plugin or directory). MCP servers may
-    /// also appear as children of a container.
+    /// also appear as children of a container, and may serve skills in
+    /// their own {@link McpServerCustomization.children | `children`} array.
     ///
     /// Client-published plugins arrive via
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -5049,7 +5050,8 @@ public struct AgentCustomization: Codable, Sendable {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -5162,7 +5164,8 @@ public struct SkillCustomization: Codable, Sendable {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -5257,7 +5260,8 @@ public struct PromptCustomization: Codable, Sendable {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -5337,7 +5341,8 @@ public struct RuleCustomization: Codable, Sendable {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -5430,7 +5435,8 @@ public struct HookCustomization: Codable, Sendable {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -5535,6 +5541,17 @@ public struct McpServerCustomization: Codable, Sendable {
     /// MCP App support. This property SHOULD be advertised for MCP servers
     /// which support apps.
     public var mcpApp: McpServerCustomizationApps?
+    /// Skills served by this MCP server, for example through the MCP skills
+    /// extension (SEP-2640).
+    ///
+    /// Absent means the host has not discovered skills for this server, or
+    /// does not support MCP-served skills. An empty array means the server
+    /// was queried and serves none.
+    ///
+    /// A skill's effective enabled state is the server's effective enabled
+    /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+    /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
+    public var children: [SkillCustomization]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -5548,6 +5565,7 @@ public struct McpServerCustomization: Codable, Sendable {
         case state
         case channel
         case mcpApp
+        case children
     }
 
     public init(
@@ -5561,7 +5579,8 @@ public struct McpServerCustomization: Codable, Sendable {
         enablement: [CustomizationEnablement]? = nil,
         state: McpServerState,
         channel: String? = nil,
-        mcpApp: McpServerCustomizationApps? = nil
+        mcpApp: McpServerCustomizationApps? = nil,
+        children: [SkillCustomization]? = nil
     ) {
         self.id = id
         self.uri = uri
@@ -5574,6 +5593,7 @@ public struct McpServerCustomization: Codable, Sendable {
         self.state = state
         self.channel = channel
         self.mcpApp = mcpApp
+        self.children = children
     }
 }
 

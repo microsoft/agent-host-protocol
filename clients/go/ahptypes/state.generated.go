@@ -324,8 +324,8 @@ const (
 // ({@link CustomizationType.Plugin | `Plugin`} or
 // {@link CustomizationType.Directory | `Directory`}) or
 // {@link CustomizationType.McpServer | `McpServer`} entries surfaced
-// directly by the host. The remaining types appear only as children of
-// a container.
+// directly by the host. The remaining types appear as children of a
+// container; skills may also be served by an MCP server.
 type CustomizationType string
 
 const (
@@ -1043,7 +1043,8 @@ type SessionState struct {
 	// - Top-level {@link McpServerCustomization} entries the host
 	//   surfaces directly (for example a globally-configured MCP server
 	//   that isn't bundled in a plugin or directory). MCP servers may
-	//   also appear as children of a container.
+	//   also appear as children of a container, and may serve skills in
+	//   their own {@link McpServerCustomization.children | `children`} array.
 	//
 	// Client-published plugins arrive via
 	// {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -3094,7 +3095,8 @@ type AgentCustomization struct {
 	// enabled state of a plugin child is the plugin's derived enabled value and
 	// `(child.enabled ?? true)`, so a disabled plugin disables every child
 	// regardless of each child's own flag. A directory child instead uses the
-	// directory's `enabled` value and its own flag.
+	// directory's `enabled` value and its own flag. An MCP-served skill uses the
+	// server's effective enabled value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3125,7 +3127,7 @@ type AgentCustomization struct {
 	DisableUserInvocation *bool `json:"disableUserInvocation,omitempty"`
 }
 
-// A skill contributed by a plugin or directory.
+// A skill contributed by a plugin, directory, or MCP server.
 //
 // Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
 // — the `skills/` directory layout (one subdirectory per skill, each with
@@ -3167,7 +3169,8 @@ type SkillCustomization struct {
 	// enabled state of a plugin child is the plugin's derived enabled value and
 	// `(child.enabled ?? true)`, so a disabled plugin disables every child
 	// regardless of each child's own flag. A directory child instead uses the
-	// directory's `enabled` value and its own flag.
+	// directory's `enabled` value and its own flag. An MCP-served skill uses the
+	// server's effective enabled value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3223,7 +3226,8 @@ type PromptCustomization struct {
 	// enabled state of a plugin child is the plugin's derived enabled value and
 	// `(child.enabled ?? true)`, so a disabled plugin disables every child
 	// regardless of each child's own flag. A directory child instead uses the
-	// directory's `enabled` value and its own flag.
+	// directory's `enabled` value and its own flag. An MCP-served skill uses the
+	// server's effective enabled value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3278,7 +3282,8 @@ type RuleCustomization struct {
 	// enabled state of a plugin child is the plugin's derived enabled value and
 	// `(child.enabled ?? true)`, so a disabled plugin disables every child
 	// regardless of each child's own flag. A directory child instead uses the
-	// directory's `enabled` value and its own flag.
+	// directory's `enabled` value and its own flag. An MCP-served skill uses the
+	// server's effective enabled value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3332,7 +3337,8 @@ type HookCustomization struct {
 	// enabled state of a plugin child is the plugin's derived enabled value and
 	// `(child.enabled ?? true)`, so a disabled plugin disables every child
 	// regardless of each child's own flag. A directory child instead uses the
-	// directory's `enabled` value and its own flag.
+	// directory's `enabled` value and its own flag. An MCP-served skill uses the
+	// server's effective enabled value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3414,6 +3420,17 @@ type McpServerCustomization struct {
 	// MCP App support. This property SHOULD be advertised for MCP servers
 	// which support apps.
 	McpApp *McpServerCustomizationApps `json:"mcpApp,omitempty"`
+	// Skills served by this MCP server, for example through the MCP skills
+	// extension (SEP-2640).
+	//
+	// Absent means the host has not discovered skills for this server, or
+	// does not support MCP-served skills. An empty array means the server
+	// was queried and serves none.
+	//
+	// A skill's effective enabled state is the server's effective enabled
+	// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+	// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
+	Children []SkillCustomization `json:"children,omitempty"`
 }
 
 // Information from the agent host needed to render MCP Apps served
