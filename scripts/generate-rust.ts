@@ -611,9 +611,10 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
       attrs.push('serialize_with = "serialize_running_tool_call"');
       attrs.push('deserialize_with = "deserialize_running_tool_call"');
     }
-    if (rustName === 'AutomationEntry' && p.rustName === 'customizations') {
-      attrs.push('serialize_with = "serialize_plugin_customizations"');
-      attrs.push('deserialize_with = "deserialize_plugin_customizations"');
+    const taggedList = TAGGED_CUSTOMIZATION_LISTS.find(list => list.owner === rustName && list.field === p.rustName);
+    if (taggedList) {
+      attrs.push(`serialize_with = "serialize_${taggedList.fnSuffix}"`);
+      attrs.push(`deserialize_with = "deserialize_${taggedList.fnSuffix}"`);
     }
     if (attrs.length > 0) {
       lines.push(`    #[serde(${attrs.join(', ')})]`);
@@ -660,13 +661,31 @@ where
 }
 
 /**
- * `PluginCustomization` omits its `type` discriminant because the
- * `Customization` enum supplies it. Standalone plugin lists outside that enum
- * (currently `AutomationEntry.customizations`) must restore it on the wire.
+ * Customization variants omit their `type` discriminant because the
+ * `Customization` and `ChildCustomization` enums supply it. Standalone lists of
+ * one variant outside those enums must restore it on the wire.
  */
-function generatePluginCustomizationsSerdeHelpers(): string {
-  return `fn serialize_plugin_customizations<S>(
-    value: &Option<Vec<PluginCustomization>>,
+interface ITaggedCustomizationList {
+  /** Rust struct that owns the field. */
+  readonly owner: string;
+  /** Rust field name. */
+  readonly field: string;
+  /** Rust element type. */
+  readonly rustType: string;
+  /** Wire value of the `type` discriminant. */
+  readonly tag: string;
+  /** Suffix of the generated `serialize_`/`deserialize_` helper names. */
+  readonly fnSuffix: string;
+}
+
+const TAGGED_CUSTOMIZATION_LISTS: readonly ITaggedCustomizationList[] = [
+  { owner: 'AutomationEntry', field: 'customizations', rustType: 'PluginCustomization', tag: 'plugin', fnSuffix: 'plugin_customizations' },
+  { owner: 'McpServerCustomization', field: 'children', rustType: 'SkillCustomization', tag: 'skill', fnSuffix: 'mcp_server_skills' },
+];
+
+function generateTaggedCustomizationsSerdeHelpers({ rustType, tag, fnSuffix }: ITaggedCustomizationList): string {
+  return `fn serialize_${fnSuffix}<S>(
+    value: &Option<Vec<${rustType}>>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -679,17 +698,17 @@ where
     for item in items {
         let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
         let serde_json::Value::Object(object) = &mut raw else {
-            return Err(serde::ser::Error::custom("plugin customization must serialize to an object"));
+            return Err(serde::ser::Error::custom("${tag} customization must serialize to an object"));
         };
-        object.insert("type".to_owned(), serde_json::Value::String("plugin".to_owned()));
+        object.insert("type".to_owned(), serde_json::Value::String("${tag}".to_owned()));
         out.push(raw);
     }
     serde::Serialize::serialize(&out, serializer)
 }
 
-fn deserialize_plugin_customizations<'de, D>(
+fn deserialize_${fnSuffix}<'de, D>(
     deserializer: D,
-) -> Result<Option<Vec<PluginCustomization>>, D::Error>
+) -> Result<Option<Vec<${rustType}>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -699,8 +718,8 @@ where
     items
         .into_iter()
         .map(|raw| {
-            if raw.get("type").and_then(serde_json::Value::as_str) != Some("plugin") {
-                return Err(serde::de::Error::custom("expected plugin customization type"));
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("${tag}") {
+                return Err(serde::de::Error::custom("expected ${tag} customization type"));
             }
             serde_json::from_value(raw).map_err(serde::de::Error::custom)
         })
@@ -1445,9 +1464,9 @@ function generateStateFile(project: Project): string {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
       }
-      if (entry.name === 'AutomationEntry') {
+      for (const list of TAGGED_CUSTOMIZATION_LISTS.filter(list => list.owner === entry.name)) {
         lines.push('');
-        lines.push(generatePluginCustomizationsSerdeHelpers());
+        lines.push(generateTaggedCustomizationsSerdeHelpers(list));
       }
       if (entry.name === 'SubscribeParams') {
         lines.push('');

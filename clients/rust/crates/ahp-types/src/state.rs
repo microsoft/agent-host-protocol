@@ -4903,8 +4903,63 @@ pub struct McpServerCustomization {
     /// A skill's effective enabled state is the server's effective enabled
     /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
     /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_mcp_server_skills",
+        deserialize_with = "deserialize_mcp_server_skills"
+    )]
     pub children: Option<Vec<SkillCustomization>>,
+}
+
+fn serialize_mcp_server_skills<S>(
+    value: &Option<Vec<SkillCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom(
+                "skill customization must serialize to an object",
+            ));
+        };
+        object.insert(
+            "type".to_owned(),
+            serde_json::Value::String("skill".to_owned()),
+        );
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_mcp_server_skills<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<SkillCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("skill") {
+                return Err(serde::de::Error::custom(
+                    "expected skill customization type",
+                ));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Information from the agent host needed to render MCP Apps served
