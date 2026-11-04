@@ -747,7 +747,7 @@
     },
     "ChatTurnStartedAction": {
       "type": "object",
-      "description": "A new message has been sent to the agent, and a new turn starts.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A new message has been sent to the agent, and a new turn starts.",
       "properties": {
         "type": {
           "const": "chat/turnStarted"
@@ -1603,7 +1603,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"

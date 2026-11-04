@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "Remove the User-only restriction on client-submitted messages in `chat/turnStarted` and `chat/pendingMessageSet`.",
+  "issues": [542]
+}
