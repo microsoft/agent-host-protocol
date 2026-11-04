@@ -1209,7 +1209,12 @@ public sealed record ListSessionsResult
 /// sent in either direction. Hosts use it to fetch content from a
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
-/// same permission/`resourceRequest` flow regardless of which peer initiated.</summary>
+/// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+/// content references and canvas sources. This includes HTTP(S) URLs that the
+/// other peer might not be able to reach, such as a development server on the
+/// host's loopback interface.</summary>
 public sealed record ResourceReadParams
 {
     public required string Channel { get; init; }
@@ -1220,7 +1225,7 @@ public sealed record ResourceReadParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Content URI from a `ContentRef`</summary>
+    /// <summary>Content URI to read, such as one from a `ContentRef`</summary>
     public required string Uri { get; init; }
 
     /// <summary>Preferred encoding for the returned data (default: server-chosen)</summary>

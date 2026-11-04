@@ -817,13 +817,18 @@ type ListSessionsResult struct {
 // client-published URI (e.g. `virtual://my-client/...` plugins); clients
 // use it to read host-side files. The receiver enforces access via the
 // same permission/`resourceRequest` flow regardless of which peer initiated.
+//
+// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+// content references and canvas sources. This includes HTTP(S) URLs that the
+// other peer might not be able to reach, such as a development server on the
+// host's loopback interface.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Content URI from a `ContentRef`
+	// Content URI to read, such as one from a `ContentRef`
 	Uri string `json:"uri"`
 	// Preferred encoding for the returned data (default: server-chosen)
 	Encoding *ContentEncoding `json:"encoding,omitempty"`

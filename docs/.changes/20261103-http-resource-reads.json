@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`resourceRead` guidance: a peer SHOULD serve reads of the URIs it publishes as content, including HTTP(S) URLs that the other peer might not be able to reach."
+}

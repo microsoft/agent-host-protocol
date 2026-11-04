@@ -7520,7 +7520,7 @@
         },
         "url": {
           "$ref": "#/$defs/URI",
-          "description": "Current absolute HTTP(S) source URL; absent when the live source is unavailable.\nHosts MUST clear this field when the provider becomes unavailable.\n\nSource URLs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
+          "description": "Absolute URI of the canvas's live content, typically an HTTP(S) URL;\nabsent when the live source is unavailable. Hosts MUST clear this field\nwhen the provider becomes unavailable.\n\nA client that can't load this URI directly, for example because it is a\nloopback address in the host's environment or uses a scheme that the\nclient doesn't load, reads it with `resourceRead`. The client resolves the\nrelative references in its content and reads them the same way. Hosts\nSHOULD serve reads of this URI, and of other URLs on its origin when it is\nan HTTP(S) URL, to clients that can subscribe to the canvas. The provider\nchooses the URI, so the host decides which sources it is willing to read.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
         }
       },
       "required": [

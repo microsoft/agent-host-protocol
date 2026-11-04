@@ -1214,7 +1214,7 @@ public struct ResourceReadParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Content URI from a `ContentRef`
+    /// Content URI to read, such as one from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?

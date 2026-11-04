@@ -770,6 +770,11 @@ export const enum ContentEncoding {
  * use it to read host-side files. The receiver enforces access via the
  * same permission/`resourceRequest` flow regardless of which peer initiated.
  *
+ * A peer SHOULD serve reads of the URIs that it publishes as content, such as
+ * content references and canvas sources. This includes HTTP(S) URLs that the
+ * other peer might not be able to reach, such as a development server on the
+ * host's loopback interface.
+ *
  * @category Commands
  * @method resourceRead
  * @direction Client ↔ Server
@@ -793,7 +798,7 @@ export const enum ContentEncoding {
  */
 export interface ResourceReadParams extends BaseParams {
   channel: 'ahp-root://';
-  /** Content URI from a `ContentRef` */
+  /** Content URI to read, such as one from a `ContentRef` */
   uri: string;
   /** Preferred encoding for the returned data (default: server-chosen) */
   encoding?: ContentEncoding;
