@@ -76,6 +76,7 @@ pub enum ActionType {
     SessionWorkingDirectoryReplaced,
     SessionInputNeededSet,
     SessionInputNeededRemoved,
+    SessionPermissionResponded,
     ChatPendingMessageSet,
     ChatPendingMessageRemoved,
     ChatQueuedMessagesReordered,
@@ -217,6 +218,9 @@ impl serde::Serialize for ActionType {
             Self::SessionInputNeededSet => serializer.serialize_str("session/inputNeededSet"),
             Self::SessionInputNeededRemoved => {
                 serializer.serialize_str("session/inputNeededRemoved")
+            }
+            Self::SessionPermissionResponded => {
+                serializer.serialize_str("session/permissionResponded")
             }
             Self::ChatPendingMessageSet => serializer.serialize_str("chat/pendingMessageSet"),
             Self::ChatPendingMessageRemoved => {
@@ -378,6 +382,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/workingDirectoryReplaced" => Self::SessionWorkingDirectoryReplaced,
             "session/inputNeededSet" => Self::SessionInputNeededSet,
             "session/inputNeededRemoved" => Self::SessionInputNeededRemoved,
+            "session/permissionResponded" => Self::SessionPermissionResponded,
             "chat/pendingMessageSet" => Self::ChatPendingMessageSet,
             "chat/pendingMessageRemoved" => Self::ChatPendingMessageRemoved,
             "chat/queuedMessagesReordered" => Self::ChatQueuedMessagesReordered,
@@ -1456,6 +1461,28 @@ pub struct SessionInputNeededSetAction {
 pub struct SessionInputNeededRemovedAction {
     /// The `id` of the input request to remove.
     pub id: String,
+}
+
+/// A client responded to a session-scoped permission request.
+///
+/// The host MUST validate that `requestId` identifies an outstanding
+/// {@link SessionExtensionPermissionRequest}, apply the decision to the
+/// underlying extension operation, and only then broadcast the accepted action.
+/// The host MUST reject a `selectedOptionId` that the request did not offer,
+/// or whose option kind does not match `approved`. Without a
+/// `selectedOptionId`, the host applies its narrowest approval or a plain
+/// denial. The session reducer removes the resolved request from
+/// {@link SessionState.inputNeeded}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPermissionRespondedAction {
+    /// The opaque `id` of the session input request being answered.
+    pub request_id: String,
+    /// Whether the user approved the request.
+    pub approved: bool,
+    /// ID of the selected option, if the request offered options.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_option_id: Option<String>,
 }
 
 /// A pending message was set (upsert semantics: creates or replaces).
@@ -2542,6 +2569,8 @@ pub enum StateAction {
     SessionInputNeededSet(Box<SessionInputNeededSetAction>),
     #[serde(rename = "session/inputNeededRemoved")]
     SessionInputNeededRemoved(SessionInputNeededRemovedAction),
+    #[serde(rename = "session/permissionResponded")]
+    SessionPermissionResponded(SessionPermissionRespondedAction),
     #[serde(rename = "chat/pendingMessageSet")]
     ChatPendingMessageSet(ChatPendingMessageSetAction),
     #[serde(rename = "chat/pendingMessageRemoved")]

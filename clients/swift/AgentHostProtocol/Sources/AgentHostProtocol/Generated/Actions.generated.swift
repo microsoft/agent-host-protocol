@@ -51,6 +51,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionWorkingDirectoryReplaced
     case sessionInputNeededSet
     case sessionInputNeededRemoved
+    case sessionPermissionResponded
     case chatPendingMessageSet
     case chatPendingMessageRemoved
     case chatQueuedMessagesReordered
@@ -166,6 +167,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/workingDirectoryReplaced": self = .sessionWorkingDirectoryReplaced
         case "session/inputNeededSet": self = .sessionInputNeededSet
         case "session/inputNeededRemoved": self = .sessionInputNeededRemoved
+        case "session/permissionResponded": self = .sessionPermissionResponded
         case "chat/pendingMessageSet": self = .chatPendingMessageSet
         case "chat/pendingMessageRemoved": self = .chatPendingMessageRemoved
         case "chat/queuedMessagesReordered": self = .chatQueuedMessagesReordered
@@ -281,6 +283,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionWorkingDirectoryReplaced: try container.encode("session/workingDirectoryReplaced")
         case .sessionInputNeededSet: try container.encode("session/inputNeededSet")
         case .sessionInputNeededRemoved: try container.encode("session/inputNeededRemoved")
+        case .sessionPermissionResponded: try container.encode("session/permissionResponded")
         case .chatPendingMessageSet: try container.encode("chat/pendingMessageSet")
         case .chatPendingMessageRemoved: try container.encode("chat/pendingMessageRemoved")
         case .chatQueuedMessagesReordered: try container.encode("chat/queuedMessagesReordered")
@@ -1610,6 +1613,28 @@ public struct SessionInputNeededRemovedAction: Codable, Sendable {
     }
 }
 
+public struct SessionPermissionRespondedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The opaque `id` of the session input request being answered.
+    public var requestId: String
+    /// Whether the user approved the request.
+    public var approved: Bool
+    /// ID of the selected option, if the request offered options.
+    public var selectedOptionId: String?
+
+    public init(
+        type: ActionType,
+        requestId: String,
+        approved: Bool,
+        selectedOptionId: String? = nil
+    ) {
+        self.type = type
+        self.requestId = requestId
+        self.approved = approved
+        self.selectedOptionId = selectedOptionId
+    }
+}
+
 public struct ChatPendingMessageSetAction: Codable, Sendable {
     public var type: ActionType
     /// Whether this is a steering or queued message
@@ -2689,6 +2714,7 @@ public enum StateAction: Codable, Sendable {
     case chatWorkingDirectoryRemoved(ChatWorkingDirectoryRemovedAction)
     case sessionInputNeededSet(SessionInputNeededSetAction)
     case sessionInputNeededRemoved(SessionInputNeededRemovedAction)
+    case sessionPermissionResponded(SessionPermissionRespondedAction)
     case chatPendingMessageSet(ChatPendingMessageSetAction)
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
@@ -2858,6 +2884,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionInputNeededSet(try SessionInputNeededSetAction(from: decoder))
         case "session/inputNeededRemoved":
             self = .sessionInputNeededRemoved(try SessionInputNeededRemovedAction(from: decoder))
+        case "session/permissionResponded":
+            self = .sessionPermissionResponded(try SessionPermissionRespondedAction(from: decoder))
         case "chat/pendingMessageSet":
             self = .chatPendingMessageSet(try ChatPendingMessageSetAction(from: decoder))
         case "chat/pendingMessageRemoved":
@@ -3032,6 +3060,7 @@ public enum StateAction: Codable, Sendable {
         case .chatWorkingDirectoryRemoved(let v): try v.encode(to: encoder)
         case .sessionInputNeededSet(let v): try v.encode(to: encoder)
         case .sessionInputNeededRemoved(let v): try v.encode(to: encoder)
+        case .sessionPermissionResponded(let v): try v.encode(to: encoder)
         case .chatPendingMessageSet(let v): try v.encode(to: encoder)
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)

@@ -32,6 +32,7 @@ import type {
   SessionWorkingDirectoryReplacedAction,
   SessionInputNeededSetAction,
   SessionInputNeededRemovedAction,
+  SessionPermissionRespondedAction,
   SessionCustomizationsChangedAction,
   SessionCustomizationToggledAction,
   SessionCustomizationUpdatedAction,
@@ -198,6 +199,7 @@ export const enum ActionType {
   SessionWorkingDirectoryReplaced = 'session/workingDirectoryReplaced',
   SessionInputNeededSet = 'session/inputNeededSet',
   SessionInputNeededRemoved = 'session/inputNeededRemoved',
+  SessionPermissionResponded = 'session/permissionResponded',
   ChatPendingMessageSet = 'chat/pendingMessageSet',
   ChatPendingMessageRemoved = 'chat/pendingMessageRemoved',
   ChatQueuedMessagesReordered = 'chat/queuedMessagesReordered',
@@ -317,6 +319,7 @@ export type StateAction =
   | SessionWorkingDirectoryReplacedAction
   | SessionInputNeededSetAction
   | SessionInputNeededRemovedAction
+  | SessionPermissionRespondedAction
   | SessionCustomizationsChangedAction
   | SessionCustomizationToggledAction
   | SessionCustomizationUpdatedAction

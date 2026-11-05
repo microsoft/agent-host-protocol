@@ -431,6 +431,9 @@ public readonly struct SessionInputRequestKind : IEquatable<SessionInputRequestK
     /// <summary>A tool call blocked on MCP authentication mid-execution.</summary>
     public static readonly SessionInputRequestKind ToolAuthentication = new SessionInputRequestKind("toolAuthentication");
 
+    /// <summary>A session-scoped extension capability awaiting explicit user approval.</summary>
+    public static readonly SessionInputRequestKind ExtensionPermission = new SessionInputRequestKind("extensionPermission");
+
     /// <inheritdoc />
     public bool Equals(SessionInputRequestKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
 
@@ -3237,6 +3240,40 @@ public sealed record SessionToolAuthenticationRequest
 
     /// <summary>The tool call awaiting authentication.</summary>
     public required ToolCallAuthRequiredState ToolCall { get; init; }
+}
+
+/// <summary>An extension capability request that is not associated with a chat turn or
+/// tool call, surfaced at the session level for explicit user approval. For
+/// example, an agent extension may need approval to register hooks when it
+/// starts, before any turn exists.
+///
+/// Respond by dispatching `session/permissionResponded` to the owning session
+/// channel, keyed by {@link SessionInputRequestBase.id | `id`}. The host applies
+/// the decision to the pending extension operation and removes this entry once
+/// the response is accepted.</summary>
+public sealed record SessionExtensionPermissionRequest
+{
+    /// <summary>Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.</summary>
+    public required string Id { get; init; }
+
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ExtensionPermission;
+
+    /// <summary>Host-defined identifier of the extension requesting access.</summary>
+    public required string ExtensionName { get; init; }
+
+    /// <summary>Human-readable capabilities the extension is requesting.</summary>
+    public required List<string> Capabilities { get; init; }
+
+    /// <summary>Options the host offers for this request, such as approving once or for
+    /// the rest of the session. When present, the client SHOULD render these
+    /// instead of a plain approve/deny UI and echo the chosen option's `id` in
+    /// `session/permissionResponded`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ConfirmationOption>? Options { get; init; }
 }
 
 /// <summary>Lightweight catalog entry summarizing one session. Surfaced via
@@ -7723,6 +7760,7 @@ internal sealed class SessionInputRequestConverter : UnionConverter<SessionInput
         ["toolConfirmation"] = typeof(SessionToolConfirmationRequest),
         ["toolClientExecution"] = typeof(SessionToolClientExecutionRequest),
         ["toolAuthentication"] = typeof(SessionToolAuthenticationRequest),
+        ["extensionPermission"] = typeof(SessionExtensionPermissionRequest),
             },
             allowUnknown: true)
     {

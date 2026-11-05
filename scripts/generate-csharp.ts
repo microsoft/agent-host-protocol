@@ -815,6 +815,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionToolConfirmationRequest' },
   { name: 'SessionToolClientExecutionRequest' },
   { name: 'SessionToolAuthenticationRequest' },
+  { name: 'SessionExtensionPermissionRequest' },
   { name: 'SessionSummary', mutable: true },
   { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
@@ -1293,6 +1294,7 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { variantName: 'ToolConfirmation', innerType: 'SessionToolConfirmationRequest', wireValue: 'toolConfirmation' },
     { variantName: 'ToolClientExecution', innerType: 'SessionToolClientExecutionRequest', wireValue: 'toolClientExecution' },
     { variantName: 'ToolAuthentication', innerType: 'SessionToolAuthenticationRequest', wireValue: 'toolAuthentication' },
+    { variantName: 'ExtensionPermission', innerType: 'SessionExtensionPermissionRequest', wireValue: 'extensionPermission' },
   ],
   unknown: true,
 };
@@ -1656,6 +1658,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'session/workingDirectoryReplaced', variantName: 'SessionWorkingDirectoryReplaced', tsInterface: 'SessionWorkingDirectoryReplacedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/permissionResponded', variantName: 'SessionPermissionResponded', tsInterface: 'SessionPermissionRespondedAction' },
   { type: 'session/pendingMessageSet', variantName: 'SessionPendingMessageSet', tsInterface: '_hand_written_session_action_' },
   { type: 'session/pendingMessageRemoved', variantName: 'SessionPendingMessageRemoved', tsInterface: '_hand_written_session_action_' },
   { type: 'session/queuedMessagesReordered', variantName: 'SessionQueuedMessagesReordered', tsInterface: '_hand_written_session_action_' },

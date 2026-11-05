@@ -23,6 +23,7 @@ import type {
   SessionWorkingDirectoryReplacedAction,
   SessionInputNeededSetAction,
   SessionInputNeededRemovedAction,
+  SessionPermissionRespondedAction,
   SessionCustomizationsChangedAction,
   SessionCustomizationToggledAction,
   SessionCustomizationUpdatedAction,
@@ -155,6 +156,7 @@ export type SessionAction =
   | SessionWorkingDirectoryReplacedAction
   | SessionInputNeededSetAction
   | SessionInputNeededRemovedAction
+  | SessionPermissionRespondedAction
   | SessionCustomizationsChangedAction
   | SessionCustomizationToggledAction
   | SessionCustomizationUpdatedAction
@@ -179,6 +181,7 @@ export type ClientSessionAction =
   | SessionWorkingDirectorySetAction
   | SessionWorkingDirectoryRemovedAction
   | SessionWorkingDirectoryReplacedAction
+  | SessionPermissionRespondedAction
   | SessionCustomizationToggledAction
   | SessionMcpServerStartRequestedAction
   | SessionMcpServerStopRequestedAction
@@ -483,6 +486,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionWorkingDirectoryReplaced]: true,
   [ActionType.SessionInputNeededSet]: false,
   [ActionType.SessionInputNeededRemoved]: false,
+  [ActionType.SessionPermissionResponded]: true,
   [ActionType.SessionCustomizationsChanged]: false,
   [ActionType.SessionCustomizationToggled]: true,
   [ActionType.SessionCustomizationUpdated]: false,

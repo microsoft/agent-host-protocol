@@ -527,6 +527,32 @@
         "id"
       ]
     },
+    "SessionPermissionRespondedAction": {
+      "type": "object",
+      "description": "A client responded to a session-scoped permission request.\n\nThe host MUST validate that `requestId` identifies an outstanding\n{@link SessionExtensionPermissionRequest}, apply the decision to the\nunderlying extension operation, and only then broadcast the accepted action.\nThe host MUST reject a `selectedOptionId` that the request did not offer,\nor whose option kind does not match `approved`. Without a\n`selectedOptionId`, the host applies its narrowest approval or a plain\ndenial. The session reducer removes the resolved request from\n{@link SessionState.inputNeeded}.",
+      "properties": {
+        "type": {
+          "const": "session/permissionResponded"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "The opaque `id` of the session input request being answered."
+        },
+        "approved": {
+          "type": "boolean",
+          "description": "Whether the user approved the request."
+        },
+        "selectedOptionId": {
+          "type": "string",
+          "description": "ID of the selected option, if the request offered options."
+        }
+      },
+      "required": [
+        "type",
+        "requestId",
+        "approved"
+      ]
+    },
     "SessionCustomizationsChangedAction": {
       "type": "object",
       "description": "The session's customizations have changed.\n\nFull-replacement semantics: the `customizations` array replaces the\nprevious `customizations` entirely.",
@@ -3689,6 +3715,19 @@
         "id": {
           "type": "string",
           "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "SessionChatInputRequestBase": {
+      "type": "object",
+      "description": "Fields common to input requests owned by a chat.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
         },
         "chat": {
           "$ref": "#/$defs/URI",
@@ -3826,6 +3865,43 @@
         "kind",
         "turnId",
         "toolCall"
+      ]
+    },
+    "SessionExtensionPermissionRequest": {
+      "type": "object",
+      "description": "An extension capability request that is not associated with a chat turn or\ntool call, surfaced at the session level for explicit user approval. For\nexample, an agent extension may need approval to register hooks when it\nstarts, before any turn exists.\n\nRespond by dispatching `session/permissionResponded` to the owning session\nchannel, keyed by {@link SessionInputRequestBase.id | `id`}. The host applies\nthe decision to the pending extension operation and removes this entry once\nthe response is accepted.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        },
+        "kind": {
+          "const": "extensionPermission"
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Host-defined identifier of the extension requesting access."
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Human-readable capabilities the extension is requesting."
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConfirmationOption"
+          },
+          "description": "Options the host offers for this request, such as approving once or for\nthe rest of the session. When present, the client SHOULD render these\ninstead of a plain approve/deny UI and echo the chosen option's `id` in\n`session/permissionResponded`."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "extensionName",
+        "capabilities"
       ]
     },
     "ProjectInfo": {
@@ -8824,9 +8900,12 @@
         },
         {
           "$ref": "#/$defs/SessionToolAuthenticationRequest"
+        },
+        {
+          "$ref": "#/$defs/SessionExtensionPermissionRequest"
         }
       ],
-      "description": "One outstanding piece of input a session is blocked on, aggregated across all\nchats in {@link SessionState.inputNeeded}.\n\nEach entry is self-sufficient: it carries the owning\n{@link SessionInputRequestBase.chat | `chat`} URI plus every identifier needed\nto construct the response, so a client can answer by dispatching the ordinary\n`chat/*` action (`chat/inputCompleted`, `chat/toolCallConfirmed`,\n`chat/toolCallComplete`, …) to that chat's channel **without having subscribed\nto the chat** — except {@link SessionToolAuthenticationRequest}, which is\nresolved via the `authenticate` command instead. The host removes the entry\nwith `session/inputNeededRemoved` once the underlying request resolves."
+      "description": "One outstanding piece of input a session is blocked on, aggregated across all\nchats and session-scoped operations in {@link SessionState.inputNeeded}.\n\nEach entry is self-sufficient and documents its response path. Chat-owned\nentries carry the owning chat URI so a client can answer without subscribing\nto that chat. Session-owned entries are answered on the session channel.\nThe host removes the entry once the underlying request resolves."
     },
     "CustomizationEnablement": {
       "oneOf": [
@@ -9403,6 +9482,9 @@
         },
         {
           "$ref": "#/$defs/SessionInputNeededRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionPermissionRespondedAction"
         },
         {
           "$ref": "#/$defs/SessionCustomizationsChangedAction"

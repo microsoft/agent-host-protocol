@@ -375,6 +375,10 @@ value class SessionInputRequestKind(val rawValue: String) {
          * A tool call blocked on MCP authentication mid-execution.
          */
         val TOOL_AUTHENTICATION: SessionInputRequestKind = SessionInputRequestKind("toolAuthentication")
+        /**
+         * A session-scoped extension capability awaiting explicit user approval.
+         */
+        val EXTENSION_PERMISSION: SessionInputRequestKind = SessionInputRequestKind("extensionPermission")
     }
 }
 
@@ -2402,6 +2406,34 @@ data class SessionToolAuthenticationRequest(
      * The tool call awaiting authentication.
      */
     val toolCall: ToolCallAuthRequiredState
+)
+
+@Serializable
+data class SessionExtensionPermissionRequest(
+    /**
+     * Stable key for this entry, unique within the session's
+     * {@link SessionState.inputNeeded} list. The host derives it however it likes
+     * (for example from the chat URI plus the underlying request or tool-call
+     * id); consumers MUST treat it as opaque. It is the key for the
+     * `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+     */
+    val id: String,
+    val kind: SessionInputRequestKind,
+    /**
+     * Host-defined identifier of the extension requesting access.
+     */
+    val extensionName: String,
+    /**
+     * Human-readable capabilities the extension is requesting.
+     */
+    val capabilities: List<String>,
+    /**
+     * Options the host offers for this request, such as approving once or for
+     * the rest of the session. When present, the client SHOULD render these
+     * instead of a plain approve/deny UI and echo the chosen option's `id` in
+     * `session/permissionResponded`.
+     */
+    val options: List<ConfirmationOption>? = null
 )
 
 @Serializable
@@ -7341,6 +7373,8 @@ value class SessionInputRequestToolConfirmation(val value: SessionToolConfirmati
 value class SessionInputRequestToolClientExecution(val value: SessionToolClientExecutionRequest) : SessionInputRequest
 @JvmInline
 value class SessionInputRequestToolAuthentication(val value: SessionToolAuthenticationRequest) : SessionInputRequest
+@JvmInline
+value class SessionInputRequestExtensionPermission(val value: SessionExtensionPermissionRequest) : SessionInputRequest
 /**
  * Forward-compat catch-all for unknown SessionInputRequest discriminators.
  *
@@ -7369,6 +7403,7 @@ internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest>
             "toolConfirmation" -> SessionInputRequestToolConfirmation(input.json.decodeFromJsonElement(SessionToolConfirmationRequest.serializer(), element))
             "toolClientExecution" -> SessionInputRequestToolClientExecution(input.json.decodeFromJsonElement(SessionToolClientExecutionRequest.serializer(), element))
             "toolAuthentication" -> SessionInputRequestToolAuthentication(input.json.decodeFromJsonElement(SessionToolAuthenticationRequest.serializer(), element))
+            "extensionPermission" -> SessionInputRequestExtensionPermission(input.json.decodeFromJsonElement(SessionExtensionPermissionRequest.serializer(), element))
             else -> SessionInputRequestUnknown(obj)
         }
     }
@@ -7381,6 +7416,7 @@ internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest>
             is SessionInputRequestToolConfirmation -> output.json.encodeToJsonElement(SessionToolConfirmationRequest.serializer(), value.value)
             is SessionInputRequestToolClientExecution -> output.json.encodeToJsonElement(SessionToolClientExecutionRequest.serializer(), value.value)
             is SessionInputRequestToolAuthentication -> output.json.encodeToJsonElement(SessionToolAuthenticationRequest.serializer(), value.value)
+            is SessionInputRequestExtensionPermission -> output.json.encodeToJsonElement(SessionExtensionPermissionRequest.serializer(), value.value)
             is SessionInputRequestUnknown -> value.raw
         }
         output.encodeJsonElement(element)

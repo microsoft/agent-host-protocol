@@ -707,7 +707,7 @@ const STATE_STRUCTS = [
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
-  'SessionToolAuthenticationRequest',
+  'SessionToolAuthenticationRequest', 'SessionExtensionPermissionRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
@@ -988,6 +988,7 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { caseName: 'toolConfirmation', structName: 'SessionToolConfirmationRequest', discriminantValue: 'toolConfirmation' },
     { caseName: 'toolClientExecution', structName: 'SessionToolClientExecutionRequest', discriminantValue: 'toolClientExecution' },
     { caseName: 'toolAuthentication', structName: 'SessionToolAuthenticationRequest', discriminantValue: 'toolAuthentication' },
+    { caseName: 'extensionPermission', structName: 'SessionExtensionPermissionRequest', discriminantValue: 'extensionPermission' },
   ],
 };
 
@@ -1477,6 +1478,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/workingDirectoryRemoved', caseName: 'chatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'sessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', caseName: 'sessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/permissionResponded', caseName: 'sessionPermissionResponded', tsInterface: 'SessionPermissionRespondedAction' },
   { type: 'chat/pendingMessageSet', caseName: 'chatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', caseName: 'chatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', caseName: 'chatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },

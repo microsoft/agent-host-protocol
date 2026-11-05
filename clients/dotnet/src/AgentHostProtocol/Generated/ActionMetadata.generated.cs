@@ -298,6 +298,9 @@ internal static class GeneratedActionMetadata
             case SessionPendingMessageSetAction value:
                 actionType = value.Type;
                 return true;
+            case SessionPermissionRespondedAction value:
+                actionType = value.Type;
+                return true;
             case SessionQueuedMessagesReorderedAction value:
                 actionType = value.Type;
                 return true;

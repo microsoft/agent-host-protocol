@@ -381,6 +381,8 @@ pub enum SessionInputRequestKind {
     ToolClientExecution,
     /// A tool call blocked on MCP authentication mid-execution.
     ToolAuthentication,
+    /// A session-scoped extension capability awaiting explicit user approval.
+    ExtensionPermission,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -395,6 +397,7 @@ impl serde::Serialize for SessionInputRequestKind {
             Self::ToolConfirmation => serializer.serialize_str("toolConfirmation"),
             Self::ToolClientExecution => serializer.serialize_str("toolClientExecution"),
             Self::ToolAuthentication => serializer.serialize_str("toolAuthentication"),
+            Self::ExtensionPermission => serializer.serialize_str("extensionPermission"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -411,6 +414,7 @@ impl<'de> serde::Deserialize<'de> for SessionInputRequestKind {
             "toolConfirmation" => Self::ToolConfirmation,
             "toolClientExecution" => Self::ToolClientExecution,
             "toolAuthentication" => Self::ToolAuthentication,
+            "extensionPermission" => Self::ExtensionPermission,
             _ => Self::Unknown(raw),
         })
     }
@@ -2645,6 +2649,36 @@ pub struct SessionToolAuthenticationRequest {
     pub turn_id: String,
     /// The tool call awaiting authentication.
     pub tool_call: ToolCallAuthRequiredState,
+}
+
+/// An extension capability request that is not associated with a chat turn or
+/// tool call, surfaced at the session level for explicit user approval. For
+/// example, an agent extension may need approval to register hooks when it
+/// starts, before any turn exists.
+///
+/// Respond by dispatching `session/permissionResponded` to the owning session
+/// channel, keyed by {@link SessionInputRequestBase.id | `id`}. The host applies
+/// the decision to the pending extension operation and removes this entry once
+/// the response is accepted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionExtensionPermissionRequest {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    pub id: String,
+    /// Host-defined identifier of the extension requesting access.
+    pub extension_name: String,
+    /// Human-readable capabilities the extension is requesting.
+    pub capabilities: Vec<String>,
+    /// Options the host offers for this request, such as approving once or for
+    /// the rest of the session. When present, the client SHOULD render these
+    /// instead of a plain approve/deny UI and echo the chosen option's `id` in
+    /// `session/permissionResponded`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<Vec<ConfirmationOption>>,
 }
 
 /// Lightweight catalog entry summarizing one session. Surfaced via
@@ -6766,6 +6800,8 @@ pub enum SessionInputRequest {
     ToolClientExecution(SessionToolClientExecutionRequest),
     #[serde(rename = "toolAuthentication")]
     ToolAuthentication(Box<SessionToolAuthenticationRequest>),
+    #[serde(rename = "extensionPermission")]
+    ExtensionPermission(SessionExtensionPermissionRequest),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

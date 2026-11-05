@@ -900,6 +900,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionToolConfirmationRequest', omitDiscriminants: true },
   { name: 'SessionToolClientExecutionRequest', omitDiscriminants: true },
   { name: 'SessionToolAuthenticationRequest', omitDiscriminants: true },
+  { name: 'SessionExtensionPermissionRequest', omitDiscriminants: true },
   { name: 'SessionSummary' },
   { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
@@ -1274,6 +1275,7 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { variantName: 'ToolConfirmation', innerType: 'SessionToolConfirmationRequest', wireValue: 'toolConfirmation' },
     { variantName: 'ToolClientExecution', innerType: 'SessionToolClientExecutionRequest', wireValue: 'toolClientExecution' },
     { variantName: 'ToolAuthentication', innerType: 'SessionToolAuthenticationRequest', wireValue: 'toolAuthentication', boxed: true },
+    { variantName: 'ExtensionPermission', innerType: 'SessionExtensionPermissionRequest', wireValue: 'extensionPermission' },
   ],
   unknown: true,
 };
@@ -1602,6 +1604,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction', boxed: true },
   { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/permissionResponded', variantName: 'SessionPermissionResponded', tsInterface: 'SessionPermissionRespondedAction' },
   { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },

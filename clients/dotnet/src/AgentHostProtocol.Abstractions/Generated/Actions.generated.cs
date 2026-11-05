@@ -115,6 +115,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType SessionInputNeededRemoved = new ActionType("session/inputNeededRemoved");
 
+    public static readonly ActionType SessionPermissionResponded = new ActionType("session/permissionResponded");
+
     public static readonly ActionType ChatPendingMessageSet = new ActionType("chat/pendingMessageSet");
 
     public static readonly ActionType ChatPendingMessageRemoved = new ActionType("chat/pendingMessageRemoved");
@@ -881,6 +883,31 @@ public sealed record SessionInputNeededRemovedAction
 
     /// <summary>The `id` of the input request to remove.</summary>
     public required string Id { get; init; }
+}
+
+/// <summary>A client responded to a session-scoped permission request.
+///
+/// The host MUST validate that `requestId` identifies an outstanding
+/// {@link SessionExtensionPermissionRequest}, apply the decision to the
+/// underlying extension operation, and only then broadcast the accepted action.
+/// The host MUST reject a `selectedOptionId` that the request did not offer,
+/// or whose option kind does not match `approved`. Without a
+/// `selectedOptionId`, the host applies its narrowest approval or a plain
+/// denial. The session reducer removes the resolved request from
+/// {@link SessionState.inputNeeded}.</summary>
+public sealed record SessionPermissionRespondedAction
+{
+    public ActionType Type { get; init; } = ActionType.SessionPermissionResponded;
+
+    /// <summary>The opaque `id` of the session input request being answered.</summary>
+    public required string RequestId { get; init; }
+
+    /// <summary>Whether the user approved the request.</summary>
+    public bool Approved { get; init; }
+
+    /// <summary>ID of the selected option, if the request offered options.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SelectedOptionId { get; init; }
 }
 
 /// <summary>The session's customizations have changed.
@@ -2880,6 +2907,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["session/workingDirectoryReplaced"] = typeof(SessionWorkingDirectoryReplacedAction),
         ["session/inputNeededSet"] = typeof(SessionInputNeededSetAction),
         ["session/inputNeededRemoved"] = typeof(SessionInputNeededRemovedAction),
+        ["session/permissionResponded"] = typeof(SessionPermissionRespondedAction),
         ["session/pendingMessageSet"] = typeof(SessionPendingMessageSetAction),
         ["session/pendingMessageRemoved"] = typeof(SessionPendingMessageRemovedAction),
         ["session/queuedMessagesReordered"] = typeof(SessionQueuedMessagesReorderedAction),

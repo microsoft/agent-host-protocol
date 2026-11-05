@@ -762,6 +762,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionToolConfirmationRequest' },
   { name: 'SessionToolClientExecutionRequest' },
   { name: 'SessionToolAuthenticationRequest' },
+  { name: 'SessionExtensionPermissionRequest' },
   { name: 'SessionSummary' },
   { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
@@ -1139,6 +1140,7 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
     { variantName: 'ToolConfirmation', innerType: 'SessionToolConfirmationRequest', wireValue: 'toolConfirmation' },
     { variantName: 'ToolClientExecution', innerType: 'SessionToolClientExecutionRequest', wireValue: 'toolClientExecution' },
     { variantName: 'ToolAuthentication', innerType: 'SessionToolAuthenticationRequest', wireValue: 'toolAuthentication' },
+    { variantName: 'ExtensionPermission', innerType: 'SessionExtensionPermissionRequest', wireValue: 'extensionPermission' },
   ],
   unknown: true,
 };
@@ -1649,6 +1651,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
   { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
+  { type: 'session/permissionResponded', variantName: 'SessionPermissionResponded', tsInterface: 'SessionPermissionRespondedAction' },
   { type: 'session/customizationsChanged', variantName: 'SessionCustomizationsChanged', tsInterface: 'SessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', variantName: 'SessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
   { type: 'session/customizationUpdated', variantName: 'SessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction' },

@@ -178,6 +178,8 @@ const (
 	SessionInputRequestKindToolClientExecution SessionInputRequestKind = "toolClientExecution"
 	// A tool call blocked on MCP authentication mid-execution.
 	SessionInputRequestKindToolAuthentication SessionInputRequestKind = "toolAuthentication"
+	// A session-scoped extension capability awaiting explicit user approval.
+	SessionInputRequestKindExtensionPermission SessionInputRequestKind = "extensionPermission"
 )
 
 // How a turn ended.
@@ -1222,6 +1224,34 @@ type SessionToolAuthenticationRequest struct {
 	TurnId string `json:"turnId"`
 	// The tool call awaiting authentication.
 	ToolCall ToolCallAuthRequiredState `json:"toolCall"`
+}
+
+// An extension capability request that is not associated with a chat turn or
+// tool call, surfaced at the session level for explicit user approval. For
+// example, an agent extension may need approval to register hooks when it
+// starts, before any turn exists.
+//
+// Respond by dispatching `session/permissionResponded` to the owning session
+// channel, keyed by {@link SessionInputRequestBase.id | `id`}. The host applies
+// the decision to the pending extension operation and removes this entry once
+// the response is accepted.
+type SessionExtensionPermissionRequest struct {
+	// Stable key for this entry, unique within the session's
+	// {@link SessionState.inputNeeded} list. The host derives it however it likes
+	// (for example from the chat URI plus the underlying request or tool-call
+	// id); consumers MUST treat it as opaque. It is the key for the
+	// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+	Id   string                  `json:"id"`
+	Kind SessionInputRequestKind `json:"kind"`
+	// Host-defined identifier of the extension requesting access.
+	ExtensionName string `json:"extensionName"`
+	// Human-readable capabilities the extension is requesting.
+	Capabilities []string `json:"capabilities"`
+	// Options the host offers for this request, such as approving once or for
+	// the rest of the session. When present, the client SHOULD render these
+	// instead of a plain approve/deny UI and echo the chosen option's `id` in
+	// `session/permissionResponded`.
+	Options []ConfirmationOption `json:"options,omitempty"`
 }
 
 // Lightweight catalog entry summarizing one session. Surfaced via
@@ -5954,6 +5984,7 @@ func (*SessionChatInputRequest) isSessionInputRequest()           {}
 func (*SessionToolConfirmationRequest) isSessionInputRequest()    {}
 func (*SessionToolClientExecutionRequest) isSessionInputRequest() {}
 func (*SessionToolAuthenticationRequest) isSessionInputRequest()  {}
+func (*SessionExtensionPermissionRequest) isSessionInputRequest() {}
 
 // SessionInputRequestUnknown carries an unrecognized SessionInputRequest variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type SessionInputRequestUnknown struct {
@@ -5989,6 +6020,12 @@ func (u *SessionInputRequest) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "toolAuthentication":
 		var value SessionToolAuthenticationRequest
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "extensionPermission":
+		var value SessionExtensionPermissionRequest
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

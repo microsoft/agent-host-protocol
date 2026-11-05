@@ -64,6 +64,7 @@ const (
 	ActionTypeSessionWorkingDirectoryReplaced     ActionType = "session/workingDirectoryReplaced"
 	ActionTypeSessionInputNeededSet               ActionType = "session/inputNeededSet"
 	ActionTypeSessionInputNeededRemoved           ActionType = "session/inputNeededRemoved"
+	ActionTypeSessionPermissionResponded          ActionType = "session/permissionResponded"
 	ActionTypeChatPendingMessageSet               ActionType = "chat/pendingMessageSet"
 	ActionTypeChatPendingMessageRemoved           ActionType = "chat/pendingMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered         ActionType = "chat/queuedMessagesReordered"
@@ -1187,6 +1188,26 @@ type SessionInputNeededRemovedAction struct {
 	Id string `json:"id"`
 }
 
+// A client responded to a session-scoped permission request.
+//
+// The host MUST validate that `requestId` identifies an outstanding
+// {@link SessionExtensionPermissionRequest}, apply the decision to the
+// underlying extension operation, and only then broadcast the accepted action.
+// The host MUST reject a `selectedOptionId` that the request did not offer,
+// or whose option kind does not match `approved`. Without a
+// `selectedOptionId`, the host applies its narrowest approval or a plain
+// denial. The session reducer removes the resolved request from
+// {@link SessionState.inputNeeded}.
+type SessionPermissionRespondedAction struct {
+	Type ActionType `json:"type"`
+	// The opaque `id` of the session input request being answered.
+	RequestId string `json:"requestId"`
+	// Whether the user approved the request.
+	Approved bool `json:"approved"`
+	// ID of the selected option, if the request offered options.
+	SelectedOptionId *string `json:"selectedOptionId,omitempty"`
+}
+
 // The session's customizations have changed.
 //
 // Full-replacement semantics: the `customizations` array replaces the
@@ -1914,6 +1935,7 @@ func (*ChatWorkingDirectorySetAction) isStateAction()             {}
 func (*ChatWorkingDirectoryRemovedAction) isStateAction()         {}
 func (*SessionInputNeededSetAction) isStateAction()               {}
 func (*SessionInputNeededRemovedAction) isStateAction()           {}
+func (*SessionPermissionRespondedAction) isStateAction()          {}
 func (*SessionCustomizationsChangedAction) isStateAction()        {}
 func (*SessionCustomizationToggledAction) isStateAction()         {}
 func (*SessionCustomizationUpdatedAction) isStateAction()         {}
@@ -2348,6 +2370,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/inputNeededRemoved":
 		var value SessionInputNeededRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/permissionResponded":
+		var value SessionPermissionRespondedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

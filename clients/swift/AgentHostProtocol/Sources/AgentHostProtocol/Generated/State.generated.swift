@@ -280,6 +280,8 @@ public enum SessionInputRequestKind: Codable, Sendable, Equatable {
     case toolClientExecution
     /// A tool call blocked on MCP authentication mid-execution.
     case toolAuthentication
+    /// A session-scoped extension capability awaiting explicit user approval.
+    case extensionPermission
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -291,6 +293,7 @@ public enum SessionInputRequestKind: Codable, Sendable, Equatable {
         case "toolConfirmation": self = .toolConfirmation
         case "toolClientExecution": self = .toolClientExecution
         case "toolAuthentication": self = .toolAuthentication
+        case "extensionPermission": self = .extensionPermission
         default: self = .unknown(raw)
         }
     }
@@ -302,6 +305,7 @@ public enum SessionInputRequestKind: Codable, Sendable, Equatable {
         case .toolConfirmation: try container.encode("toolConfirmation")
         case .toolClientExecution: try container.encode("toolClientExecution")
         case .toolAuthentication: try container.encode("toolAuthentication")
+        case .extensionPermission: try container.encode("extensionPermission")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2485,6 +2489,39 @@ public struct SessionToolAuthenticationRequest: Codable, Sendable {
         self.kind = kind
         self.turnId = turnId
         self.toolCall = toolCall
+    }
+}
+
+public struct SessionExtensionPermissionRequest: Codable, Sendable {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    public var id: String
+    public var kind: SessionInputRequestKind
+    /// Host-defined identifier of the extension requesting access.
+    public var extensionName: String
+    /// Human-readable capabilities the extension is requesting.
+    public var capabilities: [String]
+    /// Options the host offers for this request, such as approving once or for
+    /// the rest of the session. When present, the client SHOULD render these
+    /// instead of a plain approve/deny UI and echo the chosen option's `id` in
+    /// `session/permissionResponded`.
+    public var options: [ConfirmationOption]?
+
+    public init(
+        id: String,
+        kind: SessionInputRequestKind,
+        extensionName: String,
+        capabilities: [String],
+        options: [ConfirmationOption]? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.extensionName = extensionName
+        self.capabilities = capabilities
+        self.options = options
     }
 }
 
@@ -8232,6 +8269,7 @@ public enum SessionInputRequest: Codable, Sendable {
     case toolConfirmation(SessionToolConfirmationRequest)
     case toolClientExecution(SessionToolClientExecutionRequest)
     case toolAuthentication(SessionToolAuthenticationRequest)
+    case extensionPermission(SessionExtensionPermissionRequest)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -8255,6 +8293,8 @@ public enum SessionInputRequest: Codable, Sendable {
             self = .toolClientExecution(try SessionToolClientExecutionRequest(from: decoder))
         case "toolAuthentication":
             self = .toolAuthentication(try SessionToolAuthenticationRequest(from: decoder))
+        case "extensionPermission":
+            self = .extensionPermission(try SessionExtensionPermissionRequest(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -8266,6 +8306,7 @@ public enum SessionInputRequest: Codable, Sendable {
         case .toolConfirmation(let value): try value.encode(to: encoder)
         case .toolClientExecution(let value): try value.encode(to: encoder)
         case .toolAuthentication(let value): try value.encode(to: encoder)
+        case .extensionPermission(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

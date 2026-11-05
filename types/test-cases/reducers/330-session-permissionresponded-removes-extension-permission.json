@@ -1,0 +1,35 @@
+{
+  "description": "session/permissionResponded removes the matching extension-permission request and restores the idle session activity",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "extensionPermission",
+        "id": "extension-permission-1",
+        "extensionName": "example-extension",
+        "capabilities": ["register hooks"]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/permissionResponded",
+      "requestId": "extension-permission-1",
+      "approved": true
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  }
+}
