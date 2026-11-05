@@ -316,6 +316,8 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		return enc(&v)
 	case "ResourceReadResult":
 		var v ResourceReadResult
+		dec(&v)
+		return enc(&v)
 	case "OpenCanvasParams":
 		var v OpenCanvasParams
 		dec(&v)
