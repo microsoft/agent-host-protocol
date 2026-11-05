@@ -49,7 +49,7 @@ private func withInputNeededStatus(_ status: SessionStatus, _ inputNeeded: [Sess
 }
 
 /// Activity implied by the session's chats, following the chat aggregation
-/// rule: promote `.inputNeeded`, then `.error`, from any chat; otherwise use the
+/// rule: promote `.inputNeeded`, then `.inProgress`, from any chat; otherwise use the
 /// default chat, else the most recently modified chat (UTC ISO 8601 timestamps
 /// compare lexicographically). Used when a session-owned request resolves: it
 /// may have promoted an idle session to `.inputNeeded`, so the activity cannot
@@ -59,8 +59,8 @@ private func activityFromChats(_ state: SessionState) -> SessionStatus {
     if chats.contains(where: { $0.status.isSuperset(of: .inputNeeded) }) {
         return .inputNeeded
     }
-    if chats.contains(where: { !$0.status.isDisjoint(with: .error) }) {
-        return .error
+    if chats.contains(where: { !$0.status.isDisjoint(with: .inProgress) }) {
+        return .inProgress
     }
     var source = chats.first(where: { $0.resource == state.defaultChat })
     if source == nil {

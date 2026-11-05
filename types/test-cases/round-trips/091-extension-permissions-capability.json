@@ -1,0 +1,19 @@
+{
+  "name": "Extension permission capability preserves an empty object",
+  "description": "An empty extensionPermissions object declares support and must not disappear during native serialization.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root:/",
+    "protocolVersions": ["1.0.0"],
+    "clientId": "extension-permission-client",
+    "capabilities": { "extensionPermissions": {} }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root:/",
+      "protocolVersions": ["1.0.0"],
+      "clientId": "extension-permission-client",
+      "capabilities": { "extensionPermissions": {} }
+    }
+  ]
+}

@@ -304,7 +304,7 @@ fn with_input_needed_status(status: u32, input_needed: &[SessionInputRequest]) -
 }
 
 /// Activity implied by the session's chats, following the chat aggregation
-/// rule: promote `InputNeeded`, then `Error`, from any chat; otherwise use the
+/// rule: promote `InputNeeded`, then `InProgress`, from any chat; otherwise use the
 /// default chat, else the most recently modified chat (UTC ISO 8601 timestamps
 /// compare lexicographically). Used when a session-owned request resolves: it
 /// may have promoted an idle session to `InputNeeded`, so the activity cannot be
@@ -321,9 +321,9 @@ fn activity_from_chats(state: &SessionState) -> u32 {
     if state
         .chats
         .iter()
-        .any(|chat| chat.status & SessionStatus::Error.bits() != 0)
+        .any(|chat| chat.status & SessionStatus::InProgress.bits() != 0)
     {
-        return SessionStatus::Error.bits();
+        return SessionStatus::InProgress.bits();
     }
     let source = state
         .chats

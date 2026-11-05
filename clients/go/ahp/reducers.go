@@ -77,7 +77,7 @@ func withInputNeededStatus(status ahptypes.SessionStatus, inputNeeded []ahptypes
 }
 
 // activityFromChats derives the activity implied by the session's chats,
-// following the chat aggregation rule: promote InputNeeded, then Error, from
+// following the chat aggregation rule: promote InputNeeded, then InProgress, from
 // any chat; otherwise use the default chat, else the most recently modified
 // chat (UTC ISO 8601 timestamps compare lexicographically). Used when a
 // session-owned request resolves: it may have promoted an idle session to
@@ -90,8 +90,8 @@ func activityFromChats(state *ahptypes.SessionState) ahptypes.SessionStatus {
 		}
 	}
 	for i := range state.Chats {
-		if state.Chats[i].Status&ahptypes.SessionStatusError != 0 {
-			return ahptypes.SessionStatusError
+		if state.Chats[i].Status&ahptypes.SessionStatusInProgress != 0 {
+			return ahptypes.SessionStatusInProgress
 		}
 	}
 	var source *ahptypes.ChatSummary

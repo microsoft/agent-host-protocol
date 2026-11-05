@@ -1,0 +1,4 @@
+{
+  "type": "fixed",
+  "message": "Resolving session extension permissions preserves running-peer precedence without promoting peer errors. Go clients preserve the empty `extensionPermissions` capability object when serializing initialization."
+}

@@ -88,7 +88,7 @@ public static class Reducers
     }
 
     // Activity implied by the session's chats, following the chat aggregation
-    // rule: promote InputNeeded, then Error, from any chat; otherwise use the
+    // rule: promote InputNeeded, then InProgress, from any chat; otherwise use the
     // default chat, else the most recently modified chat (UTC ISO 8601
     // timestamps compare lexicographically). Used when a session-owned request
     // resolves: it may have promoted an idle session to InputNeeded, so the
@@ -102,9 +102,9 @@ public static class Reducers
             return SessionStatus.InputNeeded;
         }
 
-        if (chats.Exists(chat => (chat.Status & SessionStatus.Error) != 0))
+        if (chats.Exists(chat => (chat.Status & SessionStatus.InProgress) != 0))
         {
-            return SessionStatus.Error;
+            return SessionStatus.InProgress;
         }
 
         ChatSummary? source = chats.Find(chat => chat.Resource == state.DefaultChat);

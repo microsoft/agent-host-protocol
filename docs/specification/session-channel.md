@@ -92,8 +92,8 @@ ordering anchor. Changing `defaultChat` does not reorder the catalog.
 
 | Field | Derivation rule |
 |---|---|
-| `status` | Take the activity bits (`Idle` / `InProgress` / `InputNeeded` / `Error`) from the [`defaultChat`](#defaultchat) when set, else from the most recently modified chat. Promote `InputNeeded` if **any** chat needs input. Promote `Error` if **any** chat is in an error state. The orthogonal `IsRead` / `IsArchived` flags remain session-scoped and pass through unchanged. |
-| `activity` | Mirror the activity string of the chat that contributes the activity bits — usually the default chat, but the chat that raised `InputNeeded` / `Error` when a non-default chat wins the promotion. |
+| `status` | Promote `InputNeeded` if **any** chat needs input, else promote `InProgress` if **any** chat is running. Otherwise take the activity bits (`Idle` / `InProgress` / `InputNeeded` / `Error`) from the [`defaultChat`](#defaultchat) when set, else from the most recently modified chat. Peer errors do not override the default chat. The orthogonal `IsRead` / `IsArchived` flags remain session-scoped and pass through unchanged. |
+| `activity` | Mirror the activity string of the chat that contributes the activity bits — usually the default chat, but the chat that raised `InputNeeded` / `InProgress` when a non-default chat wins the promotion. |
 | `modifiedAt` | The maximum of every chat's `modifiedAt`. |
 | `workingDirectories` | The session-level set. Individual chats MAY restrict to a subset via [`ChatSummary.workingDirectories`](/reference/chat#chatsummary); aggregating per-chat subsets up is meaningless and SHOULD NOT be attempted. |
 | `changes` | Optional roll-up. Producers MAY sum per-chat changeset stats or report the most expensive chat's stats — whichever is cheaper to compute. |

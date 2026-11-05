@@ -265,7 +265,7 @@ type ClientCapabilities struct {
 	// `session/permissionResponded` actions to clients that omit this
 	// capability, because such clients may assume every session input request
 	// belongs to a chat.
-	ExtensionPermissions map[string]json.RawMessage `json:"extensionPermissions,omitempty"`
+	ExtensionPermissions *map[string]json.RawMessage `json:"extensionPermissions,omitempty"`
 }
 
 // Automation features supported by this host authority.

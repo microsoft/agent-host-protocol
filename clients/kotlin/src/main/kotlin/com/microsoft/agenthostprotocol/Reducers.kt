@@ -139,7 +139,7 @@ private fun withInputNeededStatus(status: SessionStatus, inputNeeded: List<Sessi
 
 /**
  * Activity implied by the session's chats, following the chat aggregation
- * rule: promote INPUT_NEEDED, then ERROR, from any chat; otherwise use the
+ * rule: promote INPUT_NEEDED, then IN_PROGRESS, from any chat; otherwise use the
  * default chat, else the most recently modified chat (UTC ISO 8601 timestamps
  * compare lexicographically). Used when a session-owned request resolves: it
  * may have promoted an idle session to INPUT_NEEDED, so the activity cannot be
@@ -151,8 +151,8 @@ private fun activityFromChats(state: SessionState): SessionStatus {
     if (chats.any { (it.status.rawValue and inputNeeded) == inputNeeded }) {
         return SessionStatus.INPUT_NEEDED
     }
-    if (chats.any { (it.status.rawValue and SessionStatus.ERROR.rawValue) != 0u }) {
-        return SessionStatus.ERROR
+    if (chats.any { (it.status.rawValue and SessionStatus.IN_PROGRESS.rawValue) != 0u }) {
+        return SessionStatus.IN_PROGRESS
     }
     var source = chats.firstOrNull { it.resource == state.defaultChat }
     if (source == null) {

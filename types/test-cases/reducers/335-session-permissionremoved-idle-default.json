@@ -1,0 +1,34 @@
+{
+  "description": "Cancelling a session permission restores the idle default without promoting peer errors",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/default",
+    "chats": [
+      { "resource": "ahp-chat:/default", "title": "Default", "status": 1, "modifiedAt": "1970-01-01T00:00:01.000Z", "origin": { "kind": "user" } },
+      { "resource": "ahp-chat:/error", "title": "Error", "status": 2, "modifiedAt": "1970-01-01T00:00:02.000Z", "origin": { "kind": "user" } }
+    ],
+    "inputNeeded": [
+      { "kind": "extensionPermission", "id": "permission", "extensionName": "example-extension", "capabilities": ["register hooks"] }
+    ]
+  },
+  "actions": [
+    { "type": "session/inputNeededRemoved", "id": "permission" }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/default",
+    "chats": [
+      { "resource": "ahp-chat:/default", "title": "Default", "status": 1, "modifiedAt": "1970-01-01T00:00:01.000Z", "origin": { "kind": "user" } },
+      { "resource": "ahp-chat:/error", "title": "Error", "status": 2, "modifiedAt": "1970-01-01T00:00:02.000Z", "origin": { "kind": "user" } }
+    ]
+  }
+}

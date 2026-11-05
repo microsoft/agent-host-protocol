@@ -364,7 +364,9 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
       && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
         && tsName === 'disableConditions')
-      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
+      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState')
+      // An empty capability object declares support; omitting it does not.
+      || (tsName === 'extensionPermissions' && iface.getName() === 'ClientCapabilities');
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }

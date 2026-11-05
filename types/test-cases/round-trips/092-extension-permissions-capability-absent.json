@@ -1,0 +1,19 @@
+{
+  "name": "Absent extension permission capability stays absent",
+  "description": "An absent extensionPermissions property must not become an advertised capability.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root:/",
+    "protocolVersions": ["1.0.0"],
+    "clientId": "extension-permission-client",
+    "capabilities": {}
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root:/",
+      "protocolVersions": ["1.0.0"],
+      "clientId": "extension-permission-client",
+      "capabilities": {}
+    }
+  ]
+}
