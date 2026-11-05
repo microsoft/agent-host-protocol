@@ -1173,27 +1173,29 @@ pub struct ChatCanvasesChangedAction {
     pub canvases: Option<Vec<CanvasReference>>,
 }
 
-/// Requests materialization of the exact chat's Canvas type registry.
+/// Requests materialization of the chat's Canvas type registry.
 ///
-/// This operation is potentially effectful: for a persisted cold chat, the host
-/// may resume its backing runtime, discover extensions, and execute extension
-/// startup code. It MUST NOT create a backing for a brand-new chat, send a user
-/// message, or invoke a model.
+/// A host MUST reject the action when the chat's agent does not advertise
+/// {@link AgentCapabilities.canvases} or when the chat cannot materialize the
+/// registry. Materialization MUST NOT send a user message or invoke a model.
 ///
 /// The reducer is a no-op. The host remains authoritative and publishes the
 /// complete result through
 /// {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
 /// Clients do not need to dispatch this action when
-/// {@link ChatState.canvasRegistry} is already present because live provider
-/// registration changes are published reactively.
+/// {@link ChatState.canvasRegistry} is already present.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatCanvasRegistryRequestedAction {}
 
-/// The Canvas type registry for this exact chat changed.
+/// The Canvas type registry for this chat changed.
 ///
 /// Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
 /// Set to `undefined` when the registry is no longer materialized or available.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatCanvasRegistryChangedAction {

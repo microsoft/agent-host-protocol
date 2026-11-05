@@ -713,9 +713,8 @@
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
         "canvases": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Experimental Canvas API.\n\nThe agent can materialize an exact chat's\n{@link ChatState.canvasRegistry | Canvas registry} through\n`chat/canvasRegistryRequested` and open a declared type with `openCanvas`.\nLive instances are published through the chat's canvas references and\ntheir `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\nregistry metadata while the Canvas channel remains experimental. This\ncapability does not gate server-published Canvas references."
+          "$ref": "#/$defs/CanvasesCapability",
+          "description": "Experimental Canvas API.\n\nThe agent can materialize an exact chat's\n{@link ChatState.canvasRegistry | Canvas registry} through\n`chat/canvasRegistryRequested` and open a declared type with `openCanvas`.\nLive instances are published through the chat's canvas references and\ntheir `ahp-canvas:` state channels.\n\nClients MUST treat absence as unsupported and SHOULD tolerate additive\nregistry metadata while the Canvas channel remains experimental. This\ncapability does not gate server-published Canvas references.\n\nStability: 1.0 - Early development."
         },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
@@ -726,6 +725,11 @@
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
         }
       }
+    },
+    "CanvasesCapability": {
+      "type": "object",
+      "description": "Presence capability for the experimental Canvas registry and lifecycle\ncommands.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "MultipleChatsCapability": {
       "type": "object",
@@ -2677,7 +2681,7 @@
         },
         "canvasRegistry": {
           "$ref": "#/$defs/CanvasRegistry",
-          "description": "Canvas types currently registered for this exact chat.\n\nAbsence means the registry has not been materialized or is not currently\navailable. Clients that need it MAY dispatch\n`chat/canvasRegistryRequested`; the host publishes the authoritative\nregistry through `chat/canvasRegistryChanged`. An empty\n{@link CanvasRegistry.extensions} array is a loaded registry with no\navailable canvas types."
+          "description": "Canvas types currently registered for this exact chat.\n\nAbsence means the registry has not been materialized or is not currently\navailable. Clients that need it MAY dispatch\n`chat/canvasRegistryRequested`; the host publishes the authoritative\nregistry through `chat/canvasRegistryChanged`. An empty\n{@link CanvasRegistry.extensions} array is a loaded registry with no\navailable canvas types.\n\nStability: 1.0 - Early development."
         },
         "canvases": {
           "type": "array",
@@ -4862,19 +4866,15 @@
     },
     "CanvasExtensionDeclaration": {
       "type": "object",
-      "description": "One extension/provider that declares canvas types for an exact chat.\n\nThe extension metadata is normalized here instead of repeated on every\n{@link CanvasTypeDeclaration}. `extensionId` is opaque: clients MUST NOT\ninfer its source or management behavior by parsing it.",
+      "description": "One namespace that declares canvas types for a chat.\n\n`extensionId` is opaque. Clients MUST NOT infer management behavior by\nparsing it.",
       "properties": {
         "extensionId": {
           "type": "string",
-          "description": "Stable opaque identifier of the extension/provider."
-        },
-        "extensionSource": {
-          "$ref": "#/$defs/CanvasExtensionSource",
-          "description": "Where the runtime discovered the extension/provider."
+          "description": "Stable opaque declaration namespace."
         },
         "extensionName": {
           "type": "string",
-          "description": "Human-readable extension/provider name, when available."
+          "description": "Human-readable namespace title, when available."
         },
         "canvases": {
           "type": "array",
@@ -4886,21 +4886,20 @@
       },
       "required": [
         "extensionId",
-        "extensionSource",
         "canvases"
       ]
     },
     "CanvasTypeDeclaration": {
       "type": "object",
-      "description": "One canvas type currently available to open.\n\nThis is discovery metadata, not a live canvas instance. Live instances are\nrepresented by {@link CanvasReference} entries on chat state and their\ncorresponding {@link CanvasState} channels.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
+      "description": "One canvas type currently available to open.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
       "properties": {
         "canvasId": {
           "type": "string",
           "description": "Provider-local canvas type identifier."
         },
-        "displayName": {
+        "title": {
           "type": "string",
-          "description": "Human-readable canvas type name."
+          "description": "Human-readable canvas type title."
         },
         "description": {
           "type": "string",
@@ -4913,21 +4912,21 @@
       },
       "required": [
         "canvasId",
-        "displayName",
+        "title",
         "description",
         "requiresInput"
       ]
     },
     "CanvasRegistry": {
       "type": "object",
-      "description": "Canvas types currently registered for one exact chat.\n\nThis is a compact presentation registry, not extension installation state\nand not the list of live instances. The host replaces the complete registry\nthrough `chat/canvasRegistryChanged` whenever provider registration changes.",
+      "description": "Canvas types currently registered for one chat.",
       "properties": {
         "extensions": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/CanvasExtensionDeclaration"
           },
-          "description": "Declaring extensions/providers. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
+          "description": "Declaring namespaces. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
         }
       },
       "required": [
@@ -4957,11 +4956,11 @@
         },
         "extensionId": {
           "type": "string",
-          "description": "Owning extension/provider identifier."
+          "description": "Owning declaration namespace."
         },
         "extensionName": {
           "type": "string",
-          "description": "Owning extension display name, when available."
+          "description": "Owning namespace title, when available."
         },
         "canvasId": {
           "type": "string",
@@ -7801,7 +7800,7 @@
     },
     "OpenCanvasParams": {
       "type": "object",
-      "description": "Opens or focuses one client-addressed canvas resource in an exact chat.\n\nThe resulting live instance is published through the chat's\n{@link ChatState.canvases} references and its `ahp-canvas:` state channel.\nRepeating this command with the same `channel` focuses or refreshes that\nlogical instance rather than creating a duplicate. Reusing the channel for\na different chat, extension, or canvas type MUST fail with `Conflict`.\n\nThe null result is not presentation state. Clients MUST observe\n{@link ChatState.canvases} and the referenced `ahp-canvas:` channel for\nauthoritative membership, availability, and presentation state.\n\nClients MUST NOT call this command unless the selected agent advertises\n{@link AgentCapabilities.canvases}.",
+      "description": "Opens one client-addressed canvas resource in a chat.\n\nThe resulting live instance is published through the chat's\n{@link ChatState.canvases} references and its `ahp-canvas:` state channel.\nRepeating this command with the same `channel` is idempotent. Reusing it for\na different chat, extension, or canvas type MUST fail with `Conflict`.\nClients MUST observe\n{@link ChatState.canvases} and the referenced `ahp-canvas:` channel for\nauthoritative membership, availability, and presentation state.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -7834,11 +7833,11 @@
     },
     "DisposeCanvasParams": {
       "type": "object",
-      "description": "Closes and disposes one live canvas resource.\n\nThe server removes the resource from the owning chat's\n{@link ChatState.canvases} references and notifies the provider that owns the\ninstance. Repeating this command after the resource is gone is a no-op.\n\nClients MUST NOT call this command unless the selected agent advertises\n{@link AgentCapabilities.canvases}.",
+      "description": "Closes and disposes one live canvas resource.\n\nThe server removes the resource from the owning chat's\n{@link ChatState.canvases} references. Repeating this command after the\nresource is gone is a no-op.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
-          "description": "Channel URI this command targets."
+          "description": "URI of the canvas resource to dispose."
         },
         "_meta": {
           "type": "object",
@@ -8809,17 +8808,6 @@
       ],
       "type": "string",
       "description": "Why a tool call was cancelled."
-    },
-    "CanvasExtensionSource": {
-      "enum": [
-        "user",
-        "project",
-        "session",
-        "plugin",
-        "unknown"
-      ],
-      "type": "string",
-      "description": "Where the runtime discovered an extension that declares a canvas type."
     },
     "TerminalClaim": {
       "oneOf": [
@@ -10761,7 +10749,7 @@
     },
     "ChatCanvasRegistryRequestedAction": {
       "type": "object",
-      "description": "Requests materialization of the exact chat's Canvas type registry.\n\nThis operation is potentially effectful: for a persisted cold chat, the host\nmay resume its backing runtime, discover extensions, and execute extension\nstartup code. It MUST NOT create a backing for a brand-new chat, send a user\nmessage, or invoke a model.\n\nThe reducer is a no-op. The host remains authoritative and publishes the\ncomplete result through\n{@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.\nClients do not need to dispatch this action when\n{@link ChatState.canvasRegistry} is already present because live provider\nregistration changes are published reactively.",
+      "description": "Requests materialization of the chat's Canvas type registry.\n\nA host MUST reject the action when the chat's agent does not advertise\n{@link AgentCapabilities.canvases} or when the chat cannot materialize the\nregistry. Materialization MUST NOT send a user message or invoke a model.\n\nThe reducer is a no-op. The host remains authoritative and publishes the\ncomplete result through\n{@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.\nClients do not need to dispatch this action when\n{@link ChatState.canvasRegistry} is already present.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/canvasRegistryRequested"
@@ -10773,7 +10761,7 @@
     },
     "ChatCanvasRegistryChangedAction": {
       "type": "object",
-      "description": "The Canvas type registry for this exact chat changed.\n\nReplaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.\nSet to `undefined` when the registry is no longer materialized or available.",
+      "description": "The Canvas type registry for this chat changed.\n\nReplaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.\nSet to `undefined` when the registry is no longer materialized or available.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/canvasRegistryChanged"
