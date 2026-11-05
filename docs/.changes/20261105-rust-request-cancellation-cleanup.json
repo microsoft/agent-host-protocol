@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Rust `Client::request` removes pending entries when its future is dropped, including while waiting for outbound admission.",
+  "targets": ["rust"],
+  "issues": [565]
+}
