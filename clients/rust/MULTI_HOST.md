@@ -41,6 +41,19 @@ Snapshots are immutable. To observe changes, listen to the connection-event stre
 
 Each host runs in its own internal task, a `HostRuntime`, that owns the current `Client`, retries the configured `ReconnectPolicy`, and re-subscribes to known URIs across reconnects.
 
+Connection readiness depends only on a successful `initialize` / `reconnect`.
+The event receiver is installed before that handshake, and the client is
+published before the session-cache refresh starts. `listSessions` is an ordinary
+concurrent RPC: slow or failed discovery does not block other client requests.
+Until it completes, `session_summaries` may be empty or retain the previous
+connection's cache. Notifications received during the refresh are merged over
+its result; cancelled or superseded refreshes cannot update a newer connection.
+
+The underlying client's automatic keepalive checks inbound wire silence,
+independently of discovery. Configure it with `HostConfig::with_client_config`
+and `ClientConfig::keepalive`; a liveness timeout closes the connection and
+enters the normal reconnect policy. Set `keepalive: None` to disable it.
+
 Every successful reconnect bumps a per-host **generation** counter. Any `HostClientHandle` you obtained from a previous connection refuses to dispatch on the new one and returns `HostError::HostReconnected`; request a fresh handle in that case. This prevents subtle bugs where a handle held across a reconnect silently writes to a different connection.
 
 ## Stable `clientId` per host
@@ -122,7 +135,7 @@ handle.check_alive().await?;
 # Ok(()) }
 ```
 
-Configuration knobs live on `HostConfig` (`with_client_id`, `with_initial_subscriptions`, `with_client_config`, `with_reconnect_policy`) and on `ReconnectPolicy::{disabled, immediate_forever, exponential}`. For persistent identity across launches, plug in a persistent `ClientIdStore` via `MultiHostClient::with_client_id_store(...)` (see below) or load the `clientId` yourself and pass it through `HostConfig::with_client_id`.
+Configuration knobs live on `HostConfig` (`with_client_id`, `with_initial_subscriptions`, `with_client_config`, `with_reconnect_policy`), `ClientConfig::keepalive`, and `ReconnectPolicy::{disabled, immediate_forever, exponential}`. For persistent identity across launches, plug in a persistent `ClientIdStore` via `MultiHostClient::with_client_id_store(...)` (see below) or load the `clientId` yourself and pass it through `HostConfig::with_client_id`.
 
 ## Persistent `clientId`s — `ClientIdStore`
 
