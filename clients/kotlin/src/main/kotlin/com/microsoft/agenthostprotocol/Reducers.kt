@@ -137,6 +137,54 @@ private fun withInputNeededStatus(status: SessionStatus, inputNeeded: List<Sessi
         SessionStatus(status.rawValue and inputBit.inv())
     }
 
+/**
+ * Activity implied by the session's chats, following the chat aggregation
+ * rule: promote INPUT_NEEDED, then ERROR, from any chat; otherwise use the
+ * default chat, else the most recently modified chat (UTC ISO 8601 timestamps
+ * compare lexicographically). Used when a session-owned request resolves: it
+ * may have promoted an idle session to INPUT_NEEDED, so the activity cannot be
+ * recovered by clearing bits from the current status.
+ */
+private fun activityFromChats(state: SessionState): SessionStatus {
+    val chats = state.chats
+    val inputNeeded = SessionStatus.INPUT_NEEDED.rawValue
+    if (chats.any { (it.status.rawValue and inputNeeded) == inputNeeded }) {
+        return SessionStatus.INPUT_NEEDED
+    }
+    if (chats.any { (it.status.rawValue and SessionStatus.ERROR.rawValue) != 0u }) {
+        return SessionStatus.ERROR
+    }
+    var source = chats.firstOrNull { it.resource == state.defaultChat }
+    if (source == null) {
+        for (chat in chats) {
+            if (source == null || chat.modifiedAt > source.modifiedAt) {
+                source = chat
+            }
+        }
+    }
+    val activity = (source?.status?.rawValue ?: 0u) and STATUS_ACTIVITY_MASK
+    return if (activity != 0u) SessionStatus(activity) else SessionStatus.IDLE
+}
+
+/**
+ * Removes the session input request with [id]. Resolving an
+ * extension-permission request with no other user-blocking entry left restores
+ * the activity implied by the session's chats.
+ */
+private fun removeInputNeeded(state: SessionState, id: String): SessionState {
+    val list = state.inputNeeded ?: return state
+    val idx = list.indexOfFirst { sessionInputRequestId(it) == id }
+    if (idx < 0) return state
+    val remaining = list.toMutableList()
+    val removed = remaining.removeAt(idx)
+    val status = if (removed is SessionInputRequestExtensionPermission && remaining.none(::awaitsUser)) {
+        SessionStatus((state.status.rawValue and STATUS_ACTIVITY_MASK.inv()) or activityFromChats(state).rawValue)
+    } else {
+        withInputNeededStatus(state.status, remaining)
+    }
+    return state.copy(inputNeeded = if (remaining.isEmpty()) null else remaining, status = status)
+}
+
 /** Derives the summary status from live session work, preserving orthogonal flags. */
 private fun chatSummaryStatus(state: ChatState, terminalStatus: SessionStatus? = null): SessionStatus {
     val activity: SessionStatus = when {
@@ -272,6 +320,7 @@ private fun sessionInputRequestId(r: SessionInputRequest): String? = when (r) {
     is SessionInputRequestToolConfirmation -> r.value.id
     is SessionInputRequestToolClientExecution -> r.value.id
     is SessionInputRequestToolAuthentication -> r.value.id
+    is SessionInputRequestExtensionPermission -> r.value.id
     // Unknown variants carry an opaque `raw` JSON object — no id to expose.
     is SessionInputRequestUnknown -> null
 }
@@ -765,20 +814,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionInputNeededRemoved -> {
-        val list = state.inputNeeded
-        if (list == null) state else {
-            val idx = list.indexOfFirst { sessionInputRequestId(it) == action.value.id }
-            if (idx < 0) state else {
-                val updated = list.toMutableList()
-                updated.removeAt(idx)
-                state.copy(
-                    inputNeeded = if (updated.isEmpty()) null else updated,
-                    status = withInputNeededStatus(state.status, updated),
-                )
-            }
-        }
-    }
+    is StateActionSessionInputNeededRemoved -> removeInputNeeded(state, action.value.id)
+
+    is StateActionSessionPermissionResponded -> removeInputNeeded(state, action.value.requestId)
 
     is StateActionSessionCustomizationsChanged -> state.copy(customizations = action.value.customizations)
 

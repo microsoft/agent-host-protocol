@@ -76,6 +76,79 @@ func withInputNeededStatus(status ahptypes.SessionStatus, inputNeeded []ahptypes
 	return status &^ (ahptypes.SessionStatusInputNeeded &^ ahptypes.SessionStatusInProgress)
 }
 
+// activityFromChats derives the activity implied by the session's chats,
+// following the chat aggregation rule: promote InputNeeded, then Error, from
+// any chat; otherwise use the default chat, else the most recently modified
+// chat (UTC ISO 8601 timestamps compare lexicographically). Used when a
+// session-owned request resolves: it may have promoted an idle session to
+// InputNeeded, so the activity cannot be recovered by clearing bits from the
+// current status.
+func activityFromChats(state *ahptypes.SessionState) ahptypes.SessionStatus {
+	for i := range state.Chats {
+		if state.Chats[i].Status&ahptypes.SessionStatusInputNeeded == ahptypes.SessionStatusInputNeeded {
+			return ahptypes.SessionStatusInputNeeded
+		}
+	}
+	for i := range state.Chats {
+		if state.Chats[i].Status&ahptypes.SessionStatusError != 0 {
+			return ahptypes.SessionStatusError
+		}
+	}
+	var source *ahptypes.ChatSummary
+	if state.DefaultChat != nil {
+		for i := range state.Chats {
+			if state.Chats[i].Resource == *state.DefaultChat {
+				source = &state.Chats[i]
+				break
+			}
+		}
+	}
+	if source == nil {
+		for i := range state.Chats {
+			if source == nil || state.Chats[i].ModifiedAt > source.ModifiedAt {
+				source = &state.Chats[i]
+			}
+		}
+	}
+	if source != nil {
+		if activity := source.Status & statusActivityMask; activity != 0 {
+			return activity
+		}
+	}
+	return ahptypes.SessionStatusIdle
+}
+
+// removeInputNeeded removes the session input request with the given id.
+// Resolving an extension-permission request with no other user-blocking
+// entry left restores the activity implied by the session's chats.
+func removeInputNeeded(state *ahptypes.SessionState, id string) ReduceOutcome {
+	for i := range state.InputNeeded {
+		got, ok := sessionInputRequestID(state.InputNeeded[i])
+		if !ok || got != id {
+			continue
+		}
+		_, isExtensionPermission := state.InputNeeded[i].Value.(*ahptypes.SessionExtensionPermissionRequest)
+		state.InputNeeded = append(state.InputNeeded[:i], state.InputNeeded[i+1:]...)
+		if len(state.InputNeeded) == 0 {
+			state.InputNeeded = nil
+		}
+		stillAwaitsUser := false
+		for _, request := range state.InputNeeded {
+			if awaitsUser(request) {
+				stillAwaitsUser = true
+				break
+			}
+		}
+		if isExtensionPermission && !stillAwaitsUser {
+			state.Status = (state.Status &^ statusActivityMask) | activityFromChats(state)
+		} else {
+			state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
+		}
+		return ReduceOutcomeApplied
+	}
+	return ReduceOutcomeNoOp
+}
+
 // ─── Tool-call helpers ─────────────────────────────────────────────────
 
 // toolCallCommon carries the fields shared by every concrete
@@ -318,6 +391,8 @@ func sessionInputRequestID(r ahptypes.SessionInputRequest) (string, bool) {
 	case *ahptypes.SessionToolClientExecutionRequest:
 		return v.Id, true
 	case *ahptypes.SessionToolAuthenticationRequest:
+		return v.Id, true
+	case *ahptypes.SessionExtensionPermissionRequest:
 		return v.Id, true
 	}
 	return "", false
@@ -1116,17 +1191,9 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionInputNeededRemovedAction:
-		for i := range state.InputNeeded {
-			if got, ok := sessionInputRequestID(state.InputNeeded[i]); ok && got == a.Id {
-				state.InputNeeded = append(state.InputNeeded[:i], state.InputNeeded[i+1:]...)
-				if len(state.InputNeeded) == 0 {
-					state.InputNeeded = nil
-				}
-				state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
-				return ReduceOutcomeApplied
-			}
-		}
-		return ReduceOutcomeNoOp
+		return removeInputNeeded(state, a.Id)
+	case *ahptypes.SessionPermissionRespondedAction:
+		return removeInputNeeded(state, a.RequestId)
 	case *ahptypes.SessionCustomizationsChangedAction:
 		state.Customizations = append([]ahptypes.Customization(nil), a.Customizations...)
 		return ReduceOutcomeApplied

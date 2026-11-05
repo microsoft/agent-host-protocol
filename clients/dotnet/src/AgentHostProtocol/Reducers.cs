@@ -87,6 +87,74 @@ public static class Reducers
         return status & ~(SessionStatus.InputNeeded & ~SessionStatus.InProgress);
     }
 
+    // Activity implied by the session's chats, following the chat aggregation
+    // rule: promote InputNeeded, then Error, from any chat; otherwise use the
+    // default chat, else the most recently modified chat (UTC ISO 8601
+    // timestamps compare lexicographically). Used when a session-owned request
+    // resolves: it may have promoted an idle session to InputNeeded, so the
+    // activity cannot be recovered by clearing bits from the current status.
+    // Mirrors the TS `activityFromChats`.
+    private static SessionStatus ActivityFromChats(SessionState state)
+    {
+        List<ChatSummary> chats = state.Chats;
+        if (chats.Exists(chat => (chat.Status & SessionStatus.InputNeeded) == SessionStatus.InputNeeded))
+        {
+            return SessionStatus.InputNeeded;
+        }
+
+        if (chats.Exists(chat => (chat.Status & SessionStatus.Error) != 0))
+        {
+            return SessionStatus.Error;
+        }
+
+        ChatSummary? source = chats.Find(chat => chat.Resource == state.DefaultChat);
+        if (source is null)
+        {
+            foreach (ChatSummary chat in chats)
+            {
+                if (source is null || string.CompareOrdinal(chat.ModifiedAt, source.ModifiedAt) > 0)
+                {
+                    source = chat;
+                }
+            }
+        }
+
+        SessionStatus activity = source is null ? 0 : source.Status & StatusActivityMask;
+        return activity != 0 ? activity : SessionStatus.Idle;
+    }
+
+    // Removes the session input request with the given id; no-op when the queue
+    // is absent or no entry matches. Resolving an extension-permission request
+    // with no other user-blocking entry left restores the activity implied by the
+    // session's chats; otherwise the input-needed activity bit is recomputed from
+    // the remaining queue. Drops the list to absent once empty. Mirrors the TS
+    // `removeInputNeeded`.
+    private static ReduceOutcome RemoveInputNeeded(SessionState state, string id)
+    {
+        if (state.InputNeeded is null)
+        {
+            return ReduceOutcome.NoOp;
+        }
+
+        int idx = state.InputNeeded.FindIndex(r => SessionInputRequestId(r) == id);
+        if (idx < 0)
+        {
+            return ReduceOutcome.NoOp;
+        }
+
+        SessionInputRequest removed = state.InputNeeded[idx];
+        state.InputNeeded.RemoveAt(idx);
+        state.Status = removed.Value is SessionExtensionPermissionRequest && !state.InputNeeded.Exists(AwaitsUser)
+            ? (state.Status & ~StatusActivityMask) | ActivityFromChats(state)
+            : WithInputNeededStatus(state.Status, state.InputNeeded);
+        if (state.InputNeeded.Count == 0)
+        {
+            state.InputNeeded = null;
+        }
+
+        return ReduceOutcome.Applied;
+    }
+
     // The stable per-entry id carried by every SessionInputRequest variant (from
     // the shared base). Unknown future kinds are preserved as a raw JsonElement
     // by the union converter — read the id structurally so forward-compat entries
@@ -105,6 +173,7 @@ public static class Reducers
         SessionToolConfirmationRequest v => v.Id,
         SessionToolClientExecutionRequest v => v.Id,
         SessionToolAuthenticationRequest v => v.Id,
+        SessionExtensionPermissionRequest v => v.Id,
         JsonElement e when e.TryGetProperty("id", out JsonElement id) => id.GetString() ?? string.Empty,
         _ => string.Empty,
     };
@@ -867,30 +936,9 @@ public static class Reducers
                     return ReduceOutcome.Applied;
                 }
             case SessionInputNeededRemovedAction a:
-                {
-                    // Remove the entry matching id; no-op when the queue is absent or
-                    // no entry matches. Clears the input-needed activity bit once the
-                    // queue empties, and drops the list to absent. Mirrors the TS reducer.
-                    if (state.InputNeeded is null)
-                    {
-                        return ReduceOutcome.NoOp;
-                    }
-
-                    int idx = state.InputNeeded.FindIndex(r => SessionInputRequestId(r) == a.Id);
-                    if (idx < 0)
-                    {
-                        return ReduceOutcome.NoOp;
-                    }
-
-                    state.InputNeeded.RemoveAt(idx);
-                    state.Status = WithInputNeededStatus(state.Status, state.InputNeeded);
-                    if (state.InputNeeded.Count == 0)
-                    {
-                        state.InputNeeded = null;
-                    }
-
-                    return ReduceOutcome.Applied;
-                }
+                return RemoveInputNeeded(state, a.Id);
+            case SessionPermissionRespondedAction a:
+                return RemoveInputNeeded(state, a.RequestId);
             case SessionCustomizationsChangedAction a:
                 state.Customizations = CopyList(a.Customizations);
                 return ReduceOutcome.Applied;

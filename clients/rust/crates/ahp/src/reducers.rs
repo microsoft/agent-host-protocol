@@ -303,6 +303,72 @@ fn with_input_needed_status(status: u32, input_needed: &[SessionInputRequest]) -
     }
 }
 
+/// Activity implied by the session's chats, following the chat aggregation
+/// rule: promote `InputNeeded`, then `Error`, from any chat; otherwise use the
+/// default chat, else the most recently modified chat (UTC ISO 8601 timestamps
+/// compare lexicographically). Used when a session-owned request resolves: it
+/// may have promoted an idle session to `InputNeeded`, so the activity cannot be
+/// recovered by clearing bits from the current status.
+fn activity_from_chats(state: &SessionState) -> u32 {
+    let input_needed = SessionStatus::InputNeeded.bits();
+    if state
+        .chats
+        .iter()
+        .any(|chat| chat.status & input_needed == input_needed)
+    {
+        return input_needed;
+    }
+    if state
+        .chats
+        .iter()
+        .any(|chat| chat.status & SessionStatus::Error.bits() != 0)
+    {
+        return SessionStatus::Error.bits();
+    }
+    let source = state
+        .chats
+        .iter()
+        .find(|chat| state.default_chat.as_ref() == Some(&chat.resource))
+        .or_else(|| {
+            state.chats.iter().fold(None, |source, chat| match source {
+                Some(s) if chat.modified_at <= s.modified_at => Some(s),
+                _ => Some(chat),
+            })
+        });
+    match source.map(|chat| chat.status & STATUS_ACTIVITY_MASK) {
+        Some(activity) if activity != 0 => activity,
+        _ => SessionStatus::Idle.bits(),
+    }
+}
+
+/// Removes the session input request with the given id. Resolving an
+/// extension-permission request with no other user-blocking entry left
+/// restores the activity implied by the session's chats.
+fn remove_input_needed(state: &mut SessionState, id: &str) -> ReduceOutcome {
+    let Some(list) = state.input_needed.as_mut() else {
+        return ReduceOutcome::NoOp;
+    };
+    let Some(idx) = list
+        .iter()
+        .position(|r| session_input_request_id(r) == Some(id))
+    else {
+        return ReduceOutcome::NoOp;
+    };
+    let removed = list.remove(idx);
+    if list.is_empty() {
+        state.input_needed = None;
+    }
+    let remaining = state.input_needed.as_deref().unwrap_or(&[]);
+    state.status = if matches!(removed, SessionInputRequest::ExtensionPermission(_))
+        && !remaining.iter().any(awaits_user)
+    {
+        (state.status & !STATUS_ACTIVITY_MASK) | activity_from_chats(state)
+    } else {
+        with_input_needed_status(state.status, remaining)
+    };
+    ReduceOutcome::Applied
+}
+
 fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
     let activity: u32 = if let Some(t) = terminal {
         t.bits()
@@ -479,6 +545,7 @@ fn session_input_request_id(r: &SessionInputRequest) -> Option<&str> {
         SessionInputRequest::ToolConfirmation(x) => Some(x.id.as_str()),
         SessionInputRequest::ToolClientExecution(x) => Some(x.id.as_str()),
         SessionInputRequest::ToolAuthentication(x) => Some(x.id.as_str()),
+        SessionInputRequest::ExtensionPermission(x) => Some(x.id.as_str()),
         SessionInputRequest::Unknown(v) => v.get("id").and_then(serde_json::Value::as_str),
     }
 }
@@ -942,28 +1009,8 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             state.status = new_status;
             ReduceOutcome::Applied
         }
-        StateAction::SessionInputNeededRemoved(a) => {
-            let Some(list) = state.input_needed.as_mut() else {
-                return ReduceOutcome::NoOp;
-            };
-            let Some(idx) = list
-                .iter()
-                .position(|r| session_input_request_id(r) == Some(a.id.as_str()))
-            else {
-                return ReduceOutcome::NoOp;
-            };
-            list.remove(idx);
-            let empty = list.is_empty();
-            if empty {
-                state.input_needed = None;
-            }
-            let new_status = with_input_needed_status(
-                state.status,
-                state.input_needed.as_deref().unwrap_or(&[]),
-            );
-            state.status = new_status;
-            ReduceOutcome::Applied
-        }
+        StateAction::SessionInputNeededRemoved(a) => remove_input_needed(state, &a.id),
+        StateAction::SessionPermissionResponded(a) => remove_input_needed(state, &a.request_id),
         StateAction::SessionCustomizationsChanged(a) => {
             state.customizations = Some(a.customizations.clone());
             ReduceOutcome::Applied

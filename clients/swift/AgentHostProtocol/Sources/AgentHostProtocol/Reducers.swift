@@ -48,6 +48,47 @@ private func withInputNeededStatus(_ status: SessionStatus, _ inputNeeded: [Sess
     return status.subtracting(SessionStatus.inputNeeded.subtracting(.inProgress))
 }
 
+/// Activity implied by the session's chats, following the chat aggregation
+/// rule: promote `.inputNeeded`, then `.error`, from any chat; otherwise use the
+/// default chat, else the most recently modified chat (UTC ISO 8601 timestamps
+/// compare lexicographically). Used when a session-owned request resolves: it
+/// may have promoted an idle session to `.inputNeeded`, so the activity cannot
+/// be recovered by clearing bits from the current status.
+private func activityFromChats(_ state: SessionState) -> SessionStatus {
+    let chats = state.chats
+    if chats.contains(where: { $0.status.isSuperset(of: .inputNeeded) }) {
+        return .inputNeeded
+    }
+    if chats.contains(where: { !$0.status.isDisjoint(with: .error) }) {
+        return .error
+    }
+    var source = chats.first(where: { $0.resource == state.defaultChat })
+    if source == nil {
+        for chat in chats where source.map({ chat.modifiedAt > $0.modifiedAt }) ?? true {
+            source = chat
+        }
+    }
+    let activity = source?.status.intersection(statusActivityMask) ?? []
+    return activity.isEmpty ? .idle : activity
+}
+
+/// Removes the session input request with `id`. Resolving an
+/// extension-permission request with no other user-blocking entry left
+/// restores the activity implied by the session's chats.
+private func removeInputNeeded(_ state: SessionState, id: String) -> SessionState {
+    guard var list = state.inputNeeded,
+          let idx = list.firstIndex(where: { sessionInputRequestID($0) == id }) else { return state }
+    var next = state
+    let removed = list.remove(at: idx)
+    next.inputNeeded = list.isEmpty ? nil : list
+    if case .extensionPermission = removed, !list.contains(where: awaitsUser) {
+        next.status = state.status.subtracting(statusActivityMask).union(activityFromChats(state))
+    } else {
+        next.status = withInputNeededStatus(state.status, list)
+    }
+    return next
+}
+
 /// Resolves a selected confirmation option by ID from a pending-confirmation state.
 private func resolveSelectedOption(_ options: [ConfirmationOption]?, id: String?) -> ConfirmationOption? {
     guard let id, let options else {
@@ -89,6 +130,7 @@ private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
     case .toolConfirmation(let x): return x.id
     case .toolClientExecution(let x): return x.id
     case .toolAuthentication(let x): return x.id
+    case .extensionPermission(let x): return x.id
     case .unknown: return nil
     }
 }
@@ -922,13 +964,10 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         return next
 
     case .sessionInputNeededRemoved(let a):
-        guard var list = state.inputNeeded,
-              let idx = list.firstIndex(where: { sessionInputRequestID($0) == a.id }) else { return state }
-        var next = state
-        list.remove(at: idx)
-        next.inputNeeded = list.isEmpty ? nil : list
-        next.status = withInputNeededStatus(next.status, list)
-        return next
+        return removeInputNeeded(state, id: a.id)
+
+    case .sessionPermissionResponded(let a):
+        return removeInputNeeded(state, id: a.requestId)
 
     // ── Customizations ──────────────────────────────────────────────────
 

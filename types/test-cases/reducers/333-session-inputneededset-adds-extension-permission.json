@@ -1,0 +1,39 @@
+{
+  "description": "session/inputNeededSet appends an extension-permission request to an idle session and promotes status to InputNeeded",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededSet",
+      "request": {
+        "kind": "extensionPermission",
+        "id": "extension-permission-1",
+        "extensionName": "example-extension",
+        "capabilities": ["register hooks"]
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "extensionPermission",
+        "id": "extension-permission-1",
+        "extensionName": "example-extension",
+        "capabilities": ["register hooks"]
+      }
+    ]
+  }
+}
