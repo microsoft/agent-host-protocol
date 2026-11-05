@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`SessionInputRequestKind.ExtensionPermission` surfaces an agent extension's capability request that is not tied to a chat, such as registering hooks at startup. Clients answer with the new `session/permissionResponded` action, optionally choosing one of the request's host-defined `options`."
+  "message": "`SessionInputRequestKind.ExtensionPermission` surfaces an agent extension's capability request that is not tied to a chat, such as registering hooks at startup. Clients that declare the new `extensionPermissions` client capability receive these requests and answer with the new `session/permissionResponded` action, optionally choosing one of the request's host-defined `options`."
 }

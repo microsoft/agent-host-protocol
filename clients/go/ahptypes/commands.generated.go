@@ -257,6 +257,15 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client can render and answer session-owned
+	// {@link SessionInputRequestKind.ExtensionPermission | `extensionPermission`}
+	// input requests with `session/permissionResponded`.
+	//
+	// Hosts MUST NOT send `extensionPermission` entries or
+	// `session/permissionResponded` actions to clients that omit this
+	// capability, because such clients may assume every session input request
+	// belongs to a chat.
+	ExtensionPermissions map[string]json.RawMessage `json:"extensionPermissions,omitempty"`
 }
 
 // Automation features supported by this host authority.

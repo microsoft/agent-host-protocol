@@ -432,6 +432,16 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Client can render and answer session-owned
+    /// {@link SessionInputRequestKind.ExtensionPermission | `extensionPermission`}
+    /// input requests with `session/permissionResponded`.
+    ///
+    /// Hosts MUST NOT send `extensionPermission` entries or
+    /// `session/permissionResponded` actions to clients that omit this
+    /// capability, because such clients may assume every session input request
+    /// belongs to a chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_permissions: Option<JsonObject>,
 }
 
 /// Automation features supported by this host authority.

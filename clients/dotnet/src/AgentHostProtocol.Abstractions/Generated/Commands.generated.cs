@@ -544,6 +544,17 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+
+    /// <summary>Client can render and answer session-owned
+    /// {@link SessionInputRequestKind.ExtensionPermission | `extensionPermission`}
+    /// input requests with `session/permissionResponded`.
+    ///
+    /// Hosts MUST NOT send `extensionPermission` entries or
+    /// `session/permissionResponded` actions to clients that omit this
+    /// capability, because such clients may assume every session input request
+    /// belongs to a chat.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ExtensionPermissions { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.

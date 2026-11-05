@@ -511,11 +511,22 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Client can render and answer session-owned
+    /// {@link SessionInputRequestKind.ExtensionPermission | `extensionPermission`}
+    /// input requests with `session/permissionResponded`.
+    ///
+    /// Hosts MUST NOT send `extensionPermission` entries or
+    /// `session/permissionResponded` actions to clients that omit this
+    /// capability, because such clients may assume every session input request
+    /// belongs to a chat.
+    public var extensionPermissions: [String: AnyCodable]?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        extensionPermissions: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+        self.extensionPermissions = extensionPermissions
     }
 }
 

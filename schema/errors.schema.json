@@ -6318,6 +6318,11 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
+        },
+        "extensionPermissions": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Client can render and answer session-owned\n{@link SessionInputRequestKind.ExtensionPermission | `extensionPermission`}\ninput requests with `session/permissionResponded`.\n\nHosts MUST NOT send `extensionPermission` entries or\n`session/permissionResponded` actions to clients that omit this\ncapability, because such clients may assume every session input request\nbelongs to a chat."
         }
       }
     },
