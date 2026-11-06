@@ -16,7 +16,7 @@ import type {
   SessionStatus,
 } from '../channels-session/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
-import type { CanvasReference } from '../channels-canvas/state.js';
+import type { CanvasReference, CanvasRegistry } from '../channels-canvas/state.js';
 import type {
   ContentRef,
   ErrorInfo,
@@ -129,6 +129,18 @@ export interface ChatState {
    * chat channel.
    */
   backgroundWork?: BackgroundWork[];
+  /**
+   * Canvas types currently registered for this exact chat.
+   *
+   * Absence means the registry has not been materialized or is not currently
+   * available. Clients that need it MAY dispatch
+   * `chat/canvasRegistryRequested`; the host publishes the authoritative
+   * registry through `chat/canvasRegistryChanged`. An empty
+   * {@link CanvasRegistry.extensions} array is a loaded registry with no
+   * available canvas types.
+   * @stability 1.0
+   */
+  canvasRegistry?: CanvasRegistry;
   /**
    * Live canvases currently exposed by this chat.
    *

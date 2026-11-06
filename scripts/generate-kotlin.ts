@@ -996,7 +996,7 @@ const STATE_ENUMS = [
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'CanvasExtensionSource',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -1008,12 +1008,13 @@ const STATE_STRUCTS = [
   'ChannelFlowControl', 'ResumedChannelSubscription',
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
+  'CanvasesCapability',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
-  'CanvasReference', 'CanvasState',
+  'CanvasExtension', 'CanvasType', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
@@ -1546,6 +1547,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/movableChanged', caseName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/canvasesChanged', caseName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'chat/canvasRegistryRequested', caseName: 'ChatCanvasRegistryRequested', tsInterface: 'ChatCanvasRegistryRequestedAction' },
+  { type: 'chat/canvasRegistryChanged', caseName: 'ChatCanvasRegistryChanged', tsInterface: 'ChatCanvasRegistryChangedAction' },
   { type: 'canvas/stateChanged', caseName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', caseName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1798,6 +1801,7 @@ const COMMAND_STRUCTS = [
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
+  'OpenCanvasParams', 'DisposeCanvasParams',
   'ListSessionsParams', 'ListSessionsResult',
   'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
@@ -2354,6 +2358,12 @@ object AhpCommands {
 
     fun disposeTerminal(id: Long, params: DisposeTerminalParams): JsonRpcRequest<DisposeTerminalParams> =
         JsonRpcRequest(id = id, method = "disposeTerminal", params = params)
+
+    fun openCanvas(id: Long, params: OpenCanvasParams): JsonRpcRequest<OpenCanvasParams> =
+        JsonRpcRequest(id = id, method = "openCanvas", params = params)
+
+    fun disposeCanvas(id: Long, params: DisposeCanvasParams): JsonRpcRequest<DisposeCanvasParams> =
+        JsonRpcRequest(id = id, method = "disposeCanvas", params = params)
 
     fun resolveSessionConfig(id: Long, params: ResolveSessionConfigParams): JsonRpcRequest<ResolveSessionConfigParams> =
         JsonRpcRequest(id = id, method = "resolveSessionConfig", params = params)

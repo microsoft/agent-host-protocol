@@ -1055,6 +1055,54 @@ pub struct MoveChatResult {
     pub session: Uri,
 }
 
+/// Opens one client-addressed canvas resource in a chat.
+///
+/// The resulting live instance is published through the chat's
+/// {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+/// Repeating this command with the same `channel` is idempotent. Reusing it for
+/// a different chat, extension, or canvas type MUST fail with `Conflict`.
+/// Clients MUST observe
+/// {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
+/// authoritative membership, availability, and presentation state.
+///
+/// Clients MUST NOT call this command unless the chat's agent advertises
+/// {@link AgentCapabilities.canvases}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCanvasParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Exact chat URI that owns the canvas instance.
+    pub chat: Uri,
+    /// Stable identifier of the extension that declares the canvas.
+    pub extension_id: String,
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+}
+
+/// Closes and disposes one live canvas resource.
+///
+/// The server removes the resource from the owning chat's
+/// {@link ChatState.canvases} references. Repeating this command after the
+/// resource is gone is a no-op.
+///
+/// Clients MUST NOT call this command unless the chat's agent advertises
+/// {@link AgentCapabilities.canvases}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisposeCanvasParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
 /// Returns a list of session summaries. Used to populate session lists and sidebars.
 ///
 /// The session list is **not** part of the state tree because it can be arbitrarily

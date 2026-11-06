@@ -6,7 +6,7 @@
 
 import { ActionType } from '../common/actions.js';
 import type { StringOrMarkdown, FileEditCollection, UsageInfo, URI } from '../common/state.js';
-import type { CanvasReference } from '../channels-canvas/state.js';
+import type { CanvasReference, CanvasRegistry } from '../channels-canvas/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
 import type { McpAuthRequirement, SessionConfigSchema } from '../channels-session/state.js';
 import type {
@@ -625,6 +625,44 @@ export interface ChatCanvasesChangedAction {
   type: ActionType.ChatCanvasesChanged;
   /** New canvas channel references, or `undefined` to clear the collection. */
   canvases: CanvasReference[] | undefined;
+}
+
+/**
+ * Requests materialization of the chat's Canvas type registry.
+ *
+ * A host MUST reject the action when the chat's agent does not advertise
+ * {@link AgentCapabilities.canvases} or when the chat cannot materialize the
+ * registry. Materialization MUST NOT send a user message or invoke a model.
+ *
+ * The reducer is a no-op. The host remains authoritative and publishes the
+ * complete result through
+ * {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
+ * Clients do not need to dispatch this action when
+ * {@link ChatState.canvasRegistry} is already present.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @stability 1.0
+ * @clientDispatchable
+ */
+export interface ChatCanvasRegistryRequestedAction {
+  type: ActionType.ChatCanvasRegistryRequested;
+}
+
+/**
+ * The Canvas type registry for this chat changed.
+ *
+ * Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
+ * Set to `undefined` when the registry is no longer materialized or available.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface ChatCanvasRegistryChangedAction {
+  type: ActionType.ChatCanvasRegistryChanged;
+  /** Authoritative registry, or `undefined` to clear it. */
+  canvasRegistry: CanvasRegistry | undefined;
 }
 
 /**

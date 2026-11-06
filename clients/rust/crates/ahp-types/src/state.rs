@@ -1773,6 +1773,21 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// Experimental Canvas API.
+    ///
+    /// The agent can materialize an exact chat's
+    /// {@link ChatState.canvasRegistry | Canvas registry} through
+    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+    /// Live instances are published through the chat's canvas references and
+    /// their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// registry metadata while the Canvas channel remains experimental. This
+    /// capability does not gate server-published Canvas references.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<CanvasesCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1792,6 +1807,14 @@ pub struct AgentCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
 }
+
+/// Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesCapability {}
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -2106,6 +2129,18 @@ pub struct ChatState {
     /// chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_work: Option<Vec<BackgroundWork>>,
+    /// Canvas types currently registered for this exact chat.
+    ///
+    /// Absence means the registry has not been materialized or is not currently
+    /// available. Clients that need it MAY dispatch
+    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
+    /// registry through `chat/canvasRegistryChanged`. An empty
+    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
+    /// available canvas types.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_registry: Option<CanvasRegistry>,
     /// Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -2158,6 +2193,44 @@ pub struct ChatState {
     pub meta: Option<JsonObject>,
 }
 
+/// One extension or provider that declares canvas types for a chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasExtension {
+    /// Stable opaque identifier.
+    pub id: String,
+    /// Human-readable label, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Canvas types declared by this extension/provider. `id` MUST be
+    /// unique within this array.
+    pub canvases: Vec<CanvasType>,
+}
+
+/// One canvas type currently available to open.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasType {
+    /// Provider-local canvas type identifier.
+    pub id: String,
+    /// Human-readable canvas type label.
+    pub label: String,
+    /// Description of what the canvas type does.
+    pub description: String,
+    /// Whether opening this canvas requires an input flow.
+    pub requires_input: bool,
+}
+
+/// Canvas types currently registered for one chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistry {
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    pub extensions: Vec<CanvasExtension>,
+}
+
 /// Stable reference to a subscribable canvas channel.
 ///
 /// Chat state intentionally carries only this reference so the experimental
@@ -2178,11 +2251,15 @@ pub struct CanvasReference {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasState {
-    /// Stable caller-supplied instance identifier.
+    /// Provider-facing instance identifier.
+    ///
+    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+    /// URI. They MUST NOT treat this provider identifier as a second resource
+    /// identity.
     pub instance_id: String,
-    /// Owning extension/provider identifier.
+    /// Owning declaration namespace.
     pub extension_id: String,
-    /// Owning extension display name, when available.
+    /// Owning namespace title, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_name: Option<String>,
     /// Provider-local canvas type identifier.

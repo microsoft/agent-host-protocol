@@ -786,6 +786,20 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// Experimental Canvas API.
+	//
+	// The agent can materialize an exact chat's
+	// {@link ChatState.canvasRegistry | Canvas registry} through
+	// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+	// Live instances are published through the chat's canvas references and
+	// their `ahp-canvas:` state channels.
+	//
+	// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+	// registry metadata while the Canvas channel remains experimental. This
+	// capability does not gate server-published Canvas references.
+	//
+	// Stability: 1.0 - Early development.
+	Canvases *CanvasesCapability `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -802,6 +816,13 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
+}
+
+// Presence capability for the experimental Canvas registry and lifecycle
+// commands.
+//
+// Stability: 1.0 - Early development.
+type CanvasesCapability struct {
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1436,6 +1457,17 @@ type ChatState struct {
 	// absent from {@link ChatSummary}; clients obtain it by subscribing to the
 	// chat channel.
 	BackgroundWork *[]BackgroundWork `json:"backgroundWork,omitempty"`
+	// Canvas types currently registered for this exact chat.
+	//
+	// Absence means the registry has not been materialized or is not currently
+	// available. Clients that need it MAY dispatch
+	// `chat/canvasRegistryRequested`; the host publishes the authoritative
+	// registry through `chat/canvasRegistryChanged`. An empty
+	// {@link CanvasRegistry.extensions} array is a loaded registry with no
+	// available canvas types.
+	//
+	// Stability: 1.0 - Early development.
+	CanvasRegistry *CanvasRegistry `json:"canvasRegistry,omitempty"`
 	// Live canvases currently exposed by this chat.
 	//
 	// Entries intentionally contain only subscribable channel references.
@@ -1480,6 +1512,37 @@ type ChatState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// One extension or provider that declares canvas types for a chat.
+type CanvasExtension struct {
+	// Stable opaque identifier.
+	Id string `json:"id"`
+	// Human-readable label, when available.
+	Label *string `json:"label,omitempty"`
+	// Canvas types declared by this extension/provider. `id` MUST be
+	// unique within this array.
+	Canvases []CanvasType `json:"canvases"`
+}
+
+// One canvas type currently available to open.
+type CanvasType struct {
+	// Provider-local canvas type identifier.
+	Id string `json:"id"`
+	// Human-readable canvas type label.
+	Label string `json:"label"`
+	// Description of what the canvas type does.
+	Description string `json:"description"`
+	// Whether opening this canvas requires an input flow.
+	RequiresInput bool `json:"requiresInput"`
+}
+
+// Canvas types currently registered for one chat.
+type CanvasRegistry struct {
+	// Extensions and providers that declare canvas types. `id` MUST be unique
+	// within this array. An empty array is an authoritative loaded registry with
+	// no types.
+	Extensions []CanvasExtension `json:"extensions"`
+}
+
 // Stable reference to a subscribable canvas channel.
 //
 // Chat state intentionally carries only this reference so the experimental
@@ -1496,11 +1559,15 @@ type CanvasReference struct {
 // The client already knows the subscribed resource, so the state does not
 // redundantly carry its channel URI.
 type CanvasState struct {
-	// Stable caller-supplied instance identifier.
+	// Provider-facing instance identifier.
+	//
+	// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+	// URI. They MUST NOT treat this provider identifier as a second resource
+	// identity.
 	InstanceId string `json:"instanceId"`
-	// Owning extension/provider identifier.
+	// Owning declaration namespace.
 	ExtensionId string `json:"extensionId"`
-	// Owning extension display name, when available.
+	// Owning namespace title, when available.
 	ExtensionName *string `json:"extensionName,omitempty"`
 	// Provider-local canvas type identifier.
 	CanvasId string `json:"canvasId"`

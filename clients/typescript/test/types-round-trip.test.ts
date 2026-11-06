@@ -67,6 +67,7 @@ import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/commo
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
 import type { ChatSource, CreateChatParams } from '../src/types/channels-chat/commands.js';
+import type { DisposeCanvasParams, OpenCanvasParams } from '../src/types/channels-canvas/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
 
@@ -264,6 +265,8 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'CreateTcpConnectionParams': void (parsed as CreateTcpConnectionParams); break;
     case 'ResourceReadParams':  void (parsed as ResourceReadParams); break;
     case 'ResourceReadResult':  void (parsed as ResourceReadResult); break;
+    case 'OpenCanvasParams':  void (parsed as OpenCanvasParams); break;
+    case 'DisposeCanvasParams': void (parsed as DisposeCanvasParams); break;
     default:
       throw new Error(
         `${file}: unknown wire type "${type}". Add a decode entry to bindToType.`,

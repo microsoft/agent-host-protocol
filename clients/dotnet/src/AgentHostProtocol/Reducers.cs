@@ -1054,6 +1054,11 @@ public static class Reducers
             case ChatCanvasesChangedAction a:
                 state.Canvases = CopyList(a.Canvases);
                 return ReduceOutcome.Applied;
+            case ChatCanvasRegistryRequestedAction:
+                return ReduceOutcome.NoOp;
+            case ChatCanvasRegistryChangedAction a:
+                state.CanvasRegistry = a.CanvasRegistry;
+                return ReduceOutcome.Applied;
             case ChatWorkingDirectorySetAction a:
                 {
                     // Membership keyed by the directory URI, over this chat's subset of
@@ -2640,6 +2645,7 @@ public static class Reducers
         "chat/isReadChanged",
         "chat/isArchivedChanged",
         "chat/configChanged",
+        "chat/canvasRegistryRequested",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

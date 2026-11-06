@@ -2053,6 +2053,22 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
+    /// <summary>Experimental Canvas API.
+    ///
+    /// The agent can materialize an exact chat's
+    /// {@link ChatState.canvasRegistry | Canvas registry} through
+    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
+    /// Live instances are published through the chat's canvas references and
+    /// their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// registry metadata while the Canvas channel remains experimental. This
+    /// capability does not gate server-published Canvas references.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CanvasesCapability? Canvases { get; init; }
+
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -2072,6 +2088,14 @@ public sealed record AgentCapabilities
     /// {@link CreateSessionParams.workingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleWorkingDirectoriesCapability? MultipleWorkingDirectories { get; init; }
+}
+
+/// <summary>Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCapability
+{
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleChats} capability.</summary>
@@ -2545,6 +2569,19 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<BackgroundWork>? BackgroundWork { get; set; }
 
+    /// <summary>Canvas types currently registered for this exact chat.
+    ///
+    /// Absence means the registry has not been materialized or is not currently
+    /// available. Clients that need it MAY dispatch
+    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
+    /// registry through `chat/canvasRegistryChanged`. An empty
+    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
+    /// available canvas types.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CanvasRegistry? CanvasRegistry { get; set; }
+
     /// <summary>Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -2606,6 +2643,46 @@ public sealed class ChatState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
+/// <summary>One extension or provider that declares canvas types for a chat.</summary>
+public sealed record CanvasExtension
+{
+    /// <summary>Stable opaque identifier.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable label, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Label { get; init; }
+
+    /// <summary>Canvas types declared by this extension/provider. `id` MUST be
+    /// unique within this array.</summary>
+    public required List<CanvasType> Canvases { get; init; }
+}
+
+/// <summary>One canvas type currently available to open.</summary>
+public sealed record CanvasType
+{
+    /// <summary>Provider-local canvas type identifier.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable canvas type label.</summary>
+    public required string Label { get; init; }
+
+    /// <summary>Description of what the canvas type does.</summary>
+    public required string Description { get; init; }
+
+    /// <summary>Whether opening this canvas requires an input flow.</summary>
+    public bool RequiresInput { get; init; }
+}
+
+/// <summary>Canvas types currently registered for one chat.</summary>
+public sealed record CanvasRegistry
+{
+    /// <summary>Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.</summary>
+    public required List<CanvasExtension> Extensions { get; init; }
+}
+
 /// <summary>Stable reference to a subscribable canvas channel.
 ///
 /// Chat state intentionally carries only this reference so the experimental
@@ -2624,13 +2701,17 @@ public sealed record CanvasReference
 /// redundantly carry its channel URI.</summary>
 public sealed class CanvasState
 {
-    /// <summary>Stable caller-supplied instance identifier.</summary>
+    /// <summary>Provider-facing instance identifier.
+    ///
+    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
+    /// URI. They MUST NOT treat this provider identifier as a second resource
+    /// identity.</summary>
     public required string InstanceId { get; set; }
 
-    /// <summary>Owning extension/provider identifier.</summary>
+    /// <summary>Owning declaration namespace.</summary>
     public required string ExtensionId { get; set; }
 
-    /// <summary>Owning extension display name, when available.</summary>
+    /// <summary>Owning namespace title, when available.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ExtensionName { get; set; }
 

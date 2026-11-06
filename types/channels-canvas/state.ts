@@ -10,6 +10,53 @@
 import type { URI } from '../common/state.js';
 
 /**
+ * One extension or provider that declares canvas types for a chat.
+ *
+ * @category Canvas State
+ */
+export interface CanvasExtension {
+  /** Stable opaque identifier. */
+  id: string;
+  /** Human-readable label, when available. */
+  label?: string;
+  /**
+   * Canvas types declared by this extension/provider. `id` MUST be
+   * unique within this array.
+   */
+  canvases: CanvasType[];
+}
+
+/**
+ * One canvas type currently available to open.
+ *
+ * @category Canvas State
+ */
+export interface CanvasType {
+  /** Provider-local canvas type identifier. */
+  id: string;
+  /** Human-readable canvas type label. */
+  label: string;
+  /** Description of what the canvas type does. */
+  description: string;
+  /** Whether opening this canvas requires an input flow. */
+  requiresInput: boolean;
+}
+
+/**
+ * Canvas types currently registered for one chat.
+ *
+ * @category Canvas State
+ */
+export interface CanvasRegistry {
+  /**
+   * Extensions and providers that declare canvas types. `id` MUST be unique
+   * within this array. An empty array is an authoritative loaded registry with
+   * no types.
+   */
+  extensions: CanvasExtension[];
+}
+
+/**
  * Stable reference to a subscribable canvas channel.
  *
  * Chat state intentionally carries only this reference so the experimental
@@ -19,7 +66,9 @@ import type { URI } from '../common/state.js';
  * @category Canvas State
  */
 export interface CanvasReference {
-  /** Canvas channel URI. Subscribe to this resource for the full state. */
+  /**
+   * Canvas channel URI. Subscribe to this resource for the full state.
+   */
   resource: URI;
 }
 
@@ -33,11 +82,17 @@ export interface CanvasReference {
  * @category Canvas State
  */
 export interface CanvasState {
-  /** Stable caller-supplied instance identifier. */
+  /**
+   * Provider-facing instance identifier.
+   *
+   * AHP clients address this instance by the subscribed `ahp-canvas:` channel
+   * URI. They MUST NOT treat this provider identifier as a second resource
+   * identity.
+   */
   instanceId: string;
-  /** Owning extension/provider identifier. */
+  /** Owning declaration namespace. */
   extensionId: string;
-  /** Owning extension display name, when available. */
+  /** Owning namespace title, when available. */
   extensionName?: string;
   /** Provider-local canvas type identifier. */
   canvasId: string;

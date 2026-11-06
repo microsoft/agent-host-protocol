@@ -247,6 +247,14 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.canvases = a.canvases
         return next
 
+    case .chatCanvasRegistryRequested:
+        return state
+
+    case .chatCanvasRegistryChanged(let a):
+        var next = state
+        next.canvasRegistry = a.canvasRegistry
+        return next
+
     case .chatWorkingDirectorySet(let a):
         if (state.workingDirectories ?? []).contains(a.directory) { return state }
         var next = state
@@ -1031,6 +1039,7 @@ public let clientDispatchableActions: Set<String> = [
     "chat/isReadChanged",
     "chat/isArchivedChanged",
     "chat/configChanged",
+    "chat/canvasRegistryRequested",
     "chat/inputAnswerChanged",
     "chat/inputCompleted",
     "session/customizationToggled",
@@ -1053,6 +1062,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
          .chatIsReadChanged, .chatIsArchivedChanged, .chatConfigChanged,
+         .chatCanvasRegistryRequested,
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,
          .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,

@@ -1,0 +1,71 @@
+/**
+ * Canvas Commands — explicit opening for one chat.
+ *
+ * Stability: 1 - Experimental
+ *
+ * @module channels-canvas/commands
+ */
+
+import type { BaseParams } from '../common/commands.js';
+import type { URI } from '../common/state.js';
+import type { AgentCapabilities } from '../channels-root/state.js';
+import type { ChatState } from '../channels-chat/state.js';
+
+// ─── openCanvas ──────────────────────────────────────────────────────────────
+
+/**
+ * Opens one client-addressed canvas resource in a chat.
+ *
+ * The resulting live instance is published through the chat's
+ * {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+ * Repeating this command with the same `channel` is idempotent. Reusing it for
+ * a different chat, extension, or canvas type MUST fail with `Conflict`.
+ * Clients MUST observe
+ * {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
+ * authoritative membership, availability, and presentation state.
+ *
+ * Clients MUST NOT call this command unless the chat's agent advertises
+ * {@link AgentCapabilities.canvases}.
+ *
+ * @category Commands
+ * @method openCanvas
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface OpenCanvasParams extends BaseParams {
+  /**
+   * Client-chosen URI for the canvas resource, for example
+   * `ahp-canvas:/<uuid>`.
+   */
+  channel: URI;
+  /** Exact chat URI that owns the canvas instance. */
+  chat: URI;
+  /** Stable identifier of the extension that declares the canvas. */
+  extensionId: string;
+  /** Provider-local canvas type identifier. */
+  canvasId: string;
+}
+
+// ─── disposeCanvas ───────────────────────────────────────────────────────────
+
+/**
+ * Closes and disposes one live canvas resource.
+ *
+ * The server removes the resource from the owning chat's
+ * {@link ChatState.canvases} references. Repeating this command after the
+ * resource is gone is a no-op.
+ *
+ * Clients MUST NOT call this command unless the chat's agent advertises
+ * {@link AgentCapabilities.canvases}.
+ *
+ * @category Commands
+ * @method disposeCanvas
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface DisposeCanvasParams extends BaseParams {
+  /** URI of the canvas resource to dispose. */
+  channel: URI;
+}

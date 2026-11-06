@@ -59,6 +59,8 @@ import type {
   ChatMovableChangedAction,
   ChatChangesetsChangedAction,
   ChatCanvasesChangedAction,
+  ChatCanvasRegistryRequestedAction,
+  ChatCanvasRegistryChangedAction,
   CanvasStateChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
@@ -233,6 +235,8 @@ export type ChatAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
+  | ChatCanvasRegistryRequestedAction
+  | ChatCanvasRegistryChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -261,6 +265,7 @@ export type ClientChatAction =
   | ChatToolCallContentChangedAction
   | ChatTurnCancelledAction
   | ChatTurnResumeAction
+  | ChatCanvasRegistryRequestedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatPendingMessageSetAction
@@ -292,6 +297,7 @@ export type ServerChatAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
+  | ChatCanvasRegistryChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatMovedAction
@@ -519,6 +525,8 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatMovableChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
   [ActionType.ChatCanvasesChanged]: false,
+  [ActionType.ChatCanvasRegistryRequested]: true,
+  [ActionType.ChatCanvasRegistryChanged]: false,
   [ActionType.CanvasStateChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,
