@@ -1512,29 +1512,23 @@ type ChatState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// One namespace that declares canvas types for a chat.
-//
-// `extensionId` is opaque. Clients MUST NOT infer management behavior by
-// parsing it.
-type CanvasExtensionDeclaration struct {
-	// Stable opaque declaration namespace.
-	ExtensionId string `json:"extensionId"`
-	// Human-readable namespace title, when available.
-	ExtensionName *string `json:"extensionName,omitempty"`
-	// Canvas types declared by this extension/provider. `canvasId` MUST be
+// One extension or provider that declares canvas types for a chat.
+type CanvasExtension struct {
+	// Stable opaque identifier.
+	Id string `json:"id"`
+	// Human-readable label, when available.
+	Label *string `json:"label,omitempty"`
+	// Canvas types declared by this extension/provider. `id` MUST be
 	// unique within this array.
-	Canvases []CanvasTypeDeclaration `json:"canvases"`
+	Canvases []CanvasType `json:"canvases"`
 }
 
 // One canvas type currently available to open.
-//
-// This experimental object may gain optional discovery metadata. Clients
-// SHOULD ignore fields they do not understand.
-type CanvasTypeDeclaration struct {
+type CanvasType struct {
 	// Provider-local canvas type identifier.
-	CanvasId string `json:"canvasId"`
-	// Human-readable canvas type title.
-	Title string `json:"title"`
+	Id string `json:"id"`
+	// Human-readable canvas type label.
+	Label string `json:"label"`
 	// Description of what the canvas type does.
 	Description string `json:"description"`
 	// Whether opening this canvas requires an input flow.
@@ -1543,9 +1537,10 @@ type CanvasTypeDeclaration struct {
 
 // Canvas types currently registered for one chat.
 type CanvasRegistry struct {
-	// Declaring namespaces. `extensionId` MUST be unique within this
-	// array. An empty array is an authoritative loaded registry with no types.
-	Extensions []CanvasExtensionDeclaration `json:"extensions"`
+	// Extensions and providers that declare canvas types. `id` MUST be unique
+	// within this array. An empty array is an authoritative loaded registry with
+	// no types.
+	Extensions []CanvasExtension `json:"extensions"`
 }
 
 // Stable reference to a subscribable canvas channel.

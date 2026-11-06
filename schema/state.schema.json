@@ -4775,42 +4775,42 @@
         "title"
       ]
     },
-    "CanvasExtensionDeclaration": {
+    "CanvasExtension": {
       "type": "object",
-      "description": "One namespace that declares canvas types for a chat.\n\n`extensionId` is opaque. Clients MUST NOT infer management behavior by\nparsing it.",
+      "description": "One extension or provider that declares canvas types for a chat.",
       "properties": {
-        "extensionId": {
+        "id": {
           "type": "string",
-          "description": "Stable opaque declaration namespace."
+          "description": "Stable opaque identifier."
         },
-        "extensionName": {
+        "label": {
           "type": "string",
-          "description": "Human-readable namespace title, when available."
+          "description": "Human-readable label, when available."
         },
         "canvases": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/CanvasTypeDeclaration"
+            "$ref": "#/$defs/CanvasType"
           },
-          "description": "Canvas types declared by this extension/provider. `canvasId` MUST be\nunique within this array."
+          "description": "Canvas types declared by this extension/provider. `id` MUST be\nunique within this array."
         }
       },
       "required": [
-        "extensionId",
+        "id",
         "canvases"
       ]
     },
-    "CanvasTypeDeclaration": {
+    "CanvasType": {
       "type": "object",
-      "description": "One canvas type currently available to open.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
+      "description": "One canvas type currently available to open.",
       "properties": {
-        "canvasId": {
+        "id": {
           "type": "string",
           "description": "Provider-local canvas type identifier."
         },
-        "title": {
+        "label": {
           "type": "string",
-          "description": "Human-readable canvas type title."
+          "description": "Human-readable canvas type label."
         },
         "description": {
           "type": "string",
@@ -4822,8 +4822,8 @@
         }
       },
       "required": [
-        "canvasId",
-        "title",
+        "id",
+        "label",
         "description",
         "requiresInput"
       ]
@@ -4835,9 +4835,9 @@
         "extensions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/CanvasExtensionDeclaration"
+            "$ref": "#/$defs/CanvasExtension"
           },
-          "description": "Declaring namespaces. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
+          "description": "Extensions and providers that declare canvas types. `id` MUST be unique\nwithin this array. An empty array is an authoritative loaded registry with\nno types."
         }
       },
       "required": [

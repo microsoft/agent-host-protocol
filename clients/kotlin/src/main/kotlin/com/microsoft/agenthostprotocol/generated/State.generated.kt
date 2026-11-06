@@ -2280,32 +2280,32 @@ data class BackgroundSubagentWork(
 )
 
 @Serializable
-data class CanvasExtensionDeclaration(
+data class CanvasExtension(
     /**
-     * Stable opaque declaration namespace.
+     * Stable opaque identifier.
      */
-    val extensionId: String,
+    val id: String,
     /**
-     * Human-readable namespace title, when available.
+     * Human-readable label, when available.
      */
-    val extensionName: String? = null,
+    val label: String? = null,
     /**
-     * Canvas types declared by this extension/provider. `canvasId` MUST be
+     * Canvas types declared by this extension/provider. `id` MUST be
      * unique within this array.
      */
-    val canvases: List<CanvasTypeDeclaration>
+    val canvases: List<CanvasType>
 )
 
 @Serializable
-data class CanvasTypeDeclaration(
+data class CanvasType(
     /**
      * Provider-local canvas type identifier.
      */
-    val canvasId: String,
+    val id: String,
     /**
-     * Human-readable canvas type title.
+     * Human-readable canvas type label.
      */
-    val title: String,
+    val label: String,
     /**
      * Description of what the canvas type does.
      */
@@ -2319,10 +2319,11 @@ data class CanvasTypeDeclaration(
 @Serializable
 data class CanvasRegistry(
     /**
-     * Declaring namespaces. `extensionId` MUST be unique within this
-     * array. An empty array is an authoritative loaded registry with no types.
+     * Extensions and providers that declare canvas types. `id` MUST be unique
+     * within this array. An empty array is an authoritative loaded registry with
+     * no types.
      */
-    val extensions: List<CanvasExtensionDeclaration>
+    val extensions: List<CanvasExtension>
 )
 
 @Serializable

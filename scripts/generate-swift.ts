@@ -752,7 +752,7 @@ const STATE_STRUCTS = [
   'TerminalRunningLifecycleState', 'TerminalExitedLifecycleState', 'TerminalState',
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
   'UsageInfo', 'ErrorInfo', 'Snapshot', 'EmptyState',
-  'CanvasExtensionDeclaration', 'CanvasTypeDeclaration', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
+  'CanvasExtension', 'CanvasType', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
   'Changeset', 'ChangesetCapabilities', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',

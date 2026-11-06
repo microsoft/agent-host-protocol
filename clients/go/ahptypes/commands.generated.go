@@ -776,8 +776,6 @@ type MoveChatResult struct {
 //
 // Clients MUST NOT call this command unless the chat's agent advertises
 // {@link AgentCapabilities.canvases}.
-//
-// Stability: 1.0 - Early development.
 type OpenCanvasParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -800,8 +798,6 @@ type OpenCanvasParams struct {
 //
 // Clients MUST NOT call this command unless the chat's agent advertises
 // {@link AgentCapabilities.canvases}.
-//
-// Stability: 1.0 - Early development.
 type DisposeCanvasParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`

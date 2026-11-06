@@ -1014,7 +1014,7 @@ const STATE_STRUCTS = [
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
-  'CanvasExtensionDeclaration', 'CanvasTypeDeclaration', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
+  'CanvasExtension', 'CanvasType', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',

@@ -1158,9 +1158,7 @@ public sealed record MoveChatResult
 /// authoritative membership, availability, and presentation state.
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises
-/// {@link AgentCapabilities.canvases}.
-///
-/// Stability: 1.0 - Early development.</summary>
+/// {@link AgentCapabilities.canvases}.</summary>
 public sealed record OpenCanvasParams
 {
     /// <summary>Client-chosen URI for the canvas resource, for example
@@ -1190,9 +1188,7 @@ public sealed record OpenCanvasParams
 /// resource is gone is a no-op.
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises
-/// {@link AgentCapabilities.canvases}.
-///
-/// Stability: 1.0 - Early development.</summary>
+/// {@link AgentCapabilities.canvases}.</summary>
 public sealed record DisposeCanvasParams
 {
     /// <summary>URI of the canvas resource to dispose.</summary>

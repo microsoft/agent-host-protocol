@@ -4864,42 +4864,42 @@
         "title"
       ]
     },
-    "CanvasExtensionDeclaration": {
+    "CanvasExtension": {
       "type": "object",
-      "description": "One namespace that declares canvas types for a chat.\n\n`extensionId` is opaque. Clients MUST NOT infer management behavior by\nparsing it.",
+      "description": "One extension or provider that declares canvas types for a chat.",
       "properties": {
-        "extensionId": {
+        "id": {
           "type": "string",
-          "description": "Stable opaque declaration namespace."
+          "description": "Stable opaque identifier."
         },
-        "extensionName": {
+        "label": {
           "type": "string",
-          "description": "Human-readable namespace title, when available."
+          "description": "Human-readable label, when available."
         },
         "canvases": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/CanvasTypeDeclaration"
+            "$ref": "#/$defs/CanvasType"
           },
-          "description": "Canvas types declared by this extension/provider. `canvasId` MUST be\nunique within this array."
+          "description": "Canvas types declared by this extension/provider. `id` MUST be\nunique within this array."
         }
       },
       "required": [
-        "extensionId",
+        "id",
         "canvases"
       ]
     },
-    "CanvasTypeDeclaration": {
+    "CanvasType": {
       "type": "object",
-      "description": "One canvas type currently available to open.\n\nThis experimental object may gain optional discovery metadata. Clients\nSHOULD ignore fields they do not understand.",
+      "description": "One canvas type currently available to open.",
       "properties": {
-        "canvasId": {
+        "id": {
           "type": "string",
           "description": "Provider-local canvas type identifier."
         },
-        "title": {
+        "label": {
           "type": "string",
-          "description": "Human-readable canvas type title."
+          "description": "Human-readable canvas type label."
         },
         "description": {
           "type": "string",
@@ -4911,8 +4911,8 @@
         }
       },
       "required": [
-        "canvasId",
-        "title",
+        "id",
+        "label",
         "description",
         "requiresInput"
       ]
@@ -4924,9 +4924,9 @@
         "extensions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/CanvasExtensionDeclaration"
+            "$ref": "#/$defs/CanvasExtension"
           },
-          "description": "Declaring namespaces. `extensionId` MUST be unique within this\narray. An empty array is an authoritative loaded registry with no types."
+          "description": "Extensions and providers that declare canvas types. `id` MUST be unique\nwithin this array. An empty array is an authoritative loaded registry with\nno types."
         }
       },
       "required": [
@@ -7800,7 +7800,7 @@
     },
     "OpenCanvasParams": {
       "type": "object",
-      "description": "Opens one client-addressed canvas resource in a chat.\n\nThe resulting live instance is published through the chat's\n{@link ChatState.canvases} references and its `ahp-canvas:` state channel.\nRepeating this command with the same `channel` is idempotent. Reusing it for\na different chat, extension, or canvas type MUST fail with `Conflict`.\nClients MUST observe\n{@link ChatState.canvases} and the referenced `ahp-canvas:` channel for\nauthoritative membership, availability, and presentation state.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.\n\nStability: 1.0 - Early development.",
+      "description": "Opens one client-addressed canvas resource in a chat.\n\nThe resulting live instance is published through the chat's\n{@link ChatState.canvases} references and its `ahp-canvas:` state channel.\nRepeating this command with the same `channel` is idempotent. Reusing it for\na different chat, extension, or canvas type MUST fail with `Conflict`.\nClients MUST observe\n{@link ChatState.canvases} and the referenced `ahp-canvas:` channel for\nauthoritative membership, availability, and presentation state.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -7833,7 +7833,7 @@
     },
     "DisposeCanvasParams": {
       "type": "object",
-      "description": "Closes and disposes one live canvas resource.\n\nThe server removes the resource from the owning chat's\n{@link ChatState.canvases} references. Repeating this command after the\nresource is gone is a no-op.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.\n\nStability: 1.0 - Early development.",
+      "description": "Closes and disposes one live canvas resource.\n\nThe server removes the resource from the owning chat's\n{@link ChatState.canvases} references. Repeating this command after the\nresource is gone is a no-op.\n\nClients MUST NOT call this command unless the chat's agent advertises\n{@link AgentCapabilities.canvases}.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",

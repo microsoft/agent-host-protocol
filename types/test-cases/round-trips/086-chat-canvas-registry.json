@@ -14,18 +14,18 @@
       "canvasRegistry": {
         "extensions": [
           {
-            "extensionId": "opaque-provider-id",
-            "extensionName": "Diagram Tools",
+            "id": "opaque-provider-id",
+            "label": "Diagram Tools",
             "canvases": [
               {
-                "canvasId": "diagram",
-                "title": "Diagram",
+                "id": "diagram",
+                "label": "Diagram",
                 "description": "Visualize a diagram.",
                 "requiresInput": false
               },
               {
-                "canvasId": "form",
-                "title": "Form",
+                "id": "form",
+                "label": "Form",
                 "description": "Collect structured input.",
                 "requiresInput": true
               }
@@ -48,18 +48,18 @@
         "canvasRegistry": {
           "extensions": [
             {
-              "extensionId": "opaque-provider-id",
-              "extensionName": "Diagram Tools",
+              "id": "opaque-provider-id",
+              "label": "Diagram Tools",
               "canvases": [
                 {
-                  "canvasId": "diagram",
-                  "title": "Diagram",
+                  "id": "diagram",
+                  "label": "Diagram",
                   "description": "Visualize a diagram.",
                   "requiresInput": false
                 },
                 {
-                  "canvasId": "form",
-                  "title": "Form",
+                  "id": "form",
+                  "label": "Form",
                   "description": "Collect structured input.",
                   "requiresInput": true
                 }

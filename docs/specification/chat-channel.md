@@ -96,10 +96,8 @@ separate from [`canvases`](/reference/chat#chatstate), which contains references
 to already-open live Canvas **instances**.
 
 The registry normalizes extension/provider metadata: each
-[`CanvasExtensionDeclaration`](/reference/canvas#canvasextensiondeclaration)
-appears once and carries its own Canvas types. Clients treat `extensionId` as
-opaque, key a type by `(extensionId, canvasId)`, and do not infer source or
-management behavior from the identifier's text.
+[`CanvasExtension`](/reference/canvas#canvasextension) appears once and carries
+its own Canvas types. Clients key a type by its extension and Canvas type IDs.
 
 For a live chat, hosts keep this registry synchronized with provider
 registration and dispatch

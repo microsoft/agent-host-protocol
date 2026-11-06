@@ -1067,8 +1067,6 @@ pub struct MoveChatResult {
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises
 /// {@link AgentCapabilities.canvases}.
-///
-/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenCanvasParams {
@@ -1094,8 +1092,6 @@ pub struct OpenCanvasParams {
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises
 /// {@link AgentCapabilities.canvases}.
-///
-/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisposeCanvasParams {

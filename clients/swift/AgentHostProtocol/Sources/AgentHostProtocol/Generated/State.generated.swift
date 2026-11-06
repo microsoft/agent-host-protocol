@@ -6239,56 +6239,57 @@ public struct EmptyState: Codable, Sendable {
     }
 }
 
-public struct CanvasExtensionDeclaration: Codable, Sendable {
-    /// Stable opaque declaration namespace.
-    public var extensionId: String
-    /// Human-readable namespace title, when available.
-    public var extensionName: String?
-    /// Canvas types declared by this extension/provider. `canvasId` MUST be
+public struct CanvasExtension: Codable, Sendable {
+    /// Stable opaque identifier.
+    public var id: String
+    /// Human-readable label, when available.
+    public var label: String?
+    /// Canvas types declared by this extension/provider. `id` MUST be
     /// unique within this array.
-    public var canvases: [CanvasTypeDeclaration]
+    public var canvases: [CanvasType]
 
     public init(
-        extensionId: String,
-        extensionName: String? = nil,
-        canvases: [CanvasTypeDeclaration]
+        id: String,
+        label: String? = nil,
+        canvases: [CanvasType]
     ) {
-        self.extensionId = extensionId
-        self.extensionName = extensionName
+        self.id = id
+        self.label = label
         self.canvases = canvases
     }
 }
 
-public struct CanvasTypeDeclaration: Codable, Sendable {
+public struct CanvasType: Codable, Sendable {
     /// Provider-local canvas type identifier.
-    public var canvasId: String
-    /// Human-readable canvas type title.
-    public var title: String
+    public var id: String
+    /// Human-readable canvas type label.
+    public var label: String
     /// Description of what the canvas type does.
     public var description: String
     /// Whether opening this canvas requires an input flow.
     public var requiresInput: Bool
 
     public init(
-        canvasId: String,
-        title: String,
+        id: String,
+        label: String,
         description: String,
         requiresInput: Bool
     ) {
-        self.canvasId = canvasId
-        self.title = title
+        self.id = id
+        self.label = label
         self.description = description
         self.requiresInput = requiresInput
     }
 }
 
 public struct CanvasRegistry: Codable, Sendable {
-    /// Declaring namespaces. `extensionId` MUST be unique within this
-    /// array. An empty array is an authoritative loaded registry with no types.
-    public var extensions: [CanvasExtensionDeclaration]
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    public var extensions: [CanvasExtension]
 
     public init(
-        extensions: [CanvasExtensionDeclaration]
+        extensions: [CanvasExtension]
     ) {
         self.extensions = extensions
     }

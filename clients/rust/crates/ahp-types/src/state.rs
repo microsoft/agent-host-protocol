@@ -2193,34 +2193,28 @@ pub struct ChatState {
     pub meta: Option<JsonObject>,
 }
 
-/// One namespace that declares canvas types for a chat.
-///
-/// `extensionId` is opaque. Clients MUST NOT infer management behavior by
-/// parsing it.
+/// One extension or provider that declares canvas types for a chat.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CanvasExtensionDeclaration {
-    /// Stable opaque declaration namespace.
-    pub extension_id: String,
-    /// Human-readable namespace title, when available.
+pub struct CanvasExtension {
+    /// Stable opaque identifier.
+    pub id: String,
+    /// Human-readable label, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub extension_name: Option<String>,
-    /// Canvas types declared by this extension/provider. `canvasId` MUST be
+    pub label: Option<String>,
+    /// Canvas types declared by this extension/provider. `id` MUST be
     /// unique within this array.
-    pub canvases: Vec<CanvasTypeDeclaration>,
+    pub canvases: Vec<CanvasType>,
 }
 
 /// One canvas type currently available to open.
-///
-/// This experimental object may gain optional discovery metadata. Clients
-/// SHOULD ignore fields they do not understand.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CanvasTypeDeclaration {
+pub struct CanvasType {
     /// Provider-local canvas type identifier.
-    pub canvas_id: String,
-    /// Human-readable canvas type title.
-    pub title: String,
+    pub id: String,
+    /// Human-readable canvas type label.
+    pub label: String,
     /// Description of what the canvas type does.
     pub description: String,
     /// Whether opening this canvas requires an input flow.
@@ -2231,9 +2225,10 @@ pub struct CanvasTypeDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasRegistry {
-    /// Declaring namespaces. `extensionId` MUST be unique within this
-    /// array. An empty array is an authoritative loaded registry with no types.
-    pub extensions: Vec<CanvasExtensionDeclaration>,
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    pub extensions: Vec<CanvasExtension>,
 }
 
 /// Stable reference to a subscribable canvas channel.

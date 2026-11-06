@@ -2643,35 +2643,29 @@ public sealed class ChatState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
-/// <summary>One namespace that declares canvas types for a chat.
-///
-/// `extensionId` is opaque. Clients MUST NOT infer management behavior by
-/// parsing it.</summary>
-public sealed record CanvasExtensionDeclaration
+/// <summary>One extension or provider that declares canvas types for a chat.</summary>
+public sealed record CanvasExtension
 {
-    /// <summary>Stable opaque declaration namespace.</summary>
-    public required string ExtensionId { get; init; }
+    /// <summary>Stable opaque identifier.</summary>
+    public required string Id { get; init; }
 
-    /// <summary>Human-readable namespace title, when available.</summary>
+    /// <summary>Human-readable label, when available.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ExtensionName { get; init; }
+    public string? Label { get; init; }
 
-    /// <summary>Canvas types declared by this extension/provider. `canvasId` MUST be
+    /// <summary>Canvas types declared by this extension/provider. `id` MUST be
     /// unique within this array.</summary>
-    public required List<CanvasTypeDeclaration> Canvases { get; init; }
+    public required List<CanvasType> Canvases { get; init; }
 }
 
-/// <summary>One canvas type currently available to open.
-///
-/// This experimental object may gain optional discovery metadata. Clients
-/// SHOULD ignore fields they do not understand.</summary>
-public sealed record CanvasTypeDeclaration
+/// <summary>One canvas type currently available to open.</summary>
+public sealed record CanvasType
 {
     /// <summary>Provider-local canvas type identifier.</summary>
-    public required string CanvasId { get; init; }
+    public required string Id { get; init; }
 
-    /// <summary>Human-readable canvas type title.</summary>
-    public required string Title { get; init; }
+    /// <summary>Human-readable canvas type label.</summary>
+    public required string Label { get; init; }
 
     /// <summary>Description of what the canvas type does.</summary>
     public required string Description { get; init; }
@@ -2683,9 +2677,10 @@ public sealed record CanvasTypeDeclaration
 /// <summary>Canvas types currently registered for one chat.</summary>
 public sealed record CanvasRegistry
 {
-    /// <summary>Declaring namespaces. `extensionId` MUST be unique within this
-    /// array. An empty array is an authoritative loaded registry with no types.</summary>
-    public required List<CanvasExtensionDeclaration> Extensions { get; init; }
+    /// <summary>Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.</summary>
+    public required List<CanvasExtension> Extensions { get; init; }
 }
 
 /// <summary>Stable reference to a subscribable canvas channel.

@@ -14,12 +14,12 @@
       "canvasRegistry": {
         "extensions": [
           {
-            "extensionId": "opaque-provider-id",
-            "extensionName": "Project Canvases",
+            "id": "opaque-provider-id",
+            "label": "Project Canvases",
             "canvases": [
               {
-                "canvasId": "diagram",
-                "title": "Diagram",
+                "id": "diagram",
+                "label": "Diagram",
                 "description": "Visualize a diagram.",
                 "requiresInput": false
               }
@@ -38,12 +38,12 @@
     "canvasRegistry": {
       "extensions": [
         {
-          "extensionId": "opaque-provider-id",
-          "extensionName": "Project Canvases",
+          "id": "opaque-provider-id",
+          "label": "Project Canvases",
           "canvases": [
             {
-              "canvasId": "diagram",
-              "title": "Diagram",
+              "id": "diagram",
+              "label": "Diagram",
               "description": "Visualize a diagram.",
               "requiresInput": false
             }
