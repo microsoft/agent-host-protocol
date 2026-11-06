@@ -59,6 +59,9 @@ use tokio::task::JoinHandle;
 use crate::error::ClientError;
 use crate::transport::{Transport, TransportMessage};
 
+#[cfg(test)]
+mod tests;
+
 /// Default size of a per-subscription broadcast channel. Consumers that
 /// lag behind this many messages will drop frames and must resubscribe.
 const DEFAULT_SUBSCRIPTION_BUFFER: usize = 256;
@@ -190,7 +193,7 @@ pub struct DispatchHandle {
 type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
 
 struct Shared {
-    pending: Mutex<PendingMap>,
+    pending: std::sync::Mutex<PendingMap>,
     subscriptions: Mutex<HashMap<String, broadcast::Sender<SubscriptionEvent>>>,
     /// Top-level all-events broadcast.
     ///
@@ -207,6 +210,22 @@ struct Shared {
     /// Handler for inbound server-initiated requests (the symmetrical
     /// `resource*` family). `None` → the client replies `MethodNotFound`.
     server_request_handler: std::sync::Mutex<Option<ServerRequestHandler>>,
+}
+
+// Synchronous cleanup must also run when the request future is dropped.
+struct PendingRequest<'a> {
+    shared: &'a Shared,
+    id: u64,
+}
+
+impl Drop for PendingRequest<'_> {
+    fn drop(&mut self) {
+        self.shared
+            .pending
+            .lock()
+            .expect("pending mutex poisoned")
+            .remove(&self.id);
+    }
 }
 
 enum Outbound {
@@ -376,7 +395,7 @@ impl Client {
         let (outbound_tx, outbound_rx) = mpsc::channel::<Outbound>(64);
         let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
         let shared = Arc::new(Shared {
-            pending: Mutex::new(HashMap::new()),
+            pending: std::sync::Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
             all_events: std::sync::Mutex::new(Some(all_events_tx)),
             outbound: outbound_tx,
@@ -400,7 +419,7 @@ impl Client {
     pub async fn shutdown(&self) {
         let _ = self.shared.outbound.send(Outbound::Shutdown).await;
         // Fail any pending in-flight requests.
-        let mut pending = self.shared.pending.lock().await;
+        let mut pending = self.shared.pending.lock().expect("pending mutex poisoned");
         for (_, tx) in pending.drain() {
             let _ = tx.send(Err(JsonRpcError {
                 code: -32000,
@@ -411,6 +430,9 @@ impl Client {
     }
 
     /// Send a JSON-RPC request and await its result.
+    ///
+    /// Dropping the future removes its local pending entry but does not
+    /// cancel processing of a request already sent to the peer.
     pub async fn request<P, R>(&self, method: &str, params: P) -> Result<R, ClientError>
     where
         P: Serialize,
@@ -432,29 +454,24 @@ impl Client {
 
         let (tx, rx) = oneshot::channel();
         {
-            let mut pending = self.shared.pending.lock().await;
+            let mut pending = self.shared.pending.lock().expect("pending mutex poisoned");
             pending.insert(id, tx);
         }
+        let _pending = PendingRequest {
+            shared: &self.shared,
+            id,
+        };
 
-        if self
-            .shared
+        self.shared
             .outbound
             .send(Outbound::Message(req))
             .await
-            .is_err()
-        {
-            self.shared.pending.lock().await.remove(&id);
-            return Err(ClientError::Shutdown);
-        }
+            .map_err(|_| ClientError::Shutdown)?;
 
         let result = match self.shared.config.default_request_timeout {
-            Some(dur) => match tokio::time::timeout(dur, rx).await {
-                Ok(r) => r,
-                Err(_) => {
-                    self.shared.pending.lock().await.remove(&id);
-                    return Err(ClientError::Cancelled);
-                }
-            },
+            Some(dur) => tokio::time::timeout(dur, rx)
+                .await
+                .map_err(|_| ClientError::Cancelled)?,
             None => rx.await,
         };
 
@@ -881,13 +898,15 @@ async fn drive_transport<T: Transport>(
     }
 
     // Teardown: close everything so waiters see Shutdown.
-    let mut pending = shared.pending.lock().await;
-    for (_, tx) in pending.drain() {
-        let _ = tx.send(Err(JsonRpcError {
-            code: -32000,
-            message: "transport closed".into(),
-            data: None,
-        }));
+    {
+        let mut pending = shared.pending.lock().expect("pending mutex poisoned");
+        for (_, tx) in pending.drain() {
+            let _ = tx.send(Err(JsonRpcError {
+                code: -32000,
+                message: "transport closed".into(),
+                data: None,
+            }));
+        }
     }
     let mut subs = shared.subscriptions.lock().await;
     subs.clear();
@@ -903,12 +922,22 @@ async fn drive_transport<T: Transport>(
 async fn dispatch_inbound(shared: &Arc<Shared>, msg: JsonRpcMessage) {
     match msg {
         JsonRpcMessage::SuccessResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some(tx) = shared
+                .pending
+                .lock()
+                .expect("pending mutex poisoned")
+                .remove(&r.id)
+            {
                 let _ = tx.send(Ok(r.result));
             }
         }
         JsonRpcMessage::ErrorResponse(r) => {
-            if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
+            if let Some(tx) = shared
+                .pending
+                .lock()
+                .expect("pending mutex poisoned")
+                .remove(&r.id)
+            {
                 let _ = tx.send(Err(r.error));
             }
         }
