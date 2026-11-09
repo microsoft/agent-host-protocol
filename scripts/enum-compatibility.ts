@@ -46,11 +46,30 @@ export function isNonexhaustiveEnum(enumDecl: EnumDeclaration): boolean {
   return getEnumCompatibility(enumDecl) === 'nonexhaustive';
 }
 
+export function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
+  const tagged = enumDecl.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .some(tag => tag.getTagName() === 'bitset');
+  if (!tagged) return false;
+
+  const valid = enumDecl.getMembers().every(member => {
+    const value = member.getValue();
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffff_ffff;
+  });
+  if (!valid) {
+    throw new Error(
+      `${enumDecl.getSourceFile().getFilePath()}: enum ${enumDecl.getName()} marked @bitset must use uint32 member values.`,
+    );
+  }
+  return true;
+}
+
 /** Validates every enum declaration participating in the protocol project. */
 export function validateEnumCompatibility(project: Project): void {
   for (const sourceFile of project.getSourceFiles()) {
     for (const enumDecl of sourceFile.getEnums()) {
       getEnumCompatibility(enumDecl);
+      isBitsetEnum(enumDecl);
     }
   }
 }

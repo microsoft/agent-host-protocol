@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "JSON Schemas accept `SessionStatus` flag combinations and forward-compatible bits as unsigned 32-bit integers, using explicit `@bitset` annotations and documenting each named flag's value and meaning.",
+  "issues": [581],
+  "targets": ["spec"]
+}

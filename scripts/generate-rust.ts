@@ -27,6 +27,7 @@ import { readWindowExemptMethods } from './read-window-exempt.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 
 const GENERATED_BANNER = '// Generated from types/*.ts — do not edit.\n//\n// Regenerate with: npm run generate:rust\n\n#![allow(missing_docs)]\n';
@@ -847,22 +848,6 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
-
-/**
- * Detects *bitset* enums (flag combinations are valid wire values) via the
- * same JSDoc convention the Kotlin and Swift generators use: a numeric enum
- * whose leading JSDoc description starts with the word "Bitset". These are
- * emitted as `u32` newtypes via {@link generateRustBitset} instead of closed
- * `#[repr(u32)]` enums, so combined flags and forward-compat bits round-trip on
- * the wire. Marking an enum a bitset is therefore a property of its `types/`
- * declaration, not a name list maintained here (currently only `SessionStatus`
- * carries the marker).
- */
-function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
-  const isNumeric = enumDecl.getMembers().every(m => typeof m.getValue() === 'number');
-  return isNumeric && desc !== undefined && /^bitset\b/i.test(desc);
-}
 
 /**
  * State structs to emit. The order matters only for human-readability — Rust

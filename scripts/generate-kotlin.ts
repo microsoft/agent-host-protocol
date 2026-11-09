@@ -18,8 +18,8 @@
  *     `@JsonClassDiscriminator`, because that mode forbids the discriminator
  *     field from existing on the variant data class — but our TS variant
  *     interfaces include it (e.g. `MarkdownResponsePart.kind = 'markdown'`).
- *   - Bitset enums (JSDoc starts with "Bitset") → `@JvmInline value class`
- *     wrapping `Int`, with companion-object flag constants and bitwise ops,
+ *   - Bitset enums (`@bitset`) → `@JvmInline value class`
+ *     wrapping `UInt`, with companion-object flag constants and bitwise ops,
  *     so unknown future bits decode/encode losslessly.
  *   - Recursive structs → plain data classes (Kotlin classes are heap-
  *     allocated by default, so self-reference Just Works).
@@ -39,6 +39,7 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
 
@@ -358,9 +359,9 @@ function generateKotlinEnum(enumDecl: EnumDeclaration): string {
   const isNumeric = values.every(v => typeof v === 'number');
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
 
-  // Bitset enums (JSDoc convention "Bitset of …") → `value class` so OR'd
+  // Bitset enums (`@bitset`) → `value class` so OR'd
   // combinations with unknown bits decode/encode losslessly.
-  const isBitset = isNumeric && desc !== undefined && /^bitset\b/i.test(desc);
+  const isBitset = isBitsetEnum(enumDecl);
 
   if (desc) {
     lines.push(...emitKDoc(desc));

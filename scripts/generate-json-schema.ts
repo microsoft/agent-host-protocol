@@ -17,6 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
+import { isBitsetEnum } from './enum-compatibility.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -153,18 +154,31 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
   return undefined;
 }
 
-// A whole `const enum` → a JSON Schema `enum` of its members' evaluated values.
-// ts-morph evaluates const-enum initializers (including bitwise expressions like
-// `(1 << 3) | (1 << 4)`), so numeric flag enums resolve to concrete numbers.
+// Bitsets use the same uint32 wire form as the native clients, allowing flag
+// combinations and unknown bits. Other enums list their evaluated values.
 function enumToSchema(en: EnumDeclaration): JsonSchema {
   const values = en.getMembers().map(m => m.getValue());
   const defined = values.filter((v): v is string | number => v !== undefined);
-  const schema: JsonSchema = { enum: defined };
-  if (defined.every(v => typeof v === 'string')) schema.type = 'string';
-  else if (defined.every(v => typeof v === 'number')) schema.type = 'number';
   const rawDesc = en.getJsDocs()[0]?.getDescription();
   const desc = rawDesc ? normalizeDescription(rawDesc) : '';
-  if (desc) schema.description = desc;
+  const isNumeric = values.every(v => typeof v === 'number');
+  const isBitset = isBitsetEnum(en);
+  const schema: JsonSchema = isBitset
+    ? { type: 'integer', minimum: 0, maximum: 0xffff_ffff }
+    : { enum: defined };
+  if (!isBitset) {
+    if (defined.every(v => typeof v === 'string')) schema.type = 'string';
+    else if (isNumeric) schema.type = 'number';
+  }
+  if (isBitset) {
+    const flags = en.getMembers().map(member => {
+      const description = normalizeDescription(getDocumentation(member));
+      return `- \`${member.getName()}\` (${member.getValue()})${description ? `: ${description}` : ''}`;
+    });
+    schema.description = [desc, 'Known flags:', flags.join('\n')].filter(Boolean).join('\n\n');
+  } else if (desc) {
+    schema.description = desc;
+  }
   return schema;
 }
 
