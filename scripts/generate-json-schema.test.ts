@@ -42,7 +42,7 @@ function collectRefTargets(node: JsonNode, acc: Set<string>): void {
   if (node && typeof node === 'object') {
     const ref = (node as Record<string, unknown>).$ref;
     if (typeof ref === 'string') {
-      const m = ref.match(/^#\/\$defs\/(.+)$/);
+      const m = ref.match(/^#\/\$defs\/(.*)$/);
       if (m) acc.add(m[1]);
     }
     const not = (node as Record<string, unknown>).not;
@@ -187,6 +187,21 @@ describe('generated JSON schemas', () => {
           [],
           `${file} references ${dangling.length} undefined $def(s) (bug #302.2): ${dangling.slice(0, 10).join(', ')}`,
         );
+      });
+
+      it('validates StateAction payloads without unresolved references', () => {
+        if (file !== 'actions.schema.json' && file !== 'commands.schema.json') return;
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const action = { type: 'root/activeSessionsChanged', activeSessions: 0 };
+
+        assert.equal(schemaAccepts(schema, defs.StateAction, action), true);
+        for (const invalid of [
+          { type: action.type },
+          { ...action, activeSessions: '0' },
+          { ...action, type: 'root/unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, defs.StateAction, invalid), false, JSON.stringify(invalid));
+        }
       });
 
       it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {

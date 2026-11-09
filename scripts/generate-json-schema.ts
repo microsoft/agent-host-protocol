@@ -261,11 +261,11 @@ function typeTextToSchema(typeText: string, project: Project, _depth = 0): JsonS
   // field) yields a single part equal to the input — it must fall through to the
   // inline-object / reference handling below rather than re-expanding forever.
   // A union type-alias's printed text can also carry a leading `|`
-  // (`type X =\n  | A\n  | B`), which makes splitUnionType yield an empty first
-  // element; dropping empties (and `undefined`) keeps us from emitting a
-  // matches-anything `{}` branch that breaks strict `oneOf` validation.
+  // (`type X =\n  | A\n  | B`); splitUnionType drops empty parts, and filtering
+  // `undefined` here avoids matches-anything `{}` branches that break strict
+  // `oneOf` validation.
   if (cleaned.includes('|') && !cleaned.startsWith("'")) {
-    const parts = splitUnionType(cleaned).filter(p => p !== 'undefined' && p !== '');
+    const parts = splitUnionType(cleaned).filter(p => p !== 'undefined');
     if (parts.length > 1) {
       return {
         oneOf: parts.map(p => typeTextToSchema(p, project, _depth + 1)),
@@ -312,7 +312,7 @@ function splitUnionType(typeText: string): string[] {
     if (char === '<' || char === '(' || char === '{' || char === '[') depth++;
     else if (char === '>' || char === ')' || char === '}' || char === ']') depth--;
     else if (char === '|' && depth === 0) {
-      parts.push(current.trim());
+      if (current.trim()) parts.push(current.trim());
       current = '';
       continue;
     }

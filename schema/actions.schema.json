@@ -9342,9 +9342,6 @@
       "description": "Discriminated union of all state actions.",
       "oneOf": [
         {
-          "$ref": "#/$defs/"
-        },
-        {
           "$ref": "#/$defs/RootAgentsChangedAction"
         },
         {
