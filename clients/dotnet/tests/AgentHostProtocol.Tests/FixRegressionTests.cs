@@ -310,6 +310,52 @@ public sealed class FixRegressionTests
         Assert.False(afterMetaPatch.Meta!["pinned"].GetBoolean());
     }
 
+    [Fact]
+    public void ApplySummaryChange_Chats_ReplacesCompactStatusProjection()
+    {
+        var entry = new HostEntry(
+            new HostId("h"),
+            new HostConfig
+            {
+                Id = new HostId("h"),
+                TransportFactory = (_, _) => throw new InvalidOperationException(),
+            },
+            "client-1");
+        entry.PutSessionSummary(new SessionSummary
+        {
+            Resource = "ahp-session:/s1",
+            Provider = "p",
+            Title = "Session",
+            CreatedAt = "2024-01-01T00:00:00.001Z",
+            ModifiedAt = "2024-01-01T00:00:00.001Z",
+            Chats =
+            [
+                new SessionChatSummary
+                {
+                    Resource = "ahp-chat:/default",
+                    Title = "Default",
+                    Status = SessionStatus.Idle,
+                },
+            ],
+        });
+
+        entry.ApplySummaryChange("ahp-session:/s1", new PartialSessionSummary
+        {
+            Chats =
+            [
+                new SessionChatSummary
+                {
+                    Resource = "ahp-chat:/default",
+                    Title = "Default",
+                    Status = SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived,
+                },
+            ],
+        });
+
+        var summary = entry.Snapshot().SessionSummaries.Single(s => s.Resource == "ahp-session:/s1");
+        Assert.Equal(SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived, Assert.Single(summary.Chats!).Status);
+    }
+
     // ── Upstream drift port (model config widened to JSON primitives; SessionModelInfo
     //    token-limit fields). ModelSelection.Config + ConfigPropertySchema.Enum carry
     //    arbitrary JSON primitives (not just strings), so a numeric/boolean picker value
@@ -638,6 +684,55 @@ public sealed class FixRegressionTests
         Assert.True(Reducers.IsClientDispatchable(new StateAction(new SessionMcpServerStopRequestedAction
         {
             Type = ActionType.SessionMcpServerStopRequested,
+            Id = "mcp-1",
+        })));
+    }
+
+    // ── session/mcpServerBackgroundRequested optimistically clears `blocking` on a
+    //    blocking `starting` server and is a no-op otherwise. The corpus fixtures
+    //    (274-276) compare STATE only; this pins Applied-vs-NoOp. ──
+    [Fact]
+    public void SessionMcpServerBackgroundRequested_ClearsBlocking_NoOpOtherwise()
+    {
+        var state = new SessionState
+        {
+            Provider = "copilot",
+            Title = "s",
+            Lifecycle = SessionLifecycle.Ready,
+            ActiveClients = new(),
+            Chats = new(),
+            Customizations = new()
+            {
+                new Customization(new McpServerCustomization
+                {
+                    Type = CustomizationType.McpServer,
+                    Id = "mcp-1",
+                    Uri = "file:///workspace/.mcp/servers.json",
+                    Name = "Filesystem",
+                    State = new McpServerState(new McpServerStartingState { Kind = McpServerStatus.Starting, Blocking = true }),
+                }),
+            },
+        };
+
+        McpServerCustomization Current() => (McpServerCustomization)state.Customizations!.Single().Value!;
+        ReduceOutcome Background(string id) => Reducers.ApplyToSession(state, new StateAction(new SessionMcpServerBackgroundRequestedAction
+        {
+            Type = ActionType.SessionMcpServerBackgroundRequested,
+            Id = id,
+        }));
+
+        Assert.Equal(ReduceOutcome.Applied, Background("mcp-1"));
+        Assert.False(Assert.IsType<McpServerStartingState>(Current().State.Value).Blocking);
+
+        // Already unblocked → NoOp.
+        Assert.Equal(ReduceOutcome.NoOp, Background("mcp-1"));
+
+        // Unknown id → NoOp.
+        Assert.Equal(ReduceOutcome.NoOp, Background("missing"));
+
+        Assert.True(Reducers.IsClientDispatchable(new StateAction(new SessionMcpServerBackgroundRequestedAction
+        {
+            Type = ActionType.SessionMcpServerBackgroundRequested,
             Id = "mcp-1",
         })));
     }

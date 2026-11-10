@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional ChangesetFile.isEditing reports per-file editing activity through existing changeset snapshots and actions without requiring provider-specific metadata.",
+  "issues": [538]
+}

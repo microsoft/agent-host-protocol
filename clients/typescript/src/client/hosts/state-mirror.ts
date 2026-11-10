@@ -28,7 +28,7 @@
  * @module client/hosts/state-mirror
  */
 
-import type { ActionEnvelope } from '../../types/common/actions.js';
+import { ActionType, type ActionEnvelope } from '../../types/common/actions.js';
 import type { Snapshot, URI } from '../../types/common/state.js';
 import type {
   ChangesetAction,
@@ -39,18 +39,21 @@ import type {
   TerminalAction,
 } from '../../types/action-origin.generated.js';
 import type { ChangesetState } from '../../types/channels-changeset/state.js';
+import type { CanvasState } from '../../types/channels-canvas/state.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../../types/channels-automation/state.js';
 import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
+import { canvasReducer } from '../../types/channels-canvas/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import { sessionReducer } from '../../types/channels-session/reducer.js';
 import { terminalReducer } from '../../types/channels-terminal/reducer.js';
 import { automationReducer } from '../../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../../types/channels-automation-run/reducer.js';
 import { ROOT_RESOURCE_URI, type HostId, type HostSubscriptionEvent } from './types.js';
+import { isCanvasState } from '../canvas-state.js';
 
 const INITIAL_ROOT: RootState = { agents: [] };
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
@@ -103,6 +106,7 @@ function hostedResourceKeyPrefix(hostId: HostId): string {
 export class MultiHostStateMirror {
   private readonly rootStatesMap = new Map<HostId, RootState>();
   private readonly sessionsMap = new Map<string, SessionState>();
+  private readonly canvasesMap = new Map<string, CanvasState>();
   private readonly terminalsMap = new Map<string, TerminalState>();
   private readonly changesetsMap = new Map<string, ChangesetState>();
   private readonly automationCatalogsMap = new Map<HostId, AutomationState>();
@@ -117,6 +121,11 @@ export class MultiHostStateMirror {
   /** All known session states keyed by `hostedResourceKey(hostId, uri)`. */
   get sessions(): ReadonlyMap<string, SessionState> {
     return this.sessionsMap;
+  }
+
+  /** Live canvases keyed by `hostedResourceKey(hostId, uri)`. */
+  get canvases(): ReadonlyMap<string, CanvasState> {
+    return this.canvasesMap;
   }
 
   /** All known terminal states keyed by `hostedResourceKey(hostId, uri)`. */
@@ -152,6 +161,10 @@ export class MultiHostStateMirror {
   /** Look up a session by `(hostId, uri)`. */
   getSession(hostId: HostId, uri: URI): SessionState | undefined {
     return this.sessionsMap.get(hostedResourceKey(hostId, uri));
+  }
+
+  getCanvas(hostId: HostId, uri: URI): CanvasState | undefined {
+    return this.canvasesMap.get(hostedResourceKey(hostId, uri));
   }
 
   /** Look up a terminal by `(hostId, uri)`. */
@@ -201,6 +214,13 @@ export class MultiHostStateMirror {
       this.sessionsMap.set(key, sessionReducer(current, action as SessionAction));
       return;
     }
+    if (channel.startsWith('ahp-canvas:')) {
+      const key = hostedResourceKey(hostId, channel);
+      const current = this.canvasesMap.get(key);
+      if (current === undefined || action.type !== ActionType.CanvasStateChanged) return;
+      this.canvasesMap.set(key, canvasReducer(current, action));
+      return;
+    }
     if (channel.startsWith('ahp-terminal:')) {
       const key = hostedResourceKey(hostId, channel);
       const current = this.terminalsMap.get(key);
@@ -246,6 +266,13 @@ export class MultiHostStateMirror {
       this.sessionsMap.set(key, snapshot.state as SessionState);
       return;
     }
+    if (resource.startsWith('ahp-canvas:')) {
+      if (!isCanvasState(snapshot.state)) {
+        throw new Error('Invalid canvas snapshot state');
+      }
+      this.canvasesMap.set(key, snapshot.state);
+      return;
+    }
     if (resource.startsWith('ahp-terminal:')) {
       this.terminalsMap.set(key, snapshot.state as TerminalState);
       return;
@@ -272,6 +299,9 @@ export class MultiHostStateMirror {
     for (const key of this.sessionsMap.keys()) {
       if (key.startsWith(prefix)) this.sessionsMap.delete(key);
     }
+    for (const key of this.canvasesMap.keys()) {
+      if (key.startsWith(prefix)) this.canvasesMap.delete(key);
+    }
     for (const key of this.terminalsMap.keys()) {
       if (key.startsWith(prefix)) this.terminalsMap.delete(key);
     }
@@ -290,6 +320,7 @@ export class MultiHostStateMirror {
   reset(): void {
     this.rootStatesMap.clear();
     this.sessionsMap.clear();
+    this.canvasesMap.clear();
     this.terminalsMap.clear();
     this.changesetsMap.clear();
     this.automationCatalogsMap.clear();

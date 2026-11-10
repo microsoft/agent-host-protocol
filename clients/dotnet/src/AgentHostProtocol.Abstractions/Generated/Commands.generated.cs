@@ -20,15 +20,109 @@ public enum ReconnectResultType
 }
 
 /// <summary>How a new chat uses its source chat and turn.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatSourceKind>))]
-public enum ChatSourceKind
+[JsonConverter(typeof(ChatSourceKindConverter))]
+public readonly struct ChatSourceKind : IEquatable<ChatSourceKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatSourceKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Copy source history through the referenced turn into the new chat.</summary>
-    [WireValue("fork")]
-    Fork,
+    public static readonly ChatSourceKind Fork = new ChatSourceKind("fork");
+
     /// <summary>Supply source context without copying it into the new chat's visible history.</summary>
-    [WireValue("sideChat")]
-    SideChat,
+    public static readonly ChatSourceKind SideChat = new ChatSourceKind("sideChat");
+
+    /// <inheritdoc />
+    public bool Equals(ChatSourceKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatSourceKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatSourceKind left, ChatSourceKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatSourceKind left, ChatSourceKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatSourceKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatSourceKindConverter : JsonConverter<ChatSourceKind>
+{
+    /// <inheritdoc />
+    public override ChatSourceKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatSourceKind(reader.GetString() ?? throw new JsonException("ChatSourceKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatSourceKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Destination kind for an atomic chat move.</summary>
+[JsonConverter(typeof(ChatMoveDestinationKindConverter))]
+public readonly struct ChatMoveDestinationKind : IEquatable<ChatMoveDestinationKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatMoveDestinationKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Move the source chat subtree into an existing session.</summary>
+    public static readonly ChatMoveDestinationKind Session = new ChatMoveDestinationKind("session");
+
+    /// <summary>Move the source chat subtree into a newly allocated session.</summary>
+    public static readonly ChatMoveDestinationKind NewSession = new ChatMoveDestinationKind("newSession");
+
+    /// <inheritdoc />
+    public bool Equals(ChatMoveDestinationKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatMoveDestinationKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatMoveDestinationKind left, ChatMoveDestinationKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatMoveDestinationKind left, ChatMoveDestinationKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatMoveDestinationKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatMoveDestinationKindConverter : JsonConverter<ChatMoveDestinationKind>
+{
+    /// <inheritdoc />
+    public override ChatMoveDestinationKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatMoveDestinationKind(reader.GetString() ?? throw new JsonException("ChatMoveDestinationKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatMoveDestinationKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Encoding of fetched content data.</summary>
@@ -42,26 +136,108 @@ public enum ContentEncoding
 }
 
 /// <summary>The kind of completion items being requested.</summary>
-[JsonConverter(typeof(WireEnumConverter<CompletionItemKind>))]
-public enum CompletionItemKind
+[JsonConverter(typeof(CompletionItemKindConverter))]
+public readonly struct CompletionItemKind : IEquatable<CompletionItemKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CompletionItemKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Completions for the text of a {@link Message} the user is composing.
     /// Each returned item carries an attachment that gets associated with the
     /// message when accepted.</summary>
-    [WireValue("userMessage")]
-    UserMessage,
+    public static readonly CompletionItemKind UserMessage = new CompletionItemKind("userMessage");
+
+    /// <inheritdoc />
+    public bool Equals(CompletionItemKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CompletionItemKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CompletionItemKind left, CompletionItemKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CompletionItemKind left, CompletionItemKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CompletionItemKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CompletionItemKindConverter : JsonConverter<CompletionItemKind>
+{
+    /// <inheritdoc />
+    public override CompletionItemKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CompletionItemKind(reader.GetString() ?? throw new JsonException("CompletionItemKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CompletionItemKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for {@link ResourceResolveResult.type}.</summary>
-[JsonConverter(typeof(WireEnumConverter<ResourceType>))]
-public enum ResourceType
+[JsonConverter(typeof(ResourceTypeConverter))]
+public readonly struct ResourceType : IEquatable<ResourceType>
 {
-    [WireValue("file")]
-    File,
-    [WireValue("directory")]
-    Directory,
-    [WireValue("symlink")]
-    Symlink,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ResourceType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ResourceType File = new ResourceType("file");
+
+    public static readonly ResourceType Directory = new ResourceType("directory");
+
+    public static readonly ResourceType Symlink = new ResourceType("symlink");
+
+    /// <inheritdoc />
+    public bool Equals(ResourceType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ResourceType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ResourceType left, ResourceType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ResourceType left, ResourceType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ResourceType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ResourceTypeConverter : JsonConverter<ResourceType>
+{
+    /// <inheritdoc />
+    public override ResourceType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ResourceType(reader.GetString() ?? throw new JsonException("ResourceType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ResourceType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How {@link ResourceWriteParams.data} is placed within the target file.
@@ -94,6 +270,55 @@ public enum ResourceWriteMode
     Insert,
 }
 
+/// <summary>Identifies the consumer of an authentication token.</summary>
+[JsonConverter(typeof(AuthenticateTargetKindConverter))]
+public readonly struct AuthenticateTargetKind : IEquatable<AuthenticateTargetKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AuthenticateTargetKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly AuthenticateTargetKind McpServer = new AuthenticateTargetKind("mcpServer");
+
+    /// <inheritdoc />
+    public bool Equals(AuthenticateTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AuthenticateTargetKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AuthenticateTargetKind left, AuthenticateTargetKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AuthenticateTargetKind left, AuthenticateTargetKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AuthenticateTargetKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AuthenticateTargetKindConverter : JsonConverter<AuthenticateTargetKind>
+{
+    /// <inheritdoc />
+    public override AuthenticateTargetKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AuthenticateTargetKind(reader.GetString() ?? throw new JsonException("AuthenticateTargetKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AuthenticateTargetKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 /// <summary>Requested repository source, not a resolved working directory.</summary>
@@ -109,6 +334,38 @@ public sealed record RepositorySource
     /// <summary>Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Subdirectory { get; init; }
+}
+
+/// <summary>Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateTcpConnectionParams
+{
+    /// <summary>The client-chosen URI for the new channel, for example `ahp-tcp:/&lt;uuid&gt;`.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>A DNS name or IP address, resolved on the host's network. Not a URL.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>The destination port.</summary>
+    public long Port { get; init; }
 }
 
 /// <summary>Establishes a new connection and negotiates the protocol version.
@@ -127,7 +384,9 @@ public sealed record InitializeParams
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
     ///
-    /// The server selects one entry and returns it as `InitializeResult.protocolVersion`.
+    /// The server selects the highest offered SemVer within its supported
+    /// caret-compatible ranges and returns that exact entry as
+    /// `InitializeResult.protocolVersion`.
     /// If the server cannot speak any of the offered versions, it MUST return
     /// error code `-32005` (`UnsupportedProtocolVersion`) with required
     /// `UnsupportedProtocolVersionErrorData` containing `supportedVersions`.</summary>
@@ -199,7 +458,8 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Snapshots for each `initialSubscriptions` URI</summary>
+    /// <summary>Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).</summary>
     public required List<Snapshot> Snapshots { get; init; }
 
     /// <summary>Suggested default directory for remote filesystem browsing</summary>
@@ -237,6 +497,21 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcpConnectionsCapability? TcpConnections { get; init; }
+
+    /// <summary>Present when chats in one session may be backed by different agents
+    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public MultipleChatProvidersCapability? MultipleChatProviders { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -336,6 +611,11 @@ public sealed record AutomationCapabilities
     /// implementation-defined.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? RunHistoryLimit { get; init; }
+
+    /// <summary>Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationCustomizationsCapability? Customizations { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationCreateRequestedAction |
@@ -369,6 +649,22 @@ public sealed record AutomationRunCancellationCapability
 {
 }
 
+/// <summary>Presence capability for
+/// {@link AutomationSessionTemplate.customizations | automation customizations}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// capture options and limits.</summary>
+public sealed record AutomationCustomizationsCapability
+{
+}
+
+/// <summary>Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record MultipleChatProvidersCapability
+{
+}
+
 /// <summary>Re-establishes a dropped connection. The server replays missed actions or
 /// provides fresh snapshots.</summary>
 public sealed record ReconnectParams
@@ -389,15 +685,74 @@ public sealed record ReconnectParams
 
     /// <summary>URIs the client was subscribed to</summary>
     public required List<string> Subscriptions { get; init; }
+
+    /// <summary>Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeOptions? Windows { get; init; }
+}
+
+/// <summary>One windowed subscription that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeParams
+{
+    /// <summary>The URI of the windowed subscription.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.</summary>
+    public required SubscriptionFlowControlOptions FlowControl { get; init; }
+
+    /// <summary>The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? LastAppliedServerSeq { get; init; }
+}
+
+/// <summary>Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeOptions
+{
+    public required List<ChannelDeliveryResumeParams> Items { get; init; }
+}
+
+/// <summary>Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChannelDeliveryResumeResult
+{
+    public required List<ResumedChannelSubscription> Items { get; init; }
+}
+
+/// <summary>A client's offer of windowed delivery.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record SubscriptionFlowControlOptions
+{
+    /// <summary>The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.</summary>
+    public required ChannelReceiveLimits Receive { get; init; }
 }
 
 /// <summary>Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all replayed data in the response.</summary>
+/// The server MUST include all replayed data for ordinary subscriptions in the
+/// response. Windowed subscriptions recover through their own data messages.</summary>
 public sealed record ReconnectReplayResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Replay;
 
     /// <summary>Missed action envelopes since `lastSeenServerSeq`</summary>
     public required List<ActionEnvelope> Actions { get; init; }
@@ -407,24 +762,49 @@ public sealed record ReconnectReplayResult
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.</summary>
     public required List<string> Missing { get; init; }
+
+    /// <summary>Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeResult? Windows { get; init; }
 }
 
 /// <summary>Reconnect result when the gap exceeds the replay buffer.</summary>
 public sealed record ReconnectSnapshotResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Snapshot;
 
-    /// <summary>Fresh snapshots for each subscription</summary>
+    /// <summary>Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).</summary>
     public required List<Snapshot> Snapshots { get; init; }
+
+    /// <summary>Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelDeliveryResumeResult? Windows { get; init; }
 }
 
 /// <summary>Subscribe to a URI-identified channel.
 ///
-/// A channel MAY have state associated with it (e.g. root, sessions,
-/// terminals) or be stateless (pure pub/sub for streaming data). For
-/// state-bearing channels the result includes a snapshot; for stateless
-/// channels `snapshot` is omitted.</summary>
+/// With ordinary delivery, the result contains a snapshot of the channel's
+/// state; the server MAY omit it for a channel whose state has no fields. With
+/// windowed delivery, the result contains `flowControl` instead,
+/// and the snapshot is sent in a `channel/snapshot` notification.
+///
+/// A client has at most one subscription to each channel. A `subscribe` for a
+/// channel that the client is already subscribed to changes the existing
+/// subscription, for example its window, without losing data. Windowed counters
+/// continue if the subscription was already windowed.</summary>
 public sealed record SubscribeParams
 {
     /// <summary>Channel URI this command targets.</summary>
@@ -436,20 +816,23 @@ public sealed record SubscribeParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.</summary>
+    /// <summary>Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscriptionDeliveryOptions? Delivery { get; init; }
 
-    /// <summary>Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.</summary>
+    /// <summary>Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SubscribeView? View { get; init; }
+
+    /// <summary>Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SubscriptionFlowControlOptions? FlowControl { get; init; }
 }
 
 /// <summary>Optional client-requested shape for a subscription snapshot.</summary>
@@ -467,26 +850,42 @@ public sealed record SubscribeView
     public long? Turns { get; init; }
 }
 
-/// <summary>Advisory delivery preferences for a single subscription.</summary>
+/// <summary>Delivery preferences for one subscription. They do not allow a server to
+/// exceed the limits of a windowed subscription.</summary>
 public sealed record SubscriptionDeliveryOptions
 {
-    /// <summary>Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.</summary>
+    /// <summary>The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? MaxLatencyMs { get; init; }
 }
 
 /// <summary>Result of the `subscribe` command.
 ///
-/// `snapshot` is present when the subscribed channel has associated state, and
-/// absent for stateless channels.</summary>
+/// With ordinary delivery, `snapshot` is present, except that the server MAY
+/// omit it for a channel whose state has no fields. With windowed delivery,
+/// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+/// snapshot in a `channel/snapshot` notification.</summary>
 public sealed record SubscribeResult
 {
-    /// <summary>Snapshot of the subscribed channel's state (omitted for stateless channels)</summary>
+    /// <summary>Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Snapshot? Snapshot { get; init; }
+
+    /// <summary>The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChannelFlowControl? FlowControl { get; init; }
 }
 
 // TODO: could not generate SessionForkSource: Error: Interface SessionForkSource not found
@@ -581,7 +980,7 @@ public sealed record DisposeSessionParams
 public sealed record ForkChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.Fork;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }
@@ -597,7 +996,7 @@ public sealed record ForkChatSource
 public sealed record SideChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.SideChat;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }
@@ -667,6 +1066,23 @@ public sealed record CreateChatParams
     /// {@link AgentCapabilities.multipleWorkingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
+
+    /// <summary>Client-selected initial display title for the new chat.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Agent provider ID for the new chat. Absent means the session's provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
 }
 
 /// <summary>Disposes a chat and cleans up server-side resources.</summary>
@@ -680,6 +1096,95 @@ public sealed record DisposeChatParams
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Moves a chat within or into an existing session.</summary>
+public sealed record ChatMoveToSessionDestination
+{
+    /// <summary>Discriminant</summary>
+    public ChatMoveDestinationKind Kind { get; init; } = ChatMoveDestinationKind.Session;
+
+    /// <summary>Destination session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Chat after which to place the requested chat.
+    ///
+    /// The anchor MUST be a different chat in the destination session. When
+    /// omitted, the requested chat is placed at the beginning of the catalog.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? After { get; init; }
+}
+
+/// <summary>Moves a top-level chat subtree into a newly allocated session.</summary>
+public sealed record ChatMoveToNewSessionDestination
+{
+    /// <summary>Discriminant</summary>
+    public ChatMoveDestinationKind Kind { get; init; } = ChatMoveDestinationKind.NewSession;
+}
+
+/// <summary>Atomically moves a host-authorized chat within or between sessions.
+///
+/// The source is the chat named by `channel`. When a `session` destination is
+/// the source's current session, only the requested entry is repositioned in
+/// that session's public chat catalog. When it names another session, the host
+/// transfers the requested chat and its complete host-managed descendant
+/// hierarchy. The optional `after` anchor positions the requested chat in the
+/// destination catalog; when omitted, the requested chat is placed first.
+///
+/// A `newSession` destination allocates a session, transfers the complete
+/// hierarchy, and makes the requested chat that session's non-movable default
+/// chat. The host owns descendant relationships; AHP does not expose them as
+/// chat state.
+///
+/// Clients MUST only request a move when the source chat advertises
+/// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
+/// eligibility, not a guarantee that request-specific validation will succeed.
+///
+/// The host MUST validate the complete operation before committing it and MAY
+/// reject unsupported destinations or transient source conditions. At minimum,
+/// the source MUST exist and advertise `movable: true`; the destination and
+/// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+/// Rejection leaves ownership, catalog order, chat state, and root summaries
+/// unchanged.
+///
+/// A moved chat keeps its agent. After the move the host reports
+/// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+/// the destination session's provider, including when the chat had none
+/// because it matched its old session. Hosts MAY refuse, as an unsupported
+/// destination, a move they cannot support, such as one that changes whether
+/// the chat's agent matches its session's.
+///
+/// A moved chat's `config.values` move with it unchanged. If a move changes
+/// whether the chat needs its own `config.schema`, the host sets or clears it,
+/// or refuses the move as an unsupported destination. After a cross-session
+/// move the host dispatches `chat/moved` on the chat's channel with its new
+/// session, `provider` and `config.schema`.
+///
+/// On success every moved chat keeps its URI, state, and immutable
+/// `ChatOrigin`. The host commits ownership and catalog order before publishing
+/// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+/// root summary updates as applicable. Session and root snapshots are the
+/// durable recovery path after reconnect or an uncertain response.</summary>
+public sealed record MoveChatParams
+{
+    /// <summary>Source chat URI.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Atomic move destination.</summary>
+    public required ChatMoveDestination Destination { get; init; }
+}
+
+/// <summary>Result of an atomic chat move.</summary>
+public sealed record MoveChatResult
+{
+    /// <summary>Authoritative owning session URI after the move.</summary>
+    public required string Session { get; init; }
 }
 
 /// <summary>Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -744,7 +1249,25 @@ public sealed record ListSessionsResult
 /// sent in either direction. Hosts use it to fetch content from a
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
-/// same permission/`resourceRequest` flow regardless of which peer initiated.</summary>
+/// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+/// content references and canvas sources. This includes HTTP(S) URLs that the
+/// other peer might not be able to reach, such as a development server on the
+/// host's loopback interface.
+///
+/// A sender MAY read part of a resource by including
+/// {@link ResourceReadParams.position | `position`} and/or
+/// {@link ResourceReadParams.length | `length`}.
+///
+/// - A receiver that honors the range SHOULD return only the requested bytes
+///   and MUST include {@link ResourceReadResult.size | `size`}, the total size
+///   of the resource in bytes.
+/// - A receiver that does not honor the range ignores `position` and `length`
+///   and returns the whole resource without `size`. A sender MUST treat a
+///   result without `size` as the whole resource.
+/// - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
+/// - A `position` at or past the end of the resource returns empty `data`.</summary>
 public sealed record ResourceReadParams
 {
     public required string Channel { get; init; }
@@ -755,19 +1278,32 @@ public sealed record ResourceReadParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Content URI from a `ContentRef`</summary>
+    /// <summary>Content URI to read, such as one from a `ContentRef`</summary>
     public required string Uri { get; init; }
 
     /// <summary>Preferred encoding for the returned data (default: server-chosen)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentEncoding? Encoding { get; init; }
+
+    /// <summary>Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Position { get; init; }
+
+    /// <summary>Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Length { get; init; }
 }
 
 /// <summary>Result of the `resourceRead` command.
 ///
 /// The server SHOULD honor the `encoding` requested in the params. If the
 /// server cannot provide the requested encoding, it MUST fall back to either
-/// `base64` or `utf-8`.</summary>
+/// `base64` or `utf-8`.
+///
+/// Unless {@link size} is present, the result contains the whole resource.</summary>
 public sealed record ResourceReadResult
 {
     /// <summary>Content encoded as a string</summary>
@@ -779,6 +1315,13 @@ public sealed record ResourceReadResult
     /// <summary>Content type (e.g. `"image/png"`, `"text/plain"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ContentType { get; init; }
+
+    /// <summary>Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Size { get; init; }
 }
 
 /// <summary>Writes content to a file on the server's filesystem.
@@ -1261,6 +1804,20 @@ public sealed record DispatchActionParams
     public required StateAction Action { get; init; }
 }
 
+/// <summary>An MCP server identified by host-published session and customization state.</summary>
+public sealed record McpServerAuthenticateTarget
+{
+    public AuthenticateTargetKind Kind { get; init; } = AuthenticateTargetKind.McpServer;
+
+    /// <summary>Session URI whose `SessionState.customizations` contains the MCP server.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.</summary>
+    public required string CustomizationId { get; init; }
+}
+
 /// <summary>Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1315,6 +1872,23 @@ public sealed record AuthenticateParams
     /// token.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
+
+    /// <summary>Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AuthenticateTarget? Target { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.
@@ -1721,6 +2295,34 @@ public sealed record FetchAutomationRunsResult
 {
 }
 
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+/// <summary>AuthenticateTarget identifies the consumer of an authentication token.</summary>
+[JsonConverter(typeof(AuthenticateTargetConverter))]
+public sealed class AuthenticateTarget : AhpUnion
+{
+    /// <summary>Creates an empty AuthenticateTarget (no active variant).</summary>
+    public AuthenticateTarget() { }
+
+    /// <summary>Creates a AuthenticateTarget wrapping the given variant value.</summary>
+    public AuthenticateTarget(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AuthenticateTarget discriminated union.</summary>
+internal sealed class AuthenticateTargetConverter : UnionConverter<AuthenticateTarget>
+{
+    public AuthenticateTargetConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["mcpServer"] = typeof(McpServerAuthenticateTarget),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 /// <summary>ReconnectResult is the result of the `reconnect` command.</summary>
@@ -1771,7 +2373,32 @@ internal sealed class ChatSourceConverter : UnionConverter<ChatSource>
         ["fork"] = typeof(ForkChatSource),
         ["sideChat"] = typeof(SideChatSource),
             },
-            allowUnknown: false)
+            allowUnknown: true)
+    {
+    }
+}
+[JsonConverter(typeof(ChatMoveDestinationConverter))]
+public sealed class ChatMoveDestination : AhpUnion
+{
+    /// <summary>Creates an empty ChatMoveDestination (no active variant).</summary>
+    public ChatMoveDestination() { }
+
+    /// <summary>Creates a ChatMoveDestination wrapping the given variant value.</summary>
+    public ChatMoveDestination(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the ChatMoveDestination discriminated union.</summary>
+internal sealed class ChatMoveDestinationConverter : UnionConverter<ChatMoveDestination>
+{
+    public ChatMoveDestinationConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["session"] = typeof(ChatMoveToSessionDestination),
+        ["newSession"] = typeof(ChatMoveToNewSessionDestination),
+            },
+            allowUnknown: true)
     {
     }
 }
@@ -1798,6 +2425,9 @@ public sealed record ChangesetOperationResourceTarget
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Side { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>Targets a range within a resource.</summary>
@@ -1811,6 +2441,9 @@ public sealed record ChangesetOperationRangeTarget
     public string? Side { get; init; }
 
     public required TextRange Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>System.Text.Json converter for the ChangesetOperationTarget union.</summary>
@@ -1824,7 +2457,7 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
                 ["resource"] = typeof(ChangesetOperationResourceTarget),
                 ["range"] = typeof(ChangesetOperationRangeTarget),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

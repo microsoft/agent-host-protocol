@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Experimental windowed delivery removes `maximumMessageBytes` and uses one size for everything: the UTF-16 size of each JSON-RPC data message as sent, including `channel/frame` envelopes. Each message and fragment counts against `windowBytes`, which is a soft target; `maximumFrameBytes` remains a hard limit on each message, and receivers can return credit for stored fragments."
+}

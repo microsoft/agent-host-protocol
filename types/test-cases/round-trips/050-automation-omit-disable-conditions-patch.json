@@ -1,0 +1,16 @@
+{
+  "name": "automation-omit-disable-conditions-patch",
+  "group": "A",
+  "description": "An unrelated automation edit keeps disableConditions absent on the wire, distinct from an empty array that clears conditions.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": { "title": "Renamed" }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/capped",
+    "changes": { "title": "Renamed" }
+  }]
+}

@@ -1,0 +1,57 @@
+{
+  "description": "session/chatUpdated mirrors chat/isReadChanged status into only the addressed chat catalog entry",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 33,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/default",
+    "chats": [
+      {
+        "resource": "ahp-chat:/default",
+        "title": "Default",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z"
+      },
+      {
+        "resource": "ahp-chat:/sibling",
+        "title": "Sibling",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatUpdated",
+      "chat": "ahp-chat:/default",
+      "changes": {
+        "status": 33
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 33,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/default",
+    "chats": [
+      {
+        "resource": "ahp-chat:/default",
+        "title": "Default",
+        "status": 33,
+        "modifiedAt": "1970-01-01T00:00:01.000Z"
+      },
+      {
+        "resource": "ahp-chat:/sibling",
+        "title": "Sibling",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z"
+      }
+    ]
+  }
+}

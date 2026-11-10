@@ -1,0 +1,28 @@
+{
+  "name": "changeset-target-range-nonce",
+  "group": "A",
+  "description": "A range target preserves its side, range, and optional opaque nonce through native decoding and encoding.",
+  "type": "ChangesetOperationTarget",
+  "input": {
+    "kind": "range",
+    "resource": "file:///a.txt",
+    "side": "after",
+    "range": {
+      "start": { "line": 2, "character": 0 },
+      "end": { "line": 5, "character": 10 }
+    },
+    "nonce": "opaque-range-change"
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "range",
+      "resource": "file:///a.txt",
+      "side": "after",
+      "range": {
+        "start": { "line": 2, "character": 0 },
+        "end": { "line": 5, "character": 10 }
+      },
+      "nonce": "opaque-range-change"
+    }
+  ]
+}

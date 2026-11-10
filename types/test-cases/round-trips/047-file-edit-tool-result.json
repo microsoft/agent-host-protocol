@@ -1,0 +1,36 @@
+{
+  "name": "file-edit-tool-result",
+  "group": "A",
+  "description": "A tool result preserves inherited file-edit side and statistics fields.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/toolCallComplete",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "result": {
+      "success": true,
+      "pastTenseMessage": "Edited file",
+      "content": [{
+        "type": "fileEdit",
+        "before": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/before"}},
+        "after": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/after"}},
+        "diff": {"added":1,"removed":1}
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "chat/toolCallComplete",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "result": {
+      "success": true,
+      "pastTenseMessage": "Edited file",
+      "content": [{
+        "type": "fileEdit",
+        "before": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/before"}},
+        "after": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/after"}},
+        "diff": {"added":1,"removed":1}
+      }]
+    }
+  }]
+}

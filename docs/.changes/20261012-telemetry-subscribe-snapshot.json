@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "`Snapshot.state` can be an `EmptyState` (`{}`) for channels whose state has no fields, such as telemetry. With ordinary delivery, a server may send such a snapshot or omit it, so clients must accept both. Clients must not fail on a snapshot state that they do not recognize."
+}

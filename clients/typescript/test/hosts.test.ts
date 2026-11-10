@@ -56,6 +56,8 @@ import {
 
 import { PROTOCOL_VERSION } from '../src/types/version/registry.js';
 import { SessionStatus } from '../src/types/channels-session/state.js';
+import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import { ActionType } from '../src/types/common/actions.js';
 
 const ROOT = 'ahp-root://' as const;
 
@@ -165,8 +167,8 @@ function handleRequest(req: JsonRpcRequest, state: FakeHostState): unknown {
     case 'listSessions':
       return buildListResult(state);
     case 'subscribe': {
-      // Minimal `SubscribeResult` — snapshot omitted (stateless channels
-      // are valid). The fake server doesn't enforce real subscriptions.
+      // Minimal `SubscribeResult` — snapshot omitted, as older hosts do for
+      // channels with no state. The fake server doesn't enforce real subscriptions.
       return {};
     }
     default:
@@ -342,6 +344,42 @@ test('MultiHostStateMirror applies root snapshots scoped to host', () => {
   });
   assert.equal(mirror.getRoot('host-a')?.agents[0]?.provider, 'copilot');
   assert.equal(mirror.getRoot('host-b')?.agents[0]?.provider, 'vscode');
+});
+
+test('MultiHostStateMirror isolates canvas updates and clears canvas state on reset', () => {
+  const mirror = new MultiHostStateMirror();
+  const resource = 'ahp-canvas:/preview';
+  const initial: CanvasState = {
+    instanceId: 'preview',
+    extensionId: 'project:preview',
+    canvasId: 'preview',
+    url: 'https://example.test/original',
+  };
+  mirror.applySnapshot('host-a', { resource, state: initial, fromSeq: 1 });
+  mirror.applySnapshot('host-b', { resource, state: initial, fromSeq: 1 });
+  const unavailable: CanvasState = {
+    instanceId: 'preview',
+    extensionId: 'project:preview',
+    canvasId: 'preview',
+  };
+  mirror.applyEnvelope('host-a', {
+    channel: resource,
+    serverSeq: 2,
+    origin: undefined,
+    action: { type: ActionType.CanvasStateChanged, canvas: unavailable },
+  });
+  const updated = mirror.getCanvas('host-a', resource);
+  mirror.resetHost('host-a');
+  const afterHostReset = {
+    removed: mirror.getCanvas('host-a', resource),
+    retained: mirror.getCanvas('host-b', resource),
+  };
+  mirror.reset();
+  assert.deepEqual({ updated, afterHostReset, remaining: mirror.canvases.size }, {
+    updated: unavailable,
+    afterHostReset: { removed: undefined, retained: initial },
+    remaining: 0,
+  });
 });
 
 test('MultiHostStateMirror.resetHost drops every keyed state for that host', () => {
@@ -611,6 +649,55 @@ test('aggregatedSessions sorts by modifiedAt descending and tags hostLabel', asy
     );
     assert.ok(sessions.every(s => s.hostId === 'local'));
     assert.ok(sessions.every(s => s.hostLabel === 'Local'));
+  } finally {
+    await multi.shutdown();
+  }
+});
+
+test('sessionSummaryChanged replaces the compact chat status projection', async () => {
+  const initial = makeSummary('copilot:/s1', 'Session', 1_000);
+  initial.chats = [
+    { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle },
+  ];
+  const state: FakeHostState = makeFakeState({
+    sessions: [initial],
+    injectAfterInit: async server => {
+      await new Promise(r => setTimeout(r, 10));
+      const notif: JsonRpcNotification = {
+        jsonrpc: '2.0',
+        method: 'root/sessionSummaryChanged',
+        params: {
+          channel: ROOT,
+          session: initial.resource,
+          changes: {
+            chats: [
+              { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived },
+            ],
+          },
+        },
+      };
+      try {
+        await server.send(notif);
+      } catch {
+        // best-effort
+      }
+    },
+  });
+
+  const multi = new MultiHostClient();
+  try {
+    await multi.addHost({
+      id: 'read-state',
+      label: 'Read State',
+      transportFactory: makeBasicFactory(state),
+    });
+    await waitUntil(() =>
+      multi.aggregatedSessions()[0]?.summary.chats?.[0]?.status === (SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived)
+    );
+
+    assert.deepEqual(multi.aggregatedSessions()[0]?.summary.chats, [
+      { resource: 'ahp-chat:/default', title: 'Default', status: SessionStatus.Idle | SessionStatus.IsRead | SessionStatus.IsArchived },
+    ]);
   } finally {
     await multi.shutdown();
   }

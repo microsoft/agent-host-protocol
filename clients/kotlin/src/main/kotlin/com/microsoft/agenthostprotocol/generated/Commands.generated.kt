@@ -62,6 +62,34 @@ internal object ChatSourceKindSerializer : KSerializer<ChatSourceKind> {
 }
 
 /**
+ * Destination kind for an atomic chat move.
+ */
+@Serializable(with = ChatMoveDestinationKindSerializer::class)
+@JvmInline
+value class ChatMoveDestinationKind(val rawValue: String) {
+    companion object {
+        /**
+         * Move the source chat subtree into an existing session.
+         */
+        val SESSION: ChatMoveDestinationKind = ChatMoveDestinationKind("session")
+        /**
+         * Move the source chat subtree into a newly allocated session.
+         */
+        val NEW_SESSION: ChatMoveDestinationKind = ChatMoveDestinationKind("newSession")
+    }
+}
+
+internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinationKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ChatMoveDestinationKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ChatMoveDestinationKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ChatMoveDestinationKind =
+        ChatMoveDestinationKind(decoder.decodeString())
+}
+
+/**
  * Encoding of fetched content data.
  */
 @Serializable
@@ -150,6 +178,27 @@ enum class ResourceWriteMode {
     APPEND,
     @SerialName("insert")
     INSERT
+}
+
+/**
+ * Identifies the consumer of an authentication token.
+ */
+@Serializable(with = AuthenticateTargetKindSerializer::class)
+@JvmInline
+value class AuthenticateTargetKind(val rawValue: String) {
+    companion object {
+        val MCP_SERVER: AuthenticateTargetKind = AuthenticateTargetKind("mcpServer")
+    }
+}
+
+internal object AuthenticateTargetKindSerializer : KSerializer<AuthenticateTargetKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthenticateTargetKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthenticateTargetKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthenticateTargetKind =
+        AuthenticateTargetKind(decoder.decodeString())
 }
 
 // ─── Command Types ──────────────────────────────────────────────────────────
@@ -286,6 +335,44 @@ data class RepositorySource(
     val subdirectory: String? = null
 )
 
+/**
+ * Opens a TCP connection from the host to a destination on the host's network.
+ *
+ * The client chooses the channel URI. This command does not subscribe: after it
+ * succeeds, the client subscribes to the channel with windowed delivery. The
+ * host MUST NOT send data for the channel before that subscription, and MUST
+ * limit how much destination data it buffers and how long it keeps a
+ * connection that is never subscribed to.
+ *
+ * The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+ * is present. If the channel URI is already in use, the host returns
+ * `AlreadyExists` and MUST NOT replace the existing connection. If the host
+ * cannot open the connection, it returns `TcpConnectionOpenFailed`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CreateTcpConnectionParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * A DNS name or IP address, resolved on the host's network. Not a URL.
+     */
+    val host: String,
+    /**
+     * The destination port.
+     */
+    val port: Long
+)
+
 @Serializable
 data class InitializeParams(
     /**
@@ -303,7 +390,9 @@ data class InitializeParams(
      * preferred to least preferred. Each entry is a [SemVer](https://semver.org)
      * `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
      *
-     * The server selects one entry and returns it as `InitializeResult.protocolVersion`.
+     * The server selects the highest offered SemVer within its supported
+     * caret-compatible ranges and returns that exact entry as
+     * `InitializeResult.protocolVersion`.
      * If the server cannot speak any of the offered versions, it MUST return
      * error code `-32005` (`UnsupportedProtocolVersion`) with required
      * `UnsupportedProtocolVersionErrorData` containing `supportedVersions`.
@@ -372,7 +461,8 @@ data class InitializeResult(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Snapshots for each `initialSubscriptions` URI
+     * Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+     * channel whose state has no fields ({@link EmptyState}).
      */
     val snapshots: List<Snapshot>,
     /**
@@ -410,7 +500,22 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Present when the host supports `createTcpConnection`, which opens a TCP
+     * connection on the host's network for the client to forward.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val tcpConnections: TcpConnectionsCapability? = null,
+    /**
+     * Present when chats in one session may be backed by different agents
+     * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+     * Clients MUST NOT send `CreateChatParams.provider` without it.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val multipleChatProviders: MultipleChatProvidersCapability? = null
 )
 
 @Serializable
@@ -468,7 +573,12 @@ data class AutomationCapabilities(
      * runs are not counted toward the limit. Absence means the retention limit is
      * implementation-defined.
      */
-    val runHistoryLimit: Long? = null
+    val runHistoryLimit: Long? = null,
+    /**
+     * Present when {@link AutomationSessionTemplate.customizations} may contain
+     * client plugins for the host to capture.
+     */
+    val customizations: AutomationCustomizationsCapability? = null
 )
 
 @Serializable
@@ -486,6 +596,17 @@ data class AutomationScheduleCapabilities(
 
 @Serializable
 class AutomationRunCancellationCapability
+
+@Serializable
+class AutomationCustomizationsCapability
+
+/**
+ * Presence capability for {@link InitializeResult.multipleChatProviders}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class MultipleChatProvidersCapability
 
 @Serializable
 data class Implementation(
@@ -527,7 +648,15 @@ data class ReconnectParams(
     /**
      * URIs the client was subscribed to
      */
-    val subscriptions: List<String>
+    val subscriptions: List<String>,
+    /**
+     * Windowed subscriptions that the client wants to keep. Each channel MUST
+     * also be in `subscriptions` and MUST appear only once. These subscriptions
+     * are not included in the result's `actions` or `snapshots`.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeOptions? = null
 )
 
 @Serializable
@@ -546,7 +675,15 @@ data class ReconnectReplayResult(
      * terminals) as well as resources the client is no longer permitted to
      * observe. Clients SHOULD drop these from their local subscription set.
      */
-    val missing: List<String>
+    val missing: List<String>,
+    /**
+     * Windowed subscriptions that the server kept. Their data is sent separately.
+     * The server MUST omit this field unless the request contained `windows`,
+     * and MUST list only channels from the request.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeResult? = null
 )
 
 @Serializable
@@ -556,9 +693,84 @@ data class ReconnectSnapshotResult(
      */
     val type: ReconnectResultType,
     /**
-     * Fresh snapshots for each subscription
+     * Fresh snapshots for each resumed ordinary subscription. Windowed
+     * subscriptions are not included; they recover through their own data
+     * messages, as described by `windows`. The server MAY leave out a channel
+     * whose state has no fields ({@link EmptyState}).
      */
-    val snapshots: List<Snapshot>
+    val snapshots: List<Snapshot>,
+    /**
+     * Windowed subscriptions that the server kept. Each one has its own
+     * `recovery` value, which does not depend on this result's type. The server
+     * MUST omit this field unless the request contained `windows`, and MUST list
+     * only channels from the request.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val windows: ChannelDeliveryResumeResult? = null
+)
+
+/**
+ * One windowed subscription that the client wants to keep after reconnection.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeParams(
+    /**
+     * The URI of the windowed subscription.
+     */
+    val channel: String,
+    /**
+     * The client's offer of limits for the new connection, as in `subscribe`.
+     * The subscription's counters start at zero on the new connection.
+     */
+    val flowControl: SubscriptionFlowControlOptions,
+    /**
+     * The `serverSeq` of the last action or observed state that the client
+     * applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+     * replay recovery; absent for channels that resume only with new data.
+     */
+    val lastAppliedServerSeq: Long? = null
+)
+
+/**
+ * Windowed subscriptions that the client wants to keep after reconnection.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeOptions(
+    val items: List<ChannelDeliveryResumeParams>
+)
+
+/**
+ * Windowed subscriptions that the server kept after reconnection.
+ *
+ * A requested channel that is not listed was not kept. For each kept
+ * subscription, both peers start their counters at zero on the new connection,
+ * and credit counts only data received on that connection. Sequence numbers
+ * decide what is sent again.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class ChannelDeliveryResumeResult(
+    val items: List<ResumedChannelSubscription>
+)
+
+/**
+ * A client's offer of windowed delivery.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SubscriptionFlowControlOptions(
+    /**
+     * The largest limits that the client accepts for data that it receives. The
+     * server MAY accept lower values, and MUST NOT accept higher values.
+     */
+    val receive: ChannelReceiveLimits
 )
 
 @Serializable
@@ -574,20 +786,23 @@ data class SubscribeParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Optional delivery preferences for this subscription.
-     *
-     * Servers MAY use these preferences to buffer and coalesce high-frequency
-     * updates while preserving the same reduced state. Omit this field for the
-     * server's default delivery behavior.
+     * Asks the server to limit how long it holds updates. If absent, the server
+     * uses its default behavior.
      */
     val delivery: SubscriptionDeliveryOptions? = null,
     /**
-     * Optional client-requested shape for the returned snapshot.
-     *
-     * Servers that do not understand a requested view ignore it and return their
-     * default snapshot. Clients MUST tolerate receiving more state than requested.
+     * Asks for a smaller snapshot. A server that does not support the requested
+     * view ignores it. Clients MUST accept more state than they requested.
      */
-    val view: SubscribeView? = null
+    val view: SubscribeView? = null,
+    /**
+     * Offers windowed delivery for this subscription. The server accepts by
+     * returning `flowControl` in the result. If the result does not contain
+     * `flowControl`, the subscription uses ordinary delivery.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val flowControl: SubscriptionFlowControlOptions? = null
 )
 
 @Serializable
@@ -608,10 +823,11 @@ data class SubscribeView(
 @Serializable
 data class SubscriptionDeliveryOptions(
     /**
-     * Maximum time, in milliseconds, that the server may intentionally delay
-     * delivery while buffering/coalescing updates for this subscription.
-     *
-     * A value of `0` requests immediate delivery with no intentional coalescing.
+     * The longest time, in milliseconds, that the server should hold updates for
+     * this subscription in order to combine them. The server MUST NOT combine
+     * updates unless the combined update produces the same state and the client
+     * still receives every event that the channel requires. A value of `0` asks
+     * the server not to delay updates.
      */
     val maxLatencyMs: Long? = null
 )
@@ -619,9 +835,21 @@ data class SubscriptionDeliveryOptions(
 @Serializable
 data class SubscribeResult(
     /**
-     * Snapshot of the subscribed channel's state (omitted for stateless channels)
+     * Snapshot of the subscribed channel's state. Present with ordinary delivery,
+     * except that the server MAY omit it for a channel whose state has no fields
+     * ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+     * `channel/snapshot` notification instead.
      */
-    val snapshot: Snapshot? = null
+    val snapshot: Snapshot? = null,
+    /**
+     * The limits that the server accepted for windowed delivery. The server sends
+     * this result before any data message for the subscription. The client MUST be
+     * ready to process data messages as soon as it receives this result, and can
+     * send data messages without waiting for the snapshot.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val flowControl: ChannelFlowControl? = null
 )
 
 @Serializable
@@ -750,7 +978,24 @@ data class CreateChatParams(
      * A client MUST NOT supply this field unless the agent advertises
      * {@link AgentCapabilities.multipleWorkingDirectories}.
      */
-    val workingDirectories: List<String>? = null
+    val workingDirectories: List<String>? = null,
+    /**
+     * Client-selected initial display title for the new chat.
+     */
+    val title: String? = null,
+    /**
+     * Agent provider ID for the new chat. Absent means the session's provider.
+     *
+     * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+     * `InvalidParams` a provider that is not in the root state's `agents` or
+     * whose agent does not advertise `multipleChats`. Forks and side chats
+     * (`source` present) continue the source chat's history, so they always use
+     * the source chat's agent: absent means that agent, and a different value is
+     * rejected. Agent capability checks for this request use the chat's agent.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val provider: String? = null
 )
 
 @Serializable
@@ -765,6 +1010,59 @@ data class DisposeChatParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ChatMoveToSessionDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatMoveDestinationKind,
+    /**
+     * Destination session URI.
+     */
+    val session: String,
+    /**
+     * Chat after which to place the requested chat.
+     *
+     * The anchor MUST be a different chat in the destination session. When
+     * omitted, the requested chat is placed at the beginning of the catalog.
+     */
+    val after: String? = null
+)
+
+@Serializable
+data class ChatMoveToNewSessionDestination(
+    /**
+     * Discriminant
+     */
+    val kind: ChatMoveDestinationKind
+)
+
+@Serializable
+data class MoveChatParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Atomic move destination.
+     */
+    val destination: ChatMoveDestination
+)
+
+@Serializable
+data class MoveChatResult(
+    /**
+     * Authoritative owning session URI after the move.
+     */
+    val session: String
 )
 
 @Serializable
@@ -822,13 +1120,24 @@ data class ResourceReadParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Content URI from a `ContentRef`
+     * Content URI to read, such as one from a `ContentRef`
      */
     val uri: String,
     /**
      * Preferred encoding for the returned data (default: server-chosen)
      */
-    val encoding: ContentEncoding? = null
+    val encoding: ContentEncoding? = null,
+    /**
+     * Byte offset to start reading at. Defaults to `0`. A receiver that does
+     * not honor byte ranges ignores it and returns the whole resource.
+     */
+    val position: Long? = null,
+    /**
+     * Maximum number of bytes to return from {@link position}. Defaults to the
+     * rest of the resource. A receiver that does not honor byte ranges ignores
+     * it and returns the whole resource.
+     */
+    val length: Long? = null
 )
 
 @Serializable
@@ -844,7 +1153,14 @@ data class ResourceReadResult(
     /**
      * Content type (e.g. `"image/png"`, `"text/plain"`)
      */
-    val contentType: String? = null
+    val contentType: String? = null,
+    /**
+     * Total size of the resource in bytes. Present if and only if the receiver
+     * honored the byte range in {@link ResourceReadParams.position} and
+     * {@link ResourceReadParams.length}; when absent, `data` is the whole
+     * resource.
+     */
+    val size: Long? = null
 )
 
 @Serializable
@@ -1239,6 +1555,21 @@ data class DispatchActionParams(
 )
 
 @Serializable
+data class McpServerAuthenticateTarget(
+    val kind: AuthenticateTargetKind,
+    /**
+     * Session URI whose `SessionState.customizations` contains the MCP server.
+     */
+    val session: String,
+    /**
+     * The server's session-unique `McpServerCustomization.id`, echoed from the
+     * customization carrying `McpServerAuthRequiredState` or from
+     * `ToolCallAuthRequiredState.contributor.customizationId`.
+     */
+    val customizationId: String
+)
+
+@Serializable
 data class AuthenticateParams(
     /**
      * Channel URI this command targets.
@@ -1283,7 +1614,24 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Optional consumer of the token. Clients SHOULD include this when answering
+     * a specific MCP server's `McpServerAuthRequiredState` or
+     * `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+     * resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+     *
+     * When present, the host MUST apply the token only to that MCP server in
+     * that session, never to sibling servers, other sessions, or agent-level
+     * resources, even if they share the resource and scopes. `resource` MUST
+     * still equal that server's advertised `McpAuthRequirement.resource.resource`.
+     * The host MUST reject an unknown session or customization, or a
+     * customization that is not an MCP server, with `InvalidParams` (-32602).
+     *
+     * Without a target, resource/scope matching is unchanged; the token may
+     * satisfy every matching pending challenge. Older hosts ignore this field.
+     */
+    val target: AuthenticateTarget? = null
 )
 
 @Serializable
@@ -1418,6 +1766,14 @@ data class SessionConfigPropertySchema(
      */
     val items: ConfigPropertySchema? = null,
     /**
+     * JSON Schema: minimum number of array items (used when `type` is `'array'`)
+     */
+    val minItems: Long? = null,
+    /**
+     * JSON Schema: maximum number of array items (used when `type` is `'array'`)
+     */
+    val maxItems: Long? = null,
+    /**
      * JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
      */
     val properties: Map<String, ConfigPropertySchema>? = null,
@@ -1439,7 +1795,12 @@ data class SessionConfigPropertySchema(
     /**
      * When `true`, the user may change this property after session creation
      */
-    val sessionMutable: Boolean? = null
+    val sessionMutable: Boolean? = null,
+    /**
+     * When `true`, the property may be changed per chat with
+     * `chat/configChanged`, affecting only that chat.
+     */
+    val chatMutable: Boolean? = null
 )
 
 @Serializable
@@ -1774,6 +2135,110 @@ internal object ChatSourceSerializer : KSerializer<ChatSource> {
     }
 }
 
+// ─── ChatMoveDestination Union ──────────────────────────────────────────────
+
+@Serializable(with = ChatMoveDestinationSerializer::class)
+sealed interface ChatMoveDestination
+
+@JvmInline
+value class ChatMoveDestinationSession(val value: ChatMoveToSessionDestination) : ChatMoveDestination
+@JvmInline
+value class ChatMoveDestinationNewSession(val value: ChatMoveToNewSessionDestination) : ChatMoveDestination
+/**
+ * Forward-compat catch-all for unknown ChatMoveDestination discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class ChatMoveDestinationUnknown(val raw: JsonObject) : ChatMoveDestination
+
+internal object ChatMoveDestinationSerializer : KSerializer<ChatMoveDestination> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ChatMoveDestination")
+
+    override fun deserialize(decoder: Decoder): ChatMoveDestination {
+        val input = decoder as? JsonDecoder
+            ?: error("ChatMoveDestination can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for ChatMoveDestination")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return ChatMoveDestinationUnknown(obj)
+        return when (discriminant) {
+            "session" -> ChatMoveDestinationSession(input.json.decodeFromJsonElement(ChatMoveToSessionDestination.serializer(), element))
+            "newSession" -> ChatMoveDestinationNewSession(input.json.decodeFromJsonElement(ChatMoveToNewSessionDestination.serializer(), element))
+            else -> ChatMoveDestinationUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ChatMoveDestination) {
+        val output = encoder as? JsonEncoder
+            ?: error("ChatMoveDestination can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ChatMoveDestinationSession -> output.json.encodeToJsonElement(ChatMoveToSessionDestination.serializer(), value.value)
+            is ChatMoveDestinationNewSession -> output.json.encodeToJsonElement(ChatMoveToNewSessionDestination.serializer(), value.value)
+            is ChatMoveDestinationUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+// ─── AuthenticateTarget Union ───────────────────────────────────────────────
+
+@Serializable(with = AuthenticateTargetSerializer::class)
+sealed interface AuthenticateTarget
+
+@JvmInline
+value class AuthenticateTargetMcpServer(val value: McpServerAuthenticateTarget) : AuthenticateTarget
+/**
+ * Forward-compat catch-all for unknown AuthenticateTarget discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AuthenticateTargetUnknown(val raw: JsonObject) : AuthenticateTarget
+
+internal object AuthenticateTargetSerializer : KSerializer<AuthenticateTarget> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AuthenticateTarget")
+
+    override fun deserialize(decoder: Decoder): AuthenticateTarget {
+        val input = decoder as? JsonDecoder
+            ?: error("AuthenticateTarget can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AuthenticateTarget")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AuthenticateTargetUnknown(obj)
+        return when (discriminant) {
+            "mcpServer" -> AuthenticateTargetMcpServer(input.json.decodeFromJsonElement(McpServerAuthenticateTarget.serializer(), element))
+            else -> AuthenticateTargetUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AuthenticateTarget) {
+        val output = encoder as? JsonEncoder
+            ?: error("AuthenticateTarget can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AuthenticateTargetMcpServer -> output.json.encodeToJsonElement(McpServerAuthenticateTarget.serializer(), value.value)
+            is AuthenticateTargetUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AuthenticateTargetMcpServer -> "mcpServer"
+            is AuthenticateTargetUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
 // ─── ReconnectResult Union ──────────────────────────────────────────────────
 
 @Serializable(with = ReconnectResultSerializer::class)
@@ -1831,6 +2296,7 @@ data class ChangesetOperationResourceTarget(
     val side: String? = null,
     /** Discriminator. Always "resource". */
     val kind: String = "resource",
+    val nonce: String? = null,
 )
 
 @Serializable
@@ -1840,6 +2306,7 @@ data class ChangesetOperationRangeTarget(
     val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
+    val nonce: String? = null,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {

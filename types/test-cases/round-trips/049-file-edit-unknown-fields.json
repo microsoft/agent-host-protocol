@@ -1,0 +1,51 @@
+{
+  "name": "file-edit-unknown-fields",
+  "group": "B",
+  "description": "Typed file-edit models drop unknown keys while intentional metadata stays raw.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/toolCallReady",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "invocationMessage": "Review",
+    "futureAction": 0,
+    "_meta": {"vendor":{"keep":true}},
+    "edits": {
+      "futureCollection": 1,
+      "items": [{
+        "futureEdit": 2,
+        "after": {"uri":"file:///workspace/file.txt","futureSide":3,"content":{"uri":"ahp-content:/file","futureContent":4}},
+        "diff": {"added":1,"futureStats":5}
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "chat/toolCallReady",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "invocationMessage": "Review",
+    "_meta": {"vendor":{"keep":true}},
+    "edits": {
+      "items": [{
+        "after": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/file"}},
+        "diff": {"added":1}
+      }]
+    }
+  }],
+  "preservedOutput": {
+    "type": "chat/toolCallReady",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "invocationMessage": "Review",
+    "futureAction": 0,
+    "_meta": {"vendor":{"keep":true}},
+    "edits": {
+      "futureCollection": 1,
+      "items": [{
+        "futureEdit": 2,
+        "after": {"uri":"file:///workspace/file.txt","futureSide":3,"content":{"uri":"ahp-content:/file","futureContent":4}},
+        "diff": {"added":1,"futureStats":5}
+      }]
+    }
+  }
+}

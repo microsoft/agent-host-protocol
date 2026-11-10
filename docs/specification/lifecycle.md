@@ -31,7 +31,7 @@ The client initiates the connection with an `initialize` **request**. The client
 }
 ```
 
-`protocolVersions` is ordered from most preferred to least preferred. The server picks one entry and returns it as `InitializeResult.protocolVersion`. If the server cannot speak any of the offered versions it MUST return [`UnsupportedProtocolVersion`](/reference/error-codes) (`-32005`) with required `data.supportedVersions` instead of a result. See [Versioning](/specification/versioning) for the negotiation rules.
+`protocolVersions` is ordered from most preferred to least preferred. The server selects the highest offered SemVer within its supported caret-compatible ranges and returns that exact entry as `InitializeResult.protocolVersion`. If the server cannot speak any of the offered versions it MUST return [`UnsupportedProtocolVersion`](/reference/error-codes) (`-32005`) with required `data.supportedVersions` instead of a result. See [Versioning](/specification/versioning) for the negotiation rules.
 
 `initialSubscriptions` allows the client to subscribe to channels in the same round-trip as the handshake — typically `ahp-root://` plus any previously-open session URIs.
 
@@ -106,7 +106,7 @@ If the transport connection drops, the client reconnects and sends a `reconnect`
 }
 ```
 
-The server MUST include all replayed data in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
+The server MUST include all replayed actions for ordinary subscriptions in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
 
 ```json
 {
@@ -141,7 +141,19 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 }
 ```
 
-Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
+On ordinary subscriptions, protocol notifications are **not** replayed — the
+client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions).
+Other missed notifications, such as telemetry batches, are dropped as well; the
+subscription continues with notifications sent after reconnection.
+
+A client with [windowed subscriptions](/specification/windowed-delivery#reconnection)
+can add `windows` to the `reconnect` request. The server includes `windows` in
+the result only if the request contained it, and lists only channels from the
+request. Windowed subscriptions are not included in the result's `actions` or
+`snapshots`. Each one recovers through its own data messages, using its own
+`lastAppliedServerSeq` instead of the connection-wide `lastSeenServerSeq`. Its
+window counters start at zero on the new connection, and its limits are
+negotiated again in the `reconnect` request and result.
 
 ## Unexpected Disconnection
 

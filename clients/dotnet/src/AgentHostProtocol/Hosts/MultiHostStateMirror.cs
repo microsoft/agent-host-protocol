@@ -21,6 +21,7 @@ public sealed class MultiHostStateMirror
     private readonly ConcurrentDictionary<HostId, RootState> _roots = new();
     private readonly ConcurrentDictionary<HostedResourceKey, SessionState> _sessions = new();
     private readonly ConcurrentDictionary<HostedResourceKey, ChatState> _chats = new();
+    private readonly ConcurrentDictionary<HostedResourceKey, CanvasState> _canvases = new();
     private readonly ConcurrentDictionary<HostedResourceKey, TerminalState> _terminals = new();
     private readonly ConcurrentDictionary<HostedResourceKey, ChangesetState> _changesets = new();
 
@@ -62,6 +63,19 @@ public sealed class MultiHostStateMirror
     public (ChatState? Value, bool Found) Chat(HostId hostId, string uri) =>
         _chats.TryGetValue(new HostedResourceKey(hostId, uri), out var v) ? (v, true) : (default, false);
 
+    /// <summary>Stores live canvas state under (hostId, uri).</summary>
+    public void PutCanvas(HostId hostId, string uri, CanvasState state)
+    {
+        Guard.ThrowIfNull(hostId, nameof(hostId));
+        Guard.ThrowIfNull(uri, nameof(uri));
+        Guard.ThrowIfNull(state, nameof(state));
+        _canvases[new HostedResourceKey(hostId, uri)] = state;
+    }
+
+    /// <summary>Returns canvas state at (hostId, uri), or (default, false).</summary>
+    public (CanvasState? Value, bool Found) Canvas(HostId hostId, string uri) =>
+        _canvases.TryGetValue(new HostedResourceKey(hostId, uri), out var v) ? (v, true) : (default, false);
+
     /// <summary>Stores a terminal snapshot under (hostId, uri).</summary>
     public void PutTerminal(HostId hostId, string uri, TerminalState state)
     {
@@ -94,6 +108,7 @@ public sealed class MultiHostStateMirror
         _roots.TryRemove(hostId, out _);
         foreach (var k in _sessions.Keys) if (k.HostId.Equals(hostId)) _sessions.TryRemove(k, out _);
         foreach (var k in _chats.Keys) if (k.HostId.Equals(hostId)) _chats.TryRemove(k, out _);
+        foreach (var k in _canvases.Keys) if (k.HostId.Equals(hostId)) _canvases.TryRemove(k, out _);
         foreach (var k in _terminals.Keys) if (k.HostId.Equals(hostId)) _terminals.TryRemove(k, out _);
         foreach (var k in _changesets.Keys) if (k.HostId.Equals(hostId)) _changesets.TryRemove(k, out _);
     }
@@ -104,6 +119,7 @@ public sealed class MultiHostStateMirror
         var key = new HostedResourceKey(hostId, uri);
         _sessions.TryRemove(key, out _);
         _chats.TryRemove(key, out _);
+        _canvases.TryRemove(key, out _);
         _terminals.TryRemove(key, out _);
         _changesets.TryRemove(key, out _);
     }

@@ -1,0 +1,72 @@
+{
+  "name": "channel-delivery-reconnect-params",
+  "group": "A",
+  "description": "Each windowed subscription in a reconnect request offers new limits and, for replay, its last applied serverSeq; there are no byte counters.",
+  "type": "ReconnectParams",
+  "input": {
+    "channel": "ahp-root://",
+    "clientId": "client-1",
+    "lastSeenServerSeq": 20,
+    "subscriptions": [
+      "ahp-chat:/c1",
+      "ahp-otlp://logs"
+    ],
+    "windows": {
+      "items": [
+        {
+          "channel": "ahp-chat:/c1",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            }
+          },
+          "lastAppliedServerSeq": 10
+        },
+        {
+          "channel": "ahp-otlp://logs",
+          "flowControl": {
+            "receive": {
+              "windowBytes": 65536,
+              "maximumFrameBytes": 16384
+            }
+          }
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "clientId": "client-1",
+      "lastSeenServerSeq": 20,
+      "subscriptions": [
+        "ahp-chat:/c1",
+        "ahp-otlp://logs"
+      ],
+      "windows": {
+        "items": [
+          {
+            "channel": "ahp-chat:/c1",
+            "flowControl": {
+              "receive": {
+                "windowBytes": 262144,
+                "maximumFrameBytes": 16384
+              }
+            },
+            "lastAppliedServerSeq": 10
+          },
+          {
+            "channel": "ahp-otlp://logs",
+            "flowControl": {
+              "receive": {
+                "windowBytes": 65536,
+                "maximumFrameBytes": 16384
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

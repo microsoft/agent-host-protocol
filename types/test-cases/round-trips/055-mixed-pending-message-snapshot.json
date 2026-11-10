@@ -1,0 +1,54 @@
+{
+  "name": "mixed-pending-message-snapshot",
+  "group": "A",
+  "description": "Snapshots preserve mixed pending kinds, absent kinds on old queued entries, raw order and the deprecated steering slot.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 7,
+    "snapshots": [
+      {
+        "resource": "ahp-chat:/steering",
+        "fromSeq": 7,
+        "state": {
+          "resource": "ahp-chat:/steering",
+          "title": "Steering",
+          "status": 8,
+          "modifiedAt": "2026-10-08T00:00:00.000Z",
+          "turns": [],
+          "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
+          "queuedMessages": [
+            { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+            { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+            { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
+          ]
+        }
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 7,
+      "snapshots": [
+        {
+          "resource": "ahp-chat:/steering",
+          "fromSeq": 7,
+          "state": {
+            "resource": "ahp-chat:/steering",
+            "title": "Steering",
+            "status": 8,
+            "modifiedAt": "2026-10-08T00:00:00.000Z",
+            "turns": [],
+            "steeringMessage": { "id": "legacy", "message": { "text": "Legacy", "origin": { "kind": "user" } } },
+            "queuedMessages": [
+              { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+              { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } },
+              { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

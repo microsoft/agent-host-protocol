@@ -1,0 +1,45 @@
+{
+  "description": "pending list preserves successive steering submissions while the legacy slot mirrors the latest",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": {
+      "id": "legacy",
+      "message": { "text": "Legacy input", "origin": { "kind": "user" } }
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "legacy",
+      "message": { "text": "Steering A", "origin": { "kind": "user" } }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "b",
+      "message": { "text": "Steering B", "origin": { "kind": "user" } }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": {
+      "id": "b",
+      "kind": "steering",
+      "message": { "text": "Steering B", "origin": { "kind": "user" } }
+    },
+    "queuedMessages": [
+      { "id": "legacy", "kind": "steering", "message": { "text": "Steering A", "origin": { "kind": "user" } } },
+      { "id": "b", "kind": "steering", "message": { "text": "Steering B", "origin": { "kind": "user" } } }
+    ]
+  }
+}

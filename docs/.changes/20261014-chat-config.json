@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`ChatState.config`, the `chat/configChanged` action, and `chatMutable` on session config properties give each chat its own config for selected settings, such as tool auto-approval, so changing them in one chat no longer changes every chat in the session. `ChatConfigState.values` holds the chat's `chatMutable` properties and does not inherit from the session; missing keys take the schema default. Optional `ChatConfigState.schema` replaces the session's schema for a chat whose agent differs from the session's."
+}

@@ -120,6 +120,22 @@ func TestRoundTripCorpus(t *testing.T) {
 	t.Logf("round-trip corpus: %d fixtures, %d asserted for real", len(fixtureFiles), ranReal)
 }
 
+func TestReconnectResultNilVariant(t *testing.T) {
+	for _, result := range []ReconnectResult{
+		{},
+		{Value: (*ReconnectReplayResult)(nil)},
+		{Value: (*ReconnectSnapshotResult)(nil)},
+	} {
+		data, err := json.Marshal(result)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != "null" {
+			t.Fatalf("expected null for nil reconnect variant, got %s", data)
+		}
+	}
+}
+
 func runRoundTripFixture(t *testing.T, name string, raw []byte) {
 	t.Helper()
 
@@ -274,12 +290,56 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v SessionConfigCompletionsParams
 		dec(&v)
 		return enc(&v)
+	case "CreateChatParams":
+		var v CreateChatParams
+		dec(&v)
+		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)
 		return enc(&v)
 	case "Snapshot":
 		var v Snapshot
+		dec(&v)
+		return enc(&v)
+	case "SubscribeParams":
+		var v SubscribeParams
+		dec(&v)
+		return enc(&v)
+	case "ChannelFrameParams":
+		var v ChannelFrameParams
+		dec(&v)
+		return enc(&v)
+	case "ChannelCreditParams":
+		var v ChannelCreditParams
+		dec(&v)
+		return enc(&v)
+	case "ReconnectParams":
+		var v ReconnectParams
+		dec(&v)
+		return enc(&v)
+	case "TcpDataParams":
+		var v TcpDataParams
+		dec(&v)
+		return enc(&v)
+	case "TcpEofParams":
+		var v TcpEofParams
+		dec(&v)
+		return enc(&v)
+	case "TcpResetParams":
+		var v TcpResetParams
+		dec(&v)
+		return enc(&v)
+	case "CreateTcpConnectionParams":
+		var v CreateTcpConnectionParams
+		dec(&v)
+		return enc(&v)
+	case "ResourceReadParams":
+		var v ResourceReadParams
+		dec(&v)
+		return enc(&v)
+	case "ResourceReadResult":
+		var v ResourceReadResult
 		dec(&v)
 		return enc(&v)
 	default:
@@ -372,8 +432,7 @@ func TestProtocolVersionConstants(t *testing.T) {
 		t.Errorf("SupportedProtocolVersions() must be non-empty")
 	}
 
-	if len(supported) > 0 && supported[0] != ProtocolVersion {
-		t.Errorf("first SupportedProtocolVersions entry %q must equal ProtocolVersion %q",
-			supported[0], ProtocolVersion)
+	if len(supported) != 2 || supported[0] != "1.0.0" || supported[1] != "0.9.0" {
+		t.Errorf("unexpected released compatibility baselines: %v", supported)
 	}
 }

@@ -1,0 +1,18 @@
+{
+  "name": "resource-read-whole-result",
+  "group": "A",
+  "description": "A receiver that does not honor byte ranges returns the whole resource without size. size stays absent on re-encode, so senders can tell the result is the whole resource.",
+  "type": "ResourceReadResult",
+  "input": {
+    "data": "aGVsbG8=",
+    "encoding": "base64",
+    "contentType": "text/plain"
+  },
+  "acceptableOutputs": [
+    {
+      "data": "aGVsbG8=",
+      "encoding": "base64",
+      "contentType": "text/plain"
+    }
+  ]
+}

@@ -22,7 +22,7 @@
  *     plus a marker interface, with custom MarshalJSON / UnmarshalJSON
  *     methods. Unknown discriminator values surface as a
  *     `*<Name>Unknown` variant carrying the raw JSON.
- *   - Bitset enums (JSDoc starts with "Bitset") are emitted as a typed
+ *   - Bitset enums (`@bitset`) are emitted as a typed
  *     `uint32` with named flag constants plus `Has` / `Or` helpers, so
  *     unknown future bits round-trip losslessly.
  *   - The generator runs `gofmt -w` after writing to keep style stable
@@ -40,8 +40,10 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
-import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
+import { discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
   '// Generated from types/*.ts — do not edit.\n' +
@@ -175,6 +177,8 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -260,9 +264,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -360,7 +362,11 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     const alreadyPointer = goType.startsWith('*');
     const optional = hasQuestionToken || hasUnionUndefined || alreadyPointer;
     const presenceSensitiveCollection = /^Record<string,\s*never>$/.test(tsType)
-      || (iface.getName() === 'AutomationDefinitionPatch' && (tsName === 'triggers' || tsName === '_meta'));
+      || (iface.getName() === 'AutomationDefinitionPatch'
+        && (tsName === 'triggers' || tsName === '_meta'))
+      || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
+        && tsName === 'disableConditions')
+      || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -403,7 +409,7 @@ function emitDocComment(prefix: string, doc: string | undefined, lines: string[]
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} string`);
   lines.push('');
@@ -419,16 +425,16 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 }
 
 /**
- * Bitset enum (numeric values, JSDoc tag "Bitset" or numeric values):
+ * Numeric enum, with flag helpers when annotated `@bitset`:
  *   type SessionStatus uint32
  *   const ( SessionStatusIdle SessionStatus = 1 ... )
  *   func (s SessionStatus) Has(other SessionStatus) bool
  *   func (s SessionStatus) Or(other SessionStatus) SessionStatus
  */
-function generateBitsetEnum(enumDecl: EnumDeclaration): string {
+function generateNumericEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   emitDocComment('', desc, lines);
   lines.push(`type ${name} uint32`);
   lines.push('');
@@ -440,20 +446,22 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
     lines.push(`\t${name}${memberName} ${name} = ${mem.getValue()}`);
   }
   lines.push(')');
-  lines.push('');
-  lines.push(`// Has reports whether every flag in other is also set in s.`);
-  lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
-  lines.push('');
-  lines.push(`// Or returns s combined with the flags in other.`);
-  lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  if (isBitsetEnum(enumDecl)) {
+    lines.push('');
+    lines.push(`// Has reports whether every flag in other is also set in s.`);
+    lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
+    lines.push('');
+    lines.push(`// Or returns s combined with the flags in other.`);
+    lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  }
   return lines.join('\n');
 }
 
-/** Choose between string-enum and bitset-enum emission. */
+/** Choose between string-enum and numeric-enum emission. */
 function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
-  return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
+  return isNumeric ? generateNumericEnum(enumDecl) : generateStringEnum(enumDecl);
 }
 
 // ─── Struct Generation ───────────────────────────────────────────────────────
@@ -514,7 +522,7 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateGoStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -698,6 +706,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
     lines.push('\tif err != nil { return nil, err }');
     lines.push('\tvar object map[string]json.RawMessage');
     lines.push('\tif err := json.Unmarshal(data, &object); err != nil { return nil, err }');
+    lines.push('\tif object == nil { return data, nil }');
     lines.push('\tswitch u.Value.(type) {');
     for (const v of cfg.variants) {
       lines.push(`\tcase *${v.innerType}: object[${JSON.stringify(cfg.discriminantField)}] = json.RawMessage(${JSON.stringify(JSON.stringify(v.wireValue))})`);
@@ -714,6 +723,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -724,14 +734,19 @@ const STATE_ENUMS = [
   'ConfirmationOptionKind', 'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus',
   'TerminalClaimKind', 'TerminalLifecycleStatus',
+  'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -759,13 +774,18 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
   { name: 'ChatState' },
+  { name: 'CanvasReference' },
+  { name: 'CanvasState' },
   { name: 'ChatSummary' },
+  { name: 'BackgroundShellWork' },
+  { name: 'BackgroundSubagentWork' },
   { name: 'SideChatSelection' },
   { name: 'PendingMessage' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
+  { name: 'ChatConfigState' },
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },
@@ -843,7 +863,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'McpAuthRequirement' },
   { name: 'ToolCallClientContributor' },
   { name: 'ToolCallMcpContributor' },
+  { name: 'FileEditSide' },
+  { name: 'FileEditDiffStats' },
   { name: 'FileEdit' },
+  { name: 'FileEditCollection' },
   { name: 'TerminalCommandResult' },
   { name: 'TerminalInfo' },
   { name: 'TerminalClientClaim' },
@@ -856,6 +879,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -878,6 +902,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationDefinitionPatch' },
+  { name: 'AutomationAfterRunsCondition' },
+  { name: 'AutomationAfterDateCondition' },
   { name: 'AutomationEntry' },
   { name: 'AutomationState' },
   { name: 'AutomationManualRunOrigin' },
@@ -1125,10 +1151,21 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const BACKGROUND_WORK_UNION: UnionConfig = {
+  name: 'BackgroundWork',
+  discriminantField: 'kind',
+  doc: 'BackgroundWork is work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.',
+  variants: [
+    { variantName: 'Shell', innerType: 'BackgroundShellWork', wireValue: 'shell' },
+    { variantName: 'Subagent', innerType: 'BackgroundSubagentWork', wireValue: 'subagent' },
+  ],
+  unknown: true,
+};
+
 const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
   name: 'WorkingDirectoryOrigin',
   discriminantField: 'kind',
-  doc: 'Host-reported working-directory provenance.',
+  doc: 'WorkingDirectoryOrigin is the host-reported working-directory provenance.',
   variants: [
     { variantName: 'Local', innerType: 'LocalWorkingDirectoryOrigin', wireValue: 'local' },
     { variantName: 'Repo', innerType: 'RepoWorkingDirectoryOrigin', wireValue: 'repo' },
@@ -1155,6 +1192,17 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
+  name: 'AutomationDisableCondition',
+  discriminantField: 'kind',
+  doc: 'AutomationDisableCondition is an automation\'s self-disable rule.',
+  variants: [
+    { variantName: 'AfterRuns', innerType: 'AutomationAfterRunsCondition', wireValue: 'afterRuns' },
+    { variantName: 'AfterDate', innerType: 'AutomationAfterDateCondition', wireValue: 'afterDate' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1284,16 +1332,22 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
+// automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automations → session → chat → terminal → changeset →
-// resourceWatch → annotations → root).
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
+// is an empty state, used by channels whose state has no fields. A state that
+// matches none of these, such as the state of a channel added in a later
+// protocol version, is kept as raw JSON in Unknown.
 type SnapshotState struct {
+\tEmpty         *EmptyState         \`json:"-"\`
+\tUnknown       json.RawMessage     \`json:"-"\`
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
+\tCanvas        *CanvasState        \`json:"-"\`
 \tTerminal      *TerminalState      \`json:"-"\`
 \tChangeset     *ChangesetState     \`json:"-"\`
 \tResourceWatch *ResourceWatchState \`json:"-"\`
@@ -1305,6 +1359,8 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
+\tcase s.Empty != nil:
+\t\treturn json.Marshal(s.Empty)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1313,6 +1369,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Session)
 \tcase s.Chat != nil:
 \t\treturn json.Marshal(s.Chat)
+\tcase s.Canvas != nil:
+\t\treturn json.Marshal(s.Canvas)
 \tcase s.Terminal != nil:
 \t\treturn json.Marshal(s.Terminal)
 \tcase s.Changeset != nil:
@@ -1323,6 +1381,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Annotations)
 \tcase s.Root != nil:
 \t\treturn json.Marshal(s.Root)
+\tcase s.Unknown != nil:
+\t\treturn s.Unknown, nil
 \tdefault:
 \t\treturn []byte("null"), nil
 \t}
@@ -1337,6 +1397,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
+\tcase len(probe) == 0:
+\t\ts.Empty = &EmptyState{}
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1361,6 +1423,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Chat = &v
+\tcase containsAll(probe, "instanceId", "extensionId", "canvasId"):
+\t\tvar v CanvasState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Canvas = &v
 \tcase containsAll(probe, "content"):
 \t\tvar v TerminalState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1385,12 +1453,15 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Annotations = &v
-\tdefault:
+\tcase containsAll(probe, "agents"):
 \t\tvar v RootState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
 \t\ts.Root = &v
+\tdefault:
+\t\t// A state from a later protocol version: keep it rather than fail.
+\t\ts.Unknown = append(json.RawMessage(nil), data...)
 \t}
 \treturn nil
 }
@@ -1557,12 +1628,15 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, TERMINAL_LIFECYCLE_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
+  lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, WORKING_DIRECTORY_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1591,6 +1665,7 @@ const ACTION_VARIANTS: {
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
   { type: 'session/chatRemoved', variantName: 'SessionChatRemoved', tsInterface: 'SessionChatRemovedAction' },
   { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
+  { type: 'session/chatsReordered', variantName: 'SessionChatsReordered', tsInterface: 'SessionChatsReorderedAction' },
   { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
   { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
@@ -1609,7 +1684,12 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundWorkSet', variantName: 'ChatBackgroundWorkSet', tsInterface: 'ChatBackgroundWorkSetAction' },
+  { type: 'chat/backgroundWorkRemoved', variantName: 'ChatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
+  { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
+  { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
@@ -1617,7 +1697,10 @@ const ACTION_VARIANTS: {
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
+  { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', variantName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1644,6 +1727,7 @@ const ACTION_VARIANTS: {
   { type: 'session/mcpServerStateChanged', variantName: 'SessionMcpServerStateChanged', tsInterface: 'SessionMcpServerStateChangedAction' },
   { type: 'session/mcpServerStartRequested', variantName: 'SessionMcpServerStartRequested', tsInterface: 'SessionMcpServerStartRequestedAction' },
   { type: 'session/mcpServerStopRequested', variantName: 'SessionMcpServerStopRequested', tsInterface: 'SessionMcpServerStopRequestedAction' },
+  { type: 'session/mcpServerBackgroundRequested', variantName: 'SessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'changeset/statusChanged', variantName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
@@ -1782,24 +1866,30 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'RepositorySource' },
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'RepositoryPreparationCapabilities' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
+  { name: 'AutomationCustomizationsCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
   { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
+  { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1814,6 +1904,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
+  { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -1827,9 +1918,20 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
 ];
 
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
+  variants: [
+    { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
   discriminantField: 'type',
+  injectDiscriminantOnMarshal: true,
   doc: 'ReconnectResult is the result of the `reconnect` command.',
   variants: [
     { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
@@ -1845,6 +1947,16 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   variants: [
     { variantName: 'Fork', innerType: 'ForkChatSource', wireValue: 'fork' },
     { variantName: 'SideChat', innerType: 'SideChatSource', wireValue: 'sideChat' },
+  ],
+};
+
+const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
+  name: 'ChatMoveDestination',
+  discriminantField: 'kind',
+  doc: 'Destination of an atomic chat move.',
+  variants: [
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
+    { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
   ],
 };
 
@@ -1931,6 +2043,7 @@ type ChangesetOperationResourceTarget struct {
 \tKind     string  \`json:"kind"\`
 \tResource URI     \`json:"resource"\`
 \tSide     *string \`json:"side,omitempty"\`
+\tNonce    *string \`json:"nonce,omitempty"\`
 }
 
 func (*ChangesetOperationResourceTarget) isChangesetOperationTarget() {}
@@ -1941,6 +2054,7 @@ type ChangesetOperationRangeTarget struct {
 \tResource URI     \`json:"resource"\`
 \tSide     *string \`json:"side,omitempty"\`
 \tRange    TextRange \`json:"range"\`
+\tNonce    *string \`json:"nonce,omitempty"\`
 }
 
 func (*ChangesetOperationRangeTarget) isChangesetOperationTarget() {}
@@ -2013,9 +2127,18 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateFixedDiscriminantMethods('SideChatSource', 'kind', 'sideChat', 'ChatSourceKind'));
   lines.push('');
-
+  lines.push(generateFixedDiscriminantMethods('ChatMoveToSessionDestination', 'kind', 'session', 'ChatMoveDestinationKind'));
+  lines.push('');
+  lines.push(generateFixedDiscriminantMethods('ChatMoveToNewSessionDestination', 'kind', 'newSession', 'ChatMoveDestinationKind'));
+  lines.push('');
   lines.push('// ─── ChatSource Union ─────────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
+  lines.push('');
+  lines.push('// ─── ChatMoveDestination Union ────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
+  lines.push('');
+  lines.push('// ─── AuthenticateTarget Union ─────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
   lines.push('');
 
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
@@ -2034,6 +2157,9 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2087,7 +2213,34 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptGo(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptGo(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `\t${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+// WindowExemptMethods lists the notification methods that do not count against
+// the window on a windowed subscription. Every other notification for a
+// subscription counts.
+var WindowExemptMethods = []string{
+${methods}
+}
+
+// CountsAgainstWindow reports whether a notification with this method counts
+// against the window on a windowed subscription. Methods that are not
+// recognized count.
+func CountsAgainstWindow(method string) bool {
+\tfor _, exempt := range WindowExemptMethods {
+\t\tif method == exempt {
+\t\t\treturn false
+\t\t}
+\t}
+\treturn true
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
@@ -2126,6 +2279,8 @@ const (
 \tErrorCodeNotFound                    int32 = -32008
 \tErrorCodePermissionDenied            int32 = -32009
 \tErrorCodeAlreadyExists               int32 = -32010
+\t// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
+\tErrorCodeTcpConnectionOpenFailed     int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -2301,6 +2456,12 @@ function generateVersionFile(project: Project): string {
   const { current, supported } = readProtocolVersions(project);
   const supportedLiteral = supported.map((v) => `\t${JSON.stringify(v)},`).join('\n');
   return `${GENERATED_BANNER}
+import (
+    "fmt"
+    "strconv"
+    "strings"
+)
+
 // ProtocolVersion is the current protocol version (SemVer
 // MAJOR.MINOR.PATCH) that this generated source speaks.
 const ProtocolVersion = ${JSON.stringify(current)}
@@ -2313,13 +2474,63 @@ ${supportedLiteral}
 }
 
 // SupportedProtocolVersions returns every protocol version this client
-// is willing to negotiate, ordered most-preferred-first. The first
-// entry always equals [ProtocolVersion]. The returned slice is a fresh
+// is willing to negotiate, ordered most-preferred-first, independently
+// of the development [ProtocolVersion]. The returned slice is a fresh
 // copy on every call so callers may mutate it freely.
 func SupportedProtocolVersions() []string {
 \tout := make([]string, len(supportedProtocolVersions))
 \tcopy(out, supportedProtocolVersions)
 \treturn out
+}
+
+// NegotiateProtocolVersion selects the highest offered version in a supported
+// caret range. An empty result means the host must send UnsupportedProtocolVersion
+// and close. Malformed versions return an error.
+func NegotiateProtocolVersion(offered []string) (string, error) {
+    parse := func(version string) ([3]uint64, error) {
+        var result [3]uint64
+        parts := strings.Split(version, ".")
+        if len(parts) != 3 { return result, fmt.Errorf("invalid protocol version: %s", version) }
+        for i, part := range parts {
+            if part == "" || (len(part) > 1 && part[0] == '0') {
+                return result, fmt.Errorf("invalid protocol version: %s", version)
+            }
+            for _, digit := range part {
+                if digit < '0' || digit > '9' { return result, fmt.Errorf("invalid protocol version: %s", version) }
+            }
+            value, err := strconv.ParseUint(part, 10, 64)
+            if err != nil { return result, fmt.Errorf("invalid protocol version: %s", version) }
+            result[i] = value
+        }
+        return result, nil
+    }
+    compare := func(a, b [3]uint64) int {
+        for i := range a {
+            if a[i] < b[i] { return -1 }
+            if a[i] > b[i] { return 1 }
+        }
+        return 0
+    }
+    var baselines [][3]uint64
+    for _, baseline := range supportedProtocolVersions {
+        parts, err := parse(baseline)
+        if err != nil { return "", err }
+        baselines = append(baselines, parts)
+    }
+    var selected string
+    var previous [3]uint64
+    for _, version := range offered {
+        parts, err := parse(version)
+        if err != nil { return "", err }
+        for _, base := range baselines {
+            if parts[0] == base[0] && (parts[0] > 0 || parts[1] == base[1]) &&
+                (parts[0] > 0 || parts[1] > 0 || parts[2] == base[2]) &&
+                compare(parts, base) >= 0 && (selected == "" || compare(parts, previous) > 0) {
+                selected, previous = version, parts
+            }
+        }
+    }
+    return selected, nil
 }
 `;
 }
@@ -2351,6 +2562,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI',
     'JsonPrimitive',
     'BaseParams',
@@ -2376,6 +2588,7 @@ function checkExhaustiveness(project: Project): void {
     'TerminalContentPart',
     'ChatOrigin',
     'ChatSource',
+    'ChatMoveDestination',
     'ChatInputQuestion',
     'ChatInputAnswerValue',
     'ChatInputAnswer',
@@ -2391,11 +2604,13 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallRiskAssessment',
     'TerminalLifecycleState',
     'SessionInputRequest',
+    'BackgroundWork',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',
     'WorkingDirectoryOrigin',
     'AutomationTrigger',
+    'AutomationDisableCondition',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',

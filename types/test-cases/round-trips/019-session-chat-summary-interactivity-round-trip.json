@@ -14,11 +14,13 @@
       {
         "resource": "ahp-chat:/lead",
         "title": "Lead",
+        "status": 1,
         "interactivity": "read-only"
       },
       {
         "resource": "ahp-chat:/worker",
         "title": "Worker",
+        "status": 1,
         "interactivity": "hidden"
       }
     ],
@@ -36,11 +38,13 @@
         {
           "resource": "ahp-chat:/lead",
           "title": "Lead",
+          "status": 1,
           "interactivity": "read-only"
         },
         {
           "resource": "ahp-chat:/worker",
           "title": "Worker",
+          "status": 1,
           "interactivity": "hidden"
         }
       ],

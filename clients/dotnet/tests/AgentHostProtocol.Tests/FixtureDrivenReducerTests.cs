@@ -78,6 +78,9 @@ public sealed class FixtureDrivenReducerTests
                 case "chat":
                     RunFixture<ChatState>(initial, expected, actions, Reducers.ApplyToChat);
                     break;
+                case "canvas":
+                    RunFixture<CanvasState>(initial, expected, actions, Reducers.ApplyToCanvas);
+                    break;
                 case "automation":
                     RunFixture<AutomationState>(
                         initial,

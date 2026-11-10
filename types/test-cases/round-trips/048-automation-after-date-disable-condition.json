@@ -1,0 +1,20 @@
+{
+  "name": "automation-after-date-disable-condition",
+  "group": "A",
+  "description": "An automation update replaces disableConditions with a single afterDate condition.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/until-friday",
+    "changes": {
+      "disableConditions": [{ "kind": "afterDate", "date": "2026-08-07T00:00:00Z" }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/until-friday",
+    "changes": {
+      "disableConditions": [{ "kind": "afterDate", "date": "2026-08-07T00:00:00Z" }]
+    }
+  }]
+}

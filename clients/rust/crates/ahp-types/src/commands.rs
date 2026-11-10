@@ -16,9 +16,10 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
+    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
+    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
+    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -65,6 +66,44 @@ impl<'de> serde::Deserialize<'de> for ChatSourceKind {
         Ok(match raw.as_str() {
             "fork" => Self::Fork,
             "sideChat" => Self::SideChat,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Destination kind for an atomic chat move.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ChatMoveDestinationKind {
+    /// Move the source chat subtree into an existing session.
+    Session,
+    /// Move the source chat subtree into a newly allocated session.
+    NewSession,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ChatMoveDestinationKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Session => serializer.serialize_str("session"),
+            Self::NewSession => serializer.serialize_str("newSession"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "session" => Self::Session,
+            "newSession" => Self::NewSession,
             _ => Self::Unknown(raw),
         })
     }
@@ -183,6 +222,39 @@ pub enum ResourceWriteMode {
     Insert,
 }
 
+/// Identifies the consumer of an authentication token.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AuthenticateTargetKind {
+    McpServer,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AuthenticateTargetKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::McpServer => serializer.serialize_str("mcpServer"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AuthenticateTargetKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "mcpServer" => Self::McpServer,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 // ─── Command Payloads ─────────────────────────────────────────────────
 
 /// Requested repository source, not a resolved working directory.
@@ -197,6 +269,35 @@ pub struct RepositorySource {
     /// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subdirectory: Option<String>,
+}
+
+/// Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTcpConnectionParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// A DNS name or IP address, resolved on the host's network. Not a URL.
+    pub host: String,
+    /// The destination port.
+    pub port: i64,
 }
 
 /// Establishes a new connection and negotiates the protocol version.
@@ -214,7 +315,9 @@ pub struct InitializeParams {
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
     ///
-    /// The server selects one entry and returns it as `InitializeResult.protocolVersion`.
+    /// The server selects the highest offered SemVer within its supported
+    /// caret-compatible ranges and returns that exact entry as
+    /// `InitializeResult.protocolVersion`.
     /// If the server cannot speak any of the offered versions, it MUST return
     /// error code `-32005` (`UnsupportedProtocolVersion`) with required
     /// `UnsupportedProtocolVersionErrorData` containing `supportedVersions`.
@@ -277,7 +380,8 @@ pub struct InitializeResult {
     /// fields on {@link InitializeResult} instead.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Snapshots for each `initialSubscriptions` URI
+    /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -309,6 +413,19 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tcp_connections: Option<TcpConnectionsCapability>,
+    /// Present when chats in one session may be backed by different agents
+    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiple_chat_providers: Option<MultipleChatProvidersCapability>,
 }
 
 /// An empty object supports one repository at its default revision.
@@ -377,6 +494,10 @@ pub struct AutomationCapabilities {
     /// implementation-defined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_history_limit: Option<i64>,
+    /// Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customizations: Option<AutomationCustomizationsCapability>,
 }
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
@@ -410,6 +531,22 @@ pub struct AutomationScheduleCapabilities {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancellationCapability {}
+
+/// Presence capability for
+/// {@link AutomationSessionTemplate.customizations | automation customizations}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// capture options and limits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCustomizationsCapability {}
+
+/// Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultipleChatProvidersCapability {}
 
 /// Identifies a protocol implementation — the software (and build) on one end
 /// of the connection, as distinct from the {@link AgentInfo | agent persona} it
@@ -456,11 +593,71 @@ pub struct ReconnectParams {
     pub last_seen_server_seq: i64,
     /// URIs the client was subscribed to
     pub subscriptions: Vec<Uri>,
+    /// Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeOptions>,
+}
+
+/// One windowed subscription that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeParams {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.
+    pub flow_control: SubscriptionFlowControlOptions,
+    /// The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_applied_server_seq: Option<i64>,
+}
+
+/// Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeOptions {
+    pub items: Vec<ChannelDeliveryResumeParams>,
+}
+
+/// Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelDeliveryResumeResult {
+    pub items: Vec<ResumedChannelSubscription>,
+}
+
+/// A client's offer of windowed delivery.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubscriptionFlowControlOptions {
+    /// The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.
+    pub receive: ChannelReceiveLimits,
 }
 
 /// Reconnect result when the server can replay from the requested sequence.
 ///
-/// The server MUST include all replayed data in the response.
+/// The server MUST include all replayed data for ordinary subscriptions in the
+/// response. Windowed subscriptions recover through their own data messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectReplayResult {
@@ -471,22 +668,45 @@ pub struct ReconnectReplayResult {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     pub missing: Vec<Uri>,
+    /// Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Reconnect result when the gap exceeds the replay buffer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectSnapshotResult {
-    /// Fresh snapshots for each subscription
+    /// Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
+    /// Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<ChannelDeliveryResumeResult>,
 }
 
 /// Subscribe to a URI-identified channel.
 ///
-/// A channel MAY have state associated with it (e.g. root, sessions,
-/// terminals) or be stateless (pure pub/sub for streaming data). For
-/// state-bearing channels the result includes a snapshot; for stateless
-/// channels `snapshot` is omitted.
+/// With ordinary delivery, the result contains a snapshot of the channel's
+/// state; the server MAY omit it for a channel whose state has no fields. With
+/// windowed delivery, the result contains `flowControl` instead,
+/// and the snapshot is sent in a `channel/snapshot` notification.
+///
+/// A client has at most one subscription to each channel. A `subscribe` for a
+/// channel that the client is already subscribed to changes the existing
+/// subscription, for example its window, without losing data. Windowed counters
+/// continue if the subscription was already windowed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeParams {
@@ -496,19 +716,21 @@ pub struct SubscribeParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.
+    /// Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery: Option<SubscriptionDeliveryOptions>,
-    /// Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.
+    /// Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view: Option<SubscribeView>,
+    /// Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<SubscriptionFlowControlOptions>,
 }
 
 impl SubscribeParams {
@@ -519,6 +741,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -529,6 +752,7 @@ impl SubscribeParams {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -539,6 +763,7 @@ impl SubscribeParams {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }
@@ -559,28 +784,43 @@ pub struct SubscribeView {
     pub turns: Option<i64>,
 }
 
-/// Advisory delivery preferences for a single subscription.
+/// Delivery preferences for one subscription. They do not allow a server to
+/// exceed the limits of a windowed subscription.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscriptionDeliveryOptions {
-    /// Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    /// The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_latency_ms: Option<i64>,
 }
 
 /// Result of the `subscribe` command.
 ///
-/// `snapshot` is present when the subscribed channel has associated state, and
-/// absent for stateless channels.
+/// With ordinary delivery, `snapshot` is present, except that the server MAY
+/// omit it for a channel whose state has no fields. With windowed delivery,
+/// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+/// snapshot in a `channel/snapshot` notification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeResult {
-    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<Snapshot>,
+    /// The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flow_control: Option<ChannelFlowControl>,
 }
 
 /// Creates a new session with the specified agent provider.
@@ -739,6 +979,21 @@ pub struct CreateChatParams {
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Client-selected initial display title for the new chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Agent provider ID for the new chat. Absent means the session's provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 /// Disposes a chat and cleans up server-side resources.
@@ -751,6 +1006,89 @@ pub struct DisposeChatParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// Moves a chat within or into an existing session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMoveToSessionDestination {
+    /// Destination session URI.
+    pub session: Uri,
+    /// Chat after which to place the requested chat.
+    ///
+    /// The anchor MUST be a different chat in the destination session. When
+    /// omitted, the requested chat is placed at the beginning of the catalog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<Uri>,
+}
+
+/// Moves a top-level chat subtree into a newly allocated session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMoveToNewSessionDestination {}
+
+/// Atomically moves a host-authorized chat within or between sessions.
+///
+/// The source is the chat named by `channel`. When a `session` destination is
+/// the source's current session, only the requested entry is repositioned in
+/// that session's public chat catalog. When it names another session, the host
+/// transfers the requested chat and its complete host-managed descendant
+/// hierarchy. The optional `after` anchor positions the requested chat in the
+/// destination catalog; when omitted, the requested chat is placed first.
+///
+/// A `newSession` destination allocates a session, transfers the complete
+/// hierarchy, and makes the requested chat that session's non-movable default
+/// chat. The host owns descendant relationships; AHP does not expose them as
+/// chat state.
+///
+/// Clients MUST only request a move when the source chat advertises
+/// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
+/// eligibility, not a guarantee that request-specific validation will succeed.
+///
+/// The host MUST validate the complete operation before committing it and MAY
+/// reject unsupported destinations or transient source conditions. At minimum,
+/// the source MUST exist and advertise `movable: true`; the destination and
+/// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+/// Rejection leaves ownership, catalog order, chat state, and root summaries
+/// unchanged.
+///
+/// A moved chat keeps its agent. After the move the host reports
+/// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+/// the destination session's provider, including when the chat had none
+/// because it matched its old session. Hosts MAY refuse, as an unsupported
+/// destination, a move they cannot support, such as one that changes whether
+/// the chat's agent matches its session's.
+///
+/// A moved chat's `config.values` move with it unchanged. If a move changes
+/// whether the chat needs its own `config.schema`, the host sets or clears it,
+/// or refuses the move as an unsupported destination. After a cross-session
+/// move the host dispatches `chat/moved` on the chat's channel with its new
+/// session, `provider` and `config.schema`.
+///
+/// On success every moved chat keeps its URI, state, and immutable
+/// `ChatOrigin`. The host commits ownership and catalog order before publishing
+/// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+/// root summary updates as applicable. Session and root snapshots are the
+/// durable recovery path after reconnect or an uncertain response.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveChatParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Atomic move destination.
+    pub destination: ChatMoveDestination,
+}
+
+/// Result of an atomic chat move.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveChatResult {
+    /// Authoritative owning session URI after the move.
+    pub session: Uri,
 }
 
 /// Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -814,6 +1152,24 @@ pub struct ListSessionsResult {
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
 /// use it to read host-side files. The receiver enforces access via the
 /// same permission/`resourceRequest` flow regardless of which peer initiated.
+///
+/// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+/// content references and canvas sources. This includes HTTP(S) URLs that the
+/// other peer might not be able to reach, such as a development server on the
+/// host's loopback interface.
+///
+/// A sender MAY read part of a resource by including
+/// {@link ResourceReadParams.position | `position`} and/or
+/// {@link ResourceReadParams.length | `length`}.
+///
+/// - A receiver that honors the range SHOULD return only the requested bytes
+///   and MUST include {@link ResourceReadResult.size | `size`}, the total size
+///   of the resource in bytes.
+/// - A receiver that does not honor the range ignores `position` and `length`
+///   and returns the whole resource without `size`. A sender MUST treat a
+///   result without `size` as the whole resource.
+/// - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
+/// - A `position` at or past the end of the resource returns empty `data`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadParams {
@@ -823,11 +1179,20 @@ pub struct ResourceReadParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Content URI from a `ContentRef`
+    /// Content URI to read, such as one from a `ContentRef`
     pub uri: String,
     /// Preferred encoding for the returned data (default: server-chosen)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<ContentEncoding>,
+    /// Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub position: Option<i64>,
+    /// Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length: Option<i64>,
 }
 
 /// Result of the `resourceRead` command.
@@ -835,6 +1200,8 @@ pub struct ResourceReadParams {
 /// The server SHOULD honor the `encoding` requested in the params. If the
 /// server cannot provide the requested encoding, it MUST fall back to either
 /// `base64` or `utf-8`.
+///
+/// Unless {@link size} is present, the result contains the whole resource.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadResult {
@@ -845,6 +1212,12 @@ pub struct ResourceReadResult {
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
+    /// Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<i64>,
 }
 
 /// Writes content to a file on the server's filesystem.
@@ -1295,6 +1668,18 @@ pub struct DispatchActionParams {
     pub action: StateAction,
 }
 
+/// An MCP server identified by host-published session and customization state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerAuthenticateTarget {
+    /// Session URI whose `SessionState.customizations` contains the MCP server.
+    pub session: Uri,
+    /// The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.
+    pub customization_id: String,
+}
+
 /// Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1345,6 +1730,22 @@ pub struct AuthenticateParams {
     /// token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<AuthenticateTarget>,
 }
 
 /// Result of the `authenticate` command.
@@ -1734,6 +2135,36 @@ pub enum ChatSource {
     Unknown(serde_json::Value),
 }
 
+// ─── ChatMoveDestination Union ────────────────────────────────────────
+
+/// Destination of an atomic chat move.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum ChatMoveDestination {
+    #[serde(rename = "session")]
+    Session(ChatMoveToSessionDestination),
+    #[serde(rename = "newSession")]
+    NewSession(ChatMoveToNewSessionDestination),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+/// AuthenticateTarget identifies the consumer of an authentication token.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AuthenticateTarget {
+    #[serde(rename = "mcpServer")]
+    McpServer(McpServerAuthenticateTarget),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 /// Result of the `reconnect` command.
@@ -1757,6 +2188,8 @@ pub enum ChangesetOperationTarget {
         resource: Uri,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(rename = "range")]
     Range {
@@ -1764,6 +2197,8 @@ pub enum ChangesetOperationTarget {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
         range: TextRange,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(untagged)]
     Unknown(serde_json::Value),

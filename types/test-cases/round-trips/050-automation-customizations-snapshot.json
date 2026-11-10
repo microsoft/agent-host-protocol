@@ -1,0 +1,182 @@
+{
+  "name": "automation-customizations-snapshot",
+  "group": "A",
+  "description": "Automation session-template client plugins and their host-owned captured copies round-trip.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [
+        {
+          "resource": "ahp-automation:/a2",
+          "definition": {
+            "title": "Weekly report",
+            "message": {
+              "text": "Write the weekly report",
+              "origin": {
+                "kind": "automation"
+              }
+            },
+            "session": {
+              "provider": "copilot",
+              "customizations": [
+                {
+                  "type": "plugin",
+                  "id": "client-plugin-1",
+                  "uri": "virtual://vscode/workspace-skills",
+                  "name": "Workspace Skills",
+                  "enablement": [
+                    {
+                      "kind": "global",
+                      "enabled": true
+                    }
+                  ],
+                  "childEnablement": {
+                    "report-writer": [
+                      {
+                        "kind": "global",
+                        "enabled": false
+                      }
+                    ]
+                  },
+                  "nonce": "sha256:abc123"
+                }
+              ]
+            },
+            "enabled": true,
+            "triggers": []
+          },
+          "runs": [],
+          "operations": [
+            "update",
+            "remove",
+            "run"
+          ],
+          "customizations": [
+            {
+              "type": "plugin",
+              "id": "client-plugin-1",
+              "uri": "ahp-automation:/a2/customizations/client-plugin-1",
+              "name": "Workspace Skills",
+              "enablement": [
+                {
+                  "kind": "global",
+                  "enabled": true
+                }
+              ],
+              "load": {
+                "kind": "loaded"
+              },
+              "children": [
+                {
+                  "type": "skill",
+                  "id": "skill-triage",
+                  "uri": "ahp-automation:/a2/customizations/client-plugin-1/skills/triage/SKILL.md",
+                  "name": "triage"
+                },
+                {
+                  "type": "agent",
+                  "id": "agent-reviewer",
+                  "uri": "ahp-automation:/a2/customizations/client-plugin-1/agents/reviewer.md",
+                  "name": "reviewer"
+                }
+              ]
+            }
+          ],
+          "createdAt": "2026-08-01T00:00:00Z",
+          "modifiedAt": "2026-08-05T12:00:00Z"
+        }
+      ]
+    },
+    "fromSeq": 7
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-automations://",
+      "state": {
+        "entries": [
+          {
+            "resource": "ahp-automation:/a2",
+            "definition": {
+              "title": "Weekly report",
+              "message": {
+                "text": "Write the weekly report",
+                "origin": {
+                  "kind": "automation"
+                }
+              },
+              "session": {
+                "provider": "copilot",
+                "customizations": [
+                  {
+                    "type": "plugin",
+                    "id": "client-plugin-1",
+                    "uri": "virtual://vscode/workspace-skills",
+                    "name": "Workspace Skills",
+                    "enablement": [
+                      {
+                        "kind": "global",
+                        "enabled": true
+                      }
+                    ],
+                    "childEnablement": {
+                      "report-writer": [
+                        {
+                          "kind": "global",
+                          "enabled": false
+                        }
+                      ]
+                    },
+                    "nonce": "sha256:abc123"
+                  }
+                ]
+              },
+              "enabled": true,
+              "triggers": []
+            },
+            "runs": [],
+            "operations": [
+              "update",
+              "remove",
+              "run"
+            ],
+            "customizations": [
+              {
+                "type": "plugin",
+                "id": "client-plugin-1",
+                "uri": "ahp-automation:/a2/customizations/client-plugin-1",
+                "name": "Workspace Skills",
+                "enablement": [
+                  {
+                    "kind": "global",
+                    "enabled": true
+                  }
+                ],
+                "load": {
+                  "kind": "loaded"
+                },
+                "children": [
+                  {
+                    "type": "skill",
+                    "id": "skill-triage",
+                    "uri": "ahp-automation:/a2/customizations/client-plugin-1/skills/triage/SKILL.md",
+                    "name": "triage"
+                  },
+                  {
+                    "type": "agent",
+                    "id": "agent-reviewer",
+                    "uri": "ahp-automation:/a2/customizations/client-plugin-1/agents/reviewer.md",
+                    "name": "reviewer"
+                  }
+                ]
+              }
+            ],
+            "createdAt": "2026-08-01T00:00:00Z",
+            "modifiedAt": "2026-08-05T12:00:00Z"
+          }
+        ]
+      },
+      "fromSeq": 7
+    }
+  ]
+}

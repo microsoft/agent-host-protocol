@@ -1,0 +1,22 @@
+{
+  "description": "changeset/fileSet replaces the nonce with the full file entry without overriding explicit review state",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "first", "reviewed": true }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/fileSet",
+      "file": { "id": "file:///a.txt", "edit": {}, "nonce": "second", "reviewed": true }
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "second", "reviewed": true }
+    ]
+  }
+}

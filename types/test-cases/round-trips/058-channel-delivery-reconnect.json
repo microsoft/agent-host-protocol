@@ -1,0 +1,54 @@
+{
+  "name": "channel-delivery-reconnect",
+  "group": "A",
+  "description": "A kept windowed subscription returns its accepted limits for the new connection and its recovery mode, with no byte counters; counters start at zero.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay",
+    "actions": [],
+    "missing": [],
+    "windows": {
+      "items": [
+        {
+          "channel": "ahp-terminal:/t1",
+          "flowControl": {
+            "clientReceive": {
+              "windowBytes": 262144,
+              "maximumFrameBytes": 16384
+            },
+            "hostReceive": {
+              "windowBytes": 131072,
+              "maximumFrameBytes": 16384
+            }
+          },
+          "recovery": "replay"
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "replay",
+      "actions": [],
+      "missing": [],
+      "windows": {
+        "items": [
+          {
+            "channel": "ahp-terminal:/t1",
+            "flowControl": {
+              "clientReceive": {
+                "windowBytes": 262144,
+                "maximumFrameBytes": 16384
+              },
+              "hostReceive": {
+                "windowBytes": 131072,
+                "maximumFrameBytes": 16384
+              }
+            },
+            "recovery": "replay"
+          }
+        ]
+      }
+    }
+  ]
+}

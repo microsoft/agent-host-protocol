@@ -461,7 +461,7 @@ public sealed class TelemetryTests
     private static Task RespondInitializeAsync(MemTransport serverSide, ulong id, CancellationToken ct) =>
         FakeHost.RespondResultAsync(
             serverSide, id,
-            new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() }, ct);
+            new InitializeResult { ProtocolVersion = ProtocolVersion.Supported[0], Snapshots = new() }, ct);
 
     private static async Task DriveOneInitializeAsync()
     {

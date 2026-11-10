@@ -1,0 +1,30 @@
+{
+  "description": "A full changeset refresh replaces editing indications while preserving unchanged operations",
+  "reducer": "changeset",
+  "initial": {
+    "status": "recomputing",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true },
+      { "id": "file:///b.txt", "edit": {}, "nonce": "b-1" }
+    ],
+    "operations": [{ "id": "accept", "label": "Accept", "scopes": ["resource"], "status": "idle" }]
+  },
+  "actions": [
+    {
+      "type": "changeset/contentChanged",
+      "files": [
+        { "id": "file:///a.txt", "edit": {}, "nonce": "a-2" },
+        { "id": "file:///b.txt", "edit": {}, "nonce": "b-1", "isEditing": true }
+      ]
+    },
+    { "type": "changeset/statusChanged", "status": "ready" }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-2" },
+      { "id": "file:///b.txt", "edit": {}, "nonce": "b-1", "isEditing": true }
+    ],
+    "operations": [{ "id": "accept", "label": "Accept", "scopes": ["resource"], "status": "idle" }]
+  }
+}

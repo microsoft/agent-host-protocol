@@ -91,7 +91,7 @@ Each concrete (expanded) changeset URI is its own subscribable resource.
 
 ```typescript
 ChangesetState {
-  status: 'computing' | 'ready' | 'error'
+  status: 'computing' | 'recomputing' | 'ready' | 'error'
   error?: ErrorInfo
   files: ChangesetFile[]
   operations?: ChangesetOperation[]
@@ -102,15 +102,24 @@ ChangesetFile {
   edit: FileEdit                           // reuses the existing FileEdit shape
   reviewed?: boolean                       // GitHub-style "Viewed" flag; absent ⇒ not reviewed
   _meta?: Record<string, unknown>
+  nonce?: string                           // optional host-issued token for this change
+  isEditing?: boolean                      // optional indication of an ongoing edit
 }
 ```
+
+`computing` means the host is producing the first result and no completed
+result is available yet. `recomputing` means the host is refreshing an existing
+result; while it does so, `files` remains the previous completed result,
+including when that result is an empty array. This lets clients distinguish an
+initial empty placeholder from a cached empty result without inspecting the
+array.
 
 Updates flow through changeset-scoped actions, broadcast to subscribers
 of the changeset URI:
 
 | Type                                | Client-dispatchable? | When                                                                         |
 | ----------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
-| `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
+| `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready` or `ready → recomputing`).   |
 | `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
 | `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
 | `changeset/filesReviewChanged`      | Yes                  | A reviewer toggled the `reviewed` flag on one or more files.                 |
@@ -118,6 +127,52 @@ of the changeset URI:
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
+
+### Per-file Editing Activity
+
+A host MAY set `ChangesetFile.isEditing` to `true` to report an ongoing edit to that file. Clients MAY use it to show progress or temporarily disable that file's review actions while other files remain reviewable. `false` or omission clears the editing indication; neither guarantees that the file is safe to modify. Hosts remain responsible for operation validation and write coordination.
+
+The field travels through existing snapshots, `changeset/fileSet`, and `changeset/contentChanged`; no new action, command, or capability is needed. Hosts SHOULD keep it set until the file entry reflects the completed edit, then clear it together with the refreshed `edit` and any updated `nonce`, or remove the file if it no longer belongs to the changeset. An older refresh should not clear the indication for a newer ongoing edit.
+
+This is distinct from changeset `computing`/`recomputing` status, which describes calculating the changeset, and from an operation's `running` status, which describes an invoked operation. The `reviewed` flag and nonce semantics are unchanged. Clients that do not understand the optional field can ignore it, and hosts that do not report editing activity can omit it.
+
+### Typed file-edit models
+
+The client API uses three shared model types:
+
+| Type | Purpose |
+| --- | --- |
+| `FileEditSide` | A file URI and its required `ContentRef`. |
+| `FileEditDiffStats` | Optional added and removed item counts. |
+| `FileEditCollection` | The preview wrapper with required `items`. |
+
+`FileEdit.before` and `after` use the same side type.
+`ToolResultFileEditContent` exposes the same fields.
+The ready action and pending-confirmation state both expose previews through
+`edits.items`.
+
+When migrating from a client with raw-JSON file-edit properties, replace JSON
+lookups and construction with these typed properties and constructors.
+This changes the affected SDK APIs, not the JSON structure. Kotlin consumers
+must also rebuild dependent binaries.
+
+Sides remain optional. In Kotlin, a present side requires its file URI and
+content reference. The existing serializer reports missing required fields
+and incompatible values. A file that causes a serialization error fails the
+containing payload. Callers must handle that error rather than apply a partial
+snapshot.
+
+Each SDK keeps its native validation rules. Go can use zero values for missing
+fields. TypeScript types do not perform runtime validation.
+
+Runtime model decoders accept unknown keys but do not retain them on recognized
+objects. Keep the original raw payload separately if forwarding must be
+lossless. Intentional extension fields and unknown variants keep their existing
+raw-data behavior.
+
+The statistics count items, such as text lines or notebook cells. They are not
+patch data. `ContentRef` retains its existing URI, size hint, content type, and
+nonce. This API change does not add diff computation or a new resource protocol.
 
 ### File Review
 
@@ -150,15 +205,10 @@ all move to the same `reviewed` value.
 ```
 
 The reducer sets `reviewed` on every listed file that is present in the
-changeset, leaving each file's `edit` and `_meta` untouched. Ids that don't
+changeset, leaving each file's `edit`, `nonce`, and `_meta` untouched. Ids that don't
 match a current file are ignored; the action is a no-op when none match.
 
-**Reset on edit.** The protocol has no per-file content version, so review is
-**not** reset automatically when a file's contents change under a stable id. The
-server, which is the authority on what changed, resets review explicitly —
-either by re-emitting the file (via `changeset/fileSet` or
-`changeset/contentChanged`) without `reviewed: true`, or by dispatching
-`changeset/filesReviewChanged` with `reviewed: false`.
+**Reset on edit.** Review is **not** reset automatically when a file's contents or nonce change under a stable id. The server, which is the authority on what changed, resets review explicitly — either by re-emitting the file (via `changeset/fileSet` or `changeset/contentChanged`) without `reviewed: true`, or by dispatching `changeset/filesReviewChanged` with `reviewed: false`.
 
 ### Changeset Operations
 
@@ -210,8 +260,8 @@ invokeChangesetOperation(params: {
   channel: URI
   operationId: string
   target?:
-    | { kind: ChangesetOperationTargetKind.Resource; resource: URI; side?: 'before' | 'after' }
-    | { kind: ChangesetOperationTargetKind.Range; resource: URI; side?: 'before' | 'after'; range: TextRange }
+    | { kind: ChangesetOperationTargetKind.Resource; resource: URI; side?: 'before' | 'after'; nonce?: string }
+    | { kind: ChangesetOperationTargetKind.Range; resource: URI; side?: 'before' | 'after'; range: TextRange; nonce?: string }
 }) → {
   message?: StringOrMarkdown
   followUp?: {
@@ -227,6 +277,25 @@ current `operations` list and that the requested target's `kind` is
 contained in the operation's `scopes`. Invalid combinations result in
 a JSON-RPC error.
 
+### Optional operation nonces
+
+A host MAY attach an opaque `nonce` to a `ChangesetFile`. Hosts SHOULD update a published nonce whenever the contents of the file change. A client MAY echo the nonce of the file it displayed in a resource or range operation's `target.nonce`. Nonces are compared for equality, not interpreted as timestamps, ordered counters, tool identifiers, filesystem ETags, or parts of a URI.
+
+When both the current file and the target carry a nonce, the host MUST compare them at the point where it applies the operation, after any wait for concurrent work. A mismatch MAY reject the invocation with [`AhpErrorCodes.Conflict`](/reference/error-codes) (`-32011`), at the host's discretion. The client should refresh the displayed changes and let the user decide again rather than automatically retrying with a newer nonce.
+
+```json
+{
+  "channel": "ahp-changeset:/opaque-review",
+  "operationId": "accept-changes",
+  "target": {
+    "kind": "resource",
+    "resource": "file:///src/example.ts",
+    "nonce": "opaque-change-token"
+  }
+}
+```
+
+
 ## Lifecycle
 
 1. The server publishes a catalogue on `SessionState.changesets` and/or
@@ -235,10 +304,11 @@ a JSON-RPC error.
 2. The client picks catalogue entries whose template variables it can
    satisfy and subscribes to the resulting URIs.
 3. The server returns a `ChangesetState` snapshot (`status: 'computing'`
-   is allowed if scanning is async) and can push `changeset/contentChanged`
-   for an initial batched file snapshot, optionally including operations or
-   error details, followed by narrower `changeset/*` actions as files or
-   operations change.
+   is allowed if the initial scan is async). For a later refresh, the server
+   transitions to `recomputing` and keeps the previous completed `files` until
+   the replacement is available. It can push `changeset/contentChanged` for a
+   batched file snapshot, optionally including operations or error details,
+   followed by narrower `changeset/*` actions as files or operations change.
 4. The user invokes a `ChangesetOperation`. The client calls
    `invokeChangesetOperation`. The server applies the operation and
    emits any resulting changeset updates.

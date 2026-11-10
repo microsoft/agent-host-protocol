@@ -57,14 +57,14 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState,
-    TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
+    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
+    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
+    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
+    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
@@ -483,6 +483,14 @@ fn session_input_request_id(r: &SessionInputRequest) -> Option<&str> {
     }
 }
 
+fn background_work_id(w: &BackgroundWork) -> Option<&str> {
+    match w {
+        BackgroundWork::Shell(x) => Some(x.id.as_str()),
+        BackgroundWork::Subagent(x) => Some(x.id.as_str()),
+        BackgroundWork::Unknown(v) => v.get("id").and_then(serde_json::Value::as_str),
+    }
+}
+
 fn child_id_of(c: &ChildCustomization) -> Option<&str> {
     match c {
         ChildCustomization::Agent(x) => Some(x.id.as_str()),
@@ -556,6 +564,20 @@ fn apply_child_enablement(c: &mut ChildCustomization, enablement: &[Customizatio
     }
 }
 
+fn toggle_mcp_server_skill(
+    server: &mut McpServerCustomization,
+    id: &str,
+    enablement: &[CustomizationEnablement],
+) -> bool {
+    if let Some(skills) = server.children.as_mut() {
+        if let Some(skill) = skills.iter_mut().find(|skill| skill.id == id) {
+            skill.enabled = Some(effective_enablement(enablement));
+            return true;
+        }
+    }
+    false
+}
+
 fn apply_toggle(
     list: &mut [Customization],
     id: &str,
@@ -566,10 +588,23 @@ fn apply_toggle(
         return true;
     }
     for container in list.iter_mut() {
+        if let Customization::McpServer(server) = container {
+            if toggle_mcp_server_skill(server, id, enablement) {
+                return true;
+            }
+            continue;
+        }
         if let Some(children) = container_children_mut(container) {
             if let Some(child) = children.iter_mut().find(|c| child_id_of(c) == Some(id)) {
                 apply_child_enablement(child, enablement);
                 return true;
+            }
+            for child in children.iter_mut() {
+                if let ChildCustomization::McpServer(server) = child {
+                    if toggle_mcp_server_skill(server, id, enablement) {
+                        return true;
+                    }
+                }
             }
         }
     }
@@ -741,6 +776,9 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             if let Some(modified_at) = &a.changes.modified_at {
                 chat.modified_at = modified_at.clone();
             }
+            if let Some(changes) = &a.changes.changes {
+                chat.changes = Some(changes.clone());
+            }
             if let Some(origin) = &a.changes.origin {
                 chat.origin = Some(origin.clone());
             }
@@ -751,6 +789,30 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         }
         StateAction::SessionDefaultChatChanged(a) => {
             state.default_chat = a.default_chat.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionChatsReordered(a) => {
+            let unique: std::collections::HashSet<&str> =
+                a.chats.iter().map(String::as_str).collect();
+            if a.chats.len() != state.chats.len() || unique.len() != state.chats.len() {
+                return ReduceOutcome::NoOp;
+            }
+            if a.chats
+                .iter()
+                .zip(&state.chats)
+                .all(|(resource, summary)| resource == &summary.resource)
+            {
+                return ReduceOutcome::NoOp;
+            }
+            let mut reordered = Vec::with_capacity(a.chats.len());
+            for resource in &a.chats {
+                let Some(summary) = state.chats.iter().find(|chat| &chat.resource == resource)
+                else {
+                    return ReduceOutcome::NoOp;
+                };
+                reordered.push(summary.clone());
+            }
+            state.chats = reordered;
             ReduceOutcome::Applied
         }
         StateAction::SessionTitleChanged(a) => {
@@ -970,9 +1032,21 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         StateAction::SessionMcpServerStartRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
-            McpServerState::Starting(McpServerStartingState {}),
+            McpServerState::Starting(McpServerStartingState { blocking: None }),
             None,
         ),
+        StateAction::SessionMcpServerBackgroundRequested(a) => {
+            let Some(m) = find_mcp_server_customization_mut(state, &a.id) else {
+                return ReduceOutcome::NoOp;
+            };
+            match &mut m.state {
+                McpServerState::Starting(s) if s.blocking == Some(true) => {
+                    s.blocking = Some(false);
+                    ReduceOutcome::Applied
+                }
+                _ => ReduceOutcome::NoOp,
+            }
+        }
         StateAction::SessionMcpServerStopRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
@@ -989,34 +1063,40 @@ fn update_mcp_server_customization_state(
     next_state: McpServerState,
     channel: Option<String>,
 ) -> ReduceOutcome {
-    let Some(list) = state.customizations.as_mut() else {
+    let Some(m) = find_mcp_server_customization_mut(state, id) else {
         return ReduceOutcome::NoOp;
     };
+    m.state = next_state;
+    m.channel = channel;
+    ReduceOutcome::Applied
+}
+
+/// Locate the [`McpServerCustomization`] with `id`, searching the top-level
+/// list first and then every container's children. Returns `None` when no
+/// entry matches or the id targets a non-MCP customization.
+fn find_mcp_server_customization_mut<'a>(
+    state: &'a mut SessionState,
+    id: &str,
+) -> Option<&'a mut McpServerCustomization> {
+    let list = state.customizations.as_mut()?;
     if let Some(idx) = list.iter().position(|c| customization_id(c) == Some(id)) {
-        match &mut list[idx] {
-            Customization::McpServer(m) => {
-                m.state = next_state;
-                m.channel = channel;
-                return ReduceOutcome::Applied;
-            }
-            // Top-level entry exists but isn't an MCP server: no-op.
-            _ => return ReduceOutcome::NoOp,
-        }
+        return match &mut list[idx] {
+            Customization::McpServer(m) => Some(&mut **m),
+            _ => None,
+        };
     }
     for container in list.iter_mut() {
         let Some(children) = container_children_mut(container) else {
             continue;
         };
         if let Some(idx) = children.iter().position(|c| child_id_of(c) == Some(id)) {
-            if let ChildCustomization::McpServer(m) = &mut children[idx] {
-                m.state = next_state;
-                m.channel = channel;
-                return ReduceOutcome::Applied;
-            }
-            return ReduceOutcome::NoOp;
+            return match &mut children[idx] {
+                ChildCustomization::McpServer(m) => Some(&mut **m),
+                _ => None,
+            };
         }
     }
-    ReduceOutcome::NoOp
+    None
 }
 
 // ─── Chat Reducer ─────────────────────────────────────────────────────
@@ -1106,8 +1186,44 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.activity = a.activity.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatBackgroundWorkSet(a) => {
+            let Some(action_id) = background_work_id(&a.work) else {
+                return ReduceOutcome::NoOp;
+            };
+            let list = state.background_work.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|w| background_work_id(w) == Some(action_id))
+            {
+                list[idx] = a.work.clone();
+            } else {
+                list.push(a.work.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatBackgroundWorkRemoved(a) => {
+            let Some(list) = state.background_work.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list
+                .iter()
+                .position(|w| background_work_id(w) == Some(a.id.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatMovableChanged(a) => {
+            state.movable = Some(a.movable);
+            ReduceOutcome::Applied
+        }
         StateAction::ChatChangesetsChanged(a) => {
             state.changesets = a.changesets.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatCanvasesChanged(a) => {
+            state.canvases = a.canvases.clone();
             ReduceOutcome::Applied
         }
         StateAction::ChatWorkingDirectorySet(a) => {
@@ -1208,6 +1324,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         StateAction::ChatReasoning(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
             if let ResponsePart::Reasoning(r) = p {
                 r.content.push_str(&a.content);
+                if let Some(started_at) = &a.started_at {
+                    r.started_at = Some(started_at.clone());
+                }
+                if let Some(duration) = a.duration {
+                    r.duration = Some(duration);
+                }
             }
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
@@ -1263,65 +1385,63 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         StateAction::ChatPendingMessageSet(a) => {
             let entry = PendingMessage {
                 id: a.id.clone(),
+                kind: Some(a.kind),
                 message: a.message.clone(),
             };
-            match &a.kind {
-                PendingMessageKind::Steering => {
-                    state.steering_message = Some(entry);
-                }
-                PendingMessageKind::Queued => {
-                    let list = state.queued_messages.get_or_insert_with(Vec::new);
-                    if let Some(idx) = list.iter().position(|m| m.id == entry.id) {
-                        list[idx] = entry;
-                    } else {
-                        list.push(entry);
-                    }
-                }
+            if a.kind == PendingMessageKind::Steering {
+                state.steering_message = Some(entry.clone());
+            } else if state.steering_message.as_ref().map(|m| &m.id) == Some(&a.id) {
+                state.steering_message = None;
+            }
+            let list = state.queued_messages.get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|m| m.id == entry.id) {
+                list[idx] = entry;
+            } else {
+                list.push(entry);
             }
             ReduceOutcome::Applied
         }
-        StateAction::ChatPendingMessageRemoved(a) => match a.kind {
-            PendingMessageKind::Steering => match &state.steering_message {
-                Some(m) if m.id == a.id => {
-                    state.steering_message = None;
-                    ReduceOutcome::Applied
-                }
-                _ => ReduceOutcome::NoOp,
-            },
-            PendingMessageKind::Queued => {
-                let Some(list) = state.queued_messages.as_mut() else {
-                    return ReduceOutcome::NoOp;
-                };
-                let before = list.len();
-                list.retain(|m| m.id != a.id);
-                if list.len() == before {
-                    return ReduceOutcome::NoOp;
-                }
-                if list.is_empty() {
-                    state.queued_messages = None;
-                }
-                ReduceOutcome::Applied
+        StateAction::ChatPendingMessageRemoved(a) => {
+            let mut outcome = ReduceOutcome::NoOp;
+            if a.kind == PendingMessageKind::Steering
+                && state.steering_message.as_ref().map(|m| &m.id) == Some(&a.id)
+            {
+                state.steering_message = None;
+                outcome = ReduceOutcome::Applied;
             }
-        },
+            let Some(list) = state.queued_messages.as_mut() else {
+                return outcome;
+            };
+            let Some(idx) = list.iter().position(|m| {
+                m.id == a.id && m.kind.unwrap_or(PendingMessageKind::Queued) == a.kind
+            }) else {
+                return outcome;
+            };
+            list.remove(idx);
+            if list.is_empty() {
+                state.queued_messages = None;
+            }
+            ReduceOutcome::Applied
+        }
         StateAction::ChatQueuedMessagesReordered(a) => {
             let Some(list) = state.queued_messages.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
+            let original_order: Vec<String> = list.iter().map(|m| m.id.clone()).collect();
             let mut by_id: HashMap<String, PendingMessage> =
                 list.drain(..).map(|m| (m.id.clone(), m)).collect();
             let mut reordered: Vec<PendingMessage> = Vec::with_capacity(by_id.len());
-            let mut seen: std::collections::HashSet<String> = Default::default();
             for id in &a.order {
                 if let Some(msg) = by_id.remove(id) {
-                    if seen.insert(id.clone()) {
-                        reordered.push(msg);
-                    }
+                    reordered.push(msg);
                 }
             }
-            // Append any remaining messages in their original iteration order.
-            let mut leftover: Vec<PendingMessage> = by_id.into_values().collect();
-            leftover.sort_by(|a, b| a.id.cmp(&b.id));
-            reordered.extend(leftover);
+            // Append unmentioned IDs in the shared list's original order.
+            for id in original_order {
+                if let Some(msg) = by_id.remove(&id) {
+                    reordered.push(msg);
+                }
+            }
             *list = reordered;
             ReduceOutcome::Applied
         }
@@ -1329,8 +1449,40 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.draft = a.draft.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatIsReadChanged(a) => {
+            state.status = with_status_flag(state.status, SessionStatus::IsRead, a.is_read);
+            ReduceOutcome::Applied
+        }
         StateAction::ChatIsArchivedChanged(a) => {
             state.status = with_status_flag(state.status, SessionStatus::IsArchived, a.is_archived);
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatConfigChanged(a) => {
+            let config = state.config.get_or_insert_with(|| ChatConfigState {
+                schema: None,
+                values: Default::default(),
+            });
+            if a.replace.unwrap_or(false) {
+                config.values = a.config.clone();
+            } else {
+                for (k, v) in &a.config {
+                    config.values.insert(k.clone(), v.clone());
+                }
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatMoved(a) => {
+            state.provider = a.provider.clone();
+            match state.config.as_mut() {
+                Some(config) => config.schema = a.schema.clone(),
+                None if a.schema.is_some() => {
+                    state.config = Some(ChatConfigState {
+                        schema: a.schema.clone(),
+                        values: Default::default(),
+                    });
+                }
+                None => {}
+            }
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,
@@ -1589,6 +1741,7 @@ fn apply_tool_call_complete(
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
                 structured_content: a.result.structured_content.clone(),
+                result_metadata: a.result.result_metadata.clone(),
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
@@ -1607,6 +1760,7 @@ fn apply_tool_call_complete(
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
                 structured_content: a.result.structured_content.clone(),
+                result_metadata: a.result.result_metadata.clone(),
                 error: a.result.error.clone(),
                 confirmed,
                 selected_option,
@@ -1637,6 +1791,7 @@ fn apply_tool_call_result_confirmed(
                 past_tense_message: s.past_tense_message,
                 content: s.content,
                 structured_content: s.structured_content,
+                result_metadata: s.result_metadata,
                 error: s.error,
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
@@ -1788,6 +1943,17 @@ fn apply_input_answer_changed(
         req.answers = None;
     }
     ReduceOutcome::Applied
+}
+
+/// Apply a [`StateAction`] to a [`CanvasState`] in place.
+pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::CanvasStateChanged(a) => {
+            *state = a.canvas.clone();
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
 }
 
 // ─── Terminal Reducer ─────────────────────────────────────────────────
@@ -2208,11 +2374,17 @@ mod tests {
             title: String::new(),
             status: SessionStatus::Idle.bits(),
             activity: None,
+            background_work: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
+            changes: None,
             origin: None,
+            movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
             changesets: None,
+            canvases: None,
+            config: None,
             turns: Vec::new(),
             turns_next_cursor: None,
             active_turn: None,
@@ -2366,8 +2538,11 @@ mod tests {
             status: SessionStatus::Idle.bits(),
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
+            changes: None,
             origin: None,
+            movable: None,
             interactivity: None,
+            provider: None,
             working_directories: None,
         };
         let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {
@@ -2626,6 +2801,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_chat,
+                    &file_name,
+                    description,
+                ),
+                "canvas" => run_fixture::<CanvasState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_canvas,
                     &file_name,
                     description,
                 ),

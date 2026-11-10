@@ -16,6 +16,8 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
+import { isBitsetEnum } from './enum-compatibility.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,10 +32,15 @@ interface JsonSchema {
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   items?: JsonSchema;
+  contains?: JsonSchema;
+  minContains?: number;
+  maxContains?: number;
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
   minItems?: number;
+  maximum?: number;
+  minLength?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -52,9 +59,7 @@ function normalizeDescription(text: string): string {
 }
 
 function getPropertyDescription(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return normalizeDescription(jsDocs[0].getDescription());
+  return getDocumentation(prop);
 }
 
 function hasPropertyTag(prop: PropertySignature, tagName: string): boolean {
@@ -79,10 +84,45 @@ function getNumericPropertyTag(prop: PropertySignature, tagName: string): number
   return value;
 }
 
+function getUniqueItemsByConstraints(prop: PropertySignature): JsonSchema[] | undefined {
+  const tag = prop.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .find(candidate => candidate.getTagName() === 'uniqueItemsBy');
+  if (!tag) return undefined;
+
+  const key = tag.getCommentText()?.trim();
+  const itemType = prop.getType().getNonNullableType().getArrayElementType();
+  if (!key || !itemType) {
+    throw new Error(
+      `${prop.getSourceFile().getFilePath()}: ${prop.getName()} requires an array and a discriminant for @uniqueItemsBy`,
+    );
+  }
+  const variants = itemType.isUnion() ? itemType.getUnionTypes() : [itemType];
+  const values = variants.map(variant => {
+    const discriminant = variant.getProperty(key);
+    const value = discriminant?.getTypeAtLocation(prop).getLiteralValue();
+    if (!discriminant || discriminant.isOptional() || (typeof value !== 'string' && typeof value !== 'number')) {
+      throw new Error(
+        `${prop.getSourceFile().getFilePath()}: ${prop.getName()} @uniqueItemsBy ${key} requires a required literal discriminant on every array variant`,
+      );
+    }
+    return value;
+  });
+
+  // uniqueItems compares whole objects; count each discriminant instead.
+  return [...new Set(values)].map(value => ({
+    contains: {
+      type: 'object',
+      properties: { [key]: { const: value } },
+      required: [key],
+    },
+    minContains: 0,
+    maxContains: 1,
+  }));
+}
+
 function getInterfaceDescription(node: InterfaceDeclaration): string {
-  const jsDocs = node.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return normalizeDescription(jsDocs[0].getDescription());
+  return getDocumentation(node);
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -115,18 +155,31 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
   return undefined;
 }
 
-// A whole `const enum` → a JSON Schema `enum` of its members' evaluated values.
-// ts-morph evaluates const-enum initializers (including bitwise expressions like
-// `(1 << 3) | (1 << 4)`), so numeric flag enums resolve to concrete numbers.
+// Bitsets use the same uint32 wire form as the native clients, allowing flag
+// combinations and unknown bits. Other enums list their evaluated values.
 function enumToSchema(en: EnumDeclaration): JsonSchema {
   const values = en.getMembers().map(m => m.getValue());
   const defined = values.filter((v): v is string | number => v !== undefined);
-  const schema: JsonSchema = { enum: defined };
-  if (defined.every(v => typeof v === 'string')) schema.type = 'string';
-  else if (defined.every(v => typeof v === 'number')) schema.type = 'number';
   const rawDesc = en.getJsDocs()[0]?.getDescription();
   const desc = rawDesc ? normalizeDescription(rawDesc) : '';
-  if (desc) schema.description = desc;
+  const isNumeric = values.every(v => typeof v === 'number');
+  const isBitset = isBitsetEnum(en);
+  const schema: JsonSchema = isBitset
+    ? { type: 'integer', minimum: 0, maximum: 0xffff_ffff }
+    : { enum: defined };
+  if (!isBitset) {
+    if (defined.every(v => typeof v === 'string')) schema.type = 'string';
+    else if (isNumeric) schema.type = 'number';
+  }
+  if (isBitset) {
+    const flags = en.getMembers().map(member => {
+      const description = normalizeDescription(getDocumentation(member));
+      return `- \`${member.getName()}\` (${member.getValue()})${description ? `: ${description}` : ''}`;
+    });
+    schema.description = [desc, 'Known flags:', flags.join('\n')].filter(Boolean).join('\n\n');
+  } else if (desc) {
+    schema.description = desc;
+  }
   return schema;
 }
 
@@ -223,11 +276,11 @@ function typeTextToSchema(typeText: string, project: Project, _depth = 0): JsonS
   // field) yields a single part equal to the input — it must fall through to the
   // inline-object / reference handling below rather than re-expanding forever.
   // A union type-alias's printed text can also carry a leading `|`
-  // (`type X =\n  | A\n  | B`), which makes splitUnionType yield an empty first
-  // element; dropping empties (and `undefined`) keeps us from emitting a
-  // matches-anything `{}` branch that breaks strict `oneOf` validation.
+  // (`type X =\n  | A\n  | B`); splitUnionType drops empty parts, and filtering
+  // `undefined` here avoids matches-anything `{}` branches that break strict
+  // `oneOf` validation.
   if (cleaned.includes('|') && !cleaned.startsWith("'")) {
-    const parts = splitUnionType(cleaned).filter(p => p !== 'undefined' && p !== '');
+    const parts = splitUnionType(cleaned).filter(p => p !== 'undefined');
     if (parts.length > 1) {
       return {
         oneOf: parts.map(p => typeTextToSchema(p, project, _depth + 1)),
@@ -274,7 +327,7 @@ function splitUnionType(typeText: string): string[] {
     if (char === '<' || char === '(' || char === '{' || char === '[') depth++;
     else if (char === '>' || char === ')' || char === '}' || char === ']') depth--;
     else if (char === '|' && depth === 0) {
-      parts.push(current.trim());
+      if (current.trim()) parts.push(current.trim());
       current = '';
       continue;
     }
@@ -368,14 +421,29 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
       }
       propSchema.type = 'integer';
     }
-    const minimum = getNumericPropertyTag(prop, 'minimum');
-    if (minimum !== undefined) {
-      if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+    for (const constraint of ['minimum', 'maximum'] as const) {
+      const value = getNumericPropertyTag(prop, constraint);
+      if (value !== undefined) {
+        if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+          throw new Error(
+            `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+          );
+        }
+        propSchema[constraint] = value;
+      }
+    }
+    const minLength = getNumericPropertyTag(prop, 'minLength');
+    if (minLength !== undefined) {
+      if (propSchema.type !== 'string' || !Number.isInteger(minLength) || minLength < 0) {
         throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+          `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @minLength on ${typeText}`,
         );
       }
-      propSchema.minimum = minimum;
+      propSchema.minLength = minLength;
+    }
+    const uniqueItemsBy = getUniqueItemsByConstraints(prop);
+    if (uniqueItemsBy) {
+      propSchema.allOf = uniqueItemsBy;
     }
     const minItems = getNumericPropertyTag(prop, 'minItems');
     if (minItems !== undefined) {
@@ -568,6 +636,20 @@ function generateCommandsSchema(project: Project): JsonSchema {
     schema.$defs![name] = interfaceToSchema(iface, project);
   }
 
+  // Add command type aliases (e.g. ChatSource and ChatMoveDestination).
+  for (const commandSf of findProtocolSourceFiles(project, 'commands.ts')) {
+    for (const ta of commandSf.getTypeAliases()) {
+      const name = ta.getName();
+      const typeText = ta.getTypeNode()?.getText() || '';
+      schema.$defs![name] = typeTextToSchema(typeText, project);
+      const rawDesc = ta.getJsDocs()[0]?.getDescription();
+      const desc = rawDesc ? normalizeDescription(rawDesc) : '';
+      if (desc) {
+        schema.$defs![name].description = desc;
+      }
+    }
+  }
+
   // Add referenced types from state.ts and actions.ts
   for (const file of ['state.ts', 'actions.ts']) {
     const ifaces = collectInterfacesFromFile(project, file);
@@ -665,6 +747,7 @@ function collectRefTargets(node: JsonSchema | undefined, acc: Set<string>): void
     if (m) acc.add(m[1]);
   }
   if (node.items) collectRefTargets(node.items, acc);
+  if (node.contains) collectRefTargets(node.contains, acc);
   if (node.additionalProperties && typeof node.additionalProperties === 'object') {
     collectRefTargets(node.additionalProperties as JsonSchema, acc);
   }

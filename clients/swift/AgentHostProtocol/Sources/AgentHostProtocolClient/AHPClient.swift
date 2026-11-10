@@ -322,9 +322,9 @@ public actor AHPClient {
         _ = try await requestRaw(method: "ping", paramsData: paramsData)
     }
 
-    /// Subscribe to a channel URI. Returns the subscribe result (whose
-    /// `snapshot` is `nil` for stateless channels) and a fresh stream of
-    /// subsequent events.
+    /// Subscribe to a channel URI. Returns the subscribe result and a fresh
+    /// stream of subsequent events. The result's `snapshot` is `nil` with
+    /// windowed delivery, and from older hosts for channels with no state.
     ///
     /// If the request fails (RPC error, timeout, transport drop), the local
     /// listener is removed and its stream finished — callers don't need to

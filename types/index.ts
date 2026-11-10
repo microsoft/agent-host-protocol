@@ -10,6 +10,7 @@
 export * from './state.js';
 export * from './actions.js';
 export * from './action-origin.generated.js';
+export * from './window-exempt.generated.js';
 export * from './commands.js';
 export * from './notifications.js';
 export * from './messages.js';
@@ -25,6 +26,7 @@ export {
   rootReducer,
   sessionReducer,
   chatReducer,
+  canvasReducer,
   terminalReducer,
   changesetReducer,
   annotationsReducer,

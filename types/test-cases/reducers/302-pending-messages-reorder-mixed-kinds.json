@@ -1,0 +1,39 @@
+{
+  "description": "mixed pending reorder covers both kinds and preserves unmentioned IDs in raw order",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "q1", "message": { "text": "Old queue 1", "origin": { "kind": "user" } } },
+      { "id": "s1", "kind": "steering", "message": { "text": "Steering 1", "origin": { "kind": "user" } } },
+      { "id": "q2", "kind": "queued", "message": { "text": "Queue 2", "origin": { "kind": "user" } } },
+      { "id": "s2", "kind": "steering", "message": { "text": "Steering 2", "origin": { "kind": "user" } } },
+      { "id": "q3", "kind": "queued", "message": { "text": "Queue 3", "origin": { "kind": "user" } } },
+      { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/queuedMessagesReordered", "order": ["q2", "s2", "q2", "unknown", "q1"] }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "q2", "kind": "queued", "message": { "text": "Queue 2", "origin": { "kind": "user" } } },
+      { "id": "s2", "kind": "steering", "message": { "text": "Steering 2", "origin": { "kind": "user" } } },
+      { "id": "q1", "message": { "text": "Old queue 1", "origin": { "kind": "user" } } },
+      { "id": "s1", "kind": "steering", "message": { "text": "Steering 1", "origin": { "kind": "user" } } },
+      { "id": "q3", "kind": "queued", "message": { "text": "Queue 3", "origin": { "kind": "user" } } },
+      { "id": "s3", "kind": "steering", "message": { "text": "Steering 3", "origin": { "kind": "user" } } }
+    ]
+  }
+}

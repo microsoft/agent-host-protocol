@@ -1,0 +1,30 @@
+{
+  "description": "canvas/stateChanged clears the previous URL when the source becomes unavailable",
+  "reducer": "canvas",
+  "initial": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "canvasId": "preview",
+    "title": "Preview",
+    "url": "https://example.test/live"
+  },
+  "actions": [
+    {
+      "type": "canvas/stateChanged",
+      "canvas": {
+        "instanceId": "preview-1",
+        "extensionId": "project:preview",
+        "canvasId": "preview",
+        "title": "Preview",
+        "status": "Reconnecting"
+      }
+    }
+  ],
+  "expected": {
+    "instanceId": "preview-1",
+    "extensionId": "project:preview",
+    "canvasId": "preview",
+    "title": "Preview",
+    "status": "Reconnecting"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "description": "toolCallReady replaces typed edit previews and preserves them when omitted",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {"text":"Edit files","origin":{"kind":"user"}},
+      "responseParts": [{
+        "kind": "toolCall",
+        "toolCall": {
+          "status": "pending-confirmation",
+          "toolCallId": "tc-1",
+          "toolName": "edit",
+          "displayName": "Edit",
+          "intention": null,
+          "contributor": null,
+          "_meta": null,
+          "invocationMessage": "Review old preview",
+          "toolInput": null,
+          "confirmationTitle": null,
+          "edits": {"items":[{"after":{"uri":"file:///workspace/old.txt","content":{"uri":"ahp-content:/old"}}}]}
+        }
+      }],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Review new preview",
+      "edits": {"items":[{"after":{"uri":"file:///workspace/new.txt","content":{"uri":"ahp-content:/new"}},"diff":{}}]}
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Review retained preview"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {"text":"Edit files","origin":{"kind":"user"}},
+      "responseParts": [{
+        "kind": "toolCall",
+        "toolCall": {
+          "status": "pending-confirmation",
+          "toolCallId": "tc-1",
+          "toolName": "edit",
+          "displayName": "Edit",
+          "intention": null,
+          "contributor": null,
+          "_meta": null,
+          "invocationMessage": "Review retained preview",
+          "toolInput": null,
+          "confirmationTitle": null,
+          "riskAssessment": null,
+          "edits": {"items":[{"after":{"uri":"file:///workspace/new.txt","content":{"uri":"ahp-content:/new"}},"diff":{}}]},
+          "editable": null
+        }
+      }],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

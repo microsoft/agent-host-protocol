@@ -20,7 +20,7 @@ public sealed class HostsTests
     private static Task RunFakeServerAsync(MemTransport serverSide, CancellationToken ct) =>
         FakeHost.New()
             .OnInitialize((req, side, c) => FakeHost.RespondResultAsync(
-                side, req.Id, new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() }, c))
+                side, req.Id, new InitializeResult { ProtocolVersion = ProtocolVersion.Supported[0], Snapshots = new() }, c))
             .RunAsync(serverSide, ct);
 
     // ── Single host handshake ─────────────────────────────────────────────
@@ -44,7 +44,7 @@ public sealed class HostsTests
         await using var disposeMulti = multi;
 
         Assert.Equal(HostStateKind.Connected, handle.State.Kind);
-        Assert.Equal(ProtocolVersion.Current, handle.ProtocolVersion);
+        Assert.Equal(ProtocolVersion.Supported[0], handle.ProtocolVersion);
         Assert.False(string.IsNullOrEmpty(handle.ClientId),
             "ClientID should be auto-generated and non-empty");
         _ = serverTask; // referenced to avoid unused-variable warning

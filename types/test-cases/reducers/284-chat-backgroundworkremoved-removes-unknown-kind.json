@@ -1,0 +1,49 @@
+{
+  "description": "background work of an unknown kind is removed by id",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "shell",
+        "id": "shell-1",
+        "label": "Run tests",
+        "command": "npm test",
+        "startedAt": "2026-09-25T00:00:00.000Z"
+      },
+      {
+        "kind": "futureKind",
+        "id": "future-1",
+        "label": "Review changes",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "target": "reviewer"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/backgroundWorkRemoved",
+      "id": "future-1"
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "shell",
+        "id": "shell-1",
+        "label": "Run tests",
+        "command": "npm test",
+        "startedAt": "2026-09-25T00:00:00.000Z"
+      }
+    ]
+  }
+}

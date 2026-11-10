@@ -41,6 +41,10 @@ applyTo: 'types/**/*.ts'
   values (clients preserve unknown raw values), and `@exhaustive` only when an
   unknown value is invalid and clients must reject it. The generators validate
   this contract and use it for both raw enums and discriminated unions.
+- Numeric flag enums MUST carry `@bitset` in their main JSDoc block. Members
+  must be unsigned 32-bit integers; combinations and unknown bits remain valid
+  wire values. Generators use this tag, not description prose, to identify
+  bitsets and include each named flag's value and documentation in JSON Schema.
 - For actions or commands that could be implemented by returning an array `T[]` directly, still prefer to wrap it in `{ items: T[] }` for forward compatibility. This allows adding additional fields later without breaking the shape.
 - Naming discriminants for discriminated unions:
   - Lifecycle / state-machine unions: name the union `Foo*State` and its discriminant enum `Foo*Status`. Variant interfaces are `Foo*State` (e.g. `ToolCallState` + `ToolCallStatus` + `ToolCallStreamingState`; `McpServerState` + `McpServerStatus` + `McpServerStartingState`; `CustomizationLoadState` + `CustomizationLoadStatus`).
@@ -67,6 +71,7 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | Toolchain | Image | Notes |
 | --- | --- | --- |
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
+| .NET SDK 10 (.NET client) | `mcr.microsoft.com/dotnet/sdk:10.0` | Supports `.slnx`; the test host rolls forward from .NET 8. |
 
 Mount the **repo root** (the shared conformance fixtures under `types/test-cases/` are resolved by walking up from the working directory, so a client-dir-only mount fails) and keep build caches out of `$HOME`. Example — run the Kotlin client's tests:
 

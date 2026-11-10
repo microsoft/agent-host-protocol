@@ -65,7 +65,7 @@ public sealed class TypesRoundTripFixtures
             string.IsNullOrWhiteSpace(ProtocolVersion.Current),
             "ProtocolVersion.Current must be non-empty");
         Assert.NotEmpty(ProtocolVersion.Supported);
-        Assert.Equal(ProtocolVersion.Current, ProtocolVersion.Supported[0]);
+        Assert.Equal(new[] { "1.0.0", "0.9.0" }, ProtocolVersion.Supported);
     }
 
     // ── Verifier ──────────────────────────────────────────────────────────
@@ -166,10 +166,6 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<InitializeResult>(inputJson));
             case "InitializeParams":
                 return Wrap(Ser.Deserialize<InitializeParams>(inputJson));
-            case "SubscribeResult":
-                return Wrap(Ser.Deserialize<SubscribeResult>(inputJson));
-            case "ReconnectResult":
-                return Wrap(Ser.Deserialize<ReconnectResult>(inputJson));
             case "ListSessionsResult":
                 return Wrap(Ser.Deserialize<ListSessionsResult>(inputJson));
             case "SessionSummaryChangedParams":
@@ -180,8 +176,34 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<ResolveSessionConfigParams>(inputJson));
             case "SessionConfigCompletionsParams":
                 return Wrap(Ser.Deserialize<SessionConfigCompletionsParams>(inputJson));
+            case "CreateChatParams":
+                return Wrap(Ser.Deserialize<CreateChatParams>(inputJson));
             case "Snapshot":
                 return Wrap(Ser.Deserialize<Snapshot>(inputJson));
+            case "SubscribeParams":
+                return Wrap(Ser.Deserialize<SubscribeParams>(inputJson));
+            case "SubscribeResult":
+                return Wrap(Ser.Deserialize<SubscribeResult>(inputJson));
+            case "ReconnectResult":
+                return Wrap(Ser.Deserialize<ReconnectResult>(inputJson));
+            case "ChannelFrameParams":
+                return Wrap(Ser.Deserialize<ChannelFrameParams>(inputJson));
+            case "ChannelCreditParams":
+                return Wrap(Ser.Deserialize<ChannelCreditParams>(inputJson));
+            case "ReconnectParams":
+                return Wrap(Ser.Deserialize<ReconnectParams>(inputJson));
+            case "TcpDataParams":
+                return Wrap(Ser.Deserialize<TcpDataParams>(inputJson));
+            case "TcpEofParams":
+                return Wrap(Ser.Deserialize<TcpEofParams>(inputJson));
+            case "TcpResetParams":
+                return Wrap(Ser.Deserialize<TcpResetParams>(inputJson));
+            case "CreateTcpConnectionParams":
+                return Wrap(Ser.Deserialize<CreateTcpConnectionParams>(inputJson));
+            case "ResourceReadParams":
+                return Wrap(Ser.Deserialize<ResourceReadParams>(inputJson));
+            case "ResourceReadResult":
+                return Wrap(Ser.Deserialize<ResourceReadResult>(inputJson));
             default:
                 throw new Xunit.Sdk.XunitException(
                     $"round-trip fixture: unknown wire type \"{type}\". "

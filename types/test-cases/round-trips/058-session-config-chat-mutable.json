@@ -1,0 +1,84 @@
+{
+  "name": "session-config-chat-mutable",
+  "group": "A",
+  "description": "SessionConfigPropertySchema.chatMutable marks a session config property that may be set per chat with chat/configChanged. A set flag survives a decode/re-encode cycle and an absent flag stays absent.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "state": {
+      "provider": "copilot",
+      "title": "Session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "autoApprove": {
+              "type": "boolean",
+              "title": "Auto-approve tools",
+              "sessionMutable": true,
+              "chatMutable": true
+            },
+            "mode": {
+              "type": "string",
+              "title": "Mode",
+              "enum": [
+                "agent",
+                "plan"
+              ],
+              "sessionMutable": true
+            }
+          }
+        },
+        "values": {
+          "autoApprove": false,
+          "mode": "agent"
+        }
+      }
+    },
+    "fromSeq": 5
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "state": {
+        "provider": "copilot",
+        "title": "Session",
+        "status": 1,
+        "lifecycle": "ready",
+        "activeClients": [],
+        "chats": [],
+        "config": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "autoApprove": {
+                "type": "boolean",
+                "title": "Auto-approve tools",
+                "sessionMutable": true,
+                "chatMutable": true
+              },
+              "mode": {
+                "type": "string",
+                "title": "Mode",
+                "enum": [
+                  "agent",
+                  "plan"
+                ],
+                "sessionMutable": true
+              }
+            }
+          },
+          "values": {
+            "autoApprove": false,
+            "mode": "agent"
+          }
+        }
+      },
+      "fromSeq": 5
+    }
+  ]
+}

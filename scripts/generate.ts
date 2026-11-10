@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { generateMarkdownDocs } from './generate-markdown.js';
 import { generateJsonSchemas } from './generate-json-schema.js';
 import { generateActionOrigin } from './generate-action-origin.js';
+import { generateWindowExempt } from './read-window-exempt.js';
 import { generateSwiftPackage } from './generate-swift.js';
 import { generateRustCrate } from './generate-rust.js';
 import { generateKotlinPackage } from './generate-kotlin.js';
@@ -86,6 +87,8 @@ if (generateAll || actionOriginOnly) {
   console.log('Generating action origin types...');
   generateActionOrigin(project, TYPES_DIR);
   console.log(`  → action-origin.generated.ts written to ${path.relative(ROOT, TYPES_DIR)}/`);
+  generateWindowExempt(project, TYPES_DIR);
+  console.log(`  → window-exempt.generated.ts written to ${path.relative(ROOT, TYPES_DIR)}/`);
 }
 
 if (generateAll || swiftOnly) {

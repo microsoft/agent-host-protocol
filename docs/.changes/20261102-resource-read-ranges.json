@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional `ResourceReadParams.position` and `ResourceReadParams.length` request a byte range from `resourceRead`, and optional `ResourceReadResult.size` reports the total size of the resource when the receiver honored the range. A result without `size` is the whole resource, and a ranged `utf-8` result does not split a UTF-8 sequence.",
+  "issues": [554]
+}

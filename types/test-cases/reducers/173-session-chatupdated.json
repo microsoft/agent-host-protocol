@@ -26,7 +26,12 @@
       "changes": {
         "status": 24,
         "activity": "Waiting for approval",
-        "modifiedAt": "1970-01-01T00:00:02.000Z"
+        "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "changes": {
+          "additions": 12,
+          "deletions": 3,
+          "files": 2
+        }
       }
     }
   ],
@@ -43,6 +48,11 @@
         "status": 24,
         "activity": "Waiting for approval",
         "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "changes": {
+          "additions": 12,
+          "deletions": 3,
+          "files": 2
+        },
         "origin": {
           "kind": "user"
         }

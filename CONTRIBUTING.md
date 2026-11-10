@@ -48,6 +48,25 @@ cd clients/go && go test ./...
 cd clients/dotnet && dotnet test
 ```
 
+### Documentation theme
+
+The site and homepage notebook share light/dark palette tokens in
+[`docs/.vitepress/theme/custom.css`](docs/.vitepress/theme/custom.css).
+Use those `--nb-*` semantic tokens in demo components and their `--vp-*`
+aliases for documentation surfaces, rather than hard-coding light colors.
+VitePress owns the theme switch and persisted preference.
+
+For theme or notebook changes, run the focused tests and documentation build:
+
+```bash
+npx tsx --test scripts/site-theme.test.ts scripts/homepage-*.test.ts
+npm run generate:docs
+npx vitepress build docs
+```
+
+Check the homepage's chat, automation, terminal and channel chapters as well as
+guide/specification/reference pages, search, and mobile navigation in both modes.
+
 ## Releases
 
 Release mechanics — tag conventions, per-client publish flows, CI guards,

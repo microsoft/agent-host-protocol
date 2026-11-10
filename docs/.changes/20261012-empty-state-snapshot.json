@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`EmptyState` variant of `Snapshot.state` for channels whose state has no fields, such as telemetry. Every experimental windowed subscription starts with `channel/snapshot`."
+}

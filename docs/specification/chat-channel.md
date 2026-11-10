@@ -10,13 +10,30 @@ A chat channel carries the full state of a single conversation thread: turns, st
 ahp-chat:/<uuid>
 ```
 
-The path is a server-unique identifier (typically a UUID) allocated by the server when the chat is created. The owning session URI is **not** encoded in the chat URI — the relationship is expressed via the session's [`chats`](/reference/session#sessionstate) catalog and each chat's [`origin`](/reference/chat#chatorigin).
+The path is a server-unique identifier allocated by the server when the chat is
+created. Clients MUST treat the full URI as opaque. A host MAY encode owning
+session identity in the path for routing or storage, but ownership is
+authoritatively expressed by the session's
+[`chats`](/reference/session#sessionstate) catalog and creation provenance by
+each chat's [`origin`](/reference/chat#chatorigin).
 
 Multiple chat channels may be active simultaneously. Clients subscribe to each chat whose state they want to track.
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue and the chat's own [`config`](#per-chat-configuration). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+
+Clients mark any known chat, including the owning session's default chat, as
+read or unread by dispatching
+[`chat/isReadChanged`](/reference/chat#actions) on that chat's channel. The
+action toggles `SessionStatus.IsRead` only on the addressed `ChatState`; it
+does not change the read state of the owning session or sibling chats. The host
+echoes the accepted action in server order and keeps the corresponding
+`ChatSummary.status` synchronized through `session/chatUpdated` and the
+matching compact `SessionChatSummary.status` projection synchronized through
+`root/sessionSummaryChanged`.
+`session/isReadChanged` independently changes the owning session's read state;
+neither action implies the other.
 
 When a client subscribes with `view.turns`, the server MAY expose only a tail of
 the most recent completed turns in the initial snapshot. The requested number is
@@ -32,6 +49,16 @@ Hosts MUST also eagerly load older turns into state before applying any
 operation that references a turn outside the currently loaded window (for
 example, a fork, side-chat source, chat attachment, or truncation targeting an
 older turn).
+
+### Reasoning timing
+
+[`ReasoningResponsePart`](/reference/chat#reasoningresponsepart) may include a producer-recorded `startedAt` timestamp and a final `duration` in non-negative integer milliseconds. Timing is optional: an absent duration means unfinished or unknown, not zero. Clients MUST treat a supplied duration as producer-owned data rather than measuring replay, subtracting their local clock from `startedAt`, or substituting a minimum display value into stored state.
+
+The measured unit is one contiguous run of reasoning output, not an SDK block, assistant message, or UI group. It starts at the first nonempty reasoning text and ends when the next markdown or tool-call part begins, or when the turn terminates. Consecutive reasoning pieces belong to the same part even when the provider changes its internal reasoning ID or completes an SDK message. Sideband notifications and metadata do not end the run.
+
+For example, `tool -> reasoning (5s) -> markdown -> reasoning (12s) -> tool` has two reasoning parts with durations `5000` and `12000`, not one duration of `17000`. Hosts SHOULD preserve the run identities and intervening content when restoring history, even if the provider's transcript stores an aggregated message. Clients that group progress should retain access to each run's duration rather than substituting a group total.
+
+The host can publish timing with the initial `chat/responsePart` or update it through `chat/reasoning`. A timing-only update uses an empty `content`; omitted timing fields preserve their previous values. The host MUST send final timing before the turn's terminal action and SHOULD retain the same timing when restoring history, so subscriptions, reconnects and reloads show consistent values. Unknown historical or interrupted intervals remain untimed unless the producer has an authoritative measurement; time while a host is stopped is not reasoning time.
 
 ### Drafts
 
@@ -59,10 +86,44 @@ itself changes, the server dispatches
 [`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
 fully replaces the catalogue or clears it when `changesets` is absent.
 
+### Per-chat configuration
+
+[`ChatState.config`](/reference/chat#chatstate) holds the chat's own values for
+the [`chatMutable`](/reference/session#sessionconfigpropertyschema) properties
+of its effective schema. For a chat without its own `config.schema`, other
+properties are session-wide and come from the session's config; a chat with its
+own `config.schema` does not use the session's config. The host sets the initial `values` when it creates the chat,
+and when the session has a config, it sets `config` on every chat. A chat's
+`values` change only through `chat/configChanged` on the chat; they do not
+inherit from the session. A key missing
+from `values` takes that property's `default`.
+
+The effective schema is `config.schema` when present, otherwise the session's
+schema. Hosts set `config.schema`, the chat's own schema for its `chatMutable`
+properties, only for a chat whose `provider` differs from the session's.
+
+Clients change a chat's `chatMutable` properties by dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
+which merges into `values` or replaces them when `replace` is `true`. Hosts
+reject keys that are not `chatMutable` in the effective schema.
+
+### Chat providers
+
+Every chat is backed by one agent. `SessionState.provider` is the session's
+agent, and [`ChatSummary.provider`](/reference/chat#chatsummary) names a chat's
+agent when it differs; absence means the session's agent. A chat's agent never
+changes, but `provider` is relative to its session, so `chat/moved` may set or
+clear it.
+
+Hosts that advertise
+[`multipleChatProviders`](/reference/common#initializeresult) accept a
+`provider` on `createChat`, letting one session mix agents. Forks and side
+chats continue the source chat's history, so they always use the source chat's
+agent.
+
 ## Relationship to the session channel
 
 - A chat's [`ChatSummary`](/reference/chat#chatsummary) appears in the session's [`SessionState.chats`](/reference/session#sessionstate) catalog. The session reducer keeps that catalog in sync with the underlying chat lifecycle.
-- The session may also expose [`defaultChat`](/reference/session#sessionstate) as a UI routing hint for input that is addressed to the session as a whole. This is advisory only — chats remain equal peers at the protocol level.
+- The session may also expose [`defaultChat`](/reference/session#sessionstate) as a UI routing hint for input that is addressed to the session as a whole. Every chat remains directly addressable.
 - Session-level fields such as [`status`](/reference/session#sessionsummary), `activity`, and `modifiedAt` are aggregates derived from the session's chats. See the [Session Channel specification](./session-channel#chat-aggregation) for the derivation rules.
 
 ## Lifecycle
@@ -79,6 +140,8 @@ fully replaces the catalogue or clears it when `changesets` is absent.
 
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
+- a `title` containing the client-selected initial display title for the target chat,
+- a `provider` selecting the chat's agent (see [Chat providers](#chat-providers)),
 - an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatSource`](/reference/chat#chatsource), either
   `{ kind: "fork", chat, turnId }` or `{ kind: "sideChat", chat, turnId }`,
@@ -138,16 +201,96 @@ Each chat advertises how it came into existence via [`ChatOrigin`](/reference/ch
 | `sideChat` | Created as an independent side conversation using context through a specific source turn — payload references the source chat URI and stable source `turnId`, which may have been active or historical when the chat was created, and MAY retain an immutable `selection` snapshot captured at create acceptance. |
 | `tool` | Spawned by a tool call running in another chat — payload references the source chat URI and tool call id (e.g. a sub-agent delegation). |
 
-Clients MAY use the origin to render contextual UI (parent indicators, fork markers, "spawned by tool" badges), but origin is **not** a hierarchy — every chat is equally addressable.
+Clients MAY use the origin to render creation-provenance UI (fork markers,
+"spawned by tool" badges). Origin does not expose any host-internal hierarchy;
+every chat remains directly addressable.
 
 A tool-spawned worker is described from both ends of the same edge. The worker chat carries the canonical record via its `tool` origin (the spawning chat URI and tool call id). The spawning tool call surfaces the same relationship forward through a [`ToolResultSubagentContent`](/reference/chat#toolresultsubagentcontent) block in its result, whose `resource` is the worker **chat** URI (`ahp-chat:/<cid>`, not a session URI). The tool call that emits that block is the one named by the worker chat's `origin.toolCallId`; hosts MUST keep the two consistent.
 
-#### Ancestry and nesting depth
+#### Provenance after a move
 
-A `fork`, `sideChat`, or `tool` origin names only the chat's **immediate** source chat (by URI), together with the turn or tool call that produced it. A chat's ancestry is therefore not stored directly; it is the chain you reconstruct by following `origin.chat` from one chat to the next. Because a tool-spawned chat can itself run tools that spawn further chats, these chains can be arbitrarily deep.
+A `fork`, `sideChat`, or `tool` origin permanently names the chat that created
+it, together with the turn or tool call that produced it. `moveChat` never
+rewrites this provenance. Moving a chat preserves its URI; a historical
+`origin.chat` may stop resolving only if the referenced chat is later pruned.
 
-- **No protocol-imposed depth limit.** AHP does not cap nesting depth or fan-out, and the wire carries no depth counter or maximum-depth field. Any bound is a host policy decision that the protocol neither enforces nor advertises; hosts SHOULD guard against runaway recursion or unbounded fan-out on their side.
-- **Ancestry is advisory and may be incomplete.** Every chat is a flat, equally-addressable peer in the session's [`chats`](/reference/session#sessionstate) catalog — `origin` is a rendering hint, not a structural parent link. A source chat MAY be pruned (`session/chatRemoved`) while a chat it spawned lives on, so an `origin.chat` URI is not guaranteed to resolve. Clients reconstructing ancestry MUST tolerate missing references and SHOULD guard against cycles and unbounded depth (for example, by capping how deep they walk or render).
+### Moving chats
+
+[`moveChat`](/reference/chat#movechat) atomically changes a chat's owning
+session or its position in the current session's ordered chat catalog. The
+source is the chat URI in `params.channel`. Its destination is one of:
+
+- `{ kind: "session", session, after? }` — move into an existing session, or
+  reorder within the current session. `after` places the requested chat
+  immediately after another chat in that session; absence places it first.
+- `{ kind: "newSession" }` — allocate a session, transfer the source hierarchy,
+  and make the source the new session's `defaultChat`.
+
+When `session` is the current owning session, only the requested public catalog
+entry is repositioned. When ownership changes, the requested chat and its
+complete host-managed descendant hierarchy transfer together. AHP does not
+expose that hierarchy.
+
+The host exposes eligibility through `ChatState.movable` and
+`ChatSummary.movable`; absence means `false`. Clients MUST only offer or invoke
+`moveChat` for a chat that advertises `movable: true`. The chat referenced by
+its owning session's `defaultChat` MUST NOT advertise `movable: true`.
+Default status does not constrain catalog position: another movable chat may be
+placed before or after the default chat, and the default chat may be an `after`
+anchor. Hosts publish `chat/movableChanged` and the corresponding
+`session/chatUpdated` when eligibility changes.
+
+```json
+{
+  "session": "ahp-session:/destination"
+}
+```
+
+The result always reports the authoritative destination session. Every moved
+chat keeps its URI, state, and byte-for-byte `ChatOrigin`, so existing
+chat-channel subscriptions remain valid.
+
+#### Validation
+
+At minimum, the source MUST exist and advertise `movable: true`; the destination
+session and optional `after` chat MUST resolve; the anchor MUST belong to the
+destination session; and the source MUST NOT anchor itself. Hosts MAY reject
+unsupported destinations or transient source conditions. Failure has no
+observable effect on ownership or catalog order.
+
+Success preserves every moved chat URI, state, and origin, and converges the
+durable session catalogs. The protocol does not require provider equality,
+prohibit active turns universally, or otherwise expose host-specific storage
+and runtime constraints.
+
+A moved chat keeps its agent. After the move the host reports `provider` on the
+chat whenever it differs from the destination session's provider, including
+when the chat had none because it matched its old session. Hosts MAY refuse, as
+an unsupported destination, a move they cannot support.
+
+A moved chat's `config.values` move with it unchanged. If a move changes whether
+the chat needs its own `config.schema`, the host sets or clears it, or refuses
+the move as an unsupported destination. After a cross-session move the host
+dispatches [`chat/moved`](/reference/chat#chatmovedaction) on the chat's channel
+with its new session, `provider` and `config.schema`.
+
+#### Atomic synchronization
+
+The host validates and persists ownership, its internal hierarchy, catalog
+order, and default-chat state before publishing synchronization actions:
+
+1. Cross-session moves use `session/chatRemoved` and `session/chatAdded` for
+   every transferred catalog entry.
+2. Ordering changes use `session/chatsReordered`, whose `chats` field is the
+   complete authoritative resulting URI order.
+3. Root notifications add a newly allocated session and update affected
+   `SessionSummary.chats` catalogs.
+
+These messages describe a transaction that is already committed; their delivery
+does not define atomicity. Clients observing only a subset of channels reconcile
+from snapshots. After an uncertain `newSession` response, clients SHOULD
+reconcile root and session state rather than blindly retrying anonymous
+allocation.
 
 ### Pulling a chat into another chat
 
@@ -270,29 +413,50 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | `chat/inputAnswerChanged`                  | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action                                                                  |
 | `chat/inputCompleted`                      | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                  |
 | `chat/inputCompleted`                      | `response` is `'accept'` but required questions do not have submitted answers                                              | Server SHOULD reject the action                                                                  |
-| `chat/pendingMessageRemoved`               | No pending message with matching `id` and `kind`                                                                           | Server SHOULD reject the action                                                                  |
+| `chat/pendingMessageRemoved`               | No pending message with matching `id` and effective kind (an absent list-entry kind means `'queued'`)                      | Server SHOULD reject the action; the reducer is a no-op                                           |
+| `chat/configChanged`                       | A changed property is not `chatMutable` in the session's config schema                                                     | Server SHOULD reject the action                                                                  |
 
 ## Pending Message Consumption
 
-Pending messages live on the chat, not the session. The consumption rules mirror the legacy session behavior:
+Pending messages live on the chat, not the session. `ChatState.queuedMessages` is one shared list containing both steering and queued input. Its name is historical: not every entry starts a future turn. Each `PendingMessage` has an optional `kind: PendingMessageKind`; absence means `'queued'` for entries read from old queued-message snapshots.
+
+### Shared List Mutations and Ordering
+
+Both kinds use the existing `chat/pendingMessageSet`, `chat/pendingMessageRemoved`, and `chat/queuedMessagesReordered` actions:
+
+- **Set** stores the action's `id`, `kind`, and full `message` in `queuedMessages`. A new ID appends; an existing ID replaces the entry in its current position, including when its kind changes. A later submission with a different ID MUST NOT replace an earlier one. IDs MUST be unique across the shared list, not just within a kind.
+- **Remove** deletes an entry only when its ID and effective kind match the action. Unknown IDs and mismatched kinds are reducer no-ops. An omitted entry kind is treated as `'queued'`, so a steering removal cannot delete an old queued entry.
+- **Reorder** applies to the entire shared array, including both kinds. Unknown and duplicate IDs in `order` are ignored. Entries not mentioned in `order` are appended in their original relative order.
+- **Turn consumption** via `chat/turnStarted.queuedMessageId` removes the matching entry regardless of kind.
+
+The raw array follows host acceptance order unless explicitly reordered; it does not encode consumption priority. UIs SHOULD display steering messages before queued messages, preserving the relative array order within each group. Clients MUST NOT reorder synchronized state merely to produce this display grouping. For example, raw `[q1, s1, q2, s2]` displays as `[s1, s2]` followed by `[q1, q2]`, but remains `[q1, s1, q2, s2]` in state. Snapshots and replay preserve raw order.
 
 ### Queued Messages
 
-When a turn completes and `queuedMessages` is non-empty, the server SHOULD:
+When a turn completes and the shared list contains queued messages, the server SHOULD:
 
-1. Dispatch `chat/pendingMessageRemoved` with `kind: 'queued'` for the first queued message.
+1. Select the first entry whose effective kind is `'queued'`, skipping steering entries, and dispatch `chat/pendingMessageRemoved` with `kind: 'queued'`.
 2. Dispatch `chat/turnStarted` with the queued message's `message` and `queuedMessageId` set to the message's `id`.
 
 When a queued message is added while the chat is idle (no active turn), the server SHOULD immediately consume it using the same two-step sequence.
 
 ### Steering Messages
 
-When a turn is active and `steeringMessages` is non-empty, the server MAY consume steering messages at its discretion. To consume a steering message, the server:
+Steering entries have `kind: 'steering'` in the shared `queuedMessages` list. When a turn is active, the host MAY inject pending steering at its discretion. A later submission MUST NOT implicitly consume an earlier one. After consumption, the host dispatches `chat/pendingMessageRemoved` with that ID and `kind: 'steering'`, or `chat/turnStarted` with that `queuedMessageId` when consumption is represented as a new presentation turn. Both remove only the matching entry from the list. Providers MAY batch delivery internally without collapsing submission identities.
 
-1. Dispatches `chat/pendingMessageRemoved` with `kind: 'steering'`.
-2. Injects the message content into the model context (the injection mechanism is opaque to the protocol).
+Transport or SDK acceptance is not necessarily model consumption. A host MUST NOT report consumption solely because a different steering message arrived. Pending messages are retained while idle and may be consumed when a turn becomes active. If delivery fails terminally, the host SHOULD surface the failure and remove the affected entry rather than leave it pending indefinitely.
 
-Steering messages added while idle are silently stored and consumed when a turn becomes active.
+An accepted set action is not a promise that subsequently changing or removing the entry can retract provider input. Hosts MUST reject edits or client removals that they can no longer honor after handoff. Repeated identical upserts MUST NOT cause duplicate provider delivery.
+
+### Legacy Steering Compatibility
+
+Protocol 1.1.0 keeps `ChatState.steeringMessage` synchronized for 1.0.0 clients that use the singleton. Each steering set replaces this compatibility slot with the set entry while independently upserting the shared list. Older clients therefore retain their latest-message view; the list remains authoritative for clients that support multiple outstanding steering messages.
+
+There is no new capability, enqueue flag, separate steering list, or steering-specific action family. To append input, use a new ID with `chat/pendingMessageSet`; to edit or change the kind of an existing entry, reuse its ID. Hosts must update their pending-input handling, and clients must update their reducers, display grouping, cancellation kinds, and reorder requests. Native SDK consumers must also update affected model construction; in particular, Rust `PendingMessage` struct literals now include `kind: Option<PendingMessageKind>`.
+
+The deprecated singleton is cleared by a matching steering removal, matching `chat/turnStarted.queuedMessageId`, or a set that changes the same ID to queued input. Other removals and reordering leave it unchanged. Clearing the slot does not promote an older list entry into it. These compatibility mutations do not remove other shared-list entries.
+
+New clients MUST deduplicate the singleton against the shared list by ID, using the list entry and its kind when present. A singleton-only entry from an old snapshot remains steering input even if its `kind` is absent. Old queued snapshots continue to default missing kinds to `'queued'`. The singleton preserves the legacy latest-message view, not the full multi-message experience; clients must understand entry kinds before treating the mixed list as queued follow-ups.
 
 ## Actions
 

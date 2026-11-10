@@ -152,7 +152,7 @@ public sealed class HostStreamDropTagTests
                 if (msg.Request?.Method == "initialize")
                     await FakeHost.RespondResultAsync(
                         serverSide, msg.Request.Id,
-                        new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() },
+                        new InitializeResult { ProtocolVersion = ProtocolVersion.Supported[0], Snapshots = new() },
                         ct).ConfigureAwait(false);
             }
         }

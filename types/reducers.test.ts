@@ -21,6 +21,7 @@ import {
   rootReducer,
   sessionReducer,
   chatReducer,
+  canvasReducer,
   terminalReducer,
   changesetReducer,
   annotationsReducer,
@@ -31,11 +32,15 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
+  CustomizationType,
+  McpServerStatus,
   SessionStatus,
+  SessionLifecycle,
   TurnState,
   MessageKind,
+  PendingMessageKind,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -52,6 +57,7 @@ function readChannelSources(baseName: string): string {
     'channels-root',
     'channels-session',
     'channels-chat',
+    'channels-canvas',
     'channels-terminal',
     'channels-changeset',
     'channels-annotations',
@@ -73,11 +79,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | CanvasState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -119,6 +125,8 @@ describe('reducer fixtures', () => {
           state = rootReducer(state as RootState, action as any);
         } else if (fixture.reducer === 'chat') {
           state = chatReducer(state as ChatState, action as any);
+        } else if (fixture.reducer === 'canvas') {
+          state = canvasReducer(state as CanvasState, action as any);
         } else if (fixture.reducer === 'terminal') {
           state = terminalReducer(state as TerminalState, action as any);
         } else if (fixture.reducer === 'changeset') {
@@ -138,6 +146,123 @@ describe('reducer fixtures', () => {
       assert.deepStrictEqual(state, fixture.expected);
     });
   }
+});
+
+describe('session/customizationToggled identity', () => {
+  const skill = {
+    type: CustomizationType.Skill,
+    id: 'mcp-skill',
+    uri: 'mcp://server/skills/lint',
+    name: 'lint',
+    enabled: false,
+  } as const;
+
+  for (const children of [undefined, [], [skill]]) {
+    for (const nested of [false, true]) {
+      it(`preserves state for an unknown skill id with ${children?.length ?? 'absent'} MCP children (${nested ? 'nested' : 'top-level'})`, () => {
+        const server = {
+          type: CustomizationType.McpServer,
+          id: 'server',
+          uri: 'https://mcp.example/server',
+          name: 'Server',
+          state: { kind: McpServerStatus.Ready },
+          ...(children ? { children } : {}),
+        } as const;
+        const state: SessionState = {
+          provider: 'copilot',
+          title: 'Test Session',
+          status: SessionStatus.Idle,
+          lifecycle: SessionLifecycle.Ready,
+          activeClients: [],
+          chats: [],
+          customizations: [
+            { type: CustomizationType.Plugin, id: 'unparsed', uri: 'file:///unparsed', name: 'Unparsed' },
+            { type: CustomizationType.Plugin, id: 'empty', uri: 'file:///empty', name: 'Empty', children: [] },
+            nested ? { type: CustomizationType.Plugin, id: 'plugin', uri: 'file:///plugin', name: 'Plugin', children: [server] } : server,
+          ],
+        };
+        assert.strictEqual(sessionReducer(state, {
+          type: ActionType.SessionCustomizationToggled,
+          id: 'unknown',
+          enablement: [],
+        }), state);
+      });
+    }
+  }
+});
+
+describe('pending message identity', () => {
+  const message = { text: 'Pending', origin: { kind: MessageKind.User } } as const;
+  const empty: ChatState = {
+    resource: 'ahp-chat:/pending',
+    title: 'Pending',
+    status: SessionStatus.Idle,
+    modifiedAt: '2026-10-14T00:00:00.000Z',
+    turns: [],
+  };
+  const mixed: ChatState = {
+    ...empty,
+    steeringMessage: { id: 'legacy', message },
+    queuedMessages: [
+      { id: 'old', message },
+      { id: 'q', kind: PendingMessageKind.Queued, message },
+      { id: 's', kind: PendingMessageKind.Steering, message },
+    ],
+  };
+
+  it('returns the original state for unknown IDs or mismatched effective kinds', () => {
+    for (const state of [empty, { ...empty, queuedMessages: [] }, mixed]) {
+      for (const [id, kind] of [
+        ['unknown', PendingMessageKind.Queued],
+        ['unknown', PendingMessageKind.Steering],
+        ['legacy', PendingMessageKind.Queued],
+        ['old', PendingMessageKind.Steering],
+        ['q', PendingMessageKind.Steering],
+        ['s', PendingMessageKind.Queued],
+      ] as const) {
+        assert.strictEqual(chatReducer(state, {
+          type: ActionType.ChatPendingMessageRemoved,
+          id,
+          kind,
+        }), state);
+      }
+    }
+  });
+
+  it('does not mutate the shared list when setting, reordering or removing entries', () => {
+    const original = structuredClone(mixed);
+    const updated = chatReducer(mixed, {
+      type: ActionType.ChatPendingMessageSet,
+      id: 'q',
+      kind: PendingMessageKind.Steering,
+      message: { ...message, text: 'Updated' },
+    });
+    const beforeReorder = structuredClone(updated);
+    const reordered = chatReducer(updated, {
+      type: ActionType.ChatQueuedMessagesReordered,
+      order: ['s', 'q'],
+    });
+    const beforeRemoval = structuredClone(reordered);
+    const removed = chatReducer(reordered, {
+      type: ActionType.ChatPendingMessageRemoved,
+      id: 'q',
+      kind: PendingMessageKind.Steering,
+    });
+    assert.deepStrictEqual({
+      original: mixed,
+      beforeReorder: updated,
+      beforeRemoval: reordered,
+      remaining: removed.queuedMessages,
+    }, {
+      original,
+      beforeReorder,
+      beforeRemoval,
+      remaining: [
+        { id: 's', kind: PendingMessageKind.Steering, message },
+        { id: 'old', message },
+      ],
+    });
+  });
 });
 
 // ─── IS_CLIENT_DISPATCHABLE validation ───────────────────────────────────────
@@ -209,6 +334,49 @@ describe('isClientDispatchable', () => {
   it('returns false for server-only actions', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
     assert.equal(isClientDispatchable(action), false);
+  });
+});
+
+describe('chat read state scoping', () => {
+  it('changes the default chat without changing its owning session or sibling chat', () => {
+    const defaultChat: ChatState = {
+      resource: 'ahp-chat:/default',
+      title: 'Default Chat',
+      status: SessionStatus.Idle,
+      modifiedAt: '2026-10-02T00:00:00.000Z',
+      turns: [],
+    };
+    const siblingChat: ChatState = {
+      resource: 'ahp-chat:/sibling',
+      title: 'Sibling Chat',
+      status: SessionStatus.Idle,
+      modifiedAt: '2026-10-02T00:00:00.000Z',
+      turns: [],
+    };
+    const session: SessionState = {
+      provider: 'copilot',
+      title: 'Session',
+      status: SessionStatus.Idle | SessionStatus.IsRead,
+      lifecycle: SessionLifecycle.Ready,
+      activeClients: [],
+      chats: [defaultChat, siblingChat],
+      defaultChat: defaultChat.resource,
+    };
+
+    const updatedDefaultChat = chatReducer(defaultChat, {
+      type: ActionType.ChatIsReadChanged,
+      isRead: true,
+    });
+
+    assert.deepStrictEqual({
+      defaultChatStatus: updatedDefaultChat.status,
+      owningSessionStatus: session.status,
+      siblingChatStatus: siblingChat.status,
+    }, {
+      defaultChatStatus: SessionStatus.Idle | SessionStatus.IsRead,
+      owningSessionStatus: SessionStatus.Idle | SessionStatus.IsRead,
+      siblingChatStatus: SessionStatus.Idle,
+    });
   });
 });
 

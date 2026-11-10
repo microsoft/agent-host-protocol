@@ -1,0 +1,46 @@
+{
+  "description": "chat/moved without provider or schema clears both and preserves the chat's config values",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "provider": "other-agent",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      },
+      "values": {
+        "autoApprove": true
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/moved",
+      "session": "ahp-session:/s1"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "config": {
+      "values": {
+        "autoApprove": true
+      }
+    }
+  }
+}

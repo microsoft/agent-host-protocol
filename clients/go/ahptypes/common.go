@@ -81,6 +81,8 @@ type PartialChatSummary struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt *string `json:"modifiedAt,omitempty"`
+	// Aggregate summary of file changes associated with this chat
+	Changes *ChangesSummary `json:"changes,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// The subset of the session's working directories this chat uses.

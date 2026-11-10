@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Experimental windowed subscriptions count every data notification against the window, whether sent whole or in `channel/frame` fragments. Fragments carry messages larger than `maximumFrameBytes` and let subscriptions share the connection."
+}

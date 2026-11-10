@@ -391,6 +391,7 @@ async fn automation_capabilities_are_exposed_and_survive_reconnect() {
         schedules: None,
         run_cancellation: None,
         run_history_limit: Some(25),
+        customizations: None,
     };
     let drop_after_init = Arc::new(AtomicBool::new(false));
     let return_replay = Arc::new(Mutex::new(true));

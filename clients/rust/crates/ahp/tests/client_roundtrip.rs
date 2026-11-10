@@ -278,6 +278,8 @@ async fn resource_read_send_wrapper_targets_root_channel() {
             meta: None,
             uri: "ahp-resource:/notes.txt".into(),
             encoding: None,
+            position: None,
+            length: None,
         })
         .await
         .expect("resource_read");
@@ -441,6 +443,7 @@ async fn inbound_resource_request_routes_to_typed_handler() {
                 data: "server-data".into(),
                 encoding: ContentEncoding::Utf8,
                 content_type: None,
+                size: None,
             })
         },
     ));

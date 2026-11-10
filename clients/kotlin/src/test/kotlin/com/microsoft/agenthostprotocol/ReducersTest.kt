@@ -151,7 +151,7 @@ class ReducersTest {
     }
 
     @Test
-    fun `pendingMessageSet upserts steering and queued messages distinctly`() {
+    fun `pendingMessageSet upserts both kinds in one list`() {
         val chat = newChat()
         val setSteering = StateActionChatPendingMessageSet(
             ChatPendingMessageSetAction(
@@ -162,8 +162,11 @@ class ReducersTest {
             ),
         )
         val withSteering = chatReducer(chat, setSteering)
-        assertEquals("s1", withSteering.steeringMessage?.id)
-        assertNull(withSteering.queuedMessages)
+        assertEquals(
+            listOf(PendingMessage(id = "s1", kind = PendingMessageKind.STEERING, message = userMessage("steer"))),
+            withSteering.queuedMessages,
+        )
+        assertEquals(withSteering.queuedMessages?.first(), withSteering.steeringMessage)
 
         val setQueued1 = StateActionChatPendingMessageSet(
             ChatPendingMessageSetAction(
@@ -182,7 +185,7 @@ class ReducersTest {
             ),
         )
         val withTwo = chatReducer(chatReducer(withSteering, setQueued1), setQueued2)
-        assertEquals(listOf("q1", "q2"), withTwo.queuedMessages?.map { it.id })
+        assertEquals(listOf("s1", "q1", "q2"), withTwo.queuedMessages?.map { it.id })
 
         // Re-setting q1 with a new body should replace in place rather than append.
         val replaceQueued1 = StateActionChatPendingMessageSet(
@@ -194,8 +197,41 @@ class ReducersTest {
             ),
         )
         val withReplacement = chatReducer(withTwo, replaceQueued1)
-        assertEquals(listOf("q1", "q2"), withReplacement.queuedMessages?.map { it.id })
-        assertEquals("q-1-revised", withReplacement.queuedMessages?.first()?.message?.text)
+        assertEquals(
+            listOf(
+                PendingMessage(id = "s1", kind = PendingMessageKind.STEERING, message = userMessage("steer")),
+                PendingMessage(id = "q1", kind = PendingMessageKind.QUEUED, message = userMessage("q-1-revised")),
+                PendingMessage(id = "q2", kind = PendingMessageKind.QUEUED, message = userMessage("q-2")),
+            ),
+            withReplacement.queuedMessages,
+        )
+    }
+
+    @Test
+    fun `pending removal preserves identity when the effective kind does not match`() {
+        val chat = newChat().copy(
+            queuedMessages = listOf(
+                PendingMessage(id = "old", message = userMessage("old queue")),
+                PendingMessage(id = "q", kind = PendingMessageKind.QUEUED, message = userMessage("queue")),
+                PendingMessage(id = "s", kind = PendingMessageKind.STEERING, message = userMessage("steer")),
+            ),
+        )
+        for ((id, kind) in listOf(
+            "old" to PendingMessageKind.STEERING,
+            "q" to PendingMessageKind.STEERING,
+            "s" to PendingMessageKind.QUEUED,
+            "unknown" to PendingMessageKind.STEERING,
+        )) {
+            assertSame(
+                chat,
+                chatReducer(
+                    chat,
+                    StateActionChatPendingMessageRemoved(
+                        ChatPendingMessageRemovedAction(type = ActionType.CHAT_PENDING_MESSAGE_REMOVED, id = id, kind = kind),
+                    ),
+                ),
+            )
+        }
     }
 
     @Test

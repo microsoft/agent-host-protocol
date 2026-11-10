@@ -140,4 +140,4 @@ pub use notifications::{
     AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
 };
 pub use state::{Icon, ProtectedResourceMetadata, RootState, SessionState, TerminalState};
-pub use version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS};
+pub use version::{negotiate_protocol_version, PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS};

@@ -1,0 +1,18 @@
+{
+  "name": "changeset-target-resource-nonce",
+  "group": "A",
+  "description": "A resource target preserves an optional opaque nonce without requiring it on legacy targets.",
+  "type": "ChangesetOperationTarget",
+  "input": {
+    "kind": "resource",
+    "resource": "file:///a.txt",
+    "nonce": "opaque-resource-change"
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "resource",
+      "resource": "file:///a.txt",
+      "nonce": "opaque-resource-change"
+    }
+  ]
+}

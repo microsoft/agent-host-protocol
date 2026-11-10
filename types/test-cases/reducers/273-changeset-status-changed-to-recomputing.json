@@ -1,0 +1,18 @@
+{
+  "description": "changeset/statusChanged distinguishes recomputing a cached empty result from initial computation",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": []
+  },
+  "actions": [
+    {
+      "type": "changeset/statusChanged",
+      "status": "recomputing"
+    }
+  ],
+  "expected": {
+    "status": "recomputing",
+    "files": []
+  }
+}

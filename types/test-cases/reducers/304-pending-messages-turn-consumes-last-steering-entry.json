@@ -1,0 +1,40 @@
+{
+  "description": "turn started consumes the last pending steering entry and matching legacy snapshot slot",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "a", "message": { "text": "Legacy A", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "a", "kind": "steering", "message": { "text": "A", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-a",
+      "startedAt": "2026-10-08T00:01:00.000Z",
+      "queuedMessageId": "a",
+      "message": { "text": "A", "origin": { "kind": "user" } }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 8,
+    "modifiedAt": "2026-10-08T00:01:00.000Z",
+    "turns": [],
+    "steeringMessage": null,
+    "queuedMessages": null,
+    "activeTurn": {
+      "id": "turn-a",
+      "startedAt": "2026-10-08T00:01:00.000Z",
+      "message": { "text": "A", "origin": { "kind": "user" } },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}
