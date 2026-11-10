@@ -41,6 +41,10 @@ applyTo: 'types/**/*.ts'
   values (clients preserve unknown raw values), and `@exhaustive` only when an
   unknown value is invalid and clients must reject it. The generators validate
   this contract and use it for both raw enums and discriminated unions.
+- Numeric flag enums MUST carry `@bitset` in their main JSDoc block. Members
+  must be unsigned 32-bit integers; combinations and unknown bits remain valid
+  wire values. Generators use this tag, not description prose, to identify
+  bitsets and include each named flag's value and documentation in JSON Schema.
 - For actions or commands that could be implemented by returning an array `T[]` directly, still prefer to wrap it in `{ items: T[] }` for forward compatibility. This allows adding additional fields later without breaking the shape.
 - Naming discriminants for discriminated unions:
   - Lifecycle / state-machine unions: name the union `Foo*State` and its discriminant enum `Foo*Status`. Variant interfaces are `Foo*State` (e.g. `ToolCallState` + `ToolCallStatus` + `ToolCallStreamingState`; `McpServerState` + `McpServerStatus` + `McpServerStartingState`; `CustomizationLoadState` + `CustomizationLoadStatus`).

@@ -22,7 +22,7 @@
  *     plus a marker interface, with custom MarshalJSON / UnmarshalJSON
  *     methods. Unknown discriminator values surface as a
  *     `*<Name>Unknown` variant carrying the raw JSON.
- *   - Bitset enums (JSDoc starts with "Bitset") are emitted as a typed
+ *   - Bitset enums (`@bitset`) are emitted as a typed
  *     `uint32` with named flag constants plus `Has` / `Or` helpers, so
  *     unknown future bits round-trip losslessly.
  *   - The generator runs `gofmt -w` after writing to keep style stable
@@ -43,7 +43,7 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
-import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
+import { discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
   '// Generated from types/*.ts — do not edit.\n' +
@@ -423,13 +423,13 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 }
 
 /**
- * Bitset enum (numeric values, JSDoc tag "Bitset" or numeric values):
+ * Numeric enum, with flag helpers when annotated `@bitset`:
  *   type SessionStatus uint32
  *   const ( SessionStatusIdle SessionStatus = 1 ... )
  *   func (s SessionStatus) Has(other SessionStatus) bool
  *   func (s SessionStatus) Or(other SessionStatus) SessionStatus
  */
-function generateBitsetEnum(enumDecl: EnumDeclaration): string {
+function generateNumericEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
   const desc = getDocumentation(enumDecl);
@@ -444,20 +444,22 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
     lines.push(`\t${name}${memberName} ${name} = ${mem.getValue()}`);
   }
   lines.push(')');
-  lines.push('');
-  lines.push(`// Has reports whether every flag in other is also set in s.`);
-  lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
-  lines.push('');
-  lines.push(`// Or returns s combined with the flags in other.`);
-  lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  if (isBitsetEnum(enumDecl)) {
+    lines.push('');
+    lines.push(`// Has reports whether every flag in other is also set in s.`);
+    lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
+    lines.push('');
+    lines.push(`// Or returns s combined with the flags in other.`);
+    lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  }
   return lines.join('\n');
 }
 
-/** Choose between string-enum and bitset-enum emission. */
+/** Choose between string-enum and numeric-enum emission. */
 function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
-  return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
+  return isNumeric ? generateNumericEnum(enumDecl) : generateStringEnum(enumDecl);
 }
 
 // ─── Struct Generation ───────────────────────────────────────────────────────

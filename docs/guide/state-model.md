@@ -147,6 +147,13 @@ The `status` bitset encodes both the session's activity state and metadata flags
 
 Bits 0–4 encode mutually-exclusive **activity** status (exactly one is set at a time). Bits 5+ encode orthogonal **metadata** flags that may be combined with any activity status via bitwise OR.
 
+On the wire, `status` is an unsigned 32-bit integer (`0` through `4294967295`).
+The JSON Schema accepts this range rather than enumerating individual flags, so
+combined flags and unknown bits from newer protocol versions remain valid.
+Producers must still follow the activity and metadata rules above.
+The canonical enum is annotated `@bitset`; schema descriptions list each named
+flag's numeric value and meaning.
+
 Read state is scoped to the addressed channel. `chat/isReadChanged` changes any
 known chat, including a default chat, without changing its owning session or
 sibling chats. `session/isReadChanged` changes only the session's independent
