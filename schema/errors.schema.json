@@ -7179,7 +7179,7 @@
         },
         "accountId": {
           "type": "string",
-          "description": "Opaque client-local account-selection hint scoped to the originating client,\n`resource`, and optional `target`; stable across token renewals and distinct\nacross account, provider, or authorization-server changes.\nThis is unverified provenance, never authorization or cross-client identity;\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
+          "description": "Account selection hint provided by the client and scoped to 'resource' and optional 'target'. \nThis is not used for access/permission decisions and only serves as guidance for authentication strategies.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
           "minLength": 1
         }
       },

@@ -1887,10 +1887,8 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
     public var target: AuthenticateTarget?
-    /// Opaque client-local account-selection hint scoped to the originating client,
-    /// `resource`, and optional `target`; stable across token renewals and distinct
-    /// across account, provider, or authorization-server changes.
-    /// This is unverified provenance, never authorization or cross-client identity;
+    /// Account selection hint provided by the client and scoped to 'resource' and optional 'target'.
+    /// This is not used for access/permission decisions and only serves as guidance for authentication strategies.
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
     public var accountId: String?
 
