@@ -1325,6 +1325,12 @@ type AuthenticateParams struct {
 	// Without a target, resource/scope matching is unchanged; the token may
 	// satisfy every matching pending challenge. Older hosts ignore this field.
 	Target *AuthenticateTarget `json:"target,omitempty"`
+	// Opaque client-local account-selection hint scoped to the originating client,
+	// `resource`, and optional `target`; stable across token renewals and distinct
+	// across account, provider, or authorization-server changes.
+	// This is unverified provenance, never authorization or cross-client identity;
+	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+	AccountId *string `json:"accountId,omitempty"`
 }
 
 // Result of the `authenticate` command.

@@ -1710,6 +1710,13 @@ pub struct AuthenticateParams {
     /// satisfy every matching pending challenge. Older hosts ignore this field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<AuthenticateTarget>,
+    /// Opaque client-local account-selection hint scoped to the originating client,
+    /// `resource`, and optional `target`; stable across token renewals and distinct
+    /// across account, provider, or authorization-server changes.
+    /// This is unverified provenance, never authorization or cross-client identity;
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
 }
 
 /// Result of the `authenticate` command.

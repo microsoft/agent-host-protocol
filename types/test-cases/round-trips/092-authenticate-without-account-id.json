@@ -1,0 +1,18 @@
+{
+  "name": "authenticate-without-account-id",
+  "group": "A",
+  "description": "Legacy token delivery does not require or fabricate an account-selection hint.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "test-token"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.com",
+      "token": "test-token"
+    }
+  ]
+}

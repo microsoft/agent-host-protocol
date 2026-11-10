@@ -154,6 +154,34 @@ The RFC 9728 `resource` field identifies the protected resource, but not necessa
 
 The `target.kind` discriminant is extensible so future consumers, such as [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
 
+### Account selection hints
+
+Clients MAY include `accountId` alongside the token to identify their selected account. When present, it MUST be a nonempty, opaque string. It is a **client-local account-selection identifier**, not an issuer-defined subject, a verified identity, or an instruction for obtaining credentials.
+
+```jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "access_token",
+    "accountId": "client-selection-7"
+  }
+}
+```
+
+The comparison namespace is the originating logical AHP client (the `clientId` established during initialization and retained on reconnection), the exact protected `resource`, and the optional `target`. Hosts MUST NOT infer account equivalence from matching hints in different namespaces. Within a namespace, clients MUST keep the hint stable across renewals of the same selected account, including changes to the token, token lifetime, granted scopes, or local authentication-session identifier. A change of selected account, authentication provider, or authorization server MUST produce a different hint. Clients can encode a tuple of their provider-local account identifier and provider/issuer namespace; hosts MUST treat the resulting value as opaque rather than interpret its components.
+
+Clients SHOULD omit the hint when they cannot supply a stable identifier, and SHOULD avoid account labels, email addresses, token values, or token-derived identifiers. Omission retains ordinary token authentication and renewal behavior. An absent hint, including its appearance or disappearance between requests, is not evidence that the underlying account changed. An empty `token` still revokes the existing resource/target credential; `accountId` does not narrow revocation and SHOULD be omitted then.
+
+The hint is unverified client input. Hosts MUST continue validating tokens independently and MUST NOT use the hint to authorize access, establish credential-sharing equivalence between clients, or discard cooldowns associated with a verified account. A host MAY use a changed hint to select a separate bootstrap-verification context, so one selected account's cooldown does not unnecessarily delay verification of another selection. Token rotation alone MUST NOT reset throttling, and a new hint that resolves to an already rate-limited verified account MUST still respect that account's cooldown.
+
+This field is optional in both directions of version skew: older hosts ignore it, and newer hosts MUST continue accepting otherwise valid requests without it. No capability or protocol-version change is required, and general `_meta` extensibility is unchanged.
+
+This compatibility guarantee concerns the wire, not generated native-model ABI compatibility. SDK consumers should rebuild against the updated models: Rust `AuthenticateParams` struct literals must initialize `account_id` (`None` when omitted), and existing Kotlin data-class binaries must be recompiled because the constructor and `copy` signatures gain a parameter.
+
 ## Error Handling
 
 ### `AuthRequired` Error Code

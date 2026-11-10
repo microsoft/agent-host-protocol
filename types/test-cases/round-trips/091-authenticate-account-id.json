@@ -1,0 +1,26 @@
+{
+  "name": "authenticate-account-id",
+  "group": "A",
+  "description": "Authentication preserves an opaque client-local account selection alongside the token and unrelated metadata.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "test-token",
+    "accountId": "client-selection-7",
+    "expiresIn": 300,
+    "scopes": ["read"],
+    "_meta": { "example.extension": { "enabled": true } }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.com",
+      "token": "test-token",
+      "accountId": "client-selection-7",
+      "expiresIn": 300,
+      "scopes": ["read"],
+      "_meta": { "example.extension": { "enabled": true } }
+    }
+  ]
+}
