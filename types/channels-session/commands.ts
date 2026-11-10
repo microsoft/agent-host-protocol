@@ -84,8 +84,7 @@ export interface CreateSessionParams extends BaseParams {
   workingDirectories?: URI[];
   /**
    * Repositories to prepare instead of an explicit `workingDirectories` list.
-   *
-   * @minItems 1
+   * An empty list is equivalent to omission.
    */
   repositories?: RepositorySource[];
   /**

@@ -38,7 +38,6 @@ interface JsonSchema {
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
-  minItems?: number;
   maximum?: number;
   minLength?: number;
   oneOf?: JsonSchema[];
@@ -444,15 +443,6 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {
       propSchema.allOf = uniqueItemsBy;
-    }
-    const minItems = getNumericPropertyTag(prop, 'minItems');
-    if (minItems !== undefined) {
-      if (propSchema.type !== 'array' || !Number.isInteger(minItems) || minItems < 0) {
-        throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @minItems on ${typeText}`,
-        );
-      }
-      propSchema.minItems = minItems;
     }
     schema.properties![name] = propSchema;
     if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {

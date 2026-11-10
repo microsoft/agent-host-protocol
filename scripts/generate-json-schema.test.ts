@@ -166,7 +166,6 @@ function schemaAccepts(
       return value === null;
     case 'array':
       return Array.isArray(value) &&
-        (typeof schema.minItems !== 'number' || value.length >= schema.minItems) &&
         (!schema.items || value.every(item => schemaAccepts(root, schema.items as JsonNode, item)));
   }
 
@@ -423,7 +422,7 @@ describe('generated JSON schemas', () => {
         assert.equal(schemaAccepts(schema, configSchema, legacy), true);
       });
 
-      it('declares optional non-empty repository lists beside generic config', () => {
+      it('declares optional repository lists beside generic config', () => {
         if (file !== 'commands.schema.json') {
           return;
         }
@@ -439,11 +438,11 @@ describe('generated JSON schemas', () => {
             Object.keys(properties).filter(name => name.startsWith('repositor')),
             ['repositories'],
           );
-          assert.equal(properties.repositories.minItems, 1);
           const base = { channel, ...(definition === 'SessionConfigCompletionsParams' ? { property: 'mode' } : {}) };
           assert.equal(schemaAccepts(schema, defs[definition], base), true);
           const source = 'https://example.org/team/project.git';
           for (const repositories of [
+            [],
             [{ source }],
             [{ source, revision: 'refs/tags/v1.2.3' }],
             [{ source, subdirectory: 'packages/api' }],
@@ -452,7 +451,7 @@ describe('generated JSON schemas', () => {
             assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories, config: { mode: 'review' } }), true);
           }
           for (const repositories of [
-            [], null, {}, source, [null], [source], [{}],
+            null, {}, source, [null], [source], [{}],
             [{ revision: 'main' }], [{ source: 42 }], [{ source: null }],
             [{ source, revision: 42 }],
             [{ source, subdirectory: 42 }],

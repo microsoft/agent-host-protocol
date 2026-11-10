@@ -581,6 +581,7 @@ type CreateSessionParams struct {
 	// after the session has started.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Repositories to prepare instead of an explicit `workingDirectories` list.
+	// An empty list is equivalent to omission.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Agent-specific configuration values collected via `resolveSessionConfig`.
 	// Keys and values correspond to the schema returned by the server.
@@ -1414,7 +1415,7 @@ type ResolveSessionConfigParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Repositories used as configuration context.
+	// Repositories used as configuration context; an empty list is equivalent to omission.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values
 	Config map[string]json.RawMessage `json:"config,omitempty"`
@@ -1443,7 +1444,7 @@ type SessionConfigCompletionsParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Repositories used as configuration context.
+	// Repositories used as configuration context; an empty list is equivalent to omission.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values (provides context for the query)
 	Config map[string]json.RawMessage `json:"config,omitempty"`

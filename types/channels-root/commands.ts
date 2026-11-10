@@ -131,11 +131,7 @@ export interface ResolveSessionConfigParams extends BaseParams {
   provider?: string;
   /** Working directory for the session */
   workingDirectory?: URI;
-  /**
-   * Repositories used as configuration context.
-   *
-   * @minItems 1
-   */
+  /** Repositories used as configuration context; an empty list is equivalent to omission. */
   repositories?: RepositorySource[];
   /** Current user-filled configuration values */
   config?: Record<string, unknown>;
@@ -202,11 +198,7 @@ export interface SessionConfigCompletionsParams extends BaseParams {
   provider?: string;
   /** Working directory for the session */
   workingDirectory?: URI;
-  /**
-   * Repositories used as configuration context.
-   *
-   * @minItems 1
-   */
+  /** Repositories used as configuration context; an empty list is equivalent to omission. */
   repositories?: RepositorySource[];
   /** Current user-filled configuration values (provides context for the query) */
   config?: Record<string, unknown>;

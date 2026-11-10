@@ -956,6 +956,7 @@ public struct CreateSessionParams: Codable, Sendable {
     /// after the session has started.
     public var workingDirectories: [String]?
     /// Repositories to prepare instead of an explicit `workingDirectories` list.
+    /// An empty list is equivalent to omission.
     public var repositories: [RepositorySource]?
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
@@ -2051,7 +2052,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Repositories used as configuration context.
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values
     public var config: [String: AnyCodable]?
@@ -2225,7 +2226,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Repositories used as configuration context.
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values (provides context for the query)
     public var config: [String: AnyCodable]?

@@ -859,6 +859,7 @@ pub struct CreateSessionParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
     /// Repositories to prepare instead of an explicit `workingDirectories` list.
+    /// An empty list is equivalent to omission.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
@@ -1826,7 +1827,7 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Repositories used as configuration context.
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values
@@ -1864,7 +1865,7 @@ pub struct SessionConfigCompletionsParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Repositories used as configuration context.
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values (provides context for the query)

@@ -886,6 +886,7 @@ data class CreateSessionParams(
     val workingDirectories: List<String>? = null,
     /**
      * Repositories to prepare instead of an explicit `workingDirectories` list.
+     * An empty list is equivalent to omission.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -1706,7 +1707,7 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Repositories used as configuration context.
+     * Repositories used as configuration context; an empty list is equivalent to omission.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -1840,7 +1841,7 @@ data class SessionConfigCompletionsParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Repositories used as configuration context.
+     * Repositories used as configuration context; an empty list is equivalent to omission.
      */
     val repositories: List<RepositorySource>? = null,
     /**

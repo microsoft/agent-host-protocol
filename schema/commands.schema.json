@@ -1148,8 +1148,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Repositories used as configuration context.",
-          "minItems": 1
+          "description": "Repositories used as configuration context; an empty list is equivalent to omission."
         },
         "config": {
           "type": "object",
@@ -1230,8 +1229,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Repositories used as configuration context.",
-          "minItems": 1
+          "description": "Repositories used as configuration context; an empty list is equivalent to omission."
         },
         "config": {
           "type": "object",
@@ -1318,8 +1316,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Repositories to prepare instead of an explicit `workingDirectories` list.",
-          "minItems": 1
+          "description": "Repositories to prepare instead of an explicit `workingDirectories` list.\nAn empty list is equivalent to omission."
         },
         "config": {
           "type": "object",

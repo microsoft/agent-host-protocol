@@ -929,7 +929,8 @@ public sealed record CreateSessionParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
-    /// <summary>Repositories to prepare instead of an explicit `workingDirectories` list.</summary>
+    /// <summary>Repositories to prepare instead of an explicit `workingDirectories` list.
+    /// An empty list is equivalent to omission.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
@@ -1979,7 +1980,7 @@ public sealed record ResolveSessionConfigParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Repositories used as configuration context.</summary>
+    /// <summary>Repositories used as configuration context; an empty list is equivalent to omission.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
@@ -2021,7 +2022,7 @@ public sealed record SessionConfigCompletionsParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Repositories used as configuration context.</summary>
+    /// <summary>Repositories used as configuration context; an empty list is equivalent to omission.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 

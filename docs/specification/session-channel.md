@@ -58,7 +58,7 @@ The optional typed `repositories: RepositorySource[]` field is shared by [`Creat
 | `revision` | Optional branch, tag, or commit. Omission requests the host's default revision. |
 | `subdirectory` | Optional repository-relative selected folder, such as `packages/api`. Omission selects the repository root. |
 
-Clients MUST check the host capability. Hosts MUST reject unsupported repository input, explicit revisions without `revision: true`, and multiple entries without `multipleRepositories: true` **before preparation**. When present, the list MUST be non-empty; omission retains directory/default creation. Generic `config` remains unchanged.
+Clients MUST check the host capability. Hosts MUST reject unsupported repository input, explicit revisions without `revision: true`, and multiple entries without `multipleRepositories: true` **before preparation**. An omitted or empty list requests no repository preparation and retains directory/default creation. Generic `config` remains unchanged.
 
 ##### Request and resolved directories
 
@@ -113,9 +113,9 @@ A host that prepares a worktree could publish this resolved session state:
 
 ##### Host validation and lifecycle
 
-For creation and configuration queries, hosts MUST reject invalid or unsupported input with `InvalidParams` (`-32602`): empty lists, empty sources or revisions, malformed or credential-bearing source URIs, and empty, absolute, or escaping `subdirectory` paths. Hosts MUST ensure the selected folder resolves inside the prepared repository, including through symbolic links, and MUST NOT silently substitute the root or a default revision.
+For creation and configuration queries, hosts MUST reject invalid or unsupported input with `InvalidParams` (`-32602`): empty sources or revisions, malformed or credential-bearing source URIs, and empty, absolute, or escaping `subdirectory` paths. Hosts MUST ensure the selected folder resolves inside the prepared repository, including through symbolic links, and MUST NOT silently substitute the root or a default revision.
 
-`createSession.repositories` and non-empty `createSession.workingDirectories` are mutually exclusive. Configuration queries may also include an existing `workingDirectory` as context but MUST NOT prepare repositories. Hosts MUST authorize the client before preparation, use the existing [authentication contract](./authentication), and keep credentials out of source URIs, state, progress, and logs.
+A non-empty `createSession.repositories` and a non-empty `createSession.workingDirectories` are mutually exclusive. Configuration queries may also include an existing `workingDirectory` as context but MUST NOT prepare repositories. Hosts MUST authorize the client before preparation, use the existing [authentication contract](./authentication), and keep credentials out of source URIs, state, progress, and logs.
 
 Preparation stays within the existing `creating` lifecycle. Before `session/ready` or `session/creationFailed`, the host MUST publish any actual resolved directories. Unresolved directories stay absent or empty; failure uses `creationError`, not a fabricated checkout. The original repository list is **not** echoed into session metadata.
 
