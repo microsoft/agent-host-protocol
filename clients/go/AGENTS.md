@@ -50,7 +50,7 @@ CI verifies the committed generated files match the output of
 | `Record<string, T>`         | `map[string]T`                                                           |
 | `Partial<T>`                | `PartialT` struct, every field a pointer                                 |
 | string enum                 | typed `string` + named constants                                         |
-| Bitset enum                 | typed `uint32` + flag constants + `Has`/`Or` helpers                     |
+| Bitset enum (`@bitset`)     | typed `uint32` + flag constants + `Has`/`Or` helpers                     |
 | Interface struct            | `struct` with JSON tags                                                  |
 | Discriminated union         | wrapper struct + marker interface + custom `MarshalJSON`/`UnmarshalJSON` |
 | `URI`                       | `type URI = string`                                                      |

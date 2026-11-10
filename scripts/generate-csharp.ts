@@ -32,7 +32,7 @@
  *     Open (`@nonexhaustive`) string enums instead become a readonly struct
  *     wrapping the raw wire string, so a value added by a newer protocol
  *     version is preserved rather than failing the whole message.
- *     Bitset enums (numeric values) become `[Flags] enum : uint` and
+ *     Bitset enums (`@bitset`) become `[Flags] enum : uint` and
  *     serialize as their numeric value (System.Text.Json default), so
  *     unknown future bits round-trip.
  */
@@ -47,7 +47,7 @@ import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
-import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
+import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
@@ -449,15 +449,15 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 }
 
 /**
- * Bitset enum (numeric values): [Flags] enum : uint. System.Text.Json
+ * Numeric enum, with [Flags] when annotated `@bitset`. System.Text.Json
  * serializes enums as their numeric value by default, so unknown future
  * bits round-trip losslessly.
  */
-function generateBitsetEnum(enumDecl: EnumDeclaration): string {
+function generateNumericEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
   emitDocComment('', getDocumentation(enumDecl), lines);
-  lines.push('[Flags]');
+  if (isBitsetEnum(enumDecl)) lines.push('[Flags]');
   lines.push(`public enum ${name} : uint`);
   lines.push('{');
   for (const mem of enumDecl.getMembers()) {
@@ -549,7 +549,7 @@ function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
   if (isNumeric) {
-    return generateBitsetEnum(enumDecl);
+    return generateNumericEnum(enumDecl);
   }
   return isNonexhaustiveEnum(enumDecl)
     ? generateOpenStringEnum(enumDecl)

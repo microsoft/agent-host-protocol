@@ -51,6 +51,7 @@ export const enum SessionLifecycle {
  *
  * @category Session State
  * @nonexhaustive
+ * @bitset
  */
 export const enum SessionStatus {
   /** Session is idle — no turn is active. */

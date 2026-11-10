@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Removed an empty `StateAction` reference from the actions JSON Schema so validators can resolve every union member.",
+  "issues": [580],
+  "targets": ["spec"]
+}
