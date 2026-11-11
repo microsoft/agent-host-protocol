@@ -156,10 +156,7 @@ The `target.kind` discriminant is extensible so future consumers, such as [host-
 
 ### Account selection hints
 
-Clients MAY include `accountId` alongside the token to identify their selected account. When present, it MUST be a nonempty, opaque string. 
-Clients SHOULD omit the hint when they cannot supply a stable identifier, and SHOULD avoid account labels, email addresses, token values, or token-derived identifiers.
-Hosts MUST continue validating tokens independently and MUST NOT use the hint to authorize access or establish credential-sharing equivalence between clients.
-A host MAY use a changed hint to adjust its authentication stategy, with ultimate access/permissions decisions based on the token, and not hint alone.
+Clients MAY include `accountId` alongside the token to identify their selected account. Hosts can compare `accountId` values to detect when the underlying account has changed. When present, `accountId` MUST be a nonempty string, and hosts MUST treat it as opaque.
 
 ```jsonc
 {
