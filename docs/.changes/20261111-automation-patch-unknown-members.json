@@ -1,5 +1,5 @@
 {
-  "type": "fixed",
+  "type": "changed",
   "message": "Preserve unknown members on automation patch objects and nested shared types (`extra` in Rust/Swift/Kotlin, `Extra` in Go/.NET). Rust literals must initialize the map; Go map-bearing structs lose comparability; Swift/Kotlin consumers must recompile.",
   "targets": [
     "spec",
