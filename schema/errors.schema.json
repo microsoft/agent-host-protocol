@@ -7179,7 +7179,7 @@
         },
         "accountId": {
           "type": "string",
-          "description": "Account selection hint provided by the client and scoped to 'resource' and optional 'target'. \nThis is not used for access/permission decisions and only serves as guidance for authentication strategies.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
+          "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
           "minLength": 1
         }
       },

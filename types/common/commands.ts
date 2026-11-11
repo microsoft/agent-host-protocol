@@ -1463,8 +1463,9 @@ export interface AuthenticateParams extends BaseParams {
    */
   target?: AuthenticateTarget;
   /**
-   * Account selection hint provided by the client and scoped to 'resource' and optional 'target'. 
-   * This is not used for access/permission decisions and only serves as guidance for authentication strategies.
+   * Optional identifier for the client's selected account, sent alongside the token.
+   * Hosts can compare `accountId` values to detect when the underlying account has changed.
+   * Hosts MUST treat `accountId` as an opaque string.
    * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
    *
    * @minLength 1
