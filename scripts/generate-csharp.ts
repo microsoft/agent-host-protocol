@@ -52,6 +52,7 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -559,6 +560,7 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 // ─── Struct Generation ───────────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   omitDiscriminants?: boolean;
   doc?: string;
   includeDiscriminants?: boolean;
@@ -648,6 +650,12 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
     const req = csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
+  if (opts.preserveUnknownMembers) {
+    lines.push('');
+    lines.push('    /// <summary>Unrecognized wire members retained for full-object edits.</summary>');
+    lines.push('    [JsonExtensionData]');
+    lines.push(`    public Dictionary<string, JsonElement>? Extra { ${accessor} }`);
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -663,7 +671,7 @@ function generateClassFromInterface(
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
+  return generateCsClass(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 function generatePartialClass(project: Project, tsInterfaceName: string): string {
@@ -1371,6 +1379,9 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 function generateCustomizationEnablementUnionCs(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; init; }\n'
+    : '';
   // Variants are inline object types in `types/`, so there are no named
   // interfaces to read the discriminator from — name the enum explicitly.
   const allowUnknown = discriminatedUnionAllowsUnknown(
@@ -1392,20 +1403,20 @@ public sealed record CustomizationEnablementGlobal
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementWorkspace
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Workspace;
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementSession
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>
 {

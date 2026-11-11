@@ -1285,17 +1285,46 @@ public struct Icon: Codable, Sendable, Equatable {
     ///
     /// If not provided, the client should assume the icon can be used with any theme.
     public var theme: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case src
+        case contentType
+        case sizes
+        case theme
+    }
 
     public init(
         src: String,
         contentType: String? = nil,
         sizes: [String]? = nil,
-        theme: String? = nil
+        theme: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.src = src
         self.contentType = contentType
         self.sizes = sizes
         self.theme = theme
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.src = try container.decode(String.self, forKey: .src)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.sizes = try container.decodeIfPresent([String].self, forKey: .sizes)
+        self.theme = try container.decodeIfPresent(String.self, forKey: .theme)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.src, forKey: .src)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.sizes, forKey: .sizes)
+        try container.encodeIfPresent(self.theme, forKey: .theme)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -1331,8 +1360,10 @@ public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
     ///
     /// Clients SHOULD treat an absent field the same as `true`.
     public var required: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case resource
         case resourceName = "resource_name"
         case authorizationServers = "authorization_servers"
@@ -1357,7 +1388,8 @@ public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
         resourceDocumentation: String? = nil,
         resourcePolicyUri: String? = nil,
         resourceTosUri: String? = nil,
-        required: Bool? = nil
+        required: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.resource = resource
         self.resourceName = resourceName
@@ -1370,6 +1402,39 @@ public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
         self.resourcePolicyUri = resourcePolicyUri
         self.resourceTosUri = resourceTosUri
         self.required = required
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.resourceName = try container.decodeIfPresent(String.self, forKey: .resourceName)
+        self.authorizationServers = try container.decodeIfPresent([String].self, forKey: .authorizationServers)
+        self.jwksUri = try container.decodeIfPresent(String.self, forKey: .jwksUri)
+        self.scopesSupported = try container.decodeIfPresent([String].self, forKey: .scopesSupported)
+        self.bearerMethodsSupported = try container.decodeIfPresent([String].self, forKey: .bearerMethodsSupported)
+        self.resourceSigningAlgValuesSupported = try container.decodeIfPresent([String].self, forKey: .resourceSigningAlgValuesSupported)
+        self.resourceDocumentation = try container.decodeIfPresent(String.self, forKey: .resourceDocumentation)
+        self.resourcePolicyUri = try container.decodeIfPresent(String.self, forKey: .resourcePolicyUri)
+        self.resourceTosUri = try container.decodeIfPresent(String.self, forKey: .resourceTosUri)
+        self.required = try container.decodeIfPresent(Bool.self, forKey: .required)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.resourceName, forKey: .resourceName)
+        try container.encodeIfPresent(self.authorizationServers, forKey: .authorizationServers)
+        try container.encodeIfPresent(self.jwksUri, forKey: .jwksUri)
+        try container.encodeIfPresent(self.scopesSupported, forKey: .scopesSupported)
+        try container.encodeIfPresent(self.bearerMethodsSupported, forKey: .bearerMethodsSupported)
+        try container.encodeIfPresent(self.resourceSigningAlgValuesSupported, forKey: .resourceSigningAlgValuesSupported)
+        try container.encodeIfPresent(self.resourceDocumentation, forKey: .resourceDocumentation)
+        try container.encodeIfPresent(self.resourcePolicyUri, forKey: .resourcePolicyUri)
+        try container.encodeIfPresent(self.resourceTosUri, forKey: .resourceTosUri)
+        try container.encodeIfPresent(self.required, forKey: .required)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -1653,24 +1718,67 @@ public struct ModelSelection: Codable, Sendable, Equatable {
     /// pickers produce strings, but some (e.g. a numeric context-size picker)
     /// produce numbers or booleans, which are carried through as-is.
     public var config: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case config
+    }
 
     public init(
         id: String,
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.config = config
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct AgentSelection: Codable, Sendable, Equatable {
     /// Stable agent URI (matches an {@link AgentCustomization.uri}).
     public var uri: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+    }
 
     public init(
-        uri: String
+        uri: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.uri = uri
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -2825,8 +2933,10 @@ public struct Message: Codable, Sendable, Equatable {
     /// agent hosts MAY use it to carry context that does not fit any other
     /// field. Mirrors the MCP `_meta` convention.
     public var meta: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case text
         case origin
         case attachments
@@ -2841,7 +2951,8 @@ public struct Message: Codable, Sendable, Equatable {
         attachments: [MessageAttachment]? = nil,
         model: ModelSelection? = nil,
         agent: AgentSelection? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.text = text
         self.origin = origin
@@ -2849,17 +2960,60 @@ public struct Message: Codable, Sendable, Equatable {
         self.model = model
         self.agent = agent
         self.meta = meta
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.origin = try container.decode(MessageOrigin.self, forKey: .origin)
+        self.attachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments)
+        self.model = try container.decodeIfPresent(ModelSelection.self, forKey: .model)
+        self.agent = try container.decodeIfPresent(AgentSelection.self, forKey: .agent)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.text, forKey: .text)
+        try container.encode(self.origin, forKey: .origin)
+        try container.encodeIfPresent(self.attachments, forKey: .attachments)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.agent, forKey: .agent)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct MessageOrigin: Codable, Sendable, Equatable {
     /// The kind of actor that produced the message.
     public var kind: MessageKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: MessageKind
+        kind: MessageKind,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(MessageKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3207,13 +3361,36 @@ public struct TextPosition: Codable, Sendable, Equatable {
     public var line: Int
     /// Zero-based character offset within the line.
     public var character: Int
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case line
+        case character
+    }
 
     public init(
         line: Int,
-        character: Int
+        character: Int,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.line = line
         self.character = character
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.line = try container.decode(Int.self, forKey: .line)
+        self.character = try container.decode(Int.self, forKey: .character)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.line, forKey: .line)
+        try container.encode(self.character, forKey: .character)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3222,24 +3399,67 @@ public struct TextRange: Codable, Sendable, Equatable {
     public var start: TextPosition
     /// End position of the range.
     public var end: TextPosition
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case start
+        case end
+    }
 
     public init(
         start: TextPosition,
-        end: TextPosition
+        end: TextPosition,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.start = start
         self.end = end
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.start = try container.decode(TextPosition.self, forKey: .start)
+        self.end = try container.decode(TextPosition.self, forKey: .end)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.start, forKey: .start)
+        try container.encode(self.end, forKey: .end)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct TextSelection: Codable, Sendable, Equatable {
     /// The range covered by the selection.
     public var range: TextRange
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case range
+    }
 
     public init(
-        range: TextRange
+        range: TextRange,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.range = range
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.range = try container.decode(TextRange.self, forKey: .range)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.range, forKey: .range)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3277,8 +3497,10 @@ public struct SimpleMessageAttachment: Codable, Sendable, Equatable {
     /// property MAY be omitted when the attachment originated from a
     /// `completions` response.
     public var modelRepresentation: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3293,7 +3515,8 @@ public struct SimpleMessageAttachment: Codable, Sendable, Equatable {
         displayKind: String? = nil,
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
-        modelRepresentation: String? = nil
+        modelRepresentation: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3301,6 +3524,29 @@ public struct SimpleMessageAttachment: Codable, Sendable, Equatable {
         self.meta = meta
         self.type = type
         self.modelRepresentation = modelRepresentation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.modelRepresentation = try container.decodeIfPresent(String.self, forKey: .modelRepresentation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.modelRepresentation, forKey: .modelRepresentation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3339,8 +3585,10 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable, Equatable {
     ///
     /// Only meaningful for textual resources.
     public var selection: TextSelection?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3359,7 +3607,8 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable, Equatable {
         type: MessageAttachmentKind,
         data: String,
         contentType: String,
-        selection: TextSelection? = nil
+        selection: TextSelection? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3369,6 +3618,33 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable, Equatable {
         self.data = data
         self.contentType = contentType
         self.selection = selection
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.data = try container.decode(String.self, forKey: .data)
+        self.contentType = try container.decode(String.self, forKey: .contentType)
+        self.selection = try container.decodeIfPresent(TextSelection.self, forKey: .selection)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.data, forKey: .data)
+        try container.encode(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.selection, forKey: .selection)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3411,8 +3687,10 @@ public struct MessageResourceAttachment: Codable, Sendable, Equatable {
     ///
     /// Only meaningful for textual resources.
     public var selection: TextSelection?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3435,7 +3713,8 @@ public struct MessageResourceAttachment: Codable, Sendable, Equatable {
         contentType: String? = nil,
         nonce: String? = nil,
         type: MessageAttachmentKind,
-        selection: TextSelection? = nil
+        selection: TextSelection? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3447,6 +3726,37 @@ public struct MessageResourceAttachment: Codable, Sendable, Equatable {
         self.nonce = nonce
         self.type = type
         self.selection = selection
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.sizeHint = try container.decodeIfPresent(Int.self, forKey: .sizeHint)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.selection = try container.decodeIfPresent(TextSelection.self, forKey: .selection)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encodeIfPresent(self.sizeHint, forKey: .sizeHint)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.selection, forKey: .selection)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3483,8 +3793,10 @@ public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
     /// Specific {@link Annotation.id | annotation ids} to reference. When
     /// omitted, the attachment references all annotations on the channel.
     public var annotationIds: [String]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3501,7 +3813,8 @@ public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
         resource: String,
-        annotationIds: [String]? = nil
+        annotationIds: [String]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3510,6 +3823,31 @@ public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
         self.type = type
         self.resource = resource
         self.annotationIds = annotationIds
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.annotationIds = try container.decodeIfPresent([String].self, forKey: .annotationIds)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.annotationIds, forKey: .annotationIds)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3545,8 +3883,10 @@ public struct MessageChatAttachment: Codable, Sendable, Equatable {
     /// Last completed turn included in the referenced transcript. When omitted,
     /// the host pins the latest completed turn when accepting the message.
     public var endTurn: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3563,7 +3903,8 @@ public struct MessageChatAttachment: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
         resource: String,
-        endTurn: String? = nil
+        endTurn: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3572,6 +3913,31 @@ public struct MessageChatAttachment: Codable, Sendable, Equatable {
         self.type = type
         self.resource = resource
         self.endTurn = endTurn
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.endTurn = try container.decodeIfPresent(String.self, forKey: .endTurn)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.endTurn, forKey: .endTurn)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -3603,17 +3969,46 @@ public struct ContentRef: Codable, Sendable, Equatable {
     public var contentType: String?
     /// Content nonce
     public var nonce: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+        case sizeHint
+        case contentType
+        case nonce
+    }
 
     public init(
         uri: String,
         sizeHint: Int? = nil,
         contentType: String? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
         self.nonce = nonce
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.sizeHint = try container.decodeIfPresent(Int.self, forKey: .sizeHint)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encodeIfPresent(self.sizeHint, forKey: .sizeHint)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -4683,21 +5078,61 @@ public struct ToolResultSubagentContent: Codable, Sendable, Equatable {
 
 public struct CustomizationLoadingState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: CustomizationLoadStatus
+        kind: CustomizationLoadStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct CustomizationLoadedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: CustomizationLoadStatus
+        kind: CustomizationLoadStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -4705,13 +5140,36 @@ public struct CustomizationDegradedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable description of the warning.
     public var message: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case message
+    }
 
     public init(
         kind: CustomizationLoadStatus,
-        message: String
+        message: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.message = message
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.message, forKey: .message)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -4719,13 +5177,36 @@ public struct CustomizationErrorState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable error message.
     public var message: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case message
+    }
 
     public init(
         kind: CustomizationLoadStatus,
-        message: String
+        message: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.message = message
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.message, forKey: .message)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -4779,8 +5260,10 @@ public struct PluginCustomization: Codable, Sendable, Equatable {
     /// has no version concept. Provenance / display only: the host neither
     /// parses nor enforces it.
     public var version: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -4807,7 +5290,8 @@ public struct PluginCustomization: Codable, Sendable, Equatable {
         children: [ChildCustomization]? = nil,
         type: CustomizationType,
         enablement: [CustomizationEnablement]? = nil,
-        version: String? = nil
+        version: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -4821,6 +5305,41 @@ public struct PluginCustomization: Codable, Sendable, Equatable {
         self.type = type
         self.enablement = enablement
         self.version = version
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+        self.load = try container.decodeIfPresent(CustomizationLoadState.self, forKey: .load)
+        self.children = try container.decodeIfPresent([ChildCustomization].self, forKey: .children)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.version = try container.decodeIfPresent(String.self, forKey: .version)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.load, forKey: .load)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encodeIfPresent(self.version, forKey: .version)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -4885,8 +5404,10 @@ public struct ClientPluginCustomization: Codable, Sendable, Equatable {
     /// carries the client's global decision for each one; the host applies it
     /// under the child's durable key.
     public var childEnablement: [String: [CustomizationEnablement]]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -4917,7 +5438,8 @@ public struct ClientPluginCustomization: Codable, Sendable, Equatable {
         enablement: [CustomizationEnablement]? = nil,
         version: String? = nil,
         nonce: String? = nil,
-        childEnablement: [String: [CustomizationEnablement]]? = nil
+        childEnablement: [String: [CustomizationEnablement]]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -4933,6 +5455,45 @@ public struct ClientPluginCustomization: Codable, Sendable, Equatable {
         self.version = version
         self.nonce = nonce
         self.childEnablement = childEnablement
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+        self.load = try container.decodeIfPresent(CustomizationLoadState.self, forKey: .load)
+        self.children = try container.decodeIfPresent([ChildCustomization].self, forKey: .children)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.version = try container.decodeIfPresent(String.self, forKey: .version)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.childEnablement = try container.decodeIfPresent([String: [CustomizationEnablement]].self, forKey: .childEnablement)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.load, forKey: .load)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encodeIfPresent(self.version, forKey: .version)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try container.encodeIfPresent(self.childEnablement, forKey: .childEnablement)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5097,8 +5658,10 @@ public struct AgentCustomization: Codable, Sendable, Equatable {
     /// in a picker); it remains available for the agent to auto-delegate
     /// to. Absent or `false` means the user may select it.
     public var disableUserInvocation: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5127,7 +5690,8 @@ public struct AgentCustomization: Codable, Sendable, Equatable {
         model: String? = nil,
         tools: [String]? = nil,
         disableModelInvocation: Bool? = nil,
-        disableUserInvocation: Bool? = nil
+        disableUserInvocation: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5142,6 +5706,43 @@ public struct AgentCustomization: Codable, Sendable, Equatable {
         self.tools = tools
         self.disableModelInvocation = disableModelInvocation
         self.disableUserInvocation = disableUserInvocation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.model = try container.decodeIfPresent(String.self, forKey: .model)
+        self.tools = try container.decodeIfPresent([String].self, forKey: .tools)
+        self.disableModelInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableModelInvocation)
+        self.disableUserInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableUserInvocation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.tools, forKey: .tools)
+        try container.encodeIfPresent(self.disableModelInvocation, forKey: .disableModelInvocation)
+        try container.encodeIfPresent(self.disableUserInvocation, forKey: .disableUserInvocation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5199,8 +5800,10 @@ public struct SkillCustomization: Codable, Sendable, Equatable {
     /// as a slash command); it remains available for the agent to
     /// auto-invoke. Absent or `false` means the user may invoke it.
     public var disableUserInvocation: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5225,7 +5828,8 @@ public struct SkillCustomization: Codable, Sendable, Equatable {
         type: CustomizationType,
         description: String? = nil,
         disableModelInvocation: Bool? = nil,
-        disableUserInvocation: Bool? = nil
+        disableUserInvocation: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5238,6 +5842,39 @@ public struct SkillCustomization: Codable, Sendable, Equatable {
         self.description = description
         self.disableModelInvocation = disableModelInvocation
         self.disableUserInvocation = disableUserInvocation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.disableModelInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableModelInvocation)
+        self.disableUserInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableUserInvocation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.disableModelInvocation, forKey: .disableModelInvocation)
+        try container.encodeIfPresent(self.disableUserInvocation, forKey: .disableUserInvocation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5286,8 +5923,10 @@ public struct PromptCustomization: Codable, Sendable, Equatable {
     public var type: CustomizationType
     /// Short description of what the prompt does.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5308,7 +5947,8 @@ public struct PromptCustomization: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5319,6 +5959,35 @@ public struct PromptCustomization: Codable, Sendable, Equatable {
         self.enabled = enabled
         self.type = type
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5374,8 +6043,10 @@ public struct RuleCustomization: Codable, Sendable, Equatable {
     /// Glob patterns the rule applies to. When present, the rule is only
     /// active for matching files.
     public var globs: [String]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5400,7 +6071,8 @@ public struct RuleCustomization: Codable, Sendable, Equatable {
         type: CustomizationType,
         description: String? = nil,
         alwaysApply: Bool? = nil,
-        globs: [String]? = nil
+        globs: [String]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5413,6 +6085,39 @@ public struct RuleCustomization: Codable, Sendable, Equatable {
         self.description = description
         self.alwaysApply = alwaysApply
         self.globs = globs
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.alwaysApply = try container.decodeIfPresent(Bool.self, forKey: .alwaysApply)
+        self.globs = try container.decodeIfPresent([String].self, forKey: .globs)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.alwaysApply, forKey: .alwaysApply)
+        try container.encodeIfPresent(self.globs, forKey: .globs)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5459,8 +6164,10 @@ public struct HookCustomization: Codable, Sendable, Equatable {
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
     public var enabled: Bool?
     public var type: CustomizationType
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5479,7 +6186,8 @@ public struct HookCustomization: Codable, Sendable, Equatable {
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
-        type: CustomizationType
+        type: CustomizationType,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5489,6 +6197,33 @@ public struct HookCustomization: Codable, Sendable, Equatable {
         self.meta = meta
         self.enabled = enabled
         self.type = type
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5569,8 +6304,10 @@ public struct McpServerCustomization: Codable, Sendable, Equatable {
     /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
     /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
     public var children: [SkillCustomization]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5597,7 +6334,8 @@ public struct McpServerCustomization: Codable, Sendable, Equatable {
         state: McpServerState,
         channel: String? = nil,
         mcpApp: McpServerCustomizationApps? = nil,
-        children: [SkillCustomization]? = nil
+        children: [SkillCustomization]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5611,6 +6349,41 @@ public struct McpServerCustomization: Codable, Sendable, Equatable {
         self.channel = channel
         self.mcpApp = mcpApp
         self.children = children
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.state = try container.decode(McpServerState.self, forKey: .state)
+        self.channel = try container.decodeIfPresent(String.self, forKey: .channel)
+        self.mcpApp = try container.decodeIfPresent(McpServerCustomizationApps.self, forKey: .mcpApp)
+        self.children = try container.decodeIfPresent([SkillCustomization].self, forKey: .children)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encode(self.state, forKey: .state)
+        try container.encodeIfPresent(self.channel, forKey: .channel)
+        try container.encodeIfPresent(self.mcpApp, forKey: .mcpApp)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5621,11 +6394,31 @@ public struct McpServerCustomizationApps: Codable, Sendable, Equatable {
     /// client feeds these straight through into the `hostCapabilities` of
     /// the `ui/initialize` response delivered to the View.
     public var capabilities: AhpMcpUiHostCapabilities
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case capabilities
+    }
 
     public init(
-        capabilities: AhpMcpUiHostCapabilities
+        capabilities: AhpMcpUiHostCapabilities,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.capabilities = capabilities
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.capabilities = try container.decode(AhpMcpUiHostCapabilities.self, forKey: .capabilities)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.capabilities, forKey: .capabilities)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5638,17 +6431,46 @@ public struct AhpMcpUiHostCapabilities: Codable, Sendable, Equatable {
     public var logging: [String: AnyCodable]?
     /// Producer serves `sampling/createMessage` via `mcpMethodCall`.
     public var sampling: AnyCodable?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case serverTools
+        case serverResources
+        case logging
+        case sampling
+    }
 
     public init(
         serverTools: AnyCodable? = nil,
         serverResources: AnyCodable? = nil,
         logging: [String: AnyCodable]? = nil,
-        sampling: AnyCodable? = nil
+        sampling: AnyCodable? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.serverTools = serverTools
         self.serverResources = serverResources
         self.logging = logging
         self.sampling = sampling
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.serverTools = try container.decodeIfPresent(AnyCodable.self, forKey: .serverTools)
+        self.serverResources = try container.decodeIfPresent(AnyCodable.self, forKey: .serverResources)
+        self.logging = try container.decodeIfPresent([String: AnyCodable].self, forKey: .logging)
+        self.sampling = try container.decodeIfPresent(AnyCodable.self, forKey: .sampling)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.serverTools, forKey: .serverTools)
+        try container.encodeIfPresent(self.serverResources, forKey: .serverResources)
+        try container.encodeIfPresent(self.logging, forKey: .logging)
+        try container.encodeIfPresent(self.sampling, forKey: .sampling)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5663,23 +6485,66 @@ public struct McpServerStartingState: Codable, Sendable, Equatable {
     /// through an appropriate affordance to ask the host to background the
     /// startup.
     public var blocking: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case blocking
+    }
 
     public init(
         kind: McpServerStatus,
-        blocking: Bool? = nil
+        blocking: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.blocking = blocking
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.blocking = try container.decodeIfPresent(Bool.self, forKey: .blocking)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encodeIfPresent(self.blocking, forKey: .blocking)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct McpServerReadyState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5703,6 +6568,17 @@ public struct McpServerAuthRequiredState: Codable, Sendable, Equatable {
     /// Human-readable hint, typically from the OAuth `error_description`.
     public var description: String?
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case reason
+        case oauthClient
+        case resource
+        case requiredScopes
+        case description
+        case kind
+    }
 
     public init(
         reason: McpAuthRequiredReason,
@@ -5710,7 +6586,8 @@ public struct McpServerAuthRequiredState: Codable, Sendable, Equatable {
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
         description: String? = nil,
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
         self.oauthClient = oauthClient
@@ -5718,6 +6595,29 @@ public struct McpServerAuthRequiredState: Codable, Sendable, Equatable {
         self.requiredScopes = requiredScopes
         self.description = description
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reason = try container.decode(McpAuthRequiredReason.self, forKey: .reason)
+        self.oauthClient = try container.decodeIfPresent(McpOAuthClient.self, forKey: .oauthClient)
+        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
+        self.requiredScopes = try container.decodeIfPresent([String].self, forKey: .requiredScopes)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.reason, forKey: .reason)
+        try container.encodeIfPresent(self.oauthClient, forKey: .oauthClient)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.requiredScopes, forKey: .requiredScopes)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5725,23 +6625,66 @@ public struct McpServerErrorState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
     /// Error details.
     public var error: ErrorInfo
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case error
+    }
 
     public init(
         kind: McpServerStatus,
-        error: ErrorInfo
+        error: ErrorInfo,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.error = error
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.error = try container.decode(ErrorInfo.self, forKey: .error)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.error, forKey: .error)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct McpServerStoppedState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5751,13 +6694,36 @@ public struct McpOAuthClient: Codable, Sendable, Equatable {
     /// OAuth client secret for a confidential client. Absence means the client is
     /// public and uses a secretless flow such as authorization code with PKCE.
     public var clientSecret: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case clientId
+        case clientSecret
+    }
 
     public init(
         clientId: String,
-        clientSecret: String? = nil
+        clientSecret: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.clientId = clientId
         self.clientSecret = clientSecret
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.clientId = try container.decode(String.self, forKey: .clientId)
+        self.clientSecret = try container.decodeIfPresent(String.self, forKey: .clientSecret)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.clientSecret, forKey: .clientSecret)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -5780,19 +6746,51 @@ public struct McpAuthRequirement: Codable, Sendable, Equatable {
     public var requiredScopes: [String]?
     /// Human-readable hint, typically from the OAuth `error_description`.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case reason
+        case oauthClient
+        case resource
+        case requiredScopes
+        case description
+    }
 
     public init(
         reason: McpAuthRequiredReason,
         oauthClient: McpOAuthClient? = nil,
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
         self.oauthClient = oauthClient
         self.resource = resource
         self.requiredScopes = requiredScopes
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reason = try container.decode(McpAuthRequiredReason.self, forKey: .reason)
+        self.oauthClient = try container.decodeIfPresent(McpOAuthClient.self, forKey: .oauthClient)
+        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
+        self.requiredScopes = try container.decodeIfPresent([String].self, forKey: .requiredScopes)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.reason, forKey: .reason)
+        try container.encodeIfPresent(self.oauthClient, forKey: .oauthClient)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.requiredScopes, forKey: .requiredScopes)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6154,8 +7152,10 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
     /// Clients MAY look for well-known optional keys here to provide enhanced UI
     /// (e.g. a structured chat fetch error for richer, localized messaging).
     public var meta: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case errorType
         case message
         case stack
@@ -6166,12 +7166,32 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
         errorType: String,
         message: String,
         stack: String? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.errorType = errorType
         self.message = message
         self.stack = stack
         self.meta = meta
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.errorType = try container.decode(String.self, forKey: .errorType)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.stack = try container.decodeIfPresent(String.self, forKey: .stack)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.errorType, forKey: .errorType)
+        try container.encode(self.message, forKey: .message)
+        try container.encodeIfPresent(self.stack, forKey: .stack)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6737,13 +7757,36 @@ public struct AutomationSchedule: Codable, Sendable, Equatable {
     /// IANA Time Zone Database identifier used to interpret the expression, for
     /// example `"UTC"` or `"Europe/Berlin"`.
     public var timeZone: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case expression
+        case timeZone
+    }
 
     public init(
         expression: String,
-        timeZone: String
+        timeZone: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.expression = expression
         self.timeZone = timeZone
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.expression = try container.decode(String.self, forKey: .expression)
+        self.timeZone = try container.decode(String.self, forKey: .timeZone)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.expression, forKey: .expression)
+        try container.encode(self.timeZone, forKey: .timeZone)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6758,17 +7801,46 @@ public struct AutomationScheduleTrigger: Codable, Sendable, Equatable {
     /// Policy for missed occurrences. Omission is equivalent to
     /// {@link AutomationMisfirePolicy.RunOnce}.
     public var misfirePolicy: AutomationMisfirePolicy?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case schedule
+        case misfirePolicy
+    }
 
     public init(
         id: String,
         kind: AutomationTriggerKind,
         schedule: AutomationSchedule,
-        misfirePolicy: AutomationMisfirePolicy? = nil
+        misfirePolicy: AutomationMisfirePolicy? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.kind = kind
         self.schedule = schedule
         self.misfirePolicy = misfirePolicy
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.schedule = try container.decode(AutomationSchedule.self, forKey: .schedule)
+        self.misfirePolicy = try container.decodeIfPresent(AutomationMisfirePolicy.self, forKey: .misfirePolicy)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.schedule, forKey: .schedule)
+        try container.encodeIfPresent(self.misfirePolicy, forKey: .misfirePolicy)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6792,6 +7864,18 @@ public struct AutomationEventTrigger: Codable, Sendable, Equatable {
     /// Values described by {@link AutomationTriggerDefinition.configSchema}.
     /// Clients MUST preserve unknown entries when editing other fields.
     public var config: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case type
+        case title
+        case description
+        case events
+        case config
+    }
 
     public init(
         id: String,
@@ -6800,7 +7884,8 @@ public struct AutomationEventTrigger: Codable, Sendable, Equatable {
         title: String,
         description: String? = nil,
         events: [AutomationTriggerEventDefinition],
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.kind = kind
@@ -6809,6 +7894,31 @@ public struct AutomationEventTrigger: Codable, Sendable, Equatable {
         self.description = description
         self.events = events
         self.config = config
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.events = try container.decode([AutomationTriggerEventDefinition].self, forKey: .events)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.title, forKey: .title)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encode(self.events, forKey: .events)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6819,15 +7929,41 @@ public struct AutomationTriggerEventDefinition: Codable, Sendable, Equatable {
     public var title: String
     /// Optional longer explanation of when this event fires.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case title
+        case description
+    }
 
     public init(
         id: String,
         title: String,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.title = title
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.title, forKey: .title)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -6899,6 +8035,17 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
     /// Clients MUST NOT set this field unless the host advertises
     /// {@link AutomationCapabilities.customizations}.
     public var customizations: [ClientPluginCustomization]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case provider
+        case model
+        case agent
+        case workingDirectories
+        case config
+        case customizations
+    }
 
     public init(
         provider: String? = nil,
@@ -6906,7 +8053,8 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
         agent: AgentSelection? = nil,
         workingDirectories: [String]? = nil,
         config: [String: AnyCodable]? = nil,
-        customizations: [ClientPluginCustomization]? = nil
+        customizations: [ClientPluginCustomization]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.provider = provider
         self.model = model
@@ -6914,6 +8062,29 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
         self.workingDirectories = workingDirectories
         self.config = config
         self.customizations = customizations
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.provider = try container.decodeIfPresent(String.self, forKey: .provider)
+        self.model = try container.decodeIfPresent(ModelSelection.self, forKey: .model)
+        self.agent = try container.decodeIfPresent(AgentSelection.self, forKey: .agent)
+        self.workingDirectories = try container.decodeIfPresent([String].self, forKey: .workingDirectories)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.customizations = try container.decodeIfPresent([ClientPluginCustomization].self, forKey: .customizations)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.provider, forKey: .provider)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.agent, forKey: .agent)
+        try container.encodeIfPresent(self.workingDirectories, forKey: .workingDirectories)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try container.encodeIfPresent(self.customizations, forKey: .customizations)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -7033,13 +8204,36 @@ public struct AutomationAfterRunsCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// Positive-integer cap on scheduled runs.
     public var max: Int
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case max
+    }
 
     public init(
         kind: AutomationDisableConditionKind,
-        max: Int
+        max: Int,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.max = max
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationDisableConditionKind.self, forKey: .kind)
+        self.max = try container.decode(Int.self, forKey: .max)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.max, forKey: .max)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -7047,13 +8241,36 @@ public struct AutomationAfterDateCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// ISO 8601 timestamp after which scheduling stops.
     public var date: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case date
+    }
 
     public init(
         kind: AutomationDisableConditionKind,
-        date: String
+        date: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.date = date
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationDisableConditionKind.self, forKey: .kind)
+        self.date = try container.decode(String.self, forKey: .date)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.date, forKey: .date)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -7440,31 +8657,116 @@ public enum CustomizationEnablement: Codable, Sendable, Equatable {
 }
 
 public struct CustomizationEnablementGlobal: Codable, Sendable, Equatable {
-    public var kind: String = "global"
     public var enabled: Bool
+    public var kind: String = "global"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case enabled
+        case kind
+    }
+
+    public init(
+        enabled: Bool,
+        kind: String = "global",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct CustomizationEnablementWorkspace: Codable, Sendable, Equatable {
-    public var kind: String = "workspace"
     public var uri: URI
     public var enabled: Bool
+    public var kind: String = "workspace"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(uri: URI, enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+        case enabled
+        case kind
+    }
+
+    public init(
+        uri: URI,
+        enabled: Bool,
+        kind: String = "workspace",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.uri = uri
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(URI.self, forKey: .uri)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct CustomizationEnablementSession: Codable, Sendable, Equatable {
-    public var kind: String = "session"
     public var enabled: Bool
+    public var kind: String = "session"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case enabled
+        case kind
+    }
+
+    public init(
+        enabled: Bool,
+        kind: String = "session",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 

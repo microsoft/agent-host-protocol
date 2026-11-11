@@ -43,6 +43,7 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 import { discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
@@ -465,6 +466,7 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 // ─── Struct Generation ───────────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
   /** Docstring for the struct itself. */
@@ -506,8 +508,29 @@ function generateGoStruct(goName: string, props: GoProp[], opts: StructOpts = {}
     const tag = `\`json:"${tagParts.join(',')}"\``;
     lines.push(`\t${p.goName} ${goType} ${tag}`);
   }
+  if (opts.preserveUnknownMembers) {
+    lines.push('\t// Extra contains unrecognized wire members retained for full-object edits.');
+    lines.push('\tExtra map[string]json.RawMessage `json:"-"`');
+  }
   lines.push('}');
+  if (opts.preserveUnknownMembers) {
+    lines.push(generateUnknownMembersMethods(goName, props.map(p => p.wireName)));
+  }
   return lines.join('\n');
+}
+
+function generateUnknownMembersMethods(name: string, knownKeys: string[]): string {
+  const keys = knownKeys.map(key => JSON.stringify(key)).join(', ');
+  return `
+func (v *${name}) UnmarshalJSON(data []byte) error {
+    type wire ${name}
+    return unmarshalWithExtra(data, (*wire)(v), &v.Extra, ${keys})
+}
+
+func (v ${name}) MarshalJSON() ([]byte, error) {
+    type wire ${name}
+    return marshalWithExtra(wire(v), v.Extra, ${keys})
+}`;
 }
 
 function generateStructFromInterface(
@@ -521,7 +544,7 @@ function generateStructFromInterface(
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateGoStruct(name, props, { doc: ifaceDoc, ...opts });
+  return generateGoStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 function generateFixedDiscriminantMethods(
@@ -1519,7 +1542,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// ─── Customization Enablement Union ───────────────────────────────────────');
   lines.push('');
-  lines.push(generateCustomizationEnablementGo());
+  lines.push(generateCustomizationEnablementGo(project));
   lines.push('');
 
   lines.push(generateToolInput());
@@ -1888,7 +1911,13 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-function generateCustomizationEnablementGo(): string {
+function generateCustomizationEnablementGo(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (name: string, workspace = false): string => generateGoStruct(name, [
+    { goName: 'Kind', wireName: 'kind', goType: 'string', optional: false, doc: '', isLiteralDiscriminant: false },
+    ...(workspace ? [{ goName: 'URI', wireName: 'uri', goType: 'URI', optional: false, doc: '', isLiteralDiscriminant: false }] : []),
+    { goName: 'Enabled', wireName: 'enabled', goType: 'bool', optional: false, doc: '', isLiteralDiscriminant: false },
+  ], { preserveUnknownMembers: preserve });
   return `// CustomizationEnablement is a single explicit customization enablement decision.
 type CustomizationEnablement struct {
 \tValue isCustomizationEnablement
@@ -1896,25 +1925,15 @@ type CustomizationEnablement struct {
 
 type isCustomizationEnablement interface{ isCustomizationEnablement() }
 
-type CustomizationEnablementGlobal struct {
-\tKind    string \`json:"kind"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementGlobal')}
 
 func (*CustomizationEnablementGlobal) isCustomizationEnablement() {}
 
-type CustomizationEnablementWorkspace struct {
-\tKind    string \`json:"kind"\`
-\tURI     URI    \`json:"uri"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementWorkspace', true)}
 
 func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
 
-type CustomizationEnablementSession struct {
-\tKind    string \`json:"kind"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementSession')}
 
 func (*CustomizationEnablementSession) isCustomizationEnablement() {}
 

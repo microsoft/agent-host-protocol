@@ -165,10 +165,13 @@ snapshot.
 Each SDK keeps its native validation rules. Go can use zero values for missing
 fields. TypeScript types do not perform runtime validation.
 
-Runtime model decoders accept unknown keys but do not retain them on recognized
-objects. Keep the original raw payload separately if forwarding must be
-lossless. Intentional extension fields and unknown variants keep their existing
-raw-data behavior.
+Runtime model decoders accept unknown keys but generally do not retain them on
+recognized objects. Types annotated `@preserveUnknownMembers` are the exception:
+automation patch replacement objects and their nested types retain unknown
+members on re-encode, including shared types such as `Message` and `ContentRef`.
+For other recognized objects, keep the original raw payload separately if
+forwarding must be lossless. Intentional extension fields and unknown variants
+keep their existing raw-data behavior.
 
 The statistics count items, such as text lines or notebook cells. They are not
 patch data. `ContentRef` retains its existing URI, size hint, content type, and

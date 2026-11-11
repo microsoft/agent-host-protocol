@@ -17,7 +17,7 @@ the Rust client's three-crate split:
 ## Code Generation
 
 The Go files under `ahptypes/` (except `common.go` and
-`discriminated_unions.go`) are **auto-generated** from the TypeScript
+`discriminated_unions.go`, and `unknown_members.go`) are **auto-generated** from the TypeScript
 definitions in `types/`. Do not edit these files directly. Generated
 files are committed to source control so the package is consumable via
 the Go module proxy without a code-generation toolchain.

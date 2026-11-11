@@ -141,6 +141,7 @@ export type JsonPrimitive = string | number | boolean | null;
  * An optionally-sized icon that can be displayed in a user interface.
  *
  * @category Common Types
+ * @preserveUnknownMembers
  */
 export interface Icon {
   /**
@@ -190,6 +191,7 @@ export interface Icon {
  *
  * @category Authentication
  * @see {@link https://datatracker.ietf.org/doc/html/rfc9728 | RFC 9728}
+ * @preserveUnknownMembers
  */
 export interface ProtectedResourceMetadata {
   /**
@@ -318,6 +320,7 @@ export interface ConfigSchema {
  * A zero-based position within a textual document.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface TextPosition {
   /** Zero-based line number. */
@@ -330,6 +333,7 @@ export interface TextPosition {
  * A range within a textual document.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface TextRange {
   /** Start position of the range. */
@@ -346,6 +350,7 @@ export interface TextRange {
  * text selection field.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface TextSelection {
   /** The range covered by the selection. */
@@ -356,6 +361,7 @@ export interface TextSelection {
 
 /**
  * A reference to large content stored outside the state tree.
+ * @preserveUnknownMembers
  */
 export interface ContentRef {
   /** Content URI */
@@ -428,6 +434,7 @@ export interface UsageInfo {
 
 /**
  * @category Common Types
+ * @preserveUnknownMembers
  */
 export interface ErrorInfo {
   /** Error type identifier */
