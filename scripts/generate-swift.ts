@@ -31,6 +31,7 @@ import {
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
 import { readActionOrigins } from './generate-action-origin.js';
+import { SNAPSHOT_STATE_SHAPES } from './snapshot-state-shapes.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -1128,6 +1129,11 @@ public enum ToolInput: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
+  const branches = SNAPSHOT_STATE_SHAPES.map(({ variant, type, keys }) => {
+    const condition = keys.map(key => `keys.contains("${key}")`).join(' && ');
+    return `        } else if ${condition} {
+            self = .${toCamelCase(variant)}(try ${type}(from: decoder))`;
+  }).join('\n');
   return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
@@ -1153,37 +1159,12 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     }
 
     public init(from decoder: Decoder) throws {
-        // An object with no members is an empty state, used by channels whose state has no fields.
-        // EmptyState would decode any object, so check for members explicitly.
-        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
+        let members = try decoder.container(keyedBy: MemberKey.self)
+        let keys = Set(members.allKeys.map { $0.stringValue })
+        // Select by shape before decoding so errors in recognized states propagate.
+        if keys.isEmpty {
             self = .empty(EmptyState())
-            return
-        }
-        // Try the most distinctive shapes first. SessionState has required
-        // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
-        // \`turns\`; CanvasState has required instance/provider/type identifiers;
-        // the remaining variants follow, with RootState as the
-        // catch-all.
-        if let session = try? SessionState(from: decoder) {
-            self = .session(session)
-        } else if let chat = try? ChatState(from: decoder) {
-            self = .chat(chat)
-        } else if let canvas = try? CanvasState(from: decoder) {
-            self = .canvas(canvas)
-        } else if let terminal = try? TerminalState(from: decoder) {
-            self = .terminal(terminal)
-        } else if let changeset = try? ChangesetState(from: decoder) {
-            self = .changeset(changeset)
-        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
-            self = .resourceWatch(resourceWatch)
-        } else if let annotations = try? AnnotationsState(from: decoder) {
-            self = .annotations(annotations)
-        } else if let automations = try? AutomationState(from: decoder) {
-            self = .automations(automations)
-        } else if let automationRun = try? AutomationRunState(from: decoder) {
-            self = .automationRun(automationRun)
-        } else if let root = try? RootState(from: decoder) {
-            self = .root(root)
+${branches}
         } else {
             // A state from a later protocol version: keep it rather than fail.
             self = .unknown(try AnyCodable(from: decoder))

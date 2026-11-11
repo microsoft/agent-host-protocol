@@ -8587,37 +8587,31 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     }
 
     public init(from decoder: Decoder) throws {
-        // An object with no members is an empty state, used by channels whose state has no fields.
-        // EmptyState would decode any object, so check for members explicitly.
-        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
+        let members = try decoder.container(keyedBy: MemberKey.self)
+        let keys = Set(members.allKeys.map { $0.stringValue })
+        // Select by shape before decoding so errors in recognized states propagate.
+        if keys.isEmpty {
             self = .empty(EmptyState())
-            return
-        }
-        // Try the most distinctive shapes first. SessionState has required
-        // `lifecycle` / `activeClients` / `chats`; ChatState has required
-        // `turns`; CanvasState has required instance/provider/type identifiers;
-        // the remaining variants follow, with RootState as the
-        // catch-all.
-        if let session = try? SessionState(from: decoder) {
-            self = .session(session)
-        } else if let chat = try? ChatState(from: decoder) {
-            self = .chat(chat)
-        } else if let canvas = try? CanvasState(from: decoder) {
-            self = .canvas(canvas)
-        } else if let terminal = try? TerminalState(from: decoder) {
-            self = .terminal(terminal)
-        } else if let changeset = try? ChangesetState(from: decoder) {
-            self = .changeset(changeset)
-        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
-            self = .resourceWatch(resourceWatch)
-        } else if let annotations = try? AnnotationsState(from: decoder) {
-            self = .annotations(annotations)
-        } else if let automations = try? AutomationState(from: decoder) {
-            self = .automations(automations)
-        } else if let automationRun = try? AutomationRunState(from: decoder) {
-            self = .automationRun(automationRun)
-        } else if let root = try? RootState(from: decoder) {
-            self = .root(root)
+        } else if keys.contains("automation") && keys.contains("origin") && keys.contains("sessions") {
+            self = .automationRun(try AutomationRunState(from: decoder))
+        } else if keys.contains("entries") {
+            self = .automations(try AutomationState(from: decoder))
+        } else if keys.contains("lifecycle") {
+            self = .session(try SessionState(from: decoder))
+        } else if keys.contains("turns") {
+            self = .chat(try ChatState(from: decoder))
+        } else if keys.contains("instanceId") && keys.contains("extensionId") && keys.contains("canvasId") {
+            self = .canvas(try CanvasState(from: decoder))
+        } else if keys.contains("status") && keys.contains("files") {
+            self = .changeset(try ChangesetState(from: decoder))
+        } else if keys.contains("root") && keys.contains("recursive") {
+            self = .resourceWatch(try ResourceWatchState(from: decoder))
+        } else if keys.contains("annotations") {
+            self = .annotations(try AnnotationsState(from: decoder))
+        } else if keys.contains("content") {
+            self = .terminal(try TerminalState(from: decoder))
+        } else if keys.contains("agents") {
+            self = .root(try RootState(from: decoder))
         } else {
             // A state from a later protocol version: keep it rather than fail.
             self = .unknown(try AnyCodable(from: decoder))
