@@ -196,11 +196,13 @@ export class MultiHostStateMirror {
   }
 
   /**
-   * Apply a single action envelope scoped to `hostId`. Routing uses
-   * `envelope.channel`: {@link ROOT_RESOURCE_URI} is the root channel,
-   * every other URI is identified by the channel the server announces.
+   * Apply a single action envelope scoped to `hostId`. Rejected envelopes
+   * are ignored. Routing uses `envelope.channel`: {@link ROOT_RESOURCE_URI}
+   * is the root channel; every other URI is identified by the channel the
+   * server announces.
    */
   applyEnvelope(hostId: HostId, envelope: ActionEnvelope): void {
+    if (envelope.rejectionReason !== undefined) return;
     const { channel, action } = envelope;
     if (channel === ROOT_RESOURCE_URI) {
       const root = this.rootStatesMap.get(hostId) ?? INITIAL_ROOT;

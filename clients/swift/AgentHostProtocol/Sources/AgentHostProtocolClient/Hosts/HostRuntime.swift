@@ -627,7 +627,7 @@ internal final class HostRuntime: Sendable {
             // Best-effort root state mirror update via the existing pure
             // reducer. Non-root channels slip through without effect — that's
             // the same posture as the Rust SDK.
-            if envelope.channel == RootResourceURI {
+            if envelope.channel == RootResourceURI && envelope.rejectionReason == nil {
                 state.rootState = rootReducer(state: state.rootState, action: envelope.action)
             }
         }

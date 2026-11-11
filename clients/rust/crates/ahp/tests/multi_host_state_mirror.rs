@@ -131,6 +131,35 @@ fn root_agents_changed_envelope(agents: Vec<AgentInfo>, server_seq: u64) -> Acti
 }
 
 #[test]
+fn rejected_action_envelopes_leave_state_unchanged() {
+    let mut mirror = MultiHostStateMirror::new();
+    let host = HostId::new("alpha");
+    let resource = "ahp-session:/s1";
+    mirror.apply_snapshot(&host, &session_snapshot("Old", resource));
+    let key = HostedResourceKey::new(host.clone(), resource);
+    let mut envelope = ActionEnvelope {
+        channel: resource.into(),
+        action: StateAction::SessionTitleChanged(SessionTitleChangedAction {
+            title: "New".into(),
+        }),
+        server_seq: 1,
+        origin: None,
+        rejection_reason: None,
+    };
+
+    for reason in ["not allowed", ""] {
+        envelope.rejection_reason = Some(reason.into());
+        mirror.apply_envelope(&host, &envelope);
+        assert_eq!(mirror.sessions()[&key].title, "Old");
+    }
+
+    envelope.rejection_reason = None;
+    envelope.server_seq = 2;
+    mirror.apply_envelope(&host, &envelope);
+    assert_eq!(mirror.sessions()[&key].title, "New");
+}
+
+#[test]
 fn canvases_are_reduced_and_reset_per_host() {
     let mut mirror = MultiHostStateMirror::new();
     let uri = "ahp-canvas:/preview";

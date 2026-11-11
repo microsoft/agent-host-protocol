@@ -42,6 +42,7 @@ import type {
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
 import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
+import { SessionLifecycle, SessionStatus } from '../src/types/channels-session/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
 import type { Snapshot } from '../src/types/common/state.js';
 
@@ -156,6 +157,34 @@ test('subscribe attaches before sending the request and fans out an action', asy
   assert.equal(event.params.serverSeq, 7);
 
   await client.shutdown();
+});
+
+test('state mirror ignores rejected action envelopes', () => {
+  const mirror = new AhpStateMirror();
+  const resource = 'ahp-session:/s1';
+  mirror.applySnapshot({
+    resource,
+    state: {
+      provider: 'test', title: 'Old', status: SessionStatus.Idle,
+      lifecycle: SessionLifecycle.Ready, activeClients: [], chats: [],
+    },
+    fromSeq: 0,
+  });
+  const initial = mirror.getSession(resource);
+  const envelope: ActionEnvelope = {
+    channel: resource,
+    action: { type: ActionType.SessionTitleChanged, title: 'New' },
+    serverSeq: 1,
+    origin: { clientId: 'test', clientSeq: 1 },
+  };
+
+  for (const rejectionReason of ['not allowed', '']) {
+    mirror.apply({ ...envelope, rejectionReason });
+    assert.equal(mirror.getSession(resource), initial);
+  }
+
+  mirror.apply({ ...envelope, serverSeq: 2 });
+  assert.equal(mirror.getSession(resource)?.title, 'New');
 });
 
 test('state mirror replaces and clears live canvas sources', () => {
