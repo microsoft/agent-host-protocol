@@ -1,6 +1,6 @@
 {
   "type": "changed",
-  "message": "Preserve unknown members on automation patch objects and nested shared types (`extra` in Rust/Swift/Kotlin, `Extra` in Go/.NET). Rust literals must initialize the map; Go map-bearing structs lose comparability; Swift/Kotlin consumers must recompile.",
+  "message": "Preserve unknown members on automation patch objects and nested shared types (`extra` in Rust/Swift/Kotlin, `Extra` in Go/.NET). Rust struct literals must initialize `extra` and exhaustive patterns need `..`; Go map-bearing structs lose `==` comparability; .NET record equality compares `Extra` by reference; Swift/Kotlin consumers must recompile.",
   "targets": [
     "spec",
     "rust",

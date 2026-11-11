@@ -1894,7 +1894,7 @@ public sealed record Icon
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes a protected resource's authentication requirements using
@@ -1967,7 +1967,7 @@ public sealed record ProtectedResourceMetadata
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Global state shared with every client subscribed to `ahp-root://`.</summary>
@@ -2213,7 +2213,7 @@ public sealed record ModelSelection
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selected custom agent for a session.
@@ -2231,7 +2231,7 @@ public sealed record AgentSelection
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A JSON Schema-compatible property descriptor with display extensions.
@@ -3654,7 +3654,7 @@ public sealed record MessageOrigin
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A message that initiates or steers a turn. Messages can originate from the
@@ -3720,7 +3720,7 @@ public sealed record TextPosition
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A range within a textual document.</summary>
@@ -3734,7 +3734,7 @@ public sealed record TextRange
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selection within a textual resource.
@@ -3749,7 +3749,7 @@ public sealed record TextSelection
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A simple, opaque attachment whose model representation is described by
@@ -3802,7 +3802,7 @@ public sealed record SimpleMessageAttachment
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment whose data is embedded inline as a base64 string.
@@ -3860,7 +3860,7 @@ public sealed record MessageEmbeddedResourceAttachment
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a resource by URI. The content is not
@@ -3925,7 +3925,7 @@ public sealed record MessageResourceAttachment
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references annotations on a session's annotations
@@ -3982,7 +3982,7 @@ public sealed record MessageAnnotationsAttachment
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a chat transcript through a fixed completed
@@ -4052,7 +4052,7 @@ public sealed record MessageChatAttachment
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed class MarkdownResponsePart
@@ -4087,7 +4087,7 @@ public sealed record ContentRef
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A content part that's a reference to large content stored outside the state tree.</summary>
@@ -4980,7 +4980,7 @@ public sealed record CustomizationLoadingState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container loaded successfully.</summary>
@@ -4990,7 +4990,7 @@ public sealed record CustomizationLoadedState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container partially loaded but has warnings.</summary>
@@ -5003,7 +5003,7 @@ public sealed record CustomizationDegradedState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container failed to load.</summary>
@@ -5016,7 +5016,7 @@ public sealed record CustomizationErrorState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An [Open Plugins](https://open-plugins.com/) plugin.</summary>
@@ -5195,7 +5195,7 @@ public sealed record ClientPluginCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A directory the host watches for this session.
@@ -5373,7 +5373,7 @@ public sealed record AgentCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A skill contributed by a plugin, directory, or MCP server.
@@ -5458,7 +5458,7 @@ public sealed record SkillCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A prompt contributed by a plugin or directory.</summary>
@@ -5525,7 +5525,7 @@ public sealed record PromptCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A rule contributed by a plugin or directory.
@@ -5611,7 +5611,7 @@ public sealed record RuleCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A hook manifest contributed by a plugin or directory.</summary>
@@ -5674,7 +5674,7 @@ public sealed record HookCustomization
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An MCP server contributed by a plugin or directory.
@@ -5801,7 +5801,7 @@ public sealed record McpServerCustomizationApps
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>The subset of MCP App
@@ -5858,7 +5858,7 @@ public sealed record AhpMcpUiHostCapabilities
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is registered with the host but has not yet started.</summary>
@@ -5879,7 +5879,7 @@ public sealed record McpServerStartingState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is running and serving requests.</summary>
@@ -5889,7 +5889,7 @@ public sealed record McpServerReadyState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A pre-registered OAuth client that clients use instead of dynamic client
@@ -5906,7 +5906,7 @@ public sealed record McpOAuthClient
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Reusable MCP authentication challenge — the RFC 9728 discovery info a
@@ -5956,7 +5956,7 @@ public sealed record McpAuthRequirement
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is reachable but cannot serve requests until the client
@@ -6012,7 +6012,7 @@ public sealed record McpServerAuthRequiredState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server failed to start, crashed, or otherwise transitioned to a
@@ -6027,7 +6027,7 @@ public sealed record McpServerErrorState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server has been shut down. The host MAY remove the server from the
@@ -6038,7 +6038,7 @@ public sealed record McpServerStoppedState
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record ToolCallClientContributor
@@ -6291,7 +6291,7 @@ public sealed record ErrorInfo
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
@@ -6801,7 +6801,7 @@ public sealed record AutomationSchedule
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from a recurring cron schedule evaluated by the host.</summary>
@@ -6824,7 +6824,7 @@ public sealed record AutomationScheduleTrigger
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from events understood by the owning host.
@@ -6866,7 +6866,7 @@ public sealed record AutomationEventTrigger
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined trigger event.</summary>
@@ -6884,7 +6884,7 @@ public sealed record AutomationTriggerEventDefinition
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined event trigger type available for a prospective
@@ -6973,7 +6973,7 @@ public sealed record AutomationSessionTemplate
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Durable, client-editable definition of an automation.
@@ -7080,7 +7080,7 @@ public sealed record AutomationAfterRunsCondition
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Stops scheduling once a wall-clock date passes.</summary>
@@ -7093,7 +7093,7 @@ public sealed record AutomationAfterDateCondition
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
@@ -7382,7 +7382,7 @@ public sealed record CustomizationEnablementGlobal
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementWorkspace
@@ -7391,7 +7391,7 @@ public sealed record CustomizationEnablementWorkspace
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementSession
@@ -7399,7 +7399,7 @@ public sealed record CustomizationEnablementSession
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
     [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; init; }
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>

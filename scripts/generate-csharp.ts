@@ -655,7 +655,9 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
     lines.push('');
     lines.push('    /// <summary>Unrecognized wire members retained for full-object edits.</summary>');
     lines.push('    [JsonExtensionData]');
-    lines.push(`    public Dictionary<string, JsonElement>? Extra { ${accessor} }`);
+    // Source-generated metadata binds init-only properties to the constructor,
+    // which System.Text.Json rejects for extension data.
+    lines.push('    public Dictionary<string, JsonElement>? Extra { get; set; }');
   }
   lines.push('}');
   return lines.join('\n');
@@ -1381,7 +1383,7 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 
 function generateCustomizationEnablementUnionCs(project: Project): string {
   const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
-    ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; init; }\n'
+    ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; set; }\n'
     : '';
   // Variants are inline object types in `types/`, so there are no named
   // interfaces to read the discriminator from — name the enum explicitly.
