@@ -1450,6 +1450,22 @@ pub enum AutomationTriggerKind {
     /// A host-defined external event discovered from trigger definitions.
     #[serde(rename = "event")]
     Event,
+    /// One notification-only reminder at an absolute UTC instant.
+    #[serde(rename = "once")]
+    Once,
+}
+
+/// Lifecycle of a notification-only automation reminder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationReminderStatus {
+    #[serde(rename = "scheduled")]
+    Scheduled,
+    #[serde(rename = "due")]
+    Due,
+    #[serde(rename = "dismissed")]
+    Dismissed,
+    #[serde(rename = "sent")]
+    Sent,
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -5891,6 +5907,42 @@ pub struct AutomationScheduleTrigger {
     pub misfire_policy: Option<AutomationMisfirePolicy>,
 }
 
+/// Delivers a notification-only reminder once, including after a missed wake.
+///
+/// Requires {@link AutomationCapabilities.reminders} and
+/// {@link AutomationDefinition.reminder}; it never starts an automation run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOnceTrigger {
+    /// Identifier unique and stable within this automation definition.
+    pub id: String,
+    /// ISO 8601 UTC timestamp ending in `Z`.
+    pub at: String,
+}
+
+/// Waiting for the host to claim the one-time trigger.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationReminderScheduledState {}
+
+/// Durably due for client presentation, including after reconnect or restart.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationReminderDueState {}
+
+/// Acknowledged without sending the reminder to an agent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationReminderDismissedState {}
+
+/// Explicitly handed off by a client to an agent session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationReminderSentState {
+    /// Canonical session resource returned by the host for the explicit handoff.
+    pub session: Uri,
+}
+
 /// Starts runs from events understood by the owning host.
 ///
 /// Event trigger types, events, and configuration are discovered through
@@ -6025,12 +6077,22 @@ pub struct AutomationSessionTemplate {
 pub struct AutomationDefinition {
     /// Human-readable automation name.
     pub title: String,
-    /// Initial message sent to every newly created run session. Its
+    /// Initial message sent to every newly created run session, or notification
+    /// content when {@link AutomationDefinition.reminder} is present. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     pub message: Message,
-    /// Template used to create fresh sessions for each run.
+    /// Template for fresh run sessions, or an explicit reminder handoff.
     pub session: AutomationSessionTemplate,
-    /// Whether automatic triggers may create runs. Manual runs remain available
+    /// Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.
+    /// A reminder has exactly one {@link AutomationOnceTrigger}, no disable
+    /// conditions, and is created scheduled. Its session template is only a saved
+    /// explicit-handoff template; due delivery MUST NOT allocate, create, or send
+    /// to a session, require a model, or create a run. Hosts MUST NOT advertise
+    /// {@link AutomationOperation.Run} for reminders. Existing automations cannot
+    /// change between reminder and session-execution modes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reminder: Option<AutomationReminderState>,
+    /// Whether automatic triggers may fire. Manual runs remain available
     /// whenever {@link AutomationOperation.Run} is advertised.
     pub enabled: bool,
     /// Automatic triggers. An empty list means manual-only.
@@ -6078,6 +6140,9 @@ pub struct AutomationDefinitionPatch {
     /// Replacement {@link AutomationDefinition.enabled}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// Replacement {@link AutomationDefinition.reminder}; cannot change execution mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reminder: Option<AutomationReminderState>,
     /// Complete replacement {@link AutomationDefinition.triggers}. The host
     /// validates event ids and normalizes event-trigger titles and descriptions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -6121,7 +6186,7 @@ pub struct AutomationEntry {
     pub resource: Uri,
     /// Current durable definition.
     pub definition: AutomationDefinition,
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
     /// Host-owned count of scheduled runs consumed against the current
@@ -6168,7 +6233,7 @@ pub struct AutomationEntry {
     pub customizations: Option<Vec<PluginCustomization>>,
     /// Creation timestamp in ISO 8601 format.
     pub created_at: String,
-    /// Last definition modification timestamp in ISO 8601 format.
+    /// Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation.
     pub modified_at: String,
     /// Opaque host-defined state metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -6805,6 +6870,21 @@ pub enum AutomationTrigger {
     Schedule(AutomationScheduleTrigger),
     #[serde(rename = "event")]
     Event(AutomationEventTrigger),
+    #[serde(rename = "once")]
+    Once(AutomationOnceTrigger),
+}
+/// Lifecycle of a notification-only automation reminder.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum AutomationReminderState {
+    #[serde(rename = "scheduled")]
+    Scheduled(AutomationReminderScheduledState),
+    #[serde(rename = "due")]
+    Due(AutomationReminderDueState),
+    #[serde(rename = "dismissed")]
+    Dismissed(AutomationReminderDismissedState),
+    #[serde(rename = "sent")]
+    Sent(AutomationReminderSentState),
 }
 
 /// Self-disable rule for an automation.

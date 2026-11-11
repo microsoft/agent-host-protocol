@@ -452,6 +452,9 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
+    /// Present when notification-only reminders and conditional automation updates and removals are supported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reminders: Option<AutomationRemindersCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -507,6 +510,17 @@ pub struct AutomationRunCancellationCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
+
+/// Presence capability for notification-only one-time automation reminders and
+/// {@link AutomationUpdateRequestedAction.expectedModifiedAt} and conditional
+/// automation removal.
+///
+/// Clients MUST NOT submit reminders or once triggers without this capability.
+/// Hosts MUST reject unsupported trigger kinds rather than execute them as
+/// session automations.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRemindersCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///

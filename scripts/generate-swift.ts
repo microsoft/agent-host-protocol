@@ -691,7 +691,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
-  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind', 'AutomationReminderStatus',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -758,7 +758,8 @@ const STATE_STRUCTS = [
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
   'AutomationSessionOrigin', 'AutomationSchedule',
-  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger', 'AutomationOnceTrigger',
+  'AutomationReminderScheduledState', 'AutomationReminderDueState', 'AutomationReminderDismissedState', 'AutomationReminderSentState',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
@@ -1294,6 +1295,19 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { caseName: 'schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
     { caseName: 'event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+    { caseName: 'once', structName: 'AutomationOnceTrigger', discriminantValue: 'once' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const AUTOMATION_REMINDER_STATE_UNION: UnionConfig = {
+  name: 'AutomationReminderState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'scheduled', structName: 'AutomationReminderScheduledState', discriminantValue: 'scheduled' },
+    { caseName: 'due', structName: 'AutomationReminderDueState', discriminantValue: 'due' },
+    { caseName: 'dismissed', structName: 'AutomationReminderDismissedState', discriminantValue: 'dismissed' },
+    { caseName: 'sent', structName: 'AutomationReminderSentState', discriminantValue: 'sent' },
   ],
   injectDiscriminantOnEncode: true,
 };
@@ -1410,6 +1424,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_REMINDER_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
   lines.push('');
@@ -1712,6 +1727,7 @@ const COMMAND_STRUCTS = [
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'AutomationRemindersCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
@@ -2522,6 +2538,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
+    'AutomationReminderState',
     'AutomationDisableCondition', // AUTOMATION_DISABLE_CONDITION_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union

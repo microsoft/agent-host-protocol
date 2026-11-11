@@ -214,6 +214,10 @@
           "$ref": "#/$defs/AutomationScheduleCapabilities",
           "description": "Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}."
         },
+        "reminders": {
+          "$ref": "#/$defs/AutomationRemindersCapability",
+          "description": "Present when notification-only reminders and conditional automation updates and removals are supported."
+        },
         "runCancellation": {
           "$ref": "#/$defs/AutomationRunCancellationCapability",
           "description": "Present when clients may request cancellation of `pending` or `running`\nautomation runs."
@@ -231,6 +235,11 @@
     "AutomationCustomizationsCapability": {
       "type": "object",
       "description": "Presence capability for\n{@link AutomationSessionTemplate.customizations | automation customizations}.\n\nThe empty object means \"supported\"; fields are reserved for future\ncapture options and limits.",
+      "properties": {}
+    },
+    "AutomationRemindersCapability": {
+      "type": "object",
+      "description": "Presence capability for notification-only one-time automation reminders and\n{@link AutomationUpdateRequestedAction.expectedModifiedAt} and conditional\nautomation removal.\n\nClients MUST NOT submit reminders or once triggers without this capability.\nHosts MUST reject unsupported trigger kinds rather than execute them as\nsession automations.",
       "properties": {}
     },
     "AutomationCreateCapability": {
@@ -7443,6 +7452,28 @@
         "timeZone"
       ]
     },
+    "AutomationOnceTrigger": {
+      "type": "object",
+      "description": "Delivers a notification-only reminder once, including after a missed wake.\n\nRequires {@link AutomationCapabilities.reminders} and\n{@link AutomationDefinition.reminder}; it never starts an automation run.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique and stable within this automation definition."
+        },
+        "kind": {
+          "const": "once"
+        },
+        "at": {
+          "type": "string",
+          "description": "ISO 8601 UTC timestamp ending in `Z`."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "at"
+      ]
+    },
     "AutomationScheduleTrigger": {
       "type": "object",
       "description": "Starts runs from a recurring cron schedule evaluated by the host.",
@@ -7511,6 +7542,59 @@
         "type",
         "title",
         "events"
+      ]
+    },
+    "AutomationReminderScheduledState": {
+      "type": "object",
+      "description": "Waiting for the host to claim the one-time trigger.",
+      "properties": {
+        "status": {
+          "const": "scheduled"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderDueState": {
+      "type": "object",
+      "description": "Durably due for client presentation, including after reconnect or restart.",
+      "properties": {
+        "status": {
+          "const": "due"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderDismissedState": {
+      "type": "object",
+      "description": "Acknowledged without sending the reminder to an agent.",
+      "properties": {
+        "status": {
+          "const": "dismissed"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderSentState": {
+      "type": "object",
+      "description": "Explicitly handed off by a client to an agent session.",
+      "properties": {
+        "status": {
+          "const": "sent"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Canonical session resource returned by the host for the explicit handoff."
+        }
+      },
+      "required": [
+        "status",
+        "session"
       ]
     },
     "AutomationAfterRunsCondition": {
@@ -7651,15 +7735,19 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Initial message sent to every newly created run session, or notification\ncontent when {@link AutomationDefinition.reminder} is present. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Template used to create fresh sessions for each run."
+          "description": "Template for fresh run sessions, or an explicit reminder handoff."
+        },
+        "reminder": {
+          "$ref": "#/$defs/AutomationReminderState",
+          "description": "Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.\nA reminder has exactly one {@link AutomationOnceTrigger}, no disable\nconditions, and is created scheduled. Its session template is only a saved\nexplicit-handoff template; due delivery MUST NOT allocate, create, or send\nto a session, require a model, or create a run. Hosts MUST NOT advertise\n{@link AutomationOperation.Run} for reminders. Existing automations cannot\nchange between reminder and session-execution modes."
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether automatic triggers may create runs. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised."
+          "description": "Whether automatic triggers may fire. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised."
         },
         "triggers": {
           "type": "array",
@@ -7735,7 +7823,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+          "description": "Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runCount": {
           "type": "number",
@@ -7772,7 +7860,7 @@
         },
         "modifiedAt": {
           "type": "string",
-          "description": "Last definition modification timestamp in ISO 8601 format."
+          "description": "Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation."
         },
         "_meta": {
           "type": "object",
@@ -10444,6 +10532,10 @@
           "type": "boolean",
           "description": "Replacement {@link AutomationDefinition.enabled}."
         },
+        "reminder": {
+          "$ref": "#/$defs/AutomationReminderState",
+          "description": "Replacement {@link AutomationDefinition.reminder}; cannot change execution mode."
+        },
         "triggers": {
           "type": "array",
           "items": {
@@ -10533,6 +10625,10 @@
         "changes": {
           "$ref": "#/$defs/AutomationDefinitionPatch",
           "description": "Editable {@link AutomationDefinition} fields to replace."
+        },
+        "expectedModifiedAt": {
+          "type": "string",
+          "description": "If present, the host MUST reject the update unless this equals the current\n{@link AutomationEntry.modifiedAt}, without changing durable or published\nstate. Support is guaranteed by the `automations.reminders` capability."
         }
       },
       "required": [
@@ -10560,7 +10656,7 @@
     },
     "AutomationRemovedAction": {
       "type": "object",
-      "description": "Remove one automation from {@link AutomationState.entries}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Remove}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
+      "description": "Remove one automation from {@link AutomationState.entries}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Remove}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op unless `expectedModifiedAt` is supplied.",
       "properties": {
         "type": {
           "const": "automation/removed"
@@ -10568,6 +10664,10 @@
         "resource": {
           "$ref": "#/$defs/URI",
           "description": "{@link AutomationEntry.resource} to remove."
+        },
+        "expectedModifiedAt": {
+          "type": "string",
+          "description": "If present, the host MUST reject the removal unless the target still exists\nand its {@link AutomationEntry.modifiedAt} equals this value. The comparison\nand deletion are serialized with definition mutations. Support is guaranteed\nby the `automations.reminders` capability; omission keeps unconditional removal."
         }
       },
       "required": [
@@ -11701,6 +11801,23 @@
       "type": "string",
       "description": "How a host handles schedule occurrences missed while automatic execution was\nunavailable."
     },
+    "AutomationReminderState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationReminderScheduledState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderDueState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderDismissedState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderSentState"
+        }
+      ],
+      "description": "Notification-only execution mode and durable reminder lifecycle.\n\nThe host alone advances scheduled reminders to due, atomically clearing\n{@link AutomationEntry.nextRunAt}. Clients may postpone with scheduled and\na replacement once trigger, dismiss, or record an explicit successful handoff\nas sent. Clients SHOULD use {@link AutomationUpdateRequestedAction.expectedModifiedAt}\nto reject stale actions."
+    },
     "AutomationTrigger": {
       "oneOf": [
         {
@@ -11708,9 +11825,12 @@
         },
         {
           "$ref": "#/$defs/AutomationEventTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationOnceTrigger"
         }
       ],
-      "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+      "description": "An automatic trigger for session runs or notification-only reminders.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
     },
     "AutomationDisableCondition": {
       "oneOf": [

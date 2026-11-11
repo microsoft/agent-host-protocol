@@ -1124,6 +1124,16 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case schedule = "schedule"
     /// A host-defined external event discovered from trigger definitions.
     case event = "event"
+    /// One notification-only reminder at an absolute UTC instant.
+    case once = "once"
+}
+
+/// Lifecycle of a notification-only automation reminder.
+public enum AutomationReminderStatus: String, Codable, Sendable {
+    case scheduled = "scheduled"
+    case due = "due"
+    case dismissed = "dismissed"
+    case sent = "sent"
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -6795,6 +6805,68 @@ public struct AutomationEventTrigger: Codable, Sendable {
     }
 }
 
+public struct AutomationOnceTrigger: Codable, Sendable {
+    /// Identifier unique and stable within this automation definition.
+    public var id: String
+    public var kind: AutomationTriggerKind
+    /// ISO 8601 UTC timestamp ending in `Z`.
+    public var at: String
+
+    public init(
+        id: String,
+        kind: AutomationTriggerKind,
+        at: String
+    ) {
+        self.id = id
+        self.kind = kind
+        self.at = at
+    }
+}
+
+public struct AutomationReminderScheduledState: Codable, Sendable {
+    public var status: AutomationReminderStatus
+
+    public init(
+        status: AutomationReminderStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct AutomationReminderDueState: Codable, Sendable {
+    public var status: AutomationReminderStatus
+
+    public init(
+        status: AutomationReminderStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct AutomationReminderDismissedState: Codable, Sendable {
+    public var status: AutomationReminderStatus
+
+    public init(
+        status: AutomationReminderStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct AutomationReminderSentState: Codable, Sendable {
+    public var status: AutomationReminderStatus
+    /// Canonical session resource returned by the host for the explicit handoff.
+    public var session: String
+
+    public init(
+        status: AutomationReminderStatus,
+        session: String
+    ) {
+        self.status = status
+        self.session = session
+    }
+}
+
 public struct AutomationTriggerEventDefinition: Codable, Sendable {
     /// Stable event id.
     public var id: String
@@ -6903,12 +6975,21 @@ public struct AutomationSessionTemplate: Codable, Sendable {
 public struct AutomationDefinition: Codable, Sendable {
     /// Human-readable automation name.
     public var title: String
-    /// Initial message sent to every newly created run session. Its
+    /// Initial message sent to every newly created run session, or notification
+    /// content when {@link AutomationDefinition.reminder} is present. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     public var message: Message
-    /// Template used to create fresh sessions for each run.
+    /// Template for fresh run sessions, or an explicit reminder handoff.
     public var session: AutomationSessionTemplate
-    /// Whether automatic triggers may create runs. Manual runs remain available
+    /// Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.
+    /// A reminder has exactly one {@link AutomationOnceTrigger}, no disable
+    /// conditions, and is created scheduled. Its session template is only a saved
+    /// explicit-handoff template; due delivery MUST NOT allocate, create, or send
+    /// to a session, require a model, or create a run. Hosts MUST NOT advertise
+    /// {@link AutomationOperation.Run} for reminders. Existing automations cannot
+    /// change between reminder and session-execution modes.
+    public var reminder: AutomationReminderState?
+    /// Whether automatic triggers may fire. Manual runs remain available
     /// whenever {@link AutomationOperation.Run} is advertised.
     public var enabled: Bool
     /// Automatic triggers. An empty list means manual-only.
@@ -6935,6 +7016,7 @@ public struct AutomationDefinition: Codable, Sendable {
         case title
         case message
         case session
+        case reminder
         case enabled
         case triggers
         case disableConditions
@@ -6945,6 +7027,7 @@ public struct AutomationDefinition: Codable, Sendable {
         title: String,
         message: Message,
         session: AutomationSessionTemplate,
+        reminder: AutomationReminderState? = nil,
         enabled: Bool,
         triggers: [AutomationTrigger],
         disableConditions: [AutomationDisableCondition]? = nil,
@@ -6953,6 +7036,7 @@ public struct AutomationDefinition: Codable, Sendable {
         self.title = title
         self.message = message
         self.session = session
+        self.reminder = reminder
         self.enabled = enabled
         self.triggers = triggers
         self.disableConditions = disableConditions
@@ -6972,6 +7056,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     public var session: AutomationSessionTemplate?
     /// Replacement {@link AutomationDefinition.enabled}.
     public var enabled: Bool?
+    /// Replacement {@link AutomationDefinition.reminder}; cannot change execution mode.
+    public var reminder: AutomationReminderState?
     /// Complete replacement {@link AutomationDefinition.triggers}. The host
     /// validates event ids and normalizes event-trigger titles and descriptions.
     public var triggers: [AutomationTrigger]?
@@ -6988,6 +7074,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         case message
         case session
         case enabled
+        case reminder
         case triggers
         case disableConditions
         case meta = "_meta"
@@ -6998,6 +7085,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         message: Message? = nil,
         session: AutomationSessionTemplate? = nil,
         enabled: Bool? = nil,
+        reminder: AutomationReminderState? = nil,
         triggers: [AutomationTrigger]? = nil,
         disableConditions: [AutomationDisableCondition]? = nil,
         meta: [String: AnyCodable]? = nil
@@ -7006,6 +7094,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
         self.message = message
         self.session = session
         self.enabled = enabled
+        self.reminder = reminder
         self.triggers = triggers
         self.disableConditions = disableConditions
         self.meta = meta
@@ -7045,7 +7134,7 @@ public struct AutomationEntry: Codable, Sendable {
     public var resource: String
     /// Current durable definition.
     public var definition: AutomationDefinition
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
     /// Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -7083,7 +7172,7 @@ public struct AutomationEntry: Codable, Sendable {
     public var customizations: [PluginCustomization]?
     /// Creation timestamp in ISO 8601 format.
     public var createdAt: String
-    /// Last definition modification timestamp in ISO 8601 format.
+    /// Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation.
     public var modifiedAt: String
     /// Opaque host-defined state metadata.
     public var meta: [String: AnyCodable]?
@@ -8343,6 +8432,7 @@ public enum SessionOrigin: Codable, Sendable {
 public enum AutomationTrigger: Codable, Sendable {
     case schedule(AutomationScheduleTrigger)
     case event(AutomationEventTrigger)
+    case once(AutomationOnceTrigger)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -8356,6 +8446,8 @@ public enum AutomationTrigger: Codable, Sendable {
             self = .schedule(try AutomationScheduleTrigger(from: decoder))
         case "event":
             self = .event(try AutomationEventTrigger(from: decoder))
+        case "once":
+            self = .once(try AutomationOnceTrigger(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationTrigger discriminant: \(discriminant)")
         }
@@ -8368,6 +8460,53 @@ public enum AutomationTrigger: Codable, Sendable {
             try value.encode(to: encoder)
         case .event(var value):
             value.kind = .event
+            try value.encode(to: encoder)
+        case .once(var value):
+            value.kind = .once
+            try value.encode(to: encoder)
+        }
+    }
+}
+public enum AutomationReminderState: Codable, Sendable {
+    case scheduled(AutomationReminderScheduledState)
+    case due(AutomationReminderDueState)
+    case dismissed(AutomationReminderDismissedState)
+    case sent(AutomationReminderSentState)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "scheduled":
+            self = .scheduled(try AutomationReminderScheduledState(from: decoder))
+        case "due":
+            self = .due(try AutomationReminderDueState(from: decoder))
+        case "dismissed":
+            self = .dismissed(try AutomationReminderDismissedState(from: decoder))
+        case "sent":
+            self = .sent(try AutomationReminderSentState(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationReminderState discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .scheduled(var value):
+            value.status = .scheduled
+            try value.encode(to: encoder)
+        case .due(var value):
+            value.status = .due
+            try value.encode(to: encoder)
+        case .dismissed(var value):
+            value.status = .dismissed
+            try value.encode(to: encoder)
+        case .sent(var value):
+            value.status = .sent
             try value.encode(to: encoder)
         }
     }

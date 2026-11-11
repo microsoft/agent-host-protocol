@@ -1,0 +1,18 @@
+{
+  "name": "automation-reminder-sent",
+  "group": "A",
+  "description": "An explicit reminder handoff preserves the canonical session resource without assuming a URI format.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/reminder",
+    "changes": { "reminder": { "status": "sent", "session": "vendor-session://host/canonical" } },
+    "expectedModifiedAt": "2026-11-11T19:00:00.000Z"
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/reminder",
+    "changes": { "reminder": { "status": "sent", "session": "vendor-session://host/canonical" } },
+    "expectedModifiedAt": "2026-11-11T19:00:00.000Z"
+  }]
+}

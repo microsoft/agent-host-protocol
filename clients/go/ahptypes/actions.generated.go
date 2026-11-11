@@ -1763,6 +1763,10 @@ type AutomationUpdateRequestedAction struct {
 	Resource URI `json:"resource"`
 	// Editable {@link AutomationDefinition} fields to replace.
 	Changes AutomationDefinitionPatch `json:"changes"`
+	// If present, the host MUST reject the update unless this equals the current
+	// {@link AutomationEntry.modifiedAt}, without changing durable or published
+	// state. Support is guaranteed by the `automations.reminders` capability.
+	ExpectedModifiedAt *string `json:"expectedModifiedAt,omitempty"`
 }
 
 // Add or replace one full automation state in
@@ -1783,11 +1787,16 @@ type AutomationSetAction struct {
 // before permanently deleting the automation. A rejected action leaves the
 // authoritative catalogue and durable definition unchanged.
 //
-// Removing an unknown resource is a no-op.
+// Removing an unknown resource is a no-op unless `expectedModifiedAt` is supplied.
 type AutomationRemovedAction struct {
 	Type ActionType `json:"type"`
 	// {@link AutomationEntry.resource} to remove.
 	Resource URI `json:"resource"`
+	// If present, the host MUST reject the removal unless the target still exists
+	// and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+	// and deletion are serialized with definition mutations. Support is guaranteed
+	// by the `automations.reminders` capability; omission keeps unconditional removal.
+	ExpectedModifiedAt *string `json:"expectedModifiedAt,omitempty"`
 }
 
 // Replace the run lifecycle.

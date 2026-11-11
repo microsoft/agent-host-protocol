@@ -2674,6 +2674,12 @@ public sealed record AutomationUpdateRequestedAction
 
     /// <summary>Editable {@link AutomationDefinition} fields to replace.</summary>
     public required AutomationDefinitionPatch Changes { get; init; }
+
+    /// <summary>If present, the host MUST reject the update unless this equals the current
+    /// {@link AutomationEntry.modifiedAt}, without changing durable or published
+    /// state. Support is guaranteed by the `automations.reminders` capability.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedModifiedAt { get; init; }
 }
 
 /// <summary>Add or replace one full automation state in
@@ -2696,13 +2702,20 @@ public sealed record AutomationSetAction
 /// before permanently deleting the automation. A rejected action leaves the
 /// authoritative catalogue and durable definition unchanged.
 ///
-/// Removing an unknown resource is a no-op.</summary>
+/// Removing an unknown resource is a no-op unless `expectedModifiedAt` is supplied.</summary>
 public sealed record AutomationRemovedAction
 {
     public ActionType Type { get; init; } = ActionType.AutomationRemoved;
 
     /// <summary>{@link AutomationEntry.resource} to remove.</summary>
     public required string Resource { get; init; }
+
+    /// <summary>If present, the host MUST reject the removal unless the target still exists
+    /// and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+    /// and deletion are serialized with definition mutations. Support is guaranteed
+    /// by the `automations.reminders` capability; omission keeps unconditional removal.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedModifiedAt { get; init; }
 }
 
 /// <summary>Replace the run lifecycle.

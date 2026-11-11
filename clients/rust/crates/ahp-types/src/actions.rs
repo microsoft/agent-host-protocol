@@ -2299,6 +2299,11 @@ pub struct AutomationUpdateRequestedAction {
     pub resource: Uri,
     /// Editable {@link AutomationDefinition} fields to replace.
     pub changes: AutomationDefinitionPatch,
+    /// If present, the host MUST reject the update unless this equals the current
+    /// {@link AutomationEntry.modifiedAt}, without changing durable or published
+    /// state. Support is guaranteed by the `automations.reminders` capability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_modified_at: Option<String>,
 }
 
 /// Add or replace one full automation state in
@@ -2320,12 +2325,18 @@ pub struct AutomationSetAction {
 /// before permanently deleting the automation. A rejected action leaves the
 /// authoritative catalogue and durable definition unchanged.
 ///
-/// Removing an unknown resource is a no-op.
+/// Removing an unknown resource is a no-op unless `expectedModifiedAt` is supplied.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRemovedAction {
     /// {@link AutomationEntry.resource} to remove.
     pub resource: Uri,
+    /// If present, the host MUST reject the removal unless the target still exists
+    /// and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+    /// and deletion are serialized with definition mutations. Support is guaranteed
+    /// by the `automations.reminders` capability; omission keeps unconditional removal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_modified_at: Option<String>,
 }
 
 /// Replace the run lifecycle.

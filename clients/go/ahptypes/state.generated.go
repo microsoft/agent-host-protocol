@@ -540,6 +540,18 @@ const (
 	AutomationTriggerKindSchedule AutomationTriggerKind = "schedule"
 	// A host-defined external event discovered from trigger definitions.
 	AutomationTriggerKindEvent AutomationTriggerKind = "event"
+	// One notification-only reminder at an absolute UTC instant.
+	AutomationTriggerKindOnce AutomationTriggerKind = "once"
+)
+
+// Lifecycle of a notification-only automation reminder.
+type AutomationReminderStatus string
+
+const (
+	AutomationReminderStatusScheduled AutomationReminderStatus = "scheduled"
+	AutomationReminderStatusDue       AutomationReminderStatus = "due"
+	AutomationReminderStatusDismissed AutomationReminderStatus = "dismissed"
+	AutomationReminderStatusSent      AutomationReminderStatus = "sent"
 )
 
 // Discriminant for an {@link AutomationDisableCondition}.
@@ -4241,6 +4253,40 @@ type AutomationScheduleTrigger struct {
 	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
 }
 
+// Delivers a notification-only reminder once, including after a missed wake.
+//
+// Requires {@link AutomationCapabilities.reminders} and
+// {@link AutomationDefinition.reminder}; it never starts an automation run.
+type AutomationOnceTrigger struct {
+	// Identifier unique and stable within this automation definition.
+	Id   string                `json:"id"`
+	Kind AutomationTriggerKind `json:"kind"`
+	// ISO 8601 UTC timestamp ending in `Z`.
+	At string `json:"at"`
+}
+
+// Waiting for the host to claim the one-time trigger.
+type AutomationReminderScheduledState struct {
+	Status AutomationReminderStatus `json:"status"`
+}
+
+// Durably due for client presentation, including after reconnect or restart.
+type AutomationReminderDueState struct {
+	Status AutomationReminderStatus `json:"status"`
+}
+
+// Acknowledged without sending the reminder to an agent.
+type AutomationReminderDismissedState struct {
+	Status AutomationReminderStatus `json:"status"`
+}
+
+// Explicitly handed off by a client to an agent session.
+type AutomationReminderSentState struct {
+	Status AutomationReminderStatus `json:"status"`
+	// Canonical session resource returned by the host for the explicit handoff.
+	Session URI `json:"session"`
+}
+
 // Starts runs from events understood by the owning host.
 //
 // Event trigger types, events, and configuration are discovered through
@@ -4355,12 +4401,21 @@ type AutomationSessionTemplate struct {
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Initial message sent to every newly created run session. Its
+	// Initial message sent to every newly created run session, or notification
+	// content when {@link AutomationDefinition.reminder} is present. Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
 	Message Message `json:"message"`
-	// Template used to create fresh sessions for each run.
+	// Template for fresh run sessions, or an explicit reminder handoff.
 	Session AutomationSessionTemplate `json:"session"`
-	// Whether automatic triggers may create runs. Manual runs remain available
+	// Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.
+	// A reminder has exactly one {@link AutomationOnceTrigger}, no disable
+	// conditions, and is created scheduled. Its session template is only a saved
+	// explicit-handoff template; due delivery MUST NOT allocate, create, or send
+	// to a session, require a model, or create a run. Hosts MUST NOT advertise
+	// {@link AutomationOperation.Run} for reminders. Existing automations cannot
+	// change between reminder and session-execution modes.
+	Reminder *AutomationReminderState `json:"reminder,omitempty"`
+	// Whether automatic triggers may fire. Manual runs remain available
 	// whenever {@link AutomationOperation.Run} is advertised.
 	Enabled bool `json:"enabled"`
 	// Automatic triggers. An empty list means manual-only.
@@ -4400,6 +4455,8 @@ type AutomationDefinitionPatch struct {
 	Session *AutomationSessionTemplate `json:"session,omitempty"`
 	// Replacement {@link AutomationDefinition.enabled}.
 	Enabled *bool `json:"enabled,omitempty"`
+	// Replacement {@link AutomationDefinition.reminder}; cannot change execution mode.
+	Reminder *AutomationReminderState `json:"reminder,omitempty"`
 	// Complete replacement {@link AutomationDefinition.triggers}. The host
 	// validates event ids and normalizes event-trigger titles and descriptions.
 	Triggers *[]AutomationTrigger `json:"triggers,omitempty"`
@@ -4436,7 +4493,7 @@ type AutomationEntry struct {
 	Resource URI `json:"resource"`
 	// Current durable definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+	// Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Host-owned count of scheduled runs consumed against the current
 	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -4474,7 +4531,7 @@ type AutomationEntry struct {
 	Customizations []PluginCustomization `json:"customizations,omitempty"`
 	// Creation timestamp in ISO 8601 format.
 	CreatedAt string `json:"createdAt"`
-	// Last definition modification timestamp in ISO 8601 format.
+	// Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation.
 	ModifiedAt string `json:"modifiedAt"`
 	// Opaque host-defined state metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -6154,6 +6211,7 @@ type isAutomationTrigger interface{ isAutomationTrigger() }
 
 func (*AutomationScheduleTrigger) isAutomationTrigger() {}
 func (*AutomationEventTrigger) isAutomationTrigger()    {}
+func (*AutomationOnceTrigger) isAutomationTrigger()     {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
 func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
@@ -6173,6 +6231,12 @@ func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "event":
 		var value AutomationEventTrigger
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "once":
+		var value AutomationOnceTrigger
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -6204,6 +6268,91 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"schedule\"")
 	case *AutomationEventTrigger:
 		object["kind"] = json.RawMessage("\"event\"")
+	case *AutomationOnceTrigger:
+		object["kind"] = json.RawMessage("\"once\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationReminderState is the lifecycle of a notification-only automation reminder.
+type AutomationReminderState struct {
+	Value isAutomationReminderState
+}
+
+// isAutomationReminderState is the marker interface implemented by every
+// concrete variant of AutomationReminderState.
+type isAutomationReminderState interface{ isAutomationReminderState() }
+
+func (*AutomationReminderScheduledState) isAutomationReminderState() {}
+func (*AutomationReminderDueState) isAutomationReminderState()       {}
+func (*AutomationReminderDismissedState) isAutomationReminderState() {}
+func (*AutomationReminderSentState) isAutomationReminderState()      {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *AutomationReminderState) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationReminderState", "status")
+	}
+	switch disc {
+	case "scheduled":
+		var value AutomationReminderScheduledState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "due":
+		var value AutomationReminderDueState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "dismissed":
+		var value AutomationReminderDismissedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "sent":
+		var value AutomationReminderSentState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationReminderState", "status", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationReminderState) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *AutomationReminderScheduledState:
+		object["status"] = json.RawMessage("\"scheduled\"")
+	case *AutomationReminderDueState:
+		object["status"] = json.RawMessage("\"due\"")
+	case *AutomationReminderDismissedState:
+		object["status"] = json.RawMessage("\"dismissed\"")
+	case *AutomationReminderSentState:
+		object["status"] = json.RawMessage("\"sent\"")
 	}
 	return json.Marshal(object)
 }

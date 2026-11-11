@@ -1,0 +1,42 @@
+{
+  "name": "automation-reminder-due",
+  "group": "A",
+  "description": "A due reminder remains in durable catalogue state without a next occurrence or any runs.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/reminder",
+      "definition": {
+        "title": "Check the build",
+        "message": { "text": "Check the build.", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": true,
+        "triggers": [{ "id": "once", "kind": "once", "at": "2026-11-11T19:00:00.000Z" }],
+        "reminder": { "status": "due" }
+      },
+      "runs": [],
+      "operations": ["update", "remove"],
+      "createdAt": "2026-11-11T18:00:00.000Z",
+      "modifiedAt": "2026-11-11T19:00:00.000Z"
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/reminder",
+      "definition": {
+        "title": "Check the build",
+        "message": { "text": "Check the build.", "origin": { "kind": "automation" } },
+        "session": {},
+        "enabled": true,
+        "triggers": [{ "id": "once", "kind": "once", "at": "2026-11-11T19:00:00.000Z" }],
+        "reminder": { "status": "due" }
+      },
+      "runs": [],
+      "operations": ["update", "remove"],
+      "createdAt": "2026-11-11T18:00:00.000Z",
+      "modifiedAt": "2026-11-11T19:00:00.000Z"
+    }
+  }]
+}

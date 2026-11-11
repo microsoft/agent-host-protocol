@@ -1,0 +1,16 @@
+{
+  "name": "automation-reminder-remove",
+  "group": "A",
+  "description": "A conditional removal preserves the expected revision so a stale undo cannot delete an edited reminder.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/removed",
+    "resource": "ahp-automation:/reminder",
+    "expectedModifiedAt": "2026-11-11T19:00:00.000Z"
+  },
+  "acceptableOutputs": [{
+    "type": "automation/removed",
+    "resource": "ahp-automation:/reminder",
+    "expectedModifiedAt": "2026-11-11T19:00:00.000Z"
+  }]
+}

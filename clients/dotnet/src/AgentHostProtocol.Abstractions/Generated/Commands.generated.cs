@@ -565,6 +565,10 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
+    /// <summary>Present when notification-only reminders and conditional automation updates and removals are supported.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationRemindersCapability? Reminders { get; init; }
+
     /// <summary>Present when clients may request cancellation of `pending` or `running`
     /// automation runs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -619,6 +623,17 @@ public sealed record AutomationRunCancellationCapability
 /// The empty object means "supported"; fields are reserved for future
 /// capture options and limits.</summary>
 public sealed record AutomationCustomizationsCapability
+{
+}
+
+/// <summary>Presence capability for notification-only one-time automation reminders and
+/// {@link AutomationUpdateRequestedAction.expectedModifiedAt} and conditional
+/// automation removal.
+///
+/// Clients MUST NOT submit reminders or once triggers without this capability.
+/// Hosts MUST reject unsupported trigger kinds rather than execute them as
+/// session automations.</summary>
+public sealed record AutomationRemindersCapability
 {
 }
 

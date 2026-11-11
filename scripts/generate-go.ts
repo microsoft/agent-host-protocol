@@ -736,7 +736,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
-  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind', 'AutomationReminderStatus',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -890,6 +890,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationSessionOrigin' },
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
+  { name: 'AutomationOnceTrigger' },
+  { name: 'AutomationReminderScheduledState' },
+  { name: 'AutomationReminderDueState' },
+  { name: 'AutomationReminderDismissedState' },
+  { name: 'AutomationReminderSentState' },
   { name: 'AutomationEventTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
@@ -1173,6 +1178,20 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'Once', innerType: 'AutomationOnceTrigger', wireValue: 'once' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const AUTOMATION_REMINDER_STATE_UNION: UnionConfig = {
+  name: 'AutomationReminderState',
+  discriminantField: 'status',
+  doc: 'AutomationReminderState is the lifecycle of a notification-only automation reminder.',
+  variants: [
+    { variantName: 'Scheduled', innerType: 'AutomationReminderScheduledState', wireValue: 'scheduled' },
+    { variantName: 'Due', innerType: 'AutomationReminderDueState', wireValue: 'due' },
+    { variantName: 'Dismissed', innerType: 'AutomationReminderDismissedState', wireValue: 'dismissed' },
+    { variantName: 'Sent', innerType: 'AutomationReminderSentState', wireValue: 'sent' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1566,6 +1585,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_REMINDER_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
   lines.push('');
@@ -1807,6 +1827,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationRemindersCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
@@ -2537,6 +2558,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',
     'SessionOrigin',
     'AutomationTrigger',
+    'AutomationReminderState',
     'AutomationDisableCondition',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',

@@ -9,6 +9,7 @@
     "snapshots": [],
     "automations": {
       "create": {},
+      "reminders": {},
       "schedules": {
         "minIntervalMinutes": 5
       },
@@ -23,6 +24,7 @@
     "snapshots": [],
     "automations": {
       "create": {},
+      "reminders": {},
       "schedules": {
         "minIntervalMinutes": 5
       },

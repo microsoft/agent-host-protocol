@@ -524,6 +524,8 @@ public struct AutomationCapabilities: Codable, Sendable {
     public var create: AutomationCreateCapability?
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     public var schedules: AutomationScheduleCapabilities?
+    /// Present when notification-only reminders and conditional automation updates and removals are supported.
+    public var reminders: AutomationRemindersCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     public var runCancellation: AutomationRunCancellationCapability?
@@ -538,12 +540,14 @@ public struct AutomationCapabilities: Codable, Sendable {
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
+        reminders: AutomationRemindersCapability? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
         customizations: AutomationCustomizationsCapability? = nil
     ) {
         self.create = create
         self.schedules = schedules
+        self.reminders = reminders
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
@@ -580,6 +584,14 @@ public struct AutomationRunCancellationCapability: Codable, Sendable {
 }
 
 public struct AutomationCustomizationsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationRemindersCapability: Codable, Sendable {
 
     public init(
 

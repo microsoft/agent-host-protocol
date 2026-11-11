@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Capability-gated notification-only automation reminders with one-time UTC triggers, durable lifecycle state, and conditional updates and removals."
+}

@@ -1147,7 +1147,27 @@ enum class AutomationTriggerKind {
      * A host-defined external event discovered from trigger definitions.
      */
     @SerialName("event")
-    EVENT
+    EVENT,
+    /**
+     * One notification-only reminder at an absolute UTC instant.
+     */
+    @SerialName("once")
+    ONCE
+}
+
+/**
+ * Lifecycle of a notification-only automation reminder.
+ */
+@Serializable
+enum class AutomationReminderStatus {
+    @SerialName("scheduled")
+    SCHEDULED,
+    @SerialName("due")
+    DUE,
+    @SerialName("dismissed")
+    DISMISSED,
+    @SerialName("sent")
+    SENT
 }
 
 /**
@@ -5828,6 +5848,43 @@ data class AutomationEventTrigger(
 )
 
 @Serializable
+data class AutomationOnceTrigger(
+    /**
+     * Identifier unique and stable within this automation definition.
+     */
+    val id: String,
+    val kind: AutomationTriggerKind,
+    /**
+     * ISO 8601 UTC timestamp ending in `Z`.
+     */
+    val at: String
+)
+
+@Serializable
+data class AutomationReminderScheduledState(
+    val status: AutomationReminderStatus
+)
+
+@Serializable
+data class AutomationReminderDueState(
+    val status: AutomationReminderStatus
+)
+
+@Serializable
+data class AutomationReminderDismissedState(
+    val status: AutomationReminderStatus
+)
+
+@Serializable
+data class AutomationReminderSentState(
+    val status: AutomationReminderStatus,
+    /**
+     * Canonical session resource returned by the host for the explicit handoff.
+     */
+    val session: String
+)
+
+@Serializable
 data class AutomationTriggerEventDefinition(
     /**
      * Stable event id.
@@ -5930,16 +5987,27 @@ data class AutomationDefinition(
      */
     val title: String,
     /**
-     * Initial message sent to every newly created run session. Its
+     * Initial message sent to every newly created run session, or notification
+     * content when {@link AutomationDefinition.reminder} is present. Its
      * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
      */
     val message: Message,
     /**
-     * Template used to create fresh sessions for each run.
+     * Template for fresh run sessions, or an explicit reminder handoff.
      */
     val session: AutomationSessionTemplate,
     /**
-     * Whether automatic triggers may create runs. Manual runs remain available
+     * Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.
+     * A reminder has exactly one {@link AutomationOnceTrigger}, no disable
+     * conditions, and is created scheduled. Its session template is only a saved
+     * explicit-handoff template; due delivery MUST NOT allocate, create, or send
+     * to a session, require a model, or create a run. Hosts MUST NOT advertise
+     * {@link AutomationOperation.Run} for reminders. Existing automations cannot
+     * change between reminder and session-execution modes.
+     */
+    val reminder: AutomationReminderState? = null,
+    /**
+     * Whether automatic triggers may fire. Manual runs remain available
      * whenever {@link AutomationOperation.Run} is advertised.
      */
     val enabled: Boolean,
@@ -5993,6 +6061,10 @@ data class AutomationDefinitionPatch(
      */
     val enabled: Boolean? = null,
     /**
+     * Replacement {@link AutomationDefinition.reminder}; cannot change execution mode.
+     */
+    val reminder: AutomationReminderState? = null,
+    /**
      * Complete replacement {@link AutomationDefinition.triggers}. The host
      * validates event ids and normalizes event-trigger titles and descriptions.
      */
@@ -6040,7 +6112,7 @@ data class AutomationEntry(
      */
     val definition: AutomationDefinition,
     /**
-     * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+     * Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
     /**
@@ -6092,7 +6164,7 @@ data class AutomationEntry(
      */
     val createdAt: String,
     /**
-     * Last definition modification timestamp in ISO 8601 format.
+     * Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation.
      */
     val modifiedAt: String,
     /**
@@ -7493,6 +7565,8 @@ sealed interface AutomationTrigger
 value class AutomationTriggerSchedule(val value: AutomationScheduleTrigger) : AutomationTrigger
 @JvmInline
 value class AutomationTriggerEvent(val value: AutomationEventTrigger) : AutomationTrigger
+@JvmInline
+value class AutomationTriggerOnce(val value: AutomationOnceTrigger) : AutomationTrigger
 
 internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
     override val descriptor: SerialDescriptor =
@@ -7509,6 +7583,7 @@ internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
         return when (discriminant) {
             "schedule" -> AutomationTriggerSchedule(input.json.decodeFromJsonElement(AutomationScheduleTrigger.serializer(), element))
             "event" -> AutomationTriggerEvent(input.json.decodeFromJsonElement(AutomationEventTrigger.serializer(), element))
+            "once" -> AutomationTriggerOnce(input.json.decodeFromJsonElement(AutomationOnceTrigger.serializer(), element))
             else -> error("Unknown AutomationTrigger discriminator: $discriminant")
         }
     }
@@ -7519,13 +7594,68 @@ internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
         val element: JsonElement = when (value) {
             is AutomationTriggerSchedule -> output.json.encodeToJsonElement(AutomationScheduleTrigger.serializer(), value.value)
             is AutomationTriggerEvent -> output.json.encodeToJsonElement(AutomationEventTrigger.serializer(), value.value)
+            is AutomationTriggerOnce -> output.json.encodeToJsonElement(AutomationOnceTrigger.serializer(), value.value)
         }
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
             is AutomationTriggerSchedule -> "schedule"
             is AutomationTriggerEvent -> "event"
+            is AutomationTriggerOnce -> "once"
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+@Serializable(with = AutomationReminderStateSerializer::class)
+sealed interface AutomationReminderState
+
+@JvmInline
+value class AutomationReminderStateScheduled(val value: AutomationReminderScheduledState) : AutomationReminderState
+@JvmInline
+value class AutomationReminderStateDue(val value: AutomationReminderDueState) : AutomationReminderState
+@JvmInline
+value class AutomationReminderStateDismissed(val value: AutomationReminderDismissedState) : AutomationReminderState
+@JvmInline
+value class AutomationReminderStateSent(val value: AutomationReminderSentState) : AutomationReminderState
+
+internal object AutomationReminderStateSerializer : KSerializer<AutomationReminderState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationReminderState")
+
+    override fun deserialize(decoder: Decoder): AutomationReminderState {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationReminderState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationReminderState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: error("Missing status discriminator on AutomationReminderState")
+        return when (discriminant) {
+            "scheduled" -> AutomationReminderStateScheduled(input.json.decodeFromJsonElement(AutomationReminderScheduledState.serializer(), element))
+            "due" -> AutomationReminderStateDue(input.json.decodeFromJsonElement(AutomationReminderDueState.serializer(), element))
+            "dismissed" -> AutomationReminderStateDismissed(input.json.decodeFromJsonElement(AutomationReminderDismissedState.serializer(), element))
+            "sent" -> AutomationReminderStateSent(input.json.decodeFromJsonElement(AutomationReminderSentState.serializer(), element))
+            else -> error("Unknown AutomationReminderState discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationReminderState) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationReminderState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationReminderStateScheduled -> output.json.encodeToJsonElement(AutomationReminderScheduledState.serializer(), value.value)
+            is AutomationReminderStateDue -> output.json.encodeToJsonElement(AutomationReminderDueState.serializer(), value.value)
+            is AutomationReminderStateDismissed -> output.json.encodeToJsonElement(AutomationReminderDismissedState.serializer(), value.value)
+            is AutomationReminderStateSent -> output.json.encodeToJsonElement(AutomationReminderSentState.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationReminderStateScheduled -> "scheduled"
+            is AutomationReminderStateDue -> "due"
+            is AutomationReminderStateDismissed -> "dismissed"
+            is AutomationReminderStateSent -> "sent"
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))
     }
 }

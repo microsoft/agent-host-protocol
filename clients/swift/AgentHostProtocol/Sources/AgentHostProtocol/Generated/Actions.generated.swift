@@ -2465,15 +2465,21 @@ public struct AutomationUpdateRequestedAction: Codable, Sendable {
     public var resource: String
     /// Editable {@link AutomationDefinition} fields to replace.
     public var changes: AutomationDefinitionPatch
+    /// If present, the host MUST reject the update unless this equals the current
+    /// {@link AutomationEntry.modifiedAt}, without changing durable or published
+    /// state. Support is guaranteed by the `automations.reminders` capability.
+    public var expectedModifiedAt: String?
 
     public init(
         type: ActionType,
         resource: String,
-        changes: AutomationDefinitionPatch
+        changes: AutomationDefinitionPatch,
+        expectedModifiedAt: String? = nil
     ) {
         self.type = type
         self.resource = resource
         self.changes = changes
+        self.expectedModifiedAt = expectedModifiedAt
     }
 }
 
@@ -2495,13 +2501,20 @@ public struct AutomationRemovedAction: Codable, Sendable {
     public var type: ActionType
     /// {@link AutomationEntry.resource} to remove.
     public var resource: String
+    /// If present, the host MUST reject the removal unless the target still exists
+    /// and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+    /// and deletion are serialized with definition mutations. Support is guaranteed
+    /// by the `automations.reminders` capability; omission keeps unconditional removal.
+    public var expectedModifiedAt: String?
 
     public init(
         type: ActionType,
-        resource: String
+        resource: String,
+        expectedModifiedAt: String? = nil
     ) {
         self.type = type
         self.resource = resource
+        self.expectedModifiedAt = expectedModifiedAt
     }
 }
 

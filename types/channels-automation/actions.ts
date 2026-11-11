@@ -13,6 +13,7 @@ import type {
   AutomationDisableCondition,
   AutomationEntry,
   AutomationOperation,
+  AutomationReminderState,
   AutomationSessionTemplate,
   AutomationState,
   AutomationTrigger,
@@ -40,6 +41,8 @@ export interface AutomationDefinitionPatch {
   session?: AutomationSessionTemplate;
   /** Replacement {@link AutomationDefinition.enabled}. */
   enabled?: boolean;
+  /** Replacement {@link AutomationDefinition.reminder}; cannot change execution mode. */
+  reminder?: AutomationReminderState;
   /**
    * Complete replacement {@link AutomationDefinition.triggers}. The host
    * validates event ids and normalizes event-trigger titles and descriptions.
@@ -111,6 +114,12 @@ export interface AutomationUpdateRequestedAction {
   resource: URI;
   /** Editable {@link AutomationDefinition} fields to replace. */
   changes: AutomationDefinitionPatch;
+  /**
+   * If present, the host MUST reject the update unless this equals the current
+   * {@link AutomationEntry.modifiedAt}, without changing durable or published
+   * state. Support is guaranteed by the `automations.reminders` capability.
+   */
+  expectedModifiedAt?: string;
 }
 
 /**
@@ -137,7 +146,7 @@ export interface AutomationSetAction {
  * before permanently deleting the automation. A rejected action leaves the
  * authoritative catalogue and durable definition unchanged.
  *
- * Removing an unknown resource is a no-op.
+ * Removing an unknown resource is a no-op unless `expectedModifiedAt` is supplied.
  *
  * @category Automation Actions
  * @version 1
@@ -147,4 +156,11 @@ export interface AutomationRemovedAction {
   type: ActionType.AutomationRemoved;
   /** {@link AutomationEntry.resource} to remove. */
   resource: URI;
+  /**
+   * If present, the host MUST reject the removal unless the target still exists
+   * and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+   * and deletion are serialized with definition mutations. Support is guaranteed
+   * by the `automations.reminders` capability; omission keeps unconditional removal.
+   */
+  expectedModifiedAt?: string;
 }

@@ -273,6 +273,8 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
+	// Present when notification-only reminders and conditional automation updates and removals are supported.
+	Reminders *AutomationRemindersCapability `json:"reminders,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
 	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
@@ -318,6 +320,16 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Presence capability for notification-only one-time automation reminders and
+// {@link AutomationUpdateRequestedAction.expectedModifiedAt} and conditional
+// automation removal.
+//
+// Clients MUST NOT submit reminders or once triggers without this capability.
+// Hosts MUST reject unsupported trigger kinds rather than execute them as
+// session automations.
+type AutomationRemindersCapability struct {
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.

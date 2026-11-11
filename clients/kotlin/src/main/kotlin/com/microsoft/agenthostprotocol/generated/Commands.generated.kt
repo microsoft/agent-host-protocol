@@ -527,6 +527,10 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
+     * Present when notification-only reminders and conditional automation updates and removals are supported.
+     */
+    val reminders: AutomationRemindersCapability? = null,
+    /**
      * Present when clients may request cancellation of `pending` or `running`
      * automation runs.
      */
@@ -562,6 +566,9 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+@Serializable
+class AutomationRemindersCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

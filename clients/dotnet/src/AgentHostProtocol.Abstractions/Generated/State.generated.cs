@@ -1730,6 +1730,23 @@ public enum AutomationTriggerKind
     /// <summary>A host-defined external event discovered from trigger definitions.</summary>
     [WireValue("event")]
     Event,
+    /// <summary>One notification-only reminder at an absolute UTC instant.</summary>
+    [WireValue("once")]
+    Once,
+}
+
+/// <summary>Lifecycle of a notification-only automation reminder.</summary>
+[JsonConverter(typeof(WireEnumConverter<AutomationReminderStatus>))]
+public enum AutomationReminderStatus
+{
+    [WireValue("scheduled")]
+    Scheduled,
+    [WireValue("due")]
+    Due,
+    [WireValue("dismissed")]
+    Dismissed,
+    [WireValue("sent")]
+    Sent,
 }
 
 /// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
@@ -6671,6 +6688,48 @@ public sealed record AutomationScheduleTrigger
     public AutomationMisfirePolicy? MisfirePolicy { get; init; }
 }
 
+/// <summary>Delivers a notification-only reminder once, including after a missed wake.
+///
+/// Requires {@link AutomationCapabilities.reminders} and
+/// {@link AutomationDefinition.reminder}; it never starts an automation run.</summary>
+public sealed record AutomationOnceTrigger
+{
+    /// <summary>Identifier unique and stable within this automation definition.</summary>
+    public required string Id { get; init; }
+
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.Once;
+
+    /// <summary>ISO 8601 UTC timestamp ending in `Z`.</summary>
+    public required string At { get; init; }
+}
+
+/// <summary>Waiting for the host to claim the one-time trigger.</summary>
+public sealed record AutomationReminderScheduledState
+{
+    public AutomationReminderStatus Status { get; init; } = AutomationReminderStatus.Scheduled;
+}
+
+/// <summary>Durably due for client presentation, including after reconnect or restart.</summary>
+public sealed record AutomationReminderDueState
+{
+    public AutomationReminderStatus Status { get; init; } = AutomationReminderStatus.Due;
+}
+
+/// <summary>Acknowledged without sending the reminder to an agent.</summary>
+public sealed record AutomationReminderDismissedState
+{
+    public AutomationReminderStatus Status { get; init; } = AutomationReminderStatus.Dismissed;
+}
+
+/// <summary>Explicitly handed off by a client to an agent session.</summary>
+public sealed record AutomationReminderSentState
+{
+    public AutomationReminderStatus Status { get; init; } = AutomationReminderStatus.Sent;
+
+    /// <summary>Canonical session resource returned by the host for the explicit handoff.</summary>
+    public required string Session { get; init; }
+}
+
 /// <summary>Starts runs from events understood by the owning host.
 ///
 /// Event trigger types, events, and configuration are discovered through
@@ -6819,14 +6878,25 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Initial message sent to every newly created run session. Its
+    /// <summary>Initial message sent to every newly created run session, or notification
+    /// content when {@link AutomationDefinition.reminder} is present. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.</summary>
     public required Message Message { get; init; }
 
-    /// <summary>Template used to create fresh sessions for each run.</summary>
+    /// <summary>Template for fresh run sessions, or an explicit reminder handoff.</summary>
     public required AutomationSessionTemplate Session { get; init; }
 
-    /// <summary>Whether automatic triggers may create runs. Manual runs remain available
+    /// <summary>Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.
+    /// A reminder has exactly one {@link AutomationOnceTrigger}, no disable
+    /// conditions, and is created scheduled. Its session template is only a saved
+    /// explicit-handoff template; due delivery MUST NOT allocate, create, or send
+    /// to a session, require a model, or create a run. Hosts MUST NOT advertise
+    /// {@link AutomationOperation.Run} for reminders. Existing automations cannot
+    /// change between reminder and session-execution modes.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationReminderState? Reminder { get; init; }
+
+    /// <summary>Whether automatic triggers may fire. Manual runs remain available
     /// whenever {@link AutomationOperation.Run} is advertised.</summary>
     public bool Enabled { get; init; }
 
@@ -6881,6 +6951,10 @@ public sealed record AutomationDefinitionPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
+    /// <summary>Replacement {@link AutomationDefinition.reminder}; cannot change execution mode.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationReminderState? Reminder { get; init; }
+
     /// <summary>Complete replacement {@link AutomationDefinition.triggers}. The host
     /// validates event ids and normalizes event-trigger titles and descriptions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -6930,7 +7004,7 @@ public sealed class AutomationEntry
     /// <summary>Current durable definition.</summary>
     public required AutomationDefinition Definition { get; set; }
 
-    /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
+    /// <summary>Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
 
@@ -6979,7 +7053,7 @@ public sealed class AutomationEntry
     /// <summary>Creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; set; }
 
-    /// <summary>Last definition modification timestamp in ISO 8601 format.</summary>
+    /// <summary>Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation.</summary>
     public required string ModifiedAt { get; set; }
 
     /// <summary>Opaque host-defined state metadata.</summary>
@@ -7830,6 +7904,36 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+        ["once"] = typeof(AutomationOnceTrigger),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>AutomationReminderState is the lifecycle of a notification-only automation reminder.</summary>
+[JsonConverter(typeof(AutomationReminderStateConverter))]
+public sealed class AutomationReminderState : AhpUnion
+{
+    /// <summary>Creates an empty AutomationReminderState (no active variant).</summary>
+    public AutomationReminderState() { }
+
+    /// <summary>Creates a AutomationReminderState wrapping the given variant value.</summary>
+    public AutomationReminderState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AutomationReminderState discriminated union.</summary>
+internal sealed class AutomationReminderStateConverter : UnionConverter<AutomationReminderState>
+{
+    public AutomationReminderStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["scheduled"] = typeof(AutomationReminderScheduledState),
+        ["due"] = typeof(AutomationReminderDueState),
+        ["dismissed"] = typeof(AutomationReminderDismissedState),
+        ["sent"] = typeof(AutomationReminderSentState),
             },
             allowUnknown: false)
     {

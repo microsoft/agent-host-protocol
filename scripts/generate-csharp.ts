@@ -764,7 +764,7 @@ const STATE_ENUMS = [
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind', 'AutomationReminderStatus',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -920,6 +920,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'TerminalExitedLifecycleState' },
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
+  { name: 'AutomationOnceTrigger' },
+  { name: 'AutomationReminderScheduledState' },
+  { name: 'AutomationReminderDueState' },
+  { name: 'AutomationReminderDismissedState' },
+  { name: 'AutomationReminderSentState' },
   { name: 'AutomationEventTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
@@ -1334,6 +1339,19 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'Once', innerType: 'AutomationOnceTrigger', wireValue: 'once' },
+  ],
+};
+
+const AUTOMATION_REMINDER_STATE_UNION: UnionConfig = {
+  name: 'AutomationReminderState',
+  discriminantField: 'status',
+  doc: 'AutomationReminderState is the lifecycle of a notification-only automation reminder.',
+  variants: [
+    { variantName: 'Scheduled', innerType: 'AutomationReminderScheduledState', wireValue: 'scheduled' },
+    { variantName: 'Due', innerType: 'AutomationReminderDueState', wireValue: 'due' },
+    { variantName: 'Dismissed', innerType: 'AutomationReminderDismissedState', wireValue: 'dismissed' },
+    { variantName: 'Sent', innerType: 'AutomationReminderSentState', wireValue: 'sent' },
   ],
 };
 
@@ -1603,6 +1621,7 @@ function generateStateFile(project: Project): string {
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
+    AUTOMATION_REMINDER_STATE_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
@@ -2313,6 +2332,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationRemindersCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
@@ -2913,6 +2933,7 @@ function checkExhaustiveness(project: Project): void {
     'Customization', 'ChildCustomization', 'ChildCustomizationType',
     'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
+    'AutomationReminderState',
     'AutomationDisableCondition',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',

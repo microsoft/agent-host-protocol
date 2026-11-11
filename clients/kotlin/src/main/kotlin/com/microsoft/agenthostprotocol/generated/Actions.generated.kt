@@ -1601,7 +1601,13 @@ data class AutomationUpdateRequestedAction(
     /**
      * Editable {@link AutomationDefinition} fields to replace.
      */
-    val changes: AutomationDefinitionPatch
+    val changes: AutomationDefinitionPatch,
+    /**
+     * If present, the host MUST reject the update unless this equals the current
+     * {@link AutomationEntry.modifiedAt}, without changing durable or published
+     * state. Support is guaranteed by the `automations.reminders` capability.
+     */
+    val expectedModifiedAt: String? = null
 )
 
 @Serializable
@@ -1619,7 +1625,14 @@ data class AutomationRemovedAction(
     /**
      * {@link AutomationEntry.resource} to remove.
      */
-    val resource: String
+    val resource: String,
+    /**
+     * If present, the host MUST reject the removal unless the target still exists
+     * and its {@link AutomationEntry.modifiedAt} equals this value. The comparison
+     * and deletion are serialized with definition mutations. Support is guaranteed
+     * by the `automations.reminders` capability; omission keeps unconditional removal.
+     */
+    val expectedModifiedAt: String? = null
 )
 
 @Serializable

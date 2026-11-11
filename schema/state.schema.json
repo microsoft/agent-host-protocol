@@ -5428,6 +5428,28 @@
         "timeZone"
       ]
     },
+    "AutomationOnceTrigger": {
+      "type": "object",
+      "description": "Delivers a notification-only reminder once, including after a missed wake.\n\nRequires {@link AutomationCapabilities.reminders} and\n{@link AutomationDefinition.reminder}; it never starts an automation run.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique and stable within this automation definition."
+        },
+        "kind": {
+          "const": "once"
+        },
+        "at": {
+          "type": "string",
+          "description": "ISO 8601 UTC timestamp ending in `Z`."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "at"
+      ]
+    },
     "AutomationScheduleTrigger": {
       "type": "object",
       "description": "Starts runs from a recurring cron schedule evaluated by the host.",
@@ -5496,6 +5518,59 @@
         "type",
         "title",
         "events"
+      ]
+    },
+    "AutomationReminderScheduledState": {
+      "type": "object",
+      "description": "Waiting for the host to claim the one-time trigger.",
+      "properties": {
+        "status": {
+          "const": "scheduled"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderDueState": {
+      "type": "object",
+      "description": "Durably due for client presentation, including after reconnect or restart.",
+      "properties": {
+        "status": {
+          "const": "due"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderDismissedState": {
+      "type": "object",
+      "description": "Acknowledged without sending the reminder to an agent.",
+      "properties": {
+        "status": {
+          "const": "dismissed"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "AutomationReminderSentState": {
+      "type": "object",
+      "description": "Explicitly handed off by a client to an agent session.",
+      "properties": {
+        "status": {
+          "const": "sent"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Canonical session resource returned by the host for the explicit handoff."
+        }
+      },
+      "required": [
+        "status",
+        "session"
       ]
     },
     "AutomationAfterRunsCondition": {
@@ -5636,15 +5711,19 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Initial message sent to every newly created run session, or notification\ncontent when {@link AutomationDefinition.reminder} is present. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Template used to create fresh sessions for each run."
+          "description": "Template for fresh run sessions, or an explicit reminder handoff."
+        },
+        "reminder": {
+          "$ref": "#/$defs/AutomationReminderState",
+          "description": "Notification-only execution mode, requiring {@link AutomationCapabilities.reminders}.\nA reminder has exactly one {@link AutomationOnceTrigger}, no disable\nconditions, and is created scheduled. Its session template is only a saved\nexplicit-handoff template; due delivery MUST NOT allocate, create, or send\nto a session, require a model, or create a run. Hosts MUST NOT advertise\n{@link AutomationOperation.Run} for reminders. Existing automations cannot\nchange between reminder and session-execution modes."
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether automatic triggers may create runs. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised."
+          "description": "Whether automatic triggers may fire. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised."
         },
         "triggers": {
           "type": "array",
@@ -5720,7 +5799,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+          "description": "Earliest schedule or reminder occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runCount": {
           "type": "number",
@@ -5757,7 +5836,7 @@
         },
         "modifiedAt": {
           "type": "string",
-          "description": "Last definition modification timestamp in ISO 8601 format."
+          "description": "Last definition modification timestamp in ISO 8601 format, including reminder lifecycle changes. Strictly increases for each accepted definition mutation."
         },
         "_meta": {
           "type": "object",
@@ -6577,9 +6656,29 @@
         },
         {
           "$ref": "#/$defs/AutomationEventTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationOnceTrigger"
         }
       ],
-      "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+      "description": "An automatic trigger for session runs or notification-only reminders.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+    },
+    "AutomationReminderState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationReminderScheduledState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderDueState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderDismissedState"
+        },
+        {
+          "$ref": "#/$defs/AutomationReminderSentState"
+        }
+      ],
+      "description": "Notification-only execution mode and durable reminder lifecycle.\n\nThe host alone advances scheduled reminders to due, atomically clearing\n{@link AutomationEntry.nextRunAt}. Clients may postpone with scheduled and\na replacement once trigger, dismiss, or record an explicit successful handoff\nas sent. Clients SHOULD use {@link AutomationUpdateRequestedAction.expectedModifiedAt}\nto reject stale actions."
     },
     "AutomationDisableCondition": {
       "oneOf": [

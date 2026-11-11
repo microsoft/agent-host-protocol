@@ -1,9 +1,22 @@
 # Automations
 
-Automations are durable, host-owned definitions that create fresh agent
-sessions manually or in response to recurring schedules and external events.
-They let multiple AHP clients share one catalogue, scheduler, execution claim,
-and run history instead of each client maintaining a local copy.
+Automations are durable, host-owned definitions that either create fresh agent sessions manually or in response to recurring schedules and external events, or publish notification-only reminders. Multiple AHP clients share one catalogue and scheduler rather than maintaining local copies.
+
+## Notification-only reminders
+
+Hosts advertising `automations.reminders` support one-time notification-only definitions. A reminder uses the existing message as notification content, exactly one `{ id, kind: 'once', at: '<ISO 8601 UTC timestamp ending in Z>' }` trigger, and `reminder: { status: 'scheduled' }`. It has no disable conditions. The session template may be `{}` or retain settings for an explicit later handoff; automatic delivery never allocates, creates, or sends to a session, never needs an available model, and never creates an automation run. Reminders do not advertise the `run` operation and cannot change into session-executing automations (or vice versa).
+
+At or after the instant, the host atomically persists `reminder: { status: 'due' }` and clears `nextRunAt` before publishing `automation/set`. Due state survives disconnects, sleep, and restarts; clients present that state rather than running their own scheduler. Disabled reminders wait until re-enabled. Repeated evaluation cannot deliver a second occurrence.
+
+Clients use `automation/updateRequested` to postpone (`reminder: { status: 'scheduled' }` plus a replacement once trigger), dismiss (`{ status: 'dismissed' }`), or record an explicitly completed handoff (`{ status: 'sent', session: '<canonical session resource>' }`). Only the host transitions to due. These updates should include `expectedModifiedAt` from the observed entry; a mismatch rejects the entire action without state or persistence changes. The host strictly increases `modifiedAt` on each definition mutation, including its due claim.
+
+For conditional deletion, such as undoing creation, clients include `expectedModifiedAt` on `automation/removed`. The host checks it inside the same serialized mutation queue before preparing deletion; a missing target or a changed revision rejects the removal. Omitting it preserves existing unconditional removal, including the no-op for a missing resource.
+
+Clients must gate this feature on `automations.reminders`; older hosts do not guarantee conditional updates. Unknown trigger kinds must fail closed rather than fall back to session execution. Definition `_meta` can preserve opaque client context but never controls reminder execution.
+
+Generated native models add a once-trigger variant and optional reminder fields without changing existing wire payloads. Rust consumers constructing affected structs must initialize the new optional fields (for example `reminders: None` on `AutomationCapabilities`); exhaustive trigger matches must handle `Once`.
+
+Older native clients with exhaustive trigger decoders can reject a catalogue containing `once`. The host capability lets newer clients avoid unsupported hosts; it does not negotiate catalogue filtering for older clients. Such clients must upgrade before consuming reminders.
 
 ## Key design points
 
@@ -33,6 +46,7 @@ AutomationCapabilities {
   schedules?: {
     minIntervalMinutes?: number
   }
+  reminders?: {}
   runCancellation?: {}
   runHistoryLimit?: number
   customizations?: {}
@@ -47,7 +61,7 @@ fields describe optional features and restrictions; clients use each
 automation's `operations` to determine which definition actions are currently
 allowed.
 
-`create`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
+`create`, `reminders`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
 the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
 
