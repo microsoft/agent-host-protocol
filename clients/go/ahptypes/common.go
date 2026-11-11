@@ -9,8 +9,8 @@
 // you need.
 //
 // Most of this package is generated from the canonical TypeScript
-// source-of-truth in types/. Hand-written code lives in common.go and
-// discriminated_unions.go; everything else is rewritten on
+// source-of-truth in types/. Hand-written code lives in common.go,
+// discriminated_unions.go, and unknown_members.go; everything else is rewritten on
 // `npm run generate:go`.
 //
 // # Companion packages

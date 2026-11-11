@@ -455,6 +455,12 @@ full rather than merging recursively. When accepted actions replace the same
 field, the later action in server order wins. The host rejects actions that are
 unauthorized, no longer permitted, or invalid for the current definition.
 
+Runtime-decoder clients preserve unknown members on `message`, `session`,
+`triggers`, and `disableConditions`, including nested objects and shared types
+annotated `@preserveUnknownMembers`. Editors should modify decoded values (or
+copy them with their preserved members), not rebuild replacements from known
+fields alone, so they do not erase fields added by newer protocol versions.
+
 To permanently remove an automation, a client dispatches
 `automation/removed` on `ahp-automations://`:
 

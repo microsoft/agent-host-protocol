@@ -24,6 +24,7 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
@@ -568,6 +569,7 @@ function generateRustEnum(enumDecl: EnumDeclaration): string {
 // ─── Rust Struct Generation ──────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
   /** Omit Serialize derive when a hand-written implementation is emitted. */
@@ -629,6 +631,13 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
     lines.push(`    pub ${p.rustName}: ${rustType},`);
   }
 
+  if (opts.preserveUnknownMembers) {
+    lines.push('    /// Unrecognized wire members retained for full-object edits.');
+    const omitted = props.filter(p => opts.omitDiscriminants && p.isLiteralDiscriminant);
+    const attrs = ['flatten', ...omitted.map(p => `deserialize_with = "deserialize_extra_without_${p.wireName}"`)];
+    lines.push(`    #[serde(${attrs.join(', ')})]`);
+    lines.push('    pub extra: serde_json::Map<String, serde_json::Value>,');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -823,7 +832,7 @@ function generateStructFromInterface(
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
+  return generateRustStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
@@ -1434,6 +1443,23 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  const omittedDiscriminants = new Set(STATE_STRUCTS.flatMap(entry => {
+    const iface = findInterface(project, entry.name);
+    return iface && entry.omitDiscriminants && preservesUnknownMembers(iface)
+      ? extractProps(iface, project).filter(p => p.isLiteralDiscriminant).map(p => p.wireName)
+      : [];
+  }));
+  for (const key of omittedDiscriminants) {
+    lines.push(`fn deserialize_extra_without_${key}<'de, D>(deserializer: D) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove(${JSON.stringify(key)});
+    Ok(extra)
+}`);
+    lines.push('');
+  }
+
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
@@ -1975,6 +2001,9 @@ function generateCommandsFile(project: Project): string {
 }
 
 function generateCustomizationEnablementRust(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '        #[serde(flatten)]\n        extra: serde_json::Map<String, serde_json::Value>,\n'
+    : '';
   const kind = findEnum(project, 'CustomizationEnablementKind');
   if (!kind) throw new Error('CustomizationEnablementKind enum not found');
   const unknownVariant = getEnumCompatibility(kind) === 'nonexhaustive'
@@ -1989,16 +2018,16 @@ pub enum CustomizationEnablement {
     #[serde(rename = "global")]
     Global {
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "workspace")]
     Workspace {
         uri: Uri,
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "session")]
     Session {
         enabled: bool,
-    },
+${extra}    },
 ${unknownVariant}}`;
 }
 

@@ -42,6 +42,7 @@ import {
   isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const GENERATED_HEADER =
   '// Generated from types/*.ts — do not edit\n\n' +
@@ -501,6 +502,19 @@ function generateKotlinDataClass(
   return lines.join('\n');
 }
 
+function generatePreservingKotlinDataClass(name: string, props: KotlinProp[]): string {
+  const declaration = generateKotlinDataClass(name, props)
+    .replace('@Serializable', `@KeepGeneratedSerializer\n@Serializable(with = ${name}Serializer::class)`)
+    .replace(/\n\)$/, ',\n    @Transient\n    val extra: Map<String, JsonElement> = emptyMap()\n)');
+  return `${declaration}
+
+internal object ${name}Serializer : UnknownMembersSerializer<${name}>(
+    ${name}.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)`;
+}
+
 // ─── Discriminated Union Generation ──────────────────────────────────────────
 
 interface UnionVariant {
@@ -655,7 +669,9 @@ function generateDataClassFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = ktNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  const declaration = generateKotlinDataClass(name, props);
+  const declaration = preservesUnknownMembers(iface)
+    ? generatePreservingKotlinDataClass(name, props)
+    : generateKotlinDataClass(name, props);
   if (!readStability(iface)) return declaration;
   return `${emitKDoc(getDocumentation(iface)).join('\n')}\n${declaration}`;
 }
@@ -1412,7 +1428,12 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 function generateStateFile(project: Project): string {
-  const lines: string[] = [GENERATED_HEADER];
+  const lines: string[] = [
+    GENERATED_HEADER.replace('package ', '@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\npackage '),
+    'import kotlinx.serialization.KeepGeneratedSerializer',
+    'import kotlinx.serialization.Transient',
+    'import com.microsoft.agenthostprotocol.UnknownMembersSerializer\n',
+  ];
 
   lines.push('// ─── Type Aliases ───────────────────────────────────────────────────────────');
   lines.push('');
@@ -1448,7 +1469,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// ─── Customization Enablement Union ─────────────────────────────────────');
   lines.push('');
-  lines.push(generateCustomizationEnablementKotlin());
+  lines.push(generateCustomizationEnablementKotlin(project));
   lines.push('');
 
   lines.push('// ─── Tool Input ──────────────────────────────────────────────────────────────');
@@ -1863,7 +1884,18 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-function generateCustomizationEnablementKotlin(): string {
+function generateCustomizationEnablementKotlin(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (kind: string, workspace = false): string => {
+    const props = [
+      ...(workspace ? [{ name: 'uri', wireName: 'uri', type: 'URI', optional: false, doc: '' }] : []),
+      { name: 'enabled', wireName: 'enabled', type: 'Boolean', optional: false, doc: '' },
+      { name: 'kind', wireName: 'kind', type: 'String', optional: false, doc: '' },
+    ];
+    const name = `CustomizationEnablement${kind[0].toUpperCase() + kind.slice(1)}`;
+    return (preserve ? generatePreservingKotlinDataClass(name, props) : generateKotlinDataClass(name, props))
+      .replaceAll('val kind: String', `val kind: String = ${JSON.stringify(kind)}`);
+  };
   return `/**
  * A single explicit customization enablement decision.
  */
@@ -1874,24 +1906,11 @@ sealed interface CustomizationEnablement {
     @JvmInline value class Session(val value: CustomizationEnablementSession) : CustomizationEnablement
 }
 
-@Serializable
-data class CustomizationEnablementGlobal(
-    val enabled: Boolean,
-    val kind: String = "global",
-)
+${variant('global')}
 
-@Serializable
-data class CustomizationEnablementWorkspace(
-    val uri: URI,
-    val enabled: Boolean,
-    val kind: String = "workspace",
-)
+${variant('workspace', true)}
 
-@Serializable
-data class CustomizationEnablementSession(
-    val enabled: Boolean,
-    val kind: String = "session",
-)
+${variant('session')}
 
 internal object CustomizationEnablementSerializer : KSerializer<CustomizationEnablement> {
     override val descriptor: SerialDescriptor =

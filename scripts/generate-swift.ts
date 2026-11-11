@@ -29,6 +29,7 @@ import {
   isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -405,6 +406,7 @@ function generateSwiftStruct(
   swiftName: string,
   props: SwiftProp[],
   nested?: string,
+  preserveUnknownMembers = false,
 ): string {
   const lines: string[] = [];
 
@@ -431,6 +433,11 @@ function generateSwiftStruct(
     lines.push(`    public var ${p.name}: ${p.type}`);
   }
 
+  if (preserveUnknownMembers) {
+    lines.push('    /// Unrecognized wire members retained for full-object edits.');
+    lines.push('    public var extra: [String: AnyCodable]');
+  }
+
   // Nested types
   if (nested) {
     lines.push('');
@@ -441,9 +448,9 @@ function generateSwiftStruct(
 
   // CodingKeys if needed
   const needsKeys = props.some(p => p.name !== p.wireName);
-  if (needsKeys) {
+  if (needsKeys || preserveUnknownMembers) {
     lines.push('');
-    lines.push('    enum CodingKeys: String, CodingKey {');
+    lines.push(`    enum CodingKeys: String, CodingKey${preserveUnknownMembers ? ', CaseIterable' : ''} {`);
     for (const p of props) {
       if (p.name !== p.wireName) {
         lines.push(`        case ${p.name} = ${JSON.stringify(p.wireName)}`);
@@ -460,16 +467,34 @@ function generateSwiftStruct(
     const defaultVal = p.optional ? ' = nil' : '';
     return `        ${p.name}: ${p.type}${defaultVal}`;
   });
+  if (preserveUnknownMembers) initParams.push('        extra: [String: AnyCodable] = [:]');
   lines.push('    public init(');
   lines.push(initParams.join(',\n'));
   lines.push('    ) {');
   for (const p of props) {
     lines.push(`        self.${p.name} = ${p.name}`);
   }
+  if (preserveUnknownMembers) lines.push('        self.extra = extra');
   lines.push('    }');
+  if (preserveUnknownMembers) lines.push(generateUnknownMembersCodable(props));
 
   lines.push('}');
   return lines.join('\n');
+}
+
+function generateUnknownMembersCodable(props: SwiftProp[]): string {
+  return `
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+${props.map(p => `        self.${p.name} = try container.${p.optional ? 'decodeIfPresent' : 'decode'}(${p.type.replace(/\?$/, '')}.self, forKey: .${p.name})`).join('\n')}
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+${props.map(p => `        try container.${p.optional ? 'encodeIfPresent' : 'encode'}(self.${p.name}, forKey: .${p.name})`).join('\n')}
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\\.rawValue)))
+    }`;
 }
 
 // ─── Discriminated Union Generation ──────────────────────────────────────────
@@ -585,7 +610,7 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = swiftNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  const declaration = generateSwiftStruct(name, props);
+  const declaration = generateSwiftStruct(name, props, undefined, preservesUnknownMembers(iface));
   if (!readStability(iface)) return declaration;
   const doc = getDocumentation(iface).split('\n').map(line => emitSwiftDocLine(line)).join('\n');
   return `${doc}\n${declaration}`;
@@ -1362,7 +1387,7 @@ function generateStateFile(project: Project): string {
   }
 
   lines.push('// MARK: - Customization Enablement Union\n');
-  lines.push(generateCustomizationEnablementSwift());
+  lines.push(generateCustomizationEnablementSwift(project));
   lines.push('');
 
   lines.push('// MARK: - Tool Input\n');
@@ -1846,7 +1871,19 @@ function generateCommandsFile(project: Project): string {
   return lines.join('\n');
 }
 
-function generateCustomizationEnablementSwift(): string {
+function generateCustomizationEnablementSwift(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (kind: string, workspace = false): string => {
+    const props = [
+      ...(workspace ? [{ name: 'uri', wireName: 'uri', type: 'URI', optional: false, doc: '' }] : []),
+      { name: 'enabled', wireName: 'enabled', type: 'Bool', optional: false, doc: '' },
+      { name: 'kind', wireName: 'kind', type: 'String', optional: false, doc: '' },
+    ];
+    const name = `CustomizationEnablement${kind[0].toUpperCase() + kind.slice(1)}`;
+    return generateSwiftStruct(name, props, undefined, preserve)
+      .replace('kind: String\n', `kind: String = ${JSON.stringify(kind)}\n`)
+      .replace('kind: String,', `kind: String = ${JSON.stringify(kind)},`);
+  };
   return `/// A single explicit customization enablement decision.
 public enum CustomizationEnablement: Codable, Sendable {
     case global(CustomizationEnablementGlobal)
@@ -1880,34 +1917,11 @@ public enum CustomizationEnablement: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementGlobal: Codable, Sendable {
-    public var kind: String = "global"
-    public var enabled: Bool
+${variant('global')}
 
-    public init(enabled: Bool) {
-        self.enabled = enabled
-    }
-}
+${variant('workspace', true)}
 
-public struct CustomizationEnablementWorkspace: Codable, Sendable {
-    public var kind: String = "workspace"
-    public var uri: URI
-    public var enabled: Bool
-
-    public init(uri: URI, enabled: Bool) {
-        self.uri = uri
-        self.enabled = enabled
-    }
-}
-
-public struct CustomizationEnablementSession: Codable, Sendable {
-    public var kind: String = "session"
-    public var enabled: Bool
-
-    public init(enabled: Bool) {
-        self.enabled = enabled
-    }
-}`;
+${variant('session')}`;
 }
 
 function generateChangesetOperationTargetSwift(): string {

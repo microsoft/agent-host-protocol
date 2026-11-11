@@ -1,0 +1,706 @@
+{
+  "name": "automation-patch-unknown-members",
+  "group": "A",
+  "description": "Known automation patch objects preserve unknown members through decode and re-encode, including nested message attachments, session customization trees, trigger variants and disable-condition variants. StateAction is registered in every client round-trip harness.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/a1",
+    "changes": {
+      "message": {
+        "text": "Updated prompt",
+        "origin": {
+          "kind": "automation",
+          "future": true
+        },
+        "attachments": [
+          {
+            "type": "simple",
+            "label": "Prompt",
+            "modelRepresentation": "Text",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 1,
+                "future": true
+              },
+              "end": {
+                "line": 0,
+                "character": 2,
+                "future": true
+              },
+              "future": true
+            },
+            "future": true
+          },
+          {
+            "type": "embeddedResource",
+            "label": "Image",
+            "data": "aGk=",
+            "contentType": "image/png",
+            "selection": {
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 1,
+                  "future": true
+                },
+                "end": {
+                  "line": 0,
+                  "character": 2,
+                  "future": true
+                },
+                "future": true
+              },
+              "future": true
+            },
+            "future": true
+          },
+          {
+            "type": "resource",
+            "label": "File",
+            "uri": "file:///workspace/file.txt",
+            "selection": {
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 1,
+                  "future": true
+                },
+                "end": {
+                  "line": 0,
+                  "character": 2,
+                  "future": true
+                },
+                "future": true
+              },
+              "future": true
+            },
+            "future": true
+          },
+          {
+            "type": "annotations",
+            "label": "Review",
+            "resource": "ahp-session:/s1/annotations",
+            "future": true
+          },
+          {
+            "type": "chat",
+            "label": "Earlier chat",
+            "resource": "ahp-chat:/c1",
+            "future": true
+          }
+        ],
+        "model": {
+          "id": "model-1",
+          "future": true
+        },
+        "agent": {
+          "uri": "file:///agent.md",
+          "future": true
+        },
+        "future": {
+          "nullable": null,
+          "values": [
+            false,
+            0,
+            "new"
+          ]
+        }
+      },
+      "session": {
+        "model": {
+          "id": "model-1",
+          "future": true
+        },
+        "agent": {
+          "uri": "file:///agent.md",
+          "future": true
+        },
+        "customizations": [
+          {
+            "type": "plugin",
+            "id": "p1",
+            "uri": "file:///plugin",
+            "name": "Plugin",
+            "icons": [
+              {
+                "src": "https://example.com/icon.png",
+                "future": true
+              }
+            ],
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 1,
+                "future": true
+              },
+              "end": {
+                "line": 0,
+                "character": 2,
+                "future": true
+              },
+              "future": true
+            },
+            "load": {
+              "kind": "loaded",
+              "future": true
+            },
+            "children": [
+              {
+                "type": "agent",
+                "id": "agent",
+                "uri": "file:///plugin/agent",
+                "name": "agent",
+                "future": true
+              },
+              {
+                "type": "skill",
+                "id": "skill",
+                "uri": "file:///plugin/skill",
+                "name": "skill",
+                "future": true
+              },
+              {
+                "type": "prompt",
+                "id": "prompt",
+                "uri": "file:///plugin/prompt",
+                "name": "prompt",
+                "future": true
+              },
+              {
+                "type": "rule",
+                "id": "rule",
+                "uri": "file:///plugin/rule",
+                "name": "rule",
+                "future": true
+              },
+              {
+                "type": "hook",
+                "id": "hook",
+                "uri": "file:///plugin/hook",
+                "name": "hook",
+                "future": true
+              },
+              {
+                "type": "mcpServer",
+                "id": "mcp-starting",
+                "uri": "file:///plugin/mcp.json",
+                "name": "MCP",
+                "state": {
+                  "kind": "starting",
+                  "future": true
+                },
+                "future": true,
+                "children": [
+                  {
+                    "type": "skill",
+                    "id": "mcp-skill",
+                    "uri": "file:///plugin/skill",
+                    "name": "MCP skill",
+                    "future": true
+                  }
+                ],
+                "mcpApp": {
+                  "capabilities": {
+                    "serverTools": {
+                      "listChanged": true,
+                      "future": true
+                    },
+                    "future": true
+                  },
+                  "future": true
+                }
+              },
+              {
+                "type": "mcpServer",
+                "id": "mcp-ready",
+                "uri": "file:///plugin/mcp.json",
+                "name": "MCP",
+                "state": {
+                  "kind": "ready",
+                  "future": true
+                },
+                "future": true
+              },
+              {
+                "type": "mcpServer",
+                "id": "mcp-authRequired",
+                "uri": "file:///plugin/mcp.json",
+                "name": "MCP",
+                "state": {
+                  "kind": "authRequired",
+                  "future": true,
+                  "reason": "required",
+                  "resource": {
+                    "resource": "https://example.com",
+                    "authorization_servers": [
+                      "https://auth.example.com"
+                    ],
+                    "future": true
+                  },
+                  "oauthClient": {
+                    "clientId": "public-client",
+                    "future": true
+                  }
+                },
+                "future": true
+              },
+              {
+                "type": "mcpServer",
+                "id": "mcp-error",
+                "uri": "file:///plugin/mcp.json",
+                "name": "MCP",
+                "state": {
+                  "kind": "error",
+                  "future": true,
+                  "error": {
+                    "errorType": "example",
+                    "message": "Unavailable",
+                    "future": true
+                  }
+                },
+                "future": true
+              },
+              {
+                "type": "mcpServer",
+                "id": "mcp-stopped",
+                "uri": "file:///plugin/mcp.json",
+                "name": "MCP",
+                "state": {
+                  "kind": "stopped",
+                  "future": true
+                },
+                "future": true
+              }
+            ],
+            "enablement": [
+              {
+                "kind": "global",
+                "enabled": true,
+                "future": true
+              },
+              {
+                "kind": "workspace",
+                "uri": "file:///workspace",
+                "enabled": false,
+                "future": true
+              },
+              {
+                "kind": "session",
+                "enabled": true,
+                "future": true
+              }
+            ],
+            "childEnablement": {
+              "agent": [
+                {
+                  "kind": "global",
+                  "enabled": true,
+                  "future": true
+                }
+              ]
+            },
+            "future": true
+          }
+        ],
+        "future": true
+      },
+      "triggers": [
+        {
+          "id": "schedule",
+          "kind": "schedule",
+          "schedule": {
+            "expression": "30 9 * * 1-5",
+            "timeZone": "UTC",
+            "future": true
+          },
+          "future": true,
+          "extra": {
+            "wireMember": 42
+          }
+        },
+        {
+          "id": "event",
+          "kind": "event",
+          "type": "repository",
+          "title": "Repository",
+          "events": [
+            {
+              "id": "push",
+              "title": "Push",
+              "future": true
+            }
+          ],
+          "config": {
+            "future": true
+          },
+          "future": true
+        }
+      ],
+      "disableConditions": [
+        {
+          "kind": "afterRuns",
+          "max": 3,
+          "future": true
+        },
+        {
+          "kind": "afterDate",
+          "date": "2026-12-01T00:00:00Z",
+          "future": true
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "automation/updateRequested",
+      "resource": "ahp-automation:/a1",
+      "changes": {
+        "message": {
+          "text": "Updated prompt",
+          "origin": {
+            "kind": "automation",
+            "future": true
+          },
+          "attachments": [
+            {
+              "type": "simple",
+              "label": "Prompt",
+              "modelRepresentation": "Text",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 1,
+                  "future": true
+                },
+                "end": {
+                  "line": 0,
+                  "character": 2,
+                  "future": true
+                },
+                "future": true
+              },
+              "future": true
+            },
+            {
+              "type": "embeddedResource",
+              "label": "Image",
+              "data": "aGk=",
+              "contentType": "image/png",
+              "selection": {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 1,
+                    "future": true
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 2,
+                    "future": true
+                  },
+                  "future": true
+                },
+                "future": true
+              },
+              "future": true
+            },
+            {
+              "type": "resource",
+              "label": "File",
+              "uri": "file:///workspace/file.txt",
+              "selection": {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 1,
+                    "future": true
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 2,
+                    "future": true
+                  },
+                  "future": true
+                },
+                "future": true
+              },
+              "future": true
+            },
+            {
+              "type": "annotations",
+              "label": "Review",
+              "resource": "ahp-session:/s1/annotations",
+              "future": true
+            },
+            {
+              "type": "chat",
+              "label": "Earlier chat",
+              "resource": "ahp-chat:/c1",
+              "future": true
+            }
+          ],
+          "model": {
+            "id": "model-1",
+            "future": true
+          },
+          "agent": {
+            "uri": "file:///agent.md",
+            "future": true
+          },
+          "future": {
+            "nullable": null,
+            "values": [
+              false,
+              0,
+              "new"
+            ]
+          }
+        },
+        "session": {
+          "model": {
+            "id": "model-1",
+            "future": true
+          },
+          "agent": {
+            "uri": "file:///agent.md",
+            "future": true
+          },
+          "customizations": [
+            {
+              "type": "plugin",
+              "id": "p1",
+              "uri": "file:///plugin",
+              "name": "Plugin",
+              "icons": [
+                {
+                  "src": "https://example.com/icon.png",
+                  "future": true
+                }
+              ],
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 1,
+                  "future": true
+                },
+                "end": {
+                  "line": 0,
+                  "character": 2,
+                  "future": true
+                },
+                "future": true
+              },
+              "load": {
+                "kind": "loaded",
+                "future": true
+              },
+              "children": [
+                {
+                  "type": "agent",
+                  "id": "agent",
+                  "uri": "file:///plugin/agent",
+                  "name": "agent",
+                  "future": true
+                },
+                {
+                  "type": "skill",
+                  "id": "skill",
+                  "uri": "file:///plugin/skill",
+                  "name": "skill",
+                  "future": true
+                },
+                {
+                  "type": "prompt",
+                  "id": "prompt",
+                  "uri": "file:///plugin/prompt",
+                  "name": "prompt",
+                  "future": true
+                },
+                {
+                  "type": "rule",
+                  "id": "rule",
+                  "uri": "file:///plugin/rule",
+                  "name": "rule",
+                  "future": true
+                },
+                {
+                  "type": "hook",
+                  "id": "hook",
+                  "uri": "file:///plugin/hook",
+                  "name": "hook",
+                  "future": true
+                },
+                {
+                  "type": "mcpServer",
+                  "id": "mcp-starting",
+                  "uri": "file:///plugin/mcp.json",
+                  "name": "MCP",
+                  "state": {
+                    "kind": "starting",
+                    "future": true
+                  },
+                  "future": true,
+                  "children": [
+                    {
+                      "type": "skill",
+                      "id": "mcp-skill",
+                      "uri": "file:///plugin/skill",
+                      "name": "MCP skill",
+                      "future": true
+                    }
+                  ],
+                  "mcpApp": {
+                    "capabilities": {
+                      "serverTools": {
+                        "listChanged": true,
+                        "future": true
+                      },
+                      "future": true
+                    },
+                    "future": true
+                  }
+                },
+                {
+                  "type": "mcpServer",
+                  "id": "mcp-ready",
+                  "uri": "file:///plugin/mcp.json",
+                  "name": "MCP",
+                  "state": {
+                    "kind": "ready",
+                    "future": true
+                  },
+                  "future": true
+                },
+                {
+                  "type": "mcpServer",
+                  "id": "mcp-authRequired",
+                  "uri": "file:///plugin/mcp.json",
+                  "name": "MCP",
+                  "state": {
+                    "kind": "authRequired",
+                    "future": true,
+                    "reason": "required",
+                    "resource": {
+                      "resource": "https://example.com",
+                      "authorization_servers": [
+                        "https://auth.example.com"
+                      ],
+                      "future": true
+                    },
+                    "oauthClient": {
+                      "clientId": "public-client",
+                      "future": true
+                    }
+                  },
+                  "future": true
+                },
+                {
+                  "type": "mcpServer",
+                  "id": "mcp-error",
+                  "uri": "file:///plugin/mcp.json",
+                  "name": "MCP",
+                  "state": {
+                    "kind": "error",
+                    "future": true,
+                    "error": {
+                      "errorType": "example",
+                      "message": "Unavailable",
+                      "future": true
+                    }
+                  },
+                  "future": true
+                },
+                {
+                  "type": "mcpServer",
+                  "id": "mcp-stopped",
+                  "uri": "file:///plugin/mcp.json",
+                  "name": "MCP",
+                  "state": {
+                    "kind": "stopped",
+                    "future": true
+                  },
+                  "future": true
+                }
+              ],
+              "enablement": [
+                {
+                  "kind": "global",
+                  "enabled": true,
+                  "future": true
+                },
+                {
+                  "kind": "workspace",
+                  "uri": "file:///workspace",
+                  "enabled": false,
+                  "future": true
+                },
+                {
+                  "kind": "session",
+                  "enabled": true,
+                  "future": true
+                }
+              ],
+              "childEnablement": {
+                "agent": [
+                  {
+                    "kind": "global",
+                    "enabled": true,
+                    "future": true
+                  }
+                ]
+              },
+              "future": true
+            }
+          ],
+          "future": true
+        },
+        "triggers": [
+          {
+            "id": "schedule",
+            "kind": "schedule",
+            "schedule": {
+              "expression": "30 9 * * 1-5",
+              "timeZone": "UTC",
+              "future": true
+            },
+            "future": true,
+            "extra": {
+              "wireMember": 42
+            }
+          },
+          {
+            "id": "event",
+            "kind": "event",
+            "type": "repository",
+            "title": "Repository",
+            "events": [
+              {
+                "id": "push",
+                "title": "Push",
+                "future": true
+              }
+            ],
+            "config": {
+              "future": true
+            },
+            "future": true
+          }
+        ],
+        "disableConditions": [
+          {
+            "kind": "afterRuns",
+            "max": 3,
+            "future": true
+          },
+          {
+            "kind": "afterDate",
+            "date": "2026-12-01T00:00:00Z",
+            "future": true
+          }
+        ]
+      }
+    }
+  ]
+}
