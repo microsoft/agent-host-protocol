@@ -6845,17 +6845,10 @@ pub enum AutomationRunLifecycle {
 
 /// The state payload of a snapshot.
 ///
-/// Deserialized by trying the empty state first (an object with no members,
-/// used by channels whose state has no fields), then session (has required `lifecycle`), then
-/// chat (has required `turns`), then canvas (has required instance/provider/type
-/// identifiers), then terminal (has required `content`),
-/// then changeset (has required `status` and `files`), then resource-watch
-/// (has required `root` and `recursive`), then annotations (has required
-/// `annotations`), then the automation catalogue (has required
-/// `automations`), then root (has required `agents`). A state that matches
-/// none of these, such as the state of a channel added in a later protocol
-/// version, decodes as `Unknown` and keeps its raw JSON.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Selects a variant by its distinctive object members, then decodes it strictly.
+/// The automation catalogue is identified by its required `entries` member.
+/// Only objects matching no known shape decode as `Unknown`, preserving raw JSON.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Empty(EmptyState),
@@ -6872,4 +6865,79 @@ pub enum SnapshotState {
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for SnapshotState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let Some(object) = value.as_object() else {
+            return Err(serde::de::Error::custom(
+                "expected an object for SnapshotState",
+            ));
+        };
+        if object.is_empty() {
+            Ok(Self::Empty(EmptyState {}))
+        } else if object.contains_key("automation")
+            && object.contains_key("origin")
+            && object.contains_key("sessions")
+        {
+            serde_json::from_value::<AutomationRunState>(value)
+                .map(Box::new)
+                .map(Self::AutomationRun)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("entries") {
+            serde_json::from_value::<AutomationState>(value)
+                .map(Box::new)
+                .map(Self::Automations)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("lifecycle") {
+            serde_json::from_value::<SessionState>(value)
+                .map(Box::new)
+                .map(Self::Session)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("turns") {
+            serde_json::from_value::<ChatState>(value)
+                .map(Box::new)
+                .map(Self::Chat)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("instanceId")
+            && object.contains_key("extensionId")
+            && object.contains_key("canvasId")
+        {
+            serde_json::from_value::<CanvasState>(value)
+                .map(Box::new)
+                .map(Self::Canvas)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("status") && object.contains_key("files") {
+            serde_json::from_value::<ChangesetState>(value)
+                .map(Box::new)
+                .map(Self::Changeset)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("root") && object.contains_key("recursive") {
+            serde_json::from_value::<ResourceWatchState>(value)
+                .map(Box::new)
+                .map(Self::ResourceWatch)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("annotations") {
+            serde_json::from_value::<AnnotationsState>(value)
+                .map(Box::new)
+                .map(Self::Annotations)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("content") {
+            serde_json::from_value::<TerminalState>(value)
+                .map(Box::new)
+                .map(Self::Terminal)
+                .map_err(serde::de::Error::custom)
+        } else if object.contains_key("agents") {
+            serde_json::from_value::<RootState>(value)
+                .map(Box::new)
+                .map(Self::Root)
+                .map_err(serde::de::Error::custom)
+        } else {
+            Ok(Self::Unknown(value))
+        }
+    }
 }

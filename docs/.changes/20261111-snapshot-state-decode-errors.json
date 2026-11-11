@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Snapshot state decoding now propagates errors for recognized shapes instead of treating malformed states as unknown.",
+  "targets": ["swift", "rust"],
+  "issues": [590]
+}
