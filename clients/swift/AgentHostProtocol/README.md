@@ -83,6 +83,23 @@ for snapshot in initialized.snapshots {
 
 `AHPStateMirror` is a convenience for simple consumers. Larger apps can keep their own state store and route snapshots/actions through the generated reducers directly.
 
+## Typed Commands
+
+Every command params type conforms to the generated `AHPCommand` protocol,
+which binds its wire method to its result type. Use `request(_:)` without a
+method string or result annotation:
+
+```swift
+let sessions = try await client.request(ListSessionsParams(channel: RootResourceURI))
+print(sessions.items)
+
+try await client.request(CreateSessionParams(channel: "ahp-session:/my-session", provider: "my-agent"))
+```
+
+Commands with JSON `null` results return `AHPNullResult`. For host-specific
+extensions, `request(method:params:)` and `requestRaw(method:paramsData:)`
+remain available.
+
 ## Multi-Host Client
 
 Use `MultiHostClient` when one app talks to more than one AHP host, or when you want the same supervisor model for a single host. It owns per-host transport creation, reconnect backoff, stable `clientId` lookup, event fan-in, session-summary caches, generation-checked client handles, and deterministic aggregated views.

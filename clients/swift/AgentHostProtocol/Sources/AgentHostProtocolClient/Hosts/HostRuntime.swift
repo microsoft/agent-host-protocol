@@ -356,7 +356,7 @@ internal final class HostRuntime: Sendable {
         // connect; kept in sync by notifications afterward. Failures are
         // non-fatal: the cache stays as-is.
         let summaries: ListSessionsResult? = if config.refreshSessionSummariesOnConnect {
-            try? await client.request(method: "listSessions", params: ListSessionsParams(channel: RootResourceURI))
+            try? await client.request(ListSessionsParams(channel: RootResourceURI))
         } else {
             nil
         }
