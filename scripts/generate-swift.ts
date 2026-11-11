@@ -29,6 +29,7 @@ import {
   isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { readActionOrigins } from './generate-action-origin.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -416,9 +417,9 @@ function generateSwiftStruct(
   const isRecursive = props.some(p => p.type === swiftName || p.type === `${swiftName}?`);
 
   if (isRecursive) {
-    lines.push(`public final class ${swiftName}: Codable, @unchecked Sendable {`);
+    lines.push(`public final class ${swiftName}: Codable, @unchecked Sendable, Equatable {`);
   } else {
-    lines.push(`public struct ${swiftName}: Codable, Sendable {`);
+    lines.push(`public struct ${swiftName}: Codable, Sendable, Equatable {`);
   }
 
   // Properties
@@ -468,6 +469,14 @@ function generateSwiftStruct(
   }
   lines.push('    }');
 
+  // Swift synthesizes equality for value types, but not recursive classes.
+  if (isRecursive) {
+    lines.push('');
+    lines.push(`    public static func == (lhs: ${swiftName}, rhs: ${swiftName}) -> Bool {`);
+    lines.push(props.map(p => `        lhs.${p.name} == rhs.${p.name}`).join(' &&\n'));
+    lines.push('    }');
+  }
+
   lines.push('}');
   return lines.join('\n');
 }
@@ -509,7 +518,7 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
     config.discriminatorEnum,
   );
   const lines: string[] = [];
-  lines.push(`public enum ${config.name}: Codable, Sendable {`);
+  lines.push(`public enum ${config.name}: Codable, Sendable, Equatable {`);
 
   for (const v of config.variants) {
     lines.push(`    case ${v.caseName}(${v.structName})`);
@@ -600,7 +609,7 @@ function generateFixedChatSourceBranchSwift(
   const hasSelection = name === 'SideChatSource';
   const lines = [
     ...doc.split('\n').map(line => emitSwiftDocLine(line)),
-    `public struct ${name}: Codable, Sendable {`,
+    `public struct ${name}: Codable, Sendable, Equatable {`,
     '    /// Discriminant',
     `    public var kind: ChatSourceKind { .${kindCase} }`,
     '    /// URI of the existing source chat.',
@@ -1004,7 +1013,7 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
 };
 
 function generateToolResultContentUnion(): string {
-  return `public enum ToolResultContent: Codable, Sendable {
+  return `public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
     case resource(ToolResultResourceContent)
@@ -1086,7 +1095,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
         }
     }
 
-    private struct MarkdownWrapper: Codable {
+    private struct MarkdownWrapper: Codable, Equatable {
         let markdown: String
     }
 }`;
@@ -1094,7 +1103,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 
 function generateToolInput(): string {
   return `/// Raw tool input represented inline or by content reference.
-public enum ToolInput: Codable, Sendable {
+public enum ToolInput: Codable, Sendable, Equatable {
     case inline(String)
     case contentRef(ContentRef)
 
@@ -1119,7 +1128,7 @@ public enum ToolInput: Codable, Sendable {
 
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
-public enum SnapshotState: Codable, Sendable {
+public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
@@ -1201,7 +1210,7 @@ public enum SnapshotState: Codable, Sendable {
 
 
 function generateChatOriginSwift(): string {
-  return `public struct ChatOriginUser: Codable, Sendable {
+  return `public struct ChatOriginUser: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
 
     public init(kind: ChatOriginKind = .user) {
@@ -1209,7 +1218,7 @@ function generateChatOriginSwift(): string {
     }
 }
 
-public struct ChatOriginFork: Codable, Sendable {
+public struct ChatOriginFork: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -1221,7 +1230,7 @@ public struct ChatOriginFork: Codable, Sendable {
     }
 }
 
-public struct ChatOriginTool: Codable, Sendable {
+public struct ChatOriginTool: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var toolCallId: String
@@ -1233,7 +1242,7 @@ public struct ChatOriginTool: Codable, Sendable {
     }
 }
 
-public struct ChatOriginSideChat: Codable, Sendable {
+public struct ChatOriginSideChat: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -1247,7 +1256,7 @@ public struct ChatOriginSideChat: Codable, Sendable {
     }
 }
 
-public enum ChatOrigin: Codable, Sendable {
+public enum ChatOrigin: Codable, Sendable, Equatable {
     case user(ChatOriginUser)
     case fork(ChatOriginFork)
     case sideChat(ChatOriginSideChat)
@@ -1544,7 +1553,7 @@ function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Sess
   const className = `${scope}ToolCallConfirmedAction`;
   const wireType = scope === 'Chat' ? 'chat/toolCallConfirmed' : 'session/toolCallConfirmed';
   return `/// Client approves or denies a pending tool call (merged approved + denied variants).
-public struct ${className}: Codable, Sendable {
+public struct ${className}: Codable, Sendable, Equatable {
     /// Action type discriminant
     public var type: String
     /// Turn identifier
@@ -1657,7 +1666,7 @@ function generateActionsFile(project: Project): string {
   // StateAction discriminated union
   lines.push('// MARK: - StateAction Union\n');
   lines.push('/// Discriminated union of all state actions.');
-  lines.push('public enum StateAction: Codable, Sendable {');
+  lines.push('public enum StateAction: Codable, Sendable, Equatable {');
   for (const v of ACTION_VARIANTS) {
     lines.push(`    case ${v.caseName}(${v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : v.tsInterface === '_merged_chat_' ? 'ChatToolCallConfirmedAction' : v.tsInterface})`);
   }
@@ -1699,6 +1708,33 @@ function generateActionsFile(project: Project): string {
   lines.push('');
 
   return lines.join('\n');
+}
+
+function generateActionOriginFile(project: Project): string {
+  const dispatchable = readActionOrigins(project)
+    .filter(action => action.isClientDispatchable)
+    .map(action => {
+      const variant = ACTION_VARIANTS.find(variant => variant.type === action.actionType);
+      if (!variant) throw new Error(`Missing Swift action variant for ${action.name}`);
+      return variant;
+    });
+
+  return `${GENERATED_HEADER}
+/// Set of action types that clients are allowed to dispatch.
+public let clientDispatchableActions: Set<String> = [
+${dispatchable.map(action => `    ${JSON.stringify(action.type)},`).join('\n')}
+]
+
+/// Checks whether an action may be dispatched by a client.
+public func isClientDispatchable(_ action: StateAction) -> Bool {
+    switch action {
+    case ${dispatchable.map(action => `.${action.caseName}`).join(',\n         ')}:
+        return true
+    default:
+        return false
+    }
+}
+`;
 }
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
@@ -1848,7 +1884,7 @@ function generateCommandsFile(project: Project): string {
 
 function generateCustomizationEnablementSwift(): string {
   return `/// A single explicit customization enablement decision.
-public enum CustomizationEnablement: Codable, Sendable {
+public enum CustomizationEnablement: Codable, Sendable, Equatable {
     case global(CustomizationEnablementGlobal)
     case workspace(CustomizationEnablementWorkspace)
     case session(CustomizationEnablementSession)
@@ -1880,7 +1916,7 @@ public enum CustomizationEnablement: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementGlobal: Codable, Sendable {
+public struct CustomizationEnablementGlobal: Codable, Sendable, Equatable {
     public var kind: String = "global"
     public var enabled: Bool
 
@@ -1889,7 +1925,7 @@ public struct CustomizationEnablementGlobal: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementWorkspace: Codable, Sendable {
+public struct CustomizationEnablementWorkspace: Codable, Sendable, Equatable {
     public var kind: String = "workspace"
     public var uri: URI
     public var enabled: Bool
@@ -1900,7 +1936,7 @@ public struct CustomizationEnablementWorkspace: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementSession: Codable, Sendable {
+public struct CustomizationEnablementSession: Codable, Sendable, Equatable {
     public var kind: String = "session"
     public var enabled: Bool
 
@@ -1912,7 +1948,7 @@ public struct CustomizationEnablementSession: Codable, Sendable {
 
 function generateChangesetOperationTargetSwift(): string {
   return `/// Identifies the file or range a \`ChangesetOperation\` should act on.
-public enum ChangesetOperationTarget: Codable, Sendable {
+public enum ChangesetOperationTarget: Codable, Sendable, Equatable {
     case resource(ChangesetOperationResourceTarget)
     case range(ChangesetOperationRangeTarget)
 
@@ -1941,7 +1977,7 @@ public enum ChangesetOperationTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationResourceTarget: Codable, Sendable {
+public struct ChangesetOperationResourceTarget: Codable, Sendable, Equatable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
@@ -1970,7 +2006,7 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationRangeTarget: Codable, Sendable {
+public struct ChangesetOperationRangeTarget: Codable, Sendable, Equatable {
     public var kind: String { "range" }
     public var resource: String
     public var side: String?
@@ -2158,7 +2194,7 @@ public struct JsonRpcRequest<Params: Codable>: Codable, Sendable where Params: S
 }
 
 /// A JSON-RPC 2.0 error object.
-public struct JsonRpcError: Codable, Sendable {
+public struct JsonRpcError: Codable, Sendable, Equatable {
     public let code: Int
     public let message: String
     public let data: AnyCodable?
@@ -2178,7 +2214,7 @@ public struct JsonRpcSuccessResponse<Result: Codable>: Codable, Sendable where R
 }
 
 /// A JSON-RPC 2.0 error response.
-public struct JsonRpcErrorResponse: Codable, Sendable {
+public struct JsonRpcErrorResponse: Codable, Sendable, Equatable {
     public let jsonrpc: String
     public let id: Int
     public let error: JsonRpcError
@@ -2196,6 +2232,10 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
         self.params = params
     }
 }
+
+extension JsonRpcRequest: Equatable where Params: Equatable {}
+extension JsonRpcSuccessResponse: Equatable where Result: Equatable {}
+extension JsonRpcNotification: Equatable where Params: Equatable {}
 
 // MARK: - Server → Client Notification Params
 
@@ -2628,6 +2668,7 @@ export function generateSwiftPackage(project: Project, outputDir: string): void 
   // Generated files (always overwritten)
   fs.writeFileSync(path.join(generatedDir, 'State.generated.swift'), generateStateFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Actions.generated.swift'), generateActionsFile(project));
+  fs.writeFileSync(path.join(generatedDir, 'ActionOrigin.generated.swift'), generateActionOriginFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Commands.generated.swift'), generateCommandsFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Notifications.generated.swift'), generateNotificationsFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Errors.generated.swift'), generateErrorsFile(project));

@@ -1,0 +1,10 @@
+{
+  "type": "added",
+  "message": "Add `Equatable` conformance to generated Swift protocol models, including associated-value enums and conditional conformance for generic JSON-RPC wrappers.",
+  "issues": [
+    591
+  ],
+  "targets": [
+    "swift"
+  ]
+}

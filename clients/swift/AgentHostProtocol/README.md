@@ -11,6 +11,11 @@ This package contains the Swift libraries for the Agent Host Protocol (AHP). The
   - State mirror helpers: `AHPStateMirror` (single-host) and `MultiHostStateMirror` (multi-host, keyed by `(hostId, uri)`).
   - `ClientIdStore` implementations: `InMemoryClientIdStore` (default) and `FileClientIdStore` (filesystem-backed, atomic writes).
 
+Generated protocol models support `Equatable`, including state/action unions and
+snapshots. Generic JSON-RPC wrappers are equatable when their payloads are.
+`clientDispatchableActions` and `isClientDispatchable(_:)` are generated from the
+canonical `@clientDispatchable` annotations.
+
 The client product is intentionally a protocol/client layer, not a full app store. App-specific policy such as server selection, authentication, reconnect UX, durable session caches, and optimistic outbound action replay should live in the app. `MultiHostClient` owns per-host supervisor policy, backoff, fan-in, and aggregated host views; it does not replace an app's product state model.
 
 ## Installation

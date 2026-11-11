@@ -351,7 +351,7 @@ public enum ActionType: Codable, Sendable, Equatable {
 
 // MARK: - Action Infrastructure
 
-public struct ActionOrigin: Codable, Sendable {
+public struct ActionOrigin: Codable, Sendable, Equatable {
     public var clientId: String
     public var clientSeq: Int
 
@@ -364,7 +364,7 @@ public struct ActionOrigin: Codable, Sendable {
     }
 }
 
-public struct ActionEnvelope: Codable, Sendable {
+public struct ActionEnvelope: Codable, Sendable, Equatable {
     /// Channel URI this action belongs to.
     public var channel: String
     public var action: StateAction
@@ -389,7 +389,7 @@ public struct ActionEnvelope: Codable, Sendable {
 
 // MARK: - Action Types
 
-public struct RootAgentsChangedAction: Codable, Sendable {
+public struct RootAgentsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated agent list
     public var agents: [AgentInfo]
@@ -403,7 +403,7 @@ public struct RootAgentsChangedAction: Codable, Sendable {
     }
 }
 
-public struct RootActiveSessionsChangedAction: Codable, Sendable {
+public struct RootActiveSessionsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Current count of active sessions
     public var activeSessions: Int
@@ -417,7 +417,7 @@ public struct RootActiveSessionsChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionReadyAction: Codable, Sendable {
+public struct SessionReadyAction: Codable, Sendable, Equatable {
     public var type: ActionType
 
     public init(
@@ -427,7 +427,7 @@ public struct SessionReadyAction: Codable, Sendable {
     }
 }
 
-public struct SessionCreationFailedAction: Codable, Sendable {
+public struct SessionCreationFailedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Error details
     public var error: ErrorInfo
@@ -441,7 +441,7 @@ public struct SessionCreationFailedAction: Codable, Sendable {
     }
 }
 
-public struct SessionChatAddedAction: Codable, Sendable {
+public struct SessionChatAddedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The full summary of the newly added (or upserted) chat.
     public var summary: ChatSummary
@@ -455,7 +455,7 @@ public struct SessionChatAddedAction: Codable, Sendable {
     }
 }
 
-public struct SessionChatRemovedAction: Codable, Sendable {
+public struct SessionChatRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The URI of the chat to remove.
     public var chat: String
@@ -469,7 +469,7 @@ public struct SessionChatRemovedAction: Codable, Sendable {
     }
 }
 
-public struct SessionChatUpdatedAction: Codable, Sendable {
+public struct SessionChatUpdatedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The URI of the chat whose summary changed.
     public var chat: String
@@ -490,7 +490,7 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
     }
 }
 
-public struct SessionChatsReorderedAction: Codable, Sendable {
+public struct SessionChatsReorderedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Every chat URI in authoritative catalog order.
     public var chats: [String]
@@ -504,7 +504,7 @@ public struct SessionChatsReorderedAction: Codable, Sendable {
     }
 }
 
-public struct SessionDefaultChatChangedAction: Codable, Sendable {
+public struct SessionDefaultChatChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New default chat URI, or `undefined` to clear the hint.
     public var defaultChat: String?
@@ -518,7 +518,7 @@ public struct SessionDefaultChatChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatTurnStartedAction: Codable, Sendable {
+public struct ChatTurnStartedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -564,7 +564,7 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     }
 }
 
-public struct ChatDeltaAction: Codable, Sendable {
+public struct ChatDeltaAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -604,7 +604,7 @@ public struct ChatDeltaAction: Codable, Sendable {
     }
 }
 
-public struct ChatResponsePartAction: Codable, Sendable {
+public struct ChatResponsePartAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -639,7 +639,7 @@ public struct ChatResponsePartAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallStartAction: Codable, Sendable {
+public struct ChatToolCallStartAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -694,7 +694,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallDeltaAction: Codable, Sendable {
+public struct ChatToolCallDeltaAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -738,7 +738,7 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallReadyAction: Codable, Sendable {
+public struct ChatToolCallReadyAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -828,7 +828,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
 }
 
 /// Client approves or denies a pending tool call (merged approved + denied variants).
-public struct ChatToolCallConfirmedAction: Codable, Sendable {
+public struct ChatToolCallConfirmedAction: Codable, Sendable, Equatable {
     /// Action type discriminant
     public var type: String
     /// Turn identifier
@@ -884,7 +884,7 @@ public struct ChatToolCallConfirmedAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallCompleteAction: Codable, Sendable {
+public struct ChatToolCallCompleteAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -928,7 +928,7 @@ public struct ChatToolCallCompleteAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallResultConfirmedAction: Codable, Sendable {
+public struct ChatToolCallResultConfirmedAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -967,7 +967,7 @@ public struct ChatToolCallResultConfirmedAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallContentChangedAction: Codable, Sendable {
+public struct ChatToolCallContentChangedAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -1006,7 +1006,7 @@ public struct ChatToolCallContentChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallAuthRequiredAction: Codable, Sendable {
+public struct ChatToolCallAuthRequiredAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -1045,7 +1045,7 @@ public struct ChatToolCallAuthRequiredAction: Codable, Sendable {
     }
 }
 
-public struct ChatToolCallAuthResolvedAction: Codable, Sendable {
+public struct ChatToolCallAuthResolvedAction: Codable, Sendable, Equatable {
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -1079,7 +1079,7 @@ public struct ChatToolCallAuthResolvedAction: Codable, Sendable {
     }
 }
 
-public struct ChatTurnCompleteAction: Codable, Sendable {
+public struct ChatTurnCompleteAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -1117,7 +1117,7 @@ public struct ChatTurnCompleteAction: Codable, Sendable {
     }
 }
 
-public struct ChatTurnCancelledAction: Codable, Sendable {
+public struct ChatTurnCancelledAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -1155,7 +1155,7 @@ public struct ChatTurnCancelledAction: Codable, Sendable {
     }
 }
 
-public struct ChatErrorAction: Codable, Sendable {
+public struct ChatErrorAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -1199,7 +1199,7 @@ public struct ChatErrorAction: Codable, Sendable {
     }
 }
 
-public struct ChatTurnResumeAction: Codable, Sendable {
+public struct ChatTurnResumeAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Identifier of the errored turn.
     public var turnId: String
@@ -1213,7 +1213,7 @@ public struct ChatTurnResumeAction: Codable, Sendable {
     }
 }
 
-public struct ChatActivityChangedAction: Codable, Sendable {
+public struct ChatActivityChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Human-readable description of current activity; omit or set `undefined` to clear
     public var activity: String?
@@ -1227,7 +1227,7 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatBackgroundWorkSetAction: Codable, Sendable {
+public struct ChatBackgroundWorkSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The complete entry.
     public var work: BackgroundWork
@@ -1241,7 +1241,7 @@ public struct ChatBackgroundWorkSetAction: Codable, Sendable {
     }
 }
 
-public struct ChatBackgroundWorkRemovedAction: Codable, Sendable {
+public struct ChatBackgroundWorkRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link BackgroundWorkBase.id | id} of the entry to remove.
     public var id: String
@@ -1255,7 +1255,7 @@ public struct ChatBackgroundWorkRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChatMovableChangedAction: Codable, Sendable {
+public struct ChatMovableChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether this chat is structurally eligible to be moved.
     public var movable: Bool
@@ -1269,7 +1269,7 @@ public struct ChatMovableChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatChangesetsChangedAction: Codable, Sendable {
+public struct ChatChangesetsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New catalogue, or `undefined` to clear it.
     public var changesets: [Changeset]?
@@ -1283,7 +1283,7 @@ public struct ChatChangesetsChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatCanvasesChangedAction: Codable, Sendable {
+public struct ChatCanvasesChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New canvas channel references, or `undefined` to clear the collection.
     public var canvases: [CanvasReference]?
@@ -1297,7 +1297,7 @@ public struct ChatCanvasesChangedAction: Codable, Sendable {
     }
 }
 
-public struct CanvasStateChangedAction: Codable, Sendable {
+public struct CanvasStateChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New authoritative canvas state.
     public var canvas: CanvasState
@@ -1311,7 +1311,7 @@ public struct CanvasStateChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionTitleChangedAction: Codable, Sendable {
+public struct SessionTitleChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New title
     public var title: String
@@ -1325,7 +1325,7 @@ public struct SessionTitleChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatUsageAction: Codable, Sendable {
+public struct ChatUsageAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -1360,7 +1360,7 @@ public struct ChatUsageAction: Codable, Sendable {
     }
 }
 
-public struct ChatReasoningAction: Codable, Sendable {
+public struct ChatReasoningAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
@@ -1410,7 +1410,7 @@ public struct ChatReasoningAction: Codable, Sendable {
     }
 }
 
-public struct SessionIsReadChangedAction: Codable, Sendable {
+public struct SessionIsReadChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether the session has been read
     public var isRead: Bool
@@ -1424,7 +1424,7 @@ public struct SessionIsReadChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionIsArchivedChangedAction: Codable, Sendable {
+public struct SessionIsArchivedChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether the session is archived
     public var isArchived: Bool
@@ -1438,7 +1438,7 @@ public struct SessionIsArchivedChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionActivityChangedAction: Codable, Sendable {
+public struct SessionActivityChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Human-readable description of current activity, or `undefined` to clear
     public var activity: String?
@@ -1452,7 +1452,7 @@ public struct SessionActivityChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionChangesetsChangedAction: Codable, Sendable {
+public struct SessionChangesetsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New catalogue, or `undefined` to clear it
     public var changesets: [Changeset]?
@@ -1466,7 +1466,7 @@ public struct SessionChangesetsChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionServerToolsChangedAction: Codable, Sendable {
+public struct SessionServerToolsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated server tools list (full replacement)
     public var tools: [ToolDefinition]
@@ -1480,7 +1480,7 @@ public struct SessionServerToolsChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionActiveClientSetAction: Codable, Sendable {
+public struct SessionActiveClientSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The active client to add or update, matched by `clientId`.
     public var activeClient: SessionActiveClient
@@ -1494,7 +1494,7 @@ public struct SessionActiveClientSetAction: Codable, Sendable {
     }
 }
 
-public struct SessionActiveClientRemovedAction: Codable, Sendable {
+public struct SessionActiveClientRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The `clientId` of the active client to remove.
     public var clientId: String
@@ -1508,7 +1508,7 @@ public struct SessionActiveClientRemovedAction: Codable, Sendable {
     }
 }
 
-public struct SessionWorkingDirectorySetAction: Codable, Sendable {
+public struct SessionWorkingDirectorySetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The working directory to grant the session's agent tool access to.
     public var directory: String
@@ -1522,7 +1522,7 @@ public struct SessionWorkingDirectorySetAction: Codable, Sendable {
     }
 }
 
-public struct SessionWorkingDirectoryRemovedAction: Codable, Sendable {
+public struct SessionWorkingDirectoryRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The working directory to revoke the session's agent tool access to.
     public var directory: String
@@ -1536,7 +1536,7 @@ public struct SessionWorkingDirectoryRemovedAction: Codable, Sendable {
     }
 }
 
-public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable {
+public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// URI of the existing entry to replace.
     public var directory: String
@@ -1554,7 +1554,7 @@ public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable {
     }
 }
 
-public struct ChatWorkingDirectorySetAction: Codable, Sendable {
+public struct ChatWorkingDirectorySetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The working directory to add to this chat's subset.
     public var directory: String
@@ -1568,7 +1568,7 @@ public struct ChatWorkingDirectorySetAction: Codable, Sendable {
     }
 }
 
-public struct ChatWorkingDirectoryRemovedAction: Codable, Sendable {
+public struct ChatWorkingDirectoryRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The working directory to remove from this chat's subset.
     public var directory: String
@@ -1582,7 +1582,7 @@ public struct ChatWorkingDirectoryRemovedAction: Codable, Sendable {
     }
 }
 
-public struct SessionInputNeededSetAction: Codable, Sendable {
+public struct SessionInputNeededSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The input request to add or update, matched by `id`.
     public var request: SessionInputRequest
@@ -1596,7 +1596,7 @@ public struct SessionInputNeededSetAction: Codable, Sendable {
     }
 }
 
-public struct SessionInputNeededRemovedAction: Codable, Sendable {
+public struct SessionInputNeededRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The `id` of the input request to remove.
     public var id: String
@@ -1610,7 +1610,7 @@ public struct SessionInputNeededRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChatPendingMessageSetAction: Codable, Sendable {
+public struct ChatPendingMessageSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether this is a steering or queued message
     public var kind: PendingMessageKind
@@ -1632,7 +1632,7 @@ public struct ChatPendingMessageSetAction: Codable, Sendable {
     }
 }
 
-public struct ChatPendingMessageRemovedAction: Codable, Sendable {
+public struct ChatPendingMessageRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether this is a steering or queued message
     public var kind: PendingMessageKind
@@ -1650,7 +1650,7 @@ public struct ChatPendingMessageRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
+public struct ChatQueuedMessagesReorderedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Pending message IDs in the desired raw order
     public var order: [String]
@@ -1664,7 +1664,7 @@ public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
     }
 }
 
-public struct ChatDraftChangedAction: Codable, Sendable {
+public struct ChatDraftChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New draft message, or `undefined` to clear it
     public var draft: Message?
@@ -1678,7 +1678,7 @@ public struct ChatDraftChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatIsReadChangedAction: Codable, Sendable {
+public struct ChatIsReadChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether the chat has been read
     public var isRead: Bool
@@ -1692,7 +1692,7 @@ public struct ChatIsReadChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatIsArchivedChangedAction: Codable, Sendable {
+public struct ChatIsArchivedChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Whether the chat is archived
     public var isArchived: Bool
@@ -1706,7 +1706,7 @@ public struct ChatIsArchivedChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatConfigChangedAction: Codable, Sendable {
+public struct ChatConfigChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Config values to set on the chat
     public var config: [String: AnyCodable]
@@ -1724,7 +1724,7 @@ public struct ChatConfigChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatMovedAction: Codable, Sendable {
+public struct ChatMovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The new owning session URI.
     public var session: String
@@ -1746,7 +1746,7 @@ public struct ChatMovedAction: Codable, Sendable {
     }
 }
 
-public struct ChatInputRequestedAction: Codable, Sendable {
+public struct ChatInputRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Input request to create or replace
     public var request: ChatInputRequest
@@ -1760,7 +1760,7 @@ public struct ChatInputRequestedAction: Codable, Sendable {
     }
 }
 
-public struct ChatInputAnswerChangedAction: Codable, Sendable {
+public struct ChatInputAnswerChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Input request identifier
     public var requestId: String
@@ -1782,7 +1782,7 @@ public struct ChatInputAnswerChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChatInputCompletedAction: Codable, Sendable {
+public struct ChatInputCompletedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Input request identifier
     public var requestId: String
@@ -1804,7 +1804,7 @@ public struct ChatInputCompletedAction: Codable, Sendable {
     }
 }
 
-public struct SessionCustomizationsChangedAction: Codable, Sendable {
+public struct SessionCustomizationsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated customization list (full replacement).
     public var customizations: [Customization]
@@ -1818,7 +1818,7 @@ public struct SessionCustomizationsChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionCustomizationToggledAction: Codable, Sendable {
+public struct SessionCustomizationToggledAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the container or child to update.
     public var id: String
@@ -1836,7 +1836,7 @@ public struct SessionCustomizationToggledAction: Codable, Sendable {
     }
 }
 
-public struct SessionCustomizationUpdatedAction: Codable, Sendable {
+public struct SessionCustomizationUpdatedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The customization to upsert (matched by `customization.id`).
     public var customization: Customization
@@ -1850,7 +1850,7 @@ public struct SessionCustomizationUpdatedAction: Codable, Sendable {
     }
 }
 
-public struct SessionCustomizationRemovedAction: Codable, Sendable {
+public struct SessionCustomizationRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the customization to remove.
     public var id: String
@@ -1864,7 +1864,7 @@ public struct SessionCustomizationRemovedAction: Codable, Sendable {
     }
 }
 
-public struct SessionMcpServerStateChangedAction: Codable, Sendable {
+public struct SessionMcpServerStateChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the {@link McpServerCustomization} to update.
     public var id: String
@@ -1888,7 +1888,7 @@ public struct SessionMcpServerStateChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionMcpServerStartRequestedAction: Codable, Sendable {
+public struct SessionMcpServerStartRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the {@link McpServerCustomization} to start.
     public var id: String
@@ -1902,7 +1902,7 @@ public struct SessionMcpServerStartRequestedAction: Codable, Sendable {
     }
 }
 
-public struct SessionMcpServerStopRequestedAction: Codable, Sendable {
+public struct SessionMcpServerStopRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the {@link McpServerCustomization} to stop.
     public var id: String
@@ -1916,7 +1916,7 @@ public struct SessionMcpServerStopRequestedAction: Codable, Sendable {
     }
 }
 
-public struct SessionMcpServerBackgroundRequestedAction: Codable, Sendable {
+public struct SessionMcpServerBackgroundRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The id of the {@link McpServerCustomization} to background.
     public var id: String
@@ -1930,7 +1930,7 @@ public struct SessionMcpServerBackgroundRequestedAction: Codable, Sendable {
     }
 }
 
-public struct ChatTruncatedAction: Codable, Sendable {
+public struct ChatTruncatedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Keep turns up to and including this turn. Omit to clear all turns.
     public var turnId: String?
@@ -1944,7 +1944,7 @@ public struct ChatTruncatedAction: Codable, Sendable {
     }
 }
 
-public struct ChatTurnsLoadedAction: Codable, Sendable {
+public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Older completed turns loaded into the state, ordered oldest-first.
     public var turns: [Turn]
@@ -1962,7 +1962,7 @@ public struct ChatTurnsLoadedAction: Codable, Sendable {
     }
 }
 
-public struct SessionConfigChangedAction: Codable, Sendable {
+public struct SessionConfigChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated config values
     public var config: [String: AnyCodable]
@@ -1980,7 +1980,7 @@ public struct SessionConfigChangedAction: Codable, Sendable {
     }
 }
 
-public struct SessionMetaChangedAction: Codable, Sendable {
+public struct SessionMetaChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New `_meta` payload, or `undefined` to clear it
     public var meta: [String: AnyCodable]?
@@ -1999,7 +1999,7 @@ public struct SessionMetaChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetStatusChangedAction: Codable, Sendable {
+public struct ChangesetStatusChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New computation lifecycle status.
     public var status: ChangesetStatus
@@ -2017,7 +2017,7 @@ public struct ChangesetStatusChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetFileSetAction: Codable, Sendable {
+public struct ChangesetFileSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The new or replacement file entry.
     public var file: ChangesetFile
@@ -2031,7 +2031,7 @@ public struct ChangesetFileSetAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetFileRemovedAction: Codable, Sendable {
+public struct ChangesetFileRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link ChangesetFile.id} of the file to remove.
     public var fileId: String
@@ -2045,7 +2045,7 @@ public struct ChangesetFileRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetFilesReviewChangedAction: Codable, Sendable {
+public struct ChangesetFilesReviewChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link ChangesetFile.id | ids} of the files whose review state changed.
     public var files: [String]
@@ -2063,7 +2063,7 @@ public struct ChangesetFilesReviewChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetContentChangedAction: Codable, Sendable {
+public struct ChangesetContentChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Full replacement file list.
     public var files: [ChangesetFile]
@@ -2081,7 +2081,7 @@ public struct ChangesetContentChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationsChangedAction: Codable, Sendable {
+public struct ChangesetOperationsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated operation list. Pass `undefined` to clear all operations.
     public var operations: [ChangesetOperation]?
@@ -2095,7 +2095,7 @@ public struct ChangesetOperationsChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationStatusChangedAction: Codable, Sendable {
+public struct ChangesetOperationStatusChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link ChangesetOperation.id} whose status changed.
     public var operationId: String
@@ -2117,7 +2117,7 @@ public struct ChangesetOperationStatusChangedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetClearedAction: Codable, Sendable {
+public struct ChangesetClearedAction: Codable, Sendable, Equatable {
     public var type: ActionType
 
     public init(
@@ -2127,7 +2127,7 @@ public struct ChangesetClearedAction: Codable, Sendable {
     }
 }
 
-public struct AnnotationsSetAction: Codable, Sendable {
+public struct AnnotationsSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The new or replacement annotation. MUST contain at least one entry.
     public var annotation: Annotation
@@ -2141,7 +2141,7 @@ public struct AnnotationsSetAction: Codable, Sendable {
     }
 }
 
-public struct AnnotationsUpdatedAction: Codable, Sendable {
+public struct AnnotationsUpdatedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link Annotation.id} of the annotation to update.
     public var annotationId: String
@@ -2176,7 +2176,7 @@ public struct AnnotationsUpdatedAction: Codable, Sendable {
     }
 }
 
-public struct AnnotationsRemovedAction: Codable, Sendable {
+public struct AnnotationsRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link Annotation.id} of the annotation to remove.
     public var annotationId: String
@@ -2190,7 +2190,7 @@ public struct AnnotationsRemovedAction: Codable, Sendable {
     }
 }
 
-public struct AnnotationsEntrySetAction: Codable, Sendable {
+public struct AnnotationsEntrySetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link Annotation.id} the entry belongs to.
     public var annotationId: String
@@ -2208,7 +2208,7 @@ public struct AnnotationsEntrySetAction: Codable, Sendable {
     }
 }
 
-public struct AnnotationsEntryRemovedAction: Codable, Sendable {
+public struct AnnotationsEntryRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The {@link Annotation.id} the entry belongs to.
     public var annotationId: String
@@ -2226,7 +2226,7 @@ public struct AnnotationsEntryRemovedAction: Codable, Sendable {
     }
 }
 
-public struct RootTerminalsChangedAction: Codable, Sendable {
+public struct RootTerminalsChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated terminal list (full replacement)
     public var terminals: [TerminalInfo]
@@ -2240,7 +2240,7 @@ public struct RootTerminalsChangedAction: Codable, Sendable {
     }
 }
 
-public struct RootConfigChangedAction: Codable, Sendable {
+public struct RootConfigChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Updated config values
     public var config: [String: AnyCodable]
@@ -2258,7 +2258,7 @@ public struct RootConfigChangedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalDataAction: Codable, Sendable {
+public struct TerminalDataAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Output data (may contain ANSI escape sequences)
     public var data: String
@@ -2272,7 +2272,7 @@ public struct TerminalDataAction: Codable, Sendable {
     }
 }
 
-public struct TerminalInputAction: Codable, Sendable {
+public struct TerminalInputAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Input data to send to the pty
     public var data: String
@@ -2286,7 +2286,7 @@ public struct TerminalInputAction: Codable, Sendable {
     }
 }
 
-public struct TerminalResizedAction: Codable, Sendable {
+public struct TerminalResizedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Terminal width in columns
     public var cols: Int
@@ -2304,7 +2304,7 @@ public struct TerminalResizedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalClaimedAction: Codable, Sendable {
+public struct TerminalClaimedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The new claim
     public var claim: TerminalClaim
@@ -2318,7 +2318,7 @@ public struct TerminalClaimedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalTitleChangedAction: Codable, Sendable {
+public struct TerminalTitleChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New terminal title
     public var title: String
@@ -2332,7 +2332,7 @@ public struct TerminalTitleChangedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalCwdChangedAction: Codable, Sendable {
+public struct TerminalCwdChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New working directory
     public var cwd: String
@@ -2346,7 +2346,7 @@ public struct TerminalCwdChangedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalExitedAction: Codable, Sendable {
+public struct TerminalExitedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Process exit code. `undefined` if the process was killed without an exit code.
     public var exitCode: Int?
@@ -2360,7 +2360,7 @@ public struct TerminalExitedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalClearedAction: Codable, Sendable {
+public struct TerminalClearedAction: Codable, Sendable, Equatable {
     public var type: ActionType
 
     public init(
@@ -2370,7 +2370,7 @@ public struct TerminalClearedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandDetectionAvailableAction: Codable, Sendable {
+public struct TerminalCommandDetectionAvailableAction: Codable, Sendable, Equatable {
     public var type: ActionType
 
     public init(
@@ -2380,7 +2380,7 @@ public struct TerminalCommandDetectionAvailableAction: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandExecutedAction: Codable, Sendable {
+public struct TerminalCommandExecutedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Stable identifier for this command, scoped to the terminal URI.
     /// Allows correlating `commandExecuted` → `commandFinished` pairs.
@@ -2404,7 +2404,7 @@ public struct TerminalCommandExecutedAction: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandFinishedAction: Codable, Sendable {
+public struct TerminalCommandFinishedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Matches the `commandId` from the corresponding `commandExecuted`
     public var commandId: String
@@ -2427,7 +2427,7 @@ public struct TerminalCommandFinishedAction: Codable, Sendable {
     }
 }
 
-public struct ResourceWatchChangedAction: Codable, Sendable {
+public struct ResourceWatchChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The set of changes in this batch, wrapped for forward compatibility.
     public var changes: AnyCodable
@@ -2441,7 +2441,7 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationCreateRequestedAction: Codable, Sendable {
+public struct AutomationCreateRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
     public var resource: String
@@ -2459,7 +2459,7 @@ public struct AutomationCreateRequestedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationUpdateRequestedAction: Codable, Sendable {
+public struct AutomationUpdateRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Target {@link AutomationEntry.resource}.
     public var resource: String
@@ -2477,7 +2477,7 @@ public struct AutomationUpdateRequestedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationSetAction: Codable, Sendable {
+public struct AutomationSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Full new or replacement automation state.
     public var automation: AutomationEntry
@@ -2491,7 +2491,7 @@ public struct AutomationSetAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRemovedAction: Codable, Sendable {
+public struct AutomationRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// {@link AutomationEntry.resource} to remove.
     public var resource: String
@@ -2505,7 +2505,7 @@ public struct AutomationRemovedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
+public struct AutomationRunLifecycleChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Complete replacement {@link AutomationRunState.lifecycle}.
     public var lifecycle: AutomationRunLifecycle
@@ -2519,7 +2519,7 @@ public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRunSessionSetAction: Codable, Sendable {
+public struct AutomationRunSessionSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Session URI to append to {@link AutomationRunState.sessions} when not already linked.
     public var session: String
@@ -2533,7 +2533,7 @@ public struct AutomationRunSessionSetAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRunSessionRemovedAction: Codable, Sendable {
+public struct AutomationRunSessionRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Entry in {@link AutomationRunState.sessions} to remove.
     public var session: String
@@ -2547,7 +2547,7 @@ public struct AutomationRunSessionRemovedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
+public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// New {@link AutomationRunState.primarySession}, or omitted to clear the selection.
     public var primarySession: String?
@@ -2561,7 +2561,7 @@ public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationRunCancelRequestedAction: Codable, Sendable {
+public struct AutomationRunCancelRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
 
     public init(
@@ -2573,7 +2573,7 @@ public struct AutomationRunCancelRequestedAction: Codable, Sendable {
 
 // MARK: - Partial Summary Types
 
-public struct PartialChatSummary: Codable, Sendable {
+public struct PartialChatSummary: Codable, Sendable, Equatable {
     /// Chat URI
     public var resource: String?
     /// Chat title
@@ -2639,7 +2639,7 @@ public struct PartialChatSummary: Codable, Sendable {
 // MARK: - StateAction Union
 
 /// Discriminated union of all state actions.
-public enum StateAction: Codable, Sendable {
+public enum StateAction: Codable, Sendable, Equatable {
     case rootAgentsChanged(RootAgentsChangedAction)
     case rootActiveSessionsChanged(RootActiveSessionsChangedAction)
     case sessionReady(SessionReadyAction)
