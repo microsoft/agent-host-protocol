@@ -13,6 +13,23 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// How the server resumes sending data on a windowed subscription after
+/// reconnection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChannelRecoveryKind {
+    /// The server sends a new `channel/snapshot`, and the client replaces its state.
+    #[serde(rename = "snapshot")]
+    Snapshot,
+    /// The server sends again each action with a `serverSeq` greater than `lastAppliedServerSeq`.
+    #[serde(rename = "replay")]
+    Replay,
+    /// The server sends only data created after reconnection.
+    #[serde(rename = "live")]
+    Live,
+}
+
 /// Policy configuration state for a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PolicyState {
@@ -869,8 +886,8 @@ impl<'de> serde::Deserialize<'de> for ToolResultContentType {
 /// ({@link CustomizationType.Plugin | `Plugin`} or
 /// {@link CustomizationType.Directory | `Directory`}) or
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
-/// directly by the host. The remaining types appear only as children of
-/// a container.
+/// directly by the host. The remaining types appear as children of a
+/// container; skills may also be served by an MCP server.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CustomizationType {
     Plugin,
@@ -992,6 +1009,47 @@ pub enum TerminalLifecycleStatus {
     Running,
     #[serde(rename = "exited")]
     Exited,
+}
+
+/// Kind of {@link BackgroundWork}.
+///
+/// This is a general/typological union (not a lifecycle), so the discriminant is
+/// a `*Kind`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackgroundWorkKind {
+    /// A shell command that continues after its initiating tool call returns.
+    Shell,
+    /// A subagent running in the background.
+    Subagent,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for BackgroundWorkKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Shell => serializer.serialize_str("shell"),
+            Self::Subagent => serializer.serialize_str("subagent"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BackgroundWorkKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "shell" => Self::Shell,
+            "subagent" => Self::Subagent,
+            _ => Self::Unknown(raw),
+        })
+    }
 }
 
 /// Discriminant for the {@link McpServerState} union.
@@ -1442,6 +1500,81 @@ pub enum AutomationRunOriginKind {
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
+/// Present when the host supports `createTcpConnection`.
+///
+/// A client creates a connection with `createTcpConnection`, then subscribes to
+/// its channel with windowed delivery. A TCP channel's state is an
+/// {@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`
+/// notifications. TCP connections do not survive the loss of the AHP connection.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TcpConnectionsCapability {}
+
+/// Limits on data that one peer receives on a windowed subscription.
+///
+/// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
+/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// includes its envelope and escape characters. The same size is used for the
+/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// size of a complete data message. Outstanding data is always less than
+/// `windowBytes + maximumFrameBytes`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelReceiveLimits {
+    /// The target amount of outstanding data. This is a soft target.
+    /// The sender MUST NOT send a data message or fragment while outstanding data
+    /// is equal to or greater than this value. The last message or fragment sent
+    /// before the window is full can go past it, so a message that fits within
+    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// remaining credit.
+    pub window_bytes: i64,
+    /// The largest JSON-RPC message that the sender can send for a data message.
+    /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
+    /// notification, it includes the envelope and escape characters. A larger data
+    /// message MUST be split into smaller messages or sent in fragments.
+    pub maximum_frame_bytes: i64,
+}
+
+/// The limits that the server accepted for a windowed subscription.
+///
+/// The client ID and channel URI identify the subscription. All counters start at
+/// zero when the subscription starts.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelFlowControl {
+    /// Limits for data that the server sends to the client.
+    pub client_receive: ChannelReceiveLimits,
+    /// Limits for data that the client sends to the server.
+    pub host_receive: ChannelReceiveLimits,
+}
+
+/// A windowed subscription that the server kept after reconnection.
+///
+/// The subscription's counters start at zero on the new connection. If a
+/// channel that the client requested is not in the result, the subscription was
+/// not kept. The client discards the old subscription and, for a byte stream,
+/// closes the stream.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumedChannelSubscription {
+    /// The URI of the windowed subscription.
+    pub channel: Uri,
+    /// The limits that the server accepted for the new connection, as in a
+    /// `subscribe` result. The server MAY lower the limits that the client offered
+    /// in its request, and MUST NOT raise them.
+    pub flow_control: ChannelFlowControl,
+    /// How the server resumes sending data.
+    pub recovery: ChannelRecoveryKind,
+}
+
 /// An optionally-sized icon that can be displayed in a user interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1644,7 +1777,8 @@ pub struct AgentCapabilities {
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
     /// source-based creation; set {@link MultipleChatsCapability.fork} or
-    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+    /// creation mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_chats: Option<MultipleChatsCapability>,
     /// The session's agent can be granted tool access to more than one working
@@ -1723,7 +1857,7 @@ pub struct MultipleWorkingDirectoriesCapability {
 pub struct SessionModelInfo {
     /// Model identifier
     pub id: String,
-    /// Provider this model belongs to
+    /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     pub provider: String,
     /// Human-readable model name
     pub name: String,
@@ -1753,6 +1887,15 @@ pub struct SessionModelInfo {
     /// For example, a `pricing` key may carry model pricing metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Vendor of this model as the provider reports it, for example `Anthropic`
+    /// or `Azure OpenAI`. This is sometimes the company that serves the model
+    /// rather than the one that built it. Not the same as {@link provider},
+    /// which names the agent provider that owns this model. Absent when the
+    /// provider does not report a vendor. Providers MAY send any value; clients
+    /// SHOULD fall back to a generic presentation for values they do not
+    /// recognize.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
 }
 
 /// A model selection: the chosen model ID together with any model-specific
@@ -1822,6 +1965,12 @@ pub struct ConfigPropertySchema {
     /// JSON Schema: schema for array items (used when `type` is `'array'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub items: Option<Box<ConfigPropertySchema>>,
+    /// JSON Schema: minimum number of array items (used when `type` is `'array'`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_items: Option<i64>,
+    /// JSON Schema: maximum number of array items (used when `type` is `'array'`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_items: Option<i64>,
     /// JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub properties: Option<std::collections::HashMap<String, Box<ConfigPropertySchema>>>,
@@ -1859,7 +2008,10 @@ pub struct ConfigSchema {
 pub struct PendingMessage {
     /// Unique identifier for this pending message
     pub id: String,
-    /// The message that will start the next turn
+    /// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<PendingMessageKind>,
+    /// The queued or steering message
     pub message: Message,
 }
 
@@ -1888,9 +2040,22 @@ pub struct ChatState {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
+    /// Whether this chat is eligible to be the source of `moveChat`, including
+    /// same-session ordering.
+    ///
+    /// The host is authoritative. Absence means `false`. A `true` value does not
+    /// guarantee that a particular request will succeed. A chat referenced by its
+    /// owning session's `defaultChat` MUST NOT be movable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movable: Option<bool>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1898,6 +2063,16 @@ pub struct ChatState {
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. Absent means the session's
+    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
+    /// differs. The chat's agent never changes, but `provider` is reported
+    /// relative to its session, so `chat/moved` may set or clear it. Like
+    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
+    /// side chats use the source chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
     /// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -1921,6 +2096,26 @@ pub struct ChatState {
     /// obtain it by subscribing to the chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Work running in the background for this chat, such as shells and
+    /// subagents. Only active work is listed: hosts remove an entry once the work
+    /// ends. An entry may have been started by an earlier turn rather than the
+    /// {@link ChatState.activeTurn | activeTurn}.
+    ///
+    /// Like {@link ChatState.changesets | changesets}, this is intentionally
+    /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
+    /// chat channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_work: Option<Vec<BackgroundWork>>,
+    /// Live canvases currently exposed by this chat.
+    ///
+    /// Entries intentionally contain only subscribable channel references.
+    /// Clients subscribe to each resource for the experimental presentation
+    /// state, including its current live source URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasReference>>,
+    /// This chat's configuration. See {@link ChatConfigState}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -1934,10 +2129,15 @@ pub struct ChatState {
     /// Currently in-progress turn
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_turn: Option<ActiveTurn>,
-    /// Message to inject into the current turn at a convenient point
+    /// Legacy steering input retained only when reading old snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steering_message: Option<PendingMessage>,
-    /// Messages to send automatically as new turns after the current turn finishes
+    /// Pending messages of both kinds, in host acceptance order unless explicitly
+    /// reordered.
+    ///
+    /// This raw order is not consumption priority. UIs SHOULD group steering
+    /// messages before queued messages, preserving relative order within each
+    /// group without changing the underlying array.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_messages: Option<Vec<PendingMessage>>,
     /// The user's in-progress draft input for this chat — the message they are
@@ -1958,6 +2158,59 @@ pub struct ChatState {
     pub meta: Option<JsonObject>,
 }
 
+/// Stable reference to a subscribable canvas channel.
+///
+/// Chat state intentionally carries only this reference so the experimental
+/// canvas presentation model can evolve without changing the stable chat
+/// channel shape.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasReference {
+    /// Canvas channel URI. Subscribe to this resource for the full state.
+    pub resource: Uri,
+}
+
+/// Full state for one live canvas, returned when a client subscribes to its
+/// `ahp-canvas:` URI.
+///
+/// The client already knows the subscribed resource, so the state does not
+/// redundantly carry its channel URI.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasState {
+    /// Stable caller-supplied instance identifier.
+    pub instance_id: String,
+    /// Owning extension/provider identifier.
+    pub extension_id: String,
+    /// Owning extension display name, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+    /// Provider-supplied title, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Provider-supplied status text, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Absolute URI of the canvas's live content, typically an HTTP(S) URL;
+    /// absent when the live source is unavailable. Hosts MUST clear this field
+    /// when the provider becomes unavailable.
+    ///
+    /// A client that can't load this URI directly, for example because it is a
+    /// loopback address in the host's environment or uses a scheme that the
+    /// client doesn't load, reads it with `resourceRead`. The client resolves the
+    /// relative references in its content and reads them the same way. Hosts
+    /// SHOULD serve reads of this URI, and of other URLs on its origin when it is
+    /// an HTTP(S) URL, to clients that can subscribe to the canvas. The provider
+    /// chooses the URI, so the host decides which sources it is willing to read.
+    ///
+    /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
+    /// from persisted state after a provider or host restart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<Uri>,
+}
+
 /// Lightweight catalog entry for a chat, carried in
 /// {@link SessionState.chats | `SessionState.chats`}. The full conversation
 /// lives in {@link ChatState}, which inlines (denormalizes) every field below.
@@ -1975,9 +2228,20 @@ pub struct ChatSummary {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub movable: Option<bool>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1985,10 +2249,67 @@ pub struct ChatSummary {
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+}
+
+/// A shell command continuing outside its initiating tool call. Covers shells
+/// tied to the agent's lifetime (attached) and shells that outlive it
+/// (detached). Whether a shell is attached is provider-specific and goes in its
+/// `_meta`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundShellWork {
+    /// Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.
+    pub id: String,
+    /// Human-readable label, such as the command's purpose or the subagent's name.
+    pub label: String,
+    /// ISO 8601 timestamp when the work started.
+    pub started_at: String,
+    /// Provider-specific metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Command line, displayed as plain text.
+    pub command: String,
+    /// Terminal carrying this shell's output. Hosts SHOULD set this whenever they
+    /// can show that output. Clients open it like
+    /// {@link ToolResultTerminalContent.resource}; `isPty` on its
+    /// {@link TerminalState} says whether the output is plain text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<Uri>,
+}
+
+/// A subagent running in the background. Its own state lives in its chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundSubagentWork {
+    /// Identifier of this entry, unique within the owning chat across all kinds.
+    /// The host derives it however it likes (for example from the kind plus the
+    /// agent's own task id); consumers MUST treat it as opaque. It is the key for
+    /// the `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert
+    /// convention.
+    pub id: String,
+    /// Human-readable label, such as the command's purpose or the subagent's name.
+    pub label: String,
+    /// ISO 8601 timestamp when the work started.
+    pub started_at: String,
+    /// Provider-specific metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// The subagent's chat: the same chat the spawning tool call's
+    /// {@link ToolResultSubagentContent.resource} points to.
+    pub chat: Uri,
 }
 
 /// Immutable selected-text snapshot captured when a side chat is created.
@@ -2073,11 +2394,13 @@ pub struct SessionState {
     /// reconnecting in time, or reconnect without resubscribing to the session.
     pub active_clients: Vec<SessionActiveClient>,
     /// Catalog of chats in this session.
+    ///
+    /// Order is host-authoritative and durable. Catalog order is independent of
+    /// `defaultChat`.
     pub chats: Vec<ChatSummary>,
     /// The chat that receives input when the user addresses the session without
-    /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker — chats remain equal peers at the protocol level. Hosts MAY change
-    /// this over the session's lifetime.
+    /// selecting a specific chat. This routing designation does not determine the
+    /// chat's catalog position. Hosts MAY change it over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
     /// Session configuration schema and current values
@@ -2094,7 +2417,8 @@ pub struct SessionState {
     /// - Top-level {@link McpServerCustomization} entries the host
     ///   surfaces directly (for example a globally-configured MCP server
     ///   that isn't bundled in a plugin or directory). MCP servers may
-    ///   also appear as children of a container.
+    ///   also appear as children of a container, and may serve skills in
+    ///   their own {@link McpServerCustomization.children | `children`} array.
     ///
     /// Client-published plugins arrive via
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -2348,7 +2672,8 @@ pub struct SessionToolAuthenticationRequest {
 ///   to a subset via {@link ChatSummary.workingDirectories}; aggregating these
 ///   up is meaningless and SHOULD NOT be attempted.
 /// - `changes`: optional roll-up across all chats. Producers MAY sum the
-///   per-chat changeset stats or report the most expensive chat's stats —
+///   per-chat {@link ChatSummary.changes | changes summaries} or report the
+///   most expensive chat's stats —
 ///   whichever is cheaper for the host to compute.
 ///
 /// Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -2408,20 +2733,15 @@ pub struct SessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Lightweight ordered chat catalog for session-list presentation.
-    ///
-    /// This intentionally omits volatile chat state such as status and activity,
-    /// while retaining interactivity so generic clients can hide chats or present
-    /// them as read-only without subscribing to the session channel.
+    /// Lightweight host-authoritative ordered chat catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chats: Option<Vec<SessionChatSummary>>,
-    /// Chat that receives input when no specific chat is selected.
+    /// Chat that receives input when none is selected, independent of catalog position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
 }
 
-/// Lightweight chat information suitable for listing a session without
-/// subscribing to its session channel.
+/// Lightweight chat information in a session catalog.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionChatSummary {
@@ -2439,9 +2759,32 @@ pub struct SessionChatSummary {
     /// backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Current chat status, matching {@link ChatSummary.status}.
+    ///
+    /// Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
+    /// and {@link SessionStatus.IsArchived} flags. Generic clients use these bits
+    /// to present read, unread, or archived chats in session lists without
+    /// subscribing to the session or chat channel. Absence means the host did
+    /// not provide the status; clients MUST treat it as unknown, not as unread
+    /// or unarchived.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<u32>,
+    /// Aggregate summary of file changes associated with this chat.
+    ///
+    /// Servers may populate this so session lists can show per-chat change
+    /// counts without subscribing to the session or chat channel. Updates travel
+    /// with the rest of the catalog in `root/sessionSummaryChanged`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
 }
 
-/// Aggregate counts describing the file changes associated with a session.
+/// Aggregate counts describing the file changes associated with a session or
+/// chat.
 ///
 /// All fields are optional so servers can populate only the metrics they
 /// cheaply have available.
@@ -2501,6 +2844,12 @@ pub struct SessionConfigPropertySchema {
     /// JSON Schema: schema for array items (used when `type` is `'array'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub items: Option<ConfigPropertySchema>,
+    /// JSON Schema: minimum number of array items (used when `type` is `'array'`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_items: Option<i64>,
+    /// JSON Schema: maximum number of array items (used when `type` is `'array'`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_items: Option<i64>,
     /// JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub properties: Option<std::collections::HashMap<String, ConfigPropertySchema>>,
@@ -2519,6 +2868,10 @@ pub struct SessionConfigPropertySchema {
     /// When `true`, the user may change this property after session creation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mutable: Option<bool>,
+    /// When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_mutable: Option<bool>,
 }
 
 /// A JSON Schema object describing available session configuration metadata.
@@ -2544,6 +2897,33 @@ pub struct SessionConfigState {
     /// JSON Schema describing available configuration properties
     pub schema: SessionConfigSchema,
     /// Current configuration values
+    pub values: JsonObject,
+}
+
+/// A chat's configuration. `values` holds the chat's `chatMutable` properties
+/// of the effective schema. For a chat without its own `schema`, other
+/// properties are session-wide and come from the session's config; a chat with
+/// its own `schema` does not use the session's config. It does not inherit
+/// from the session: a chat's `values` change only through
+/// `chat/configChanged` on the chat.
+///
+/// Only `chatMutable` properties can be changed with `chat/configChanged`;
+/// hosts reject other keys. Hosts set the initial `values` when they create
+/// the chat. When the session has a config, hosts set `config` on every chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigState {
+    /// Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<SessionConfigSchema>,
+    /// The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.
     pub values: JsonObject,
 }
 
@@ -3192,6 +3572,12 @@ pub struct ReasoningResponsePart {
     pub id: String,
     /// Accumulated reasoning text
     pub content: String,
+    /// Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
 }
 
 /// A system notification surfaced as part of the response stream.
@@ -3275,6 +3661,11 @@ pub struct ToolCallResult {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,
@@ -3568,6 +3959,11 @@ pub struct ToolCallPendingResultConfirmationState {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,
@@ -3625,6 +4021,11 @@ pub struct ToolCallCompletedState {
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
+    /// Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_metadata: Option<JsonObject>,
     /// Error details if the tool failed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<AnyValue>,
@@ -3990,6 +4391,7 @@ pub struct ClientPluginCustomization {
     /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<ChildCustomization>>,
+    pub r#type: CustomizationType,
     /// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enablement: Option<Vec<CustomizationEnablement>>,
@@ -4127,7 +4529,8 @@ pub struct AgentCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4163,7 +4566,7 @@ pub struct AgentCustomization {
     pub disable_user_invocation: Option<bool>,
 }
 
-/// A skill contributed by a plugin or directory.
+/// A skill contributed by a plugin, directory, or MCP server.
 ///
 /// Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
 /// — the `skills/` directory layout (one subdirectory per skill, each with
@@ -4210,7 +4613,8 @@ pub struct SkillCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4274,7 +4678,8 @@ pub struct PromptCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4335,7 +4740,8 @@ pub struct RuleCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4397,7 +4803,8 @@ pub struct HookCustomization {
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -4486,6 +4893,73 @@ pub struct McpServerCustomization {
     /// which support apps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_app: Option<McpServerCustomizationApps>,
+    /// Skills served by this MCP server, for example through the MCP skills
+    /// extension (SEP-2640).
+    ///
+    /// Absent means the host has not discovered skills for this server, or
+    /// does not support MCP-served skills. An empty array means the server
+    /// was queried and serves none.
+    ///
+    /// A skill's effective enabled state is the server's effective enabled
+    /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+    /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_mcp_server_skills",
+        deserialize_with = "deserialize_mcp_server_skills"
+    )]
+    pub children: Option<Vec<SkillCustomization>>,
+}
+
+fn serialize_mcp_server_skills<S>(
+    value: &Option<Vec<SkillCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom(
+                "skill customization must serialize to an object",
+            ));
+        };
+        object.insert(
+            "type".to_owned(),
+            serde_json::Value::String("skill".to_owned()),
+        );
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_mcp_server_skills<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<SkillCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("skill") {
+                return Err(serde::de::Error::custom(
+                    "expected skill customization type",
+                ));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Information from the agent host needed to render MCP Apps served
@@ -4942,17 +5416,34 @@ pub struct ErrorInfo {
 }
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by
-/// `initialize`, `reconnect`, and `subscribe`.
+/// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
+    /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     pub resource: Uri,
-    /// The current state of the resource
+    /// The current state of the resource. A channel with no state fields, such as a
+    /// telemetry channel, has an {@link EmptyState}. Later protocol versions can add
+    /// new kinds of state; a client MUST NOT fail on a state that it does not
+    /// recognize, and ignores that snapshot.
     pub state: SnapshotState,
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     pub from_seq: i64,
 }
+
+/// The state of a channel that has no state fields, such as a telemetry
+/// channel. It is always the empty object `{}`.
+///
+/// Every windowed subscription starts with a snapshot, including subscriptions
+/// to these channels, so a channel can gain state fields in a later revision
+/// without changing how windowed subscriptions start. With ordinary delivery,
+/// the server MAY omit a snapshot whose state is an `EmptyState`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct EmptyState {}
 
 /// Catalogue entry describing one changeset the server can produce for a
 /// session or chat.
@@ -5076,8 +5567,8 @@ pub struct ChangesetFile {
     /// the server MAY also originate it (e.g. an agent self-reviewing its own
     /// output).
     ///
-    /// There is no content version in the protocol, so review is **not** reset
-    /// automatically when a file's contents change under a stable id. The server,
+    /// Review is **not** reset automatically when a file's contents or nonce
+    /// change under a stable id. The server,
     /// which is the authority on what changed, resets review explicitly — either
     /// by re-emitting the file (via {@link ChangesetFileSetAction} or
     /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
@@ -5088,6 +5579,15 @@ pub struct ChangesetFile {
     /// but not interpreted by the protocol.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Optional host-issued token for this reviewable change, which clients MAY
+    /// echo in {@link ChangesetOperationTarget.nonce}.
+    /// Hosts SHOULD update a published nonce whenever contents of the file change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    /// Whether the host reports an ongoing edit to this file.
+    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_editing: Option<bool>,
 }
 
 /// A server-declared invokable verb the client can run against a
@@ -5487,6 +5987,31 @@ pub struct AutomationSessionTemplate {
     /// {@link ResolveSessionConfigResult.values}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
+    /// Client plugins to make available in every run session, in the same
+    /// published shape as
+    /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
+    /// Entries are keyed by `id`.
+    ///
+    /// Runs usually start when no client is connected, so the host does not
+    /// resolve these URIs at run time. Instead, when it accepts a
+    /// {@link AutomationCreateRequestedAction | `automation/createRequested`} or
+    /// {@link AutomationUpdateRequestedAction | `automation/updateRequested`}
+    /// that adds an entry or changes an entry's `uri` or `nonce`, the host
+    /// captures a host-owned copy of the plugin. For client-served URIs such as
+    /// `virtual://…`, it reads the contents from the dispatching client with
+    /// server→client `resource*` requests. If a capture fails, the host rejects
+    /// the whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep
+    /// their existing copy, so any client can re-submit a template it received
+    /// without being able to serve the plugin itself. The resulting copies are
+    /// reported in {@link AutomationEntry.customizations}.
+    ///
+    /// The host MAY share one stored copy between entries with equal `uri` and
+    /// `nonce`, including across automations; this is not observable to clients.
+    ///
+    /// Clients MUST NOT set this field unless the host advertises
+    /// {@link AutomationCapabilities.customizations}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customizations: Option<Vec<ClientPluginCustomization>>,
 }
 
 /// Durable, client-editable definition of an automation.
@@ -5545,7 +6070,9 @@ pub struct AutomationDefinitionPatch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,
     /// Replacement {@link AutomationDefinition.session}. The host revalidates
-    /// affected event triggers when their discovery context changes.
+    /// affected event triggers when their discovery context changes, and
+    /// captures {@link AutomationSessionTemplate.customizations} entries that
+    /// are new or whose `uri` or `nonce` changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<AutomationSessionTemplate>,
     /// Replacement {@link AutomationDefinition.enabled}.
@@ -5619,6 +6146,26 @@ pub struct AutomationEntry {
     pub runs_next_cursor: Option<String>,
     /// Operations currently permitted for this automation.
     pub operations: Vec<AutomationOperation>,
+    /// Host-owned copies of the plugins in
+    /// {@link AutomationSessionTemplate.customizations}, one per template entry
+    /// with the same `id`. Absent when the template has no customizations.
+    ///
+    /// Each copy's `uri` identifies the captured contents, which clients can
+    /// browse with `resourceRead`. `children` and `load` report what the host
+    /// found in that copy, independent of whether the originating client is
+    /// connected. `clientId` is absent because the copy no longer depends on a
+    /// client.
+    ///
+    /// Every run session receives these plugins in
+    /// {@link SessionState.customizations}, with the enablement from the
+    /// matching template entry.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_plugin_customizations",
+        deserialize_with = "deserialize_plugin_customizations"
+    )]
+    pub customizations: Option<Vec<PluginCustomization>>,
     /// Creation timestamp in ISO 8601 format.
     pub created_at: String,
     /// Last definition modification timestamp in ISO 8601 format.
@@ -5626,6 +6173,56 @@ pub struct AutomationEntry {
     /// Opaque host-defined state metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+fn serialize_plugin_customizations<S>(
+    value: &Option<Vec<PluginCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom(
+                "plugin customization must serialize to an object",
+            ));
+        };
+        object.insert(
+            "type".to_owned(),
+            serde_json::Value::String("plugin".to_owned()),
+        );
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_plugin_customizations<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<PluginCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("plugin") {
+                return Err(serde::de::Error::custom(
+                    "expected plugin customization type",
+                ));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Authoritative automation catalogue exposed on the `ahp-automations://`
@@ -6174,6 +6771,19 @@ pub enum SessionInputRequest {
     #[serde(untagged)]
     Unknown(serde_json::Value),
 }
+/// Work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum BackgroundWork {
+    #[serde(rename = "shell")]
+    Shell(BackgroundShellWork),
+    #[serde(rename = "subagent")]
+    Subagent(BackgroundSubagentWork),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
 
 /// Durable origin of a session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -6235,17 +6845,23 @@ pub enum AutomationRunLifecycle {
 
 /// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required `lifecycle`), then
-/// chat (has required `turns`), then terminal (has required `content`),
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by channels whose state has no fields), then session (has required `lifecycle`), then
+/// chat (has required `turns`), then canvas (has required instance/provider/type
+/// identifiers), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
-/// `automations`), then root.
+/// `automations`), then root (has required `agents`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as `Unknown` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
+    Canvas(Box<CanvasState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
@@ -6253,4 +6869,7 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }

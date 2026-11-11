@@ -1,0 +1,65 @@
+{
+  "description": "background work of an unknown kind is kept and replaced by id",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "shell",
+        "id": "shell-1",
+        "label": "Run tests",
+        "command": "npm test",
+        "startedAt": "2026-09-25T00:00:00.000Z"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/backgroundWorkSet",
+      "work": {
+        "kind": "futureKind",
+        "id": "future-1",
+        "label": "Start review",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "target": "reviewer"
+      }
+    },
+    {
+      "type": "chat/backgroundWorkSet",
+      "work": {
+        "kind": "futureKind",
+        "id": "future-1",
+        "label": "Review changes",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "target": "reviewer"
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundWork": [
+      {
+        "kind": "shell",
+        "id": "shell-1",
+        "label": "Run tests",
+        "command": "npm test",
+        "startedAt": "2026-09-25T00:00:00.000Z"
+      },
+      {
+        "kind": "futureKind",
+        "id": "future-1",
+        "label": "Review changes",
+        "startedAt": "2026-09-25T00:01:00.000Z",
+        "target": "reviewer"
+      }
+    ]
+  }
+}

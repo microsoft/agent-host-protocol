@@ -21,10 +21,13 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 
 const GENERATED_BANNER = '// Generated from types/*.ts — do not edit.\n//\n// Regenerate with: npm run generate:rust\n\n#![allow(missing_docs)]\n';
@@ -164,6 +167,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -234,9 +239,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -378,7 +381,7 @@ function findEnum(project: Project, name: string): EnumDeclaration | undefined {
 function generateRustBitset(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
 
   if (desc) {
     for (const d of desc.split('\n')) lines.push(`/// ${d.trimEnd()}`);
@@ -473,7 +476,7 @@ function generateRustBitset(enumDecl: EnumDeclaration): string {
 function generateRustEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
+  const desc = getDocumentation(enumDecl);
   const values = enumDecl.getMembers().map(m => m.getValue());
   const isNumeric = values.every(v => typeof v === 'number');
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
@@ -609,6 +612,11 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
       attrs.push('serialize_with = "serialize_running_tool_call"');
       attrs.push('deserialize_with = "deserialize_running_tool_call"');
     }
+    const taggedList = TAGGED_CUSTOMIZATION_LISTS.find(list => list.owner === rustName && list.field === p.rustName);
+    if (taggedList) {
+      attrs.push(`serialize_with = "serialize_${taggedList.fnSuffix}"`);
+      attrs.push(`deserialize_with = "deserialize_${taggedList.fnSuffix}"`);
+    }
     if (attrs.length > 0) {
       lines.push(`    #[serde(${attrs.join(', ')})]`);
     }
@@ -650,6 +658,74 @@ where
         return Err(serde::de::Error::custom("expected running tool-call status"));
     }
     serde_json::from_value(raw).map_err(serde::de::Error::custom)
+}`;
+}
+
+/**
+ * Customization variants omit their `type` discriminant because the
+ * `Customization` and `ChildCustomization` enums supply it. Standalone lists of
+ * one variant outside those enums must restore it on the wire.
+ */
+interface ITaggedCustomizationList {
+  /** Rust struct that owns the field. */
+  readonly owner: string;
+  /** Rust field name. */
+  readonly field: string;
+  /** Rust element type. */
+  readonly rustType: string;
+  /** Wire value of the `type` discriminant. */
+  readonly tag: string;
+  /** Suffix of the generated `serialize_`/`deserialize_` helper names. */
+  readonly fnSuffix: string;
+}
+
+const TAGGED_CUSTOMIZATION_LISTS: readonly ITaggedCustomizationList[] = [
+  { owner: 'AutomationEntry', field: 'customizations', rustType: 'PluginCustomization', tag: 'plugin', fnSuffix: 'plugin_customizations' },
+  { owner: 'McpServerCustomization', field: 'children', rustType: 'SkillCustomization', tag: 'skill', fnSuffix: 'mcp_server_skills' },
+];
+
+function generateTaggedCustomizationsSerdeHelpers({ rustType, tag, fnSuffix }: ITaggedCustomizationList): string {
+  return `fn serialize_${fnSuffix}<S>(
+    value: &Option<Vec<${rustType}>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom("${tag} customization must serialize to an object"));
+        };
+        object.insert("type".to_owned(), serde_json::Value::String("${tag}".to_owned()));
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_${fnSuffix}<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<${rustType}>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("${tag}") {
+                return Err(serde::de::Error::custom("expected ${tag} customization type"));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }`;
 }
 
@@ -746,13 +822,14 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -763,6 +840,7 @@ const STATE_ENUMS = [
   'ConfirmationOptionKind', 'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus',
   'TerminalClaimKind', 'TerminalLifecycleStatus',
+  'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -772,27 +850,14 @@ const STATE_ENUMS = [
 ];
 
 /**
- * Detects *bitset* enums (flag combinations are valid wire values) via the
- * same JSDoc convention the Kotlin and Swift generators use: a numeric enum
- * whose leading JSDoc description starts with the word "Bitset". These are
- * emitted as `u32` newtypes via {@link generateRustBitset} instead of closed
- * `#[repr(u32)]` enums, so combined flags and forward-compat bits round-trip on
- * the wire. Marking an enum a bitset is therefore a property of its `types/`
- * declaration, not a name list maintained here (currently only `SessionStatus`
- * carries the marker).
- */
-function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
-  const isNumeric = enumDecl.getMembers().every(m => typeof m.getValue() === 'number');
-  return isNumeric && desc !== undefined && /^bitset\b/i.test(desc);
-}
-
-/**
  * State structs to emit. The order matters only for human-readability — Rust
  * doesn't require forward declaration. Structs that serve as variants of a
  * discriminated union have `omitDiscriminants: true` set.
  */
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -808,7 +873,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'ConfigSchema' },
   { name: 'PendingMessage' },
   { name: 'ChatState' },
+  { name: 'CanvasReference' },
+  { name: 'CanvasState' },
   { name: 'ChatSummary' },
+  { name: 'BackgroundShellWork', omitDiscriminants: true },
+  { name: 'BackgroundSubagentWork', omitDiscriminants: true },
   { name: 'SideChatSelection' },
   { name: 'SessionState' },
   { name: 'SessionActiveClient' },
@@ -823,6 +892,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
+  { name: 'ChatConfigState' },
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },
@@ -881,7 +951,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'CustomizationDegradedState', omitDiscriminants: true },
   { name: 'CustomizationErrorState', omitDiscriminants: true },
   { name: 'PluginCustomization', omitDiscriminants: true },
-  { name: 'ClientPluginCustomization', omitDiscriminants: true },
+  { name: 'ClientPluginCustomization' },
   { name: 'DirectoryCustomization', omitDiscriminants: true },
   { name: 'AgentCustomization', omitDiscriminants: true },
   { name: 'SkillCustomization', omitDiscriminants: true },
@@ -916,6 +986,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState' },
@@ -1192,6 +1263,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const BACKGROUND_WORK_UNION: UnionConfig = {
+  name: 'BackgroundWork',
+  discriminantField: 'kind',
+  doc: 'Work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.',
+  variants: [
+    { variantName: 'Shell', innerType: 'BackgroundShellWork', wireValue: 'shell' },
+    { variantName: 'Subagent', innerType: 'BackgroundSubagentWork', wireValue: 'subagent' },
+  ],
+  unknown: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1297,17 +1379,23 @@ ${unknownVariant}}`;
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 ///
-/// Deserialized by trying session first (has required \`lifecycle\`), then
-/// chat (has required \`turns\`), then terminal (has required \`content\`),
+/// Deserialized by trying the empty state first (an object with no members,
+/// used by channels whose state has no fields), then session (has required \`lifecycle\`), then
+/// chat (has required \`turns\`), then canvas (has required instance/provider/type
+/// identifiers), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
 /// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root.
+/// \`automations\`), then root (has required \`agents\`). A state that matches
+/// none of these, such as the state of a channel added in a later protocol
+/// version, decodes as \`Unknown\` and keeps its raw JSON.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Empty(EmptyState),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
+    Canvas(Box<CanvasState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
@@ -1315,6 +1403,9 @@ pub enum SnapshotState {
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+    /// A state that this version does not recognize, kept as raw JSON so it
+    /// re-encodes unchanged.
+    Unknown(serde_json::Value),
 }`;
 }
 
@@ -1346,12 +1437,21 @@ function generateStateFile(project: Project): string {
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
-      lines.push(generateStructFromInterface(project, entry.name, entry.rustName, {
+      const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
-      }));
+      });
+      // EmptyState must match only `{}`, so the untagged SnapshotState does not
+      // decode an unknown state shape as empty.
+      lines.push(entry.name === 'EmptyState'
+        ? struct.replace('pub struct EmptyState', '#[serde(deny_unknown_fields)]\npub struct EmptyState')
+        : struct);
       if (entry.name === 'SessionToolClientExecutionRequest') {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
+      }
+      for (const list of TAGGED_CUSTOMIZATION_LISTS.filter(list => list.owner === entry.name)) {
+        lines.push('');
+        lines.push(generateTaggedCustomizationsSerdeHelpers(list));
       }
       if (entry.name === 'SubscribeParams') {
         lines.push('');
@@ -1409,6 +1509,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, TERMINAL_LIFECYCLE_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
+  lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
   lines.push('');
@@ -1444,6 +1545,7 @@ const ACTION_VARIANTS: {
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
   { type: 'session/chatRemoved', variantName: 'SessionChatRemoved', tsInterface: 'SessionChatRemovedAction' },
   { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
+  { type: 'session/chatsReordered', variantName: 'SessionChatsReordered', tsInterface: 'SessionChatsReorderedAction' },
   { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
   { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
@@ -1462,7 +1564,12 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundWorkSet', variantName: 'ChatBackgroundWorkSet', tsInterface: 'ChatBackgroundWorkSetAction' },
+  { type: 'chat/backgroundWorkRemoved', variantName: 'ChatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
+  { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
+  { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
@@ -1484,7 +1591,10 @@ const ACTION_VARIANTS: {
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
+  { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', variantName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1612,9 +1722,8 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
-
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
   const actionTypeEnum = findEnum(project, 'ActionType');
@@ -1716,16 +1825,21 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
+  { name: 'AutomationCustomizationsCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
   { name: 'SubscribeParams' }, { name: 'SubscribeView' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
@@ -1733,6 +1847,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource', omitDiscriminants: true }, { name: 'SideChatSource', omitDiscriminants: true }, { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
+  { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
+  { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1747,6 +1863,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
+  { name: 'McpServerAuthenticateTarget', omitDiscriminants: true },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -1759,6 +1876,15 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
 ];
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
+  variants: [
+    { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
+  ],
+};
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
@@ -1780,12 +1906,22 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   ],
 };
 
+const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
+  name: 'ChatMoveDestination',
+  discriminantField: 'kind',
+  doc: 'Destination of an atomic chat move.',
+  variants: [
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
+    { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
+  ],
+};
+
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1819,6 +1955,12 @@ function generateCommandsFile(project: Project): string {
 
   lines.push('// ─── ChatSource Union ─────────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
+  lines.push('');
+  lines.push('// ─── ChatMoveDestination Union ────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
+  lines.push('');
+  lines.push('// ─── AuthenticateTarget Union ─────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
   lines.push('');
 
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
@@ -1869,6 +2011,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1879,6 +2022,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: Some(delivery),
             view: None,
+            flow_control: None,
         }
     }
 
@@ -1889,6 +2033,7 @@ function generateSubscribeParamsImplRust(): string {
             meta: None,
             delivery: None,
             view: Some(view),
+            flow_control: None,
         }
     }
 }`;
@@ -1911,6 +2056,8 @@ pub enum ChangesetOperationTarget {
         resource: Uri,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
     #[serde(rename = "range")]
     Range {
@@ -1918,6 +2065,8 @@ pub enum ChangesetOperationTarget {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         side: Option<String>,
         range: TextRange,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nonce: Option<String>,
     },
 ${unknownVariant}}`;
 }
@@ -1927,6 +2076,9 @@ ${unknownVariant}}`;
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -1940,7 +2092,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary, Snapshot};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1981,7 +2133,27 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptRust(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptRust(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `    ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// Notification methods that do not count against the window on a windowed
+/// subscription. Every other notification for a subscription counts.
+pub const WINDOW_EXEMPT_METHODS: &[&str] = &[
+${methods}
+];
+
+/// Whether a notification with this method counts against the window on a
+/// windowed subscription. Methods that are not recognized count.
+pub fn counts_against_window(method: &str) -> bool {
+    !WINDOW_EXEMPT_METHODS.contains(&method)
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
@@ -2032,6 +2204,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// The host could not open the requested TCP connection.
+    pub const TCP_CONNECTION_OPEN_FAILED: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.
@@ -2166,7 +2340,7 @@ function generateVersionFile(project: Project): string {
 pub const PROTOCOL_VERSION: &str = ${JSON.stringify(current)};
 
 /// Every protocol version this crate is willing to negotiate, ordered
-/// most-preferred-first. The first entry equals [\`PROTOCOL_VERSION\`].
+/// most-preferred-first, independently of the development [\`PROTOCOL_VERSION\`].
 ///
 /// Consumers building \`InitializeParams\` should pass this slice (or a
 /// derived \`Vec<String>\`) so the same client binary can fall back to
@@ -2174,6 +2348,41 @@ pub const PROTOCOL_VERSION: &str = ${JSON.stringify(current)};
 pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &[
 ${supportedLiteral}
 ];
+
+/// Select the highest offered version in a supported caret range.
+/// None means the host must send UnsupportedProtocolVersion and close.
+pub fn negotiate_protocol_version(offered: &[String]) -> Result<Option<&str>, String> {
+    fn parse(version: &str) -> Result<(u64, u64, u64), String> {
+        let invalid = || format!("Invalid protocol version: {version}");
+        let parts: Vec<&str> = version.split('.').collect();
+        if parts.len() != 3 {
+            return Err(invalid());
+        }
+        let mut values = [0; 3];
+        for (index, part) in parts.iter().enumerate() {
+            if part.is_empty() || (part.len() > 1 && part.starts_with('0'))
+                || !part.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Err(invalid());
+            }
+            values[index] = part.parse::<u64>().map_err(|_| invalid())?;
+        }
+        Ok((values[0], values[1], values[2]))
+    }
+    let baselines = SUPPORTED_PROTOCOL_VERSIONS.iter()
+        .map(|version| parse(version)).collect::<Result<Vec<_>, _>>()?;
+    let mut selected: Option<(&str, (u64, u64, u64))> = None;
+    for version in offered {
+        let parts = parse(version)?;
+        if baselines.iter().any(|base| parts.0 == base.0
+            && (parts.0 > 0 || parts.1 == base.1)
+            && (parts.0 > 0 || parts.1 > 0 || parts.2 == base.2)
+            && parts >= *base)
+            && selected.as_ref().map_or(true, |(_, previous)| parts > *previous) {
+            selected = Some((version.as_str(), parts));
+        }
+    }
+    Ok(selected.map(|(version, _)| version))
+}
 `;
 }
 
@@ -2206,6 +2415,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI',
     'JsonPrimitive',
     'BaseParams',
@@ -2228,6 +2438,7 @@ function checkExhaustiveness(project: Project): void {
     'ChatAction',                   // source-only union covered by StateAction
     'ChatOrigin',                   // hand-generated union for inline variants
     'ChatSource',
+    'ChatMoveDestination',
     'PingParams',
     'TerminalClaim',
     'TerminalContentPart',
@@ -2246,6 +2457,7 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallRiskAssessment',       // TOOL_CALL_RISK_ASSESSMENT_UNION discriminated union
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
     'SessionOrigin',

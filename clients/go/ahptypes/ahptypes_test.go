@@ -15,8 +15,8 @@ func TestProtocolVersion(t *testing.T) {
 	if len(supported) == 0 {
 		t.Fatal("SupportedProtocolVersions is empty")
 	}
-	if supported[0] != ProtocolVersion {
-		t.Fatalf("SupportedProtocolVersions[0] = %q, want %q (ProtocolVersion)", supported[0], ProtocolVersion)
+	if len(supported) != 2 || supported[0] != "1.0.0" || supported[1] != "0.9.0" {
+		t.Fatalf("unexpected released compatibility baselines: %v", supported)
 	}
 }
 

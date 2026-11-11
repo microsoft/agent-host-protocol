@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "Historical `ToolResultTerminalContent.resource` subscriptions return lazily reconstructed exited terminal state with retained output."
-}

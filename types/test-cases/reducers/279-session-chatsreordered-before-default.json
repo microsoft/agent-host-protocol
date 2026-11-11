@@ -1,0 +1,72 @@
+{
+  "description": "session/chatsReordered may place a movable chat before the default chat",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/c1",
+    "chats": [
+      {
+        "resource": "ahp-chat:/c1",
+        "title": "Chat 1",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Chat 2",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c3",
+        "title": "Chat 3",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:03.000Z",
+        "origin": { "kind": "user" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatsReordered",
+      "chats": ["ahp-chat:/c3", "ahp-chat:/c1", "ahp-chat:/c2"]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "defaultChat": "ahp-chat:/c1",
+    "chats": [
+      {
+        "resource": "ahp-chat:/c3",
+        "title": "Chat 3",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:03.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c1",
+        "title": "Chat 1",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "origin": { "kind": "user" }
+      },
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Chat 2",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:02.000Z",
+        "origin": { "kind": "user" }
+      }
+    ]
+  }
+}

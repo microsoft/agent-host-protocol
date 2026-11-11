@@ -192,7 +192,7 @@
     },
     "SessionChatUpdatedAction": {
       "type": "object",
-      "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`) MUST NOT be\ncarried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.",
+      "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`) MUST NOT be\ncarried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.\nWhen `changes.status` changes, the host MUST project that exact value into\nthe matching `SessionChatSummary.status` field and publish\nthe updated compact chat catalog through `root/sessionSummaryChanged`.",
       "properties": {
         "type": {
           "const": "session/chatUpdated"
@@ -224,13 +224,25 @@
               "type": "string",
               "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
             },
+            "changes": {
+              "$ref": "#/$defs/ChangesSummary",
+              "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
+            },
             "origin": {
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
             },
+            "movable": {
+              "type": "boolean",
+              "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
+            },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
               "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+            },
+            "provider": {
+              "type": "string",
+              "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
             },
             "workingDirectories": {
               "type": "array",
@@ -240,7 +252,7 @@
               "description": "The subset of the session's working directories this chat uses.\nSee {@link ChatState.workingDirectories} for the full semantics."
             }
           },
-          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
         }
       },
       "required": [
@@ -263,6 +275,26 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "SessionChatsReorderedAction": {
+      "type": "object",
+      "description": "The owning session's authoritative chat catalog order changed.\n\nHost-emitted convergence signal; it never originates from a client\ndispatch. `chats` is the complete resulting order and MUST contain every\nchat currently in the session exactly once. Reducers replace the catalog\norder while preserving each matching summary. Invalid or incomplete orders\nare ignored.",
+      "properties": {
+        "type": {
+          "const": "session/chatsReordered"
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "Every chat URI in authoritative catalog order."
+        }
+      },
+      "required": [
+        "type",
+        "chats"
       ]
     },
     "SessionTitleChangedAction": {
@@ -517,7 +549,7 @@
     },
     "SessionCustomizationToggledAction": {
       "type": "object",
-      "description": "A client updated a customization's enablement decisions.\n\nMatches `id` against every top-level customization first — a plugin or\ndirectory container, or a bare top-level MCP server — then against the\nchildren inside each container (a skill, agent, or other entry). Plugins\nand MCP servers retain the matched entry's explicit decisions; other\nentries update their `enabled` flag. Disabling a plugin still disables all\nof its children — the effective state of a plugin child is the plugin's\nderived enabled value and `(child.enabled ?? true)` — so toggling a child\nonly matters while its plugin is enabled. Is a no-op when no\ncustomization has the given `id`.\n\nThe `enablement` array completely replaces all explicit decisions. A caller\nchanging one scope must include every decision it intends to preserve.",
+      "description": "A client updated a customization's enablement decisions.\n\nMatches `id` against every top-level customization first — a plugin or\ndirectory container, or a bare top-level MCP server — then against the\nchildren inside each container (a skill, agent, or other entry), including\nskills served by top-level or container-child MCP servers. Plugins and\nMCP servers retain the matched entry's explicit decisions; other\nentries update their `enabled` flag. Disabling a plugin still disables all\nof its children — the effective state of a plugin child is the plugin's\nderived enabled value and `(child.enabled ?? true)` — so toggling a child\nonly matters while its plugin is enabled. Is a no-op when no\ncustomization has the given `id`.\n\nThe `enablement` array completely replaces all explicit decisions. A caller\nchanging one scope must include every decision it intends to preserve.",
       "properties": {
         "type": {
           "const": "session/customizationToggled"
@@ -715,7 +747,7 @@
     },
     "ChatTurnStartedAction": {
       "type": "object",
-      "description": "A new message has been sent to the agent, and a new turn starts.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A new message has been sent to the agent, and a new turn starts.",
       "properties": {
         "type": {
           "const": "chat/turnStarted"
@@ -734,7 +766,7 @@
         },
         "queuedMessageId": {
           "type": "string",
-          "description": "If this turn was auto-started from a queued message, the ID of that message"
+          "description": "If this turn consumes a pending message, its ID. Removes the matching\nentry from {@link ChatState.queuedMessages}."
         },
         "_meta": {
           "type": "object",
@@ -1339,6 +1371,57 @@
         "type"
       ]
     },
+    "ChatBackgroundWorkSetAction": {
+      "type": "object",
+      "description": "Adds or replaces a {@link BackgroundWork} entry by `id`, independently of turn\nstate.",
+      "properties": {
+        "type": {
+          "const": "chat/backgroundWorkSet"
+        },
+        "work": {
+          "$ref": "#/$defs/BackgroundWork",
+          "description": "The complete entry."
+        }
+      },
+      "required": [
+        "type",
+        "work"
+      ]
+    },
+    "ChatBackgroundWorkRemovedAction": {
+      "type": "object",
+      "description": "Removes finished or no-longer-tracked background work; unknown IDs are a no-op.",
+      "properties": {
+        "type": {
+          "const": "chat/backgroundWorkRemoved"
+        },
+        "id": {
+          "type": "string",
+          "description": "The {@link BackgroundWorkBase.id | id} of the entry to remove."
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    },
+    "ChatMovableChangedAction": {
+      "type": "object",
+      "description": "Whether this chat is structurally eligible to be the source of `moveChat`\nchanged.\n\nThe host is authoritative and MUST also update the owning session's chat\ncatalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.\nA chat referenced by its owning session's `defaultChat` MUST always carry\n`movable: false`.",
+      "properties": {
+        "type": {
+          "const": "chat/movableChanged"
+        },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be moved."
+        }
+      },
+      "required": [
+        "type",
+        "movable"
+      ]
+    },
     "ChatChangesetsChangedAction": {
       "type": "object",
       "description": "The {@link Changeset | catalogue of changesets} the agent host advertises\nfor this chat changed. Replaces\n{@link ChatState.changesets | `state.changesets`} entirely\n(full-replacement semantics) — set to `undefined` to clear the catalogue.\n\nEntries SHOULD describe Branch, Uncommitted Changes, or other views scoped\nto the chat's effective {@link ChatState.workingDirectories | working\ndirectories}. Clients subscribe to each advertised changeset URI for\nfile-level updates through the existing `changeset/*` action stream.",
@@ -1352,6 +1435,25 @@
             "$ref": "#/$defs/Changeset"
           },
           "description": "New catalogue, or `undefined` to clear it."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "ChatCanvasesChangedAction": {
+      "type": "object",
+      "description": "The live canvas channels exposed by this chat changed.\n\nReplaces {@link ChatState.canvases | `state.canvases`} entirely. Set to\n`undefined` to clear the collection.",
+      "properties": {
+        "type": {
+          "const": "chat/canvasesChanged"
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasReference"
+          },
+          "description": "New canvas channel references, or `undefined` to clear the collection."
         }
       },
       "required": [
@@ -1421,7 +1523,7 @@
     },
     "ChatReasoningAction": {
       "type": "object",
-      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
+      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text or record its timing.\nAn empty `content` updates only the supplied timing fields.",
       "properties": {
         "type": {
           "const": "chat/reasoning"
@@ -1437,6 +1539,14 @@
         "content": {
           "type": "string",
           "description": "Reasoning text chunk"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown."
         },
         "_meta": {
           "type": "object",
@@ -1493,7 +1603,7 @@
     },
     "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nBoth kinds are stored in {@link ChatState.queuedMessages}, including this\naction's `kind`. A new `id` appends an entry; an existing `id` replaces its\nmessage and kind in place.\n\nIf the chat is idle when a queued message is set, the server SHOULD\nimmediately consume it and start a new turn.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageSet"
@@ -1520,7 +1630,7 @@
     },
     "ChatPendingMessageRemovedAction": {
       "type": "object",
-      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
+      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).\n\nRemoves an entry from {@link ChatState.queuedMessages} only when both `id`\nand effective kind match. Unknown IDs and mismatched kinds are\nno-ops.",
       "properties": {
         "type": {
           "const": "chat/pendingMessageRemoved"
@@ -1542,7 +1652,7 @@
     },
     "ChatQueuedMessagesReorderedAction": {
       "type": "object",
-      "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
+      "description": "Reorder the entire shared {@link ChatState.queuedMessages} list.\n\nThe `order` array contains pending message IDs of either kind in their new\ndesired raw order. Unknown and duplicate IDs are ignored.\nMessages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the list never silently drops messages). UIs SHOULD still group\nsteering messages first, independently of this raw order.",
       "properties": {
         "type": {
           "const": "chat/queuedMessagesReordered"
@@ -1552,7 +1662,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Queued message IDs in the desired order"
+          "description": "Pending message IDs in the desired raw order"
         }
       },
       "required": [
@@ -1576,6 +1686,23 @@
         "type"
       ]
     },
+    "ChatIsReadChangedAction": {
+      "type": "object",
+      "description": "The read state of the chat changed.\n\nDispatched by a client to mark any known chat, including the owning\nsession's default chat, as read (e.g. after viewing it) or unread. This\nchanges only the addressed chat; it does not change the read state of its\nowning session or sibling chats. Use `session/isReadChanged` only to change\nthe owning session's independent read state. After accepting this action,\nthe host also synchronizes the addressed chat's `ChatSummary.status` and\n`SessionChatSummary.status` projections.",
+      "properties": {
+        "type": {
+          "const": "chat/isReadChanged"
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "Whether the chat has been read"
+        }
+      },
+      "required": [
+        "type",
+        "isRead"
+      ]
+    },
     "ChatIsArchivedChangedAction": {
       "type": "object",
       "description": "The archived state of the chat changed.\n\nDispatched by a client to archive a chat independently of its owning\nsession or to restore it. Archiving the session's default chat is equivalent\nto archiving the session and SHOULD use `session/isArchivedChanged` instead.",
@@ -1591,6 +1718,53 @@
       "required": [
         "type",
         "isArchived"
+      ]
+    },
+    "ChatConfigChangedAction": {
+      "type": "object",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.",
+      "properties": {
+        "type": {
+          "const": "chat/configChanged"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Config values to set on the chat"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces the chat's config values instead of merging"
+        }
+      },
+      "required": [
+        "type",
+        "config"
+      ]
+    },
+    "ChatMovedAction": {
+      "type": "object",
+      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | `provider`} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.",
+      "properties": {
+        "type": {
+          "const": "chat/moved"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "The new owning session URI."
+        },
+        "provider": {
+          "type": "string",
+          "description": "The chat's provider in the new session; absent clears it."
+        },
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "The chat's config schema in the new session; absent clears it."
+        }
+      },
+      "required": [
+        "type",
+        "session"
       ]
     },
     "ChatInputRequestedAction": {
@@ -1663,6 +1837,23 @@
         "type",
         "requestId",
         "response"
+      ]
+    },
+    "CanvasStateChangedAction": {
+      "type": "object",
+      "description": "The presentation state for this canvas changed.\n\nReplaces the subscribed canvas channel state entirely. Full-replacement\nsemantics intentionally keep this early-development channel free to evolve\nwithout expanding the stable chat action surface.",
+      "properties": {
+        "type": {
+          "const": "canvas/stateChanged"
+        },
+        "canvas": {
+          "$ref": "#/$defs/CanvasState",
+          "description": "New authoritative canvas state."
+        }
+      },
+      "required": [
+        "type",
+        "canvas"
       ]
     },
     "TerminalDataAction": {
@@ -1921,7 +2112,7 @@
     },
     "ChangesetFilesReviewChangedAction": {
       "type": "object",
-      "description": "Set the {@link ChangesetFile.reviewed} flag for one or more files — the\nGitHub-style \"Viewed\" toggle, applied in a single batch.\n\nTargets files by their {@link ChangesetFile.id}. Ids in {@link files} that\ndo not match a file currently present in the changeset are ignored; if none\nmatch, the action is a no-op. Only the {@link ChangesetFile.reviewed} field\nof each matched file is affected; the files' {@link ChangesetFile.edit | edit}\nand {@link ChangesetFile._meta | _meta} are left untouched.\n\nOnly meaningful on a changeset that advertises\n{@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action\nthis one is **client-dispatchable**: a reviewer toggles review state directly,\napplying it optimistically through the write-ahead reducer and letting the\nserver echo it back on the normal `action` envelope stream. The server MAY\nalso originate it (e.g. an agent marking its own output reviewed).\n\nThere is no protocol-level content version, so review is not reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either by\nre-emitting the file without `reviewed: true`, or by dispatching this action\nwith `reviewed: false`.",
+      "description": "Set the {@link ChangesetFile.reviewed} flag for one or more files — the\nGitHub-style \"Viewed\" toggle, applied in a single batch.\n\nTargets files by their {@link ChangesetFile.id}. Ids in {@link files} that\ndo not match a file currently present in the changeset are ignored; if none\nmatch, the action is a no-op. Only the {@link ChangesetFile.reviewed} field\nof each matched file is affected; the files' {@link ChangesetFile.edit | edit},\n{@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}\nare left untouched.\n\nOnly meaningful on a changeset that advertises\n{@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action\nthis one is **client-dispatchable**: a reviewer toggles review state directly,\napplying it optimistically through the write-ahead reducer and letting the\nserver echo it back on the normal `action` envelope stream. The server MAY\nalso originate it (e.g. an agent marking its own output reviewed).\n\nReview is not reset automatically when a file's contents or nonce change\nunder a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either by\nre-emitting the file without `reviewed: true`, or by dispatching this action\nwith `reviewed: false`.",
       "properties": {
         "type": {
           "const": "changeset/filesReviewChanged"
@@ -2181,7 +2372,7 @@
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Replacement {@link AutomationDefinition.session}. The host revalidates\naffected event triggers when their discovery context changes."
+          "description": "Replacement {@link AutomationDefinition.session}. The host revalidates\naffected event triggers when their discovery context changes, and\ncaptures {@link AutomationSessionTemplate.customizations} entries that\nare new or whose `uri` or `nonce` changed."
         },
         "enabled": {
           "type": "boolean",
@@ -2242,7 +2433,7 @@
     },
     "AutomationCreateRequestedAction": {
       "type": "object",
-      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates trigger ids and configuration, normalizes event-trigger\ntitles and descriptions, persists the definition, then publishes the\nauthoritative result with {@link AutomationSetAction | `automation/set`}.\nRejections leave the catalogue unchanged.",
+      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates trigger ids and configuration, normalizes event-trigger\ntitles and descriptions, captures any\n{@link AutomationSessionTemplate.customizations | session customizations}\nfrom the dispatching client, persists the definition, then publishes the\nauthoritative result with {@link AutomationSetAction | `automation/set`}.\nRejections leave the catalogue unchanged.",
       "properties": {
         "type": {
           "const": "automation/createRequested"
@@ -2462,7 +2653,19 @@
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovableChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatCanvasesChangedAction"
         },
         {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"
@@ -2495,7 +2698,16 @@
           "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatIsReadChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatIsArchivedChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatConfigChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -2506,6 +2718,69 @@
         {
           "$ref": "#/$defs/ChatInputCompletedAction"
         }
+      ]
+    },
+    "ChannelReceiveLimits": {
+      "type": "object",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "windowBytes": {
+          "type": "integer",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maximumFrameBytes": {
+          "type": "integer",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "minimum": 1024,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "windowBytes",
+        "maximumFrameBytes"
+      ]
+    },
+    "ChannelFlowControl": {
+      "type": "object",
+      "description": "The limits that the server accepted for a windowed subscription.\n\nThe client ID and channel URI identify the subscription. All counters start at\nzero when the subscription starts.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "clientReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the server sends to the client."
+        },
+        "hostReceive": {
+          "$ref": "#/$defs/ChannelReceiveLimits",
+          "description": "Limits for data that the client sends to the server."
+        }
+      },
+      "required": [
+        "clientReceive",
+        "hostReceive"
+      ]
+    },
+    "ResumedChannelSubscription": {
+      "type": "object",
+      "description": "A windowed subscription that the server kept after reconnection.\n\nThe subscription's counters start at zero on the new connection. If a\nchannel that the client requested is not in the result, the subscription was\nnot kept. The client discards the old subscription and, for a byte stream,\ncloses the stream.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the windowed subscription."
+        },
+        "flowControl": {
+          "$ref": "#/$defs/ChannelFlowControl",
+          "description": "The limits that the server accepted for the new connection, as in a\n`subscribe` result. The server MAY lower the limits that the client offered\nin its request, and MUST NOT raise them."
+        },
+        "recovery": {
+          "$ref": "#/$defs/ChannelRecoveryKind",
+          "description": "How the server resumes sending data."
+        }
+      },
+      "required": [
+        "channel",
+        "flowControl",
+        "recovery"
       ]
     },
     "Icon": {
@@ -2659,6 +2934,16 @@
         "items": {
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "minItems": {
+          "type": "integer",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)",
+          "minimum": 0
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)",
+          "minimum": 0
         },
         "properties": {
           "type": "object",
@@ -2905,11 +3190,11 @@
     },
     "Snapshot": {
       "type": "object",
-      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
+      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -2935,13 +3220,19 @@
               "$ref": "#/$defs/ChatState"
             },
             {
+              "$ref": "#/$defs/CanvasState"
+            },
+            {
               "$ref": "#/$defs/AutomationState"
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/EmptyState"
             }
           ],
-          "description": "The current state of the resource"
+          "description": "The current state of the resource. A channel with no state fields, such as a\ntelemetry channel, has an {@link EmptyState}. Later protocol versions can add\nnew kinds of state; a client MUST NOT fail on a state that it does not\nrecognize, and ignores that snapshot."
         },
         "fromSeq": {
           "type": "number",
@@ -2953,6 +3244,11 @@
         "state",
         "fromSeq"
       ]
+    },
+    "EmptyState": {
+      "type": "object",
+      "description": "The state of a channel that has no state fields, such as a telemetry\nchannel. It is always the empty object `{}`.\n\nEvery windowed subscription starts with a snapshot, including subscriptions\nto these channels, so a channel can gain state fields in a later revision\nwithout changing how windowed subscriptions start. With ordinary delivery,\nthe server MAY omit a snapshot whose state is an `EmptyState`.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "RootState": {
       "type": "object",
@@ -3044,7 +3340,7 @@
       "properties": {
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
-          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding mode."
+          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding\ncreation mode."
         },
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
@@ -3089,7 +3385,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Provider this model belongs to"
+          "description": "Agent provider that owns this model. Matches {@link AgentInfo.provider}."
         },
         "name": {
           "type": "string",
@@ -3123,6 +3419,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this model.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `pricing` key may carry model pricing metadata."
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Vendor of this model as the provider reports it, for example `Anthropic`\nor `Azure OpenAI`. This is sometimes the company that serves the model\nrather than the one that built it. Not the same as {@link provider},\nwhich names the agent provider that owns this model. Absent when the\nprovider does not report a vendor. Providers MAY send any value; clients\nSHOULD fall back to a generic presentation for values they do not\nrecognize."
         }
       },
       "required": [
@@ -3304,11 +3604,11 @@
           "items": {
             "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Catalog of chats in this session."
+          "description": "Catalog of chats in this session.\n\nOrder is host-authoritative and durable. Catalog order is independent of\n`defaultChat`."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker — chats remain equal peers at the protocol level. Hosts MAY change\nthis over the session's lifetime."
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This routing designation does not determine the\nchat's catalog position. Hosts MAY change it over the session's lifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -3319,7 +3619,7 @@
           "items": {
             "$ref": "#/$defs/Customization"
           },
-          "description": "Top-level customizations active in this session.\n\nAlways one of the {@link Customization} variants:\n\n- Container customizations ({@link PluginCustomization},\n  {@link DirectoryCustomization}) whose children — agents, skills,\n  prompts, rules, hooks, MCP servers — live in each container's\n  {@link ContainerCustomizationBase.children | `children`} array.\n- Top-level {@link McpServerCustomization} entries the host\n  surfaces directly (for example a globally-configured MCP server\n  that isn't bundled in a plugin or directory). MCP servers may\n  also appear as children of a container.\n\nClient-published plugins arrive via\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}\nand the host propagates them into this list (typically with the\ncontainer's `clientId` set and `children` populated). Clients\npublish in container shape only; bare MCP servers at the top level\nare server-originated."
+          "description": "Top-level customizations active in this session.\n\nAlways one of the {@link Customization} variants:\n\n- Container customizations ({@link PluginCustomization},\n  {@link DirectoryCustomization}) whose children — agents, skills,\n  prompts, rules, hooks, MCP servers — live in each container's\n  {@link ContainerCustomizationBase.children | `children`} array.\n- Top-level {@link McpServerCustomization} entries the host\n  surfaces directly (for example a globally-configured MCP server\n  that isn't bundled in a plugin or directory). MCP servers may\n  also appear as children of a container, and may serve skills in\n  their own {@link McpServerCustomization.children | `children`} array.\n\nClient-published plugins arrive via\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}\nand the host propagates them into this list (typically with the\ncontainer's `clientId` set and `children` populated). Clients\npublish in container shape only; bare MCP servers at the top level\nare server-originated."
         },
         "changesets": {
           "type": "array",
@@ -3548,7 +3848,7 @@
     },
     "SessionSummary": {
       "type": "object",
-      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `workingDirectories`: the session-level set. Individual chats MAY restrict\n  to a subset via {@link ChatSummary.workingDirectories}; aggregating these\n  up is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat changeset stats or report the most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
+      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `workingDirectories`: the session-level set. Individual chats MAY restrict\n  to a subset via {@link ChatSummary.workingDirectories}; aggregating these\n  up is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat {@link ChatSummary.changes | changes summaries} or report the\n  most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
       "properties": {
         "provider": {
           "type": "string",
@@ -3611,11 +3911,11 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+          "description": "Lightweight host-authoritative ordered chat catalog."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "Chat that receives input when no specific chat is selected."
+          "description": "Chat that receives input when none is selected, independent of catalog position."
         }
       },
       "required": [
@@ -3629,7 +3929,7 @@
     },
     "SessionChatSummary": {
       "type": "object",
-      "description": "Lightweight chat information suitable for listing a session without\nsubscribing to its session channel.",
+      "description": "Lightweight chat information in a session catalog.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -3646,6 +3946,18 @@
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current chat status, matching {@link ChatSummary.status}.\n\nIncludes the activity bits and the orthogonal {@link SessionStatus.IsRead}\nand {@link SessionStatus.IsArchived} flags. Generic clients use these bits\nto present read, unread, or archived chats in session lists without\nsubscribing to the session or chat channel. Absence means the host did\nnot provide the status; clients MUST treat it as unknown, not as unread\nor unarchived."
+        },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this chat.\n\nServers may populate this so session lists can show per-chat change\ncounts without subscribing to the session or chat channel. Updates travel\nwith the rest of the catalog in `root/sessionSummaryChanged`."
         }
       },
       "required": [
@@ -3655,7 +3967,7 @@
     },
     "ChangesSummary": {
       "type": "object",
-      "description": "Aggregate counts describing the file changes associated with a session.\n\nAll fields are optional so servers can populate only the metrics they\ncheaply have available.",
+      "description": "Aggregate counts describing the file changes associated with a session or\nchat.\n\nAll fields are optional so servers can populate only the metrics they\ncheaply have available.",
       "properties": {
         "additions": {
           "type": "number",
@@ -3739,6 +4051,16 @@
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
         },
+        "minItems": {
+          "type": "integer",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)",
+          "minimum": 0
+        },
+        "maxItems": {
+          "type": "integer",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)",
+          "minimum": 0
+        },
         "properties": {
           "type": "object",
           "additionalProperties": {
@@ -3764,6 +4086,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatMutable": {
+          "type": "boolean",
+          "description": "When `true`, the property may be changed per chat with\n`chat/configChanged`, affecting only that chat."
         }
       },
       "required": [
@@ -4309,7 +4635,7 @@
     },
     "ChildCustomizationBase": {
       "type": "object",
-      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
+      "description": "Fields shared by the leaf child customizations that live inside a container\n(or, for skills, an MCP server) — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
       "properties": {
         "id": {
           "type": "string",
@@ -4341,7 +4667,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         }
       },
       "required": [
@@ -4384,7 +4710,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "agent"
@@ -4422,7 +4748,7 @@
     },
     "SkillCustomization": {
       "type": "object",
-      "description": "A skill contributed by a plugin or directory.\n\nCovers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)\n— the `skills/` directory layout (one subdirectory per skill, each with\na `SKILL.md`) and the flatter `commands/` directory of slash-command\nskills.",
+      "description": "A skill contributed by a plugin, directory, or MCP server.\n\nCovers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)\n— the `skills/` directory layout (one subdirectory per skill, each with\na `SKILL.md`) and the flatter `commands/` directory of slash-command\nskills.",
       "properties": {
         "id": {
           "type": "string",
@@ -4454,7 +4780,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "skill"
@@ -4513,7 +4839,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "prompt"
@@ -4564,7 +4890,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "rule"
@@ -4626,7 +4952,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag. An MCP-served skill uses the\nserver's effective enabled value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "hook"
@@ -4692,6 +5018,13 @@
         "mcpApp": {
           "$ref": "#/$defs/McpServerCustomizationApps",
           "description": "MCP App support. This property SHOULD be advertised for MCP servers\nwhich support apps."
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SkillCustomization"
+          },
+          "description": "Skills served by this MCP server, for example through the MCP skills\nextension (SEP-2640).\n\nAbsent means the host has not discovered skills for this server, or\ndoes not support MCP-served skills. An empty array means the server\nwas queried and serves none.\n\nA skill's effective enabled state is the server's effective enabled\nvalue and `(skill.enabled ?? true)`. A skill is turned on or off by id\nwith [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction)."
         }
       },
       "required": [
@@ -4922,13 +5255,25 @@
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
         },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
+        },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is eligible to be the source of `moveChat`, including\nsame-session ordering.\n\nThe host is authoritative. Absence means `false`. A `true` value does not\nguarantee that a particular request will succeed. A chat referenced by its\nowning session's `defaultChat` MUST NOT be movable."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. The chat's agent never changes, but `provider` is reported\nrelative to its session, so `chat/moved` may set or clear it. Like\n`resource`, it is omitted from `session/chatUpdated` changes. Forks and\nside chats use the source chat's agent.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -4943,6 +5288,24 @@
             "$ref": "#/$defs/Changeset"
           },
           "description": "Catalogue of changesets the server can produce for this chat. Each entry\nadvertises a subscribable view of file changes scoped to the chat's\neffective working directories and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model.\n\nThis catalogue is intentionally absent from {@link ChatSummary}; clients\nobtain it by subscribing to the chat channel."
+        },
+        "backgroundWork": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BackgroundWork"
+          },
+          "description": "Work running in the background for this chat, such as shells and\nsubagents. Only active work is listed: hosts remove an entry once the work\nends. An entry may have been started by an earlier turn rather than the\n{@link ChatState.activeTurn | activeTurn}.\n\nLike {@link ChatState.changesets | changesets}, this is intentionally\nabsent from {@link ChatSummary}; clients obtain it by subscribing to the\nchat channel."
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasReference"
+          },
+          "description": "Live canvases currently exposed by this chat.\n\nEntries intentionally contain only subscribable channel references.\nClients subscribe to each resource for the experimental presentation\nstate, including its current live source URL."
+        },
+        "config": {
+          "$ref": "#/$defs/ChatConfigState",
+          "description": "This chat's configuration. See {@link ChatConfigState}."
         },
         "turns": {
           "type": "array",
@@ -4961,14 +5324,14 @@
         },
         "steeringMessage": {
           "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
+          "description": "Legacy steering input retained only when reading old snapshots."
         },
         "queuedMessages": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/PendingMessage"
           },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
+          "description": "Pending messages of both kinds, in host acceptance order unless explicitly\nreordered.\n\nThis raw order is not consumption priority. UIs SHOULD group steering\nmessages before queued messages, preserving relative order within each\ngroup without changing the underlying array."
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -5012,13 +5375,25 @@
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
         },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this chat. Servers may\npopulate this to give clients a quick at-a-glance view of the chat's\nfootprint without requiring the client to subscribe to a changeset."
+        },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "movable": {
+          "type": "boolean",
+          "description": "Whether this chat is structurally eligible to be the source of\n`moveChat`. Absence means `false`.\n\nSee {@link ChatState.movable} for the full semantics."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID backing this chat. See {@link ChatState.provider}.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -5033,6 +5408,112 @@
         "title",
         "status",
         "modifiedAt"
+      ]
+    },
+    "BackgroundWorkBase": {
+      "type": "object",
+      "description": "Fields common to every {@link BackgroundWork} variant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier of this entry, unique within the owning chat across all kinds.\nThe host derives it however it likes (for example from the kind plus the\nagent's own task id); consumers MUST treat it as opaque. It is the key for\nthe `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert\nconvention."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label, such as the command's purpose or the subagent's name."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the work started."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Provider-specific metadata."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "startedAt"
+      ]
+    },
+    "BackgroundShellWork": {
+      "type": "object",
+      "description": "A shell command continuing outside its initiating tool call. Covers shells\ntied to the agent's lifetime (attached) and shells that outlive it\n(detached). Whether a shell is attached is provider-specific and goes in its\n`_meta`.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier of this entry, unique within the owning chat across all kinds.\nThe host derives it however it likes (for example from the kind plus the\nagent's own task id); consumers MUST treat it as opaque. It is the key for\nthe `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert\nconvention."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label, such as the command's purpose or the subagent's name."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the work started."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Provider-specific metadata."
+        },
+        "kind": {
+          "const": "shell"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command line, displayed as plain text."
+        },
+        "terminal": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal carrying this shell's output. Hosts SHOULD set this whenever they\ncan show that output. Clients open it like\n{@link ToolResultTerminalContent.resource}; `isPty` on its\n{@link TerminalState} says whether the output is plain text."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "startedAt",
+        "kind",
+        "command"
+      ]
+    },
+    "BackgroundSubagentWork": {
+      "type": "object",
+      "description": "A subagent running in the background. Its own state lives in its chat.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier of this entry, unique within the owning chat across all kinds.\nThe host derives it however it likes (for example from the kind plus the\nagent's own task id); consumers MUST treat it as opaque. It is the key for\nthe `chat/backgroundWorkSet` / `chat/backgroundWorkRemoved` upsert\nconvention."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label, such as the command's purpose or the subagent's name."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the work started."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Provider-specific metadata."
+        },
+        "kind": {
+          "const": "subagent"
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The subagent's chat: the same chat the spawning tool call's\n{@link ToolResultSubagentContent.resource} points to."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "startedAt",
+        "kind",
+        "chat"
       ]
     },
     "SideChatSelection": {
@@ -5052,6 +5533,24 @@
         "text"
       ]
     },
+    "ChatConfigState": {
+      "type": "object",
+      "description": "A chat's configuration. `values` holds the chat's `chatMutable` properties\nof the effective schema. For a chat without its own `schema`, other\nproperties are session-wide and come from the session's config; a chat with\nits own `schema` does not use the session's config. It does not inherit\nfrom the session: a chat's `values` change only through\n`chat/configChanged` on the chat.\n\nOnly `chatMutable` properties can be changed with `chat/configChanged`;\nhosts reject other keys. Hosts set the initial `values` when they create\nthe chat. When the session has a config, hosts set `config` on every chat.",
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The chat's values for the `chatMutable` properties of the effective\nschema, keyed by property id. A missing key takes that property's\n`default`."
+        }
+      },
+      "required": [
+        "values"
+      ]
+    },
     "PendingMessage": {
       "type": "object",
       "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
@@ -5060,9 +5559,13 @@
           "type": "string",
           "description": "Unique identifier for this pending message"
         },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Delivery kind, defaults to {@link PendingMessageKind.Queued}."
+        },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
+          "description": "The queued or steering message"
         }
       },
       "required": [
@@ -5968,6 +6471,14 @@
         "content": {
           "type": "string",
           "description": "Accumulated reasoning text"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock."
         }
       },
       "required": [
@@ -6230,6 +6741,11 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
         },
         "error": {
           "type": "object",
@@ -6582,6 +7098,11 @@
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
         },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
+        },
         "error": {
           "type": "object",
           "properties": {
@@ -6676,6 +7197,11 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "resultMetadata": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional result metadata.\n\nThis mirrors the `_meta` field of MCP `CallToolResult`."
         },
         "error": {
           "type": "object",
@@ -6949,6 +7475,58 @@
         "type",
         "resource",
         "title"
+      ]
+    },
+    "CanvasReference": {
+      "type": "object",
+      "description": "Stable reference to a subscribable canvas channel.\n\nChat state intentionally carries only this reference so the experimental\ncanvas presentation model can evolve without changing the stable chat\nchannel shape.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Canvas channel URI. Subscribe to this resource for the full state."
+        }
+      },
+      "required": [
+        "resource"
+      ]
+    },
+    "CanvasState": {
+      "type": "object",
+      "description": "Full state for one live canvas, returned when a client subscribes to its\n`ahp-canvas:` URI.\n\nThe client already knows the subscribed resource, so the state does not\nredundantly carry its channel URI.",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "description": "Stable caller-supplied instance identifier."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Owning extension/provider identifier."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Owning extension display name, when available."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas type identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Provider-supplied title, when available."
+        },
+        "status": {
+          "type": "string",
+          "description": "Provider-supplied status text, when available."
+        },
+        "url": {
+          "$ref": "#/$defs/URI",
+          "description": "Absolute URI of the canvas's live content, typically an HTTP(S) URL;\nabsent when the live source is unavailable. Hosts MUST clear this field\nwhen the provider becomes unavailable.\n\nA client that can't load this URI directly, for example because it is a\nloopback address in the host's environment or uses a scheme that the\nclient doesn't load, reads it with `resourceRead`. The client resolves the\nrelative references in its content and reads them the same way. Hosts\nSHOULD serve reads of this URI, and of other URLs on its origin when it is\nan HTTP(S) URL, to clients that can subscribe to the canvas. The provider\nchooses the URI, so the host decides which sources it is willing to read.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
+        }
+      },
+      "required": [
+        "instanceId",
+        "extensionId",
+        "canvasId"
       ]
     },
     "TerminalInfo": {
@@ -7263,12 +7841,20 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nThere is no content version in the protocol, so review is **not** reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
+          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nReview is **not** reset automatically when a file's contents or nonce\nchange under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
         },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
           "description": "Server-defined opaque metadata, surfaced to operations and tooling\nbut not interpreted by the protocol."
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
+        },
+        "isEditing": {
+          "type": "boolean",
+          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
         }
       },
       "required": [
@@ -7745,6 +8331,13 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Session configuration values equivalent to\n{@link CreateSessionParams.config}, normally obtained from\n{@link ResolveSessionConfigResult.values}."
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClientPluginCustomization"
+          },
+          "description": "Client plugins to make available in every run session, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
         }
       }
     },
@@ -7865,6 +8458,13 @@
             "$ref": "#/$defs/AutomationOperation"
           },
           "description": "Operations currently permitted for this automation."
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginCustomization"
+          },
+          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery run session receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
         },
         "createdAt": {
           "type": "string",
@@ -8166,6 +8766,11 @@
         "sessions"
       ]
     },
+    "TcpConnectionsCapability": {
+      "type": "object",
+      "description": "Present when the host supports `createTcpConnection`.\n\nA client creates a connection with `createTcpConnection`, then subscribes to\nits channel with windowed delivery. A TCP channel's state is an\n{@link EmptyState}; its data is sent in `tcp/data` and `tcp/eof`\nnotifications. TCP connections do not survive the loss of the AHP connection.\n\nStability: 1.0 - Early development.",
+      "properties": {}
+    },
     "StringOrMarkdown": {
       "oneOf": [
         {
@@ -8352,7 +8957,7 @@
           "$ref": "#/$defs/McpServerCustomization"
         }
       ],
-      "description": "A top-level customization active in a session. Either a container\n({@link PluginCustomization} or {@link DirectoryCustomization}) whose\nleaf customizations live in its\n{@link ContainerCustomizationBase.children | `children`} array, or a\nbare {@link McpServerCustomization} surfaced directly by the host."
+      "description": "A top-level customization active in a session. Either a container\n({@link PluginCustomization} or {@link DirectoryCustomization}) whose\nchild customizations live in its\n{@link ContainerCustomizationBase.children | `children`} array, or a\nbare {@link McpServerCustomization} surfaced directly by the host."
     },
     "McpServerState": {
       "oneOf": [
@@ -8373,6 +8978,17 @@
         }
       ],
       "description": "Discriminated union of all MCP server lifecycle states.\nDiscriminated by `kind` (a {@link McpServerStatus} value)."
+    },
+    "BackgroundWork": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BackgroundShellWork"
+        },
+        {
+          "$ref": "#/$defs/BackgroundSubagentWork"
+        }
+      ],
+      "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
     "ChatOrigin": {
       "oneOf": [
@@ -8448,7 +9064,7 @@
           ]
         }
       ],
-      "description": "How a chat came into existence. Clients MAY use it to render\ncontextual UI (parent indicators, fork markers, \"spawned by tool\" badges).\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
+      "description": "How a chat came into existence. Clients MAY use it to render creation\nprovenance (fork markers and \"spawned by tool\" badges). Any host-internal\nhierarchy used to move a complete chat subtree is not exposed by AHP.\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
     },
     "ChatInputQuestion": {
       "oneOf": [
@@ -8726,9 +9342,6 @@
       "description": "Discriminated union of all state actions.",
       "oneOf": [
         {
-          "$ref": "#/$defs/"
-        },
-        {
           "$ref": "#/$defs/RootAgentsChangedAction"
         },
         {
@@ -8754,6 +9367,9 @@
         },
         {
           "$ref": "#/$defs/SessionChatUpdatedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionChatsReorderedAction"
         },
         {
           "$ref": "#/$defs/SessionDefaultChatChangedAction"
@@ -8879,7 +9495,22 @@
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatBackgroundWorkSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatBackgroundWorkRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovableChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatCanvasesChangedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasStateChangedAction"
         },
         {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"
@@ -8906,7 +9537,16 @@
           "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatIsReadChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatIsArchivedChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatConfigChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatMovedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -9032,16 +9672,10 @@
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
     },
     "SessionStatus": {
-      "enum": [
-        1,
-        2,
-        8,
-        24,
-        32,
-        64
-      ],
-      "type": "number",
-      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input.\n\nKnown flags:\n\n- `Idle` (1): Session is idle — no turn is active.\n- `Error` (2): Session ended with an error.\n- `InProgress` (8): A turn is actively streaming.\n- `InputNeeded` (24): A turn is in progress but blocked waiting for user input or tool confirmation.\n- `IsRead` (32): The client has viewed this session since its last modification.\n- `IsArchived` (64): The session has been archived by the client."
     },
     "ChatInteractivity": {
       "enum": [
@@ -9097,6 +9731,15 @@
       ],
       "type": "string",
       "description": "Execution lifecycle of a {@link ChangesetOperation}.\n\nAn operation is invoked imperatively via `invokeChangesetOperation`, but\nits progress and outcome are reflected back into changeset state so that\nevery subscriber observes a consistent view (e.g. a spinner on a \"Create\nPull Request\" button, or an inline error after a failed \"revert\")."
+    },
+    "ChannelRecoveryKind": {
+      "enum": [
+        "snapshot",
+        "replay",
+        "live"
+      ],
+      "type": "string",
+      "description": "How the server resumes sending data on a windowed subscription after\nreconnection."
     },
     "PolicyState": {
       "enum": [

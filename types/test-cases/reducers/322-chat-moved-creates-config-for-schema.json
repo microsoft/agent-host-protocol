@@ -1,0 +1,51 @@
+{
+  "description": "chat/moved with a schema creates the chat's config when it has none",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/moved",
+      "session": "ahp-session:/s2",
+      "provider": "other-agent",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat:/c2",
+    "title": "Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "provider": "other-agent",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      },
+      "values": {}
+    }
+  }
+}

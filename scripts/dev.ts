@@ -44,7 +44,7 @@ function generate(): void {
 
 // Initial generation
 console.log('\x1b[36m[dev]\x1b[0m initial generation...');
-const initial = spawn('npx tsx scripts/generate.ts', {
+const initial = spawn('npx tsx scripts/generate.ts && npx tsx scripts/build-doc-versions.ts', {
   cwd: ROOT,
   stdio: 'inherit',
   shell: true,

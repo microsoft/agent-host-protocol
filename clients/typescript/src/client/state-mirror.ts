@@ -2,7 +2,7 @@
  * Convenience reducer-driven state store, mirroring the Swift
  * `AHPStateMirror` and the Rust reducers example.
  *
- * Tracks root, session, terminal, changeset, automation catalogue, and
+ * Tracks root, session, canvas, terminal, changeset, automation catalogue, and
  * automation-run state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
  * the mirror keeps those resources up to date via the generated reducers.
  *
@@ -12,7 +12,7 @@
  * @module client/state-mirror
  */
 
-import type { ActionEnvelope } from '../types/common/actions.js';
+import { ActionType, type ActionEnvelope } from '../types/common/actions.js';
 import type { Snapshot, URI } from '../types/common/state.js';
 import type {
   ChangesetAction,
@@ -23,17 +23,20 @@ import type {
   TerminalAction,
 } from '../types/action-origin.generated.js';
 import type { ChangesetState } from '../types/channels-changeset/state.js';
+import type { CanvasState } from '../types/channels-canvas/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../types/channels-automation/state.js';
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
+import { canvasReducer } from '../types/channels-canvas/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
 import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
 import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
+import { isCanvasState } from './canvas-state.js';
 
 const ROOT_URI = 'ahp-root://' as const;
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
@@ -45,6 +48,7 @@ const INITIAL_AUTOMATION_CATALOG: AutomationState = { entries: [] };
 export class AhpStateMirror {
   private rootState: RootState = INITIAL_ROOT;
   private readonly sessionsMap = new Map<URI, SessionState>();
+  private readonly canvasesMap = new Map<URI, CanvasState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
   private automationCatalogState: AutomationState = INITIAL_AUTOMATION_CATALOG;
@@ -59,6 +63,11 @@ export class AhpStateMirror {
   /** All known sessions keyed by URI. */
   get sessions(): ReadonlyMap<URI, SessionState> {
     return this.sessionsMap;
+  }
+
+  /** All known live canvases keyed by their channel URI. */
+  get canvases(): ReadonlyMap<URI, CanvasState> {
+    return this.canvasesMap;
   }
 
   /** All known terminals keyed by URI. */
@@ -91,6 +100,10 @@ export class AhpStateMirror {
     return this.sessionsMap.get(uri);
   }
 
+  getCanvas(uri: URI): CanvasState | undefined {
+    return this.canvasesMap.get(uri);
+  }
+
   /** Look up a terminal by URI. */
   getTerminal(uri: URI): TerminalState | undefined {
     return this.terminalsMap.get(uri);
@@ -113,6 +126,13 @@ export class AhpStateMirror {
     }
     if (resource.startsWith('ahp-session:')) {
       this.sessionsMap.set(resource, snapshot.state as SessionState);
+      return;
+    }
+    if (resource.startsWith('ahp-canvas:')) {
+      if (!isCanvasState(snapshot.state)) {
+        throw new Error('Invalid canvas snapshot state');
+      }
+      this.canvasesMap.set(resource, snapshot.state);
       return;
     }
     if (resource.startsWith('ahp-terminal:')) {
@@ -153,6 +173,12 @@ export class AhpStateMirror {
       const current = this.sessionsMap.get(channel);
       if (!current) return;
       this.sessionsMap.set(channel, sessionReducer(current, action as SessionAction));
+      return;
+    }
+    if (channel.startsWith('ahp-canvas:')) {
+      const current = this.canvasesMap.get(channel);
+      if (current === undefined || action.type !== ActionType.CanvasStateChanged) return;
+      this.canvasesMap.set(channel, canvasReducer(current, action));
       return;
     }
     if (channel.startsWith('ahp-terminal:')) {

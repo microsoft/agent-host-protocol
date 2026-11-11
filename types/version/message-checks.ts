@@ -57,6 +57,8 @@ type _ExpectedCommands =
   | 'createSession'
   | 'disposeSession'
   | 'createChat'
+  | 'createTcpConnection'
+  | 'moveChat'
   | 'disposeChat'
   | 'createTerminal'
   | 'disposeTerminal'
@@ -84,7 +86,12 @@ type _ExpectedCommands =
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
   | 'unsubscribe'
-  | 'dispatchAction';
+  | 'dispatchAction'
+  | 'channel/frame'
+  | 'channel/credit'
+  | 'tcp/data'
+  | 'tcp/eof'
+  | 'tcp/reset';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =
@@ -96,7 +103,13 @@ type _ExpectedServerNotifications =
   | 'auth/required'
   | 'otlp/exportLogs'
   | 'otlp/exportTraces'
-  | 'otlp/exportMetrics';
+  | 'otlp/exportMetrics'
+  | 'channel/frame'
+  | 'channel/credit'
+  | 'channel/snapshot'
+  | 'tcp/data'
+  | 'tcp/eof'
+  | 'tcp/reset';
 
 /** All server → client request methods. */
 type _ExpectedServerCommands =

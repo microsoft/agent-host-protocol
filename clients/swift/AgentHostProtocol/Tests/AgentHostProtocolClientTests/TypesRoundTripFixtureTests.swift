@@ -188,10 +188,36 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(Implementation.self, from: inputData))
         case "InitializeResult":
             return try reencode(dec.decode(InitializeResult.self, from: inputData))
+        case "CreateChatParams":
+            return try reencode(dec.decode(CreateChatParams.self, from: inputData))
         case "ChatSource":
             return try reencode(dec.decode(ChatSource.self, from: inputData))
         case "Snapshot":
             return try reencode(dec.decode(Snapshot.self, from: inputData))
+        case "SubscribeParams":
+            return try reencode(dec.decode(SubscribeParams.self, from: inputData))
+        case "SubscribeResult":
+            return try reencode(dec.decode(SubscribeResult.self, from: inputData))
+        case "ReconnectResult":
+            return try reencode(dec.decode(ReconnectResult.self, from: inputData))
+        case "ChannelFrameParams":
+            return try reencode(dec.decode(ChannelFrameParams.self, from: inputData))
+        case "ChannelCreditParams":
+            return try reencode(dec.decode(ChannelCreditParams.self, from: inputData))
+        case "ReconnectParams":
+            return try reencode(dec.decode(ReconnectParams.self, from: inputData))
+        case "TcpDataParams":
+            return try reencode(dec.decode(TcpDataParams.self, from: inputData))
+        case "TcpEofParams":
+            return try reencode(dec.decode(TcpEofParams.self, from: inputData))
+        case "TcpResetParams":
+            return try reencode(dec.decode(TcpResetParams.self, from: inputData))
+        case "CreateTcpConnectionParams":
+            return try reencode(dec.decode(CreateTcpConnectionParams.self, from: inputData))
+        case "ResourceReadParams":
+            return try reencode(dec.decode(ResourceReadParams.self, from: inputData))
+        case "ResourceReadResult":
+            return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
         default:
             throw FixtureError.message(
                 "round-trip fixture: unknown wire type \"\(type)\". Add a decode entry to decodeAndReencode.")
@@ -226,9 +252,9 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             "SUPPORTED_PROTOCOL_VERSIONS must be non-empty"
         )
         XCTAssertEqual(
-            SUPPORTED_PROTOCOL_VERSIONS.first,
-            PROTOCOL_VERSION,
-            "first SUPPORTED_PROTOCOL_VERSIONS entry must equal PROTOCOL_VERSION"
+            SUPPORTED_PROTOCOL_VERSIONS,
+            ["1.0.0", "0.9.0"],
+            "only released compatibility baselines should be advertised"
         )
     }
 

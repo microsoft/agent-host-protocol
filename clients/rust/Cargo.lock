@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "ahp"
-version = "0.9.0"
+version = "1.0.0"
 dependencies = [
  "ahp-types",
  "ahp-ws",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "ahp-types"
-version = "0.9.0"
+version = "1.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -28,7 +28,7 @@ dependencies = [
 
 [[package]]
 name = "ahp-ws"
-version = "0.9.0"
+version = "1.0.0"
 dependencies = [
  "ahp",
  "futures-util",
@@ -847,9 +847,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.41"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b92b125634d9b795e7beca796cc790df15a7fb38323bf3196fda83292d06b1f"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "once_cell",
  "ring",
@@ -882,9 +882,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "ring",
  "rustls-pki-types",

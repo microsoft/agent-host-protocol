@@ -12,6 +12,7 @@ import type {
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
+  SessionChatsReorderedAction,
   SessionDefaultChatChangedAction,
   SessionTitleChangedAction,
   SessionServerToolsChangedAction,
@@ -53,7 +54,12 @@ import type {
   ChatErrorAction,
   ChatTurnResumeAction,
   ChatActivityChangedAction,
+  ChatBackgroundWorkSetAction,
+  ChatBackgroundWorkRemovedAction,
+  ChatMovableChangedAction,
   ChatChangesetsChangedAction,
+  ChatCanvasesChangedAction,
+  CanvasStateChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -62,7 +68,10 @@ import type {
   ChatPendingMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
+  ChatIsReadChangedAction,
   ChatIsArchivedChangedAction,
+  ChatConfigChangedAction,
+  ChatMovedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
@@ -106,7 +115,7 @@ import type {
 
 import { ActionType } from './actions.js';
 
-// ─── Root vs Session vs Chat vs Terminal vs Changeset Action Unions ─────────────────
+// ─── Per-channel Action Unions ───────────────────────────────────────────────
 
 /** Union of all root-scoped actions. */
 export type RootAction =
@@ -135,6 +144,7 @@ export type SessionAction =
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
+  | SessionChatsReorderedAction
   | SessionDefaultChatChangedAction
   | SessionTitleChangedAction
   | SessionServerToolsChangedAction
@@ -185,6 +195,7 @@ export type ServerSessionAction =
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
+  | SessionChatsReorderedAction
   | SessionDefaultChatChangedAction
   | SessionServerToolsChangedAction
   | SessionInputNeededSetAction
@@ -217,7 +228,11 @@ export type ChatAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatBackgroundWorkSetAction
+  | ChatBackgroundWorkRemovedAction
+  | ChatMovableChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -226,7 +241,10 @@ export type ChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
+  | ChatConfigChangedAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
@@ -249,7 +267,9 @@ export type ClientChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
+  | ChatConfigChangedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
   | ChatTruncatedAction
@@ -267,11 +287,31 @@ export type ServerChatAction =
   | ChatTurnCompleteAction
   | ChatErrorAction
   | ChatActivityChangedAction
+  | ChatBackgroundWorkSetAction
+  | ChatBackgroundWorkRemovedAction
+  | ChatMovableChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatUsageAction
   | ChatReasoningAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatTurnsLoadedAction
+;
+
+/** Union of all canvas-scoped actions. */
+export type CanvasAction =
+  | CanvasStateChangedAction
+;
+
+/** Union of canvas actions that clients may dispatch. */
+export type ClientCanvasAction =
+  never
+;
+
+/** Union of canvas actions that only the server may produce. */
+export type ServerCanvasAction =
+  | CanvasStateChangedAction
 ;
 
 /** Union of all terminal-scoped actions. */
@@ -432,6 +472,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionChatAdded]: false,
   [ActionType.SessionChatRemoved]: false,
   [ActionType.SessionChatUpdated]: false,
+  [ActionType.SessionChatsReordered]: false,
   [ActionType.SessionDefaultChatChanged]: false,
   [ActionType.SessionTitleChanged]: true,
   [ActionType.SessionServerToolsChanged]: false,
@@ -473,7 +514,12 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatError]: false,
   [ActionType.ChatTurnResume]: true,
   [ActionType.ChatActivityChanged]: false,
+  [ActionType.ChatBackgroundWorkSet]: false,
+  [ActionType.ChatBackgroundWorkRemoved]: false,
+  [ActionType.ChatMovableChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
+  [ActionType.ChatCanvasesChanged]: false,
+  [ActionType.CanvasStateChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,
   [ActionType.ChatUsage]: false,
@@ -482,7 +528,10 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatPendingMessageRemoved]: true,
   [ActionType.ChatQueuedMessagesReordered]: true,
   [ActionType.ChatDraftChanged]: true,
+  [ActionType.ChatIsReadChanged]: true,
   [ActionType.ChatIsArchivedChanged]: true,
+  [ActionType.ChatConfigChanged]: true,
+  [ActionType.ChatMoved]: false,
   [ActionType.ChatInputRequested]: false,
   [ActionType.ChatInputAnswerChanged]: true,
   [ActionType.ChatInputCompleted]: true,

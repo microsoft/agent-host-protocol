@@ -97,14 +97,14 @@ internal static class Program
             "initialize",
             new InitializeResult
             {
-                ProtocolVersion = ProtocolVersion.Current,
+                ProtocolVersion = ProtocolVersion.Supported[0],
                 ServerSeq = 4,
                 Snapshots = new List<Snapshot>(),
             },
             cancellationToken);
         InitializeResult initializeResult = await client.InitializeAsync("native-aot-client", cancellationToken: cancellationToken);
         JsonRpcRequest initializeRequest = await initializeResponse;
-        Ensure(initializeResult.ProtocolVersion == ProtocolVersion.Current, "Initialize result failed.");
+        Ensure(initializeResult.ProtocolVersion == ProtocolVersion.Supported[0], "Initialize result failed.");
         Ensure(
             initializeRequest.Params?.GetProperty("clientId").GetString() == "native-aot-client",
             "Initialize params failed.");

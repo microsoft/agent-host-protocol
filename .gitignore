@@ -5,6 +5,7 @@ docs/.vitepress/cache
 
 # Generated files (npm run generate)
 docs/reference/
+docs/versions/
 docs/public/schema/
 
 # SwiftPM build artifacts
@@ -30,3 +31,6 @@ clients/kotlin/.gradle/
 clients/kotlin/build/
 clients/kotlin/.kotlin/
 clients/kotlin/local.properties
+
+# Strong-name key material is supplied by the vscode-engineering release template.
+clients/dotnet/*.snk

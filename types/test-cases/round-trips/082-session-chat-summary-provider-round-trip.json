@@ -1,0 +1,52 @@
+{
+  "name": "session-chat-summary-provider-round-trip",
+  "group": "A",
+  "description": "SessionSummary chat catalog entries preserve a per-chat provider so session lists can show sessions whose chats use different agents without subscribing to them.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "copilot",
+    "title": "Mixed agents",
+    "status": 1,
+    "createdAt": "2026-10-20T10:00:00.000Z",
+    "modifiedAt": "2026-10-20T10:05:00.000Z",
+    "chats": [
+      {
+        "resource": "ahp-chat:/main",
+        "title": "Main",
+        "status": 1
+      },
+      {
+        "resource": "ahp-chat:/other",
+        "title": "Other agent",
+        "status": 1,
+        "provider": "other-agent"
+      }
+    ],
+    "defaultChat": "ahp-chat:/main"
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "copilot",
+      "title": "Mixed agents",
+      "status": 1,
+      "createdAt": "2026-10-20T10:00:00.000Z",
+      "modifiedAt": "2026-10-20T10:05:00.000Z",
+      "chats": [
+        {
+          "resource": "ahp-chat:/main",
+          "title": "Main",
+          "status": 1
+        },
+        {
+          "resource": "ahp-chat:/other",
+          "title": "Other agent",
+          "status": 1,
+          "provider": "other-agent"
+        }
+      ],
+      "defaultChat": "ahp-chat:/main"
+    }
+  ]
+}

@@ -1,10 +1,33 @@
 package ahp
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/microsoft/agent-host-protocol/clients/go/ahptypes"
 )
+
+func TestMultiHostStateMirrorCanvasLifecycle(t *testing.T) {
+	mirror := NewMultiHostStateMirror()
+	uri := ahptypes.URI("ahp-canvas:/preview")
+	state := ahptypes.CanvasState{
+		InstanceId:  "preview",
+		ExtensionId: "project:preview",
+		CanvasId:    "preview",
+	}
+	mirror.PutCanvas("host-a", uri, state)
+	mirror.PutCanvas("host-b", uri, state)
+	mirror.DropResource("host-a", uri)
+	_, removed := mirror.Canvas("host-a", uri)
+	retained, found := mirror.Canvas("host-b", uri)
+	mirror.PutCanvas("host-a", uri, state)
+	mirror.DropHost("host-a")
+	_, dropped := mirror.Canvas("host-a", uri)
+	_, otherHost := mirror.Canvas("host-b", uri)
+	if removed || !found || !reflect.DeepEqual(retained, state) || dropped || !otherHost {
+		t.Fatal("canvas state was not isolated or removed with its resource and host")
+	}
+}
 
 func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	mirror := NewMultiHostStateMirror()

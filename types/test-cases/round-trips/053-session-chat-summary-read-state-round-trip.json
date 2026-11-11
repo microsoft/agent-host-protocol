@@ -1,0 +1,68 @@
+{
+  "name": "session-chat-summary-read-state-round-trip",
+  "group": "A",
+  "description": "SessionSummary chat catalog entries preserve read, unread, activity, archived, and unknown future bits in the optional status bitset, while allowing hosts to omit unknown status.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Agent team",
+    "status": 1,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "chats": [
+      {
+        "resource": "ahp-chat:/lead",
+        "title": "Lead",
+        "status": 33
+      },
+      {
+        "resource": "ahp-chat:/worker",
+        "title": "Worker",
+        "status": 24
+      },
+      {
+        "resource": "ahp-chat:/future",
+        "title": "Future",
+        "status": 225
+      },
+      {
+        "resource": "ahp-chat:/legacy",
+        "title": "Legacy"
+      }
+    ],
+    "defaultChat": "ahp-chat:/lead"
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Agent team",
+      "status": 1,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "chats": [
+        {
+          "resource": "ahp-chat:/lead",
+          "title": "Lead",
+          "status": 33
+        },
+        {
+          "resource": "ahp-chat:/worker",
+          "title": "Worker",
+          "status": 24
+        },
+        {
+          "resource": "ahp-chat:/future",
+          "title": "Future",
+          "status": 225
+        },
+        {
+          "resource": "ahp-chat:/legacy",
+          "title": "Legacy"
+        }
+      ],
+      "defaultChat": "ahp-chat:/lead"
+    }
+  ]
+}

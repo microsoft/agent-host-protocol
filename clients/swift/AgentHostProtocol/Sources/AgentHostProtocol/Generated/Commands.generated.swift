@@ -39,6 +39,35 @@ public enum ChatSourceKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Destination kind for an atomic chat move.
+public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
+    /// Move the source chat subtree into an existing session.
+    case session
+    /// Move the source chat subtree into a newly allocated session.
+    case newSession
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "session": self = .session
+        case "newSession": self = .newSession
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .session: try container.encode("session")
+        case .newSession: try container.encode("newSession")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Native filesystem path grammar used by a host environment.
 ///
 /// This does not change URI syntax: AHP resources remain URIs with
@@ -157,6 +186,30 @@ public enum ResourceWriteMode: String, Codable, Sendable {
     case insert = "insert"
 }
 
+/// Identifies the consumer of an authentication token.
+public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
+    case mcpServer
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "mcpServer": self = .mcpServer
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .mcpServer: try container.encode("mcpServer")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - Command Types
 
 /// Copies source history through a completed turn into the new chat.
@@ -259,6 +312,51 @@ public struct SideChatSource: Codable, Sendable {
     }
 }
 
+/// Opens a TCP connection from the host to a destination on the host's network.
+///
+/// The client chooses the channel URI. This command does not subscribe: after it
+/// succeeds, the client subscribes to the channel with windowed delivery. The
+/// host MUST NOT send data for the channel before that subscription, and MUST
+/// limit how much destination data it buffers and how long it keeps a
+/// connection that is never subscribed to.
+///
+/// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+/// is present. If the channel URI is already in use, the host returns
+/// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+/// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// A DNS name or IP address, resolved on the host's network. Not a URL.
+    public var host: String
+    /// The destination port.
+    public var port: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case host
+        case port
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        host: String,
+        port: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.host = host
+        self.port = port
+    }
+}
+
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -269,7 +367,9 @@ public struct InitializeParams: Codable, Sendable {
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
     ///
-    /// The server selects one entry and returns it as `InitializeResult.protocolVersion`.
+    /// The server selects the highest offered SemVer within its supported
+    /// caret-compatible ranges and returns that exact entry as
+    /// `InitializeResult.protocolVersion`.
     /// If the server cannot speak any of the offered versions, it MUST return
     /// error code `-32005` (`UnsupportedProtocolVersion`) with required
     /// `UnsupportedProtocolVersionErrorData` containing `supportedVersions`.
@@ -361,7 +461,8 @@ public struct InitializeResult: Codable, Sendable {
     /// understand. Capabilities needed for interoperable behavior SHOULD use typed
     /// fields on {@link InitializeResult} instead.
     public var meta: [String: AnyCodable]?
-    /// Snapshots for each `initialSubscriptions` URI
+    /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+    /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
     /// Default execution environment exposed by this host connection.
     ///
@@ -389,6 +490,17 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Present when the host supports `createTcpConnection`, which opens a TCP
+    /// connection on the host's network for the client to forward.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var tcpConnections: TcpConnectionsCapability?
+    /// Present when chats in one session may be backed by different agents
+    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var multipleChatProviders: MultipleChatProvidersCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -402,6 +514,8 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case tcpConnections
+        case multipleChatProviders
     }
 
     public init(
@@ -415,7 +529,9 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tcpConnections: TcpConnectionsCapability? = nil,
+        multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -428,6 +544,8 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tcpConnections = tcpConnections
+        self.multipleChatProviders = multipleChatProviders
     }
 }
 
@@ -464,17 +582,22 @@ public struct AutomationCapabilities: Codable, Sendable {
     /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.
     public var runHistoryLimit: Int?
+    /// Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.
+    public var customizations: AutomationCustomizationsCapability?
 
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
-        runHistoryLimit: Int? = nil
+        runHistoryLimit: Int? = nil,
+        customizations: AutomationCustomizationsCapability? = nil
     ) {
         self.create = create
         self.schedules = schedules
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
+        self.customizations = customizations
     }
 }
 
@@ -500,6 +623,25 @@ public struct AutomationScheduleCapabilities: Codable, Sendable {
 }
 
 public struct AutomationRunCancellationCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationCustomizationsCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.
+public struct MultipleChatProvidersCapability: Codable, Sendable {
 
     public init(
 
@@ -539,6 +681,12 @@ public struct ReconnectParams: Codable, Sendable {
     public var lastSeenServerSeq: Int
     /// URIs the client was subscribed to
     public var subscriptions: [String]
+    /// Windowed subscriptions that the client wants to keep. Each channel MUST
+    /// also be in `subscriptions` and MUST appear only once. These subscriptions
+    /// are not included in the result's `actions` or `snapshots`.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -546,6 +694,7 @@ public struct ReconnectParams: Codable, Sendable {
         case clientId
         case lastSeenServerSeq
         case subscriptions
+        case windows
     }
 
     public init(
@@ -553,13 +702,15 @@ public struct ReconnectParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         clientId: String,
         lastSeenServerSeq: Int,
-        subscriptions: [String]
+        subscriptions: [String],
+        windows: ChannelDeliveryResumeOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.clientId = clientId
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
+        self.windows = windows
     }
 }
 
@@ -573,30 +724,121 @@ public struct ReconnectReplayResult: Codable, Sendable {
     /// terminals) as well as resources the client is no longer permitted to
     /// observe. Clients SHOULD drop these from their local subscription set.
     public var missing: [String]
+    /// Windowed subscriptions that the server kept. Their data is sent separately.
+    /// The server MUST omit this field unless the request contained `windows`,
+    /// and MUST list only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
         actions: [ActionEnvelope],
-        missing: [String]
+        missing: [String],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.actions = actions
         self.missing = missing
+        self.windows = windows
     }
 }
 
 public struct ReconnectSnapshotResult: Codable, Sendable {
     /// Discriminant
     public var type: ReconnectResultType
-    /// Fresh snapshots for each subscription
+    /// Fresh snapshots for each resumed ordinary subscription. Windowed
+    /// subscriptions are not included; they recover through their own data
+    /// messages, as described by `windows`. The server MAY leave out a channel
+    /// whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
+    /// Windowed subscriptions that the server kept. Each one has its own
+    /// `recovery` value, which does not depend on this result's type. The server
+    /// MUST omit this field unless the request contained `windows`, and MUST list
+    /// only channels from the request.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var windows: ChannelDeliveryResumeResult?
 
     public init(
         type: ReconnectResultType,
-        snapshots: [Snapshot]
+        snapshots: [Snapshot],
+        windows: ChannelDeliveryResumeResult? = nil
     ) {
         self.type = type
         self.snapshots = snapshots
+        self.windows = windows
+    }
+}
+
+/// One windowed subscription that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeParams: Codable, Sendable {
+    /// The URI of the windowed subscription.
+    public var channel: String
+    /// The client's offer of limits for the new connection, as in `subscribe`.
+    /// The subscription's counters start at zero on the new connection.
+    public var flowControl: SubscriptionFlowControlOptions
+    /// The `serverSeq` of the last action or observed state that the client
+    /// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+    /// replay recovery; absent for channels that resume only with new data.
+    public var lastAppliedServerSeq: Int?
+
+    public init(
+        channel: String,
+        flowControl: SubscriptionFlowControlOptions,
+        lastAppliedServerSeq: Int? = nil
+    ) {
+        self.channel = channel
+        self.flowControl = flowControl
+        self.lastAppliedServerSeq = lastAppliedServerSeq
+    }
+}
+
+/// Windowed subscriptions that the client wants to keep after reconnection.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeOptions: Codable, Sendable {
+    public var items: [ChannelDeliveryResumeParams]
+
+    public init(
+        items: [ChannelDeliveryResumeParams]
+    ) {
+        self.items = items
+    }
+}
+
+/// Windowed subscriptions that the server kept after reconnection.
+///
+/// A requested channel that is not listed was not kept. For each kept
+/// subscription, both peers start their counters at zero on the new connection,
+/// and credit counts only data received on that connection. Sequence numbers
+/// decide what is sent again.
+///
+/// Stability: 1.0 - Early development.
+public struct ChannelDeliveryResumeResult: Codable, Sendable {
+    public var items: [ResumedChannelSubscription]
+
+    public init(
+        items: [ResumedChannelSubscription]
+    ) {
+        self.items = items
+    }
+}
+
+/// A client's offer of windowed delivery.
+///
+/// Stability: 1.0 - Early development.
+public struct SubscriptionFlowControlOptions: Codable, Sendable {
+    /// The largest limits that the client accepts for data that it receives. The
+    /// server MAY accept lower values, and MUST NOT accept higher values.
+    public var receive: ChannelReceiveLimits
+
+    public init(
+        receive: ChannelReceiveLimits
+    ) {
+        self.receive = receive
     }
 }
 
@@ -606,35 +848,39 @@ public struct SubscribeParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Optional delivery preferences for this subscription.
-    ///
-    /// Servers MAY use these preferences to buffer and coalesce high-frequency
-    /// updates while preserving the same reduced state. Omit this field for the
-    /// server's default delivery behavior.
+    /// Asks the server to limit how long it holds updates. If absent, the server
+    /// uses its default behavior.
     public var delivery: SubscriptionDeliveryOptions?
-    /// Optional client-requested shape for the returned snapshot.
-    ///
-    /// Servers that do not understand a requested view ignore it and return their
-    /// default snapshot. Clients MUST tolerate receiving more state than requested.
+    /// Asks for a smaller snapshot. A server that does not support the requested
+    /// view ignores it. Clients MUST accept more state than they requested.
     public var view: SubscribeView?
+    /// Offers windowed delivery for this subscription. The server accepts by
+    /// returning `flowControl` in the result. If the result does not contain
+    /// `flowControl`, the subscription uses ordinary delivery.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: SubscriptionFlowControlOptions?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case delivery
         case view
+        case flowControl
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         delivery: SubscriptionDeliveryOptions? = nil,
-        view: SubscribeView? = nil
+        view: SubscribeView? = nil,
+        flowControl: SubscriptionFlowControlOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.delivery = delivery
         self.view = view
+        self.flowControl = flowControl
     }
 }
 
@@ -657,10 +903,11 @@ public struct SubscribeView: Codable, Sendable {
 }
 
 public struct SubscriptionDeliveryOptions: Codable, Sendable {
-    /// Maximum time, in milliseconds, that the server may intentionally delay
-    /// delivery while buffering/coalescing updates for this subscription.
-    ///
-    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    /// The longest time, in milliseconds, that the server should hold updates for
+    /// this subscription in order to combine them. The server MUST NOT combine
+    /// updates unless the combined update produces the same state and the client
+    /// still receives every event that the channel requires. A value of `0` asks
+    /// the server not to delay updates.
     public var maxLatencyMs: Int?
 
     public init(
@@ -671,13 +918,25 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
 }
 
 public struct SubscribeResult: Codable, Sendable {
-    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+    /// except that the server MAY omit it for a channel whose state has no fields
+    /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+    /// `channel/snapshot` notification instead.
     public var snapshot: Snapshot?
+    /// The limits that the server accepted for windowed delivery. The server sends
+    /// this result before any data message for the subscription. The client MUST be
+    /// ready to process data messages as soon as it receives this result, and can
+    /// send data messages without waiting for the snapshot.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var flowControl: ChannelFlowControl?
 
     public init(
-        snapshot: Snapshot? = nil
+        snapshot: Snapshot? = nil,
+        flowControl: ChannelFlowControl? = nil
     ) {
         self.snapshot = snapshot
+        self.flowControl = flowControl
     }
 }
 
@@ -809,6 +1068,19 @@ public struct CreateChatParams: Codable, Sendable {
     /// A client MUST NOT supply this field unless the agent advertises
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     public var workingDirectories: [String]?
+    /// Client-selected initial display title for the new chat.
+    public var title: String?
+    /// Agent provider ID for the new chat. Absent means the session's provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` a provider that is not in the root state's `agents` or
+    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent: absent means that agent, and a different value is
+    /// rejected. Agent capability checks for this request use the chat's agent.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -817,6 +1089,8 @@ public struct CreateChatParams: Codable, Sendable {
         case initialMessage
         case source
         case workingDirectories
+        case title
+        case provider
     }
 
     public init(
@@ -825,7 +1099,9 @@ public struct CreateChatParams: Codable, Sendable {
         chat: String,
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
-        workingDirectories: [String]? = nil
+        workingDirectories: [String]? = nil,
+        title: String? = nil,
+        provider: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -833,6 +1109,8 @@ public struct CreateChatParams: Codable, Sendable {
         self.initialMessage = initialMessage
         self.source = source
         self.workingDirectories = workingDirectories
+        self.title = title
+        self.provider = provider
     }
 }
 
@@ -854,6 +1132,76 @@ public struct DisposeChatParams: Codable, Sendable {
     ) {
         self.channel = channel
         self.meta = meta
+    }
+}
+
+public struct ChatMoveToSessionDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatMoveDestinationKind
+    /// Destination session URI.
+    public var session: String
+    /// Chat after which to place the requested chat.
+    ///
+    /// The anchor MUST be a different chat in the destination session. When
+    /// omitted, the requested chat is placed at the beginning of the catalog.
+    public var after: String?
+
+    public init(
+        kind: ChatMoveDestinationKind,
+        session: String,
+        after: String? = nil
+    ) {
+        self.kind = kind
+        self.session = session
+        self.after = after
+    }
+}
+
+public struct ChatMoveToNewSessionDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatMoveDestinationKind
+
+    public init(
+        kind: ChatMoveDestinationKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct MoveChatParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Atomic move destination.
+    public var destination: ChatMoveDestination
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case destination
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        destination: ChatMoveDestination
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.destination = destination
+    }
+}
+
+public struct MoveChatResult: Codable, Sendable {
+    /// Authoritative owning session URI after the move.
+    public var session: String
+
+    public init(
+        session: String
+    ) {
+        self.session = session
     }
 }
 
@@ -917,28 +1265,41 @@ public struct ResourceReadParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Content URI from a `ContentRef`
+    /// Content URI to read, such as one from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
+    /// Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.
+    public var position: Int?
+    /// Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.
+    public var length: Int?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case uri
         case encoding
+        case position
+        case length
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         uri: String,
-        encoding: ContentEncoding? = nil
+        encoding: ContentEncoding? = nil,
+        position: Int? = nil,
+        length: Int? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.uri = uri
         self.encoding = encoding
+        self.position = position
+        self.length = length
     }
 }
 
@@ -949,15 +1310,22 @@ public struct ResourceReadResult: Codable, Sendable {
     public var encoding: ContentEncoding
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     public var contentType: String?
+    /// Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.
+    public var size: Int?
 
     public init(
         data: String,
         encoding: ContentEncoding,
-        contentType: String? = nil
+        contentType: String? = nil,
+        size: Int? = nil
     ) {
         self.data = data
         self.encoding = encoding
         self.contentType = contentType
+        self.size = size
     }
 }
 
@@ -1503,6 +1871,26 @@ public struct DispatchActionParams: Codable, Sendable {
     }
 }
 
+public struct McpServerAuthenticateTarget: Codable, Sendable {
+    public var kind: AuthenticateTargetKind
+    /// Session URI whose `SessionState.customizations` contains the MCP server.
+    public var session: String
+    /// The server's session-unique `McpServerCustomization.id`, echoed from the
+    /// customization carrying `McpServerAuthRequiredState` or from
+    /// `ToolCallAuthRequiredState.contributor.customizationId`.
+    public var customizationId: String
+
+    public init(
+        kind: AuthenticateTargetKind,
+        session: String,
+        customizationId: String
+    ) {
+        self.kind = kind
+        self.session = session
+        self.customizationId = customizationId
+    }
+}
+
 public struct AuthenticateParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -1535,6 +1923,21 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
+    /// Optional consumer of the token. Clients SHOULD include this when answering
+    /// a specific MCP server's `McpServerAuthRequiredState` or
+    /// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+    /// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+    ///
+    /// When present, the host MUST apply the token only to that MCP server in
+    /// that session, never to sibling servers, other sessions, or agent-level
+    /// resources, even if they share the resource and scopes. `resource` MUST
+    /// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+    /// The host MUST reject an unknown session or customization, or a
+    /// customization that is not an MCP server, with `InvalidParams` (-32602).
+    ///
+    /// Without a target, resource/scope matching is unchanged; the token may
+    /// satisfy every matching pending challenge. Older hosts ignore this field.
+    public var target: AuthenticateTarget?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1543,6 +1946,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
+        case target
     }
 
     public init(
@@ -1551,7 +1955,8 @@ public struct AuthenticateParams: Codable, Sendable {
         resource: String,
         token: String,
         expiresIn: Int? = nil,
-        scopes: [String]? = nil
+        scopes: [String]? = nil,
+        target: AuthenticateTarget? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1559,6 +1964,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
+        self.target = target
     }
 }
 
@@ -1707,6 +2113,10 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var readOnly: Bool?
     /// JSON Schema: schema for array items (used when `type` is `'array'`)
     public var items: ConfigPropertySchema?
+    /// JSON Schema: minimum number of array items (used when `type` is `'array'`)
+    public var minItems: Int?
+    /// JSON Schema: maximum number of array items (used when `type` is `'array'`)
+    public var maxItems: Int?
     /// JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
     public var properties: [String: ConfigPropertySchema]?
     /// JSON Schema: list of required property ids (used when `type` is `'object'`)
@@ -1720,6 +2130,9 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
+    /// When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.
+    public var chatMutable: Bool?
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -1731,11 +2144,14 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         case enumDescriptions
         case readOnly
         case items
+        case minItems
+        case maxItems
         case properties
         case required
         case additionalProperties
         case enumDynamic
         case sessionMutable
+        case chatMutable
     }
 
     public init(
@@ -1748,11 +2164,14 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         enumDescriptions: [String]? = nil,
         readOnly: Bool? = nil,
         items: ConfigPropertySchema? = nil,
+        minItems: Int? = nil,
+        maxItems: Int? = nil,
         properties: [String: ConfigPropertySchema]? = nil,
         required: [String]? = nil,
         additionalProperties: ConfigPropertySchema? = nil,
         enumDynamic: Bool? = nil,
-        sessionMutable: Bool? = nil
+        sessionMutable: Bool? = nil,
+        chatMutable: Bool? = nil
     ) {
         self.type = type
         self.title = title
@@ -1763,11 +2182,14 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         self.enumDescriptions = enumDescriptions
         self.readOnly = readOnly
         self.items = items
+        self.minItems = minItems
+        self.maxItems = maxItems
         self.properties = properties
         self.required = required
         self.additionalProperties = additionalProperties
         self.enumDynamic = enumDynamic
         self.sessionMutable = sessionMutable
+        self.chatMutable = chatMutable
     }
 }
 
@@ -2179,6 +2601,78 @@ public enum ChatSource: Codable, Sendable {
     }
 }
 
+public enum ChatMoveDestination: Codable, Sendable {
+    case session(ChatMoveToSessionDestination)
+    case newSession(ChatMoveToNewSessionDestination)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "session":
+            self = .session(try ChatMoveToSessionDestination(from: decoder))
+        case "newSession":
+            self = .newSession(try ChatMoveToNewSessionDestination(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .session(let value): try value.encode(to: encoder)
+        case .newSession(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+// MARK: - AuthenticateTarget Union
+
+public enum AuthenticateTarget: Codable, Sendable {
+    case mcpServer(McpServerAuthenticateTarget)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "mcpServer":
+            self = .mcpServer(try McpServerAuthenticateTarget(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .mcpServer(var value):
+            value.kind = .mcpServer
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 // MARK: - ReconnectResult Union
 
 public enum ReconnectResult: Codable, Sendable {
@@ -2246,10 +2740,12 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil) {
+    public init(resource: String, side: String? = nil, nonce: String? = nil) {
         self.resource = resource
         self.side = side
+        self.nonce = nonce
     }
 
     // kind is the union discriminant: a fixed constant for this variant (so it
@@ -2257,14 +2753,15 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     // MUST be re-emitted on encode so the wire stays a decodable
     // discriminated-union value. Hence the custom encode and the decode-only
     // CodingKeys that omit kind.
-    private enum CodingKeys: String, CodingKey { case resource, side }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side }
+    private enum CodingKeys: String, CodingKey { case resource, side, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(kind, forKey: .kind)
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }
 
@@ -2273,17 +2770,19 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
     public var resource: String
     public var side: String?
     public var range: TextRange
+    public var nonce: String?
 
-    public init(resource: String, side: String? = nil, range: TextRange) {
+    public init(resource: String, side: String? = nil, range: TextRange, nonce: String? = nil) {
         self.resource = resource
         self.side = side
         self.range = range
+        self.nonce = nonce
     }
 
     // See ChangesetOperationResourceTarget: kind is re-emitted on encode but
     // not decoded (the union dispatches on it).
-    private enum CodingKeys: String, CodingKey { case resource, side, range }
-    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range }
+    private enum CodingKeys: String, CodingKey { case resource, side, range, nonce }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range, nonce }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
@@ -2291,5 +2790,6 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(resource, forKey: .resource)
         try container.encodeIfPresent(side, forKey: .side)
         try container.encode(range, forKey: .range)
+        try container.encodeIfPresent(nonce, forKey: .nonce)
     }
 }

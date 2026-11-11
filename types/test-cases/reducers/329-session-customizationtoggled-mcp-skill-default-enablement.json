@@ -1,0 +1,63 @@
+{
+  "description": "session/customizationToggled enables an MCP-served skill when enablement is empty",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server",
+        "uri": "https://mcp.example/server",
+        "name": "Server",
+        "state": { "kind": "ready" },
+        "children": [
+          {
+            "type": "skill",
+            "id": "mcp-skill",
+            "uri": "mcp://server/skills/lint",
+            "name": "lint",
+            "enabled": false
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "id": "mcp-skill",
+      "enablement": []
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server",
+        "uri": "https://mcp.example/server",
+        "name": "Server",
+        "state": { "kind": "ready" },
+        "children": [
+          {
+            "type": "skill",
+            "id": "mcp-skill",
+            "uri": "mcp://server/skills/lint",
+            "name": "lint",
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  }
+}

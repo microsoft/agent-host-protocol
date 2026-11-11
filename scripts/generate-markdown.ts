@@ -29,6 +29,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDescription, getDocumentation, readStability } from './read-stability.js';
 
 const GENERATED_HEADER = '<!-- Generated from types/*.ts — do not edit -->\n\n';
 
@@ -67,6 +68,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-root': 'root',
   'channels-session': 'session',
   'channels-chat': 'chat',
+  'channels-canvas': 'canvas',
   'channels-terminal': 'terminal',
   'channels-changeset': 'changeset',
   'channels-annotations': 'annotations',
@@ -74,6 +76,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-otlp': 'otlp',
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
+  'channels-tcp': 'tcp',
 };
 
 /**
@@ -173,15 +176,26 @@ type DocNode =
   | EnumDeclaration
   | VariableDeclaration;
 
-function renderHeading(name: string, _node: DocNode, level = 3): string {
+function renderHeading(name: string, node: DocNode, level = 3): string {
   const hashes = '#'.repeat(level);
-  return `${hashes} \`${name}\`\n`;
+  const heading = `${hashes} \`${name}\`\n`;
+  if (Node.isVariableDeclaration(node)) return heading;
+  const stability = readStability(node);
+  return stability ? `${heading}\n<StabilityIndex level="${stability.level}" />\n` : heading;
 }
 
 function getJsDocDescription(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration): string {
-  const jsDocs = node.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDescription(node);
+}
+
+/**
+ * Table row saying whether a notification counts against the window on a
+ * windowed subscription. Only notifications get the row.
+ */
+function windowRow(node: InterfaceDeclaration, messageType: string): string[] {
+  if (messageType !== 'Notification') return [];
+  const exempt = node.getJsDocs().some(doc => doc.getTags().some(tag => tag.getTagName() === 'windowExempt'));
+  return [`| Counts against the window | ${exempt ? 'No' : 'Yes'} |`];
 }
 
 function getJsDocTag(node: InterfaceDeclaration | TypeAliasDeclaration | EnumDeclaration, tagName: string): string | undefined {
@@ -214,9 +228,7 @@ function getJsDocExamples(node: InterfaceDeclaration | TypeAliasDeclaration): st
 }
 
 function getPropertyDescription(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -672,12 +684,14 @@ function emitCommandBlock(project: Project, entry: RegistryEntry, paramsIface: I
   const direction = getJsDocTag(paramsIface, 'direction') || 'Client → Server';
   const messageType = getJsDocTag(paramsIface, 'messageType') || 'Request';
 
-  lines.push(`## \`${entry.method}\`\n`);
+  lines.push(renderHeading(entry.method, paramsIface, 2));
   if (desc) lines.push(desc + '\n');
   lines.push('| Property | Value |');
   lines.push('|---|---|');
   lines.push(`| Direction | ${direction} |`);
-  lines.push(`| Type | ${messageType} |\n`);
+  lines.push(`| Type | ${messageType} |`);
+  lines.push(...windowRow(paramsIface, messageType));
+  lines.push('');
 
   lines.push('**Parameters:**\n');
   if (paramsIface.getProperties().length > 0) {
@@ -772,12 +786,14 @@ function emitNotificationBlock(entry: RegistryEntry, paramsIface: InterfaceDecla
   const direction = getJsDocTag(paramsIface, 'direction') || 'Server → Client';
   const messageType = getJsDocTag(paramsIface, 'messageType') || 'Notification';
 
-  lines.push(`### \`${entry.method}\`\n`);
+  lines.push(renderHeading(entry.method, paramsIface));
   if (desc) lines.push(desc + '\n');
   lines.push('| Property | Value |');
   lines.push('|---|---|');
   lines.push(`| Direction | ${direction} |`);
-  lines.push(`| Type | ${messageType} |\n`);
+  lines.push(`| Type | ${messageType} |`);
+  lines.push(...windowRow(paramsIface, messageType));
+  lines.push('');
 
   if (paramsIface.getProperties().length > 0) {
     lines.push('**Parameters:**\n');
@@ -997,6 +1013,30 @@ function generateChatChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateCanvasChannelPage(project: Project): string {
+  currentPage = 'canvas';
+  const stateSf = findChannelSourceFile(project, 'channels-canvas', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-canvas', 'actions.ts');
+
+  const lines: string[] = [GENERATED_HEADER];
+  lines.push('# Canvas Channel\n');
+  lines.push(stabilityIndex(stateSf));
+  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and content URI. A client that cannot load the content URI directly reads it with `resourceRead`. A missing URI means the source is unavailable. Source URIs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
+  lines.push(schemaLink('state.schema.json'));
+
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
+    lines.push('Replace `CanvasState` through server-authoritative actions scoped to the canvas URI via `ActionEnvelope.channel`.\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  return lines.join('\n');
+}
+
 function generateTerminalChannelPage(project: Project): string {
   currentPage = 'terminal';
   const stateSf = findChannelSourceFile(project, 'channels-terminal', 'state.ts');
@@ -1125,12 +1165,12 @@ function generateOtlpChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Telemetry Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the `ahp-otlp:` channels — stateless channels that pass OpenTelemetry logs, traces, and metrics from the agent host to subscribed clients as [OTLP/JSON](https://github.com/open-telemetry/opentelemetry-proto) payloads. See [Telemetry Channel specification](/specification/telemetry-channel) for the wire-level overview, including URI templates and severity filtering.\n');
+  lines.push('Reference for the `ahp-otlp:` channels, which pass OpenTelemetry logs, traces, and metrics from the agent host to subscribed clients as [OTLP/JSON](https://github.com/open-telemetry/opentelemetry-proto) payloads. See [Telemetry Channel specification](/specification/telemetry-channel) for the wire-level overview, including URI templates and severity filtering.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {
     lines.push('## State Types\n');
-    lines.push('The `ahp-otlp:` channels are stateless; the only state type is the capability descriptor the host advertises on `InitializeResult.telemetry`.\n');
+    lines.push('The state of an `ahp-otlp:` channel is an `EmptyState`; its data arrives only in notifications. The type below is the capability descriptor that the host advertises on `InitializeResult.telemetry`.\n');
     lines.push(emitStateTypesSection([stateSf]));
   }
 
@@ -1142,6 +1182,30 @@ function generateOtlpChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+
+function generateTcpChannelPage(project: Project): string {
+  currentPage = 'tcp';
+  const stateSf = findChannelSourceFile(project, 'channels-tcp', 'state.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-tcp', 'commands.ts');
+  const notificationsSf = findChannelSourceFile(project, 'channels-tcp', 'notifications.ts');
+  const lines: string[] = [GENERATED_HEADER, '# TCP Channel\n', stabilityIndex(stateSf)];
+  lines.push('A private channel that forwards a TCP connection on the host\'s network, using windowed delivery. Its state is an `EmptyState`. See the [TCP Channel specification](/specification/tcp-channel).\n');
+  if (stateSf) {
+    lines.push('## Capability Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Creation\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  if (notificationsSf) {
+    lines.push('## Notifications\n');
+    lines.push(schemaLink('notifications.schema.json'));
+    lines.push(emitNotificationsSection(project, [notificationsSf]));
+  }
+  return lines.join('\n');
+}
 
 // ─── Error Codes Page ────────────────────────────────────────────────────────
 
@@ -1413,11 +1477,13 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'root.md', generator: generateRootChannelPage },
     { filename: 'session.md', generator: generateSessionChannelPage },
     { filename: 'chat.md', generator: generateChatChannelPage },
+    { filename: 'canvas.md', generator: generateCanvasChannelPage },
     { filename: 'terminal.md', generator: generateTerminalChannelPage },
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },
     { filename: 'resource-watch.md', generator: generateResourceWatchChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
+    { filename: 'tcp.md', generator: generateTcpChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
     { filename: 'mcp.md', generator: generateMcpChannelPage },

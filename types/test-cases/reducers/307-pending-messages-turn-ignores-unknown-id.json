@@ -1,0 +1,46 @@
+{
+  "description": "turn consumption preserves mixed pending entries and the legacy snapshot for an unknown ID",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+      { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } },
+      { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-unknown",
+      "startedAt": "2026-10-14T00:01:00.000Z",
+      "queuedMessageId": "unknown",
+      "message": { "text": "Unrelated turn", "origin": { "kind": "user" } }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 8,
+    "modifiedAt": "2026-10-14T00:01:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "legacy", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "old", "message": { "text": "Old queued entry", "origin": { "kind": "user" } } },
+      { "id": "s", "kind": "steering", "message": { "text": "Steering", "origin": { "kind": "user" } } },
+      { "id": "q", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } }
+    ],
+    "activeTurn": {
+      "id": "turn-unknown",
+      "startedAt": "2026-10-14T00:01:00.000Z",
+      "message": { "text": "Unrelated turn", "origin": { "kind": "user" } },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}

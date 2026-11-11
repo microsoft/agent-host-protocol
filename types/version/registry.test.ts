@@ -5,13 +5,14 @@
  *  - {@link PROTOCOL_VERSION} parses as `MAJOR.MINOR.PATCH`.
  *  - {@link SUPPORTED_PROTOCOL_VERSIONS} is non-empty.
  *  - Every entry parses as `MAJOR.MINOR.PATCH`.
- *  - The first entry equals {@link PROTOCOL_VERSION} (most-preferred-first).
+ *  - Released compatibility baselines are independent of the development version.
  *  - The list is strictly descending by SemVer.
  *  - No duplicate entries.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   ACTION_INTRODUCED_IN,
@@ -19,10 +20,23 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
   compareProtocolVersions,
   isActionKnownToVersion,
+  negotiateProtocolVersion,
 } from './registry.js';
 import { ActionType } from '../actions.js';
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
+test('host negotiation follows the shared compatibility corpus', () => {
+  const cases: { offered: string[]; expected?: string | null; invalid?: boolean }[] =
+    JSON.parse(readFileSync(new URL('../test-cases/version-negotiation.json', import.meta.url), 'utf8'));
+  for (const fixture of cases) {
+    if (fixture.invalid) {
+      assert.throws(() => negotiateProtocolVersion(fixture.offered), /Invalid protocol version/);
+    } else {
+      assert.equal(negotiateProtocolVersion(fixture.offered), fixture.expected ?? undefined);
+    }
+  }
+});
 
 test('PROTOCOL_VERSION is MAJOR.MINOR.PATCH', () => {
   assert.match(PROTOCOL_VERSION, SEMVER_RE);
@@ -38,8 +52,8 @@ test('every SUPPORTED_PROTOCOL_VERSIONS entry is MAJOR.MINOR.PATCH', () => {
   }
 });
 
-test('SUPPORTED_PROTOCOL_VERSIONS[0] equals PROTOCOL_VERSION', () => {
-  assert.equal(SUPPORTED_PROTOCOL_VERSIONS[0], PROTOCOL_VERSION);
+test('SUPPORTED_PROTOCOL_VERSIONS contains only released compatibility baselines', () => {
+  assert.deepEqual(SUPPORTED_PROTOCOL_VERSIONS, ['1.0.0', '0.9.0']);
 });
 
 test('SUPPORTED_PROTOCOL_VERSIONS is strictly descending', () => {
@@ -71,8 +85,30 @@ test('chat/turnResume is available starting in protocol 0.9.0', () => {
   assert.equal(isActionKnownToVersion(action, '0.9.0'), true);
 });
 
+test('chat/isReadChanged is available starting in protocol 0.9.0', () => {
+  const action = {
+    type: ActionType.ChatIsReadChanged,
+    isRead: true,
+  } as const;
+
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatIsReadChanged], '0.9.0');
+  assert.equal(isActionKnownToVersion(action, '0.8.0'), false);
+  assert.equal(isActionKnownToVersion(action, '0.9.0'), true);
+});
+
 test('public package entry re-exports both protocol-version constants', async () => {
   const pkg = await import('../index.js');
   assert.equal(pkg.PROTOCOL_VERSION, PROTOCOL_VERSION);
   assert.deepEqual([...pkg.SUPPORTED_PROTOCOL_VERSIONS], [...SUPPORTED_PROTOCOL_VERSIONS]);
+});
+
+test('chat/configChanged is available starting in protocol 1.1.0', () => {
+  const action = {
+    type: ActionType.ChatConfigChanged,
+    config: { autoApprove: true },
+  } as const;
+
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatConfigChanged], '1.1.0');
+  assert.equal(isActionKnownToVersion(action, '1.0.0'), false);
+  assert.equal(isActionKnownToVersion(action, '1.1.0'), true);
 });

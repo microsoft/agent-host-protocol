@@ -26,6 +26,7 @@
     "queuedMessages": [
       {
         "id": "pm-1",
+        "kind": "queued",
         "message": {
           "text": "Do something",
           "origin": {

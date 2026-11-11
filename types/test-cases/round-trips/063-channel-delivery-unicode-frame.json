@@ -1,0 +1,18 @@
+{
+  "name": "channel-delivery-unicode-frame",
+  "group": "A",
+  "description": "A fragment carrying a complete JSON-RPC notification preserves BMP and surrogate-pair content through native string models.",
+  "type": "ChannelFrameParams",
+  "input": {
+    "channel": "ahp-terminal:/t1",
+    "data": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"Aé😀\"},\"serverSeq\":7}}",
+    "final": true
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-terminal:/t1",
+      "data": "{\"jsonrpc\":\"2.0\",\"method\":\"action\",\"params\":{\"channel\":\"ahp-terminal:/t1\",\"action\":{\"type\":\"terminal/data\",\"data\":\"Aé😀\"},\"serverSeq\":7}}",
+      "final": true
+    }
+  ]
+}

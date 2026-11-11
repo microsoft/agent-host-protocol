@@ -6,6 +6,37 @@ import AgentHostProtocol
 
 final class MultiHostStateMirrorTests: XCTestCase {
 
+    func testCanvasUpdatesAndResetAreIsolatedPerHost() async {
+        let mirror = MultiHostStateMirror()
+        let resource = "ahp-canvas:/preview"
+        let initial = CanvasState(
+            instanceId: "preview", extensionId: "project:preview", canvasId: "preview",
+            url: "https://example.test/original"
+        )
+        let snapshot = Snapshot(resource: resource, state: .canvas(initial), fromSeq: 1)
+        await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
+        await mirror.applySnapshot(host: "beta", snapshot: snapshot)
+        var unavailable = initial
+        unavailable.url = nil
+        await mirror.apply(host: "alpha", envelope: ActionEnvelope(
+            channel: resource,
+            action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: unavailable)),
+            serverSeq: 2
+        ))
+        let targeted = await mirror.canvases
+        await mirror.reset(host: "alpha")
+        let afterReset = await mirror.canvases
+        await mirror.reset()
+        let remaining = await mirror.canvases
+        let alphaKey = HostedResourceKey(hostId: "alpha", uri: resource)
+        let betaKey = HostedResourceKey(hostId: "beta", uri: resource)
+        XCTAssertEqual(
+            [targeted[alphaKey]?.url, targeted[betaKey]?.url, afterReset[alphaKey]?.instanceId, afterReset[betaKey]?.url],
+            [nil, "https://example.test/original", nil, "https://example.test/original"]
+        )
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     // MARK: - root_states_are_isolated_per_host
 
     func testRootStatesAreIsolatedPerHost() async {

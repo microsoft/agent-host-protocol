@@ -114,7 +114,7 @@ public sealed class MultiHostClientTests
 
     private static Task RespondInitializeAsync(MemTransport serverSide, ulong id, CancellationToken ct) =>
         FakeHost.RespondResultAsync(
-            serverSide, id, new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() }, ct);
+            serverSide, id, new InitializeResult { ProtocolVersion = ProtocolVersion.Supported[0], Snapshots = new() }, ct);
 
     private static Task SendActionAsync(
         MemTransport serverSide, string channel, long serverSeq, CancellationToken ct) =>
@@ -174,7 +174,7 @@ public sealed class MultiHostClientTests
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var store = new BlockingClientIdStore();
         var subscriptions = new List<string> { "ahp-test://original" };
-        var protocolVersions = new List<string> { ProtocolVersion.Current };
+        var protocolVersions = new List<string> { ProtocolVersion.Supported[0] };
         var observedInitialize = new TaskCompletionSource<InitializeParams>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         await using var multiHost = new MultiHostClient(store);
@@ -208,7 +208,7 @@ public sealed class MultiHostClientTests
         await addTask;
         var initialize = await observedInitialize.Task.WaitAsync(cts.Token);
         Assert.Equal("ahp-test://original", Assert.Single(initialize.InitialSubscriptions!));
-        Assert.Equal(ProtocolVersion.Current, Assert.Single(initialize.ProtocolVersions));
+        Assert.Equal(ProtocolVersion.Supported[0], Assert.Single(initialize.ProtocolVersions));
     }
 
     // ── H: events tagged hostId ────────────────────────────────────────────
@@ -965,7 +965,7 @@ public sealed class MultiHostClientTests
     {
         var result = new InitializeResult
         {
-            ProtocolVersion = ProtocolVersion.Current,
+            ProtocolVersion = ProtocolVersion.Supported[0],
             ServerSeq = 0,
             Snapshots = new List<Snapshot>
             {

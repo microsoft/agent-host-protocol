@@ -1,0 +1,65 @@
+{
+  "description": "steering and queued messages share one list",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "s-1",
+      "message": {
+        "text": "Steer",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "queued",
+      "id": "q-1",
+      "message": {
+        "text": "Queue",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "steeringMessage": { "id": "s-1", "kind": "steering", "message": { "text": "Steer", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      {
+        "id": "s-1",
+        "kind": "steering",
+        "message": {
+          "text": "Steer",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      },
+      {
+        "id": "q-1",
+        "kind": "queued",
+        "message": {
+          "text": "Queue",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

@@ -323,6 +323,24 @@ func sessionInputRequestID(r ahptypes.SessionInputRequest) (string, bool) {
 	return "", false
 }
 
+func backgroundWorkID(w ahptypes.BackgroundWork) (string, bool) {
+	switch v := w.Value.(type) {
+	case *ahptypes.BackgroundShellWork:
+		return v.Id, true
+	case *ahptypes.BackgroundSubagentWork:
+		return v.Id, true
+	case *ahptypes.BackgroundWorkUnknown:
+		// Kinds from newer hosts still carry the common `id`, so they can be replaced and removed.
+		var common struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(v.Raw, &common); err == nil && common.ID != "" {
+			return common.ID, true
+		}
+	}
+	return "", false
+}
+
 func childCustomizationID(c ahptypes.ChildCustomization) (string, bool) {
 	switch v := c.Value.(type) {
 	case *ahptypes.AgentCustomization:
@@ -399,6 +417,17 @@ func applyChildEnablement(c *ahptypes.ChildCustomization, enablement []ahptypes.
 	}
 }
 
+func toggleMcpServerSkill(server *ahptypes.McpServerCustomization, id string, enablement []ahptypes.CustomizationEnablement) bool {
+	for i := range server.Children {
+		if server.Children[i].Id == id {
+			enabled := effectiveEnablement(enablement)
+			server.Children[i].Enabled = &enabled
+			return true
+		}
+	}
+	return false
+}
+
 func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes.CustomizationEnablement) bool {
 	for i := range list {
 		got, ok := customizationID(list[i])
@@ -408,6 +437,12 @@ func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes
 		}
 	}
 	for i := range list {
+		if server, ok := list[i].Value.(*ahptypes.McpServerCustomization); ok {
+			if toggleMcpServerSkill(server, id, enablement) {
+				return true
+			}
+			continue
+		}
 		children := containerChildren(&list[i])
 		if children == nil {
 			continue
@@ -416,6 +451,11 @@ func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes
 			got, ok := childCustomizationID((*children)[j])
 			if ok && got == id {
 				applyChildEnablement(&(*children)[j], enablement)
+				return true
+			}
+		}
+		for _, child := range *children {
+			if server, ok := child.Value.(*ahptypes.McpServerCustomization); ok && toggleMcpServerSkill(server, id, enablement) {
 				return true
 			}
 		}
@@ -559,11 +599,52 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatBackgroundWorkSetAction:
+		id, ok := backgroundWorkID(a.Work)
+		if !ok {
+			return ReduceOutcomeNoOp
+		}
+		if state.BackgroundWork == nil {
+			work := []ahptypes.BackgroundWork{}
+			state.BackgroundWork = &work
+		}
+		work := *state.BackgroundWork
+		for i := range work {
+			if got, ok := backgroundWorkID(work[i]); ok && got == id {
+				work[i] = a.Work
+				return ReduceOutcomeApplied
+			}
+		}
+		*state.BackgroundWork = append(work, a.Work)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatBackgroundWorkRemovedAction:
+		if state.BackgroundWork == nil {
+			return ReduceOutcomeNoOp
+		}
+		work := *state.BackgroundWork
+		for i := range work {
+			if got, ok := backgroundWorkID(work[i]); ok && got == a.Id {
+				*state.BackgroundWork = append(work[:i], work[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.ChatMovableChangedAction:
+		movable := a.Movable
+		state.Movable = &movable
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatChangesetsChangedAction:
 		if a.Changesets == nil {
 			state.Changesets = nil
 		} else {
 			state.Changesets = append([]ahptypes.Changeset(nil), a.Changesets...)
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatCanvasesChangedAction:
+		if a.Canvases == nil {
+			state.Canvases = nil
+		} else {
+			state.Canvases = append([]ahptypes.CanvasReference(nil), a.Canvases...)
 		}
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatWorkingDirectorySetAction:
@@ -658,6 +739,12 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if r, ok := p.Value.(*ahptypes.ReasoningResponsePart); ok {
 				r.Content += a.Content
+				if a.StartedAt != nil {
+					r.StartedAt = a.StartedAt
+				}
+				if a.Duration != nil {
+					r.Duration = a.Duration
+				}
 			}
 		})
 	case *ahptypes.ChatTruncatedAction:
@@ -713,60 +800,44 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		}
 		return ReduceOutcomeNoOp
 	case *ahptypes.ChatPendingMessageSetAction:
-		entry := ahptypes.PendingMessage{Id: a.Id, Message: a.Message}
-		switch a.Kind {
-		case ahptypes.PendingMessageKindSteering:
+		kind := a.Kind
+		entry := ahptypes.PendingMessage{Id: a.Id, Kind: &kind, Message: a.Message}
+		if a.Kind == ahptypes.PendingMessageKindSteering {
 			state.SteeringMessage = &entry
-		case ahptypes.PendingMessageKindQueued:
-			list := state.QueuedMessages
-			idx := -1
-			for i := range list {
-				if list[i].Id == entry.Id {
-					idx = i
-					break
-				}
-			}
-			if idx >= 0 {
-				list[idx] = entry
-			} else {
-				list = append(list, entry)
-			}
-			state.QueuedMessages = list
+		} else if state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
+			state.SteeringMessage = nil
 		}
-		return ReduceOutcomeApplied
-	case *ahptypes.ChatPendingMessageRemovedAction:
-		switch a.Kind {
-		case ahptypes.PendingMessageKindSteering:
-			if state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
-				state.SteeringMessage = nil
+		list := state.QueuedMessages
+		for i := range list {
+			if list[i].Id == entry.Id {
+				list[i] = entry
 				return ReduceOutcomeApplied
 			}
-			return ReduceOutcomeNoOp
-		case ahptypes.PendingMessageKindQueued:
-			list := state.QueuedMessages
-			if list == nil {
-				return ReduceOutcomeNoOp
-			}
-			next := list[:0]
-			removed := false
-			for _, m := range list {
-				if m.Id == a.Id {
-					removed = true
-					continue
-				}
-				next = append(next, m)
-			}
-			if !removed {
-				return ReduceOutcomeNoOp
-			}
-			if len(next) == 0 {
-				state.QueuedMessages = nil
-			} else {
-				state.QueuedMessages = next
-			}
-			return ReduceOutcomeApplied
 		}
-		return ReduceOutcomeNoOp
+		state.QueuedMessages = append(list, entry)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatPendingMessageRemovedAction:
+		outcome := ReduceOutcomeNoOp
+		if a.Kind == ahptypes.PendingMessageKindSteering && state.SteeringMessage != nil && state.SteeringMessage.Id == a.Id {
+			state.SteeringMessage = nil
+			outcome = ReduceOutcomeApplied
+		}
+		for i, message := range state.QueuedMessages {
+			kind := ahptypes.PendingMessageKindQueued
+			if message.Kind != nil {
+				kind = *message.Kind
+			}
+			if message.Id == a.Id && kind == a.Kind {
+				list := state.QueuedMessages
+				list = append(list[:i], list[i+1:]...)
+				if len(list) == 0 {
+					list = nil
+				}
+				state.QueuedMessages = list
+				return ReduceOutcomeApplied
+			}
+		}
+		return outcome
 	case *ahptypes.ChatQueuedMessagesReorderedAction:
 		if state.QueuedMessages == nil {
 			return ReduceOutcomeNoOp
@@ -798,8 +869,30 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatDraftChangedAction:
 		state.Draft = a.Draft
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatIsReadChangedAction:
+		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsRead, a.IsRead)
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatIsArchivedChangedAction:
 		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatConfigChangedAction:
+		if state.Config == nil {
+			state.Config = &ahptypes.ChatConfigState{}
+		}
+		if (a.Replace != nil && *a.Replace) || state.Config.Values == nil {
+			state.Config.Values = make(map[string]json.RawMessage, len(a.Config))
+		}
+		for k, v := range a.Config {
+			state.Config.Values[k] = v
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatMovedAction:
+		state.Provider = a.Provider
+		if state.Config != nil {
+			state.Config.Schema = a.Schema
+		} else if a.Schema != nil {
+			state.Config = &ahptypes.ChatConfigState{Schema: a.Schema, Values: map[string]json.RawMessage{}}
+		}
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
@@ -817,6 +910,9 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 	if changes.ModifiedAt != nil {
 		summary.ModifiedAt = *changes.ModifiedAt
+	}
+	if changes.Changes != nil {
+		summary.Changes = changes.Changes
 	}
 	if changes.Origin != nil {
 		summary.Origin = changes.Origin
@@ -869,6 +965,39 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.SessionChatsReorderedAction:
+		if len(a.Chats) != len(state.Chats) {
+			return ReduceOutcomeNoOp
+		}
+		unchanged := true
+		for i, resource := range a.Chats {
+			if state.Chats[i].Resource != resource {
+				unchanged = false
+				break
+			}
+		}
+		if unchanged {
+			return ReduceOutcomeNoOp
+		}
+		summaries := make(map[ahptypes.URI]ahptypes.ChatSummary, len(state.Chats))
+		for _, summary := range state.Chats {
+			summaries[summary.Resource] = summary
+		}
+		seen := make(map[ahptypes.URI]struct{}, len(a.Chats))
+		reordered := make([]ahptypes.ChatSummary, 0, len(a.Chats))
+		for _, resource := range a.Chats {
+			if _, duplicate := seen[resource]; duplicate {
+				return ReduceOutcomeNoOp
+			}
+			summary, ok := summaries[resource]
+			if !ok {
+				return ReduceOutcomeNoOp
+			}
+			seen[resource] = struct{}{}
+			reordered = append(reordered, summary)
+		}
+		state.Chats = reordered
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionDefaultChatChangedAction:
 		state.DefaultChat = a.DefaultChat
 		return ReduceOutcomeApplied
@@ -1372,6 +1501,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				PastTenseMessage:  a.Result.PastTenseMessage,
 				Content:           append([]ahptypes.ToolResultContent(nil), content...),
 				StructuredContent: a.Result.StructuredContent,
+				ResultMetadata:    a.Result.ResultMetadata,
 				Error:             a.Result.Error,
 				Confirmed:         confirmed,
 				SelectedOption:    selectedOption,
@@ -1391,6 +1521,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			PastTenseMessage:  a.Result.PastTenseMessage,
 			Content:           append([]ahptypes.ToolResultContent(nil), content...),
 			StructuredContent: a.Result.StructuredContent,
+			ResultMetadata:    a.Result.ResultMetadata,
 			Error:             a.Result.Error,
 			Confirmed:         confirmed,
 			SelectedOption:    selectedOption,
@@ -1423,6 +1554,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				PastTenseMessage:  s.PastTenseMessage,
 				Content:           s.Content,
 				StructuredContent: s.StructuredContent,
+				ResultMetadata:    s.ResultMetadata,
 				Error:             s.Error,
 				Confirmed:         s.Confirmed,
 				SelectedOption:    s.SelectedOption,
@@ -1595,6 +1727,16 @@ func applyInputAnswerChanged(state *ahptypes.ChatState, a *ahptypes.ChatInputAns
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeNoOp
+}
+
+// ApplyActionToCanvas replaces the live canvas state or returns OutOfScope.
+func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateAction) ReduceOutcome {
+	a, ok := action.Value.(*ahptypes.CanvasStateChangedAction)
+	if !ok {
+		return ReduceOutcomeOutOfScope
+	}
+	*state = a.Canvas
+	return ReduceOutcomeApplied
 }
 
 // ─── Terminal Reducer ──────────────────────────────────────────────────

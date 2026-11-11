@@ -3,6 +3,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import {
   ActionType,
   PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  negotiateProtocolVersion,
   SessionLifecycle,
   SessionStatus,
   sessionReducer,
@@ -42,8 +44,8 @@ function success(socket: WebSocket, id: number, result: unknown): void {
   send(socket, { jsonrpc: '2.0', id, result });
 }
 
-function failure(socket: WebSocket, id: number, code: number, message: string): void {
-  send(socket, { jsonrpc: '2.0', id, error: { code, message } });
+function failure(socket: WebSocket, id: number, code: number, message: string, data?: unknown): void {
+  send(socket, { jsonrpc: '2.0', id, error: { code, message, ...(data === undefined ? {} : { data }) } });
 }
 
 function isRequest(value: unknown): value is JsonRpcRequest {
@@ -74,16 +76,32 @@ function handleRequest(socket: WebSocket, request: JsonRpcRequest, initialized: 
       || typeof params.clientId !== 'string'
       || !Array.isArray(offered)
       || !offered.every(version => typeof version === 'string')
-      || !offered.includes(PROTOCOL_VERSION)
       || !Array.isArray(subscriptions)
       || subscriptions.length !== 1
       || subscriptions[0] !== sessionUri) {
       failure(socket, request.id, -32602, 'invalid current-protocol initialize request');
       return;
     }
+    let protocolVersion: string | undefined;
+    try {
+      protocolVersion = negotiateProtocolVersion(offered);
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      failure(socket, request.id, -32602, error.message);
+      return;
+    }
+    if (protocolVersion === undefined) {
+      failure(socket, request.id, -32005, 'unsupported protocol version', {
+        supportedVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+      socket.close(1002, 'unsupported protocol version');
+      return;
+    }
     initialized.value = true;
     success(socket, request.id, {
-      protocolVersion: PROTOCOL_VERSION,
+      protocolVersion,
       serverSeq: 0,
       serverInfo: { name: 'repository-local-typescript-conformance-host', version: PROTOCOL_VERSION },
       snapshots: [{ resource: sessionUri, state: initialState, fromSeq: 0 }],

@@ -6,7 +6,13 @@ AI is an evolving space. Unlike LSP or DAP — which largely guarantee backwards
 
 AHP uses a channel-level stability index based on the [Node.js stability index](https://nodejs.org/api/documentation.html#stability-index). It communicates how much change implementors should expect within a channel independently of the protocol version negotiated on a connection.
 
-Until more granular annotations are introduced, a channel's index applies to its complete surface: URI shape, state, actions, commands, notifications, and lifecycle.
+A channel's index applies to its surface by default: URI shape, state, actions,
+commands, notifications, and lifecycle. A declaration or field may override that
+default with a JSDoc `@stability` annotation. For example, the flow-control
+entrypoints on `subscribe` and `reconnect` are **1.0 - Early development** without
+making the existing command fields experimental. Generated API documentation and
+native client documentation preserve these annotations. Stability levels are not
+protocol or package version numbers.
 
 <div class="stability-scale">
   <StabilityIndex level="0" compact />
@@ -33,7 +39,9 @@ Until more granular annotations are introduced, a channel's index applies to its
 | [Root](/specification/root-channel) | **2 - Stable** |
 | [Session](/specification/session-channel) | **2 - Stable** |
 | [Chat](/specification/chat-channel) | **2 - Stable** |
+| [Canvas](/reference/canvas) | **1 - Experimental** |
 | [Terminal](/specification/terminal-channel) | **2 - Stable** |
+| [TCP](/specification/tcp-channel) | **1.0 - Early development** |
 | [Changeset](/reference/changeset) | **1.2 - Release candidate** |
 | [Annotations](/reference/annotations) | **1.1 - Active development** |
 | [Telemetry](/specification/telemetry-channel) | **2 - Stable** |
@@ -53,10 +61,18 @@ Protocol versions are [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` strings (
 Version selection happens once, during the [`initialize`](/specification/lifecycle) handshake — modelled after WebSocket subprotocol negotiation:
 
 1. The client sends `InitializeParams.protocolVersions`: an array of every protocol version it is willing to speak, ordered from most preferred to least preferred.
-2. The server picks one entry it can speak and returns it as `InitializeResult.protocolVersion`. Servers SHOULD honor the client's preference order when multiple offered versions are acceptable.
+2. The server selects the highest SemVer entry within a supported caret-compatible range and returns that exact offered string as `InitializeResult.protocolVersion`. The released compatibility baselines are `1.0.0` and `0.9.0`: hosts accept `>=1.0.0 <2.0.0` or `>=0.9.0 <0.10.0`, regardless of offer order. Development versions are independent of these advertised baselines.
 3. If the server cannot speak any of the offered versions, it MUST respond with [`UnsupportedProtocolVersion`](/reference/error-codes) (`-32005`) and required `data.supportedVersions` instead of a result, and close the connection.
 
 Both peers MUST use the selected version for the rest of the connection. There is no per-message renegotiation.
+
+The SDKs expose host-side selection helpers: TypeScript, Kotlin, and Swift
+`negotiateProtocolVersion`, Rust `negotiate_protocol_version`, Go
+`NegotiateProtocolVersion`, and .NET `ProtocolVersion.Negotiate`.
+Pass the client's offered version list. A missing result means the host must send
+`UnsupportedProtocolVersion` with its supported baselines and close the connection.
+Malformed versions produce an explicit error; versions must contain three
+non-negative integer components without leading zeros, prerelease or build metadata.
 
 ## Compatibility Guarantee
 

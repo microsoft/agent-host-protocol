@@ -10,207 +10,266 @@ namespace Microsoft.AgentHostProtocol;
 // ─── ActionType ──────────────────────────────────────────────────────
 
 /// <summary>Discriminant values for all state actions.</summary>
-[JsonConverter(typeof(WireEnumConverter<ActionType>))]
-public enum ActionType
+[JsonConverter(typeof(ActionTypeConverter))]
+public readonly struct ActionType : IEquatable<ActionType>
 {
-    [WireValue("root/agentsChanged")]
-    RootAgentsChanged,
-    [WireValue("root/activeSessionsChanged")]
-    RootActiveSessionsChanged,
-    [WireValue("session/ready")]
-    SessionReady,
-    [WireValue("session/creationFailed")]
-    SessionCreationFailed,
-    [WireValue("session/chatAdded")]
-    SessionChatAdded,
-    [WireValue("session/chatRemoved")]
-    SessionChatRemoved,
-    [WireValue("session/chatUpdated")]
-    SessionChatUpdated,
-    [WireValue("session/defaultChatChanged")]
-    SessionDefaultChatChanged,
-    [WireValue("chat/turnStarted")]
-    ChatTurnStarted,
-    [WireValue("chat/delta")]
-    ChatDelta,
-    [WireValue("chat/responsePart")]
-    ChatResponsePart,
-    [WireValue("chat/toolCallStart")]
-    ChatToolCallStart,
-    [WireValue("chat/toolCallDelta")]
-    ChatToolCallDelta,
-    [WireValue("chat/toolCallReady")]
-    ChatToolCallReady,
-    [WireValue("chat/toolCallConfirmed")]
-    ChatToolCallConfirmed,
-    [WireValue("chat/toolCallComplete")]
-    ChatToolCallComplete,
-    [WireValue("chat/toolCallResultConfirmed")]
-    ChatToolCallResultConfirmed,
-    [WireValue("chat/toolCallContentChanged")]
-    ChatToolCallContentChanged,
-    [WireValue("chat/toolCallAuthRequired")]
-    ChatToolCallAuthRequired,
-    [WireValue("chat/toolCallAuthResolved")]
-    ChatToolCallAuthResolved,
-    [WireValue("chat/turnComplete")]
-    ChatTurnComplete,
-    [WireValue("chat/turnCancelled")]
-    ChatTurnCancelled,
-    [WireValue("chat/error")]
-    ChatError,
-    [WireValue("chat/turnResume")]
-    ChatTurnResume,
-    [WireValue("chat/activityChanged")]
-    ChatActivityChanged,
-    [WireValue("chat/changesetsChanged")]
-    ChatChangesetsChanged,
-    [WireValue("chat/workingDirectorySet")]
-    ChatWorkingDirectorySet,
-    [WireValue("chat/workingDirectoryRemoved")]
-    ChatWorkingDirectoryRemoved,
-    [WireValue("session/titleChanged")]
-    SessionTitleChanged,
-    [WireValue("chat/usage")]
-    ChatUsage,
-    [WireValue("chat/reasoning")]
-    ChatReasoning,
-    [WireValue("session/serverToolsChanged")]
-    SessionServerToolsChanged,
-    [WireValue("session/activeClientSet")]
-    SessionActiveClientSet,
-    [WireValue("session/activeClientRemoved")]
-    SessionActiveClientRemoved,
-    [WireValue("session/workingDirectorySet")]
-    SessionWorkingDirectorySet,
-    [WireValue("session/workingDirectoryRemoved")]
-    SessionWorkingDirectoryRemoved,
-    [WireValue("session/workingDirectoryReplaced")]
-    SessionWorkingDirectoryReplaced,
-    [WireValue("session/inputNeededSet")]
-    SessionInputNeededSet,
-    [WireValue("session/inputNeededRemoved")]
-    SessionInputNeededRemoved,
-    [WireValue("chat/pendingMessageSet")]
-    ChatPendingMessageSet,
-    [WireValue("chat/pendingMessageRemoved")]
-    ChatPendingMessageRemoved,
-    [WireValue("chat/queuedMessagesReordered")]
-    ChatQueuedMessagesReordered,
-    [WireValue("chat/draftChanged")]
-    ChatDraftChanged,
-    [WireValue("chat/isArchivedChanged")]
-    ChatIsArchivedChanged,
-    [WireValue("chat/inputRequested")]
-    ChatInputRequested,
-    [WireValue("chat/inputAnswerChanged")]
-    ChatInputAnswerChanged,
-    [WireValue("chat/inputCompleted")]
-    ChatInputCompleted,
-    [WireValue("session/customizationsChanged")]
-    SessionCustomizationsChanged,
-    [WireValue("session/customizationToggled")]
-    SessionCustomizationToggled,
-    [WireValue("session/customizationUpdated")]
-    SessionCustomizationUpdated,
-    [WireValue("session/customizationRemoved")]
-    SessionCustomizationRemoved,
-    [WireValue("session/mcpServerStateChanged")]
-    SessionMcpServerStateChanged,
-    [WireValue("session/mcpServerStartRequested")]
-    SessionMcpServerStartRequested,
-    [WireValue("session/mcpServerStopRequested")]
-    SessionMcpServerStopRequested,
-    [WireValue("session/mcpServerBackgroundRequested")]
-    SessionMcpServerBackgroundRequested,
-    [WireValue("chat/truncated")]
-    ChatTruncated,
-    [WireValue("chat/turnsLoaded")]
-    ChatTurnsLoaded,
-    [WireValue("session/isReadChanged")]
-    SessionIsReadChanged,
-    [WireValue("session/isArchivedChanged")]
-    SessionIsArchivedChanged,
-    [WireValue("session/activityChanged")]
-    SessionActivityChanged,
-    [WireValue("session/changesetsChanged")]
-    SessionChangesetsChanged,
-    [WireValue("session/configChanged")]
-    SessionConfigChanged,
-    [WireValue("session/metaChanged")]
-    SessionMetaChanged,
-    [WireValue("changeset/statusChanged")]
-    ChangesetStatusChanged,
-    [WireValue("changeset/fileSet")]
-    ChangesetFileSet,
-    [WireValue("changeset/fileRemoved")]
-    ChangesetFileRemoved,
-    [WireValue("changeset/filesReviewChanged")]
-    ChangesetFilesReviewChanged,
-    [WireValue("changeset/contentChanged")]
-    ChangesetContentChanged,
-    [WireValue("changeset/operationsChanged")]
-    ChangesetOperationsChanged,
-    [WireValue("changeset/operationStatusChanged")]
-    ChangesetOperationStatusChanged,
-    [WireValue("changeset/cleared")]
-    ChangesetCleared,
-    [WireValue("annotations/set")]
-    AnnotationsSet,
-    [WireValue("annotations/updated")]
-    AnnotationsUpdated,
-    [WireValue("annotations/removed")]
-    AnnotationsRemoved,
-    [WireValue("annotations/entrySet")]
-    AnnotationsEntrySet,
-    [WireValue("annotations/entryRemoved")]
-    AnnotationsEntryRemoved,
-    [WireValue("root/terminalsChanged")]
-    RootTerminalsChanged,
-    [WireValue("root/configChanged")]
-    RootConfigChanged,
-    [WireValue("terminal/data")]
-    TerminalData,
-    [WireValue("terminal/input")]
-    TerminalInput,
-    [WireValue("terminal/resized")]
-    TerminalResized,
-    [WireValue("terminal/claimed")]
-    TerminalClaimed,
-    [WireValue("terminal/titleChanged")]
-    TerminalTitleChanged,
-    [WireValue("terminal/cwdChanged")]
-    TerminalCwdChanged,
-    [WireValue("terminal/exited")]
-    TerminalExited,
-    [WireValue("terminal/cleared")]
-    TerminalCleared,
-    [WireValue("terminal/commandDetectionAvailable")]
-    TerminalCommandDetectionAvailable,
-    [WireValue("terminal/commandExecuted")]
-    TerminalCommandExecuted,
-    [WireValue("terminal/commandFinished")]
-    TerminalCommandFinished,
-    [WireValue("resourceWatch/changed")]
-    ResourceWatchChanged,
-    [WireValue("automation/createRequested")]
-    AutomationCreateRequested,
-    [WireValue("automation/updateRequested")]
-    AutomationUpdateRequested,
-    [WireValue("automation/set")]
-    AutomationSet,
-    [WireValue("automation/removed")]
-    AutomationRemoved,
-    [WireValue("automationRun/lifecycleChanged")]
-    AutomationRunLifecycleChanged,
-    [WireValue("automationRun/sessionSet")]
-    AutomationRunSessionSet,
-    [WireValue("automationRun/sessionRemoved")]
-    AutomationRunSessionRemoved,
-    [WireValue("automationRun/primarySessionChanged")]
-    AutomationRunPrimarySessionChanged,
-    [WireValue("automationRun/cancelRequested")]
-    AutomationRunCancelRequested,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ActionType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ActionType RootAgentsChanged = new ActionType("root/agentsChanged");
+
+    public static readonly ActionType RootActiveSessionsChanged = new ActionType("root/activeSessionsChanged");
+
+    public static readonly ActionType SessionReady = new ActionType("session/ready");
+
+    public static readonly ActionType SessionCreationFailed = new ActionType("session/creationFailed");
+
+    public static readonly ActionType SessionChatAdded = new ActionType("session/chatAdded");
+
+    public static readonly ActionType SessionChatRemoved = new ActionType("session/chatRemoved");
+
+    public static readonly ActionType SessionChatUpdated = new ActionType("session/chatUpdated");
+
+    public static readonly ActionType SessionChatsReordered = new ActionType("session/chatsReordered");
+
+    public static readonly ActionType SessionDefaultChatChanged = new ActionType("session/defaultChatChanged");
+
+    public static readonly ActionType ChatTurnStarted = new ActionType("chat/turnStarted");
+
+    public static readonly ActionType ChatDelta = new ActionType("chat/delta");
+
+    public static readonly ActionType ChatResponsePart = new ActionType("chat/responsePart");
+
+    public static readonly ActionType ChatToolCallStart = new ActionType("chat/toolCallStart");
+
+    public static readonly ActionType ChatToolCallDelta = new ActionType("chat/toolCallDelta");
+
+    public static readonly ActionType ChatToolCallReady = new ActionType("chat/toolCallReady");
+
+    public static readonly ActionType ChatToolCallConfirmed = new ActionType("chat/toolCallConfirmed");
+
+    public static readonly ActionType ChatToolCallComplete = new ActionType("chat/toolCallComplete");
+
+    public static readonly ActionType ChatToolCallResultConfirmed = new ActionType("chat/toolCallResultConfirmed");
+
+    public static readonly ActionType ChatToolCallContentChanged = new ActionType("chat/toolCallContentChanged");
+
+    public static readonly ActionType ChatToolCallAuthRequired = new ActionType("chat/toolCallAuthRequired");
+
+    public static readonly ActionType ChatToolCallAuthResolved = new ActionType("chat/toolCallAuthResolved");
+
+    public static readonly ActionType ChatTurnComplete = new ActionType("chat/turnComplete");
+
+    public static readonly ActionType ChatTurnCancelled = new ActionType("chat/turnCancelled");
+
+    public static readonly ActionType ChatError = new ActionType("chat/error");
+
+    public static readonly ActionType ChatTurnResume = new ActionType("chat/turnResume");
+
+    public static readonly ActionType ChatActivityChanged = new ActionType("chat/activityChanged");
+
+    public static readonly ActionType ChatBackgroundWorkSet = new ActionType("chat/backgroundWorkSet");
+
+    public static readonly ActionType ChatBackgroundWorkRemoved = new ActionType("chat/backgroundWorkRemoved");
+
+    public static readonly ActionType ChatMovableChanged = new ActionType("chat/movableChanged");
+
+    public static readonly ActionType ChatChangesetsChanged = new ActionType("chat/changesetsChanged");
+
+    public static readonly ActionType ChatCanvasesChanged = new ActionType("chat/canvasesChanged");
+
+    public static readonly ActionType CanvasStateChanged = new ActionType("canvas/stateChanged");
+
+    public static readonly ActionType ChatWorkingDirectorySet = new ActionType("chat/workingDirectorySet");
+
+    public static readonly ActionType ChatWorkingDirectoryRemoved = new ActionType("chat/workingDirectoryRemoved");
+
+    public static readonly ActionType SessionTitleChanged = new ActionType("session/titleChanged");
+
+    public static readonly ActionType ChatUsage = new ActionType("chat/usage");
+
+    public static readonly ActionType ChatReasoning = new ActionType("chat/reasoning");
+
+    public static readonly ActionType SessionServerToolsChanged = new ActionType("session/serverToolsChanged");
+
+    public static readonly ActionType SessionActiveClientSet = new ActionType("session/activeClientSet");
+
+    public static readonly ActionType SessionActiveClientRemoved = new ActionType("session/activeClientRemoved");
+
+    public static readonly ActionType SessionWorkingDirectorySet = new ActionType("session/workingDirectorySet");
+
+    public static readonly ActionType SessionWorkingDirectoryRemoved = new ActionType("session/workingDirectoryRemoved");
+
+    public static readonly ActionType SessionWorkingDirectoryReplaced = new ActionType("session/workingDirectoryReplaced");
+
+    public static readonly ActionType SessionInputNeededSet = new ActionType("session/inputNeededSet");
+
+    public static readonly ActionType SessionInputNeededRemoved = new ActionType("session/inputNeededRemoved");
+
+    public static readonly ActionType ChatPendingMessageSet = new ActionType("chat/pendingMessageSet");
+
+    public static readonly ActionType ChatPendingMessageRemoved = new ActionType("chat/pendingMessageRemoved");
+
+    public static readonly ActionType ChatQueuedMessagesReordered = new ActionType("chat/queuedMessagesReordered");
+
+    public static readonly ActionType ChatDraftChanged = new ActionType("chat/draftChanged");
+
+    public static readonly ActionType ChatIsReadChanged = new ActionType("chat/isReadChanged");
+
+    public static readonly ActionType ChatIsArchivedChanged = new ActionType("chat/isArchivedChanged");
+
+    public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
+
+    public static readonly ActionType ChatMoved = new ActionType("chat/moved");
+
+    public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
+
+    public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
+
+    public static readonly ActionType ChatInputCompleted = new ActionType("chat/inputCompleted");
+
+    public static readonly ActionType SessionCustomizationsChanged = new ActionType("session/customizationsChanged");
+
+    public static readonly ActionType SessionCustomizationToggled = new ActionType("session/customizationToggled");
+
+    public static readonly ActionType SessionCustomizationUpdated = new ActionType("session/customizationUpdated");
+
+    public static readonly ActionType SessionCustomizationRemoved = new ActionType("session/customizationRemoved");
+
+    public static readonly ActionType SessionMcpServerStateChanged = new ActionType("session/mcpServerStateChanged");
+
+    public static readonly ActionType SessionMcpServerStartRequested = new ActionType("session/mcpServerStartRequested");
+
+    public static readonly ActionType SessionMcpServerStopRequested = new ActionType("session/mcpServerStopRequested");
+
+    public static readonly ActionType SessionMcpServerBackgroundRequested = new ActionType("session/mcpServerBackgroundRequested");
+
+    public static readonly ActionType ChatTruncated = new ActionType("chat/truncated");
+
+    public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
+
+    public static readonly ActionType SessionIsReadChanged = new ActionType("session/isReadChanged");
+
+    public static readonly ActionType SessionIsArchivedChanged = new ActionType("session/isArchivedChanged");
+
+    public static readonly ActionType SessionActivityChanged = new ActionType("session/activityChanged");
+
+    public static readonly ActionType SessionChangesetsChanged = new ActionType("session/changesetsChanged");
+
+    public static readonly ActionType SessionConfigChanged = new ActionType("session/configChanged");
+
+    public static readonly ActionType SessionMetaChanged = new ActionType("session/metaChanged");
+
+    public static readonly ActionType ChangesetStatusChanged = new ActionType("changeset/statusChanged");
+
+    public static readonly ActionType ChangesetFileSet = new ActionType("changeset/fileSet");
+
+    public static readonly ActionType ChangesetFileRemoved = new ActionType("changeset/fileRemoved");
+
+    public static readonly ActionType ChangesetFilesReviewChanged = new ActionType("changeset/filesReviewChanged");
+
+    public static readonly ActionType ChangesetContentChanged = new ActionType("changeset/contentChanged");
+
+    public static readonly ActionType ChangesetOperationsChanged = new ActionType("changeset/operationsChanged");
+
+    public static readonly ActionType ChangesetOperationStatusChanged = new ActionType("changeset/operationStatusChanged");
+
+    public static readonly ActionType ChangesetCleared = new ActionType("changeset/cleared");
+
+    public static readonly ActionType AnnotationsSet = new ActionType("annotations/set");
+
+    public static readonly ActionType AnnotationsUpdated = new ActionType("annotations/updated");
+
+    public static readonly ActionType AnnotationsRemoved = new ActionType("annotations/removed");
+
+    public static readonly ActionType AnnotationsEntrySet = new ActionType("annotations/entrySet");
+
+    public static readonly ActionType AnnotationsEntryRemoved = new ActionType("annotations/entryRemoved");
+
+    public static readonly ActionType RootTerminalsChanged = new ActionType("root/terminalsChanged");
+
+    public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
+
+    public static readonly ActionType TerminalData = new ActionType("terminal/data");
+
+    public static readonly ActionType TerminalInput = new ActionType("terminal/input");
+
+    public static readonly ActionType TerminalResized = new ActionType("terminal/resized");
+
+    public static readonly ActionType TerminalClaimed = new ActionType("terminal/claimed");
+
+    public static readonly ActionType TerminalTitleChanged = new ActionType("terminal/titleChanged");
+
+    public static readonly ActionType TerminalCwdChanged = new ActionType("terminal/cwdChanged");
+
+    public static readonly ActionType TerminalExited = new ActionType("terminal/exited");
+
+    public static readonly ActionType TerminalCleared = new ActionType("terminal/cleared");
+
+    public static readonly ActionType TerminalCommandDetectionAvailable = new ActionType("terminal/commandDetectionAvailable");
+
+    public static readonly ActionType TerminalCommandExecuted = new ActionType("terminal/commandExecuted");
+
+    public static readonly ActionType TerminalCommandFinished = new ActionType("terminal/commandFinished");
+
+    public static readonly ActionType ResourceWatchChanged = new ActionType("resourceWatch/changed");
+
+    public static readonly ActionType AutomationCreateRequested = new ActionType("automation/createRequested");
+
+    public static readonly ActionType AutomationUpdateRequested = new ActionType("automation/updateRequested");
+
+    public static readonly ActionType AutomationSet = new ActionType("automation/set");
+
+    public static readonly ActionType AutomationRemoved = new ActionType("automation/removed");
+
+    public static readonly ActionType AutomationRunLifecycleChanged = new ActionType("automationRun/lifecycleChanged");
+
+    public static readonly ActionType AutomationRunSessionSet = new ActionType("automationRun/sessionSet");
+
+    public static readonly ActionType AutomationRunSessionRemoved = new ActionType("automationRun/sessionRemoved");
+
+    public static readonly ActionType AutomationRunPrimarySessionChanged = new ActionType("automationRun/primarySessionChanged");
+
+    public static readonly ActionType AutomationRunCancelRequested = new ActionType("automationRun/cancelRequested");
+
+    /// <inheritdoc />
+    public bool Equals(ActionType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ActionType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ActionType left, ActionType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ActionType left, ActionType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ActionType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ActionTypeConverter : JsonConverter<ActionType>
+{
+    /// <inheritdoc />
+    public override ActionType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ActionType(reader.GetString() ?? throw new JsonException("ActionType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ActionType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -250,7 +309,7 @@ public sealed record ActionEnvelope
 /// <summary>Fired when available agent backends or their models change.</summary>
 public sealed record RootAgentsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.RootAgentsChanged;
 
     /// <summary>Updated agent list</summary>
     public required List<AgentInfo> Agents { get; init; }
@@ -259,7 +318,7 @@ public sealed record RootAgentsChangedAction
 /// <summary>Fired when the number of active sessions changes.</summary>
 public sealed record RootActiveSessionsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.RootActiveSessionsChanged;
 
     /// <summary>Current count of active sessions</summary>
     public long ActiveSessions { get; init; }
@@ -271,7 +330,7 @@ public sealed record RootActiveSessionsChangedAction
 /// Set `replace` to `true` to replace all values instead of merging.</summary>
 public sealed record RootConfigChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.RootConfigChanged;
 
     /// <summary>Updated config values</summary>
     public required Dictionary<string, JsonElement> Config { get; init; }
@@ -284,13 +343,13 @@ public sealed record RootConfigChangedAction
 /// <summary>Session backend initialized successfully.</summary>
 public sealed record SessionReadyAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionReady;
 }
 
 /// <summary>Session backend failed to initialize.</summary>
 public sealed record SessionCreationFailedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionCreationFailed;
 
     /// <summary>Error details</summary>
     public required ErrorInfo Error { get; init; }
@@ -298,7 +357,7 @@ public sealed record SessionCreationFailedAction
 
 public sealed record SessionTurnStartedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnStarted");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -317,7 +376,7 @@ public sealed record SessionTurnStartedAction
 /// part (markdown or reasoning), then use this action to append text to it.</summary>
 public sealed record SessionDeltaAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/delta");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -332,7 +391,7 @@ public sealed record SessionDeltaAction
 /// <summary>Structured content appended to the response.</summary>
 public sealed record SessionResponsePartAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/responsePart");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -354,7 +413,7 @@ public sealed record SessionToolCallStartAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallStart");
 
     /// <summary>Internal tool name (for debugging/logging)</summary>
     public required string ToolName { get; init; }
@@ -380,7 +439,7 @@ public sealed record SessionToolCallDeltaAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallDelta");
 
     /// <summary>Partial parameter content to append</summary>
     public required string Content { get; init; }
@@ -403,7 +462,7 @@ public sealed record SessionToolCallReadyAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallReady");
 
     /// <summary>Message describing what the tool will do or what confirmation is needed</summary>
     public required StringOrMarkdown InvocationMessage { get; init; }
@@ -446,7 +505,7 @@ public sealed record SessionToolCallCompleteAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallComplete");
 
     /// <summary>Execution result</summary>
     public required ToolCallResult Result { get; init; }
@@ -469,7 +528,7 @@ public sealed record SessionToolCallResultConfirmedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallResultConfirmed");
 
     /// <summary>Whether the result was approved</summary>
     public bool Approved { get; init; }
@@ -478,7 +537,7 @@ public sealed record SessionToolCallResultConfirmedAction
 /// <summary>Turn finished — the assistant is idle.</summary>
 public sealed record SessionTurnCompleteAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnComplete");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -487,7 +546,7 @@ public sealed record SessionTurnCompleteAction
 /// <summary>Turn was aborted; server stops processing.</summary>
 public sealed record SessionTurnCancelledAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnCancelled");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -496,7 +555,7 @@ public sealed record SessionTurnCancelledAction
 /// <summary>Error during turn processing.</summary>
 public sealed record SessionErrorAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/error");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -508,7 +567,7 @@ public sealed record SessionErrorAction
 /// <summary>Token usage report for a turn.</summary>
 public sealed record SessionUsageAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/usage");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -520,7 +579,7 @@ public sealed record SessionUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.</summary>
 public sealed record SessionReasoningAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/reasoning");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -535,7 +594,7 @@ public sealed record SessionReasoningAction
 /// <summary>A pending message was set (upsert semantics: creates or replaces).</summary>
 public sealed record SessionPendingMessageSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageSet");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -550,7 +609,7 @@ public sealed record SessionPendingMessageSetAction
 /// <summary>A pending message was removed (steering or queued).</summary>
 public sealed record SessionPendingMessageRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageRemoved");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -562,7 +621,7 @@ public sealed record SessionPendingMessageRemovedAction
 /// <summary>Reorder the queued messages.</summary>
 public sealed record SessionQueuedMessagesReorderedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/queuedMessagesReordered");
 
     /// <summary>Queued message IDs in the desired order</summary>
     public required List<string> Order { get; init; }
@@ -574,7 +633,7 @@ public sealed record SessionQueuedMessagesReorderedAction
 /// </summary>
 public sealed record SessionToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallConfirmed");
 
     public required string TurnId { get; init; }
 
@@ -610,7 +669,7 @@ public sealed record SessionToolCallConfirmedAction
 /// from conversation, or dispatched by a client to rename a session.</summary>
 public sealed record SessionTitleChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionTitleChanged;
 
     /// <summary>New title</summary>
     public required string Title { get; init; }
@@ -622,7 +681,7 @@ public sealed record SessionTitleChangedAction
 /// or unread (e.g. after new activity since the client last looked at it).</summary>
 public sealed record SessionIsReadChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionIsReadChanged;
 
     /// <summary>Whether the session has been read</summary>
     public bool IsRead { get; init; }
@@ -634,7 +693,7 @@ public sealed record SessionIsReadChangedAction
 /// complete) or to unarchive it.</summary>
 public sealed record SessionIsArchivedChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionIsArchivedChanged;
 
     /// <summary>Whether the session is archived</summary>
     public bool IsArchived { get; init; }
@@ -646,7 +705,7 @@ public sealed record SessionIsArchivedChangedAction
 /// (e.g. running a tool, thinking). Clear activity by setting it to `undefined`.</summary>
 public sealed record SessionActivityChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionActivityChanged;
 
     /// <summary>Human-readable description of current activity, or `undefined` to clear</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -665,7 +724,7 @@ public sealed record SessionActivityChangedAction
 /// stream they already follow for file-level updates.</summary>
 public sealed record SessionChangesetsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionChangesetsChanged;
 
     /// <summary>New catalogue, or `undefined` to clear it</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -677,7 +736,7 @@ public sealed record SessionChangesetsChangedAction
 /// Full-replacement semantics: the `tools` array replaces the previous `serverTools` entirely.</summary>
 public sealed record SessionServerToolsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionServerToolsChanged;
 
     /// <summary>Updated server tools list (full replacement)</summary>
     public required List<ToolDefinition> Tools { get; init; }
@@ -696,7 +755,7 @@ public sealed record SessionServerToolsChangedAction
 /// client disconnects.</summary>
 public sealed record SessionActiveClientSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionActiveClientSet;
 
     /// <summary>The active client to add or update, matched by `clientId`.</summary>
     public required SessionActiveClient ActiveClient { get; init; }
@@ -719,7 +778,7 @@ public sealed record SessionActiveClientSetAction
 /// mechanism, and the call ends in `completed` status with a failed result.)</summary>
 public sealed record SessionActiveClientRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionActiveClientRemoved;
 
     /// <summary>The `clientId` of the active client to remove.</summary>
     public required string ClientId { get; init; }
@@ -734,7 +793,7 @@ public sealed record SessionActiveClientRemovedAction
 /// advertises {@link AgentCapabilities.multipleWorkingDirectories}.</summary>
 public sealed record SessionWorkingDirectorySetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionWorkingDirectorySet;
 
     /// <summary>The working directory to grant the session's agent tool access to.</summary>
     public required string Directory { get; init; }
@@ -754,7 +813,7 @@ public sealed record SessionWorkingDirectorySetAction
 /// reject such a removal, leaving the protected slot intact.</summary>
 public sealed record SessionWorkingDirectoryRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionWorkingDirectoryRemoved;
 
     /// <summary>The working directory to revoke the session's agent tool access to.</summary>
     public required string Directory { get; init; }
@@ -779,7 +838,7 @@ public sealed record SessionWorkingDirectoryRemovedAction
 /// backend side effect before broadcasting an accepted action, or reject it.</summary>
 public sealed record SessionWorkingDirectoryReplacedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionWorkingDirectoryReplaced;
 
     /// <summary>URI of the existing entry to replace.</summary>
     public required string Directory { get; init; }
@@ -802,7 +861,7 @@ public sealed record SessionWorkingDirectoryReplacedAction
 /// {@link SessionInputRequest}.</summary>
 public sealed record SessionInputNeededSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionInputNeededSet;
 
     /// <summary>The input request to add or update, matched by `id`.</summary>
     public required SessionInputRequest Request { get; init; }
@@ -818,7 +877,7 @@ public sealed record SessionInputNeededSetAction
 /// reports its result).</summary>
 public sealed record SessionInputNeededRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionInputNeededRemoved;
 
     /// <summary>The `id` of the input request to remove.</summary>
     public required string Id { get; init; }
@@ -830,7 +889,7 @@ public sealed record SessionInputNeededRemovedAction
 /// previous `customizations` entirely.</summary>
 public sealed record SessionCustomizationsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionCustomizationsChanged;
 
     /// <summary>Updated customization list (full replacement).</summary>
     public required List<Customization> Customizations { get; init; }
@@ -840,8 +899,9 @@ public sealed record SessionCustomizationsChangedAction
 ///
 /// Matches `id` against every top-level customization first — a plugin or
 /// directory container, or a bare top-level MCP server — then against the
-/// children inside each container (a skill, agent, or other entry). Plugins
-/// and MCP servers retain the matched entry's explicit decisions; other
+/// children inside each container (a skill, agent, or other entry), including
+/// skills served by top-level or container-child MCP servers. Plugins and
+/// MCP servers retain the matched entry's explicit decisions; other
 /// entries update their `enabled` flag. Disabling a plugin still disables all
 /// of its children — the effective state of a plugin child is the plugin's
 /// derived enabled value and `(child.enabled ?? true)` — so toggling a child
@@ -852,7 +912,7 @@ public sealed record SessionCustomizationsChangedAction
 /// changing one scope must include every decision it intends to preserve.</summary>
 public sealed record SessionCustomizationToggledAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionCustomizationToggled;
 
     /// <summary>The id of the container or child to update.</summary>
     public required string Id { get; init; }
@@ -871,7 +931,7 @@ public sealed record SessionCustomizationToggledAction
 /// - If not found, the entry is appended.</summary>
 public sealed record SessionCustomizationUpdatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionCustomizationUpdated;
 
     /// <summary>The customization to upsert (matched by `customization.id`).</summary>
     public required Customization Customization { get; init; }
@@ -884,7 +944,7 @@ public sealed record SessionCustomizationUpdatedAction
 /// matching id is found.</summary>
 public sealed record SessionCustomizationRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionCustomizationRemoved;
 
     /// <summary>The id of the customization to remove.</summary>
     public required string Id { get; init; }
@@ -912,7 +972,7 @@ public sealed record SessionCustomizationRemovedAction
 /// {@link McpServerAuthRequiredState} for the rationale.</summary>
 public sealed record SessionMcpServerStateChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionMcpServerStateChanged;
 
     /// <summary>The id of the {@link McpServerCustomization} to update.</summary>
     public required string Id { get; init; }
@@ -941,7 +1001,7 @@ public sealed record SessionMcpServerStateChangedAction
 /// rejected. Is a no-op when no matching `McpServerCustomization` is found.</summary>
 public sealed record SessionMcpServerStartRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionMcpServerStartRequested;
 
     /// <summary>The id of the {@link McpServerCustomization} to start.</summary>
     public required string Id { get; init; }
@@ -965,7 +1025,7 @@ public sealed record SessionMcpServerStartRequestedAction
 /// `McpServerCustomization` is found.</summary>
 public sealed record SessionMcpServerStopRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionMcpServerStopRequested;
 
     /// <summary>The id of the {@link McpServerCustomization} to stop.</summary>
     public required string Id { get; init; }
@@ -991,7 +1051,7 @@ public sealed record SessionMcpServerStopRequestedAction
 /// restoring `blocking: true`.</summary>
 public sealed record SessionMcpServerBackgroundRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionMcpServerBackgroundRequested;
 
     /// <summary>The id of the {@link McpServerCustomization} to background.</summary>
     public required string Id { get; init; }
@@ -1008,7 +1068,7 @@ public sealed record SessionMcpServerBackgroundRequestedAction
 /// `session/turnStarted` with an edited message.</summary>
 public sealed record SessionTruncatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/truncated");
 
     /// <summary>Keep turns up to and including this turn. Omit to clear all turns.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1022,7 +1082,7 @@ public sealed record SessionTruncatedAction
 /// the new values into `state.config.values`.</summary>
 public sealed record SessionConfigChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionConfigChanged;
 
     /// <summary>Updated config values</summary>
     public required Dictionary<string, JsonElement> Config { get; init; }
@@ -1037,7 +1097,7 @@ public sealed record SessionConfigChangedAction
 /// keys they wish to preserve into the new value before dispatching.</summary>
 public sealed record SessionMetaChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionMetaChanged;
 
     /// <summary>New `_meta` payload, or `undefined` to clear it</summary>
     [JsonPropertyName("_meta")]
@@ -1073,7 +1133,7 @@ public sealed record SessionToolCallContentChangedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallContentChanged");
 
     /// <summary>The current partial content for the running tool call</summary>
     public required List<ToolResultContent> Content { get; init; }
@@ -1086,7 +1146,7 @@ public sealed record SessionToolCallContentChangedAction
 /// Mirrors the root-channel `root/sessionAdded` notification.</summary>
 public sealed record SessionChatAddedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionChatAdded;
 
     /// <summary>The full summary of the newly added (or upserted) chat.</summary>
     public required ChatSummary Summary { get; init; }
@@ -1097,7 +1157,7 @@ public sealed record SessionChatAddedAction
 /// Mirrors the root-channel `root/sessionRemoved` notification.</summary>
 public sealed record SessionChatRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionChatRemoved;
 
     /// <summary>The URI of the chat to remove.</summary>
     public required string Chat { get; init; }
@@ -1110,37 +1170,53 @@ public sealed record SessionChatRemovedAction
 /// carried in `changes`. No-op when no entry with `chat` exists — clients
 /// SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
 ///
-/// Mirrors the root-channel `root/sessionSummaryChanged` notification.</summary>
+/// Mirrors the root-channel `root/sessionSummaryChanged` notification.
+/// When `changes.status` changes, the host MUST project that exact value into
+/// the matching `SessionChatSummary.status` field and publish
+/// the updated compact chat catalog through `root/sessionSummaryChanged`.</summary>
 public sealed record SessionChatUpdatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionChatUpdated;
 
     /// <summary>The URI of the chat whose summary changed.</summary>
     public required string Chat { get; init; }
 
     /// <summary>Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.</summary>
     public required PartialChatSummary Changes { get; init; }
+}
+
+/// <summary>The owning session's authoritative chat catalog order changed.
+///
+/// Host-emitted convergence signal; it never originates from a client
+/// dispatch. `chats` is the complete resulting order and MUST contain every
+/// chat currently in the session exactly once. Reducers replace the catalog
+/// order while preserving each matching summary. Invalid or incomplete orders
+/// are ignored.</summary>
+public sealed record SessionChatsReorderedAction
+{
+    public ActionType Type { get; init; } = ActionType.SessionChatsReordered;
+
+    /// <summary>Every chat URI in authoritative catalog order.</summary>
+    public required List<string> Chats { get; init; }
 }
 
 /// <summary>The default chat input-routing hint for this session changed.</summary>
 public sealed record SessionDefaultChatChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.SessionDefaultChatChanged;
 
     /// <summary>New default chat URI, or `undefined` to clear the hint.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; init; }
 }
 
-/// <summary>A new message has been sent to the agent, and a new turn starts.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// <summary>A new message has been sent to the agent, and a new turn starts.</summary>
 public sealed record ChatTurnStartedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTurnStarted;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1151,7 +1227,8 @@ public sealed record ChatTurnStartedAction
     /// <summary>The new message</summary>
     public required Message Message { get; init; }
 
-    /// <summary>If this turn was auto-started from a queued message, the ID of that message</summary>
+    /// <summary>If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? QueuedMessageId { get; init; }
 
@@ -1173,7 +1250,7 @@ public sealed record ChatTurnStartedAction
 /// markdown part, then use this action to append text to it.</summary>
 public sealed record ChatDeltaAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatDelta;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1202,7 +1279,7 @@ public sealed record ChatDeltaAction
 /// instead so adding the part and ending the turn are one atomic transition.</summary>
 public sealed record ChatResponsePartAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatResponsePart;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1247,7 +1324,7 @@ public sealed record ChatToolCallStartAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallStart;
 
     /// <summary>Internal tool name (for debugging/logging)</summary>
     public required string ToolName { get; init; }
@@ -1284,7 +1361,7 @@ public sealed record ChatToolCallDeltaAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallDelta;
 
     /// <summary>Partial parameter content to append, if provided by the host.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1326,7 +1403,7 @@ public sealed record ChatToolCallReadyAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallReady;
 
     /// <summary>Final contributor metadata. MUST NOT change execution ownership established
     /// at `chat/toolCallStart`; a client contributor must keep the same `clientId`.</summary>
@@ -1379,7 +1456,7 @@ public sealed record ChatToolCallReadyAction
 /// </summary>
 public sealed record ChatToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallConfirmed;
 
     public required string TurnId { get; init; }
 
@@ -1456,7 +1533,7 @@ public sealed record ChatToolCallCompleteAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallComplete;
 
     /// <summary>Execution result</summary>
     public required ToolCallResult Result { get; init; }
@@ -1487,7 +1564,7 @@ public sealed record ChatToolCallResultConfirmedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallResultConfirmed;
 
     /// <summary>Whether the result was approved</summary>
     public bool Approved { get; init; }
@@ -1522,7 +1599,7 @@ public sealed record ChatToolCallContentChangedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallContentChanged;
 
     /// <summary>The current partial content for the running tool call</summary>
     public required List<ToolResultContent> Content { get; init; }
@@ -1559,7 +1636,7 @@ public sealed record ChatToolCallAuthRequiredAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallAuthRequired;
 
     /// <summary>The authentication challenge blocking this invocation.</summary>
     public required McpAuthRequirement Auth { get; init; }
@@ -1590,13 +1667,13 @@ public sealed record ChatToolCallAuthResolvedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallAuthResolved;
 }
 
 /// <summary>Turn finished — the assistant is idle.</summary>
 public sealed record ChatTurnCompleteAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTurnComplete;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1622,7 +1699,7 @@ public sealed record ChatTurnCompleteAction
 /// <summary>Turn was aborted; server stops processing.</summary>
 public sealed record ChatTurnCancelledAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTurnCancelled;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1648,7 +1725,7 @@ public sealed record ChatTurnCancelledAction
 /// <summary>Error during turn processing.</summary>
 public sealed record ChatErrorAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatError;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1683,7 +1760,7 @@ public sealed record ChatErrorAction
 /// resumes the provider's execution for that turn.</summary>
 public sealed record ChatTurnResumeAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTurnResume;
 
     /// <summary>Identifier of the errored turn.</summary>
     public required string TurnId { get; init; }
@@ -1698,11 +1775,45 @@ public sealed record ChatTurnResumeAction
 /// `session/chatUpdated` so `ChatSummary.activity` stays in sync.</summary>
 public sealed record ChatActivityChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatActivityChanged;
 
     /// <summary>Human-readable description of current activity; omit or set `undefined` to clear</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Activity { get; init; }
+}
+
+/// <summary>Adds or replaces a {@link BackgroundWork} entry by `id`, independently of turn
+/// state.</summary>
+public sealed record ChatBackgroundWorkSetAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatBackgroundWorkSet;
+
+    /// <summary>The complete entry.</summary>
+    public required BackgroundWork Work { get; init; }
+}
+
+/// <summary>Removes finished or no-longer-tracked background work; unknown IDs are a no-op.</summary>
+public sealed record ChatBackgroundWorkRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatBackgroundWorkRemoved;
+
+    /// <summary>The {@link BackgroundWorkBase.id | id} of the entry to remove.</summary>
+    public required string Id { get; init; }
+}
+
+/// <summary>Whether this chat is structurally eligible to be the source of `moveChat`
+/// changed.
+///
+/// The host is authoritative and MUST also update the owning session's chat
+/// catalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.
+/// A chat referenced by its owning session's `defaultChat` MUST always carry
+/// `movable: false`.</summary>
+public sealed record ChatMovableChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatMovableChanged;
+
+    /// <summary>Whether this chat is structurally eligible to be moved.</summary>
+    public bool Movable { get; init; }
 }
 
 /// <summary>The {@link Changeset | catalogue of changesets} the agent host advertises
@@ -1716,11 +1827,37 @@ public sealed record ChatActivityChangedAction
 /// file-level updates through the existing `changeset/*` action stream.</summary>
 public sealed record ChatChangesetsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatChangesetsChanged;
 
     /// <summary>New catalogue, or `undefined` to clear it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Changeset>? Changesets { get; init; }
+}
+
+/// <summary>The live canvas channels exposed by this chat changed.
+///
+/// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+/// `undefined` to clear the collection.</summary>
+public sealed record ChatCanvasesChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatCanvasesChanged;
+
+    /// <summary>New canvas channel references, or `undefined` to clear the collection.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasReference>? Canvases { get; init; }
+}
+
+/// <summary>The presentation state for this canvas changed.
+///
+/// Replaces the subscribed canvas channel state entirely. Full-replacement
+/// semantics intentionally keep this early-development channel free to evolve
+/// without expanding the stable chat action surface.</summary>
+public sealed record CanvasStateChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasStateChanged;
+
+    /// <summary>New authoritative canvas state.</summary>
+    public required CanvasState Canvas { get; init; }
 }
 
 /// <summary>A working directory was added to this chat's
@@ -1734,7 +1871,7 @@ public sealed record ChatChangesetsChangedAction
 /// {@link AgentCapabilities.multipleWorkingDirectories}.</summary>
 public sealed record ChatWorkingDirectorySetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatWorkingDirectorySet;
 
     /// <summary>The working directory to add to this chat's subset.</summary>
     public required string Directory { get; init; }
@@ -1748,7 +1885,7 @@ public sealed record ChatWorkingDirectorySetAction
 /// chat's subset — the directory remains in the session's set.</summary>
 public sealed record ChatWorkingDirectoryRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatWorkingDirectoryRemoved;
 
     /// <summary>The working directory to remove from this chat's subset.</summary>
     public required string Directory { get; init; }
@@ -1757,7 +1894,7 @@ public sealed record ChatWorkingDirectoryRemovedAction
 /// <summary>Token usage report for a turn.</summary>
 public sealed record ChatUsageAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatUsage;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1780,10 +1917,11 @@ public sealed record ChatUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.
 ///
 /// The server MUST first emit a `chat/responsePart` to create the target
-/// reasoning part, then use this action to append text to it.</summary>
+/// reasoning part, then use this action to append text or record its timing.
+/// An empty `content` updates only the supplied timing fields.</summary>
 public sealed record ChatReasoningAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatReasoning;
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1793,6 +1931,14 @@ public sealed record ChatReasoningAction
 
     /// <summary>Reasoning text chunk</summary>
     public required string Content { get; init; }
+
+    /// <summary>Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
     ///
@@ -1817,7 +1963,7 @@ public sealed record ChatReasoningAction
 /// `chat/turnStarted` with an edited message.</summary>
 public sealed record ChatTruncatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTruncated;
 
     /// <summary>Keep turns up to and including this turn. Omit to clear all turns.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1833,7 +1979,7 @@ public sealed record ChatTruncatedAction
 /// retained turns are now loaded.</summary>
 public sealed record ChatTurnsLoadedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatTurnsLoaded;
 
     /// <summary>Older completed turns loaded into the state, ordered oldest-first.</summary>
     public required List<Turn> Turns { get; init; }
@@ -1845,16 +1991,15 @@ public sealed record ChatTurnsLoadedAction
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
 ///
-/// For steering messages, this always replaces the single steering message.
-/// For queued messages, if a message with the given `id` already exists it is
-/// updated in place; otherwise it is appended to the queue. If the chat is
-/// idle when a queued message is set, the server SHOULD immediately consume it
-/// and start a new turn.
+/// Both kinds are stored in {@link ChatState.queuedMessages}, including this
+/// action's `kind`. A new `id` appends an entry; an existing `id` replaces its
+/// message and kind in place.
 ///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// If the chat is idle when a queued message is set, the server SHOULD
+/// immediately consume it and start a new turn.</summary>
 public sealed record ChatPendingMessageSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatPendingMessageSet;
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -1870,10 +2015,14 @@ public sealed record ChatPendingMessageSetAction
 ///
 /// Dispatched by clients to cancel a pending message, or by the server when
 /// it consumes a message (e.g. starting a turn from a queued message or
-/// injecting a steering message into the current turn).</summary>
+/// injecting a steering message into the current turn).
+///
+/// Removes an entry from {@link ChatState.queuedMessages} only when both `id`
+/// and effective kind match. Unknown IDs and mismatched kinds are
+/// no-ops.</summary>
 public sealed record ChatPendingMessageRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatPendingMessageRemoved;
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -1882,18 +2031,19 @@ public sealed record ChatPendingMessageRemovedAction
     public required string Id { get; init; }
 }
 
-/// <summary>Reorder the queued messages.
+/// <summary>Reorder the entire shared {@link ChatState.queuedMessages} list.
 ///
-/// The `order` array contains the IDs of queued messages in their new
-/// desired order. IDs not present in the current queue are ignored.
-/// Queued messages whose IDs are absent from `order` are appended at
+/// The `order` array contains pending message IDs of either kind in their new
+/// desired raw order. Unknown and duplicate IDs are ignored.
+/// Messages whose IDs are absent from `order` are appended at
 /// the end in their original relative order (so a client with a stale
-/// view of the queue never silently drops messages).</summary>
+/// view of the list never silently drops messages). UIs SHOULD still group
+/// steering messages first, independently of this raw order.</summary>
 public sealed record ChatQueuedMessagesReorderedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatQueuedMessagesReordered;
 
-    /// <summary>Queued message IDs in the desired order</summary>
+    /// <summary>Pending message IDs in the desired raw order</summary>
     public required List<string> Order { get; init; }
 }
 
@@ -1910,11 +2060,28 @@ public sealed record ChatQueuedMessagesReorderedAction
 /// A client is only allowed to draft {@link MessageKind.User} messages.</summary>
 public sealed record ChatDraftChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatDraftChanged;
 
     /// <summary>New draft message, or `undefined` to clear it</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Message? Draft { get; init; }
+}
+
+/// <summary>The read state of the chat changed.
+///
+/// Dispatched by a client to mark any known chat, including the owning
+/// session's default chat, as read (e.g. after viewing it) or unread. This
+/// changes only the addressed chat; it does not change the read state of its
+/// owning session or sibling chats. Use `session/isReadChanged` only to change
+/// the owning session's independent read state. After accepting this action,
+/// the host also synchronizes the addressed chat's `ChatSummary.status` and
+/// `SessionChatSummary.status` projections.</summary>
+public sealed record ChatIsReadChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatIsReadChanged;
+
+    /// <summary>Whether the chat has been read</summary>
+    public bool IsRead { get; init; }
 }
 
 /// <summary>The archived state of the chat changed.
@@ -1924,10 +2091,54 @@ public sealed record ChatDraftChangedAction
 /// to archiving the session and SHOULD use `session/isArchivedChanged` instead.</summary>
 public sealed record ChatIsArchivedChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatIsArchivedChanged;
 
     /// <summary>Whether the chat is archived</summary>
     public bool IsArchived { get; init; }
+}
+
+/// <summary>Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.</summary>
+public sealed record ChatConfigChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
+
+    /// <summary>Config values to set on the chat</summary>
+    public required Dictionary<string, JsonElement> Config { get; init; }
+
+    /// <summary>When `true`, replaces the chat's config values instead of merging</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Replace { get; init; }
+}
+
+/// <summary>The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | `provider`} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.</summary>
+public sealed record ChatMovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatMoved;
+
+    /// <summary>The new owning session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The chat's provider in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
+    /// <summary>The chat's config schema in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; init; }
 }
 
 /// <summary>A session requested input from the user.
@@ -1937,7 +2148,7 @@ public sealed record ChatIsArchivedChangedAction
 /// are preserved unless `request.answers` is provided.</summary>
 public sealed record ChatInputRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatInputRequested;
 
     /// <summary>Input request to create or replace</summary>
     public required ChatInputRequest Request { get; init; }
@@ -1948,7 +2159,7 @@ public sealed record ChatInputRequestedAction
 /// Dispatching with `answer: undefined` removes that question's answer draft.</summary>
 public sealed record ChatInputAnswerChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatInputAnswerChanged;
 
     /// <summary>Input request identifier</summary>
     public required string RequestId { get; init; }
@@ -1968,7 +2179,7 @@ public sealed record ChatInputAnswerChangedAction
 /// response and final answers on the existing {@link InputRequestResponsePart}.</summary>
 public sealed record ChatInputCompletedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatInputCompleted;
 
     /// <summary>Input request identifier</summary>
     public required string RequestId { get; init; }
@@ -1987,7 +2198,7 @@ public sealed record ChatInputCompletedAction
 /// {@link ChangesetStatus.Error | Error}.</summary>
 public sealed record ChangesetStatusChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetStatusChanged;
 
     /// <summary>New computation lifecycle status.</summary>
     public ChangesetStatus Status { get; init; }
@@ -2001,7 +2212,7 @@ public sealed record ChangesetStatusChangedAction
 /// replaces an existing one identified by {@link ChangesetFile.id}.</summary>
 public sealed record ChangesetFileSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetFileSet;
 
     /// <summary>The new or replacement file entry.</summary>
     public required ChangesetFile File { get; init; }
@@ -2013,7 +2224,7 @@ public sealed record ChangesetFileSetAction
 /// no longer in scope (e.g. a renamed file is replaced by a new entry).</summary>
 public sealed record ChangesetFileRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetFileRemoved;
 
     /// <summary>The {@link ChangesetFile.id} of the file to remove.</summary>
     public required string FileId { get; init; }
@@ -2025,8 +2236,9 @@ public sealed record ChangesetFileRemovedAction
 /// Targets files by their {@link ChangesetFile.id}. Ids in {@link files} that
 /// do not match a file currently present in the changeset are ignored; if none
 /// match, the action is a no-op. Only the {@link ChangesetFile.reviewed} field
-/// of each matched file is affected; the files' {@link ChangesetFile.edit | edit}
-/// and {@link ChangesetFile._meta | _meta} are left untouched.
+/// of each matched file is affected; the files' {@link ChangesetFile.edit | edit},
+/// {@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}
+/// are left untouched.
 ///
 /// Only meaningful on a changeset that advertises
 /// {@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action
@@ -2035,14 +2247,14 @@ public sealed record ChangesetFileRemovedAction
 /// server echo it back on the normal `action` envelope stream. The server MAY
 /// also originate it (e.g. an agent marking its own output reviewed).
 ///
-/// There is no protocol-level content version, so review is not reset
-/// automatically when a file's contents change under a stable id. The server,
+/// Review is not reset automatically when a file's contents or nonce change
+/// under a stable id. The server,
 /// which is the authority on what changed, resets review explicitly — either by
 /// re-emitting the file without `reviewed: true`, or by dispatching this action
 /// with `reviewed: false`.</summary>
 public sealed record ChangesetFilesReviewChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetFilesReviewChanged;
 
     /// <summary>The {@link ChangesetFile.id | ids} of the files whose review state changed.</summary>
     public required List<string> Files { get; init; }
@@ -2060,7 +2272,7 @@ public sealed record ChangesetFilesReviewChangedAction
 /// {@link ChangesetOperationsChangedAction} for incremental updates.</summary>
 public sealed record ChangesetContentChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetContentChanged;
 
     /// <summary>Full replacement file list.</summary>
     public required List<ChangesetFile> Files { get; init; }
@@ -2075,7 +2287,7 @@ public sealed record ChangesetContentChangedAction
 /// removes it entirely when `operations` is `undefined`).</summary>
 public sealed record ChangesetOperationsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetOperationsChanged;
 
     /// <summary>Updated operation list. Pass `undefined` to clear all operations.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2094,7 +2306,7 @@ public sealed record ChangesetOperationsChangedAction
 /// or otherwise replace the operation list itself.</summary>
 public sealed record ChangesetOperationStatusChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetOperationStatusChanged;
 
     /// <summary>The {@link ChangesetOperation.id} whose status changed.</summary>
     public required string OperationId { get; init; }
@@ -2123,7 +2335,7 @@ public sealed record ChangesetOperationStatusChangedAction
 /// `root/sessionRemoved`) for the "going away" case.</summary>
 public sealed record ChangesetClearedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChangesetCleared;
 }
 
 /// <summary>Fired when the list of known terminals changes.
@@ -2132,7 +2344,7 @@ public sealed record ChangesetClearedAction
 /// `terminals` entirely.</summary>
 public sealed record RootTerminalsChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.RootTerminalsChanged;
 
     /// <summary>Updated terminal list (full replacement)</summary>
     public required List<TerminalInfo> Terminals { get; init; }
@@ -2150,7 +2362,7 @@ public sealed record RootTerminalsChangedAction
 /// is server-authoritative output (pty → server → client).</summary>
 public sealed record TerminalDataAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalData;
 
     /// <summary>Output data (may contain ANSI escape sequences)</summary>
     public required string Data { get; init; }
@@ -2165,7 +2377,7 @@ public sealed record TerminalDataAction
 /// See `terminal/data` for why these two actions are kept separate.</summary>
 public sealed record TerminalInputAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalInput;
 
     /// <summary>Input data to send to the pty</summary>
     public required string Data { get; init; }
@@ -2177,7 +2389,7 @@ public sealed record TerminalInputAction
 /// clients of the actual terminal dimensions.</summary>
 public sealed record TerminalResizedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalResized;
 
     /// <summary>Terminal width in columns</summary>
     public long Cols { get; init; }
@@ -2192,7 +2404,7 @@ public sealed record TerminalResizedAction
 /// the claim.</summary>
 public sealed record TerminalClaimedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalClaimed;
 
     /// <summary>The new claim</summary>
     public required TerminalClaim Claim { get; init; }
@@ -2204,7 +2416,7 @@ public sealed record TerminalClaimedAction
 /// escape sequences), or dispatched by a client to rename a terminal.</summary>
 public sealed record TerminalTitleChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalTitleChanged;
 
     /// <summary>New terminal title</summary>
     public required string Title { get; init; }
@@ -2213,7 +2425,7 @@ public sealed record TerminalTitleChangedAction
 /// <summary>Terminal working directory changed.</summary>
 public sealed record TerminalCwdChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalCwdChanged;
 
     /// <summary>New working directory</summary>
     public required string Cwd { get; init; }
@@ -2222,7 +2434,7 @@ public sealed record TerminalCwdChangedAction
 /// <summary>Terminal process exited.</summary>
 public sealed record TerminalExitedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalExited;
 
     /// <summary>Process exit code. `undefined` if the process was killed without an exit code.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2232,7 +2444,7 @@ public sealed record TerminalExitedAction
 /// <summary>Terminal scrollback buffer cleared.</summary>
 public sealed record TerminalClearedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalCleared;
 }
 
 /// <summary>Shell integration has loaded and the terminal now supports command
@@ -2243,7 +2455,7 @@ public sealed record TerminalClearedAction
 /// (or `terminal/commandExecuted`) has been received.</summary>
 public sealed record TerminalCommandDetectionAvailableAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalCommandDetectionAvailable;
 }
 
 /// <summary>A command has been submitted to the shell and is now executing.
@@ -2251,7 +2463,7 @@ public sealed record TerminalCommandDetectionAvailableAction
 /// `terminal/commandFinished`) constitute this command's output.</summary>
 public sealed record TerminalCommandExecutedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalCommandExecuted;
 
     /// <summary>Stable identifier for this command, scoped to the terminal URI.
     /// Allows correlating `commandExecuted` → `commandFinished` pairs.</summary>
@@ -2272,7 +2484,7 @@ public sealed record TerminalCommandExecutedAction
 /// the complete output of the command.</summary>
 public sealed record TerminalCommandFinishedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.TerminalCommandFinished;
 
     /// <summary>Matches the `commandId` from the corresponding `commandExecuted`</summary>
     public required string CommandId { get; init; }
@@ -2296,7 +2508,7 @@ public sealed record TerminalCommandFinishedAction
 /// them directly off the action stream and apply their own logic.</summary>
 public sealed record ResourceWatchChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ResourceWatchChanged;
 
     /// <summary>The set of changes in this batch, wrapped for forward compatibility.</summary>
     public JsonElement Changes { get; init; }
@@ -2316,7 +2528,7 @@ public sealed record ResourceWatchChangedAction
 /// annotation, to keep wire updates small.</summary>
 public sealed record AnnotationsSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AnnotationsSet;
 
     /// <summary>The new or replacement annotation. MUST contain at least one entry.</summary>
     public required Annotation Annotation { get; init; }
@@ -2330,7 +2542,7 @@ public sealed record AnnotationsSetAction
 /// annotation — rather than {@link AnnotationsEntryRemovedAction}.</summary>
 public sealed record AnnotationsRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AnnotationsRemoved;
 
     /// <summary>The {@link Annotation.id} of the annotation to remove.</summary>
     public required string AnnotationId { get; init; }
@@ -2343,7 +2555,7 @@ public sealed record AnnotationsRemovedAction
 /// is a no-op.</summary>
 public sealed record AnnotationsEntrySetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AnnotationsEntrySet;
 
     /// <summary>The {@link Annotation.id} the entry belongs to.</summary>
     public required string AnnotationId { get; init; }
@@ -2361,7 +2573,7 @@ public sealed record AnnotationsEntrySetAction
 /// current state the action is a no-op.</summary>
 public sealed record AnnotationsEntryRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AnnotationsEntryRemoved;
 
     /// <summary>The {@link Annotation.id} the entry belongs to.</summary>
     public required string AnnotationId { get; init; }
@@ -2388,7 +2600,7 @@ public sealed record AnnotationsEntryRemovedAction
 /// a no-op.</summary>
 public sealed record AnnotationsUpdatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AnnotationsUpdated;
 
     /// <summary>The {@link Annotation.id} of the annotation to update.</summary>
     public required string AnnotationId { get; init; }
@@ -2424,12 +2636,14 @@ public sealed record AnnotationsUpdatedAction
 ///
 /// This side-effect request leaves optimistic catalogue state unchanged. The
 /// host validates trigger ids and configuration, normalizes event-trigger
-/// titles and descriptions, persists the definition, then publishes the
+/// titles and descriptions, captures any
+/// {@link AutomationSessionTemplate.customizations | session customizations}
+/// from the dispatching client, persists the definition, then publishes the
 /// authoritative result with {@link AutomationSetAction | `automation/set`}.
 /// Rejections leave the catalogue unchanged.</summary>
 public sealed record AutomationCreateRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationCreateRequested;
 
     /// <summary>Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.</summary>
     public required string Resource { get; init; }
@@ -2453,7 +2667,7 @@ public sealed record AutomationCreateRequestedAction
 /// server order wins.</summary>
 public sealed record AutomationUpdateRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationUpdateRequested;
 
     /// <summary>Target {@link AutomationEntry.resource}.</summary>
     public required string Resource { get; init; }
@@ -2469,7 +2683,7 @@ public sealed record AutomationUpdateRequestedAction
 /// replaced in place. A previously unseen resource is appended.</summary>
 public sealed record AutomationSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationSet;
 
     /// <summary>Full new or replacement automation state.</summary>
     public required AutomationEntry Automation { get; init; }
@@ -2485,7 +2699,7 @@ public sealed record AutomationSetAction
 /// Removing an unknown resource is a no-op.</summary>
 public sealed record AutomationRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRemoved;
 
     /// <summary>{@link AutomationEntry.resource} to remove.</summary>
     public required string Resource { get; init; }
@@ -2496,7 +2710,7 @@ public sealed record AutomationRemovedAction
 /// The host dispatches this action for every lifecycle transition.</summary>
 public sealed record AutomationRunLifecycleChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRunLifecycleChanged;
 
     /// <summary>Complete replacement {@link AutomationRunState.lifecycle}.</summary>
     public required AutomationRunLifecycle Lifecycle { get; init; }
@@ -2507,7 +2721,7 @@ public sealed record AutomationRunLifecycleChangedAction
 /// Session URIs are unique. Setting an existing URI is a no-op.</summary>
 public sealed record AutomationRunSessionSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRunSessionSet;
 
     /// <summary>Session URI to append to {@link AutomationRunState.sessions} when not already linked.</summary>
     public required string Session { get; init; }
@@ -2519,7 +2733,7 @@ public sealed record AutomationRunSessionSetAction
 /// {@link AutomationRunState.primarySession}. An unknown URI is a no-op.</summary>
 public sealed record AutomationRunSessionRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRunSessionRemoved;
 
     /// <summary>Entry in {@link AutomationRunState.sessions} to remove.</summary>
     public required string Session { get; init; }
@@ -2528,7 +2742,7 @@ public sealed record AutomationRunSessionRemovedAction
 /// <summary>Select or clear the session clients should open first for this run.</summary>
 public sealed record AutomationRunPrimarySessionChangedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRunPrimarySessionChanged;
 
     /// <summary>New {@link AutomationRunState.primarySession}, or omitted to clear the selection.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2548,7 +2762,7 @@ public sealed record AutomationRunPrimarySessionChangedAction
 /// effect.</summary>
 public sealed record AutomationRunCancelRequestedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.AutomationRunCancelRequested;
 }
 
 // ─── Partial Summaries (action-discovered) ───────────────────────────
@@ -2576,9 +2790,22 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModifiedAt { get; init; }
 
+    /// <summary>Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChangesSummary? Changes { get; init; }
+
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; init; }
+
+    /// <summary>Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Movable { get; init; }
 
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
@@ -2587,6 +2814,12 @@ public sealed record PartialChatSummary
     /// compatibility.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
+
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
 
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
@@ -2665,6 +2898,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["session/chatAdded"] = typeof(SessionChatAddedAction),
         ["session/chatRemoved"] = typeof(SessionChatRemovedAction),
         ["session/chatUpdated"] = typeof(SessionChatUpdatedAction),
+        ["session/chatsReordered"] = typeof(SessionChatsReorderedAction),
         ["session/defaultChatChanged"] = typeof(SessionDefaultChatChangedAction),
         ["chat/turnStarted"] = typeof(ChatTurnStartedAction),
         ["chat/delta"] = typeof(ChatDeltaAction),
@@ -2683,7 +2917,12 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/backgroundWorkSet"] = typeof(ChatBackgroundWorkSetAction),
+        ["chat/backgroundWorkRemoved"] = typeof(ChatBackgroundWorkRemovedAction),
+        ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
+        ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
+        ["canvas/stateChanged"] = typeof(CanvasStateChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
         ["chat/usage"] = typeof(ChatUsageAction),
@@ -2694,7 +2933,10 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
+        ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
+        ["chat/configChanged"] = typeof(ChatConfigChangedAction),
+        ["chat/moved"] = typeof(ChatMovedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

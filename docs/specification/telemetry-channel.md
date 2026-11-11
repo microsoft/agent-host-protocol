@@ -40,7 +40,7 @@ Each field is optional. A host that emits no metrics simply omits `metrics`. A h
 
 ## Subscribing
 
-Telemetry channels are stateless*, subscribing returns an empty `SubscribeResult`. After the subscribe succeeds the client receives `otlp/export*` notifications for batches the host emits while the subscription is live.
+A telemetry channel delivers its data only in notifications, so its state has no fields. Subscribing returns a snapshot whose `state` is the empty object `{}`, or the server may omit the snapshot and return `{}`. After the subscribe succeeds the client receives `otlp/export*` notifications for batches the host emits while the subscription is live.
 
 ```jsonc
 // Client → Server
@@ -48,10 +48,11 @@ Telemetry channels are stateless*, subscribing returns an empty `SubscribeResult
   "params": { "channel": "ahp-otlp://logs" } }
 
 // Server → Client
-{ "jsonrpc": "2.0", "id": 2, "result": {} }
+{ "jsonrpc": "2.0", "id": 2,
+  "result": { "snapshot": { "resource": "ahp-otlp://logs", "state": {}, "fromSeq": 5 } } }
 ```
 
-Telemetry is not replayed on reconnect. After `reconnect`, clients re-subscribe and resume from the live edge.
+Telemetry batches are not replayed on reconnect. After `reconnect`, a resumed telemetry subscription receives only batches emitted after reconnection. A [windowed](/specification/windowed-delivery#reconnection) telemetry subscription that the server keeps can use `live` recovery.
 
 ## Wire Format
 

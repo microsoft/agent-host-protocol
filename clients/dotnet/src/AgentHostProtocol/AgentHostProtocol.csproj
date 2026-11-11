@@ -19,6 +19,13 @@
     <ProjectReference Include="../AgentHostProtocol.Abstractions/AgentHostProtocol.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- Keep internal test seams out of the public API. Signed release builds
+       receive the friend assembly's full public key from vscode-engineering;
+       ordinary local builds use the simple assembly name. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentHostProtocol.Tests" Key="$(StrongNamePublicKey)" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

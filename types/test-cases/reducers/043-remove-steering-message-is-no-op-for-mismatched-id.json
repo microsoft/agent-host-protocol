@@ -1,5 +1,5 @@
 {
-  "description": "remove steering message is no-op for mismatched ID",
+  "description": "remove deprecated steering snapshot slot is no-op for mismatched ID",
   "reducer": "chat",
   "initial": {
     "turns": [],

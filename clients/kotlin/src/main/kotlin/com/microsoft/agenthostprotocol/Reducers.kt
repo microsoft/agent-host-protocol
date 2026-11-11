@@ -11,6 +11,7 @@ import com.microsoft.agenthostprotocol.generated.*
 import java.time.Instant
 import java.time.format.DateTimeFormatterBuilder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
 
@@ -18,10 +19,10 @@ import kotlinx.serialization.json.JsonElement
  * A pure state reducer: `reduce(state, action)` returns the next state, with
  * no mutation of [state] and no side effects.
  *
- * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer],
+ * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer], [canvasReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
  * [automationReducer], and [automationRunReducer]) are the canonical implementations.
- * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer],
+ * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer], [CanvasReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
  * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
@@ -46,6 +47,12 @@ public object SessionReducer : Reducer<SessionState, StateAction> {
 public object ChatReducer : Reducer<ChatState, StateAction> {
     override fun reduce(state: ChatState, action: StateAction): ChatState =
         chatReducer(state, action)
+}
+
+/** Pure canvas reducer as a [Reducer] instance. */
+public object CanvasReducer : Reducer<CanvasState, StateAction> {
+    override fun reduce(state: CanvasState, action: StateAction): CanvasState =
+        canvasReducer(state, action)
 }
 
 /** Pure terminal reducer as a [Reducer] instance. Delegates to [terminalReducer]. */
@@ -253,6 +260,13 @@ private fun customizationId(c: Customization): String? = when (c) {
     is CustomizationUnknown -> null
 }
 
+private fun backgroundWorkId(w: BackgroundWork): String? = when (w) {
+    is BackgroundWorkShell -> w.value.id
+    is BackgroundWorkSubagent -> w.value.id
+    // Kinds from newer hosts still carry the common `id`, so they can be replaced and removed.
+    is BackgroundWorkUnknown -> (w.raw["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+}
+
 private fun sessionInputRequestId(r: SessionInputRequest): String? = when (r) {
     is SessionInputRequestChatInput -> r.value.id
     is SessionInputRequestToolConfirmation -> r.value.id
@@ -307,6 +321,37 @@ private fun withChildCustomizationEnablement(c: ChildCustomization, enablement: 
     is ChildCustomizationMcpServer -> ChildCustomizationMcpServer(c.value.copy(enablement = provenance))
     is ChildCustomizationUnknown -> c
     }
+}
+
+private fun toggleMcpServerSkill(server: McpServerCustomization, id: String, enablement: List<CustomizationEnablement>): McpServerCustomization? {
+    val skills = server.children ?: return null
+    val index = skills.indexOfFirst { it.id == id }
+    if (index < 0) return null
+    val updated = skills.toMutableList()
+    updated[index] = skills[index].copy(enabled = effectiveEnablement(enablement))
+    return server.copy(children = updated)
+}
+
+private fun toggleContainerChild(container: Customization, id: String, enablement: List<CustomizationEnablement>): Customization? {
+    if (container is CustomizationMcpServer) {
+        return toggleMcpServerSkill(container.value, id, enablement)?.let { CustomizationMcpServer(it) }
+    }
+    val children = customizationChildren(container) ?: return null
+    val childIndex = children.indexOfFirst { childCustomizationId(it) == id }
+    val updated = children.toMutableList()
+    if (childIndex >= 0) {
+        updated[childIndex] = withChildCustomizationEnablement(children[childIndex], enablement)
+        return withCustomizationChildren(container, updated)
+    }
+    for (i in children.indices) {
+        val child = children[i]
+        if (child is ChildCustomizationMcpServer) {
+            val toggled = toggleMcpServerSkill(child.value, id, enablement) ?: continue
+            updated[i] = ChildCustomizationMcpServer(toggled)
+            return withCustomizationChildren(container, updated)
+        }
+    }
+    return null
 }
 
 private fun childCustomizationId(c: ChildCustomization): String? = when (c) {
@@ -588,6 +633,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 status = c.status ?: prior.status,
                 activity = c.activity ?: prior.activity,
                 modifiedAt = c.modifiedAt ?: prior.modifiedAt,
+                changes = c.changes ?: prior.changes,
                 origin = c.origin ?: prior.origin,
                 workingDirectories = c.workingDirectories ?: prior.workingDirectories,
             )
@@ -598,6 +644,17 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
     }
 
     is StateActionSessionDefaultChatChanged -> state.copy(defaultChat = action.value.defaultChat)
+
+    is StateActionSessionChatsReordered -> {
+        val a = action.value
+        val summaries = state.chats.associateBy { it.resource }
+        if (a.chats.size != state.chats.size || a.chats.toSet().size != state.chats.size) {
+            state
+        } else {
+            val reordered = a.chats.mapNotNull(summaries::get)
+            if (reordered.size != state.chats.size) state else state.copy(chats = reordered)
+        }
+    }
 
     is StateActionSessionTitleChanged -> state.copy(title = action.value.title)
 
@@ -736,13 +793,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 state.copy(customizations = updated)
             } else run {
                 for (i in list.indices) {
-                    val children = customizationChildren(list[i]) ?: continue
-                    val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
-                    if (childIdx < 0) continue
-                    val newChildren = children.toMutableList()
-                    newChildren[childIdx] = withChildCustomizationEnablement(newChildren[childIdx], a.enablement)
+                    val toggled = toggleContainerChild(list[i], a.id, a.enablement) ?: continue
                     val updated = list.toMutableList()
-                    updated[i] = withCustomizationChildren(list[i], newChildren)
+                    updated[i] = toggled
                     return@run state.copy(customizations = updated)
                 }
                 state
@@ -993,8 +1046,41 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
 
+    is StateActionChatBackgroundWorkSet -> {
+        val work = action.value.work
+        val id = backgroundWorkId(work)
+        if (id == null) state else {
+            val list = state.backgroundWork ?: emptyList()
+            val idx = list.indexOfFirst { backgroundWorkId(it) == id }
+            val updated = if (idx < 0) {
+                list + work
+            } else {
+                list.toMutableList().also { it[idx] = work }
+            }
+            state.copy(backgroundWork = updated)
+        }
+    }
+
+    is StateActionChatBackgroundWorkRemoved -> {
+        val list = state.backgroundWork
+        val idx = list?.indexOfFirst { backgroundWorkId(it) == action.value.id } ?: -1
+        if (list == null || idx < 0) {
+            state
+        } else {
+            val next = list.toMutableList()
+            next.removeAt(idx)
+            state.copy(backgroundWork = next)
+        }
+    }
+
+    is StateActionChatMovableChanged ->
+        state.copy(movable = action.value.movable)
+
     is StateActionChatChangesetsChanged ->
         state.copy(changesets = action.value.changesets)
+
+    is StateActionChatCanvasesChanged ->
+        state.copy(canvases = action.value.canvases)
 
     is StateActionChatWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
@@ -1237,6 +1323,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.PENDING_RESULT_CONFIRMATION,
                             confirmed = confirmed,
@@ -1258,6 +1345,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.COMPLETED,
                             confirmed = confirmed,
@@ -1290,6 +1378,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 pastTenseMessage = tc.value.pastTenseMessage,
                                 content = tc.value.content,
                                 structuredContent = tc.value.structuredContent,
+                                resultMetadata = tc.value.resultMetadata,
                                 error = tc.value.error,
                                 status = ToolCallStatus.COMPLETED,
                                 confirmed = tc.value.confirmed,
@@ -1406,7 +1495,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartReasoning) {
-                ResponsePartReasoning(part.value.copy(content = part.value.content + a.content))
+                ResponsePartReasoning(part.value.copy(
+                    content = part.value.content + a.content,
+                    startedAt = a.startedAt ?: part.value.startedAt,
+                    duration = a.duration ?: part.value.duration,
+                ))
             } else {
                 part
             }
@@ -1507,38 +1600,37 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatPendingMessageSet -> {
         val a = action.value
-        val entry = PendingMessage(id = a.id, message = a.message)
-        if (a.kind == PendingMessageKind.STEERING) {
-            state.copy(steeringMessage = entry)
+        val entry = PendingMessage(id = a.id, kind = a.kind, message = a.message)
+        val existing = state.queuedMessages ?: emptyList()
+        val idx = existing.indexOfFirst { it.id == a.id }
+        val next = existing.toMutableList()
+        if (idx < 0) {
+            next.add(entry)
         } else {
-            val existing = state.queuedMessages ?: emptyList()
-            val idx = existing.indexOfFirst { it.id == a.id }
-            val updated = if (idx >= 0) {
-                existing.toMutableList().also { it[idx] = entry }
-            } else {
-                existing + entry
-            }
-            state.copy(queuedMessages = updated)
+            next[idx] = entry
         }
+        val steeringMessage = when {
+            a.kind == PendingMessageKind.STEERING -> entry
+            state.steeringMessage?.id == a.id -> null
+            else -> state.steeringMessage
+        }
+        state.copy(queuedMessages = next, steeringMessage = steeringMessage)
     }
 
     is StateActionChatPendingMessageRemoved -> {
         val a = action.value
-        if (a.kind == PendingMessageKind.STEERING) {
-            val steering = state.steeringMessage
-            if (steering == null || steering.id != a.id) {
-                state
-            } else {
-                state.copy(steeringMessage = null)
-            }
+        var next = state
+        if (a.kind == PendingMessageKind.STEERING && state.steeringMessage?.id == a.id) {
+            next = next.copy(steeringMessage = null)
+        }
+        val existing = state.queuedMessages ?: return@chatReducer next
+        val idx = existing.indexOfFirst { it.id == a.id && (it.kind ?: PendingMessageKind.QUEUED) == a.kind }
+        if (idx < 0) {
+            next
         } else {
-            val existing = state.queuedMessages ?: return@chatReducer state
-            val filtered = existing.filter { it.id != a.id }
-            if (filtered.size == existing.size) {
-                state
-            } else {
-                state.copy(queuedMessages = filtered.ifEmpty { null })
-            }
+            val queuedMessages = existing.toMutableList()
+            queuedMessages.removeAt(idx)
+            next.copy(queuedMessages = queuedMessages.ifEmpty { null })
         }
     }
 
@@ -1564,9 +1656,33 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatDraftChanged -> state.copy(draft = action.value.draft)
 
+    is StateActionChatIsReadChanged -> state.copy(
+        status = withStatusFlag(state.status, SessionStatus.IS_READ, action.value.isRead),
+    )
+
     is StateActionChatIsArchivedChanged -> state.copy(
         status = withStatusFlag(state.status, SessionStatus.IS_ARCHIVED, action.value.isArchived),
     )
+
+    is StateActionChatConfigChanged -> {
+        val a = action.value
+        val current = state.config
+        val newValues = if (a.replace == true || current == null) a.config else current.values + a.config
+        state.copy(config = current?.copy(values = newValues) ?: ChatConfigState(values = newValues))
+    }
+
+    is StateActionChatMoved -> {
+        val a = action.value
+        val current = state.config
+        state.copy(
+            provider = a.provider,
+            config = when {
+                current != null -> current.copy(schema = a.schema)
+                a.schema != null -> ChatConfigState(schema = a.schema, values = emptyMap())
+                else -> null
+            },
+        )
+    }
 
     else -> state
 
@@ -1587,6 +1703,12 @@ private data class CompleteCtx(
     val fromAuthRequired: Boolean = false,
 )
 
+
+/** Pure reducer for live canvas state. */
+public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
+    is StateActionCanvasStateChanged -> action.value.canvas
+    else -> state
+}
 
 // ─── Terminal Reducer ───────────────────────────────────────────────────────
 

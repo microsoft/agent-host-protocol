@@ -1,0 +1,68 @@
+{
+  "name": "config-schema-array-cardinality",
+  "group": "A",
+  "description": "A ConfigPropertySchema of type 'array' carries the JSON Schema cardinality keywords `minItems` and `maxItems` alongside its `items` schema, reaching every client through SessionModelInfo.configSchema on a root/agentsChanged action. Both fields are optional integers, so this pins their presence and value through a decode/re-encode cycle — without it, a per-language serialization regression on the new fields would leave the rest of the corpus green. `minItems: 0` is included deliberately: it must survive rather than being dropped as a falsy default.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/agentsChanged",
+    "agents": [
+      {
+        "provider": "copilot",
+        "displayName": "Copilot",
+        "description": "An agent with an array-valued config property.",
+        "models": [
+          {
+            "id": "model-1",
+            "provider": "copilot",
+            "name": "Model One",
+            "configSchema": {
+              "type": "object",
+              "properties": {
+                "toolsets": {
+                  "type": "array",
+                  "title": "Toolsets",
+                  "description": "At most one toolset may be selected.",
+                  "items": { "type": "string", "title": "Toolset" },
+                  "minItems": 0,
+                  "maxItems": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/agentsChanged",
+      "agents": [
+        {
+          "provider": "copilot",
+          "displayName": "Copilot",
+          "description": "An agent with an array-valued config property.",
+          "models": [
+            {
+              "id": "model-1",
+              "provider": "copilot",
+              "name": "Model One",
+              "configSchema": {
+                "type": "object",
+                "properties": {
+                  "toolsets": {
+                    "type": "array",
+                    "title": "Toolsets",
+                    "description": "At most one toolset may be selected.",
+                    "items": { "type": "string", "title": "Toolset" },
+                    "minItems": 0,
+                    "maxItems": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -90,7 +90,10 @@ internal static class FakeServer
         Assert.NotNull(msg.Request);
         Assert.Equal("initialize", msg.Request!.Method);
 
-        var result = new InitializeResult { ProtocolVersion = ProtocolVersion.Current, Snapshots = new() };
+        var offered = Ser.Deserialize<InitializeParams>(msg.Request.Params!.Value.GetRawText()).ProtocolVersions;
+        var selected = ProtocolVersion.Negotiate(offered)
+            ?? throw new InvalidOperationException("Fake server received no compatible protocol version");
+        var result = new InitializeResult { ProtocolVersion = selected, Snapshots = new() };
         var response = new JsonRpcMessage
         {
             SuccessResponse = new JsonRpcSuccessResponse
@@ -123,7 +126,7 @@ public sealed class ClientTests
         await using var client = AhpClient.Connect(clientSide);
         var result = await client.InitializeAsync("test-client", cancellationToken: cts.Token);
 
-        Assert.Equal(ProtocolVersion.Current, result.ProtocolVersion);
+        Assert.Equal(ProtocolVersion.Supported[0], result.ProtocolVersion);
         await serverTask;
     }
 
@@ -365,7 +368,7 @@ public sealed class ClientTests
         await using var client = AhpClient.Connect(clientSide);
         var result = await client.InitializeAsync("test-client", cancellationToken: cts.Token);
 
-        Assert.Equal(ProtocolVersion.Current, result.ProtocolVersion);
+        Assert.Equal(ProtocolVersion.Supported[0], result.ProtocolVersion);
         // The resolved request left no pending entry behind.
         Assert.Equal(0, client.PendingRequestCount);
         await serverTask;
@@ -548,7 +551,7 @@ public sealed class ClientTests
         // Server replies to `initialize` with a result carrying one snapshot.
         var initResult = new InitializeResult
         {
-            ProtocolVersion = ProtocolVersion.Current,
+            ProtocolVersion = ProtocolVersion.Supported[0],
             ServerSeq = 7,
             Snapshots = new System.Collections.Generic.List<Snapshot>
             {
@@ -572,7 +575,7 @@ public sealed class ClientTests
             initialSubscriptions: new[] { "ahp-session:/s1" },
             cancellationToken: cts.Token);
 
-        Assert.Equal(ProtocolVersion.Current, result.ProtocolVersion);
+        Assert.Equal(ProtocolVersion.Supported[0], result.ProtocolVersion);
         Assert.NotNull(result.Snapshots);
         var snapshot = Assert.Single(result.Snapshots);
         Assert.Equal("ahp-session:/s1", snapshot.Resource);

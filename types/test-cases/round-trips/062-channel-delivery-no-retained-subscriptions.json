@@ -1,0 +1,16 @@
+{
+  "name": "channel-delivery-no-retained-subscriptions",
+  "group": "A",
+  "description": "An empty retained subscription list signals unavailability without detailed failure variants.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": [],
+    "windows": { "items": [] }
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": [],
+    "windows": { "items": [] }
+  }]
+}

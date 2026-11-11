@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Each client exposes the notification methods that do not count against the window on a windowed subscription (`WINDOW_EXEMPT_METHODS` and `countsAgainstWindow` in TypeScript, with equivalents in the other clients), generated from the new `@windowExempt` annotation."
+}

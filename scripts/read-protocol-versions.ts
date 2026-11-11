@@ -27,8 +27,8 @@ export interface ProtocolVersions {
 /**
  * Read the protocol version constants from `types/version/registry.ts`.
  * Throws if the registry source file is not present in `project`, or if
- * either constant is missing, malformed, or violates the ordering
- * invariant. Callers building a partial ts-morph project must include
+ * either constant is missing or has an unexpected shape. Released baselines
+ * may differ from the development version. Callers building a partial project must include
  * `types/version/registry.ts` among the source files.
  */
 export function readProtocolVersions(project: Project): ProtocolVersions {
@@ -63,13 +63,6 @@ export function readProtocolVersions(project: Project): ProtocolVersions {
       'readProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS missing or empty',
     );
   }
-  if (supported[0] !== current) {
-    throw new Error(
-      `readProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS[0] (${supported[0]}) ` +
-        `must equal PROTOCOL_VERSION (${current})`,
-    );
-  }
-
   return { current, supported };
 }
 

@@ -1,0 +1,19 @@
+{
+  "description": "changeset/filesReviewChanged changes only the Viewed flag and preserves the nonce",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "first" }
+    ]
+  },
+  "actions": [
+    { "type": "changeset/filesReviewChanged", "files": ["file:///a.txt"], "reviewed": true }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      { "id": "file:///a.txt", "edit": {}, "nonce": "first", "reviewed": true }
+    ]
+  }
+}

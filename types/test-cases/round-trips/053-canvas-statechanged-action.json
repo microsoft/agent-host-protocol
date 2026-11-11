@@ -1,0 +1,24 @@
+{
+  "name": "canvas-statechanged-action",
+  "group": "A",
+  "description": "The server-authoritative canvas state replacement action preserves its typed state.",
+  "type": "StateAction",
+  "input": {
+    "type": "canvas/stateChanged",
+    "canvas": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "url": "https://example.test/replacement"
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "canvas/stateChanged",
+    "canvas": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "canvasId": "preview",
+      "url": "https://example.test/replacement"
+    }
+  }]
+}

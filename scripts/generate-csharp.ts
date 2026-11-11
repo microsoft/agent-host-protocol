@@ -26,10 +26,15 @@
  *     a generated `UnionConverter<T>` subclass. Unknown discriminator
  *     values surface as a raw `JsonElement` stored in `Value`, preserved
  *     verbatim for loss-free round-trips.
- *   - String enums map wire values via `[WireValue("...")]` + the
- *     hand-written `WireEnumConverter<T>`. Bitset enums (numeric values)
- *     become `[Flags] enum : uint` and serialize as their numeric value
- *     (System.Text.Json default), so unknown future bits round-trip.
+ *   - Closed (`@exhaustive`) string enums map wire values via
+ *     `[WireValue("...")]` + the hand-written `WireEnumConverter<T>`, which
+ *     rejects an unrecognized value because the contract says it is invalid.
+ *     Open (`@nonexhaustive`) string enums instead become a readonly struct
+ *     wrapping the raw wire string, so a value added by a newer protocol
+ *     version is preserved rather than failing the whole message.
+ *     Bitset enums (`@bitset`) become `[Flags] enum : uint` and
+ *     serialize as their numeric value (System.Text.Json default), so
+ *     unknown future bits round-trip.
  */
 
 import {
@@ -41,9 +46,12 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { getDocumentation } from './read-stability.js';
+import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
+import { readWindowExemptMethods } from './read-window-exempt.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -237,6 +245,8 @@ interface CsProp {
   doc: string;
   isLiteralDiscriminant: boolean;
   literalValue?: string;
+  /** Enum member backing a literal discriminant (e.g. `SessionReady`), when there is one. */
+  literalMemberName?: string;
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -246,9 +256,7 @@ function getPropertyType(prop: PropertySignature): string {
 }
 
 function getPropertyDoc(prop: PropertySignature): string {
-  const jsDocs = prop.getJsDocs();
-  if (jsDocs.length === 0) return '';
-  return jsDocs[0].getDescription().trim();
+  return getDocumentation(prop);
 }
 
 function hasFormatFloat(prop: PropertySignature): boolean {
@@ -324,6 +332,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
     const stringLiteral = tsType.match(/^'([^']+)'$/);
     let isLiteralDiscriminant = false;
     let literalValue: string | undefined;
+    let literalMemberName: string | undefined;
 
     const tsPropLower = tsName.toLowerCase();
     if (['type', 'kind', 'status', 'state'].includes(tsPropLower)) {
@@ -336,6 +345,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
           if (mem) {
             isLiteralDiscriminant = true;
             literalValue = String(mem.getValue());
+            literalMemberName = memberName;
           }
         }
       } else if (stringLiteral) {
@@ -366,6 +376,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
       doc: getPropertyDoc(p),
       isLiteralDiscriminant,
       literalValue,
+      literalMemberName,
     });
   }
   return result;
@@ -421,7 +432,7 @@ function escapeXmlDoc(s: string): string {
 function generateStringEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  emitDocComment('', getDocumentation(enumDecl), lines);
   lines.push(`[JsonConverter(typeof(WireEnumConverter<${name}>))]`);
   lines.push(`public enum ${name}`);
   lines.push('{');
@@ -438,15 +449,15 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 }
 
 /**
- * Bitset enum (numeric values): [Flags] enum : uint. System.Text.Json
+ * Numeric enum, with [Flags] when annotated `@bitset`. System.Text.Json
  * serializes enums as their numeric value by default, so unknown future
  * bits round-trip losslessly.
  */
-function generateBitsetEnum(enumDecl: EnumDeclaration): string {
+function generateNumericEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
-  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
-  lines.push('[Flags]');
+  emitDocComment('', getDocumentation(enumDecl), lines);
+  if (isBitsetEnum(enumDecl)) lines.push('[Flags]');
   lines.push(`public enum ${name} : uint`);
   lines.push('{');
   for (const mem of enumDecl.getMembers()) {
@@ -458,10 +469,91 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   return lines.join('\n');
 }
 
+/**
+ * Open ("nonexhaustive") string enum. The protocol contract says later
+ * versions may add wire values, and `versioning.md` requires an older peer to
+ * preserve one it does not recognize instead of failing the whole message. A
+ * closed C# `enum` cannot hold an unrecognized value, so an open enum is
+ * emitted as a readonly struct wrapping the raw wire string, with the known
+ * values as static members:
+ *
+ *   [JsonConverter(typeof(ToolCallStatusConverter))]
+ *   public readonly struct ToolCallStatus : IEquatable<ToolCallStatus>
+ *   { public string Value { get; } public static readonly ToolCallStatus Running = new("running"); ... }
+ *
+ * This mirrors the Kotlin client's `@JvmInline value class … (val rawValue: String)`
+ * and Rust's `Unknown(String)` variant. The per-type converter is generated
+ * (rather than a shared reflective one) so the path stays trimming- and
+ * AOT-safe.
+ */
+function generateOpenStringEnum(enumDecl: EnumDeclaration): string {
+  const name = enumDecl.getName();
+  const lines: string[] = [];
+  emitDocComment('', getDocumentation(enumDecl), lines);
+  lines.push(`[JsonConverter(typeof(${name}Converter))]`);
+  lines.push(`public readonly struct ${name} : IEquatable<${name}>`);
+  lines.push('{');
+  lines.push('    private readonly string? _value;');
+  lines.push('');
+  lines.push(`    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>`);
+  lines.push(`    /// <param name="value">The raw wire string.</param>`);
+  lines.push(`    public ${name}(string value)`);
+  lines.push('    {');
+  lines.push('        _value = value;');
+  lines.push('    }');
+  lines.push('');
+  lines.push('    /// <summary>The raw wire value.</summary>');
+  lines.push('    public string Value => _value ?? string.Empty;');
+  for (const mem of enumDecl.getMembers()) {
+    const memberDoc = mem.getJsDocs()[0]?.getDescription().trim();
+    lines.push('');
+    emitDocComment('    ', memberDoc, lines);
+    const wire = String(mem.getValue());
+    lines.push(`    public static readonly ${name} ${mem.getName()} = new ${name}(${JSON.stringify(wire)});`);
+  }
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public bool Equals(${name} other) => string.Equals(Value, other.Value, StringComparison.Ordinal);`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override bool Equals(object? obj) => obj is ${name} other && Equals(other);`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push('    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);');
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push('    public override string ToString() => Value;');
+  lines.push('');
+  lines.push(`    /// <summary>Ordinal equality over the raw wire value.</summary>`);
+  lines.push(`    public static bool operator ==(${name} left, ${name} right) => left.Equals(right);`);
+  lines.push('');
+  lines.push(`    /// <summary>Ordinal inequality over the raw wire value.</summary>`);
+  lines.push(`    public static bool operator !=(${name} left, ${name} right) => !left.Equals(right);`);
+  lines.push('}');
+  lines.push('');
+  lines.push(`/// <summary>Reads and writes <see cref="${name}"/> as its raw wire string, preserving unrecognized values.</summary>`);
+  lines.push(`internal sealed class ${name}Converter : JsonConverter<${name}>`);
+  lines.push('{');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override ${name} Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)`);
+  lines.push(`        => new ${name}(reader.GetString() ?? throw new JsonException("${name} expects a JSON string."));`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override void Write(Utf8JsonWriter writer, ${name} value, JsonSerializerOptions options)`);
+  lines.push('        => writer.WriteStringValue(value.Value);');
+  lines.push('}');
+  return lines.join('\n');
+}
+
 function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
-  return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
+  if (isNumeric) {
+    return generateNumericEnum(enumDecl);
+  }
+  return isNonexhaustiveEnum(enumDecl)
+    ? generateOpenStringEnum(enumDecl)
+    : generateStringEnum(enumDecl);
 }
 
 // ─── Struct Generation ───────────────────────────────────────────────────────
@@ -504,8 +596,17 @@ function csRequiredModifier(csType: string, optional: boolean): string {
   return csIsRequiredReference(csType, optional) ? 'required ' : '';
 }
 
-function csPropDefault(csType: string, optional: boolean): string {
+function csPropDefault(csType: string, optional: boolean, prop?: CsProp): string {
   if (optional) return '';
+  // A literal discriminant has exactly one valid value, so pin it as the
+  // initializer. Both closed enums and open-enum structs expose the member by
+  // name, so one form covers each. Without this the property falls back to the
+  // type's zero value — the *first* enum member for a closed enum (silently the
+  // wrong discriminator on every record but the first) and an empty wire string
+  // for an open-enum struct.
+  if (prop?.isLiteralDiscriminant && prop.literalMemberName && csIsValueType(csType)) {
+    return ` = ${csType}.${prop.literalMemberName};`;
+  }
   // Required value types get the C# default (matches Go's numeric/bool zero).
   if (csIsValueType(csType)) return '';
   // Required reference types (string, StringOrMarkdown, nested object,
@@ -543,7 +644,7 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
       lines.push('    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]');
       csType = `${csType}?`;
     }
-    const def = csPropDefault(p.csType, p.optional);
+    const def = csPropDefault(p.csType, p.optional, p);
     const req = csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
@@ -561,7 +662,7 @@ function generateClassFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
-  const ifaceDoc = iface.getJsDocs()[0]?.getDescription().trim();
+  const ifaceDoc = getDocumentation(iface);
   return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
 }
 
@@ -589,9 +690,26 @@ interface UnionConfig {
   doc?: string;
   variants: UnionVariant[];
   unknown?: boolean;
+  /**
+   * Discriminator enum to read the compatibility annotation from, when it
+   * cannot be resolved from the variant interfaces (e.g. hand-written
+   * variants that don't carry a typed discriminator property).
+   */
+  discriminatorEnum?: string;
 }
 
-function generateDiscriminatedUnion(cfg: UnionConfig): string {
+function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string {
+  // Whether an unrecognized discriminator must be preserved is a property of
+  // the discriminator enum's `@exhaustive` / `@nonexhaustive` annotation, not
+  // of this config — deriving it (as every other generator does) keeps the
+  // union's forward compatibility in lockstep with the protocol declaration.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    cfg.discriminantField,
+    cfg.variants.map((variant) => variant.innerType),
+    cfg.unknown,
+    cfg.discriminatorEnum,
+  );
   const lines: string[] = [];
   emitDocComment('', cfg.doc, lines);
   lines.push(`[JsonConverter(typeof(${cfg.name}Converter))]`);
@@ -621,7 +739,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
   lines.push('            {');
   lines.push(entries);
   lines.push('            },');
-  lines.push(`            allowUnknown: ${cfg.unknown ? 'true' : 'false'})`);
+  lines.push(`            allowUnknown: ${allowUnknown ? 'true' : 'false'})`);
   lines.push('    {');
   lines.push('    }');
   lines.push('}');
@@ -631,6 +749,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
@@ -642,6 +761,7 @@ const STATE_ENUMS = [
   'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'TerminalLifecycleStatus',
+  'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
@@ -652,6 +772,9 @@ const STATE_ENUMS = [
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+  { name: 'TcpConnectionsCapability' },
+  { name: 'ChannelReceiveLimits' },
+  { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState', mutable: true },
@@ -667,7 +790,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'ConfigSchema' },
   { name: 'PendingMessage' },
   { name: 'ChatSummary', mutable: true },
+  { name: 'BackgroundShellWork' },
+  { name: 'BackgroundSubagentWork' },
   { name: 'ChatState', mutable: true },
+  { name: 'CanvasReference' },
+  { name: 'CanvasState', mutable: true },
   { name: 'ChatInputOption' },
   { name: 'ChatInputTextQuestion' },
   { name: 'ChatInputNumberQuestion' },
@@ -695,6 +822,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigPropertySchema' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
+  { name: 'ChatConfigState', mutable: true },
   { name: 'Turn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },
@@ -773,6 +901,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'UsageInfo' },
   { name: 'ErrorInfo' },
   { name: 'Snapshot' },
+  { name: 'EmptyState' },
   { name: 'Changeset' },
   { name: 'ChangesetCapabilities' },
   { name: 'ChangesetState', mutable: true },
@@ -937,7 +1066,17 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
     }
 }`;
 
-const CHAT_ORIGIN_UNION_CS = `/// <summary>
+function generateChatOriginUnionCs(project: Project): string {
+  // Variants are generated separately from this hand-written block, so name the
+  // discriminator enum explicitly rather than resolving it from them.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'ChatOriginKind',
+  );
+  return `/// <summary>
 /// ChatOrigin describes how a chat came into existence.
 /// </summary>
 [JsonConverter(typeof(ChatOriginConverter))]
@@ -1004,10 +1143,11 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
                 ["sideChat"] = typeof(ChatOriginSideChat),
                 ["tool"] = typeof(ChatOriginTool),
             },
-            allowUnknown: true)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
+}
 
 const CHAT_INPUT_QUESTION_UNION: UnionConfig = {
   name: 'ChatInputQuestion',
@@ -1157,6 +1297,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const BACKGROUND_WORK_UNION: UnionConfig = {
+  name: 'BackgroundWork',
+  discriminantField: 'kind',
+  doc: 'Work that keeps running after the tool call that started it returns and will resume the owning chat when it finishes.',
+  variants: [
+    { variantName: 'Shell', innerType: 'BackgroundShellWork', wireValue: 'shell' },
+    { variantName: 'Subagent', innerType: 'BackgroundSubagentWork', wireValue: 'subagent' },
+  ],
+  unknown: true,
+};
+
 const TERMINAL_LIFECYCLE_STATE_UNION: UnionConfig = {
   name: 'TerminalLifecycleState',
   discriminantField: 'status',
@@ -1219,7 +1370,17 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
-const CUSTOMIZATION_ENABLEMENT_UNION_CS = `/// <summary>A single explicit customization enablement decision.</summary>
+function generateCustomizationEnablementUnionCs(project: Project): string {
+  // Variants are inline object types in `types/`, so there are no named
+  // interfaces to read the discriminator from — name the enum explicitly.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'CustomizationEnablementKind',
+  );
+  return `/// <summary>A single explicit customization enablement decision.</summary>
 [JsonConverter(typeof(CustomizationEnablementConverter))]
 public sealed class CustomizationEnablement : AhpUnion
 {
@@ -1257,22 +1418,27 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
                 ["workspace"] = typeof(CustomizationEnablementWorkspace),
                 ["session"] = typeof(CustomizationEnablementSession),
             },
-            allowUnknown: false)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
+}
 
 function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
+  /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
+    /// <summary>Empty state variant, when populated.</summary>
+    public EmptyState? Empty { get; set; }
+
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
 
@@ -1281,6 +1447,9 @@ public sealed class SnapshotState
 
     /// <summary>Chat state variant, when populated.</summary>
     public ChatState? Chat { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 
     /// <summary>Terminal state variant, when populated.</summary>
     public TerminalState? Terminal { get; set; }
@@ -1299,6 +1468,12 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>
+    /// A state that this version does not recognize, such as the state of a channel
+    /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
+    /// </summary>
+    public JsonElement? Unknown { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -1309,7 +1484,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        var members = root.EnumerateObject();
+        if (!members.MoveNext())
+        {
+            result.Empty = new EmptyState();
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1330,6 +1510,12 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
             // session state was flattened.)
             result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
         }
+        else if (root.TryGetProperty("instanceId", out _) &&
+            root.TryGetProperty("extensionId", out _) &&
+            root.TryGetProperty("canvasId", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
         else if (root.TryGetProperty("content", out _))
         {
             result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
@@ -1346,24 +1532,32 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
         }
-        else
+        else if (root.TryGetProperty("agents", out _))
         {
             result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
+        }
+        else
+        {
+            // A state from a later protocol version: keep it rather than fail.
+            result.Unknown = root.Clone();
         }
         return result;
     }
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, AhpJsonTypeInfo.Get<ResourceWatchState>(options)); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, AhpJsonTypeInfo.Get<AnnotationsState>(options)); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, AhpJsonTypeInfo.Get<RootState>(options)); return; }
+        if (value.Unknown is { } unknown) { unknown.WriteTo(writer); return; }
         writer.WriteNullValue();
     }
 }`;
@@ -1398,7 +1592,7 @@ function generateStateFile(project: Project): string {
   }
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
-  lines.push(CUSTOMIZATION_ENABLEMENT_UNION_CS);
+  lines.push(generateCustomizationEnablementUnionCs(project));
   lines.push('');
   for (const u of [
     RESPONSE_PART_UNION, TOOL_CALL_STATE_UNION, TOOL_CALL_CONFIRMATION_STATE_UNION,
@@ -1407,15 +1601,15 @@ function generateStateFile(project: Project): string {
     CHAT_INPUT_QUESTION_UNION, CHAT_INPUT_ANSWER_VALUE_UNION, CHAT_INPUT_ANSWER_UNION,
     TOOL_RESULT_CONTENT_UNION, MESSAGE_ATTACHMENT_UNION, CUSTOMIZATION_UNION,
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
-    MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION,
+    MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
-    lines.push(generateDiscriminatedUnion(u));
+    lines.push(generateDiscriminatedUnion(project, u));
     lines.push('');
   }
-  lines.push(CHAT_ORIGIN_UNION_CS);
+  lines.push(generateChatOriginUnionCs(project));
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
   lines.push('');
@@ -1482,6 +1676,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
   { type: 'session/chatRemoved', variantName: 'SessionChatRemoved', tsInterface: 'SessionChatRemovedAction' },
   { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
+  { type: 'session/chatsReordered', variantName: 'SessionChatsReordered', tsInterface: 'SessionChatsReorderedAction' },
   { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
   { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
@@ -1500,7 +1695,12 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundWorkSet', variantName: 'ChatBackgroundWorkSet', tsInterface: 'ChatBackgroundWorkSetAction' },
+  { type: 'chat/backgroundWorkRemoved', variantName: 'ChatBackgroundWorkRemoved', tsInterface: 'ChatBackgroundWorkRemovedAction' },
+  { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
+  { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1511,7 +1711,10 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
+  { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', variantName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1559,7 +1762,7 @@ function generateMergedToolCallConfirmedClass(): string {
 /// </summary>
 public sealed record SessionToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallConfirmed");
 
     public required string TurnId { get; init; }
 
@@ -1599,7 +1802,7 @@ function generateMergedChatToolCallConfirmedClass(): string {
 /// </summary>
 public sealed record ChatToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallConfirmed;
 
     public required string TurnId { get; init; }
 
@@ -1644,7 +1847,7 @@ function generateSessionTruncatedActionClass(): string {
 /// \`session/turnStarted\` with an edited message.</summary>
 public sealed record SessionTruncatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/truncated");
 
     /// <summary>Keep turns up to and including this turn. Omit to clear all turns.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1681,7 +1884,7 @@ public sealed record SessionToolCallContentChangedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallContentChanged");
 
     /// <summary>The current partial content for the running tool call</summary>
     public required List<ToolResultContent> Content { get; init; }
@@ -1694,7 +1897,7 @@ public sealed record SessionToolCallContentChangedAction
 // Keep in ACTION_VARIANTS order so the generated union matches.
 const SESSION_ACTION_TYPES_CS = `public sealed record SessionTurnStartedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnStarted");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1713,7 +1916,7 @@ const SESSION_ACTION_TYPES_CS = `public sealed record SessionTurnStartedAction
 /// part (markdown or reasoning), then use this action to append text to it.</summary>
 public sealed record SessionDeltaAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/delta");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1728,7 +1931,7 @@ public sealed record SessionDeltaAction
 /// <summary>Structured content appended to the response.</summary>
 public sealed record SessionResponsePartAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/responsePart");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1750,7 +1953,7 @@ public sealed record SessionToolCallStartAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallStart");
 
     /// <summary>Internal tool name (for debugging/logging)</summary>
     public required string ToolName { get; init; }
@@ -1776,7 +1979,7 @@ public sealed record SessionToolCallDeltaAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallDelta");
 
     /// <summary>Partial parameter content to append</summary>
     public required string Content { get; init; }
@@ -1799,7 +2002,7 @@ public sealed record SessionToolCallReadyAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallReady");
 
     /// <summary>Message describing what the tool will do or what confirmation is needed</summary>
     public required StringOrMarkdown InvocationMessage { get; init; }
@@ -1842,7 +2045,7 @@ public sealed record SessionToolCallCompleteAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallComplete");
 
     /// <summary>Execution result</summary>
     public required ToolCallResult Result { get; init; }
@@ -1865,7 +2068,7 @@ public sealed record SessionToolCallResultConfirmedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallResultConfirmed");
 
     /// <summary>Whether the result was approved</summary>
     public bool Approved { get; init; }
@@ -1874,7 +2077,7 @@ public sealed record SessionToolCallResultConfirmedAction
 /// <summary>Turn finished — the assistant is idle.</summary>
 public sealed record SessionTurnCompleteAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnComplete");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1883,7 +2086,7 @@ public sealed record SessionTurnCompleteAction
 /// <summary>Turn was aborted; server stops processing.</summary>
 public sealed record SessionTurnCancelledAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnCancelled");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1892,7 +2095,7 @@ public sealed record SessionTurnCancelledAction
 /// <summary>Error during turn processing.</summary>
 public sealed record SessionErrorAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/error");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1904,7 +2107,7 @@ public sealed record SessionErrorAction
 /// <summary>Token usage report for a turn.</summary>
 public sealed record SessionUsageAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/usage");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1916,7 +2119,7 @@ public sealed record SessionUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.</summary>
 public sealed record SessionReasoningAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/reasoning");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1931,7 +2134,7 @@ public sealed record SessionReasoningAction
 /// <summary>A pending message was set (upsert semantics: creates or replaces).</summary>
 public sealed record SessionPendingMessageSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageSet");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -1946,7 +2149,7 @@ public sealed record SessionPendingMessageSetAction
 /// <summary>A pending message was removed (steering or queued).</summary>
 public sealed record SessionPendingMessageRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageRemoved");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -1958,7 +2161,7 @@ public sealed record SessionPendingMessageRemovedAction
 /// <summary>Reorder the queued messages.</summary>
 public sealed record SessionQueuedMessagesReorderedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/queuedMessagesReordered");
 
     /// <summary>Queued message IDs in the desired order</summary>
     public required List<string> Order { get; init; }
@@ -1988,7 +2191,7 @@ public sealed record ActionEnvelope
 }`;
 }
 
-function generateActionsUnion(): string {
+function generateActionsUnion(project: Project): string {
   const cfg: UnionConfig = {
     name: 'StateAction',
     discriminantField: 'type',
@@ -2004,8 +2207,11 @@ function generateActionsUnion(): string {
       wireValue: v.type,
     })),
     unknown: true,
+    // Several variants are synthesized or hand-written, so they carry no
+    // resolvable `type` property — read the annotation from ActionType itself.
+    discriminatorEnum: 'ActionType',
   };
-  return generateDiscriminatedUnion(cfg);
+  return generateDiscriminatedUnion(project, cfg);
 }
 
 function generateActionsFile(project: Project): string {
@@ -2084,7 +2290,7 @@ function generateActionsFile(project: Project): string {
   }
 
   lines.push('// ─── StateAction Union ───────────────────────────────────────────────\n');
-  lines.push(generateActionsUnion());
+  lines.push(generateActionsUnion(project));
   lines.push('');
 
   return lines.join('\n');
@@ -2092,9 +2298,10 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
+  { name: 'CreateTcpConnectionParams' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
@@ -2105,7 +2312,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
+  { name: 'AutomationCustomizationsCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
+  { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
+  { name: 'ChannelDeliveryResumeResult' }, { name: 'SubscriptionFlowControlOptions' },
   // Union variants MUST self-carry their `type` discriminator: UnionConverter<T>.Write
   // serializes the inner value by its runtime type and relies on that property to
   // emit the discriminator (matching ACTION_VARIANTS' includeDiscriminants). Omitting
@@ -2121,6 +2332,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ForkChatSource' }, { name: 'SideChatSource' },
   { name: 'CreateChatParams' },
   { name: 'DisposeChatParams' },
+  { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -2135,6 +2347,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
+  { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -2158,6 +2371,25 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   ],
 };
 
+const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
+  name: 'ChatMoveDestination',
+  discriminantField: 'kind',
+  unknown: true,
+  variants: [
+    { variantName: 'Session', innerType: 'ChatMoveToSessionDestination', wireValue: 'session' },
+    { variantName: 'NewSession', innerType: 'ChatMoveToNewSessionDestination', wireValue: 'newSession' },
+  ],
+};
+
+const AUTHENTICATE_TARGET_UNION: UnionConfig = {
+  name: 'AuthenticateTarget',
+  discriminantField: 'kind',
+  doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
+  variants: [
+    { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
+  ],
+};
+
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
   discriminantField: 'type',
@@ -2168,7 +2400,14 @@ const RECONNECT_RESULT_UNION: UnionConfig = {
   ],
 };
 
-function generateChangesetOperationTargetCs(): string {
+function generateChangesetOperationTargetCs(project: Project): string {
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'ChangesetOperationTargetKind',
+  );
   return `/// <summary>
 /// ChangesetOperationTarget identifies the file or range a
 /// ChangesetOperation should act on.
@@ -2189,6 +2428,9 @@ public sealed record ChangesetOperationResourceTarget
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Side { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>Targets a range within a resource.</summary>
@@ -2202,6 +2444,9 @@ public sealed record ChangesetOperationRangeTarget
     public string? Side { get; init; }
 
     public required TextRange Range { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Nonce { get; init; }
 }
 
 /// <summary>System.Text.Json converter for the ChangesetOperationTarget union.</summary>
@@ -2215,7 +2460,7 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
                 ["resource"] = typeof(ChangesetOperationResourceTarget),
                 ["range"] = typeof(ChangesetOperationRangeTarget),
             },
-            allowUnknown: false)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
@@ -2251,13 +2496,18 @@ function generateCommandsFile(project: Project): string {
     }
   }
 
+  lines.push('// ─── AuthenticateTarget Union ─────────────────────────────────────────\n');
+  lines.push(generateDiscriminatedUnion(project, AUTHENTICATE_TARGET_UNION));
+  lines.push('');
+
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(RECONNECT_RESULT_UNION));
-  lines.push(generateDiscriminatedUnion(CHAT_SOURCE_UNION));
+  lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
+  lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
+  lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
   lines.push('');
 
   lines.push('// ─── Changeset Operation Unions ───────────────────────────────────────\n');
-  lines.push(generateChangesetOperationTargetCs());
+  lines.push(generateChangesetOperationTargetCs(project));
   lines.push('');
 
   return lines.join('\n');
@@ -2268,6 +2518,9 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
+  'TcpDataParams', 'TcpEofParams', 'TcpResetParams',
+  'ChannelFrameParams', 'ChannelCreditParams',
+  'ChannelSnapshotParams',
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
@@ -2317,7 +2570,36 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  lines.push(generateWindowExemptCSharp(project));
+
   return lines.join('\n');
+}
+
+function generateWindowExemptCSharp(project: Project): string {
+  const methods = readWindowExemptMethods(project).map((m) => `        ${JSON.stringify(m)},`).join('\n');
+  return `// ─── Windowed Delivery ────────────────────────────────────────────────
+
+/// <summary>Which notifications count against the window on a windowed subscription.</summary>
+public static class WindowedDelivery
+{
+    private static readonly HashSet<string> s_exemptMethods = new(StringComparer.Ordinal)
+    {
+${methods}
+    };
+
+    /// <summary>
+    /// Notification methods that do not count against the window on a windowed
+    /// subscription. Every other notification for a subscription counts.
+    /// </summary>
+    public static IReadOnlyCollection<string> ExemptMethods => s_exemptMethods;
+
+    /// <summary>
+    /// Whether a notification with this method counts against the window on a
+    /// windowed subscription. Methods that are not recognized count.
+    /// </summary>
+    public static bool CountsAgainstWindow(string method) => !s_exemptMethods.Contains(method);
+}
+`;
 }
 
 // ─── Errors File Generator ───────────────────────────────────────────────────
@@ -2524,10 +2806,60 @@ ${supportedLiteral}
 
     /// <summary>
     /// Every protocol version this client is willing to negotiate, ordered
-    /// most-preferred-first. The first entry always equals <see cref="Current"/>.
+    /// most-preferred-first, independently of the development <see cref="Current"/>.
     /// A fresh copy is returned on every call so callers may mutate it freely.
     /// </summary>
     public static IReadOnlyList<string> Supported => (string[])s_supported.Clone();
+
+    /// <summary>
+    /// Selects the highest offered version in a supported caret range.
+    /// Null means the host must send UnsupportedProtocolVersion and close.
+    /// Malformed versions throw ArgumentException.
+    /// </summary>
+    public static string? Negotiate(IEnumerable<string> offered)
+    {
+        Guard.ThrowIfNull(offered, nameof(offered));
+        static long[] Parse(string version)
+        {
+            if (version is null || !System.Text.RegularExpressions.Regex.IsMatch(
+                version, @"\\A(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\z"))
+                throw new ArgumentException($"Invalid protocol version: {version}", nameof(version));
+            var parts = version.Split('.');
+            var values = new long[3];
+            for (var i = 0; i < 3; i++)
+            {
+                if (!long.TryParse(parts[i], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out values[i]))
+                    throw new ArgumentException($"Invalid protocol version: {version}", nameof(version));
+            }
+            return values;
+        }
+        static int Compare(long[] a, long[] b)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var comparison = a[i].CompareTo(b[i]);
+                if (comparison != 0) return comparison;
+            }
+            return 0;
+        }
+        var baselines = new List<long[]>();
+        foreach (var baseline in s_supported) baselines.Add(Parse(baseline));
+        string? selected = null;
+        long[]? previous = null;
+        foreach (var version in offered)
+        {
+            var parts = Parse(version);
+            if (baselines.Exists(b => parts[0] == b[0] && (parts[0] > 0 || parts[1] == b[1])
+                && (parts[0] > 0 || parts[1] > 0 || parts[2] == b[2]) && Compare(parts, b) >= 0)
+                && (previous is null || Compare(parts, previous) > 0))
+            {
+                selected = version;
+                previous = parts;
+            }
+        }
+        return selected;
+    }
 
     /// <summary>The well-known channel URI for the root channel.</summary>
     public const string RootResourceUri = "ahp-root://";
@@ -2572,6 +2904,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AuthenticateTarget',
     'URI', 'JsonPrimitive', 'BaseParams', 'StringOrMarkdown', 'ToolCallState', 'StateAction',
     'ActionEnvelope', 'ActionOrigin', 'ResponsePart', 'ToolResultContent',
     'SessionToolCallApprovedAction', 'SessionToolCallDeniedAction',
@@ -2582,7 +2915,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
-    'SessionInputRequest', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
+    'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
@@ -2592,7 +2925,7 @@ function checkExhaustiveness(project: Project): void {
     // (TOOL_INPUT_UNION_CS), not through the discriminated-union list.
     'ToolInput',
     'ChatToolCallConfirmedAction', 'ChatToolCallApprovedAction', 'ChatToolCallDeniedAction',
-    'ChatSource', 'ChatAction',
+    'ChatSource', 'ChatMoveDestination', 'ChatAction',
     // SessionMetadata is the shared base interface whose fields are denormalized
     // (inlined) into both SessionState and SessionSummary; it has no standalone
     // C# record by design.
@@ -2735,11 +3068,23 @@ function generateReducerMetadata(project: Project): string {
   if (!actionTypeEnum) {
     throw new Error('ActionType enum not found');
   }
+  const actionTypeIsOpen = isNonexhaustiveEnum(actionTypeEnum);
   const wireCases = actionTypeEnum.getMembers()
     .map((member) => [member.getName(), String(member.getValue())] as const)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, wire]) => `            ActionType.${name} => ${JSON.stringify(wire)},`)
     .join('\n');
+
+  // An open ActionType already carries the wire string, so the lookup is the
+  // identity — and it stays correct for a value this build does not know.
+  const getWireName = actionTypeIsOpen
+    ? `    public static string GetWireName(ActionType actionType) => actionType.Value;`
+    : `    public static string GetWireName(ActionType actionType) =>
+        actionType switch
+        {
+${wireCases}
+            _ => throw new ArgumentOutOfRangeException(nameof(actionType)),
+        };`;
 
   return `${fileHeader()}
 internal static class GeneratedActionMetadata
@@ -2755,12 +3100,7 @@ ${cases}
         }
     }
 
-    public static string GetWireName(ActionType actionType) =>
-        actionType switch
-        {
-${wireCases}
-            _ => throw new ArgumentOutOfRangeException(nameof(actionType)),
-        };
+${getWireName}
 }
 `;
 }

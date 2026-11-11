@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `ToolCallResult.resultMetadata` carries MCP `CallToolResult._meta` separately from host/provider tool-call metadata and is preserved through result confirmation."
+}

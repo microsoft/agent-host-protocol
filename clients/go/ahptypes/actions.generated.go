@@ -26,6 +26,7 @@ const (
 	ActionTypeSessionChatAdded                    ActionType = "session/chatAdded"
 	ActionTypeSessionChatRemoved                  ActionType = "session/chatRemoved"
 	ActionTypeSessionChatUpdated                  ActionType = "session/chatUpdated"
+	ActionTypeSessionChatsReordered               ActionType = "session/chatsReordered"
 	ActionTypeSessionDefaultChatChanged           ActionType = "session/defaultChatChanged"
 	ActionTypeChatTurnStarted                     ActionType = "chat/turnStarted"
 	ActionTypeChatDelta                           ActionType = "chat/delta"
@@ -44,7 +45,12 @@ const (
 	ActionTypeChatError                           ActionType = "chat/error"
 	ActionTypeChatTurnResume                      ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                 ActionType = "chat/activityChanged"
+	ActionTypeChatBackgroundWorkSet               ActionType = "chat/backgroundWorkSet"
+	ActionTypeChatBackgroundWorkRemoved           ActionType = "chat/backgroundWorkRemoved"
+	ActionTypeChatMovableChanged                  ActionType = "chat/movableChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
+	ActionTypeChatCanvasesChanged                 ActionType = "chat/canvasesChanged"
+	ActionTypeCanvasStateChanged                  ActionType = "canvas/stateChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
 	ActionTypeSessionTitleChanged                 ActionType = "session/titleChanged"
@@ -62,7 +68,10 @@ const (
 	ActionTypeChatPendingMessageRemoved           ActionType = "chat/pendingMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered         ActionType = "chat/queuedMessagesReordered"
 	ActionTypeChatDraftChanged                    ActionType = "chat/draftChanged"
+	ActionTypeChatIsReadChanged                   ActionType = "chat/isReadChanged"
 	ActionTypeChatIsArchivedChanged               ActionType = "chat/isArchivedChanged"
+	ActionTypeChatConfigChanged                   ActionType = "chat/configChanged"
+	ActionTypeChatMoved                           ActionType = "chat/moved"
 	ActionTypeChatInputRequested                  ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged              ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                  ActionType = "chat/inputCompleted"
@@ -207,15 +216,31 @@ type SessionChatRemovedAction struct {
 // SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
 //
 // Mirrors the root-channel `root/sessionSummaryChanged` notification.
+// When `changes.status` changes, the host MUST project that exact value into
+// the matching `SessionChatSummary.status` field and publish
+// the updated compact chat catalog through `root/sessionSummaryChanged`.
 type SessionChatUpdatedAction struct {
 	Type ActionType `json:"type"`
 	// The URI of the chat whose summary changed.
 	Chat URI `json:"chat"`
 	// Mutable summary fields that changed; omitted fields are unchanged.
 	//
-	// Identity fields (`resource`) never change and MUST be omitted by
+	// Identity fields (`resource`, `provider`) never change and MUST be omitted by
 	// senders; receivers SHOULD ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
+}
+
+// The owning session's authoritative chat catalog order changed.
+//
+// Host-emitted convergence signal; it never originates from a client
+// dispatch. `chats` is the complete resulting order and MUST contain every
+// chat currently in the session exactly once. Reducers replace the catalog
+// order while preserving each matching summary. Invalid or incomplete orders
+// are ignored.
+type SessionChatsReorderedAction struct {
+	Type ActionType `json:"type"`
+	// Every chat URI in authoritative catalog order.
+	Chats []URI `json:"chats"`
 }
 
 // The default chat input-routing hint for this session changed.
@@ -226,8 +251,6 @@ type SessionDefaultChatChangedAction struct {
 }
 
 // A new message has been sent to the agent, and a new turn starts.
-//
-// A client is only allowed to send {@link MessageKind.User} messages.
 type ChatTurnStartedAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
@@ -236,7 +259,8 @@ type ChatTurnStartedAction struct {
 	StartedAt string `json:"startedAt"`
 	// The new message
 	Message Message `json:"message"`
-	// If this turn was auto-started from a queued message, the ID of that message
+	// If this turn consumes a pending message, its ID. Removes the matching
+	// entry from {@link ChatState.queuedMessages}.
 	QueuedMessageId *string `json:"queuedMessageId,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
@@ -644,6 +668,34 @@ type ChatActivityChangedAction struct {
 	Activity *string `json:"activity,omitempty"`
 }
 
+// Adds or replaces a {@link BackgroundWork} entry by `id`, independently of turn
+// state.
+type ChatBackgroundWorkSetAction struct {
+	Type ActionType `json:"type"`
+	// The complete entry.
+	Work BackgroundWork `json:"work"`
+}
+
+// Removes finished or no-longer-tracked background work; unknown IDs are a no-op.
+type ChatBackgroundWorkRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The {@link BackgroundWorkBase.id | id} of the entry to remove.
+	Id string `json:"id"`
+}
+
+// Whether this chat is structurally eligible to be the source of `moveChat`
+// changed.
+//
+// The host is authoritative and MUST also update the owning session's chat
+// catalog with `session/chatUpdated` so `ChatSummary.movable` stays in sync.
+// A chat referenced by its owning session's `defaultChat` MUST always carry
+// `movable: false`.
+type ChatMovableChangedAction struct {
+	Type ActionType `json:"type"`
+	// Whether this chat is structurally eligible to be moved.
+	Movable bool `json:"movable"`
+}
+
 // The {@link Changeset | catalogue of changesets} the agent host advertises
 // for this chat changed. Replaces
 // {@link ChatState.changesets | `state.changesets`} entirely
@@ -657,6 +709,27 @@ type ChatChangesetsChangedAction struct {
 	Type ActionType `json:"type"`
 	// New catalogue, or `undefined` to clear it.
 	Changesets []Changeset `json:"changesets,omitempty"`
+}
+
+// The live canvas channels exposed by this chat changed.
+//
+// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+// `undefined` to clear the collection.
+type ChatCanvasesChangedAction struct {
+	Type ActionType `json:"type"`
+	// New canvas channel references, or `undefined` to clear the collection.
+	Canvases []CanvasReference `json:"canvases,omitempty"`
+}
+
+// The presentation state for this canvas changed.
+//
+// Replaces the subscribed canvas channel state entirely. Full-replacement
+// semantics intentionally keep this early-development channel free to evolve
+// without expanding the stable chat action surface.
+type CanvasStateChangedAction struct {
+	Type ActionType `json:"type"`
+	// New authoritative canvas state.
+	Canvas CanvasState `json:"canvas"`
 }
 
 // Session title updated. Fired by the server when the title is auto-generated
@@ -687,7 +760,8 @@ type ChatUsageAction struct {
 // Reasoning/thinking text from the model, appended to a specific reasoning response part.
 //
 // The server MUST first emit a `chat/responsePart` to create the target
-// reasoning part, then use this action to append text to it.
+// reasoning part, then use this action to append text or record its timing.
+// An empty `content` updates only the supplied timing fields.
 type ChatReasoningAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
@@ -696,6 +770,10 @@ type ChatReasoningAction struct {
 	PartId string `json:"partId"`
 	// Reasoning text chunk
 	Content string `json:"content"`
+	// Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+	StartedAt *string `json:"startedAt,omitempty"`
+	// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+	Duration *int64 `json:"duration,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -708,13 +786,12 @@ type ChatReasoningAction struct {
 
 // A pending message was set (upsert semantics: creates or replaces).
 //
-// For steering messages, this always replaces the single steering message.
-// For queued messages, if a message with the given `id` already exists it is
-// updated in place; otherwise it is appended to the queue. If the chat is
-// idle when a queued message is set, the server SHOULD immediately consume it
-// and start a new turn.
+// Both kinds are stored in {@link ChatState.queuedMessages}, including this
+// action's `kind`. A new `id` appends an entry; an existing `id` replaces its
+// message and kind in place.
 //
-// A client is only allowed to send {@link MessageKind.User} messages.
+// If the chat is idle when a queued message is set, the server SHOULD
+// immediately consume it and start a new turn.
 type ChatPendingMessageSetAction struct {
 	Type ActionType `json:"type"`
 	// Whether this is a steering or queued message
@@ -730,6 +807,10 @@ type ChatPendingMessageSetAction struct {
 // Dispatched by clients to cancel a pending message, or by the server when
 // it consumes a message (e.g. starting a turn from a queued message or
 // injecting a steering message into the current turn).
+//
+// Removes an entry from {@link ChatState.queuedMessages} only when both `id`
+// and effective kind match. Unknown IDs and mismatched kinds are
+// no-ops.
 type ChatPendingMessageRemovedAction struct {
 	Type ActionType `json:"type"`
 	// Whether this is a steering or queued message
@@ -738,16 +819,17 @@ type ChatPendingMessageRemovedAction struct {
 	Id string `json:"id"`
 }
 
-// Reorder the queued messages.
+// Reorder the entire shared {@link ChatState.queuedMessages} list.
 //
-// The `order` array contains the IDs of queued messages in their new
-// desired order. IDs not present in the current queue are ignored.
-// Queued messages whose IDs are absent from `order` are appended at
+// The `order` array contains pending message IDs of either kind in their new
+// desired raw order. Unknown and duplicate IDs are ignored.
+// Messages whose IDs are absent from `order` are appended at
 // the end in their original relative order (so a client with a stale
-// view of the queue never silently drops messages).
+// view of the list never silently drops messages). UIs SHOULD still group
+// steering messages first, independently of this raw order.
 type ChatQueuedMessagesReorderedAction struct {
 	Type ActionType `json:"type"`
-	// Queued message IDs in the desired order
+	// Pending message IDs in the desired raw order
 	Order []string `json:"order"`
 }
 
@@ -768,6 +850,21 @@ type ChatDraftChangedAction struct {
 	Draft *Message `json:"draft,omitempty"`
 }
 
+// The read state of the chat changed.
+//
+// Dispatched by a client to mark any known chat, including the owning
+// session's default chat, as read (e.g. after viewing it) or unread. This
+// changes only the addressed chat; it does not change the read state of its
+// owning session or sibling chats. Use `session/isReadChanged` only to change
+// the owning session's independent read state. After accepting this action,
+// the host also synchronizes the addressed chat's `ChatSummary.status` and
+// `SessionChatSummary.status` projections.
+type ChatIsReadChangedAction struct {
+	Type ActionType `json:"type"`
+	// Whether the chat has been read
+	IsRead bool `json:"isRead"`
+}
+
 // The archived state of the chat changed.
 //
 // Dispatched by a client to archive a chat independently of its owning
@@ -777,6 +874,40 @@ type ChatIsArchivedChangedAction struct {
 	Type ActionType `json:"type"`
 	// Whether the chat is archived
 	IsArchived bool `json:"isArchived"`
+}
+
+// Config values set on a chat changed.
+//
+// Merges `config` into the chat's
+// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+// `replace` is `true`; keys missing after a replace take their property's
+// `default`. Only properties with `chatMutable: true` in
+// the effective schema may be set.
+type ChatConfigChangedAction struct {
+	Type ActionType `json:"type"`
+	// Config values to set on the chat
+	Config map[string]json.RawMessage `json:"config"`
+	// When `true`, replaces the chat's config values instead of merging
+	Replace *bool `json:"replace,omitempty"`
+}
+
+// The chat moved to another session.
+//
+// Dispatched by the host on the moved chat's channel after a cross-session
+// `moveChat`. `provider` and `schema` are the chat's
+// {@link ChatState.provider | `provider`} and
+// {@link ChatConfigState.schema | `config.schema`} relative to the new
+// session; absent clears them. `ChatState` has no session field, so the
+// reducer does not store `session`; it tells subscribers which session now
+// owns the chat.
+type ChatMovedAction struct {
+	Type ActionType `json:"type"`
+	// The new owning session URI.
+	Session URI `json:"session"`
+	// The chat's provider in the new session; absent clears it.
+	Provider *string `json:"provider,omitempty"`
+	// The chat's config schema in the new session; absent clears it.
+	Schema *SessionConfigSchema `json:"schema,omitempty"`
 }
 
 // A session requested input from the user.
@@ -1070,8 +1201,9 @@ type SessionCustomizationsChangedAction struct {
 //
 // Matches `id` against every top-level customization first — a plugin or
 // directory container, or a bare top-level MCP server — then against the
-// children inside each container (a skill, agent, or other entry). Plugins
-// and MCP servers retain the matched entry's explicit decisions; other
+// children inside each container (a skill, agent, or other entry), including
+// skills served by top-level or container-child MCP servers. Plugins and
+// MCP servers retain the matched entry's explicit decisions; other
 // entries update their `enabled` flag. Disabling a plugin still disables all
 // of its children — the effective state of a plugin child is the plugin's
 // derived enabled value and `(child.enabled ?? true)` — so toggling a child
@@ -1267,8 +1399,9 @@ type ChangesetFileRemovedAction struct {
 // Targets files by their {@link ChangesetFile.id}. Ids in {@link files} that
 // do not match a file currently present in the changeset are ignored; if none
 // match, the action is a no-op. Only the {@link ChangesetFile.reviewed} field
-// of each matched file is affected; the files' {@link ChangesetFile.edit | edit}
-// and {@link ChangesetFile._meta | _meta} are left untouched.
+// of each matched file is affected; the files' {@link ChangesetFile.edit | edit},
+// {@link ChangesetFile.nonce | nonce}, and {@link ChangesetFile._meta | _meta}
+// are left untouched.
 //
 // Only meaningful on a changeset that advertises
 // {@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action
@@ -1277,8 +1410,8 @@ type ChangesetFileRemovedAction struct {
 // server echo it back on the normal `action` envelope stream. The server MAY
 // also originate it (e.g. an agent marking its own output reviewed).
 //
-// There is no protocol-level content version, so review is not reset
-// automatically when a file's contents change under a stable id. The server,
+// Review is not reset automatically when a file's contents or nonce change
+// under a stable id. The server,
 // which is the authority on what changed, resets review explicitly — either by
 // re-emitting the file without `reviewed: true`, or by dispatching this action
 // with `reviewed: false`.
@@ -1598,7 +1731,9 @@ type ResourceWatchChangedAction struct {
 //
 // This side-effect request leaves optimistic catalogue state unchanged. The
 // host validates trigger ids and configuration, normalizes event-trigger
-// titles and descriptions, persists the definition, then publishes the
+// titles and descriptions, captures any
+// {@link AutomationSessionTemplate.customizations | session customizations}
+// from the dispatching client, persists the definition, then publishes the
 // authoritative result with {@link AutomationSetAction | `automation/set`}.
 // Rejections leave the catalogue unchanged.
 type AutomationCreateRequestedAction struct {
@@ -1724,6 +1859,7 @@ func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
 func (*SessionChatRemovedAction) isStateAction()                  {}
 func (*SessionChatUpdatedAction) isStateAction()                  {}
+func (*SessionChatsReorderedAction) isStateAction()               {}
 func (*SessionDefaultChatChangedAction) isStateAction()           {}
 func (*ChatTurnStartedAction) isStateAction()                     {}
 func (*ChatDeltaAction) isStateAction()                           {}
@@ -1742,7 +1878,12 @@ func (*ChatTurnCancelledAction) isStateAction()                   {}
 func (*ChatErrorAction) isStateAction()                           {}
 func (*ChatTurnResumeAction) isStateAction()                      {}
 func (*ChatActivityChangedAction) isStateAction()                 {}
+func (*ChatBackgroundWorkSetAction) isStateAction()               {}
+func (*ChatBackgroundWorkRemovedAction) isStateAction()           {}
+func (*ChatMovableChangedAction) isStateAction()                  {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
+func (*ChatCanvasesChangedAction) isStateAction()                 {}
+func (*CanvasStateChangedAction) isStateAction()                  {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
 func (*ChatReasoningAction) isStateAction()                       {}
@@ -1750,7 +1891,10 @@ func (*ChatPendingMessageSetAction) isStateAction()               {}
 func (*ChatPendingMessageRemovedAction) isStateAction()           {}
 func (*ChatQueuedMessagesReorderedAction) isStateAction()         {}
 func (*ChatDraftChangedAction) isStateAction()                    {}
+func (*ChatIsReadChangedAction) isStateAction()                   {}
 func (*ChatIsArchivedChangedAction) isStateAction()               {}
+func (*ChatConfigChangedAction) isStateAction()                   {}
+func (*ChatMovedAction) isStateAction()                           {}
 func (*ChatInputRequestedAction) isStateAction()                  {}
 func (*ChatInputAnswerChangedAction) isStateAction()              {}
 func (*ChatInputCompletedAction) isStateAction()                  {}
@@ -1878,6 +2022,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "session/chatsReordered":
+		var value SessionChatsReorderedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "session/defaultChatChanged":
 		var value SessionDefaultChatChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -1986,8 +2136,38 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "chat/backgroundWorkSet":
+		var value ChatBackgroundWorkSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/backgroundWorkRemoved":
+		var value ChatBackgroundWorkRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/movableChanged":
+		var value ChatMovableChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "chat/changesetsChanged":
 		var value ChatChangesetsChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasesChanged":
+		var value ChatCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/stateChanged":
+		var value CanvasStateChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -2034,8 +2214,26 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "chat/isReadChanged":
+		var value ChatIsReadChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "chat/isArchivedChanged":
 		var value ChatIsArchivedChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/configChanged":
+		var value ChatConfigChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/moved":
+		var value ChatMovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

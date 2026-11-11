@@ -51,6 +51,7 @@ export const enum SessionLifecycle {
  *
  * @category Session State
  * @nonexhaustive
+ * @bitset
  */
 export const enum SessionStatus {
   /** Session is idle — no turn is active. */
@@ -180,13 +181,17 @@ export interface SessionState extends SessionMetadata {
    * reconnecting in time, or reconnect without resubscribing to the session.
    */
   activeClients: SessionActiveClient[];
-  /** Catalog of chats in this session. */
+  /**
+   * Catalog of chats in this session.
+   *
+   * Order is host-authoritative and durable. Catalog order is independent of
+   * `defaultChat`.
+   */
   chats: ChatSummary[];
   /**
    * The chat that receives input when the user addresses the session without
-   * selecting a specific chat. This is a UI routing hint, not a hierarchy
-   * marker — chats remain equal peers at the protocol level. Hosts MAY change
-   * this over the session's lifetime.
+   * selecting a specific chat. This routing designation does not determine the
+   * chat's catalog position. Hosts MAY change it over the session's lifetime.
    */
   defaultChat?: URI;
   /** Session configuration schema and current values */
@@ -203,7 +208,8 @@ export interface SessionState extends SessionMetadata {
    * - Top-level {@link McpServerCustomization} entries the host
    *   surfaces directly (for example a globally-configured MCP server
    *   that isn't bundled in a plugin or directory). MCP servers may
-   *   also appear as children of a container.
+   *   also appear as children of a container, and may serve skills in
+   *   their own {@link McpServerCustomization.children | `children`} array.
    *
    * Client-published plugins arrive via
    * {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -480,7 +486,8 @@ export interface ProjectInfo {
  *   to a subset via {@link ChatSummary.workingDirectories}; aggregating these
  *   up is meaningless and SHOULD NOT be attempted.
  * - `changes`: optional roll-up across all chats. Producers MAY sum the
- *   per-chat changeset stats or report the most expensive chat's stats —
+ *   per-chat {@link ChatSummary.changes | changes summaries} or report the
+ *   most expensive chat's stats —
  *   whichever is cheaper for the host to compute.
  *
  * Sessions with a single chat trivially satisfy all of the above (the chat's
@@ -497,11 +504,11 @@ export interface SessionSummary extends SessionMetadata {
   /** Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`) */
   modifiedAt: string;
   /**
-  * Aggregate summary of file changes associated with this session. Servers
-  * may populate this to give clients a quick at-a-glance view of the
-  * session's footprint (e.g., for list rendering) without requiring the
-  * client to subscribe to a changeset.
-  */
+   * Aggregate summary of file changes associated with this session. Servers
+   * may populate this to give clients a quick at-a-glance view of the
+   * session's footprint (e.g., for list rendering) without requiring the
+   * client to subscribe to a changeset.
+   */
   changes?: ChangesSummary;
   /**
    * Lightweight server-defined metadata clients may use for the session
@@ -511,20 +518,15 @@ export interface SessionSummary extends SessionMetadata {
    */
   _meta?: Record<string, unknown>;
   /**
-   * Lightweight ordered chat catalog for session-list presentation.
-   *
-   * This intentionally omits volatile chat state such as status and activity,
-   * while retaining interactivity so generic clients can hide chats or present
-   * them as read-only without subscribing to the session channel.
+   * Lightweight host-authoritative ordered chat catalog.
    */
   chats?: SessionChatSummary[];
-  /** Chat that receives input when no specific chat is selected. */
+  /** Chat that receives input when none is selected, independent of catalog position. */
   defaultChat?: URI;
 }
 
 /**
- * Lightweight chat information suitable for listing a session without
- * subscribing to its session channel.
+ * Lightweight chat information in a session catalog.
  *
  * @category Session State
  */
@@ -543,10 +545,35 @@ export interface SessionChatSummary {
    * backward compatibility.
    */
   interactivity?: ChatInteractivity;
+  /**
+   * Agent provider ID backing this chat. See {@link ChatState.provider}.
+   * @stability 1.0
+   */
+  provider?: string;
+  /**
+   * Current chat status, matching {@link ChatSummary.status}.
+   *
+   * Includes the activity bits and the orthogonal {@link SessionStatus.IsRead}
+   * and {@link SessionStatus.IsArchived} flags. Generic clients use these bits
+   * to present read, unread, or archived chats in session lists without
+   * subscribing to the session or chat channel. Absence means the host did
+   * not provide the status; clients MUST treat it as unknown, not as unread
+   * or unarchived.
+   */
+  status?: SessionStatus;
+  /**
+   * Aggregate summary of file changes associated with this chat.
+   *
+   * Servers may populate this so session lists can show per-chat change
+   * counts without subscribing to the session or chat channel. Updates travel
+   * with the rest of the catalog in `root/sessionSummaryChanged`.
+   */
+  changes?: ChangesSummary;
 }
 
 /**
- * Aggregate counts describing the file changes associated with a session.
+ * Aggregate counts describing the file changes associated with a session or
+ * chat.
  *
  * All fields are optional so servers can populate only the metrics they
  * cheaply have available.
@@ -601,6 +628,11 @@ export interface SessionConfigPropertySchema extends ConfigPropertySchema {
   enumDynamic?: boolean;
   /** When `true`, the user may change this property after session creation */
   sessionMutable?: boolean;
+  /**
+   * When `true`, the property may be changed per chat with
+   * `chat/configChanged`, affecting only that chat.
+   */
+  chatMutable?: boolean;
 }
 
 /**
@@ -708,8 +740,8 @@ export interface ToolAnnotations {
  * ({@link CustomizationType.Plugin | `Plugin`} or
  * {@link CustomizationType.Directory | `Directory`}) or
  * {@link CustomizationType.McpServer | `McpServer`} entries surfaced
- * directly by the host. The remaining types appear only as children of
- * a container.
+ * directly by the host. The remaining types appear as children of a
+ * container; skills may also be served by an MCP server.
  *
  * @category Customization Types
  * @nonexhaustive
@@ -964,8 +996,8 @@ export interface DirectoryCustomization extends ContainerCustomizationBase {
 }
 
 /**
- * Fields shared by the leaf child customizations that live inside a
- * container — {@link AgentCustomization}, {@link SkillCustomization},
+ * Fields shared by the leaf child customizations that live inside a container
+ * (or, for skills, an MCP server) — {@link AgentCustomization}, {@link SkillCustomization},
  * {@link PromptCustomization}, {@link RuleCustomization}, and
  * {@link HookCustomization}.
  *
@@ -984,7 +1016,8 @@ interface ChildCustomizationBase extends CustomizationBase {
    * enabled state of a plugin child is the plugin's derived enabled value and
    * `(child.enabled ?? true)`, so a disabled plugin disables every child
    * regardless of each child's own flag. A directory child instead uses the
-   * directory's `enabled` value and its own flag.
+   * directory's `enabled` value and its own flag. An MCP-served skill uses the
+   * server's effective enabled value and its own flag.
    *
    * A child is turned on or off by id with
    * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -1039,7 +1072,7 @@ export interface AgentCustomization extends ChildCustomizationBase {
 }
 
 /**
- * A skill contributed by a plugin or directory.
+ * A skill contributed by a plugin, directory, or MCP server.
  *
  * Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
  * — the `skills/` directory layout (one subdirectory per skill, each with
@@ -1180,6 +1213,19 @@ export interface McpServerCustomization extends CustomizationBase {
    * which support apps.
    */
   mcpApp?: McpServerCustomizationApps;
+  /**
+   * Skills served by this MCP server, for example through the MCP skills
+   * extension (SEP-2640).
+   *
+   * Absent means the host has not discovered skills for this server, or
+   * does not support MCP-served skills. An empty array means the server
+   * was queried and serves none.
+   *
+   * A skill's effective enabled state is the server's effective enabled
+   * value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+   * with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
+   */
+  children?: SkillCustomization[];
 }
 
 /**
@@ -1278,7 +1324,7 @@ export type ChildCustomization =
 /**
  * A top-level customization active in a session. Either a container
  * ({@link PluginCustomization} or {@link DirectoryCustomization}) whose
- * leaf customizations live in its
+ * child customizations live in its
  * {@link ContainerCustomizationBase.children | `children`} array, or a
  * bare {@link McpServerCustomization} surfaced directly by the host.
  *

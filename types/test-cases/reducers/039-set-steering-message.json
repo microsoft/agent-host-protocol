@@ -23,15 +23,19 @@
   ],
   "expected": {
     "turns": [],
-    "steeringMessage": {
-      "id": "sm-1",
-      "message": {
-        "text": "Focus on tests",
-        "origin": {
-          "kind": "user"
+    "steeringMessage": { "id": "sm-1", "kind": "steering", "message": { "text": "Focus on tests", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      {
+        "id": "sm-1",
+        "kind": "steering",
+        "message": {
+          "text": "Focus on tests",
+          "origin": {
+            "kind": "user"
+          }
         }
       }
-    },
+    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 1,

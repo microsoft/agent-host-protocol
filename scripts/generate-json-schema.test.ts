@@ -12,11 +12,15 @@
 
 import { describe, it, before } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
-import { typeAdmitsUndefined } from './generate-json-schema.js';
+import { generateJsonSchemas, typeAdmitsUndefined } from './generate-json-schema.js';
+import { ActionType } from '../types/common/actions.js';
+import { SessionLifecycle, SessionStatus } from '../types/channels-session/state.js';
+import { sessionReducer } from '../types/channels-session/reducer.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -42,7 +46,7 @@ function collectRefTargets(node: JsonNode, acc: Set<string>): void {
   if (node && typeof node === 'object') {
     const ref = (node as Record<string, unknown>).$ref;
     if (typeof ref === 'string') {
-      const m = ref.match(/^#\/\$defs\/(.+)$/);
+      const m = ref.match(/^#\/\$defs\/(.*)$/);
       if (m) acc.add(m[1]);
     }
     const not = (node as Record<string, unknown>).not;
@@ -116,16 +120,16 @@ function schemaAccepts(
     return value === schema.const;
   }
 
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return false;
+  }
+
   if (schema.contains && Array.isArray(value)) {
     const matches = value.filter(item => schemaAccepts(root, schema.contains as JsonNode, item)).length;
     const minimum = typeof schema.minContains === 'number' ? schema.minContains : 1;
     if (matches < minimum || (typeof schema.maxContains === 'number' && matches > schema.maxContains)) {
       return false;
     }
-  }
-
-  if (Array.isArray(schema.enum)) {
-    return schema.enum.includes(value);
   }
 
   if (schema.type === 'object' || schema.required || schema.properties) {
@@ -148,12 +152,14 @@ function schemaAccepts(
 
   switch (schema.type) {
     case 'string':
-      return typeof value === 'string';
+      return typeof value === 'string' &&
+        (typeof schema.minLength !== 'number' || [...value].length >= schema.minLength);
     case 'number':
     case 'integer':
       return typeof value === 'number' &&
         (schema.type !== 'integer' || Number.isInteger(value)) &&
-        (typeof schema.minimum !== 'number' || value >= schema.minimum);
+        (typeof schema.minimum !== 'number' || value >= schema.minimum) &&
+        (typeof schema.maximum !== 'number' || value <= schema.maximum);
     case 'boolean':
       return typeof value === 'boolean';
     case 'null':
@@ -165,6 +171,42 @@ function schemaAccepts(
 
   return true;
 }
+
+describe('@bitset JSON Schema generation', () => {
+  it('uses the tag to accept combinations and documents every named value', () => {
+    const project = new Project({ useInMemoryFileSystem: true });
+    project.createSourceFile('/types/common/state.ts', `
+      /** Status flags. @nonexhaustive @bitset */
+      export enum Tagged {
+        /** The first flag. */
+        First = 1,
+        /** Both flags together. */
+        Combined = 1 | 2,
+      }
+      /** Bitset is just prose here. @nonexhaustive */
+      export enum Untagged { First = 1, Second = 2 }
+      export interface Example { tagged: Tagged; untagged: Untagged }
+    `);
+    const outDir = mkdtempSync(resolve(tmpdir(), 'ahp-bitset-schema-'));
+    try {
+      generateJsonSchemas(project, outDir);
+      const schema = JSON.parse(readFileSync(resolve(outDir, 'state.schema.json'), 'utf-8'));
+      assert.deepEqual(schema.$defs.Tagged, {
+        type: 'integer',
+        minimum: 0,
+        maximum: 0xffff_ffff,
+        description: 'Status flags.\n\nKnown flags:\n\n- `First` (1): The first flag.\n- `Combined` (3): Both flags together.',
+      });
+      assert.deepEqual(schema.$defs.Untagged, {
+        enum: [1, 2],
+        type: 'number',
+        description: 'Bitset is just prose here.',
+      });
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('generated JSON schemas', () => {
   for (const file of SCHEMA_FILES) {
@@ -189,6 +231,144 @@ describe('generated JSON schemas', () => {
           [],
           `${file} references ${dangling.length} undefined $def(s) (bug #302.2): ${dangling.slice(0, 10).join(', ')}`,
         );
+      });
+
+      it('validates StateAction payloads without unresolved references', () => {
+        if (file !== 'actions.schema.json' && file !== 'commands.schema.json') return;
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const action = { type: 'root/activeSessionsChanged', activeSessions: 0 };
+
+        assert.equal(schemaAccepts(schema, defs.StateAction, action), true);
+        for (const invalid of [
+          { type: action.type },
+          { ...action, activeSessions: '0' },
+          { ...action, type: 'root/unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, defs.StateAction, invalid), false, JSON.stringify(invalid));
+        }
+      });
+
+      it('accepts all activity, read, and archived SessionStatus combinations', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const activity of [SessionStatus.Idle, SessionStatus.Error, SessionStatus.InProgress, SessionStatus.InputNeeded]) {
+          for (const flags of [0, SessionStatus.IsRead, SessionStatus.IsArchived, SessionStatus.IsRead | SessionStatus.IsArchived]) {
+            const status = activity | flags;
+            assert.equal(schemaAccepts(schema, defs.SessionStatus, status), true, `status ${status}`);
+          }
+        }
+      });
+
+      it('validates a session snapshot after marking it read', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const session = sessionReducer({
+          provider: 'copilot',
+          title: 'Test Session',
+          status: SessionStatus.Idle,
+          lifecycle: SessionLifecycle.Ready,
+          activeClients: [],
+          chats: [],
+        }, { type: ActionType.SessionIsReadChanged, isRead: true });
+
+        assert.equal(schemaAccepts(schema, defs.SessionState, session), true);
+        assert.equal(schemaAccepts(schema, defs.SessionSummary, {
+          ...session,
+          resource: 'ahp-session:/test',
+          createdAt: '2026-11-09T00:00:00Z',
+          modifiedAt: '2026-11-09T00:00:00Z',
+        }), true);
+      });
+
+      it('accepts forward-compatible uint32 status bits and rejects non-uint32 values', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const fixture = JSON.parse(readFileSync(resolve(
+          root, 'types/test-cases/round-trips/005-session-status-unknown-bits-preserved.json',
+        ), 'utf-8'));
+        for (const value of [0, fixture.input, 0xffff_ffff]) {
+          assert.equal(schemaAccepts(schema, defs.SessionStatus, value), true, `status ${value}`);
+        }
+        for (const value of [-1, 1.5, 0x1_0000_0000, '33', null]) {
+          assert.equal(schemaAccepts(schema, defs.SessionStatus, value), false, `status ${value}`);
+        }
+      });
+
+      it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
+        if (file !== 'notifications.schema.json') return;
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
+        for (const property of Object.values(limits)) {
+          assert.equal(property.type, 'integer');
+          assert.equal(property.maximum, Number.MAX_SAFE_INTEGER);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER), true);
+          assert.equal(schemaAccepts(schema, property, Number.MAX_SAFE_INTEGER + 1), false);
+          assert.equal(schemaAccepts(schema, property, 1.5), false);
+          assert.equal(schemaAccepts(schema, property, -1), false);
+          assert.equal(schemaAccepts(schema, property, 0), false);
+        }
+        assert.equal('ChannelReceiveProgress' in defs, false);
+        const frame = defs.ChannelFrameParams.properties as Record<string, Record<string, unknown>>;
+        assert.equal(frame.data.minLength, 1);
+        assert.equal(schemaAccepts(schema, frame.data, ''), false);
+        assert.equal(schemaAccepts(schema, frame.data, '{'), true);
+        assert.equal('messageId' in frame, false);
+        assert.equal('subscriptionId' in frame, false);
+        assert.equal('control' in frame, false);
+        const credit = defs.ChannelCreditParams.properties as Record<string, Record<string, unknown>>;
+        assert.equal(credit.consumedBytes.type, 'integer');
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, 0), true);
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, 1.5), false);
+        assert.equal(schemaAccepts(schema, credit.consumedBytes, Number.MAX_SAFE_INTEGER + 1), false);
+      });
+
+      it('keeps TCP payloads minimal and validates the destination port', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        if (file === 'notifications.schema.json') {
+          const data = defs.TcpDataParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(data).sort(), ['channel', 'data']);
+          assert.equal(data.data.minLength, 1);
+          for (const name of ['TcpEofParams', 'TcpResetParams']) {
+            assert.deepEqual(Object.keys(defs[name].properties as Record<string, unknown>), ['channel']);
+          }
+        }
+        if (file === 'commands.schema.json') {
+          const creation = defs.CreateTcpConnectionParams.properties as Record<string, Record<string, unknown>>;
+          assert.deepEqual(Object.keys(creation).sort(), ['_meta', 'channel', 'host', 'port']);
+          for (const port of [1, 65535]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), true);
+          }
+          for (const port of [0, 65536, 1.5]) {
+            assert.equal(schemaAccepts(schema, creation.port, port), false);
+          }
+        }
+      });
+
+      it('accepts resourceRead byte ranges and rejects invalid ranges', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const params = defs.ResourceReadParams;
+        const result = defs.ResourceReadResult;
+        const base = { channel: 'ahp-root://', uri: 'file:///workspace/logo.png' };
+        assert.equal((params.required as string[]).some(name => name === 'position' || name === 'length'), false);
+        assert.equal((result.required as string[]).includes('size'), false);
+        for (const value of [base, { ...base, position: 0 }, { ...base, length: 0 }, { ...base, position: 16, length: 16 }]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const value of [
+          { ...base, position: -1 },
+          { ...base, position: 1.5 },
+          { ...base, length: -1 },
+          { ...base, length: 2.5 },
+        ]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), false, JSON.stringify(value));
+        }
+        const whole = { data: 'aGVsbG8=', encoding: 'base64' };
+        for (const value of [whole, { ...whole, size: 52341 }, { data: '', encoding: 'base64', size: 0 }, { data: 'Aé😀', encoding: 'utf-8', size: 1024 }]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const size of [-1, 1.5]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, { ...whole, size }), false, `size ${size}`);
+        }
       });
 
       it('preserves automation schedule restrictions', () => {
@@ -416,6 +596,97 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+
+      it('constrains stable chat move destinations and results', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const destination = defs.ChatMoveDestination;
+        assert.ok(destination, 'ChatMoveDestination must be emitted as a command definition');
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'session',
+            session: 'ahp-session:/destination',
+            after: 'ahp-chat:/anchor',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'newSession',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'session',
+          }),
+          false,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'unknown',
+          }),
+          false,
+        );
+
+        assert.deepEqual(defs.MoveChatParams.required, ['channel', 'destination']);
+        assert.equal(
+          Object.hasOwn(defs.MoveChatParams.properties as object, 'requestId'),
+          false,
+        );
+        assert.deepEqual(defs.MoveChatResult.required, ['session']);
+        assert.deepEqual(
+          Object.keys(defs.MoveChatResult.properties as object),
+          ['session'],
+        );
+      });
+
+      it('exposes optional host-authoritative chat movability and its update action', () => {
+        if (file !== 'state.schema.json' && file !== 'actions.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['ChatState', 'ChatSummary']) {
+          const definition = defs[name];
+          assert.ok(definition, `${name} must be emitted`);
+          const properties = definition.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.movable.type, 'boolean');
+          assert.equal(
+            (definition.required as string[]).includes('movable'),
+            false,
+            `${name}.movable must remain optional so absence means false`,
+          );
+        }
+
+        if (file === 'actions.schema.json') {
+          const action = defs.ChatMovableChangedAction;
+          assert.ok(action, 'ChatMovableChangedAction must be emitted');
+          assert.deepEqual(action.required, ['type', 'movable']);
+          const properties = action.properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.type.const, 'chat/movableChanged');
+          assert.equal(properties.movable.type, 'boolean');
+        }
+      });
+
+      it('carries the complete authoritative session chat order', () => {
+        if (file !== 'actions.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const action = defs.SessionChatsReorderedAction;
+        assert.ok(action, 'SessionChatsReorderedAction must be emitted');
+        assert.deepEqual(action.required, ['type', 'chats']);
+        const properties = action.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.chats.type, 'array');
+        assert.deepEqual(properties.chats.items, { $ref: '#/$defs/URI' });
+        assert.equal(Object.hasOwn(properties, 'destination'), false);
+      });
+
     });
   }
 });

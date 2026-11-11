@@ -1,0 +1,32 @@
+{
+  "name": "canvas-ready-snapshot",
+  "group": "A",
+  "description": "A canvas snapshot preserves its live URL and presentation metadata.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-canvas:/preview",
+    "state": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "extensionName": "Preview",
+      "canvasId": "preview",
+      "title": "Preview",
+      "status": "Ready",
+      "url": "https://example.test/preview"
+    },
+    "fromSeq": 5
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-canvas:/preview",
+    "state": {
+      "instanceId": "preview",
+      "extensionId": "project:preview",
+      "extensionName": "Preview",
+      "canvasId": "preview",
+      "title": "Preview",
+      "status": "Ready",
+      "url": "https://example.test/preview"
+    },
+    "fromSeq": 5
+  }]
+}

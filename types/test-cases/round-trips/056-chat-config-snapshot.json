@@ -1,0 +1,40 @@
+{
+  "name": "chat-config-snapshot",
+  "group": "A",
+  "description": "ChatState.config carries the chat's chatMutable values without a schema when the chat uses the session's schema; it survives a decode/re-encode cycle on a chat snapshot.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/peer",
+    "state": {
+      "resource": "ahp-chat:/peer",
+      "title": "Peer",
+      "status": 1,
+      "modifiedAt": "2026-10-14T10:00:00.000Z",
+      "turns": [],
+      "config": {
+        "values": {
+          "autoApprove": true
+        }
+      }
+    },
+    "fromSeq": 3
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-chat:/peer",
+      "state": {
+        "resource": "ahp-chat:/peer",
+        "title": "Peer",
+        "status": 1,
+        "modifiedAt": "2026-10-14T10:00:00.000Z",
+        "turns": [],
+        "config": {
+          "values": {
+            "autoApprove": true
+          }
+        }
+      },
+      "fromSeq": 3
+    }
+  ]
+}

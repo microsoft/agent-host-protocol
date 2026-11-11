@@ -28,13 +28,14 @@ AgentInfo {
 
 SessionModelInfo {
   id: string
-  provider: string
+  provider: string   // agent provider; matches AgentInfo.provider
   name: string
   maxContextWindow?: number
   supportsVision?: boolean
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
   configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
   _meta?: Record<string, unknown>  // intrinsic facts (e.g. pricing); see below
+  vendor?: string   // e.g. 'Anthropic', 'Azure OpenAI'; absent when unknown
 }
 
 ConfigSchema {
@@ -52,6 +53,8 @@ ConfigPropertySchema {
   enumLabels?: string[]          // display labels (parallel array)
   enumDescriptions?: string[]    // descriptions (parallel array)
   readOnly?: boolean
+  minItems?: number              // array cardinality (when type is 'array')
+  maxItems?: number
 }
 ```
 
@@ -110,6 +113,7 @@ SessionSummary {
   workingDirectories?: URI[]   // equal-peer working directories
   annotations?: AnnotationsSummary
   changes?: ChangesSummary
+  chats?: SessionChatSummary[] // compact list presentation, including per-chat status
 }
 
 ProjectInfo {
@@ -117,6 +121,14 @@ ProjectInfo {
   displayName: string
 }
 ```
+
+`SessionChatSummary.status` is the same `SessionStatus` bitset as
+`ChatSummary.status`, including activity, read, and archived state. Hosts keep
+both projections synchronized with the chat's state so session lists can
+render per-chat status without subscribing to every session or chat. Clients
+check `SessionStatus.IsRead` and `SessionStatus.IsArchived` with bitwise
+operations rather than separate boolean fields. The compact `status` field
+is optional to ease adoption; absence means unknown, not unread or unarchived.
 
 The `status` bitset encodes both the session's activity state and metadata flags like read/archived state. See the [Session Status Bitset](#session-status-bitset) table below for details.
 
@@ -130,16 +142,53 @@ The `status` bitset encodes both the session's activity state and metadata flags
 | `SessionStatus.Error`       |   `2` | `1 << 1`               | The most recent turn ended with an error.                                                                                                                                             |
 | `SessionStatus.InProgress`  |   `8` | `1 << 3`               | A turn is active.                                                                                                                                                                     |
 | `SessionStatus.InputNeeded` |  `24` | `(1 << 3) \| (1 << 4)` | A turn is active and either at least one user input request is open, or at least one tool call is awaiting user confirmation (pre- or post-execution). Includes the `InProgress` bit. |
-| `SessionStatus.IsRead`      |  `32` | `1 << 5`               | The client has viewed this session since its last modification. Cleared automatically when a new turn starts or an input request arrives. Toggled via `session/isReadChanged`.        |
+| `SessionStatus.IsRead`      |  `32` | `1 << 5`               | The client has viewed this session or chat since its last modification. Cleared automatically when a new turn starts or an input request arrives. Toggled via `session/isReadChanged` or `chat/isReadChanged` on the corresponding channel. |
 | `SessionStatus.IsArchived`  |  `64` | `1 << 6`               | The session has been archived by the client. Toggled via `session/isArchivedChanged`.                                                                                                 |
 
 Bits 0–4 encode mutually-exclusive **activity** status (exactly one is set at a time). Bits 5+ encode orthogonal **metadata** flags that may be combined with any activity status via bitwise OR.
+
+On the wire, `status` is an unsigned 32-bit integer (`0` through `4294967295`).
+The JSON Schema accepts this range rather than enumerating individual flags, so
+combined flags and unknown bits from newer protocol versions remain valid.
+Producers must still follow the activity and metadata rules above.
+The canonical enum is annotated `@bitset`; schema descriptions list each named
+flag's numeric value and meaning.
+
+Read state is scoped to the addressed channel. `chat/isReadChanged` changes any
+known chat, including a default chat, without changing its owning session or
+sibling chats. `session/isReadChanged` changes only the session's independent
+read state.
 
 For example, `(status & SessionStatus.InProgress) !== 0` is true for both `InProgress` and `InputNeeded`. A session that is idle, read, and archived has status `1 | 32 | 64 = 97`.
 
 ## Chat State
 
 Subscribable on a [Chat Channel](/specification/chat-channel) at `ahp-chat:/<cid>`. A session is a catalog of chats (`SessionState.chats`); each chat carries the per-conversation state — the turn history, the active turn and its streaming response parts (including live input requests), tool calls, steering/queued messages, and the user's in-progress draft. A session starts with a default chat (`SessionState.defaultChat`); hosts advertising the `multipleChats` capability let clients open more via `createChat`.
+
+`backgroundWork` lists work running in the background for the chat, such as shells
+and subagents.
+Hosts publish complete entries with `chat/backgroundWorkSet` and remove them with
+`chat/backgroundWorkRemoved` when they finish or are no longer tracked. Entry IDs are
+opaque, unique within a chat across all kinds, and scoped to that chat. Like
+`changesets`, the list is not mirrored into `SessionState.chats`; clients read it by
+subscribing to the chat.
+
+Each entry has a `kind`, a `label`, and a start time. Every entry is unfinished work;
+hosts remove entries when the work finishes rather than marking them done. A shell
+entry adds its plain-text command and, when the host has one, the terminal carrying
+its output. Shells can be tied to the agent's lifetime (attached) or outlive it
+(detached); that distinction is provider-specific and goes in the shell's `_meta`. A
+subagent entry points to the subagent's own chat instead of repeating its state. The
+kind set is non-exhaustive: clients should keep entries of unknown kinds and may
+render them from the common fields. Other provider-specific details also belong in
+`_meta`.
+
+The collection survives turn completion, cancellation, steering, and history
+truncation; those actions do not establish whether the work has stopped. Hosts must
+reconcile the runtime's current inventory after restoring a chat, rather than replaying
+historical work as running. A missing collection means no inventory has been
+published; an empty collection contains no active work. This metadata does not
+provide process controls or a new turn-completion rule.
 
 ```typescript
 ChatState {
@@ -150,14 +199,16 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
+  provider?: string        // chat's agent; absent = session's provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
+  config?: ChatConfigState        // chat's chatMutable values (+ optional schema)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
   activeTurn?: ActiveTurn             // the in-progress turn, if any
-  steeringMessage?: PendingMessage
-  queuedMessages?: PendingMessage[]
+  steeringMessage?: PendingMessage    // deprecated latest-steering mirror
+  queuedMessages?: PendingMessage[]   // shared steering and queued input
   draft?: Message                     // user's in-progress input
 }
 ```
@@ -169,6 +220,15 @@ changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
 
+`config.values` holds the chat's own values for its `chatMutable` settings;
+`config.schema` is present only when the chat's agent differs from the
+session's. See
+[Per-chat configuration](/specification/chat-channel#per-chat-configuration).
+
+`provider` names the chat's agent when it differs from the session's. Hosts
+advertising `multipleChatProviders` let one session mix agents. See
+[Chat providers](/specification/chat-channel#chat-providers).
+
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`
 and `{ kind: 'sideChat', chat, turnId, selection? }`. For side chats, hosts
@@ -179,6 +239,16 @@ turn later moves into `turns` when it completes. When `selection` is present,
 the host also snapshots that exact selected text (which MUST be non-empty) into
 the created chat's `origin`; `responsePartId` there is advisory provenance, not
 a range.
+
+`origin` is immutable creation provenance. `moveChat` may change a top-level
+chat hierarchy's owning session without rewriting origin; any descendant
+hierarchy used for the move is owned internally by the host and is not exposed
+as chat state. See [Moving chats](/specification/chat-channel#moving-chats).
+
+`SessionState.chats` is a durable, host-authoritative order, not just a set.
+`moveChat` can reposition a movable chat within its current session without
+changing ownership, hierarchy, or any chat URI. `defaultChat` is not pinned to
+any catalog position. See [Moving chats](/specification/chat-channel#moving-chats).
 
 The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
 
@@ -498,31 +568,37 @@ Notifications are ephemeral — not processed by reducers, not stored in state, 
 
 ## Pending Messages
 
-Each chat maintains two optional **pending messages** — instructions queued for future delivery to the agent:
+Each chat maintains a single optional list of pending input for steering the active turn or starting future turns:
 
 ```typescript
 ChatState {
   // ...existing fields...
-  steeringMessage?: PendingMessage      // inject into current turn
-  queuedMessages?: PendingMessage[]     // start as new turns
+  steeringMessage?: PendingMessage    // deprecated latest-steering mirror
+  queuedMessages?: PendingMessage[]   // both kinds in raw host order
 }
 
 PendingMessage {
   id: string
+  kind?: PendingMessageKind          // 'steering' | 'queued'; absent means 'queued'
   message: Message
 }
 ```
 
-### Steering Message
+### Steering Messages
 
-The steering message is injected into the **current turn** at a convenient point. Clients set a steering message to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one steering message exists at a time; adding a new one replaces any existing one.
+Each steering submission is an entry with `kind: 'steering'` in `queuedMessages`. Clients use `chat/pendingMessageSet` with a new ID to append input; reusing an ID replaces its message and kind in place. A later submission with a different ID does not replace an earlier one.
 
-- When the chat has an active turn, the server consumes the steering message at its discretion, dispatching `chat/pendingMessageRemoved` when it does.
-- When set while idle, the steering message is silently stored until a turn starts.
+When a turn is active, the host may inject steering into the current turn. After consumption it dispatches `chat/pendingMessageRemoved` with the ID and `kind: 'steering'`. A consuming `chat/turnStarted` can also remove the matching entry via `queuedMessageId`, regardless of kind. Steering submitted while idle remains pending until it can be consumed.
+
+### Raw Order and Display Order
+
+The shared array records host acceptance order unless reordered with `chat/queuedMessagesReordered`. New IDs always append, including steering IDs added after queued input. Reusing an ID, even to change its kind, keeps the same position.
+
+UIs should group steering first and queued second, preserving each group's relative array order without mutating state. For example, raw `[q1, s1, q2, s2]` is displayed as steering `[s1, s2]`, then queued `[q1, q2]`. A reorder action applies to both kinds in the raw array; unmentioned IDs stay at the end in their original relative order, and unknown or duplicate IDs are ignored.
 
 ### Queued Messages
 
-Queued messages are automatically started as **new turns** after the current turn finishes. The server processes them FIFO (by arrival order).
+Queued messages are automatically started as **new turns** after the current turn finishes. The server processes entries with effective kind `'queued'` in their current array order, skipping steering entries. An entry without `kind` is an old queued entry and is treated as `'queued'`.
 
 - When a turn completes and queued messages exist, the server removes the first queued message and starts a new turn from it.
 - When a queued message is added while the chat is idle, the server SHOULD immediately consume it and start a turn.
@@ -550,7 +626,13 @@ sequenceDiagram
 
 ### Management
 
-Clients can **set** or **remove** both steering and queued messages at any time using the `chat/pendingMessageSet` (upsert) and `chat/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
+Clients use the existing `chat/pendingMessageSet` and `chat/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`). Set always stores that kind. Remove requires both ID and effective kind to match; unknown IDs and mismatched kinds are reducer no-ops. Hosts must reject edits or removals they can no longer honor after handing input to the provider. Repeated identical upserts must not duplicate provider delivery.
+
+### Migration and the Deprecated Steering Slot
+
+There is no new capability or enqueue flag. For 1.0.0 clients, each steering set also replaces the deprecated `steeringMessage` slot with the latest entry. The shared list keeps every outstanding submission independently. Updated clients deduplicate the mirror by ID and use the list's order and kinds.
+
+A matching steering removal, `chat/turnStarted.queuedMessageId`, or set changing the mirrored ID to queued input clears the slot without promoting an older entry. Other removals and reordering leave it untouched. Singleton-only entries from old snapshots remain supported. The legacy slot preserves a latest-message view, not the complete multi-message experience. See [the compatibility contract](../specification/chat-channel.md#legacy-steering-compatibility) for host, client, and native model changes.
 
 ## Chat Truncation
 

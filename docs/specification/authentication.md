@@ -114,15 +114,45 @@ Clients push Bearer tokens to the server using the [`authenticate`](/reference/c
 
 `expiresIn` is optional and corresponds to the `expires_in` field in an OAuth 2.0 token response, as defined by [RFC 6749 section 5.1](https://datatracker.ietf.org/doc/html/rfc6749#section-5.1). It is the access token's remaining lifetime in seconds when the client sends the `authenticate` request. When supplied, it MUST be a positive integer.
 
-If the client retained the original token response, it MUST subtract elapsed time from the original `expires_in` value before forwarding it. The client MUST omit `expiresIn` when the authorization server did not supply an expiry or the expiry is otherwise unknown. An empty `token` revokes authentication for the resource; `expiresIn` is irrelevant and SHOULD be omitted in that request.
+If the client retained the original token response, it MUST subtract elapsed time from the original `expires_in` value before forwarding it. The client MUST omit `expiresIn` when the authorization server did not supply an expiry or the expiry is otherwise unknown. An empty `token` revokes authentication for the resource, limited to `target` when supplied; `expiresIn` is irrelevant and SHOULD be omitted in that request.
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
+`target` is an optional, extensible discriminated union identifying the token's consumer. Clients SHOULD include it when answering a challenge from a specific MCP server (`McpServerAuthRequiredState` or `ToolCallAuthRequiredState`), and omit it for provider-level resources (`AgentInfo.protectedResources` or `AuthRequired` `-32007` error data). The currently defined variant is:
+
+```jsonc
+// MCP token delivery (the command still uses the root channel)
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://mcp.example.com",
+    "token": "access_token",
+    "scopes": ["read"],
+    "target": {
+      "kind": "mcpServer",
+      "session": "ahp-session:/session-1",
+      "customizationId": "mcp-server-1"
+    }
+  }
+}
+```
+
+`session` is the URI of the session whose `SessionState.customizations` contains the MCP server, either as a top-level entry or a child customization. `customizationId` is that server's session-unique `McpServerCustomization.id`. Clients only echo these host-published identifiers: `McpServerAuthRequiredState` lives on the customization, and `ToolCallAuthRequiredState.contributor.customizationId` identifies the same customization.
+
+When `target` is present, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
+
+Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge. Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
+
 If the token is invalid or the resource is unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams` `-32602`).
 
-### Why keyed by `resource`?
+### Why keyed by `resource` and optional `target`?
 
-The RFC 9728 `resource` field is already a unique identifier for the protected resource. Using it directly as the correlation key between discovery and token delivery avoids inventing a parallel ID scheme. Clients match tokens to resources using standard OAuth 2.0 semantics.
+The RFC 9728 `resource` field identifies the protected resource, but not necessarily its consumer: different MCP servers can share a resource and scopes while using distinct OAuth clients or accounts. `target` adds the session URI and customization ID needed to distinguish these consumers, even when server names repeat across sessions or manifests. Provider-level authentication continues to omit `target` and remains keyed by `resource` and scopes.
+
+The `target.kind` discriminant is extensible so future consumers, such as [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
 
 ## Error Handling
 

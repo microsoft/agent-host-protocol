@@ -1,0 +1,31 @@
+{
+  "description": "pending list removal handles absent and last steering entries",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "unknown" },
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "steering",
+      "id": "a",
+      "message": { "text": "A", "origin": { "kind": "user" } }
+    },
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "a" },
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "a" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/steering",
+    "title": "Steering",
+    "status": 1,
+    "modifiedAt": "2026-10-08T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": null,
+    "queuedMessages": null
+  }
+}

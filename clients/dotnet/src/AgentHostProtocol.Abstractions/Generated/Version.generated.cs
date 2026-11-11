@@ -14,24 +14,70 @@ public static class ProtocolVersion
     /// The current protocol version (SemVer MAJOR.MINOR.PATCH) this
     /// generated source speaks.
     /// </summary>
-    public const string Current = "0.9.0";
+    public const string Current = "1.1.0";
 
     private static readonly string[] s_supported =
     {
+        "1.0.0",
         "0.9.0",
-        "0.8.0",
-        "0.7.0",
-        "0.6.0",
-        "0.5.2",
-        "0.5.1",
     };
 
     /// <summary>
     /// Every protocol version this client is willing to negotiate, ordered
-    /// most-preferred-first. The first entry always equals <see cref="Current"/>.
+    /// most-preferred-first, independently of the development <see cref="Current"/>.
     /// A fresh copy is returned on every call so callers may mutate it freely.
     /// </summary>
     public static IReadOnlyList<string> Supported => (string[])s_supported.Clone();
+
+    /// <summary>
+    /// Selects the highest offered version in a supported caret range.
+    /// Null means the host must send UnsupportedProtocolVersion and close.
+    /// Malformed versions throw ArgumentException.
+    /// </summary>
+    public static string? Negotiate(IEnumerable<string> offered)
+    {
+        Guard.ThrowIfNull(offered, nameof(offered));
+        static long[] Parse(string version)
+        {
+            if (version is null || !System.Text.RegularExpressions.Regex.IsMatch(
+                version, @"\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z"))
+                throw new ArgumentException($"Invalid protocol version: {version}", nameof(version));
+            var parts = version.Split('.');
+            var values = new long[3];
+            for (var i = 0; i < 3; i++)
+            {
+                if (!long.TryParse(parts[i], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out values[i]))
+                    throw new ArgumentException($"Invalid protocol version: {version}", nameof(version));
+            }
+            return values;
+        }
+        static int Compare(long[] a, long[] b)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var comparison = a[i].CompareTo(b[i]);
+                if (comparison != 0) return comparison;
+            }
+            return 0;
+        }
+        var baselines = new List<long[]>();
+        foreach (var baseline in s_supported) baselines.Add(Parse(baseline));
+        string? selected = null;
+        long[]? previous = null;
+        foreach (var version in offered)
+        {
+            var parts = Parse(version);
+            if (baselines.Exists(b => parts[0] == b[0] && (parts[0] > 0 || parts[1] == b[1])
+                && (parts[0] > 0 || parts[1] > 0 || parts[2] == b[2]) && Compare(parts, b) >= 0)
+                && (previous is null || Compare(parts, previous) > 0))
+            {
+                selected = version;
+                previous = parts;
+            }
+        }
+        return selected;
+    }
 
     /// <summary>The well-known channel URI for the root channel.</summary>
     public const string RootResourceUri = "ahp-root://";

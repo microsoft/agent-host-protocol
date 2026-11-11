@@ -1,0 +1,32 @@
+{
+  "name": "tcp-subscribe-result",
+  "group": "A",
+  "description": "The subscribe result for a TCP channel contains only the accepted limits; the snapshot follows in channel/snapshot.",
+  "type": "SubscribeResult",
+  "input": {
+    "flowControl": {
+      "clientReceive": {
+        "windowBytes": 262144,
+        "maximumFrameBytes": 16384
+      },
+      "hostReceive": {
+        "windowBytes": 131072,
+        "maximumFrameBytes": 16384
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "flowControl": {
+        "clientReceive": {
+          "windowBytes": 262144,
+          "maximumFrameBytes": 16384
+        },
+        "hostReceive": {
+          "windowBytes": 131072,
+          "maximumFrameBytes": 16384
+        }
+      }
+    }
+  ]
+}

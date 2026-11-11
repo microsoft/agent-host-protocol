@@ -33,6 +33,16 @@ const (
 	ChatSourceKindSideChat ChatSourceKind = "sideChat"
 )
 
+// Destination kind for an atomic chat move.
+type ChatMoveDestinationKind string
+
+const (
+	// Move the source chat subtree into an existing session.
+	ChatMoveDestinationKindSession ChatMoveDestinationKind = "session"
+	// Move the source chat subtree into a newly allocated session.
+	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
+)
+
 // Native filesystem path grammar used by a host environment.
 //
 // This does not change URI syntax: AHP resources remain URIs with
@@ -98,7 +108,40 @@ const (
 	ResourceWriteModeInsert   ResourceWriteMode = "insert"
 )
 
+// Identifies the consumer of an authentication token.
+type AuthenticateTargetKind string
+
+const (
+	AuthenticateTargetKindMcpServer AuthenticateTargetKind = "mcpServer"
+)
+
 // ─── Command Payloads ─────────────────────────────────────────────────
+
+// Opens a TCP connection from the host to a destination on the host's network.
+//
+// The client chooses the channel URI. This command does not subscribe: after it
+// succeeds, the client subscribes to the channel with windowed delivery. The
+// host MUST NOT send data for the channel before that subscription, and MUST
+// limit how much destination data it buffers and how long it keeps a
+// connection that is never subscribed to.
+//
+// The client MUST NOT send this command unless `InitializeResult.tcpConnections`
+// is present. If the channel URI is already in use, the host returns
+// `AlreadyExists` and MUST NOT replace the existing connection. If the host
+// cannot open the connection, it returns `TcpConnectionOpenFailed`.
+//
+// Stability: 1.0 - Early development.
+type CreateTcpConnectionParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// A DNS name or IP address, resolved on the host's network. Not a URL.
+	Host string `json:"host"`
+	// The destination port.
+	Port int64 `json:"port"`
+}
 
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
@@ -112,7 +155,9 @@ type InitializeParams struct {
 	// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
 	// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
 	//
-	// The server selects one entry and returns it as `InitializeResult.protocolVersion`.
+	// The server selects the highest offered SemVer within its supported
+	// caret-compatible ranges and returns that exact entry as
+	// `InitializeResult.protocolVersion`.
 	// If the server cannot speak any of the offered versions, it MUST return
 	// error code `-32005` (`UnsupportedProtocolVersion`) with required
 	// `UnsupportedProtocolVersionErrorData` containing `supportedVersions`.
@@ -184,7 +229,8 @@ type InitializeResult struct {
 	// understand. Capabilities needed for interoperable behavior SHOULD use typed
 	// fields on {@link InitializeResult} instead.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Snapshots for each `initialSubscriptions` URI
+	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
+	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
 	// Default execution environment exposed by this host connection.
 	//
@@ -212,6 +258,17 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Present when the host supports `createTcpConnection`, which opens a TCP
+	// connection on the host's network for the client to forward.
+	//
+	// Stability: 1.0 - Early development.
+	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
+	// Present when chats in one session may be backed by different agents
+	// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+	// Clients MUST NOT send `CreateChatParams.provider` without it.
+	//
+	// Stability: 1.0 - Early development.
+	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -255,6 +312,9 @@ type AutomationCapabilities struct {
 	// runs are not counted toward the limit. Absence means the retention limit is
 	// implementation-defined.
 	RunHistoryLimit *int64 `json:"runHistoryLimit,omitempty"`
+	// Present when {@link AutomationSessionTemplate.customizations} may contain
+	// client plugins for the host to capture.
+	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -282,6 +342,20 @@ type AutomationScheduleCapabilities struct {
 // The empty object means "supported." Clients may dispatch the action for
 // `pending` or `running` runs; terminal runs cannot be cancelled.
 type AutomationRunCancellationCapability struct {
+}
+
+// Presence capability for
+// {@link AutomationSessionTemplate.customizations | automation customizations}.
+//
+// The empty object means "supported"; fields are reserved for future
+// capture options and limits.
+type AutomationCustomizationsCapability struct {
+}
+
+// Presence capability for {@link InitializeResult.multipleChatProviders}.
+//
+// Stability: 1.0 - Early development.
+type MultipleChatProvidersCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -322,11 +396,61 @@ type ReconnectParams struct {
 	LastSeenServerSeq int64 `json:"lastSeenServerSeq"`
 	// URIs the client was subscribed to
 	Subscriptions []URI `json:"subscriptions"`
+	// Windowed subscriptions that the client wants to keep. Each channel MUST
+	// also be in `subscriptions` and MUST appear only once. These subscriptions
+	// are not included in the result's `actions` or `snapshots`.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
+}
+
+// One windowed subscription that the client wants to keep after reconnection.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeParams struct {
+	// The URI of the windowed subscription.
+	Channel URI `json:"channel"`
+	// The client's offer of limits for the new connection, as in `subscribe`.
+	// The subscription's counters start at zero on the new connection.
+	FlowControl SubscriptionFlowControlOptions `json:"flowControl"`
+	// The `serverSeq` of the last action or observed state that the client
+	// applied, or kept for processing, on this channel. Parsing an action is not enough. Required for
+	// replay recovery; absent for channels that resume only with new data.
+	LastAppliedServerSeq *int64 `json:"lastAppliedServerSeq,omitempty"`
+}
+
+// Windowed subscriptions that the client wants to keep after reconnection.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeOptions struct {
+	Items []ChannelDeliveryResumeParams `json:"items"`
+}
+
+// Windowed subscriptions that the server kept after reconnection.
+//
+// A requested channel that is not listed was not kept. For each kept
+// subscription, both peers start their counters at zero on the new connection,
+// and credit counts only data received on that connection. Sequence numbers
+// decide what is sent again.
+//
+// Stability: 1.0 - Early development.
+type ChannelDeliveryResumeResult struct {
+	Items []ResumedChannelSubscription `json:"items"`
+}
+
+// A client's offer of windowed delivery.
+//
+// Stability: 1.0 - Early development.
+type SubscriptionFlowControlOptions struct {
+	// The largest limits that the client accepts for data that it receives. The
+	// server MAY accept lower values, and MUST NOT accept higher values.
+	Receive ChannelReceiveLimits `json:"receive"`
 }
 
 // Reconnect result when the server can replay from the requested sequence.
 //
-// The server MUST include all replayed data in the response.
+// The server MUST include all replayed data for ordinary subscriptions in the
+// response. Windowed subscriptions recover through their own data messages.
 type ReconnectReplayResult struct {
 	// Missed action envelopes since `lastSeenServerSeq`
 	Actions []ActionEnvelope `json:"actions"`
@@ -335,37 +459,59 @@ type ReconnectReplayResult struct {
 	// terminals) as well as resources the client is no longer permitted to
 	// observe. Clients SHOULD drop these from their local subscription set.
 	Missing []URI `json:"missing"`
+	// Windowed subscriptions that the server kept. Their data is sent separately.
+	// The server MUST omit this field unless the request contained `windows`,
+	// and MUST list only channels from the request.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Reconnect result when the gap exceeds the replay buffer.
 type ReconnectSnapshotResult struct {
-	// Fresh snapshots for each subscription
+	// Fresh snapshots for each resumed ordinary subscription. Windowed
+	// subscriptions are not included; they recover through their own data
+	// messages, as described by `windows`. The server MAY leave out a channel
+	// whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
+	// Windowed subscriptions that the server kept. Each one has its own
+	// `recovery` value, which does not depend on this result's type. The server
+	// MUST omit this field unless the request contained `windows`, and MUST list
+	// only channels from the request.
+	//
+	// Stability: 1.0 - Early development.
+	Windows *ChannelDeliveryResumeResult `json:"windows,omitempty"`
 }
 
 // Subscribe to a URI-identified channel.
 //
-// A channel MAY have state associated with it (e.g. root, sessions,
-// terminals) or be stateless (pure pub/sub for streaming data). For
-// state-bearing channels the result includes a snapshot; for stateless
-// channels `snapshot` is omitted.
+// With ordinary delivery, the result contains a snapshot of the channel's
+// state; the server MAY omit it for a channel whose state has no fields. With
+// windowed delivery, the result contains `flowControl` instead,
+// and the snapshot is sent in a `channel/snapshot` notification.
+//
+// A client has at most one subscription to each channel. A `subscribe` for a
+// channel that the client is already subscribed to changes the existing
+// subscription, for example its window, without losing data. Windowed counters
+// continue if the subscription was already windowed.
 type SubscribeParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Optional delivery preferences for this subscription.
-	//
-	// Servers MAY use these preferences to buffer and coalesce high-frequency
-	// updates while preserving the same reduced state. Omit this field for the
-	// server's default delivery behavior.
+	// Asks the server to limit how long it holds updates. If absent, the server
+	// uses its default behavior.
 	Delivery *SubscriptionDeliveryOptions `json:"delivery,omitempty"`
-	// Optional client-requested shape for the returned snapshot.
-	//
-	// Servers that do not understand a requested view ignore it and return their
-	// default snapshot. Clients MUST tolerate receiving more state than requested.
+	// Asks for a smaller snapshot. A server that does not support the requested
+	// view ignores it. Clients MUST accept more state than they requested.
 	View *SubscribeView `json:"view,omitempty"`
+	// Offers windowed delivery for this subscription. The server accepts by
+	// returning `flowControl` in the result. If the result does not contain
+	// `flowControl`, the subscription uses ordinary delivery.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *SubscriptionFlowControlOptions `json:"flowControl,omitempty"`
 }
 
 // Optional client-requested shape for a subscription snapshot.
@@ -381,22 +527,36 @@ type SubscribeView struct {
 	Turns *int64 `json:"turns,omitempty"`
 }
 
-// Advisory delivery preferences for a single subscription.
+// Delivery preferences for one subscription. They do not allow a server to
+// exceed the limits of a windowed subscription.
 type SubscriptionDeliveryOptions struct {
-	// Maximum time, in milliseconds, that the server may intentionally delay
-	// delivery while buffering/coalescing updates for this subscription.
-	//
-	// A value of `0` requests immediate delivery with no intentional coalescing.
+	// The longest time, in milliseconds, that the server should hold updates for
+	// this subscription in order to combine them. The server MUST NOT combine
+	// updates unless the combined update produces the same state and the client
+	// still receives every event that the channel requires. A value of `0` asks
+	// the server not to delay updates.
 	MaxLatencyMs *int64 `json:"maxLatencyMs,omitempty"`
 }
 
 // Result of the `subscribe` command.
 //
-// `snapshot` is present when the subscribed channel has associated state, and
-// absent for stateless channels.
+// With ordinary delivery, `snapshot` is present, except that the server MAY
+// omit it for a channel whose state has no fields. With windowed delivery,
+// `flowControl` is present and `snapshot` MUST be absent. The server sends the
+// snapshot in a `channel/snapshot` notification.
 type SubscribeResult struct {
-	// Snapshot of the subscribed channel's state (omitted for stateless channels)
+	// Snapshot of the subscribed channel's state. Present with ordinary delivery,
+	// except that the server MAY omit it for a channel whose state has no fields
+	// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
+	// `channel/snapshot` notification instead.
 	Snapshot *Snapshot `json:"snapshot,omitempty"`
+	// The limits that the server accepted for windowed delivery. The server sends
+	// this result before any data message for the subscription. The client MUST be
+	// ready to process data messages as soon as it receives this result, and can
+	// send data messages without waiting for the snapshot.
+	//
+	// Stability: 1.0 - Early development.
+	FlowControl *ChannelFlowControl `json:"flowControl,omitempty"`
 }
 
 // Creates a new session with the specified agent provider.
@@ -534,6 +694,19 @@ type CreateChatParams struct {
 	// A client MUST NOT supply this field unless the agent advertises
 	// {@link AgentCapabilities.multipleWorkingDirectories}.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Client-selected initial display title for the new chat.
+	Title *string `json:"title,omitempty"`
+	// Agent provider ID for the new chat. Absent means the session's provider.
+	//
+	// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+	// `InvalidParams` a provider that is not in the root state's `agents` or
+	// whose agent does not advertise `multipleChats`. Forks and side chats
+	// (`source` present) continue the source chat's history, so they always use
+	// the source chat's agent: absent means that agent, and a different value is
+	// rejected. Agent capability checks for this request use the chat's agent.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 }
 
 // Disposes a chat and cleans up server-side resources.
@@ -543,6 +716,84 @@ type DisposeChatParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Moves a chat within or into an existing session.
+type ChatMoveToSessionDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+	// Destination session URI.
+	Session URI `json:"session"`
+	// Chat after which to place the requested chat.
+	//
+	// The anchor MUST be a different chat in the destination session. When
+	// omitted, the requested chat is placed at the beginning of the catalog.
+	After *URI `json:"after,omitempty"`
+}
+
+// Moves a top-level chat subtree into a newly allocated session.
+type ChatMoveToNewSessionDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+}
+
+// Atomically moves a host-authorized chat within or between sessions.
+//
+// The source is the chat named by `channel`. When a `session` destination is
+// the source's current session, only the requested entry is repositioned in
+// that session's public chat catalog. When it names another session, the host
+// transfers the requested chat and its complete host-managed descendant
+// hierarchy. The optional `after` anchor positions the requested chat in the
+// destination catalog; when omitted, the requested chat is placed first.
+//
+// A `newSession` destination allocates a session, transfers the complete
+// hierarchy, and makes the requested chat that session's non-movable default
+// chat. The host owns descendant relationships; AHP does not expose them as
+// chat state.
+//
+// Clients MUST only request a move when the source chat advertises
+// `movable: true` in its `ChatState` or `ChatSummary`. This is structural
+// eligibility, not a guarantee that request-specific validation will succeed.
+//
+// The host MUST validate the complete operation before committing it and MAY
+// reject unsupported destinations or transient source conditions. At minimum,
+// the source MUST exist and advertise `movable: true`; the destination and
+// optional anchor MUST resolve; and the source MUST NOT anchor itself.
+// Rejection leaves ownership, catalog order, chat state, and root summaries
+// unchanged.
+//
+// A moved chat keeps its agent. After the move the host reports
+// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+// the destination session's provider, including when the chat had none
+// because it matched its old session. Hosts MAY refuse, as an unsupported
+// destination, a move they cannot support, such as one that changes whether
+// the chat's agent matches its session's.
+//
+// A moved chat's `config.values` move with it unchanged. If a move changes
+// whether the chat needs its own `config.schema`, the host sets or clears it,
+// or refuses the move as an unsupported destination. After a cross-session
+// move the host dispatches `chat/moved` on the chat's channel with its new
+// session, `provider` and `config.schema`.
+//
+// On success every moved chat keeps its URI, state, and immutable
+// `ChatOrigin`. The host commits ownership and catalog order before publishing
+// `session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and
+// root summary updates as applicable. Session and root snapshots are the
+// durable recovery path after reconnect or an uncertain response.
+type MoveChatParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Atomic move destination.
+	Destination ChatMoveDestination `json:"destination"`
+}
+
+// Result of an atomic chat move.
+type MoveChatResult struct {
+	// Authoritative owning session URI after the move.
+	Session URI `json:"session"`
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -598,16 +849,41 @@ type ListSessionsResult struct {
 // client-published URI (e.g. `virtual://my-client/...` plugins); clients
 // use it to read host-side files. The receiver enforces access via the
 // same permission/`resourceRequest` flow regardless of which peer initiated.
+//
+// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+// content references and canvas sources. This includes HTTP(S) URLs that the
+// other peer might not be able to reach, such as a development server on the
+// host's loopback interface.
+//
+// A sender MAY read part of a resource by including
+// {@link ResourceReadParams.position | `position`} and/or
+// {@link ResourceReadParams.length | `length`}.
+//
+//   - A receiver that honors the range SHOULD return only the requested bytes
+//     and MUST include {@link ResourceReadResult.size | `size`}, the total size
+//     of the resource in bytes.
+//   - A receiver that does not honor the range ignores `position` and `length`
+//     and returns the whole resource without `size`. A sender MUST treat a
+//     result without `size` as the whole resource.
+//   - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
+//   - A `position` at or past the end of the resource returns empty `data`.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Content URI from a `ContentRef`
+	// Content URI to read, such as one from a `ContentRef`
 	Uri string `json:"uri"`
 	// Preferred encoding for the returned data (default: server-chosen)
 	Encoding *ContentEncoding `json:"encoding,omitempty"`
+	// Byte offset to start reading at. Defaults to `0`. A receiver that does
+	// not honor byte ranges ignores it and returns the whole resource.
+	Position *int64 `json:"position,omitempty"`
+	// Maximum number of bytes to return from {@link position}. Defaults to the
+	// rest of the resource. A receiver that does not honor byte ranges ignores
+	// it and returns the whole resource.
+	Length *int64 `json:"length,omitempty"`
 }
 
 // Result of the `resourceRead` command.
@@ -615,6 +891,8 @@ type ResourceReadParams struct {
 // The server SHOULD honor the `encoding` requested in the params. If the
 // server cannot provide the requested encoding, it MUST fall back to either
 // `base64` or `utf-8`.
+//
+// Unless {@link size} is present, the result contains the whole resource.
 type ResourceReadResult struct {
 	// Content encoded as a string
 	Data string `json:"data"`
@@ -622,6 +900,11 @@ type ResourceReadResult struct {
 	Encoding ContentEncoding `json:"encoding"`
 	// Content type (e.g. `"image/png"`, `"text/plain"`)
 	ContentType *string `json:"contentType,omitempty"`
+	// Total size of the resource in bytes. Present if and only if the receiver
+	// honored the byte range in {@link ResourceReadParams.position} and
+	// {@link ResourceReadParams.length}; when absent, `data` is the whole
+	// resource.
+	Size *int64 `json:"size,omitempty"`
 }
 
 // Writes content to a file on the server's filesystem.
@@ -1003,6 +1286,17 @@ type DispatchActionParams struct {
 	Action StateAction `json:"action"`
 }
 
+// An MCP server identified by host-published session and customization state.
+type McpServerAuthenticateTarget struct {
+	Kind AuthenticateTargetKind `json:"kind"`
+	// Session URI whose `SessionState.customizations` contains the MCP server.
+	Session URI `json:"session"`
+	// The server's session-unique `McpServerCustomization.id`, echoed from the
+	// customization carrying `McpServerAuthRequiredState` or from
+	// `ToolCallAuthRequiredState.contributor.customizationId`.
+	CustomizationId string `json:"customizationId"`
+}
+
 // Pushes a Bearer token for a protected resource. The `resource` field MUST
 // match a protected-resource identifier the client has discovered from the
 // server — whether declared statically in `AgentInfo.protectedResources`,
@@ -1048,6 +1342,21 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Optional consumer of the token. Clients SHOULD include this when answering
+	// a specific MCP server's `McpServerAuthRequiredState` or
+	// `ToolCallAuthRequiredState` challenge, and omit it for provider-level
+	// resources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).
+	//
+	// When present, the host MUST apply the token only to that MCP server in
+	// that session, never to sibling servers, other sessions, or agent-level
+	// resources, even if they share the resource and scopes. `resource` MUST
+	// still equal that server's advertised `McpAuthRequirement.resource.resource`.
+	// The host MUST reject an unknown session or customization, or a
+	// customization that is not an MCP server, with `InvalidParams` (-32602).
+	//
+	// Without a target, resource/scope matching is unchanged; the token may
+	// satisfy every matching pending challenge. Older hosts ignore this field.
+	Target *AuthenticateTarget `json:"target,omitempty"`
 }
 
 // Result of the `authenticate` command.
@@ -1402,6 +1711,62 @@ func (v SideChatSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
+func (v *ChatMoveToSessionDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToSessionDestination", "kind")
+	}
+	if disc != "session" {
+		return unknownDiscriminatorError("ChatMoveToSessionDestination", "kind", disc)
+	}
+	type wire ChatMoveToSessionDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToSessionDestination(raw)
+	v.Kind = ChatMoveDestinationKindSession
+	return nil
+}
+
+func (v ChatMoveToSessionDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToSessionDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindSession
+	return json.Marshal(raw)
+}
+
+func (v *ChatMoveToNewSessionDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToNewSessionDestination", "kind")
+	}
+	if disc != "newSession" {
+		return unknownDiscriminatorError("ChatMoveToNewSessionDestination", "kind", disc)
+	}
+	type wire ChatMoveToNewSessionDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToNewSessionDestination(raw)
+	v.Kind = ChatMoveDestinationKindNewSession
+	return nil
+}
+
+func (v ChatMoveToNewSessionDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToNewSessionDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindNewSession
+	return json.Marshal(raw)
+}
+
 // ─── ChatSource Union ─────────────────────────────────────────────────
 
 // ChatSource identifies how a new chat uses a source chat.
@@ -1464,6 +1829,138 @@ func (u ChatSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// ─── ChatMoveDestination Union ────────────────────────────────────────
+
+// Destination of an atomic chat move.
+type ChatMoveDestination struct {
+	Value isChatMoveDestination
+}
+
+// isChatMoveDestination is the marker interface implemented by every
+// concrete variant of ChatMoveDestination.
+type isChatMoveDestination interface{ isChatMoveDestination() }
+
+func (*ChatMoveToSessionDestination) isChatMoveDestination()    {}
+func (*ChatMoveToNewSessionDestination) isChatMoveDestination() {}
+
+// ChatMoveDestinationUnknown carries an unrecognized ChatMoveDestination variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatMoveDestinationUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ChatMoveDestinationUnknown) isChatMoveDestination() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *ChatMoveDestination) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "session":
+		var value ChatMoveToSessionDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "newSession":
+		var value ChatMoveToNewSessionDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ChatMoveDestinationUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatMoveDestinationUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// ─── AuthenticateTarget Union ─────────────────────────────────────────
+
+// AuthenticateTarget identifies the consumer of an authentication token.
+type AuthenticateTarget struct {
+	Value isAuthenticateTarget
+}
+
+// isAuthenticateTarget is the marker interface implemented by every
+// concrete variant of AuthenticateTarget.
+type isAuthenticateTarget interface{ isAuthenticateTarget() }
+
+func (*McpServerAuthenticateTarget) isAuthenticateTarget() {}
+
+// AuthenticateTargetUnknown carries an unrecognized AuthenticateTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AuthenticateTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AuthenticateTargetUnknown) isAuthenticateTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AuthenticateTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "mcpServer":
+		var value McpServerAuthenticateTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AuthenticateTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AuthenticateTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AuthenticateTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *McpServerAuthenticateTarget:
+		object["kind"] = json.RawMessage("\"mcpServer\"")
+	}
+	return json.Marshal(object)
+}
+
 // ─── ReconnectResult Union ────────────────────────────────────────────
 
 // ReconnectResult is the result of the `reconnect` command.
@@ -1511,7 +2008,24 @@ func (u ReconnectResult) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(u.Value)
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *ReconnectReplayResult:
+		object["type"] = json.RawMessage("\"replay\"")
+	case *ReconnectSnapshotResult:
+		object["type"] = json.RawMessage("\"snapshot\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────
@@ -1530,6 +2044,7 @@ type ChangesetOperationResourceTarget struct {
 	Kind     string  `json:"kind"`
 	Resource URI     `json:"resource"`
 	Side     *string `json:"side,omitempty"`
+	Nonce    *string `json:"nonce,omitempty"`
 }
 
 func (*ChangesetOperationResourceTarget) isChangesetOperationTarget() {}
@@ -1540,6 +2055,7 @@ type ChangesetOperationRangeTarget struct {
 	Resource URI       `json:"resource"`
 	Side     *string   `json:"side,omitempty"`
 	Range    TextRange `json:"range"`
+	Nonce    *string   `json:"nonce,omitempty"`
 }
 
 func (*ChangesetOperationRangeTarget) isChangesetOperationTarget() {}

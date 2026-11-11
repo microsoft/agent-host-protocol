@@ -55,6 +55,9 @@ internal static class GeneratedActionMetadata
             case AutomationUpdateRequestedAction value:
                 actionType = value.Type;
                 return true;
+            case CanvasStateChangedAction value:
+                actionType = value.Type;
+                return true;
             case ChangesetClearedAction value:
                 actionType = value.Type;
                 return true;
@@ -82,7 +85,19 @@ internal static class GeneratedActionMetadata
             case ChatActivityChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatBackgroundWorkRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatBackgroundWorkSetAction value:
+                actionType = value.Type;
+                return true;
+            case ChatCanvasesChangedAction value:
+                actionType = value.Type;
+                return true;
             case ChatChangesetsChangedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatConfigChangedAction value:
                 actionType = value.Type;
                 return true;
             case ChatDeltaAction value:
@@ -104,6 +119,15 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case ChatIsArchivedChangedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatIsReadChangedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatMovableChangedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatMovedAction value:
                 actionType = value.Type;
                 return true;
             case ChatPendingMessageRemovedAction value:
@@ -206,6 +230,9 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case SessionChatRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case SessionChatsReorderedAction value:
                 actionType = value.Type;
                 return true;
             case SessionChatUpdatedAction value:
@@ -373,108 +400,5 @@ internal static class GeneratedActionMetadata
         }
     }
 
-    public static string GetWireName(ActionType actionType) =>
-        actionType switch
-        {
-            ActionType.AnnotationsEntryRemoved => "annotations/entryRemoved",
-            ActionType.AnnotationsEntrySet => "annotations/entrySet",
-            ActionType.AnnotationsRemoved => "annotations/removed",
-            ActionType.AnnotationsSet => "annotations/set",
-            ActionType.AnnotationsUpdated => "annotations/updated",
-            ActionType.AutomationCreateRequested => "automation/createRequested",
-            ActionType.AutomationRemoved => "automation/removed",
-            ActionType.AutomationRunCancelRequested => "automationRun/cancelRequested",
-            ActionType.AutomationRunLifecycleChanged => "automationRun/lifecycleChanged",
-            ActionType.AutomationRunPrimarySessionChanged => "automationRun/primarySessionChanged",
-            ActionType.AutomationRunSessionRemoved => "automationRun/sessionRemoved",
-            ActionType.AutomationRunSessionSet => "automationRun/sessionSet",
-            ActionType.AutomationSet => "automation/set",
-            ActionType.AutomationUpdateRequested => "automation/updateRequested",
-            ActionType.ChangesetCleared => "changeset/cleared",
-            ActionType.ChangesetContentChanged => "changeset/contentChanged",
-            ActionType.ChangesetFileRemoved => "changeset/fileRemoved",
-            ActionType.ChangesetFileSet => "changeset/fileSet",
-            ActionType.ChangesetFilesReviewChanged => "changeset/filesReviewChanged",
-            ActionType.ChangesetOperationsChanged => "changeset/operationsChanged",
-            ActionType.ChangesetOperationStatusChanged => "changeset/operationStatusChanged",
-            ActionType.ChangesetStatusChanged => "changeset/statusChanged",
-            ActionType.ChatActivityChanged => "chat/activityChanged",
-            ActionType.ChatChangesetsChanged => "chat/changesetsChanged",
-            ActionType.ChatDelta => "chat/delta",
-            ActionType.ChatDraftChanged => "chat/draftChanged",
-            ActionType.ChatError => "chat/error",
-            ActionType.ChatInputAnswerChanged => "chat/inputAnswerChanged",
-            ActionType.ChatInputCompleted => "chat/inputCompleted",
-            ActionType.ChatInputRequested => "chat/inputRequested",
-            ActionType.ChatIsArchivedChanged => "chat/isArchivedChanged",
-            ActionType.ChatPendingMessageRemoved => "chat/pendingMessageRemoved",
-            ActionType.ChatPendingMessageSet => "chat/pendingMessageSet",
-            ActionType.ChatQueuedMessagesReordered => "chat/queuedMessagesReordered",
-            ActionType.ChatReasoning => "chat/reasoning",
-            ActionType.ChatResponsePart => "chat/responsePart",
-            ActionType.ChatToolCallAuthRequired => "chat/toolCallAuthRequired",
-            ActionType.ChatToolCallAuthResolved => "chat/toolCallAuthResolved",
-            ActionType.ChatToolCallComplete => "chat/toolCallComplete",
-            ActionType.ChatToolCallConfirmed => "chat/toolCallConfirmed",
-            ActionType.ChatToolCallContentChanged => "chat/toolCallContentChanged",
-            ActionType.ChatToolCallDelta => "chat/toolCallDelta",
-            ActionType.ChatToolCallReady => "chat/toolCallReady",
-            ActionType.ChatToolCallResultConfirmed => "chat/toolCallResultConfirmed",
-            ActionType.ChatToolCallStart => "chat/toolCallStart",
-            ActionType.ChatTruncated => "chat/truncated",
-            ActionType.ChatTurnCancelled => "chat/turnCancelled",
-            ActionType.ChatTurnComplete => "chat/turnComplete",
-            ActionType.ChatTurnResume => "chat/turnResume",
-            ActionType.ChatTurnsLoaded => "chat/turnsLoaded",
-            ActionType.ChatTurnStarted => "chat/turnStarted",
-            ActionType.ChatUsage => "chat/usage",
-            ActionType.ChatWorkingDirectoryRemoved => "chat/workingDirectoryRemoved",
-            ActionType.ChatWorkingDirectorySet => "chat/workingDirectorySet",
-            ActionType.ResourceWatchChanged => "resourceWatch/changed",
-            ActionType.RootActiveSessionsChanged => "root/activeSessionsChanged",
-            ActionType.RootAgentsChanged => "root/agentsChanged",
-            ActionType.RootConfigChanged => "root/configChanged",
-            ActionType.RootTerminalsChanged => "root/terminalsChanged",
-            ActionType.SessionActiveClientRemoved => "session/activeClientRemoved",
-            ActionType.SessionActiveClientSet => "session/activeClientSet",
-            ActionType.SessionActivityChanged => "session/activityChanged",
-            ActionType.SessionChangesetsChanged => "session/changesetsChanged",
-            ActionType.SessionChatAdded => "session/chatAdded",
-            ActionType.SessionChatRemoved => "session/chatRemoved",
-            ActionType.SessionChatUpdated => "session/chatUpdated",
-            ActionType.SessionConfigChanged => "session/configChanged",
-            ActionType.SessionCreationFailed => "session/creationFailed",
-            ActionType.SessionCustomizationRemoved => "session/customizationRemoved",
-            ActionType.SessionCustomizationsChanged => "session/customizationsChanged",
-            ActionType.SessionCustomizationToggled => "session/customizationToggled",
-            ActionType.SessionCustomizationUpdated => "session/customizationUpdated",
-            ActionType.SessionDefaultChatChanged => "session/defaultChatChanged",
-            ActionType.SessionInputNeededRemoved => "session/inputNeededRemoved",
-            ActionType.SessionInputNeededSet => "session/inputNeededSet",
-            ActionType.SessionIsArchivedChanged => "session/isArchivedChanged",
-            ActionType.SessionIsReadChanged => "session/isReadChanged",
-            ActionType.SessionMcpServerBackgroundRequested => "session/mcpServerBackgroundRequested",
-            ActionType.SessionMcpServerStartRequested => "session/mcpServerStartRequested",
-            ActionType.SessionMcpServerStateChanged => "session/mcpServerStateChanged",
-            ActionType.SessionMcpServerStopRequested => "session/mcpServerStopRequested",
-            ActionType.SessionMetaChanged => "session/metaChanged",
-            ActionType.SessionReady => "session/ready",
-            ActionType.SessionServerToolsChanged => "session/serverToolsChanged",
-            ActionType.SessionTitleChanged => "session/titleChanged",
-            ActionType.SessionWorkingDirectoryRemoved => "session/workingDirectoryRemoved",
-            ActionType.SessionWorkingDirectoryReplaced => "session/workingDirectoryReplaced",
-            ActionType.SessionWorkingDirectorySet => "session/workingDirectorySet",
-            ActionType.TerminalClaimed => "terminal/claimed",
-            ActionType.TerminalCleared => "terminal/cleared",
-            ActionType.TerminalCommandDetectionAvailable => "terminal/commandDetectionAvailable",
-            ActionType.TerminalCommandExecuted => "terminal/commandExecuted",
-            ActionType.TerminalCommandFinished => "terminal/commandFinished",
-            ActionType.TerminalCwdChanged => "terminal/cwdChanged",
-            ActionType.TerminalData => "terminal/data",
-            ActionType.TerminalExited => "terminal/exited",
-            ActionType.TerminalInput => "terminal/input",
-            ActionType.TerminalResized => "terminal/resized",
-            ActionType.TerminalTitleChanged => "terminal/titleChanged",
-            _ => throw new ArgumentOutOfRangeException(nameof(actionType)),
-        };
+    public static string GetWireName(ActionType actionType) => actionType.Value;
 }

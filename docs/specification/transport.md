@@ -25,6 +25,12 @@ When WebSocket is used:
 - Messages are sent as WebSocket **text** frames.
 - Each text frame contains exactly one complete JSON-RPC message.
 
+[Windowed delivery](/specification/windowed-delivery) does not change this
+requirement. A data message that is too large for one JSON-RPC message can be
+sent in several `channel/frame` notifications. Each `channel/frame` is a
+complete JSON-RPC message, and the receiver joins the fragments after the
+transport has delivered them.
+
 ## Keep-Alive
 
 AHP defines a protocol-level [`ping`](/reference/common#ping) command that clients MAY use to verify the connection is alive and to keep it from being closed by idle-timeout intermediaries (proxies, load balancers, etc.). `ping` carries no payload in either direction; the response itself is the signal, and the server MUST respond regardless of whether the client has completed `initialize` or holds any subscriptions.

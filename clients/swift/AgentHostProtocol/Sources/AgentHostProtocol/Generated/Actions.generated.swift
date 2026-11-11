@@ -13,6 +13,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionChatAdded
     case sessionChatRemoved
     case sessionChatUpdated
+    case sessionChatsReordered
     case sessionDefaultChatChanged
     case chatTurnStarted
     case chatDelta
@@ -31,7 +32,12 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatError
     case chatTurnResume
     case chatActivityChanged
+    case chatBackgroundWorkSet
+    case chatBackgroundWorkRemoved
+    case chatMovableChanged
     case chatChangesetsChanged
+    case chatCanvasesChanged
+    case canvasStateChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
     case sessionTitleChanged
@@ -49,7 +55,10 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatPendingMessageRemoved
     case chatQueuedMessagesReordered
     case chatDraftChanged
+    case chatIsReadChanged
     case chatIsArchivedChanged
+    case chatConfigChanged
+    case chatMoved
     case chatInputRequested
     case chatInputAnswerChanged
     case chatInputCompleted
@@ -119,6 +128,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/chatAdded": self = .sessionChatAdded
         case "session/chatRemoved": self = .sessionChatRemoved
         case "session/chatUpdated": self = .sessionChatUpdated
+        case "session/chatsReordered": self = .sessionChatsReordered
         case "session/defaultChatChanged": self = .sessionDefaultChatChanged
         case "chat/turnStarted": self = .chatTurnStarted
         case "chat/delta": self = .chatDelta
@@ -137,7 +147,12 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/error": self = .chatError
         case "chat/turnResume": self = .chatTurnResume
         case "chat/activityChanged": self = .chatActivityChanged
+        case "chat/backgroundWorkSet": self = .chatBackgroundWorkSet
+        case "chat/backgroundWorkRemoved": self = .chatBackgroundWorkRemoved
+        case "chat/movableChanged": self = .chatMovableChanged
         case "chat/changesetsChanged": self = .chatChangesetsChanged
+        case "chat/canvasesChanged": self = .chatCanvasesChanged
+        case "canvas/stateChanged": self = .canvasStateChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
         case "session/titleChanged": self = .sessionTitleChanged
@@ -155,7 +170,10 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/pendingMessageRemoved": self = .chatPendingMessageRemoved
         case "chat/queuedMessagesReordered": self = .chatQueuedMessagesReordered
         case "chat/draftChanged": self = .chatDraftChanged
+        case "chat/isReadChanged": self = .chatIsReadChanged
         case "chat/isArchivedChanged": self = .chatIsArchivedChanged
+        case "chat/configChanged": self = .chatConfigChanged
+        case "chat/moved": self = .chatMoved
         case "chat/inputRequested": self = .chatInputRequested
         case "chat/inputAnswerChanged": self = .chatInputAnswerChanged
         case "chat/inputCompleted": self = .chatInputCompleted
@@ -225,6 +243,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionChatAdded: try container.encode("session/chatAdded")
         case .sessionChatRemoved: try container.encode("session/chatRemoved")
         case .sessionChatUpdated: try container.encode("session/chatUpdated")
+        case .sessionChatsReordered: try container.encode("session/chatsReordered")
         case .sessionDefaultChatChanged: try container.encode("session/defaultChatChanged")
         case .chatTurnStarted: try container.encode("chat/turnStarted")
         case .chatDelta: try container.encode("chat/delta")
@@ -243,7 +262,12 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatError: try container.encode("chat/error")
         case .chatTurnResume: try container.encode("chat/turnResume")
         case .chatActivityChanged: try container.encode("chat/activityChanged")
+        case .chatBackgroundWorkSet: try container.encode("chat/backgroundWorkSet")
+        case .chatBackgroundWorkRemoved: try container.encode("chat/backgroundWorkRemoved")
+        case .chatMovableChanged: try container.encode("chat/movableChanged")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
+        case .chatCanvasesChanged: try container.encode("chat/canvasesChanged")
+        case .canvasStateChanged: try container.encode("canvas/stateChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
         case .sessionTitleChanged: try container.encode("session/titleChanged")
@@ -261,7 +285,10 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatPendingMessageRemoved: try container.encode("chat/pendingMessageRemoved")
         case .chatQueuedMessagesReordered: try container.encode("chat/queuedMessagesReordered")
         case .chatDraftChanged: try container.encode("chat/draftChanged")
+        case .chatIsReadChanged: try container.encode("chat/isReadChanged")
         case .chatIsArchivedChanged: try container.encode("chat/isArchivedChanged")
+        case .chatConfigChanged: try container.encode("chat/configChanged")
+        case .chatMoved: try container.encode("chat/moved")
         case .chatInputRequested: try container.encode("chat/inputRequested")
         case .chatInputAnswerChanged: try container.encode("chat/inputAnswerChanged")
         case .chatInputCompleted: try container.encode("chat/inputCompleted")
@@ -448,7 +475,7 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
     public var chat: String
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
+    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.
     public var changes: PartialChatSummary
 
@@ -460,6 +487,20 @@ public struct SessionChatUpdatedAction: Codable, Sendable {
         self.type = type
         self.chat = chat
         self.changes = changes
+    }
+}
+
+public struct SessionChatsReorderedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Every chat URI in authoritative catalog order.
+    public var chats: [String]
+
+    public init(
+        type: ActionType,
+        chats: [String]
+    ) {
+        self.type = type
+        self.chats = chats
     }
 }
 
@@ -485,7 +526,8 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     public var startedAt: String
     /// The new message
     public var message: Message
-    /// If this turn was auto-started from a queued message, the ID of that message
+    /// If this turn consumes a pending message, its ID. Removes the matching
+    /// entry from {@link ChatState.queuedMessages}.
     public var queuedMessageId: String?
     /// Additional provider-specific metadata for this action.
     ///
@@ -1185,6 +1227,48 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     }
 }
 
+public struct ChatBackgroundWorkSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// The complete entry.
+    public var work: BackgroundWork
+
+    public init(
+        type: ActionType,
+        work: BackgroundWork
+    ) {
+        self.type = type
+        self.work = work
+    }
+}
+
+public struct ChatBackgroundWorkRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The {@link BackgroundWorkBase.id | id} of the entry to remove.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
+public struct ChatMovableChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Whether this chat is structurally eligible to be moved.
+    public var movable: Bool
+
+    public init(
+        type: ActionType,
+        movable: Bool
+    ) {
+        self.type = type
+        self.movable = movable
+    }
+}
+
 public struct ChatChangesetsChangedAction: Codable, Sendable {
     public var type: ActionType
     /// New catalogue, or `undefined` to clear it.
@@ -1196,6 +1280,34 @@ public struct ChatChangesetsChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.changesets = changesets
+    }
+}
+
+public struct ChatCanvasesChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New canvas channel references, or `undefined` to clear the collection.
+    public var canvases: [CanvasReference]?
+
+    public init(
+        type: ActionType,
+        canvases: [CanvasReference]? = nil
+    ) {
+        self.type = type
+        self.canvases = canvases
+    }
+}
+
+public struct CanvasStateChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New authoritative canvas state.
+    public var canvas: CanvasState
+
+    public init(
+        type: ActionType,
+        canvas: CanvasState
+    ) {
+        self.type = type
+        self.canvas = canvas
     }
 }
 
@@ -1256,6 +1368,10 @@ public struct ChatReasoningAction: Codable, Sendable {
     public var partId: String
     /// Reasoning text chunk
     public var content: String
+    /// Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.
+    public var startedAt: String?
+    /// Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.
+    public var duration: Int?
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1270,6 +1386,8 @@ public struct ChatReasoningAction: Codable, Sendable {
         case turnId
         case partId
         case content
+        case startedAt
+        case duration
         case meta = "_meta"
     }
 
@@ -1278,12 +1396,16 @@ public struct ChatReasoningAction: Codable, Sendable {
         turnId: String,
         partId: String,
         content: String,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
         self.partId = partId
         self.content = content
+        self.startedAt = startedAt
+        self.duration = duration
         self.meta = meta
     }
 }
@@ -1530,7 +1652,7 @@ public struct ChatPendingMessageRemovedAction: Codable, Sendable {
 
 public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
     public var type: ActionType
-    /// Queued message IDs in the desired order
+    /// Pending message IDs in the desired raw order
     public var order: [String]
 
     public init(
@@ -1556,6 +1678,20 @@ public struct ChatDraftChangedAction: Codable, Sendable {
     }
 }
 
+public struct ChatIsReadChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Whether the chat has been read
+    public var isRead: Bool
+
+    public init(
+        type: ActionType,
+        isRead: Bool
+    ) {
+        self.type = type
+        self.isRead = isRead
+    }
+}
+
 public struct ChatIsArchivedChangedAction: Codable, Sendable {
     public var type: ActionType
     /// Whether the chat is archived
@@ -1567,6 +1703,46 @@ public struct ChatIsArchivedChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.isArchived = isArchived
+    }
+}
+
+public struct ChatConfigChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Config values to set on the chat
+    public var config: [String: AnyCodable]
+    /// When `true`, replaces the chat's config values instead of merging
+    public var replace: Bool?
+
+    public init(
+        type: ActionType,
+        config: [String: AnyCodable],
+        replace: Bool? = nil
+    ) {
+        self.type = type
+        self.config = config
+        self.replace = replace
+    }
+}
+
+public struct ChatMovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The new owning session URI.
+    public var session: String
+    /// The chat's provider in the new session; absent clears it.
+    public var provider: String?
+    /// The chat's config schema in the new session; absent clears it.
+    public var schema: SessionConfigSchema?
+
+    public init(
+        type: ActionType,
+        session: String,
+        provider: String? = nil,
+        schema: SessionConfigSchema? = nil
+    ) {
+        self.type = type
+        self.session = session
+        self.provider = provider
+        self.schema = schema
     }
 }
 
@@ -2408,14 +2584,27 @@ public struct PartialChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String?
+    /// Aggregate summary of file changes associated with this chat. Servers may
+    /// populate this to give clients a quick at-a-glance view of the chat's
+    /// footprint without requiring the client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Whether this chat is structurally eligible to be the source of
+    /// `moveChat`. Absence means `false`.
+    ///
+    /// See {@link ChatState.movable} for the full semantics.
+    public var movable: Bool?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     public var interactivity: ChatInteractivity?
+    /// Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
     /// The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.
     public var workingDirectories: [String]?
@@ -2426,8 +2615,11 @@ public struct PartialChatSummary: Codable, Sendable {
         status: SessionStatus? = nil,
         activity: String? = nil,
         modifiedAt: String? = nil,
+        changes: ChangesSummary? = nil,
         origin: ChatOrigin? = nil,
+        movable: Bool? = nil,
         interactivity: ChatInteractivity? = nil,
+        provider: String? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.resource = resource
@@ -2435,8 +2627,11 @@ public struct PartialChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
+        self.changes = changes
         self.origin = origin
+        self.movable = movable
         self.interactivity = interactivity
+        self.provider = provider
         self.workingDirectories = workingDirectories
     }
 }
@@ -2452,6 +2647,7 @@ public enum StateAction: Codable, Sendable {
     case sessionChatAdded(SessionChatAddedAction)
     case sessionChatRemoved(SessionChatRemovedAction)
     case sessionChatUpdated(SessionChatUpdatedAction)
+    case sessionChatsReordered(SessionChatsReorderedAction)
     case sessionDefaultChatChanged(SessionDefaultChatChangedAction)
     case chatTurnStarted(ChatTurnStartedAction)
     case chatDelta(ChatDeltaAction)
@@ -2470,7 +2666,12 @@ public enum StateAction: Codable, Sendable {
     case chatError(ChatErrorAction)
     case chatTurnResume(ChatTurnResumeAction)
     case chatActivityChanged(ChatActivityChangedAction)
+    case chatBackgroundWorkSet(ChatBackgroundWorkSetAction)
+    case chatBackgroundWorkRemoved(ChatBackgroundWorkRemovedAction)
+    case chatMovableChanged(ChatMovableChangedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
+    case chatCanvasesChanged(ChatCanvasesChangedAction)
+    case canvasStateChanged(CanvasStateChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
     case chatReasoning(ChatReasoningAction)
@@ -2492,7 +2693,10 @@ public enum StateAction: Codable, Sendable {
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
     case chatDraftChanged(ChatDraftChangedAction)
+    case chatIsReadChanged(ChatIsReadChangedAction)
     case chatIsArchivedChanged(ChatIsArchivedChangedAction)
+    case chatConfigChanged(ChatConfigChangedAction)
+    case chatMoved(ChatMovedAction)
     case chatInputRequested(ChatInputRequestedAction)
     case chatInputAnswerChanged(ChatInputAnswerChangedAction)
     case chatInputCompleted(ChatInputCompletedAction)
@@ -2570,6 +2774,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionChatRemoved(try SessionChatRemovedAction(from: decoder))
         case "session/chatUpdated":
             self = .sessionChatUpdated(try SessionChatUpdatedAction(from: decoder))
+        case "session/chatsReordered":
+            self = .sessionChatsReordered(try SessionChatsReorderedAction(from: decoder))
         case "session/defaultChatChanged":
             self = .sessionDefaultChatChanged(try SessionDefaultChatChangedAction(from: decoder))
         case "chat/turnStarted":
@@ -2606,8 +2812,18 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnResume(try ChatTurnResumeAction(from: decoder))
         case "chat/activityChanged":
             self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
+        case "chat/backgroundWorkSet":
+            self = .chatBackgroundWorkSet(try ChatBackgroundWorkSetAction(from: decoder))
+        case "chat/backgroundWorkRemoved":
+            self = .chatBackgroundWorkRemoved(try ChatBackgroundWorkRemovedAction(from: decoder))
+        case "chat/movableChanged":
+            self = .chatMovableChanged(try ChatMovableChangedAction(from: decoder))
         case "chat/changesetsChanged":
             self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
+        case "chat/canvasesChanged":
+            self = .chatCanvasesChanged(try ChatCanvasesChangedAction(from: decoder))
+        case "canvas/stateChanged":
+            self = .canvasStateChanged(try CanvasStateChangedAction(from: decoder))
         case "session/titleChanged":
             self = .sessionTitleChanged(try SessionTitleChangedAction(from: decoder))
         case "chat/usage":
@@ -2650,8 +2866,14 @@ public enum StateAction: Codable, Sendable {
             self = .chatQueuedMessagesReordered(try ChatQueuedMessagesReorderedAction(from: decoder))
         case "chat/draftChanged":
             self = .chatDraftChanged(try ChatDraftChangedAction(from: decoder))
+        case "chat/isReadChanged":
+            self = .chatIsReadChanged(try ChatIsReadChangedAction(from: decoder))
         case "chat/isArchivedChanged":
             self = .chatIsArchivedChanged(try ChatIsArchivedChangedAction(from: decoder))
+        case "chat/configChanged":
+            self = .chatConfigChanged(try ChatConfigChangedAction(from: decoder))
+        case "chat/moved":
+            self = .chatMoved(try ChatMovedAction(from: decoder))
         case "chat/inputRequested":
             self = .chatInputRequested(try ChatInputRequestedAction(from: decoder))
         case "chat/inputAnswerChanged":
@@ -2768,6 +2990,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionChatAdded(let v): try v.encode(to: encoder)
         case .sessionChatRemoved(let v): try v.encode(to: encoder)
         case .sessionChatUpdated(let v): try v.encode(to: encoder)
+        case .sessionChatsReordered(let v): try v.encode(to: encoder)
         case .sessionDefaultChatChanged(let v): try v.encode(to: encoder)
         case .chatTurnStarted(let v): try v.encode(to: encoder)
         case .chatDelta(let v): try v.encode(to: encoder)
@@ -2786,7 +3009,12 @@ public enum StateAction: Codable, Sendable {
         case .chatError(let v): try v.encode(to: encoder)
         case .chatTurnResume(let v): try v.encode(to: encoder)
         case .chatActivityChanged(let v): try v.encode(to: encoder)
+        case .chatBackgroundWorkSet(let v): try v.encode(to: encoder)
+        case .chatBackgroundWorkRemoved(let v): try v.encode(to: encoder)
+        case .chatMovableChanged(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
+        case .chatCanvasesChanged(let v): try v.encode(to: encoder)
+        case .canvasStateChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)
         case .chatReasoning(let v): try v.encode(to: encoder)
@@ -2808,7 +3036,10 @@ public enum StateAction: Codable, Sendable {
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)
         case .chatDraftChanged(let v): try v.encode(to: encoder)
+        case .chatIsReadChanged(let v): try v.encode(to: encoder)
         case .chatIsArchivedChanged(let v): try v.encode(to: encoder)
+        case .chatConfigChanged(let v): try v.encode(to: encoder)
+        case .chatMoved(let v): try v.encode(to: encoder)
         case .chatInputRequested(let v): try v.encode(to: encoder)
         case .chatInputAnswerChanged(let v): try v.encode(to: encoder)
         case .chatInputCompleted(let v): try v.encode(to: encoder)

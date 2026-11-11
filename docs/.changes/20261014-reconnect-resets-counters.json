@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Experimental windowed subscriptions no longer carry byte counters across `reconnect`. Their counters start at zero on the new connection, and each `reconnect.windows` item offers new limits in `flowControl`, which the result accepts as in `subscribe`. Removes `ChannelReceiveProgress` and the `clientReceive`/`hostReceive` counters from reconnect."
+}

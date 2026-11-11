@@ -1,0 +1,30 @@
+{
+  "description": "removing earlier steering preserves the legacy mirror of a later submission",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending",
+    "status": 1,
+    "modifiedAt": "2026-10-15T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "a", "kind": "steering", "message": { "text": "A", "origin": { "kind": "user" } } },
+      { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "a" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending",
+    "status": 1,
+    "modifiedAt": "2026-10-15T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "b", "kind": "steering", "message": { "text": "B", "origin": { "kind": "user" } } }
+    ]
+  }
+}

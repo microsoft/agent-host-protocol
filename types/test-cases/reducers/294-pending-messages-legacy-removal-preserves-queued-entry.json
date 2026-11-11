@@ -1,0 +1,29 @@
+{
+  "description": "legacy steering removal clears only the snapshot slot when a shared-list entry has a different kind",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": { "id": "same", "message": { "text": "Legacy snapshot", "origin": { "kind": "user" } } },
+    "queuedMessages": [
+      { "id": "same", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } }
+    ]
+  },
+  "actions": [
+    { "type": "chat/pendingMessageRemoved", "kind": "steering", "id": "same" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/pending",
+    "title": "Pending messages",
+    "status": 1,
+    "modifiedAt": "2026-10-14T00:00:00.000Z",
+    "turns": [],
+    "steeringMessage": null,
+    "queuedMessages": [
+      { "id": "same", "kind": "queued", "message": { "text": "Queued", "origin": { "kind": "user" } } }
+    ]
+  }
+}

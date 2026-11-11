@@ -21,6 +21,7 @@ import type {
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
+  SessionChatsReorderedAction,
   SessionDefaultChatChangedAction,
   SessionTitleChangedAction,
   SessionServerToolsChangedAction,
@@ -65,7 +66,11 @@ import type {
   ChatErrorAction,
   ChatTurnResumeAction,
   ChatActivityChangedAction,
+  ChatBackgroundWorkSetAction,
+  ChatBackgroundWorkRemovedAction,
+  ChatMovableChangedAction,
   ChatChangesetsChangedAction,
+  ChatCanvasesChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -74,13 +79,20 @@ import type {
   ChatPendingMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
+  ChatIsReadChangedAction,
   ChatIsArchivedChangedAction,
+  ChatConfigChangedAction,
+  ChatMovedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
   ChatTruncatedAction,
   ChatTurnsLoadedAction,
 } from '../channels-chat/actions.js';
+
+import type {
+  CanvasStateChangedAction,
+} from '../channels-canvas/actions.js';
 
 import type {
   ChangesetStatusChangedAction,
@@ -148,6 +160,7 @@ export const enum ActionType {
   SessionChatAdded = 'session/chatAdded',
   SessionChatRemoved = 'session/chatRemoved',
   SessionChatUpdated = 'session/chatUpdated',
+  SessionChatsReordered = 'session/chatsReordered',
   SessionDefaultChatChanged = 'session/defaultChatChanged',
   ChatTurnStarted = 'chat/turnStarted',
   ChatDelta = 'chat/delta',
@@ -166,7 +179,12 @@ export const enum ActionType {
   ChatError = 'chat/error',
   ChatTurnResume = 'chat/turnResume',
   ChatActivityChanged = 'chat/activityChanged',
+  ChatBackgroundWorkSet = 'chat/backgroundWorkSet',
+  ChatBackgroundWorkRemoved = 'chat/backgroundWorkRemoved',
+  ChatMovableChanged = 'chat/movableChanged',
   ChatChangesetsChanged = 'chat/changesetsChanged',
+  ChatCanvasesChanged = 'chat/canvasesChanged',
+  CanvasStateChanged = 'canvas/stateChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
   SessionTitleChanged = 'session/titleChanged',
@@ -184,7 +202,10 @@ export const enum ActionType {
   ChatPendingMessageRemoved = 'chat/pendingMessageRemoved',
   ChatQueuedMessagesReordered = 'chat/queuedMessagesReordered',
   ChatDraftChanged = 'chat/draftChanged',
+  ChatIsReadChanged = 'chat/isReadChanged',
   ChatIsArchivedChanged = 'chat/isArchivedChanged',
+  ChatConfigChanged = 'chat/configChanged',
+  ChatMoved = 'chat/moved',
   ChatInputRequested = 'chat/inputRequested',
   ChatInputAnswerChanged = 'chat/inputAnswerChanged',
   ChatInputCompleted = 'chat/inputCompleted',
@@ -285,6 +306,7 @@ export type StateAction =
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
+  | SessionChatsReorderedAction
   | SessionDefaultChatChangedAction
   | SessionTitleChangedAction
   | SessionServerToolsChangedAction
@@ -326,7 +348,12 @@ export type StateAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatBackgroundWorkSetAction
+  | ChatBackgroundWorkRemovedAction
+  | ChatMovableChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
+  | CanvasStateChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -335,7 +362,10 @@ export type StateAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatIsReadChangedAction
   | ChatIsArchivedChangedAction
+  | ChatConfigChangedAction
+  | ChatMovedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
