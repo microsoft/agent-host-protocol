@@ -8225,7 +8225,7 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// shared by all native clients (terminal content is checked before session lifecycle).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -8294,16 +8294,17 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
         }
-        else if (root.TryGetProperty("turns", out _))
+        else if (root.TryGetProperty("content", out _))
         {
-            result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
         }
         else if (root.TryGetProperty("lifecycle", out _))
         {
-            // SessionState is discriminated on its required `lifecycle` field.
-            // (It no longer carries `summary`; that field was removed when the
-            // session state was flattened.)
             result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
+        }
+        else if (root.TryGetProperty("turns", out _))
+        {
+            result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
         }
         else if (root.TryGetProperty("instanceId", out _) &&
             root.TryGetProperty("extensionId", out _) &&
@@ -8311,15 +8312,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
         }
-        else if (root.TryGetProperty("content", out _))
-        {
-            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
-        }
-        else if (root.TryGetProperty("status", out _) && root.TryGetProperty("files", out _))
+        else if (root.TryGetProperty("status", out _) &&
+            root.TryGetProperty("files", out _))
         {
             result.Changeset = root.Deserialize(AhpJsonTypeInfo.Get<ChangesetState>(options));
         }
-        else if (root.TryGetProperty("root", out _) && root.TryGetProperty("recursive", out _))
+        else if (root.TryGetProperty("root", out _) &&
+            root.TryGetProperty("recursive", out _))
         {
             result.ResourceWatch = root.Deserialize(AhpJsonTypeInfo.Get<ResourceWatchState>(options));
         }

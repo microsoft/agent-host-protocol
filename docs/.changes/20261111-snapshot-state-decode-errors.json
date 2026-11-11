@@ -1,6 +1,6 @@
 {
   "type": "fixed",
-  "message": "Snapshot state decoding now propagates errors for recognized shapes instead of treating malformed states as unknown.",
-  "targets": ["swift", "rust"],
+  "message": "Snapshot state decoding dispatches terminals before sessions and propagates errors for recognized shapes instead of treating malformed states as unknown.",
+  "targets": ["swift", "rust", "kotlin", "dotnet", "go"],
   "issues": [590]
 }

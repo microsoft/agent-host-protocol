@@ -8193,15 +8193,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. AutomationRunState has required
-        // `automation`, `origin`, and `sessions`; AutomationState has
-        // required `entries`; SessionState has required
-        // `lifecycle`; ChatState has required `turns`; ChangesetState has
-        // required `status` + `files`; ResourceWatchState has required
-        // `root` + `recursive`; AnnotationsState has required `annotations`
-        // (checked after session, whose optional annotations summary reuses the
-        // key); TerminalState has required `content`; RootState is the
-        // catch-all.
+        // Probe distinctive shapes in the shared order so lifecycle and annotations do not shadow other states.
         // An object with no members is an empty state, used by channels whose state has no fields.
         return when {
             obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
@@ -8209,8 +8201,12 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
-            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
-            obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
+            obj.containsKey("content") ->
+                SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
+            obj.containsKey("lifecycle") ->
+                SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("turns") ->
+                SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
                 SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -8219,9 +8215,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
-            obj.containsKey("content") ->
-                SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
-            obj.containsKey("agents") -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            obj.containsKey("agents") ->
+                SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
             // A state from a later protocol version: keep it rather than fail.
             else -> SnapshotState.Unknown(obj)
         }

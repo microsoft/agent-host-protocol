@@ -7067,6 +7067,11 @@ impl<'de> Deserialize<'de> for SnapshotState {
                 .map(Box::new)
                 .map(Self::Automations)
                 .map_err(serde::de::Error::custom)
+        } else if object.contains_key("content") {
+            serde_json::from_value::<TerminalState>(value)
+                .map(Box::new)
+                .map(Self::Terminal)
+                .map_err(serde::de::Error::custom)
         } else if object.contains_key("lifecycle") {
             serde_json::from_value::<SessionState>(value)
                 .map(Box::new)
@@ -7099,11 +7104,6 @@ impl<'de> Deserialize<'de> for SnapshotState {
             serde_json::from_value::<AnnotationsState>(value)
                 .map(Box::new)
                 .map(Self::Annotations)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("content") {
-            serde_json::from_value::<TerminalState>(value)
-                .map(Box::new)
-                .map(Self::Terminal)
                 .map_err(serde::de::Error::custom)
         } else if object.contains_key("agents") {
             serde_json::from_value::<RootState>(value)

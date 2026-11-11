@@ -2409,7 +2409,7 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
     public let value: Any
 
     public init(_ value: Any) {
-        self.value = value
+        self.value = (value as? AnyCodable)?.value ?? value
     }
 
     public init(from decoder: Decoder) throws {
@@ -2485,12 +2485,22 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
         }
     }
 
+    private static func booleanValue(_ value: Any) -> Bool? {
+        if type(of: value) == Bool.self { return value as? Bool }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+
     public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool {
+        let lhsBool = booleanValue(lhs.value)
+        let rhsBool = booleanValue(rhs.value)
+        if lhsBool != nil || rhsBool != nil {
+            return lhsBool == rhsBool
+        }
         switch (lhs.value, rhs.value) {
         case is (NSNull, NSNull):
             return true
-        case let (lhs as Bool, rhs as Bool):
-            return lhs == rhs
         case let (lhs as Int, rhs as Int):
             return lhs == rhs
         case let (lhs as Double, rhs as Double):
@@ -2499,12 +2509,14 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
             return lhs == rhs
         case let (lhs as [Any], rhs as [Any]):
             guard lhs.count == rhs.count else { return false }
-            return zip(lhs, rhs).allSatisfy { AnyCodable($0) == AnyCodable($1) }
+            return zip(lhs, rhs).allSatisfy {
+                ($0 as? AnyCodable ?? AnyCodable($0)) == ($1 as? AnyCodable ?? AnyCodable($1))
+            }
         case let (lhs as [String: Any], rhs as [String: Any]):
             guard lhs.count == rhs.count else { return false }
             return lhs.allSatisfy { key, val in
                 guard let other = rhs[key] else { return false }
-                return AnyCodable(val) == AnyCodable(other)
+                return (val as? AnyCodable ?? AnyCodable(val)) == (other as? AnyCodable ?? AnyCodable(other))
             }
         default:
             return false

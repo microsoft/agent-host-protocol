@@ -9898,6 +9898,8 @@ public enum SnapshotState: Codable, Sendable, Equatable {
             self = .automationRun(try AutomationRunState(from: decoder))
         } else if keys.contains("entries") {
             self = .automations(try AutomationState(from: decoder))
+        } else if keys.contains("content") {
+            self = .terminal(try TerminalState(from: decoder))
         } else if keys.contains("lifecycle") {
             self = .session(try SessionState(from: decoder))
         } else if keys.contains("turns") {
@@ -9910,8 +9912,6 @@ public enum SnapshotState: Codable, Sendable, Equatable {
             self = .resourceWatch(try ResourceWatchState(from: decoder))
         } else if keys.contains("annotations") {
             self = .annotations(try AnnotationsState(from: decoder))
-        } else if keys.contains("content") {
-            self = .terminal(try TerminalState(from: decoder))
         } else if keys.contains("agents") {
             self = .root(try RootState(from: decoder))
         } else {

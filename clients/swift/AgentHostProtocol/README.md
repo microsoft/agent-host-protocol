@@ -60,6 +60,11 @@ Task {
         switch event.event {
         case .action(let envelope):
             await mirror.apply(envelope)
+        case .actionDecodingFailed(let channel, _, _, _, _):
+            let (result, _) = try await client.subscribe(channel)
+            if let snapshot = result.snapshot {
+                await mirror.applySnapshot(snapshot)
+            }
         case .sessionAdded, .sessionRemoved, .sessionSummaryChanged, .authRequired:
             // Protocol notifications are ephemeral and are not replayed on
             // reconnect. Apps commonly refresh listSessions() after reconnect.

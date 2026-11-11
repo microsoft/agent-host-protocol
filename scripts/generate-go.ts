@@ -40,6 +40,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { SNAPSHOT_STATE_SHAPES } from './snapshot-state-shapes.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
@@ -1339,9 +1340,8 @@ function generateSnapshotState(): string {
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
 // automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
+// for required fields in the order shared by all native clients (terminal
+// content is checked before session lifecycle). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -1403,66 +1403,14 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \tswitch {
 \tcase len(probe) == 0:
 \t\ts.Empty = &EmptyState{}
-\tcase containsAll(probe, "automation", "origin", "sessions"):
-\t\tvar v AutomationRunState
+${SNAPSHOT_STATE_SHAPES.map(({ variant, type, keys }) =>
+    `\tcase containsAll(probe, ${keys.map(key => `"${key}"`).join(', ')}):
+\t\tvar v ${type}
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
-\t\ts.AutomationRun = &v
-\tcase containsAll(probe, "entries"):
-\t\tvar v AutomationState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Automations = &v
-\tcase containsAll(probe, "lifecycle"):
-\t\tvar v SessionState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Session = &v
-\tcase containsAll(probe, "turns"):
-\t\tvar v ChatState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Chat = &v
-\tcase containsAll(probe, "instanceId", "extensionId", "canvasId"):
-\t\tvar v CanvasState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Canvas = &v
-\tcase containsAll(probe, "content"):
-\t\tvar v TerminalState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Terminal = &v
-\tcase containsAll(probe, "status", "files"):
-\t\tvar v ChangesetState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Changeset = &v
-\tcase containsAll(probe, "root", "recursive"):
-\t\tvar v ResourceWatchState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.ResourceWatch = &v
-\tcase containsAll(probe, "annotations"):
-\t\tvar v AnnotationsState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Annotations = &v
-\tcase containsAll(probe, "agents"):
-\t\tvar v RootState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Root = &v
+\t\ts.${variant} = &v`
+  ).join('\n')}
 \tdefault:
 \t\t// A state from a later protocol version: keep it rather than fail.
 \t\ts.Unknown = append(json.RawMessage(nil), data...)

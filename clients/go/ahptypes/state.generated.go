@@ -7097,9 +7097,8 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
 // automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
+// for required fields in the order shared by all native clients (terminal
+// content is checked before session lifecycle). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -7173,6 +7172,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Automations = &v
+	case containsAll(probe, "content"):
+		var v TerminalState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Terminal = &v
 	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {
@@ -7191,12 +7196,6 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Canvas = &v
-	case containsAll(probe, "content"):
-		var v TerminalState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Terminal = &v
 	case containsAll(probe, "status", "files"):
 		var v ChangesetState
 		if err := json.Unmarshal(data, &v); err != nil {
