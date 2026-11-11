@@ -37,6 +37,79 @@ final class AHPClientTests: XCTestCase {
         await client.shutdown()
     }
 
+    // MARK: - typed requests
+
+    func testTypedRequestInfersResultAndPreservesParams() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+
+        let serverTask = Task {
+            let request = try await readRequest(from: serverSide, expectedMethod: "listSessions")
+            let paramsData = try JSONEncoder().encode(XCTUnwrap(request.params))
+            let params = try JSONDecoder().decode(ListSessionsParams.self, from: paramsData)
+            XCTAssertEqual(params.channel, RootResourceURI)
+            XCTAssertEqual(params.limit, 7)
+            XCTAssertEqual(params.cursor, "page-1")
+            XCTAssertEqual(params.meta?["trace"]?.value as? String, "trace-1")
+            let result = ListSessionsResult(nextCursor: "page-2", items: [SessionSummary(
+                provider: "test",
+                title: "Session",
+                status: .idle,
+                resource: "ahp-session:/s1",
+                createdAt: "1970-01-01T00:00:00.001Z",
+                modifiedAt: "1970-01-01T00:00:00.001Z"
+            )])
+            try await respond(to: request.id, with: result, on: serverSide)
+        }
+
+        let result = try await client.request(ListSessionsParams(
+            channel: RootResourceURI,
+            meta: ["trace": AnyCodable("trace-1")],
+            limit: 7,
+            cursor: "page-1"
+        ))
+        XCTAssertEqual(result.items.map(\.resource), ["ahp-session:/s1"])
+        XCTAssertEqual(result.nextCursor, "page-2")
+
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testTypedNullResultAcceptsNullAndRejectsPayload() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+
+        let serverTask = Task {
+            let create = try await readRequest(from: serverSide, expectedMethod: "createSession")
+            let paramsData = try JSONEncoder().encode(XCTUnwrap(create.params))
+            let params = try JSONDecoder().decode(CreateSessionParams.self, from: paramsData)
+            XCTAssertEqual(params.channel, "ahp-session:/s1")
+            XCTAssertEqual(params.provider, "test")
+            try await respond(to: create.id, with: AnyCodable(NSNull()), on: serverSide)
+
+            let dispose = try await readRequest(from: serverSide, expectedMethod: "disposeSession")
+            try await respond(to: dispose.id, with: [String: String](), on: serverSide)
+        }
+
+        let _: AHPNullResult = try await client.request(CreateSessionParams(
+            channel: "ahp-session:/s1", provider: "test"
+        ))
+        do {
+            try await client.request(DisposeSessionParams(channel: "ahp-session:/s1"))
+            XCTFail("expected a decoding error for a non-null result")
+        } catch let error as AHPClientError {
+            guard case .decoding = error else {
+                XCTFail("expected .decoding, got \(error)")
+                return
+            }
+        }
+
+        try await serverTask.value
+        await client.shutdown()
+    }
+
     // MARK: - ping
 
     func testPingTargetsRootChannelAndResolvesOnNullResult() async throws {

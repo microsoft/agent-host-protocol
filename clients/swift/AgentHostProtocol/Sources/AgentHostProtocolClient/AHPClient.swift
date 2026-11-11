@@ -266,7 +266,7 @@ public actor AHPClient {
             clientId: clientId,
             initialSubscriptions: initialSubscriptions.isEmpty ? nil : initialSubscriptions
         )
-        let result: InitializeResult = try await request(method: "initialize", params: params)
+        let result: InitializeResult = try await request(params)
         if result.serverSeq > lastSeenServerSeq {
             lastSeenServerSeq = result.serverSeq
         }
@@ -290,7 +290,7 @@ public actor AHPClient {
             lastSeenServerSeq: lastSeenServerSeq,
             subscriptions: subscriptions
         )
-        let result: ReconnectResult = try await request(method: "reconnect", params: params)
+        let result: ReconnectResult = try await request(params)
         switch result {
         case .replay(let r):
             if let last = r.actions.last, last.serverSeq > self.lastSeenServerSeq {
@@ -318,8 +318,7 @@ public actor AHPClient {
     /// distinct from transport-level WebSocket ping frames exposed via
     /// ``AHPKeepAliveTransport``.
     public func ping() async throws {
-        let paramsData = try encoder.encode([ "channel": RootResourceURI ])
-        _ = try await requestRaw(method: "ping", paramsData: paramsData)
+        _ = try await request(PingParams(channel: RootResourceURI))
     }
 
     /// Subscribe to a channel URI. Returns the subscribe result and a fresh
@@ -336,10 +335,7 @@ public actor AHPClient {
     ) async throws -> (SubscribeResult, AsyncStream<SubscriptionEvent>) {
         let (stream, listenerId) = attachSubscriptionInternal(uri)
         do {
-            let result: SubscribeResult = try await request(
-                method: "subscribe",
-                params: SubscribeParams(channel: uri, delivery: delivery, view: view)
-            )
+            let result = try await request(SubscribeParams(channel: uri, delivery: delivery, view: view))
             return (result, stream)
         } catch {
             removeAndFinishSubscriptionListener(uri: uri, id: listenerId)
@@ -439,7 +435,7 @@ public actor AHPClient {
     public func resourceRead(_ params: ResourceReadParams) async throws -> ResourceReadResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceRead", params: params)
+        return try await request(params)
     }
 
     /// Write content to a resource (`resourceWrite`).
@@ -447,7 +443,7 @@ public actor AHPClient {
     public func resourceWrite(_ params: ResourceWriteParams) async throws -> ResourceWriteResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceWrite", params: params)
+        return try await request(params)
     }
 
     /// List the children of a resource (`resourceList`).
@@ -455,7 +451,7 @@ public actor AHPClient {
     public func resourceList(_ params: ResourceListParams) async throws -> ResourceListResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceList", params: params)
+        return try await request(params)
     }
 
     /// Copy a resource (`resourceCopy`).
@@ -463,7 +459,7 @@ public actor AHPClient {
     public func resourceCopy(_ params: ResourceCopyParams) async throws -> ResourceCopyResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceCopy", params: params)
+        return try await request(params)
     }
 
     /// Delete a resource (`resourceDelete`).
@@ -471,7 +467,7 @@ public actor AHPClient {
     public func resourceDelete(_ params: ResourceDeleteParams) async throws -> ResourceDeleteResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceDelete", params: params)
+        return try await request(params)
     }
 
     /// Move or rename a resource (`resourceMove`).
@@ -479,7 +475,7 @@ public actor AHPClient {
     public func resourceMove(_ params: ResourceMoveParams) async throws -> ResourceMoveResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceMove", params: params)
+        return try await request(params)
     }
 
     /// Resolve a resource URI to its canonical form (`resourceResolve`).
@@ -487,7 +483,7 @@ public actor AHPClient {
     public func resourceResolve(_ params: ResourceResolveParams) async throws -> ResourceResolveResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceResolve", params: params)
+        return try await request(params)
     }
 
     /// Create a directory resource (`resourceMkdir`).
@@ -495,7 +491,7 @@ public actor AHPClient {
     public func resourceMkdir(_ params: ResourceMkdirParams) async throws -> ResourceMkdirResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceMkdir", params: params)
+        return try await request(params)
     }
 
     /// Issue a free-form resource request (`resourceRequest`).
@@ -503,7 +499,7 @@ public actor AHPClient {
     public func resourceRequest(_ params: ResourceRequestParams) async throws -> ResourceRequestResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "resourceRequest", params: params)
+        return try await request(params)
     }
 
     /// Create a resource watch channel (`createResourceWatch`). Pair the
@@ -512,7 +508,7 @@ public actor AHPClient {
     public func createResourceWatch(_ params: CreateResourceWatchParams) async throws -> CreateResourceWatchResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "createResourceWatch", params: params)
+        return try await request(params)
     }
 
     // MARK: - Completions commands (send)
@@ -525,7 +521,7 @@ public actor AHPClient {
     /// flooding the server on every keystroke.
     @discardableResult
     public func completions(_ params: CompletionsParams) async throws -> CompletionsResult {
-        return try await request(method: "completions", params: params)
+        return try await request(params)
     }
 
     /// Query the server for allowed values of a dynamic session config property
@@ -535,7 +531,7 @@ public actor AHPClient {
     public func sessionConfigCompletions(_ params: SessionConfigCompletionsParams) async throws -> SessionConfigCompletionsResult {
         var params = params
         params.channel = RootResourceURI
-        return try await request(method: "sessionConfigCompletions", params: params)
+        return try await request(params)
     }
 
     // MARK: - Server-initiated requests (inbound)
@@ -564,6 +560,14 @@ public actor AHPClient {
     }
 
     // MARK: - Generic request
+
+    /// Send a protocol command using its generated method and result type.
+    /// Params (including the channel) are sent as supplied. Null results decode
+    /// as `AHPNullResult`. Cancellation and errors match `request(method:params:)`.
+    @discardableResult
+    public func request<C: AHPCommand>(_ params: C) async throws -> C.Result {
+        try await request(method: C.method, params: params)
+    }
 
     /// Send a JSON-RPC request and await its decoded result.
     ///

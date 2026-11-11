@@ -498,6 +498,27 @@ public struct InitializeResult: Codable, Sendable {
     }
 }
 
+public struct PingParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
 public struct ClientCapabilities: Codable, Sendable {
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -2741,4 +2762,192 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(range, forKey: .range)
         try container.encodeIfPresent(nonce, forKey: .nonce)
     }
+}
+
+// MARK: - Typed Commands
+
+/// A protocol command whose params determine its method and result type.
+public protocol AHPCommand: Encodable, Sendable {
+    associatedtype Result: Decodable, Sendable
+    static var method: String { get }
+}
+
+/// The JSON null result returned by commands with no response payload.
+public struct AHPNullResult: Codable, Sendable {
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard container.decodeNil() else {
+            throw DecodingError.typeMismatch(Self.self, DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected a null command result"
+            ))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
+    }
+}
+
+extension InitializeParams: AHPCommand {
+    public typealias Result = InitializeResult
+    public static let method = "initialize"
+}
+
+extension PingParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "ping"
+}
+
+extension ReconnectParams: AHPCommand {
+    public typealias Result = ReconnectResult
+    public static let method = "reconnect"
+}
+
+extension SubscribeParams: AHPCommand {
+    public typealias Result = SubscribeResult
+    public static let method = "subscribe"
+}
+
+extension CreateSessionParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createSession"
+}
+
+extension DisposeSessionParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeSession"
+}
+
+extension CreateChatParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createChat"
+}
+
+extension CreateTcpConnectionParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createTcpConnection"
+}
+
+extension MoveChatParams: AHPCommand {
+    public typealias Result = MoveChatResult
+    public static let method = "moveChat"
+}
+
+extension DisposeChatParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeChat"
+}
+
+extension CreateTerminalParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createTerminal"
+}
+
+extension DisposeTerminalParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeTerminal"
+}
+
+extension CreateResourceWatchParams: AHPCommand {
+    public typealias Result = CreateResourceWatchResult
+    public static let method = "createResourceWatch"
+}
+
+extension ListSessionsParams: AHPCommand {
+    public typealias Result = ListSessionsResult
+    public static let method = "listSessions"
+}
+
+extension ResourceReadParams: AHPCommand {
+    public typealias Result = ResourceReadResult
+    public static let method = "resourceRead"
+}
+
+extension ResourceWriteParams: AHPCommand {
+    public typealias Result = ResourceWriteResult
+    public static let method = "resourceWrite"
+}
+
+extension ResourceListParams: AHPCommand {
+    public typealias Result = ResourceListResult
+    public static let method = "resourceList"
+}
+
+extension ResourceCopyParams: AHPCommand {
+    public typealias Result = ResourceCopyResult
+    public static let method = "resourceCopy"
+}
+
+extension ResourceDeleteParams: AHPCommand {
+    public typealias Result = ResourceDeleteResult
+    public static let method = "resourceDelete"
+}
+
+extension ResourceMoveParams: AHPCommand {
+    public typealias Result = ResourceMoveResult
+    public static let method = "resourceMove"
+}
+
+extension ResourceResolveParams: AHPCommand {
+    public typealias Result = ResourceResolveResult
+    public static let method = "resourceResolve"
+}
+
+extension ResourceMkdirParams: AHPCommand {
+    public typealias Result = ResourceMkdirResult
+    public static let method = "resourceMkdir"
+}
+
+extension ResourceRequestParams: AHPCommand {
+    public typealias Result = ResourceRequestResult
+    public static let method = "resourceRequest"
+}
+
+extension FetchTurnsParams: AHPCommand {
+    public typealias Result = FetchTurnsResult
+    public static let method = "fetchTurns"
+}
+
+extension AuthenticateParams: AHPCommand {
+    public typealias Result = AuthenticateResult
+    public static let method = "authenticate"
+}
+
+extension ResolveSessionConfigParams: AHPCommand {
+    public typealias Result = ResolveSessionConfigResult
+    public static let method = "resolveSessionConfig"
+}
+
+extension SessionConfigCompletionsParams: AHPCommand {
+    public typealias Result = SessionConfigCompletionsResult
+    public static let method = "sessionConfigCompletions"
+}
+
+extension CompletionsParams: AHPCommand {
+    public typealias Result = CompletionsResult
+    public static let method = "completions"
+}
+
+extension InvokeChangesetOperationParams: AHPCommand {
+    public typealias Result = InvokeChangesetOperationResult
+    public static let method = "invokeChangesetOperation"
+}
+
+extension ListAutomationTriggerDefinitionsParams: AHPCommand {
+    public typealias Result = ListAutomationTriggerDefinitionsResult
+    public static let method = "listAutomationTriggerDefinitions"
+}
+
+extension RunAutomationParams: AHPCommand {
+    public typealias Result = RunAutomationResult
+    public static let method = "runAutomation"
+}
+
+extension FetchAutomationRunsParams: AHPCommand {
+    public typealias Result = FetchAutomationRunsResult
+    public static let method = "fetchAutomationRuns"
 }

@@ -17,6 +17,7 @@ import {
   EnumDeclaration,
   PropertySignature,
   SourceFile,
+  Node,
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
@@ -1707,7 +1708,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
-  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
+  'InitializeParams', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
@@ -1785,6 +1786,55 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
+function generateCommandConformances(project: Project): string {
+  const commandMap = findInterface(project, 'CommandMap');
+  if (!commandMap) throw new Error('Interface CommandMap not found');
+
+  const lines = [`/// A protocol command whose params determine its method and result type.
+public protocol AHPCommand: Encodable, Sendable {
+    associatedtype Result: Decodable, Sendable
+    static var method: String { get }
+}
+
+/// The JSON null result returned by commands with no response payload.
+public struct AHPNullResult: Codable, Sendable {
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard container.decodeNil() else {
+            throw DecodingError.typeMismatch(Self.self, DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected a null command result"
+            ))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
+    }
+}
+`];
+
+  for (const property of commandMap.getProperties()) {
+    const command = property.getTypeNodeOrThrow();
+    if (!Node.isTypeLiteral(command)) {
+      throw new Error(`Expected a type literal for CommandMap.${property.getName()}`);
+    }
+    const method = property.getName().replace(/^['"]|['"]$/g, '');
+    const params = mapType(command.getPropertyOrThrow('params').getTypeNodeOrThrow().getText());
+    const resultType = command.getPropertyOrThrow('result').getTypeNodeOrThrow().getText();
+    const result = resultType === 'null' || resultType === 'void' ? 'AHPNullResult' : mapType(resultType);
+    lines.push(`extension ${params}: AHPCommand {
+    public typealias Result = ${result}
+    public static let method = ${JSON.stringify(method)}
+}
+`);
+  }
+  return lines.join('\n');
+}
+
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1842,6 +1892,9 @@ function generateCommandsFile(project: Project): string {
   lines.push('// MARK: - Changeset Operation Unions\n');
   lines.push(generateChangesetOperationTargetSwift());
   lines.push('');
+
+  lines.push('// MARK: - Typed Commands\n');
+  lines.push(generateCommandConformances(project));
 
   return lines.join('\n');
 }
@@ -2210,8 +2263,7 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "initialize", params: params)
     }
 
-    // \`ping\` carries no payload beyond the root channel discriminant, so there is
-    // no dedicated \`PingParams\` type. The helper hardcodes the channel object.
+    // Preserve the dictionary-based helper's public signature for compatibility.
     public static func ping(id: Int) -> JsonRpcRequest<[String: String]> {
         JsonRpcRequest(id: id, method: "ping", params: ["channel": "ahp-root://"])
     }
@@ -2484,7 +2536,6 @@ function checkExhaustiveness(project: Project): void {
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
     'SessionToolCallConfirmedAction', // emitted as merged variant
-    'PingParams',                    // empty interface; no Swift type emitted (AHPCommands.ping hardcodes the channel)
     'TerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
     'TerminalContentPart',           // TERMINAL_CONTENT_PART_UNION discriminated union
     'ChatInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
