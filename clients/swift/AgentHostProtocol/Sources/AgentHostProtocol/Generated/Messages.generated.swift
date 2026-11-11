@@ -20,7 +20,7 @@ public struct JsonRpcRequest<Params: Codable>: Codable, Sendable where Params: S
 }
 
 /// A JSON-RPC 2.0 error object.
-public struct JsonRpcError: Codable, Sendable {
+public struct JsonRpcError: Codable, Sendable, Equatable {
     public let code: Int
     public let message: String
     public let data: AnyCodable?
@@ -40,7 +40,7 @@ public struct JsonRpcSuccessResponse<Result: Codable>: Codable, Sendable where R
 }
 
 /// A JSON-RPC 2.0 error response.
-public struct JsonRpcErrorResponse: Codable, Sendable {
+public struct JsonRpcErrorResponse: Codable, Sendable, Equatable {
     public let jsonrpc: String
     public let id: Int
     public let error: JsonRpcError
@@ -58,6 +58,10 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
         self.params = params
     }
 }
+
+extension JsonRpcRequest: Equatable where Params: Equatable {}
+extension JsonRpcSuccessResponse: Equatable where Result: Equatable {}
+extension JsonRpcNotification: Equatable where Params: Equatable {}
 
 // MARK: - Server → Client Notification Params
 

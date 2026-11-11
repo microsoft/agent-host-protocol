@@ -43,7 +43,7 @@ public enum AhpErrorCodes {
 
 // MARK: - Error Detail Payloads
 
-public struct AuthRequiredErrorData: Codable, Sendable {
+public struct AuthRequiredErrorData: Codable, Sendable, Equatable {
     /// Protected resources that require authentication.
     public var resources: [ProtectedResourceMetadata]
 
@@ -54,7 +54,7 @@ public struct AuthRequiredErrorData: Codable, Sendable {
     }
 }
 
-public struct PermissionDeniedErrorData: Codable, Sendable {
+public struct PermissionDeniedErrorData: Codable, Sendable, Equatable {
     /// The resource access that, if granted via `resourceRequest`, would unlock
     /// the operation. Omitted when no specific access grant would resolve the
     /// denial (for example, when the resource is fundamentally inaccessible).
@@ -67,7 +67,7 @@ public struct PermissionDeniedErrorData: Codable, Sendable {
     }
 }
 
-public struct UnsupportedProtocolVersionErrorData: Codable, Sendable {
+public struct UnsupportedProtocolVersionErrorData: Codable, Sendable, Equatable {
     /// Protocol versions the server is willing to speak.
     ///
     /// Each entry is either a [SemVer](https://semver.org) `MAJOR.MINOR.PATCH`

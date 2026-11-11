@@ -33,7 +33,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
         }
     }
 
-    private struct MarkdownWrapper: Codable {
+    private struct MarkdownWrapper: Codable, Equatable {
         let markdown: String
     }
 }
@@ -1170,7 +1170,7 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
 /// notifications. TCP connections do not survive the loss of the AHP connection.
 ///
 /// Stability: 1.0 - Early development.
-public struct TcpConnectionsCapability: Codable, Sendable {
+public struct TcpConnectionsCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1188,7 +1188,7 @@ public struct TcpConnectionsCapability: Codable, Sendable {
 /// `windowBytes + maximumFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelReceiveLimits: Codable, Sendable {
+public struct ChannelReceiveLimits: Codable, Sendable, Equatable {
     /// The target amount of outstanding data. This is a soft target.
     /// The sender MUST NOT send a data message or fragment while outstanding data
     /// is equal to or greater than this value. The last message or fragment sent
@@ -1217,7 +1217,7 @@ public struct ChannelReceiveLimits: Codable, Sendable {
 /// zero when the subscription starts.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelFlowControl: Codable, Sendable {
+public struct ChannelFlowControl: Codable, Sendable, Equatable {
     /// Limits for data that the server sends to the client.
     public var clientReceive: ChannelReceiveLimits
     /// Limits for data that the client sends to the server.
@@ -1240,7 +1240,7 @@ public struct ChannelFlowControl: Codable, Sendable {
 /// closes the stream.
 ///
 /// Stability: 1.0 - Early development.
-public struct ResumedChannelSubscription: Codable, Sendable {
+public struct ResumedChannelSubscription: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// The limits that the server accepted for the new connection, as in a
@@ -1261,7 +1261,7 @@ public struct ResumedChannelSubscription: Codable, Sendable {
     }
 }
 
-public struct Icon: Codable, Sendable {
+public struct Icon: Codable, Sendable, Equatable {
     /// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
     /// `data:` URI with Base64-encoded image data.
     ///
@@ -1299,7 +1299,7 @@ public struct Icon: Codable, Sendable {
     }
 }
 
-public struct ProtectedResourceMetadata: Codable, Sendable {
+public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
     /// REQUIRED. The protected resource's resource identifier, a URL using the
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
     public var resource: String
@@ -1373,7 +1373,7 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
     }
 }
 
-public struct RootState: Codable, Sendable {
+public struct RootState: Codable, Sendable, Equatable {
     /// Available agent backends and their models
     public var agents: [AgentInfo]
     /// Number of active (non-disposed) sessions on the server
@@ -1410,7 +1410,7 @@ public struct RootState: Codable, Sendable {
     }
 }
 
-public struct RootConfigState: Codable, Sendable {
+public struct RootConfigState: Codable, Sendable, Equatable {
     /// JSON Schema describing available configuration properties
     public var schema: ConfigSchema
     /// Current configuration values
@@ -1425,7 +1425,7 @@ public struct RootConfigState: Codable, Sendable {
     }
 }
 
-public struct AgentInfo: Codable, Sendable {
+public struct AgentInfo: Codable, Sendable, Equatable {
     /// Agent provider ID (e.g. `'copilot'`)
     public var provider: String
     /// Human-readable name
@@ -1478,7 +1478,7 @@ public struct AgentInfo: Codable, Sendable {
     }
 }
 
-public struct AgentCapabilities: Codable, Sendable {
+public struct AgentCapabilities: Codable, Sendable, Equatable {
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1505,7 +1505,7 @@ public struct AgentCapabilities: Codable, Sendable {
     }
 }
 
-public struct MultipleChatsCapability: Codable, Sendable {
+public struct MultipleChatsCapability: Codable, Sendable, Equatable {
     /// The agent can fork a chat from a specific turn. When absent or `false`,
     /// clients MUST NOT pass a {@link ChatSource} with `kind: "fork"` to
     /// `createChat`.
@@ -1532,7 +1532,7 @@ public struct MultipleChatsCapability: Codable, Sendable {
     }
 }
 
-public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
+public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable {
     /// The agent's **first** working directory (index `0` of
     /// {@link CreateSessionParams.workingDirectories}) is an immutable primary:
     /// its URI is fixed for the lifetime of the session — clients MUST NOT remove,
@@ -1570,7 +1570,7 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
     }
 }
 
-public struct SessionModelInfo: Codable, Sendable {
+public struct SessionModelInfo: Codable, Sendable, Equatable {
     /// Model identifier
     public var id: String
     /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
@@ -1646,7 +1646,7 @@ public struct SessionModelInfo: Codable, Sendable {
     }
 }
 
-public struct ModelSelection: Codable, Sendable {
+public struct ModelSelection: Codable, Sendable, Equatable {
     /// Model identifier
     public var id: String
     /// Model-specific configuration values. Values are JSON primitives: most
@@ -1663,7 +1663,7 @@ public struct ModelSelection: Codable, Sendable {
     }
 }
 
-public struct AgentSelection: Codable, Sendable {
+public struct AgentSelection: Codable, Sendable, Equatable {
     /// Stable agent URI (matches an {@link AgentCustomization.uri}).
     public var uri: String
 
@@ -1674,7 +1674,7 @@ public struct AgentSelection: Codable, Sendable {
     }
 }
 
-public final class ConfigPropertySchema: Codable, @unchecked Sendable {
+public final class ConfigPropertySchema: Codable, @unchecked Sendable, Equatable {
     /// JSON Schema: property type
     public var type: String
     /// JSON Schema: human-readable label for the property
@@ -1752,9 +1752,26 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
         self.required = required
         self.additionalProperties = additionalProperties
     }
+
+    public static func == (lhs: ConfigPropertySchema, rhs: ConfigPropertySchema) -> Bool {
+        lhs.type == rhs.type &&
+        lhs.title == rhs.title &&
+        lhs.description == rhs.description &&
+        lhs.`default` == rhs.`default` &&
+        lhs.`enum` == rhs.`enum` &&
+        lhs.enumLabels == rhs.enumLabels &&
+        lhs.enumDescriptions == rhs.enumDescriptions &&
+        lhs.readOnly == rhs.readOnly &&
+        lhs.items == rhs.items &&
+        lhs.minItems == rhs.minItems &&
+        lhs.maxItems == rhs.maxItems &&
+        lhs.properties == rhs.properties &&
+        lhs.required == rhs.required &&
+        lhs.additionalProperties == rhs.additionalProperties
+    }
 }
 
-public struct ConfigSchema: Codable, Sendable {
+public struct ConfigSchema: Codable, Sendable, Equatable {
     /// JSON Schema: always `'object'`
     public var type: String
     /// JSON Schema: property descriptors keyed by property id
@@ -1773,7 +1790,7 @@ public struct ConfigSchema: Codable, Sendable {
     }
 }
 
-public struct PendingMessage: Codable, Sendable {
+public struct PendingMessage: Codable, Sendable, Equatable {
     /// Unique identifier for this pending message
     public var id: String
     /// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
@@ -1792,7 +1809,7 @@ public struct PendingMessage: Codable, Sendable {
     }
 }
 
-public struct ChatState: Codable, Sendable {
+public struct ChatState: Codable, Sendable, Equatable {
     /// Chat URI
     public var resource: String
     /// Chat title
@@ -1978,7 +1995,7 @@ public struct ChatState: Codable, Sendable {
     }
 }
 
-public struct ChatSummary: Codable, Sendable {
+public struct ChatSummary: Codable, Sendable, Equatable {
     /// Chat URI
     public var resource: String
     /// Chat title
@@ -2041,7 +2058,7 @@ public struct ChatSummary: Codable, Sendable {
     }
 }
 
-public struct SideChatSelection: Codable, Sendable {
+public struct SideChatSelection: Codable, Sendable, Equatable {
     /// Exact selected-text snapshot captured at `createChat` acceptance.
     ///
     /// MUST be non-empty.
@@ -2062,7 +2079,7 @@ public struct SideChatSelection: Codable, Sendable {
     }
 }
 
-public struct SessionState: Codable, Sendable {
+public struct SessionState: Codable, Sendable, Equatable {
     /// Agent provider ID
     public var provider: String
     /// Session title
@@ -2235,7 +2252,7 @@ public struct SessionState: Codable, Sendable {
     }
 }
 
-public struct SessionActiveClient: Codable, Sendable {
+public struct SessionActiveClient: Codable, Sendable, Equatable {
     /// Client identifier (matches `clientId` from `initialize`)
     public var clientId: String
     /// Human-readable client name (e.g. `"VS Code"`)
@@ -2263,7 +2280,7 @@ public struct SessionActiveClient: Codable, Sendable {
     }
 }
 
-public struct BackgroundShellWork: Codable, Sendable {
+public struct BackgroundShellWork: Codable, Sendable, Equatable {
     /// Identifier of this entry, unique within the owning chat across all kinds.
     /// The host derives it however it likes (for example from the kind plus the
     /// agent's own task id); consumers MUST treat it as opaque. It is the key for
@@ -2314,7 +2331,7 @@ public struct BackgroundShellWork: Codable, Sendable {
     }
 }
 
-public struct BackgroundSubagentWork: Codable, Sendable {
+public struct BackgroundSubagentWork: Codable, Sendable, Equatable {
     /// Identifier of this entry, unique within the owning chat across all kinds.
     /// The host derives it however it likes (for example from the kind plus the
     /// agent's own task id); consumers MUST treat it as opaque. It is the key for
@@ -2358,7 +2375,7 @@ public struct BackgroundSubagentWork: Codable, Sendable {
     }
 }
 
-public struct SessionChatInputRequest: Codable, Sendable {
+public struct SessionChatInputRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2386,7 +2403,7 @@ public struct SessionChatInputRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolConfirmationRequest: Codable, Sendable {
+public struct SessionToolConfirmationRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2418,7 +2435,7 @@ public struct SessionToolConfirmationRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolClientExecutionRequest: Codable, Sendable {
+public struct SessionToolClientExecutionRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2456,7 +2473,7 @@ public struct SessionToolClientExecutionRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolAuthenticationRequest: Codable, Sendable {
+public struct SessionToolAuthenticationRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2488,7 +2505,7 @@ public struct SessionToolAuthenticationRequest: Codable, Sendable {
     }
 }
 
-public struct SessionSummary: Codable, Sendable {
+public struct SessionSummary: Codable, Sendable, Equatable {
     /// Agent provider ID
     public var provider: String
     /// Session title
@@ -2591,7 +2608,7 @@ public struct SessionSummary: Codable, Sendable {
     }
 }
 
-public struct SessionChatSummary: Codable, Sendable {
+public struct SessionChatSummary: Codable, Sendable, Equatable {
     /// Canonical chat URI
     public var resource: String
     /// Human-readable chat title
@@ -2643,7 +2660,7 @@ public struct SessionChatSummary: Codable, Sendable {
     }
 }
 
-public struct ChangesSummary: Codable, Sendable {
+public struct ChangesSummary: Codable, Sendable, Equatable {
     /// Total number of inserted lines across all changed files.
     public var additions: Int?
     /// Total number of deleted lines across all changed files.
@@ -2662,7 +2679,7 @@ public struct ChangesSummary: Codable, Sendable {
     }
 }
 
-public struct ProjectInfo: Codable, Sendable {
+public struct ProjectInfo: Codable, Sendable, Equatable {
     /// Project URI
     public var uri: String
     /// Human-readable project name
@@ -2677,7 +2694,7 @@ public struct ProjectInfo: Codable, Sendable {
     }
 }
 
-public struct SessionConfigState: Codable, Sendable {
+public struct SessionConfigState: Codable, Sendable, Equatable {
     /// JSON Schema describing available configuration properties
     public var schema: SessionConfigSchema
     /// Current configuration values
@@ -2692,7 +2709,7 @@ public struct SessionConfigState: Codable, Sendable {
     }
 }
 
-public struct ChatConfigState: Codable, Sendable {
+public struct ChatConfigState: Codable, Sendable, Equatable {
     /// Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
     /// {@link ChatState.provider | `provider`} differs from the session's; when
@@ -2714,7 +2731,7 @@ public struct ChatConfigState: Codable, Sendable {
     }
 }
 
-public struct Turn: Codable, Sendable {
+public struct Turn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String
     /// ISO 8601 timestamp when this turn started.
@@ -2752,7 +2769,7 @@ public struct Turn: Codable, Sendable {
     }
 }
 
-public struct ActiveTurn: Codable, Sendable {
+public struct ActiveTurn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String
     /// ISO 8601 timestamp when this turn started.
@@ -2781,7 +2798,7 @@ public struct ActiveTurn: Codable, Sendable {
     }
 }
 
-public struct Message: Codable, Sendable {
+public struct Message: Codable, Sendable, Equatable {
     /// Message text
     public var text: String
     /// The origin of the message
@@ -2835,7 +2852,7 @@ public struct Message: Codable, Sendable {
     }
 }
 
-public struct MessageOrigin: Codable, Sendable {
+public struct MessageOrigin: Codable, Sendable, Equatable {
     /// The kind of actor that produced the message.
     public var kind: MessageKind
 
@@ -2846,7 +2863,7 @@ public struct MessageOrigin: Codable, Sendable {
     }
 }
 
-public struct ChatInputOption: Codable, Sendable {
+public struct ChatInputOption: Codable, Sendable, Equatable {
     /// Stable option identifier; for MCP enum values this is the enum string
     public var id: String
     /// Display label
@@ -2869,7 +2886,7 @@ public struct ChatInputOption: Codable, Sendable {
     }
 }
 
-public struct ChatInputTextAnswerValue: Codable, Sendable {
+public struct ChatInputTextAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: String
 
@@ -2882,7 +2899,7 @@ public struct ChatInputTextAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputNumberAnswerValue: Codable, Sendable {
+public struct ChatInputNumberAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: Double
 
@@ -2895,7 +2912,7 @@ public struct ChatInputNumberAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputBooleanAnswerValue: Codable, Sendable {
+public struct ChatInputBooleanAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: Bool
 
@@ -2908,7 +2925,7 @@ public struct ChatInputBooleanAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputSelectedAnswerValue: Codable, Sendable {
+public struct ChatInputSelectedAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: String
     /// Free-form text entered instead of selecting an option
@@ -2925,7 +2942,7 @@ public struct ChatInputSelectedAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputSelectedManyAnswerValue: Codable, Sendable {
+public struct ChatInputSelectedManyAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: [String]
     /// Free-form text entered in addition to selected options
@@ -2942,7 +2959,7 @@ public struct ChatInputSelectedManyAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputAnswered: Codable, Sendable {
+public struct ChatInputAnswered: Codable, Sendable, Equatable {
     /// Answer state
     public var state: ChatInputAnswerState
     /// Answer value
@@ -2957,7 +2974,7 @@ public struct ChatInputAnswered: Codable, Sendable {
     }
 }
 
-public struct ChatInputSkipped: Codable, Sendable {
+public struct ChatInputSkipped: Codable, Sendable, Equatable {
     /// Answer state
     public var state: ChatInputAnswerState
     /// Free-form reason or value captured while skipping, if any
@@ -2972,7 +2989,7 @@ public struct ChatInputSkipped: Codable, Sendable {
     }
 }
 
-public struct ChatInputTextQuestion: Codable, Sendable {
+public struct ChatInputTextQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3014,7 +3031,7 @@ public struct ChatInputTextQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputNumberQuestion: Codable, Sendable {
+public struct ChatInputNumberQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3052,7 +3069,7 @@ public struct ChatInputNumberQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputBooleanQuestion: Codable, Sendable {
+public struct ChatInputBooleanQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3082,7 +3099,7 @@ public struct ChatInputBooleanQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputSingleSelectQuestion: Codable, Sendable {
+public struct ChatInputSingleSelectQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3116,7 +3133,7 @@ public struct ChatInputSingleSelectQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputMultiSelectQuestion: Codable, Sendable {
+public struct ChatInputMultiSelectQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3158,7 +3175,7 @@ public struct ChatInputMultiSelectQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputRequest: Codable, Sendable {
+public struct ChatInputRequest: Codable, Sendable, Equatable {
     /// Stable request identifier
     public var id: String
     /// Display message for the request as a whole
@@ -3185,7 +3202,7 @@ public struct ChatInputRequest: Codable, Sendable {
     }
 }
 
-public struct TextPosition: Codable, Sendable {
+public struct TextPosition: Codable, Sendable, Equatable {
     /// Zero-based line number.
     public var line: Int
     /// Zero-based character offset within the line.
@@ -3200,7 +3217,7 @@ public struct TextPosition: Codable, Sendable {
     }
 }
 
-public struct TextRange: Codable, Sendable {
+public struct TextRange: Codable, Sendable, Equatable {
     /// Start position of the range.
     public var start: TextPosition
     /// End position of the range.
@@ -3215,7 +3232,7 @@ public struct TextRange: Codable, Sendable {
     }
 }
 
-public struct TextSelection: Codable, Sendable {
+public struct TextSelection: Codable, Sendable, Equatable {
     /// The range covered by the selection.
     public var range: TextRange
 
@@ -3226,7 +3243,7 @@ public struct TextSelection: Codable, Sendable {
     }
 }
 
-public struct SimpleMessageAttachment: Codable, Sendable {
+public struct SimpleMessageAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3287,7 +3304,7 @@ public struct SimpleMessageAttachment: Codable, Sendable {
     }
 }
 
-public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
+public struct MessageEmbeddedResourceAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3355,7 +3372,7 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
     }
 }
 
-public struct MessageResourceAttachment: Codable, Sendable {
+public struct MessageResourceAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3433,7 +3450,7 @@ public struct MessageResourceAttachment: Codable, Sendable {
     }
 }
 
-public struct MessageAnnotationsAttachment: Codable, Sendable {
+public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3496,7 +3513,7 @@ public struct MessageAnnotationsAttachment: Codable, Sendable {
     }
 }
 
-public struct MessageChatAttachment: Codable, Sendable {
+public struct MessageChatAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3558,7 +3575,7 @@ public struct MessageChatAttachment: Codable, Sendable {
     }
 }
 
-public struct MarkdownResponsePart: Codable, Sendable {
+public struct MarkdownResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Part identifier, used by `chat/delta` to target this part for content appends
@@ -3577,7 +3594,7 @@ public struct MarkdownResponsePart: Codable, Sendable {
     }
 }
 
-public struct ContentRef: Codable, Sendable {
+public struct ContentRef: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -3600,7 +3617,7 @@ public struct ContentRef: Codable, Sendable {
     }
 }
 
-public struct ResourceResponsePart: Codable, Sendable {
+public struct ResourceResponsePart: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -3627,7 +3644,7 @@ public struct ResourceResponsePart: Codable, Sendable {
     }
 }
 
-public struct ToolCallResponsePart: Codable, Sendable {
+public struct ToolCallResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Full tool call lifecycle state
@@ -3642,7 +3659,7 @@ public struct ToolCallResponsePart: Codable, Sendable {
     }
 }
 
-public struct ReasoningResponsePart: Codable, Sendable {
+public struct ReasoningResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Part identifier, used by `chat/reasoning` to target this part for content appends
@@ -3669,7 +3686,7 @@ public struct ReasoningResponsePart: Codable, Sendable {
     }
 }
 
-public struct SystemNotificationResponsePart: Codable, Sendable {
+public struct SystemNotificationResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// The text of the system notification
@@ -3700,7 +3717,7 @@ public struct SystemNotificationResponsePart: Codable, Sendable {
     }
 }
 
-public struct InputRequestResponsePart: Codable, Sendable {
+public struct InputRequestResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// The request, carrying its `id`, `message`, `url`, `questions`, and current
@@ -3721,7 +3738,7 @@ public struct InputRequestResponsePart: Codable, Sendable {
     }
 }
 
-public struct ErrorResponsePart: Codable, Sendable {
+public struct ErrorResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Error details.
@@ -3740,7 +3757,7 @@ public struct ErrorResponsePart: Codable, Sendable {
     }
 }
 
-public struct ToolCallResult: Codable, Sendable {
+public struct ToolCallResult: Codable, Sendable, Equatable {
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -3777,7 +3794,7 @@ public struct ToolCallResult: Codable, Sendable {
     }
 }
 
-public struct ToolCallStreamingState: Codable, Sendable {
+public struct ToolCallStreamingState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -3835,7 +3852,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
     }
 }
 
-public struct ToolCallPendingConfirmationState: Codable, Sendable {
+public struct ToolCallPendingConfirmationState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -3926,7 +3943,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRunningState: Codable, Sendable {
+public struct ToolCallRunningState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4007,7 +4024,7 @@ public struct ToolCallRunningState: Codable, Sendable {
     }
 }
 
-public struct ToolCallAuthRequiredState: Codable, Sendable {
+public struct ToolCallAuthRequiredState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4090,7 +4107,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     }
 }
 
-public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
+public struct ToolCallPendingResultConfirmationState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4199,7 +4216,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     }
 }
 
-public struct ToolCallCompletedState: Codable, Sendable {
+public struct ToolCallCompletedState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4308,7 +4325,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
     }
 }
 
-public struct ToolCallCancelledState: Codable, Sendable {
+public struct ToolCallCancelledState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4391,7 +4408,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable {
+public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable, Equatable {
     public var kind: ToolCallRiskAssessmentKind
     public var status: ToolCallRiskAssessmentStatus
 
@@ -4404,7 +4421,7 @@ public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable {
+public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable, Equatable {
     public var kind: ToolCallRiskAssessmentKind
     public var status: ToolCallRiskAssessmentStatus
     public var reason: StringOrMarkdown
@@ -4424,7 +4441,7 @@ public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable {
     }
 }
 
-public struct ConfirmationOption: Codable, Sendable {
+public struct ConfirmationOption: Codable, Sendable, Equatable {
     /// Unique identifier for the option, returned in the confirmed action
     public var id: String
     /// Human-readable label displayed to the user
@@ -4451,7 +4468,7 @@ public struct ConfirmationOption: Codable, Sendable {
     }
 }
 
-public struct ToolDefinition: Codable, Sendable {
+public struct ToolDefinition: Codable, Sendable, Equatable {
     /// Unique tool identifier
     public var name: String
     /// Human-readable display name
@@ -4503,7 +4520,7 @@ public struct ToolDefinition: Codable, Sendable {
     }
 }
 
-public struct ToolAnnotations: Codable, Sendable {
+public struct ToolAnnotations: Codable, Sendable, Equatable {
     /// Alternate human-readable title
     public var title: String?
     /// Tool does not modify its environment (default: false)
@@ -4530,7 +4547,7 @@ public struct ToolAnnotations: Codable, Sendable {
     }
 }
 
-public struct ToolResultTextContent: Codable, Sendable {
+public struct ToolResultTextContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// The text content
     public var text: String
@@ -4544,7 +4561,7 @@ public struct ToolResultTextContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultEmbeddedResourceContent: Codable, Sendable {
+public struct ToolResultEmbeddedResourceContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Base64-encoded data
     public var data: String
@@ -4562,7 +4579,7 @@ public struct ToolResultEmbeddedResourceContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultResourceContent: Codable, Sendable {
+public struct ToolResultResourceContent: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -4588,7 +4605,7 @@ public struct ToolResultResourceContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultFileEditContent: Codable, Sendable {
+public struct ToolResultFileEditContent: Codable, Sendable, Equatable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
@@ -4610,7 +4627,7 @@ public struct ToolResultFileEditContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultTerminalContent: Codable, Sendable {
+public struct ToolResultTerminalContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Terminal URI (subscribable for live or retained terminal state)
     public var resource: String
@@ -4638,7 +4655,7 @@ public struct ToolResultTerminalContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultSubagentContent: Codable, Sendable {
+public struct ToolResultSubagentContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Worker chat URI (subscribable for full chat state)
     public var resource: String
@@ -4664,7 +4681,7 @@ public struct ToolResultSubagentContent: Codable, Sendable {
     }
 }
 
-public struct CustomizationLoadingState: Codable, Sendable {
+public struct CustomizationLoadingState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
 
     public init(
@@ -4674,7 +4691,7 @@ public struct CustomizationLoadingState: Codable, Sendable {
     }
 }
 
-public struct CustomizationLoadedState: Codable, Sendable {
+public struct CustomizationLoadedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
 
     public init(
@@ -4684,7 +4701,7 @@ public struct CustomizationLoadedState: Codable, Sendable {
     }
 }
 
-public struct CustomizationDegradedState: Codable, Sendable {
+public struct CustomizationDegradedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable description of the warning.
     public var message: String
@@ -4698,7 +4715,7 @@ public struct CustomizationDegradedState: Codable, Sendable {
     }
 }
 
-public struct CustomizationErrorState: Codable, Sendable {
+public struct CustomizationErrorState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable error message.
     public var message: String
@@ -4712,7 +4729,7 @@ public struct CustomizationErrorState: Codable, Sendable {
     }
 }
 
-public struct PluginCustomization: Codable, Sendable {
+public struct PluginCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -4807,7 +4824,7 @@ public struct PluginCustomization: Codable, Sendable {
     }
 }
 
-public struct ClientPluginCustomization: Codable, Sendable {
+public struct ClientPluginCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -4919,7 +4936,7 @@ public struct ClientPluginCustomization: Codable, Sendable {
     }
 }
 
-public struct DirectoryCustomization: Codable, Sendable {
+public struct DirectoryCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5014,7 +5031,7 @@ public struct DirectoryCustomization: Codable, Sendable {
     }
 }
 
-public struct AgentCustomization: Codable, Sendable {
+public struct AgentCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5128,7 +5145,7 @@ public struct AgentCustomization: Codable, Sendable {
     }
 }
 
-public struct SkillCustomization: Codable, Sendable {
+public struct SkillCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5224,7 +5241,7 @@ public struct SkillCustomization: Codable, Sendable {
     }
 }
 
-public struct PromptCustomization: Codable, Sendable {
+public struct PromptCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5305,7 +5322,7 @@ public struct PromptCustomization: Codable, Sendable {
     }
 }
 
-public struct RuleCustomization: Codable, Sendable {
+public struct RuleCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5399,7 +5416,7 @@ public struct RuleCustomization: Codable, Sendable {
     }
 }
 
-public struct HookCustomization: Codable, Sendable {
+public struct HookCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5475,7 +5492,7 @@ public struct HookCustomization: Codable, Sendable {
     }
 }
 
-public struct McpServerCustomization: Codable, Sendable {
+public struct McpServerCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5597,7 +5614,7 @@ public struct McpServerCustomization: Codable, Sendable {
     }
 }
 
-public struct McpServerCustomizationApps: Codable, Sendable {
+public struct McpServerCustomizationApps: Codable, Sendable, Equatable {
     /// The subset of MCP App
     /// [`HostCapabilities`](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
     /// the AHP host can satisfy for Views backed by this server. The
@@ -5612,7 +5629,7 @@ public struct McpServerCustomizationApps: Codable, Sendable {
     }
 }
 
-public struct AhpMcpUiHostCapabilities: Codable, Sendable {
+public struct AhpMcpUiHostCapabilities: Codable, Sendable, Equatable {
     /// Producer proxies the MCP `tools/*` methods to the upstream server.
     public var serverTools: AnyCodable?
     /// Producer proxies the MCP `resources/*` methods to the upstream server.
@@ -5635,7 +5652,7 @@ public struct AhpMcpUiHostCapabilities: Codable, Sendable {
     }
 }
 
-public struct McpServerStartingState: Codable, Sendable {
+public struct McpServerStartingState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
     /// Hosts SHOULD set this to `true` when this server's startup will hold back
     /// the processing of new messages (for example, the next turn) while the
@@ -5656,7 +5673,7 @@ public struct McpServerStartingState: Codable, Sendable {
     }
 }
 
-public struct McpServerReadyState: Codable, Sendable {
+public struct McpServerReadyState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
 
     public init(
@@ -5666,7 +5683,7 @@ public struct McpServerReadyState: Codable, Sendable {
     }
 }
 
-public struct McpServerAuthRequiredState: Codable, Sendable {
+public struct McpServerAuthRequiredState: Codable, Sendable, Equatable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
     /// Pre-registered OAuth client to use for authorization. When present, clients
@@ -5704,7 +5721,7 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
     }
 }
 
-public struct McpServerErrorState: Codable, Sendable {
+public struct McpServerErrorState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
     /// Error details.
     public var error: ErrorInfo
@@ -5718,7 +5735,7 @@ public struct McpServerErrorState: Codable, Sendable {
     }
 }
 
-public struct McpServerStoppedState: Codable, Sendable {
+public struct McpServerStoppedState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
 
     public init(
@@ -5728,7 +5745,7 @@ public struct McpServerStoppedState: Codable, Sendable {
     }
 }
 
-public struct McpOAuthClient: Codable, Sendable {
+public struct McpOAuthClient: Codable, Sendable, Equatable {
     /// OAuth client identifier registered with the authorization server.
     public var clientId: String
     /// OAuth client secret for a confidential client. Absence means the client is
@@ -5744,7 +5761,7 @@ public struct McpOAuthClient: Codable, Sendable {
     }
 }
 
-public struct McpAuthRequirement: Codable, Sendable {
+public struct McpAuthRequirement: Codable, Sendable, Equatable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
     /// Pre-registered OAuth client to use for authorization. When present, clients
@@ -5779,7 +5796,7 @@ public struct McpAuthRequirement: Codable, Sendable {
     }
 }
 
-public struct ToolCallClientContributor: Codable, Sendable {
+public struct ToolCallClientContributor: Codable, Sendable, Equatable {
     public var kind: ToolCallContributorKind
     /// If this tool is provided by a client, the `clientId` of the owning client.
     /// Absent for server-side tools.
@@ -5797,7 +5814,7 @@ public struct ToolCallClientContributor: Codable, Sendable {
     }
 }
 
-public struct ToolCallMcpContributor: Codable, Sendable {
+public struct ToolCallMcpContributor: Codable, Sendable, Equatable {
     public var kind: ToolCallContributorKind
     /// Customization ID of the corresponding MCP server in {@link SessionState.customizations}.
     public var customizationId: String
@@ -5811,7 +5828,7 @@ public struct ToolCallMcpContributor: Codable, Sendable {
     }
 }
 
-public struct FileEditSide: Codable, Sendable {
+public struct FileEditSide: Codable, Sendable, Equatable {
     /// URI of the file on this side of the edit
     public var uri: String
     /// Reference to the file content on this side of the edit
@@ -5826,7 +5843,7 @@ public struct FileEditSide: Codable, Sendable {
     }
 }
 
-public struct FileEditDiffStats: Codable, Sendable {
+public struct FileEditDiffStats: Codable, Sendable, Equatable {
     /// Number of items added (e.g., lines for text files, cells for notebooks)
     public var added: Int?
     /// Number of items removed (e.g., lines for text files, cells for notebooks)
@@ -5841,7 +5858,7 @@ public struct FileEditDiffStats: Codable, Sendable {
     }
 }
 
-public struct FileEdit: Codable, Sendable {
+public struct FileEdit: Codable, Sendable, Equatable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
@@ -5860,7 +5877,7 @@ public struct FileEdit: Codable, Sendable {
     }
 }
 
-public struct FileEditCollection: Codable, Sendable {
+public struct FileEditCollection: Codable, Sendable, Equatable {
     public var items: [FileEdit]
 
     public init(
@@ -5870,7 +5887,7 @@ public struct FileEditCollection: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandResult: Codable, Sendable {
+public struct TerminalCommandResult: Codable, Sendable, Equatable {
     /// Exit code from the completed command, if reported by the runtime
     public var exitCode: Int?
     /// Preview of the command's output, for clients that are not subscribed
@@ -5892,7 +5909,7 @@ public struct TerminalCommandResult: Codable, Sendable {
     }
 }
 
-public struct TerminalInfo: Codable, Sendable {
+public struct TerminalInfo: Codable, Sendable, Equatable {
     /// Terminal URI (subscribable for full terminal state)
     public var resource: String
     /// Human-readable terminal title
@@ -5915,7 +5932,7 @@ public struct TerminalInfo: Codable, Sendable {
     }
 }
 
-public struct TerminalClientClaim: Codable, Sendable {
+public struct TerminalClientClaim: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: TerminalClaimKind
     /// The `clientId` of the claiming client
@@ -5930,7 +5947,7 @@ public struct TerminalClientClaim: Codable, Sendable {
     }
 }
 
-public struct TerminalSessionClaim: Codable, Sendable {
+public struct TerminalSessionClaim: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: TerminalClaimKind
     /// Session URI that claimed the terminal
@@ -5957,7 +5974,7 @@ public struct TerminalSessionClaim: Codable, Sendable {
     }
 }
 
-public struct TerminalRunningLifecycleState: Codable, Sendable {
+public struct TerminalRunningLifecycleState: Codable, Sendable, Equatable {
     public var status: TerminalLifecycleStatus
 
     public init(
@@ -5967,7 +5984,7 @@ public struct TerminalRunningLifecycleState: Codable, Sendable {
     }
 }
 
-public struct TerminalExitedLifecycleState: Codable, Sendable {
+public struct TerminalExitedLifecycleState: Codable, Sendable, Equatable {
     public var status: TerminalLifecycleStatus
     /// Process exit code, if the runtime reported one.
     public var exitCode: Int?
@@ -5981,7 +5998,7 @@ public struct TerminalExitedLifecycleState: Codable, Sendable {
     }
 }
 
-public struct TerminalState: Codable, Sendable {
+public struct TerminalState: Codable, Sendable, Equatable {
     /// Human-readable terminal title
     public var title: String
     /// Current working directory of the terminal process
@@ -6036,7 +6053,7 @@ public struct TerminalState: Codable, Sendable {
     }
 }
 
-public struct TerminalUnclassifiedPart: Codable, Sendable {
+public struct TerminalUnclassifiedPart: Codable, Sendable, Equatable {
     public var type: String
     /// Accumulated VT output. Appended to by `terminal/data` when no command is executing.
     public var value: String
@@ -6050,7 +6067,7 @@ public struct TerminalUnclassifiedPart: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandPart: Codable, Sendable {
+public struct TerminalCommandPart: Codable, Sendable, Equatable {
     public var type: String
     /// Stable id matching the `commandId` on the corresponding
     /// `terminal/commandExecuted` and `terminal/commandFinished` actions.
@@ -6090,7 +6107,7 @@ public struct TerminalCommandPart: Codable, Sendable {
     }
 }
 
-public struct UsageInfo: Codable, Sendable {
+public struct UsageInfo: Codable, Sendable, Equatable {
     /// Input tokens consumed
     public var inputTokens: Int?
     /// Output tokens generated
@@ -6126,7 +6143,7 @@ public struct UsageInfo: Codable, Sendable {
     }
 }
 
-public struct ErrorInfo: Codable, Sendable {
+public struct ErrorInfo: Codable, Sendable, Equatable {
     /// Error type identifier
     public var errorType: String
     /// Human-readable error message
@@ -6158,7 +6175,7 @@ public struct ErrorInfo: Codable, Sendable {
     }
 }
 
-public struct Snapshot: Codable, Sendable {
+public struct Snapshot: Codable, Sendable, Equatable {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     public var resource: String
     /// The current state of the resource. A channel with no state fields, such as a
@@ -6189,7 +6206,7 @@ public struct Snapshot: Codable, Sendable {
 /// the server MAY omit a snapshot whose state is an `EmptyState`.
 ///
 /// Stability: 1.0 - Early development.
-public struct EmptyState: Codable, Sendable {
+public struct EmptyState: Codable, Sendable, Equatable {
 
     public init(
 
@@ -6197,7 +6214,7 @@ public struct EmptyState: Codable, Sendable {
     }
 }
 
-public struct CanvasReference: Codable, Sendable {
+public struct CanvasReference: Codable, Sendable, Equatable {
     /// Canvas channel URI. Subscribe to this resource for the full state.
     public var resource: String
 
@@ -6208,7 +6225,7 @@ public struct CanvasReference: Codable, Sendable {
     }
 }
 
-public struct CanvasState: Codable, Sendable {
+public struct CanvasState: Codable, Sendable, Equatable {
     /// Stable caller-supplied instance identifier.
     public var instanceId: String
     /// Owning extension/provider identifier.
@@ -6256,7 +6273,7 @@ public struct CanvasState: Codable, Sendable {
     }
 }
 
-public struct Changeset: Codable, Sendable {
+public struct Changeset: Codable, Sendable, Equatable {
     /// Human-readable label, e.g. `"Uncommitted Changes"`.
     public var label: String
     /// RFC 6570 URI template. Clients parse the variables directly out of the
@@ -6320,7 +6337,7 @@ public struct Changeset: Codable, Sendable {
     }
 }
 
-public struct ChangesetCapabilities: Codable, Sendable {
+public struct ChangesetCapabilities: Codable, Sendable, Equatable {
     /// The changeset supports the per-file **review** workflow. When declared,
     /// clients MAY surface a GitHub-style "Viewed" toggle per file and dispatch
     /// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
@@ -6335,7 +6352,7 @@ public struct ChangesetCapabilities: Codable, Sendable {
     }
 }
 
-public struct ChangesetState: Codable, Sendable {
+public struct ChangesetState: Codable, Sendable, Equatable {
     /// Computation lifecycle.
     public var status: ChangesetStatus
     /// Present iff `status === ChangesetStatus.Error`.
@@ -6359,7 +6376,7 @@ public struct ChangesetState: Codable, Sendable {
     }
 }
 
-public struct ChangesetFile: Codable, Sendable {
+public struct ChangesetFile: Codable, Sendable, Equatable {
     /// Stable identifier within the changeset. Typically `after.uri`
     /// (or `before.uri` for deletions).
     public var id: String
@@ -6420,7 +6437,7 @@ public struct ChangesetFile: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperation: Codable, Sendable {
+public struct ChangesetOperation: Codable, Sendable, Equatable {
     /// Stable identifier, unique within this changeset.
     public var id: String
     /// Human-readable button/menu label.
@@ -6477,7 +6494,7 @@ public struct ChangesetOperation: Codable, Sendable {
     }
 }
 
-public struct AnnotationsSummary: Codable, Sendable {
+public struct AnnotationsSummary: Codable, Sendable, Equatable {
     /// The subscribable annotations channel URI for the owning session
     /// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
     /// though it is derivable from the session URI so badge UI does not need
@@ -6499,7 +6516,7 @@ public struct AnnotationsSummary: Codable, Sendable {
     }
 }
 
-public struct AnnotationsState: Codable, Sendable {
+public struct AnnotationsState: Codable, Sendable, Equatable {
     /// Annotations in this channel, keyed by {@link Annotation.id}.
     public var annotations: [Annotation]
 
@@ -6510,7 +6527,7 @@ public struct AnnotationsState: Codable, Sendable {
     }
 }
 
-public struct AnnotationOrigin: Codable, Sendable {
+public struct AnnotationOrigin: Codable, Sendable, Equatable {
     /// Owning session URI.
     public var session: String
     /// Owning chat URI, when the annotation is scoped to a chat.
@@ -6529,7 +6546,7 @@ public struct AnnotationOrigin: Codable, Sendable {
     }
 }
 
-public struct Annotation: Codable, Sendable {
+public struct Annotation: Codable, Sendable, Equatable {
     /// Stable identifier within the annotations channel. Assigned by the client
     /// that dispatches the creating {@link AnnotationsSetAction}.
     public var id: String
@@ -6582,7 +6599,7 @@ public struct Annotation: Codable, Sendable {
     }
 }
 
-public struct AnnotationEntry: Codable, Sendable {
+public struct AnnotationEntry: Codable, Sendable, Equatable {
     /// Stable identifier within the enclosing annotation. Assigned by the client
     /// that dispatches the {@link AnnotationsEntrySetAction} (or the enclosing
     /// {@link AnnotationsSetAction}) introducing the entry.
@@ -6612,7 +6629,7 @@ public struct AnnotationEntry: Codable, Sendable {
     }
 }
 
-public struct TelemetryCapabilities: Codable, Sendable {
+public struct TelemetryCapabilities: Codable, Sendable, Equatable {
     /// Channel URI (or RFC 6570 URI template) for OTLP log records
     /// (`otlp/exportLogs` notifications).
     ///
@@ -6651,7 +6668,7 @@ public struct TelemetryCapabilities: Codable, Sendable {
     }
 }
 
-public struct ResourceWatchState: Codable, Sendable {
+public struct ResourceWatchState: Codable, Sendable, Equatable {
     /// The URI being watched. For recursive watches this is the root of the
     /// subtree; for non-recursive watches this is the single file or
     /// directory.
@@ -6681,7 +6698,7 @@ public struct ResourceWatchState: Codable, Sendable {
     }
 }
 
-public struct ResourceChange: Codable, Sendable {
+public struct ResourceChange: Codable, Sendable, Equatable {
     /// The URI of the resource that changed.
     public var uri: String
     /// The kind of change observed.
@@ -6696,7 +6713,7 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
-public struct AutomationSessionOrigin: Codable, Sendable {
+public struct AutomationSessionOrigin: Codable, Sendable, Equatable {
     public var kind: SessionOriginKind
     /// Owning {@link AutomationEntry.resource}.
     public var automation: String
@@ -6714,7 +6731,7 @@ public struct AutomationSessionOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationSchedule: Codable, Sendable {
+public struct AutomationSchedule: Codable, Sendable, Equatable {
     /// Five-field AHP cron expression described by {@link AutomationSchedule}.
     public var expression: String
     /// IANA Time Zone Database identifier used to interpret the expression, for
@@ -6730,7 +6747,7 @@ public struct AutomationSchedule: Codable, Sendable {
     }
 }
 
-public struct AutomationScheduleTrigger: Codable, Sendable {
+public struct AutomationScheduleTrigger: Codable, Sendable, Equatable {
     /// Identifier unique and stable within this automation definition. Recorded in
     /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
     /// run.
@@ -6755,7 +6772,7 @@ public struct AutomationScheduleTrigger: Codable, Sendable {
     }
 }
 
-public struct AutomationEventTrigger: Codable, Sendable {
+public struct AutomationEventTrigger: Codable, Sendable, Equatable {
     /// Identifier unique and stable within this automation definition. Recorded in
     /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
     /// run.
@@ -6795,7 +6812,7 @@ public struct AutomationEventTrigger: Codable, Sendable {
     }
 }
 
-public struct AutomationTriggerEventDefinition: Codable, Sendable {
+public struct AutomationTriggerEventDefinition: Codable, Sendable, Equatable {
     /// Stable event id.
     public var id: String
     /// Human-readable event name.
@@ -6814,7 +6831,7 @@ public struct AutomationTriggerEventDefinition: Codable, Sendable {
     }
 }
 
-public struct AutomationTriggerDefinition: Codable, Sendable {
+public struct AutomationTriggerDefinition: Codable, Sendable, Equatable {
     /// Stable type id stored in {@link AutomationEventTrigger.type}.
     public var type: String
     /// Human-readable trigger type name.
@@ -6841,7 +6858,7 @@ public struct AutomationTriggerDefinition: Codable, Sendable {
     }
 }
 
-public struct AutomationSessionTemplate: Codable, Sendable {
+public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
     /// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
     public var provider: String?
     /// Optional model selection resolved when a run starts. Its
@@ -6900,7 +6917,7 @@ public struct AutomationSessionTemplate: Codable, Sendable {
     }
 }
 
-public struct AutomationDefinition: Codable, Sendable {
+public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
     /// Initial message sent to every newly created run session. Its
@@ -6960,7 +6977,7 @@ public struct AutomationDefinition: Codable, Sendable {
     }
 }
 
-public struct AutomationDefinitionPatch: Codable, Sendable {
+public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Replacement {@link AutomationDefinition.title}.
     public var title: String?
     /// Replacement {@link AutomationDefinition.message}.
@@ -7012,7 +7029,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     }
 }
 
-public struct AutomationAfterRunsCondition: Codable, Sendable {
+public struct AutomationAfterRunsCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// Positive-integer cap on scheduled runs.
     public var max: Int
@@ -7026,7 +7043,7 @@ public struct AutomationAfterRunsCondition: Codable, Sendable {
     }
 }
 
-public struct AutomationAfterDateCondition: Codable, Sendable {
+public struct AutomationAfterDateCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// ISO 8601 timestamp after which scheduling stops.
     public var date: String
@@ -7040,7 +7057,7 @@ public struct AutomationAfterDateCondition: Codable, Sendable {
     }
 }
 
-public struct AutomationEntry: Codable, Sendable {
+public struct AutomationEntry: Codable, Sendable, Equatable {
     /// Stable `ahp-automation:/<id>` resource identifier.
     public var resource: String
     /// Current durable definition.
@@ -7129,7 +7146,7 @@ public struct AutomationEntry: Codable, Sendable {
     }
 }
 
-public struct AutomationState: Codable, Sendable {
+public struct AutomationState: Codable, Sendable, Equatable {
     /// Full automation entries keyed by {@link AutomationEntry.resource}.
     public var entries: [AutomationEntry]
     /// Opaque host-defined catalogue metadata.
@@ -7149,7 +7166,7 @@ public struct AutomationState: Codable, Sendable {
     }
 }
 
-public struct AutomationManualRunOrigin: Codable, Sendable {
+public struct AutomationManualRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
 
     public init(
@@ -7159,7 +7176,7 @@ public struct AutomationManualRunOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationTriggeredRunOrigin: Codable, Sendable {
+public struct AutomationTriggeredRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
     /// Matches the stable {@link AutomationScheduleTrigger.id} or
     /// {@link AutomationEventTrigger.id} in the definition.
@@ -7189,7 +7206,7 @@ public struct AutomationTriggeredRunOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationPendingRunLifecycle: Codable, Sendable {
+public struct AutomationPendingRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7203,7 +7220,7 @@ public struct AutomationPendingRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationRunningRunLifecycle: Codable, Sendable {
+public struct AutomationRunningRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7221,7 +7238,7 @@ public struct AutomationRunningRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationCompletedRunLifecycle: Codable, Sendable {
+public struct AutomationCompletedRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7247,7 +7264,7 @@ public struct AutomationCompletedRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationFailedRunLifecycle: Codable, Sendable {
+public struct AutomationFailedRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7273,7 +7290,7 @@ public struct AutomationFailedRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationCancelledRunLifecycle: Codable, Sendable {
+public struct AutomationCancelledRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7295,7 +7312,7 @@ public struct AutomationCancelledRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationRunSummary: Codable, Sendable {
+public struct AutomationRunSummary: Codable, Sendable, Equatable {
     /// Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}.
     public var resource: String
     /// Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}.
@@ -7340,7 +7357,7 @@ public struct AutomationRunSummary: Codable, Sendable {
     }
 }
 
-public struct AutomationRunState: Codable, Sendable {
+public struct AutomationRunState: Codable, Sendable, Equatable {
     /// URI of this automation-run channel.
     public var resource: String
     /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
@@ -7390,7 +7407,7 @@ public struct AutomationRunState: Codable, Sendable {
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
-public enum CustomizationEnablement: Codable, Sendable {
+public enum CustomizationEnablement: Codable, Sendable, Equatable {
     case global(CustomizationEnablementGlobal)
     case workspace(CustomizationEnablementWorkspace)
     case session(CustomizationEnablementSession)
@@ -7422,7 +7439,7 @@ public enum CustomizationEnablement: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementGlobal: Codable, Sendable {
+public struct CustomizationEnablementGlobal: Codable, Sendable, Equatable {
     public var kind: String = "global"
     public var enabled: Bool
 
@@ -7431,7 +7448,7 @@ public struct CustomizationEnablementGlobal: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementWorkspace: Codable, Sendable {
+public struct CustomizationEnablementWorkspace: Codable, Sendable, Equatable {
     public var kind: String = "workspace"
     public var uri: URI
     public var enabled: Bool
@@ -7442,7 +7459,7 @@ public struct CustomizationEnablementWorkspace: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementSession: Codable, Sendable {
+public struct CustomizationEnablementSession: Codable, Sendable, Equatable {
     public var kind: String = "session"
     public var enabled: Bool
 
@@ -7454,7 +7471,7 @@ public struct CustomizationEnablementSession: Codable, Sendable {
 // MARK: - Tool Input
 
 /// Raw tool input represented inline or by content reference.
-public enum ToolInput: Codable, Sendable {
+public enum ToolInput: Codable, Sendable, Equatable {
     case inline(String)
     case contentRef(ContentRef)
 
@@ -7478,7 +7495,7 @@ public enum ToolInput: Codable, Sendable {
 
 // MARK: - Discriminated Unions
 
-public struct ChatOriginUser: Codable, Sendable {
+public struct ChatOriginUser: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
 
     public init(kind: ChatOriginKind = .user) {
@@ -7486,7 +7503,7 @@ public struct ChatOriginUser: Codable, Sendable {
     }
 }
 
-public struct ChatOriginFork: Codable, Sendable {
+public struct ChatOriginFork: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -7498,7 +7515,7 @@ public struct ChatOriginFork: Codable, Sendable {
     }
 }
 
-public struct ChatOriginTool: Codable, Sendable {
+public struct ChatOriginTool: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var toolCallId: String
@@ -7510,7 +7527,7 @@ public struct ChatOriginTool: Codable, Sendable {
     }
 }
 
-public struct ChatOriginSideChat: Codable, Sendable {
+public struct ChatOriginSideChat: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -7524,7 +7541,7 @@ public struct ChatOriginSideChat: Codable, Sendable {
     }
 }
 
-public enum ChatOrigin: Codable, Sendable {
+public enum ChatOrigin: Codable, Sendable, Equatable {
     case user(ChatOriginUser)
     case fork(ChatOriginFork)
     case sideChat(ChatOriginSideChat)
@@ -7555,7 +7572,7 @@ public enum ChatOrigin: Codable, Sendable {
     }
 }
 
-public enum ResponsePart: Codable, Sendable {
+public enum ResponsePart: Codable, Sendable, Equatable {
     case markdown(MarkdownResponsePart)
     case contentRef(ResourceResponsePart)
     case toolCall(ToolCallResponsePart)
@@ -7611,7 +7628,7 @@ public enum ResponsePart: Codable, Sendable {
     }
 }
 
-public enum ToolCallState: Codable, Sendable {
+public enum ToolCallState: Codable, Sendable, Equatable {
     case streaming(ToolCallStreamingState)
     case pendingConfirmation(ToolCallPendingConfirmationState)
     case running(ToolCallRunningState)
@@ -7667,7 +7684,7 @@ public enum ToolCallState: Codable, Sendable {
     }
 }
 
-public enum ToolCallConfirmationState: Codable, Sendable {
+public enum ToolCallConfirmationState: Codable, Sendable, Equatable {
     case pendingConfirmation(ToolCallPendingConfirmationState)
     case pendingResultConfirmation(ToolCallPendingResultConfirmationState)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -7703,7 +7720,7 @@ public enum ToolCallConfirmationState: Codable, Sendable {
     }
 }
 
-public enum TerminalClaim: Codable, Sendable {
+public enum TerminalClaim: Codable, Sendable, Equatable {
     case client(TerminalClientClaim)
     case session(TerminalSessionClaim)
 
@@ -7732,7 +7749,7 @@ public enum TerminalClaim: Codable, Sendable {
     }
 }
 
-public enum TerminalContentPart: Codable, Sendable {
+public enum TerminalContentPart: Codable, Sendable, Equatable {
     case unclassified(TerminalUnclassifiedPart)
     case command(TerminalCommandPart)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -7768,7 +7785,7 @@ public enum TerminalContentPart: Codable, Sendable {
     }
 }
 
-public enum ChatInputQuestion: Codable, Sendable {
+public enum ChatInputQuestion: Codable, Sendable, Equatable {
     case text(ChatInputTextQuestion)
     case number(ChatInputNumberQuestion)
     case integer(ChatInputNumberQuestion)
@@ -7820,7 +7837,7 @@ public enum ChatInputQuestion: Codable, Sendable {
     }
 }
 
-public enum ChatInputAnswerValue: Codable, Sendable {
+public enum ChatInputAnswerValue: Codable, Sendable, Equatable {
     case text(ChatInputTextAnswerValue)
     case number(ChatInputNumberAnswerValue)
     case boolean(ChatInputBooleanAnswerValue)
@@ -7868,7 +7885,7 @@ public enum ChatInputAnswerValue: Codable, Sendable {
     }
 }
 
-public enum ChatInputAnswer: Codable, Sendable {
+public enum ChatInputAnswer: Codable, Sendable, Equatable {
     case draft(ChatInputAnswered)
     case submitted(ChatInputAnswered)
     case skipped(ChatInputSkipped)
@@ -7901,7 +7918,7 @@ public enum ChatInputAnswer: Codable, Sendable {
     }
 }
 
-public enum MessageAttachment: Codable, Sendable {
+public enum MessageAttachment: Codable, Sendable, Equatable {
     case simple(SimpleMessageAttachment)
     case embeddedResource(MessageEmbeddedResourceAttachment)
     case resource(MessageResourceAttachment)
@@ -7949,7 +7966,7 @@ public enum MessageAttachment: Codable, Sendable {
     }
 }
 
-public enum Customization: Codable, Sendable {
+public enum Customization: Codable, Sendable, Equatable {
     case plugin(PluginCustomization)
     case directory(DirectoryCustomization)
     case mcpServer(McpServerCustomization)
@@ -7989,7 +8006,7 @@ public enum Customization: Codable, Sendable {
     }
 }
 
-public enum ChildCustomization: Codable, Sendable {
+public enum ChildCustomization: Codable, Sendable, Equatable {
     case agent(AgentCustomization)
     case skill(SkillCustomization)
     case prompt(PromptCustomization)
@@ -8041,7 +8058,7 @@ public enum ChildCustomization: Codable, Sendable {
     }
 }
 
-public enum CustomizationLoadState: Codable, Sendable {
+public enum CustomizationLoadState: Codable, Sendable, Equatable {
     case loading(CustomizationLoadingState)
     case loaded(CustomizationLoadedState)
     case degraded(CustomizationDegradedState)
@@ -8078,7 +8095,7 @@ public enum CustomizationLoadState: Codable, Sendable {
     }
 }
 
-public enum McpServerState: Codable, Sendable {
+public enum McpServerState: Codable, Sendable, Equatable {
     case starting(McpServerStartingState)
     case ready(McpServerReadyState)
     case authRequired(McpServerAuthRequiredState)
@@ -8126,7 +8143,7 @@ public enum McpServerState: Codable, Sendable {
     }
 }
 
-public enum ToolCallContributor: Codable, Sendable {
+public enum ToolCallContributor: Codable, Sendable, Equatable {
     case client(ToolCallClientContributor)
     case mcp(ToolCallMcpContributor)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8162,7 +8179,7 @@ public enum ToolCallContributor: Codable, Sendable {
     }
 }
 
-public enum ToolCallRiskAssessment: Codable, Sendable {
+public enum ToolCallRiskAssessment: Codable, Sendable, Equatable {
     case loading(ToolCallRiskAssessmentLoadingState)
     case complete(ToolCallRiskAssessmentCompleteState)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8198,7 +8215,7 @@ public enum ToolCallRiskAssessment: Codable, Sendable {
     }
 }
 
-public enum TerminalLifecycleState: Codable, Sendable {
+public enum TerminalLifecycleState: Codable, Sendable, Equatable {
     case running(TerminalRunningLifecycleState)
     case exited(TerminalExitedLifecycleState)
 
@@ -8227,7 +8244,7 @@ public enum TerminalLifecycleState: Codable, Sendable {
     }
 }
 
-public enum SessionInputRequest: Codable, Sendable {
+public enum SessionInputRequest: Codable, Sendable, Equatable {
     case chatInput(SessionChatInputRequest)
     case toolConfirmation(SessionToolConfirmationRequest)
     case toolClientExecution(SessionToolClientExecutionRequest)
@@ -8270,7 +8287,7 @@ public enum SessionInputRequest: Codable, Sendable {
         }
     }
 }
-public enum BackgroundWork: Codable, Sendable {
+public enum BackgroundWork: Codable, Sendable, Equatable {
     case shell(BackgroundShellWork)
     case subagent(BackgroundSubagentWork)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8306,7 +8323,7 @@ public enum BackgroundWork: Codable, Sendable {
     }
 }
 
-public enum SessionOrigin: Codable, Sendable {
+public enum SessionOrigin: Codable, Sendable, Equatable {
     case automation(AutomationSessionOrigin)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
@@ -8340,7 +8357,7 @@ public enum SessionOrigin: Codable, Sendable {
     }
 }
 
-public enum AutomationTrigger: Codable, Sendable {
+public enum AutomationTrigger: Codable, Sendable, Equatable {
     case schedule(AutomationScheduleTrigger)
     case event(AutomationEventTrigger)
 
@@ -8373,7 +8390,7 @@ public enum AutomationTrigger: Codable, Sendable {
     }
 }
 
-public enum AutomationDisableCondition: Codable, Sendable {
+public enum AutomationDisableCondition: Codable, Sendable, Equatable {
     case afterRuns(AutomationAfterRunsCondition)
     case afterDate(AutomationAfterDateCondition)
 
@@ -8406,7 +8423,7 @@ public enum AutomationDisableCondition: Codable, Sendable {
     }
 }
 
-public enum AutomationRunOrigin: Codable, Sendable {
+public enum AutomationRunOrigin: Codable, Sendable, Equatable {
     case manual(AutomationManualRunOrigin)
     case trigger(AutomationTriggeredRunOrigin)
 
@@ -8439,7 +8456,7 @@ public enum AutomationRunOrigin: Codable, Sendable {
     }
 }
 
-public enum AutomationRunLifecycle: Codable, Sendable {
+public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
     case pending(AutomationPendingRunLifecycle)
     case running(AutomationRunningRunLifecycle)
     case completed(AutomationCompletedRunLifecycle)
@@ -8490,7 +8507,7 @@ public enum AutomationRunLifecycle: Codable, Sendable {
     }
 }
 
-public enum ToolResultContent: Codable, Sendable {
+public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
     case resource(ToolResultResourceContent)
@@ -8546,7 +8563,7 @@ public enum ToolResultContent: Codable, Sendable {
 }
 
 /// The state payload of a snapshot.
-public enum SnapshotState: Codable, Sendable {
+public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
