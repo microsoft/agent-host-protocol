@@ -593,6 +593,10 @@ internal final class HostRuntime: Sendable {
         switch event.event {
         case .action(let envelope):
             await applyAction(envelope)
+        case .actionDecodingFailed(_, let serverSeq, _, _, _):
+            await shared.update { state in
+                state.serverSeq = max(state.serverSeq, serverSeq)
+            }
         case .sessionAdded(let n):
             await shared.update { state in
                 state.sessionSummaries[n.summary.resource] = n.summary

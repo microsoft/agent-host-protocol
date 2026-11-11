@@ -548,7 +548,7 @@ public actor MultiHostClient {
                                 if let snap = await self.host(host) {
                                     cont.yield(snap.sessionSummaries)
                                 }
-                            case .action, .authRequired:
+                            case .action, .actionDecodingFailed, .authRequired:
                                 continue
                             }
                         }

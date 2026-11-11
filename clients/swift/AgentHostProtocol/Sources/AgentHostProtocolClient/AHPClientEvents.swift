@@ -6,11 +6,25 @@ import AgentHostProtocol
 /// One event delivered by a per-channel subscription.
 ///
 /// `action` envelopes carry the write-ahead mutation stream for a stateful
-/// channel; the remaining cases carry protocol-level signals the server
-/// broadcasts. Every case carries a `channel: String` on its associated
-/// params, which is how the client routes them to subscriptions.
+/// channel; the remaining cases carry decoding failures or protocol-level
+/// signals the server broadcasts. Every case carries a `channel: String`
+/// directly or on its associated params, used to route it to subscriptions.
 public enum SubscriptionEvent: Sendable {
     case action(ActionEnvelope)
+
+    /// An envelope header decoded, but its action payload did not.
+    ///
+    /// `lastSeenServerSeq` advances past this envelope so reconnect does not
+    /// replay the same undecodable payload forever. Consumers should resubscribe
+    /// for a fresh snapshot and can settle pending actions using `origin`.
+    /// The original decoding error is preserved in `error`.
+    case actionDecodingFailed(
+        channel: String,
+        serverSeq: Int,
+        origin: ActionOrigin?,
+        rejectionReason: String?,
+        error: Error
+    )
     case sessionAdded(SessionAddedParams)
     case sessionRemoved(SessionRemovedParams)
     case sessionSummaryChanged(SessionSummaryChangedParams)
@@ -19,9 +33,9 @@ public enum SubscriptionEvent: Sendable {
 
 /// One event delivered by `AHPClient.events` — the top-level multicast tap.
 ///
-/// `resource` is non-nil for action envelopes (carrying the URI the action is
-/// scoped to) and nil for cross-resource protocol notifications. Mirrors the
-/// shape planned for the Rust `Client::events()` method.
+/// `resource` carries the channel URI for channel-scoped events, including
+/// action decoding failures, and is nil for cross-resource notifications.
+/// Mirrors the shape planned for the Rust `Client::events()` method.
 public struct ClientEvent: Sendable {
     public let resource: String?
     public let event: SubscriptionEvent

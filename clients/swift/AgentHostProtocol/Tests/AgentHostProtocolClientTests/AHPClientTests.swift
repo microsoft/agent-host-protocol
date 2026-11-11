@@ -197,6 +197,144 @@ final class AHPClientTests: XCTestCase {
         await client.shutdown()
     }
 
+    func testActionDecodingFailurePreservesHeaderAndReachesBothStreams() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        let events = await client.events
+        let subscription = await client.attachSubscription("ahp-session:/s1")
+        try await client.connect()
+
+        try await pushNotification(
+            method: "action",
+            params: AnyCodable([
+                "channel": "ahp-session:/s1",
+                "serverSeq": 42,
+                "origin": ["clientId": "test-client", "clientSeq": 7],
+                "rejectionReason": "rejected",
+                "action": ["type": "session/titleChanged"],
+            ]),
+            on: serverSide
+        )
+
+        var subscriptionIter = subscription.makeAsyncIterator()
+        let nextSubscriptionEvent = try await nextWithTimeout(&subscriptionIter)
+        let subscriptionEvent = try XCTUnwrap(nextSubscriptionEvent)
+        var eventIter = events.makeAsyncIterator()
+        let nextClientEvent = try await nextWithTimeout(&eventIter)
+        let clientEvent = try XCTUnwrap(nextClientEvent)
+        XCTAssertEqual(clientEvent.resource, "ahp-session:/s1")
+
+        for event in [subscriptionEvent, clientEvent.event] {
+            guard case .actionDecodingFailed(
+                let channel, let seq, let origin, let rejectionReason, let error
+            ) = event else {
+                XCTFail("expected actionDecodingFailed, got \(event)")
+                await client.shutdown()
+                return
+            }
+            XCTAssertEqual(channel, "ahp-session:/s1")
+            XCTAssertEqual(seq, 42)
+            XCTAssertEqual(origin?.clientId, "test-client")
+            XCTAssertEqual(origin?.clientSeq, 7)
+            XCTAssertEqual(rejectionReason, "rejected")
+            guard case DecodingError.keyNotFound(let key, let context) = error else {
+                XCTFail("expected the original missing-title decoding error, got \(error)")
+                await client.shutdown()
+                return
+            }
+            XCTAssertEqual(key.stringValue, "title")
+            XCTAssertEqual(context.codingPath.map(\.stringValue), ["action"])
+        }
+        let lastSeen = await client.lastSeenServerSeq
+        XCTAssertEqual(lastSeen, 42)
+        await client.shutdown()
+    }
+
+    func testActionDecodingFailureWithoutOriginKeepsCursorMonotonic() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        let subscription = await client.attachSubscription("ahp-session:/s1")
+        try await client.connect()
+        var iter = subscription.makeAsyncIterator()
+
+        for seq in [4, 2] {
+            try await pushNotification(
+                method: "action",
+                params: AnyCodable([
+                    "channel": "ahp-session:/s1",
+                    "serverSeq": seq,
+                    "action": ["type": "session/titleChanged"],
+                ]),
+                on: serverSide
+            )
+            let event = try await nextWithTimeout(&iter)
+            guard case .actionDecodingFailed(_, let serverSeq, let origin, let reason, _) = event else {
+                XCTFail("expected actionDecodingFailed, got \(String(describing: event))")
+                await client.shutdown()
+                return
+            }
+            XCTAssertEqual(serverSeq, seq)
+            XCTAssertNil(origin)
+            XCTAssertNil(reason)
+            let lastSeen = await client.lastSeenServerSeq
+            XCTAssertEqual(lastSeen, 4)
+        }
+        await client.shutdown()
+    }
+
+    func testMalformedActionHeadersAreDroppedAndUnknownActionsStillDecode() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        let events = await client.events
+        let subscription = await client.attachSubscription("ahp-session:/s1")
+        try await client.connect()
+
+        // Neither malformed header should emit an event or move the cursor.
+        for params in [
+            AnyCodable([
+                "serverSeq": 99,
+                "action": ["type": "session/titleChanged"],
+            ]),
+            AnyCodable([
+                "channel": "ahp-session:/s1",
+                "serverSeq": 98,
+                "origin": ["clientId": "test-client"],
+                "action": ["type": "session/titleChanged"],
+            ]),
+        ] {
+            try await pushNotification(method: "action", params: params, on: serverSide)
+        }
+        // A later valid header is a barrier: earlier notifications are handled first.
+        try await pushNotification(
+            method: "action",
+            params: AnyCodable([
+                "channel": "ahp-session:/s1",
+                "serverSeq": 1,
+                "action": ["type": "future/action"],
+            ]),
+            on: serverSide
+        )
+
+        var subscriptionIter = subscription.makeAsyncIterator()
+        let nextSubscriptionEvent = try await nextWithTimeout(&subscriptionIter)
+        let subscriptionEvent = try XCTUnwrap(nextSubscriptionEvent)
+        var eventIter = events.makeAsyncIterator()
+        let nextClientEvent = try await nextWithTimeout(&eventIter)
+        let clientEvent = try XCTUnwrap(nextClientEvent)
+        XCTAssertEqual(clientEvent.resource, "ahp-session:/s1")
+        for event in [subscriptionEvent, clientEvent.event] {
+            guard case .action(let envelope) = event, case .unknown = envelope.action else {
+                XCTFail("expected an unknown action, got \(event)")
+                await client.shutdown()
+                return
+            }
+            XCTAssertEqual(envelope.serverSeq, 1)
+        }
+        let lastSeen = await client.lastSeenServerSeq
+        XCTAssertEqual(lastSeen, 1)
+        await client.shutdown()
+    }
+
     // MARK: - events_tap_captures_handshake_notifications
 
     func testEventsTapCapturesHandshakeNotifications() async throws {

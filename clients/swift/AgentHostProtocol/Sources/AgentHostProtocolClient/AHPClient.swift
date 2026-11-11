@@ -971,20 +971,31 @@ public actor AHPClient {
 
     private func handleActionNotification(paramsData: Data?) async {
         guard let paramsData else { return }
-        let envelope: ActionEnvelope
+        let header: ActionEnvelopeHeader
         do {
-            envelope = try decoder.decode(ActionEnvelope.self, from: paramsData)
+            header = try decoder.decode(ActionEnvelopeHeader.self, from: paramsData)
         } catch {
             #if DEBUG
-            print("[AHPClient] failed to decode action envelope: \(error)")
+            print("[AHPClient] failed to decode action envelope header: \(error)")
             #endif
             return
         }
-        if envelope.serverSeq > lastSeenServerSeq {
-            lastSeenServerSeq = envelope.serverSeq
+        let event: SubscriptionEvent
+        do {
+            event = .action(try decoder.decode(ActionEnvelope.self, from: paramsData))
+        } catch {
+            event = .actionDecodingFailed(
+                channel: header.channel,
+                serverSeq: header.serverSeq,
+                origin: header.origin,
+                rejectionReason: header.rejectionReason,
+                error: error
+            )
         }
-        let channel = envelope.channel
-        let event = SubscriptionEvent.action(envelope)
+        if header.serverSeq > lastSeenServerSeq {
+            lastSeenServerSeq = header.serverSeq
+        }
+        let channel = header.channel
         if let listeners = perUriListeners[channel] {
             for l in listeners { l.continuation.yield(event) }
         }
@@ -1330,6 +1341,13 @@ private final class PendingEntry: @unchecked Sendable {
     init(continuation: CheckedContinuation<Data, Error>) {
         self.continuation = continuation
     }
+}
+
+private struct ActionEnvelopeHeader: Decodable {
+    let channel: String
+    let serverSeq: Int
+    let origin: ActionOrigin?
+    let rejectionReason: String?
 }
 
 private struct SubscriptionListener {
