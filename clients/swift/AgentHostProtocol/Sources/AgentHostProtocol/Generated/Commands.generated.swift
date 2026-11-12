@@ -68,6 +68,12 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Native filesystem path grammar used by a host environment.
+public enum PathStyle: String, Codable, Sendable {
+    case posix = "posix"
+    case windows = "windows"
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -397,6 +403,20 @@ public struct InitializeParams: Codable, Sendable {
     }
 }
 
+public struct HostEnvironment: Codable, Sendable {
+    /// Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.
+    public var pathStyle: PathStyle?
+
+    public init(
+        pathStyle: PathStyle? = nil
+    ) {
+        self.pathStyle = pathStyle
+    }
+}
+
 public struct InitializeResult: Codable, Sendable {
     /// Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
@@ -420,6 +440,10 @@ public struct InitializeResult: Codable, Sendable {
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
+    /// Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.
+    public var environment: HostEnvironment?
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -460,6 +484,7 @@ public struct InitializeResult: Codable, Sendable {
         case serverInfo
         case meta = "_meta"
         case snapshots
+        case environment
         case defaultDirectory
         case completionTriggerCharacters
         case terminalCommandPrefix
@@ -475,6 +500,7 @@ public struct InitializeResult: Codable, Sendable {
         serverInfo: Implementation? = nil,
         meta: [String: AnyCodable]? = nil,
         snapshots: [Snapshot],
+        environment: HostEnvironment? = nil,
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
@@ -488,6 +514,7 @@ public struct InitializeResult: Codable, Sendable {
         self.serverInfo = serverInfo
         self.meta = meta
         self.snapshots = snapshots
+        self.environment = environment
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
         self.terminalCommandPrefix = terminalCommandPrefix

@@ -232,6 +232,40 @@ export interface ClientCapabilities {
 }
 
 /**
+ * Native filesystem path grammar used by a host environment.
+ *
+ * @category Commands
+ * @exhaustive
+ */
+export const enum PathStyle {
+  Posix = 'posix',
+  Windows = 'windows',
+}
+
+/**
+ * Describes the connection's default host-side execution environment.
+ *
+ * The descriptor applies to {@link InitializeResult.defaultDirectory},
+ * session working directories, and `file:` resources handled by the server
+ * through the `resource*` commands, unless more specific environment metadata
+ * is available. It does not apply to resources provided by the client.
+ *
+ * A host that exposes mixed environments MUST only populate fields that have a
+ * single connection-wide default.
+ *
+ * @category Commands
+ */
+export interface HostEnvironment {
+  /**
+   * Authoritative native path grammar for resources in this environment.
+   *
+   * Clients parsing or formatting native paths MUST use this field instead of
+   * inferring path semantics from their local environment.
+   */
+  pathStyle?: PathStyle;
+}
+
+/**
  * Result of the `initialize` command.
  *
  * `protocolVersion` is the version the server has selected from the client's
@@ -272,6 +306,12 @@ export interface InitializeResult {
    * channel whose state has no fields ({@link EmptyState}).
    */
   snapshots: Snapshot[];
+  /**
+   * Default execution environment exposed by this host connection.
+   *
+   * Absence means no environment metadata is available.
+   */
+  environment?: HostEnvironment;
   /** Suggested default directory for remote filesystem browsing */
   defaultDirectory?: URI;
   /**

@@ -486,6 +486,35 @@ describe('generated JSON schemas', () => {
         }
       });
 
+      it('optionally describes host path semantics in an extensible environment descriptor', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const initializeResult = defs.InitializeResult;
+        const properties = initializeResult.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.environment.$ref, '#/$defs/HostEnvironment');
+
+        const environment = defs.HostEnvironment;
+        assert.equal(environment.required, undefined);
+
+        const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
+        assert.equal(schemaAccepts(schema, initializeResult, base), true);
+        for (const value of [
+          {},
+          { pathStyle: 'posix' },
+          { pathStyle: 'windows' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), true);
+        }
+        for (const value of [
+          null,
+          { pathStyle: 'unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), false);
+        }
+      });
+
       it('constrains every ChatOrigin branch to a distinct kind', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const chatOrigin = defs.ChatOrigin;

@@ -109,6 +109,15 @@ impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
     }
 }
 
+/// Native filesystem path grammar used by a host environment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PathStyle {
+    #[serde(rename = "posix")]
+    Posix,
+    #[serde(rename = "windows")]
+    Windows,
+}
+
 /// Encoding of fetched content data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContentEncoding {
@@ -334,6 +343,26 @@ pub struct InitializeParams {
     pub capabilities: Option<ClientCapabilities>,
 }
 
+/// Describes the connection's default host-side execution environment.
+///
+/// The descriptor applies to {@link InitializeResult.defaultDirectory},
+/// session working directories, and `file:` resources handled by the server
+/// through the `resource*` commands, unless more specific environment metadata
+/// is available. It does not apply to resources provided by the client.
+///
+/// A host that exposes mixed environments MUST only populate fields that have a
+/// single connection-wide default.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HostEnvironment {
+    /// Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_style: Option<PathStyle>,
+}
+
 /// Result of the `initialize` command.
 ///
 /// `protocolVersion` is the version the server has selected from the client's
@@ -369,6 +398,11 @@ pub struct InitializeResult {
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     pub snapshots: Vec<Snapshot>,
+    /// Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<HostEnvironment>,
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_directory: Option<Uri>,
