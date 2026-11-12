@@ -1028,7 +1028,7 @@ export interface MessageAnnotationsAttachment extends MessageAttachmentBase {
   /** Discriminant */
   type: MessageAttachmentKind.Annotations;
   /**
-   * The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+   * The annotations channel URI (`ahp-annotations:/<uuid>`).
    * Matches {@link AnnotationsSummary.resource}.
    */
   resource: URI;

@@ -1,6 +1,6 @@
 {
   "type": "fixed",
-  "message": "Snapshot state decoding dispatches terminals before sessions and propagates errors for recognized shapes instead of treating malformed states as unknown.",
-  "targets": ["swift", "rust", "kotlin", "dotnet", "go"],
+  "message": "Swift and Rust select snapshot state types from `Snapshot.resource`, propagating errors for malformed known-channel states and preserving unrecognized schemes as raw JSON.",
+  "targets": ["swift", "rust"],
   "issues": [590]
 }

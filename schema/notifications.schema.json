@@ -172,7 +172,7 @@
             },
             "annotations": {
               "$ref": "#/$defs/AnnotationsSummary",
-              "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+              "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
             },
             "resource": {
               "$ref": "#/$defs/URI",
@@ -1205,7 +1205,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         }
       },
       "required": [
@@ -1251,7 +1251,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "lifecycle": {
           "$ref": "#/$defs/SessionLifecycle",
@@ -1559,7 +1559,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -4006,7 +4006,7 @@
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).\nMatches {@link AnnotationsSummary.resource}."
+          "description": "The annotations channel URI (`ahp-annotations:/<uuid>`).\nMatches {@link AnnotationsSummary.resource}."
         },
         "annotationIds": {
           "type": "array",
@@ -5595,7 +5595,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribable annotations channel URI for the owning session\n(typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even\nthough it is derivable from the session URI so badge UI does not need\nto know the derivation rule."
+          "description": "The subscribable annotations channel URI for the owning session\n(`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).\nClients should use this value rather than derive it from the session URI."
         },
         "annotationCount": {
           "type": "number",
@@ -5614,7 +5614,7 @@
     },
     "AnnotationsState": {
       "type": "object",
-      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-session:/<uuid>/annotations` URI.",
+      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-annotations:/<uuid>` URI.",
       "properties": {
         "annotations": {
           "type": "array",

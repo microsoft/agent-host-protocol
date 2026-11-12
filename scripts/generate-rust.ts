@@ -24,7 +24,7 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
-import { SNAPSHOT_STATE_SHAPES } from './snapshot-state-shapes.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
 import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 import {
   discriminatedUnionAllowsUnknown,
@@ -575,6 +575,8 @@ interface StructOpts {
   omitDiscriminants?: boolean;
   /** Omit Serialize derive when a hand-written implementation is emitted. */
   omitSerialize?: boolean;
+  /** Omit Deserialize derive when a hand-written implementation is emitted. */
+  omitDeserialize?: boolean;
   /** Force `Default` derive (synthesizes Default impl when all fields optional). */
   deriveDefault?: boolean;
   /** Docstring for the struct itself. */
@@ -595,7 +597,7 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
   if (!opts.omitSerialize) {
     derives.push('Serialize');
   }
-  derives.push('Deserialize');
+  if (!opts.omitDeserialize) derives.push('Deserialize');
   if (wantsDefault) derives.push('Default');
   lines.push(`#[derive(${derives.join(', ')})]`);
   lines.push('#[serde(rename_all = "camelCase")]');
@@ -1387,19 +1389,13 @@ ${unknownVariant}}`;
 }
 
 function generateSnapshotState(): string {
-  const branches = SNAPSHOT_STATE_SHAPES.map(({ variant, type, keys }) => {
-    const condition = keys.map(key => `object.contains_key("${key}")`).join(' && ');
-    return `        } else if ${condition} {
-            serde_json::from_value::<${type}>(value)
-                .map(Box::new)
-                .map(Self::${variant})
-                .map_err(serde::de::Error::custom)`;
-  }).join('\n');
-  return `/// The state payload of a snapshot.
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `            "${scheme}" => serde_json::from_value::<${type}>(value)${variant === 'Empty' ? '' : '.map(Box::new)'}.map(Self::${variant}),`
+  ).join('\n');
+  return `/// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
-/// Selects a variant by its distinctive object members, then decodes it strictly.
-/// The automation catalogue is identified by its required \`entries\` member.
-/// Only objects matching no known shape decode as \`Unknown\`, preserving raw JSON.
+/// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
+/// or from_resource for typed decoding, which propagates known-channel errors.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -1419,21 +1415,47 @@ pub enum SnapshotState {
     Unknown(serde_json::Value),
 }
 
+impl SnapshotState {
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    pub fn from_resource(resource: &str, value: serde_json::Value) -> Result<Self, serde_json::Error> {
+        let scheme = resource.split_once(':').map(|(scheme, _)| scheme).unwrap_or("");
+        match scheme {
+${branches}
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for SnapshotState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        let Some(object) = value.as_object() else {
-            return Err(serde::de::Error::custom("expected an object for SnapshotState"));
-        };
-        if object.is_empty() {
-            Ok(Self::Empty(EmptyState {}))
-${branches}
-        } else {
-            Ok(Self::Unknown(value))
+        serde_json::Value::deserialize(deserializer).map(Self::Unknown)
+    }
+}
+
+impl<'de> Deserialize<'de> for Snapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireSnapshot {
+            resource: Uri,
+            state: serde_json::Value,
+            from_seq: i64,
         }
+
+        let wire = WireSnapshot::deserialize(deserializer)?;
+        let state = SnapshotState::from_resource(&wire.resource, wire.state)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            resource: wire.resource,
+            state,
+            from_seq: wire.from_seq,
+        })
     }
 }`;
 }
@@ -1485,6 +1507,7 @@ where D: serde::Deserializer<'de>,
     try {
       const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
+        omitDeserialize: entry.name === 'Snapshot',
       });
       // EmptyState must match only `{}`, including when decoded directly.
       lines.push(entry.name === 'EmptyState'

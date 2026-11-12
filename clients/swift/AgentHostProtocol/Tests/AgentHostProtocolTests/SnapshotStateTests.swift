@@ -3,49 +3,56 @@ import Foundation
 import AgentHostProtocol
 
 final class SnapshotStateTests: XCTestCase {
-    func testMalformedKnownStatesFailToDecode() {
-        for json in [
-            #"{"lifecycle":"ready","agents":[]}"#,
-            #"{"turns":[]}"#,
-            #"{"content":[]}"#,
-            #"{"automation":"ahp-automation:/a1","origin":{"kind":"manual"},"sessions":[]}"#,
-            #"{"entries":null}"#,
-            #"{"agents":null}"#,
-            #"{"annotations":null}"#,
-            #"{"instanceId":"i1","extensionId":"provider","canvasId":42}"#,
-            #"{"status":null,"files":[]}"#,
-            #"{"root":"file:///workspace","recursive":null}"#,
+    func testMalformedKnownChannelStateFailsToDecode() {
+        let json = #"{"resource":"ahp-session:/s1","state":{"lifecycle":"ready"},"fromSeq":1}"#
+        XCTAssertThrowsError(try JSONDecoder().decode(Snapshot.self, from: Data(json.utf8)))
+    }
+
+    func testUnknownAndStandaloneStatesRoundTrip() throws {
+        for state in [
+            #"{"content":[],"lifecycle":"ready","entries":null}"#,
+            "{}", "null", "[]", "42", #""state""#,
         ] {
-            XCTAssertThrowsError(
-                try JSONDecoder().decode(SnapshotState.self, from: Data(json.utf8)),
-                "Malformed known state must not fall back to another variant: \(json)"
+            let json = #"{"resource":"x-ext:/a","state":\#(state),"fromSeq":1}"#
+            let data = Data(json.utf8)
+            let snapshot = try JSONDecoder().decode(Snapshot.self, from: data)
+            guard case .unknown = snapshot.state else {
+                return XCTFail("Expected unknown snapshot state")
+            }
+            XCTAssertEqual(
+                try JSONDecoder().decode(AnyCodable.self, from: JSONEncoder().encode(snapshot)),
+                try JSONDecoder().decode(AnyCodable.self, from: data)
+            )
+
+            let standalone = try JSONDecoder().decode(SnapshotState.self, from: Data(state.utf8))
+            guard case .unknown = standalone else {
+                return XCTFail("Standalone decoding must preserve raw JSON")
+            }
+            XCTAssertEqual(
+                try JSONDecoder().decode(AnyCodable.self, from: JSONEncoder().encode(standalone)),
+                try JSONDecoder().decode(AnyCodable.self, from: Data(state.utf8))
             )
         }
     }
 
-    func testUnknownStateRoundTrips() throws {
-        let json = #"{"futureField":{"items":[1,true,"value"]}}"#
-        let state = try JSONDecoder().decode(SnapshotState.self, from: Data(json.utf8))
-        guard case .unknown = state else {
-            return XCTFail("Expected unknown snapshot state")
+    func testTerminalChannelDecodesAsTerminal() throws {
+        let json = """
+        {"resource":"ahp-terminal:/t1","fromSeq":1,"state":{
+            "title":"Shell","content":[],"lifecycle":{"status":"running"},
+            "claim":{"kind":"client","clientId":"c1"}
+        }}
+        """
+        let snapshot = try JSONDecoder().decode(Snapshot.self, from: Data(json.utf8))
+        guard case .terminal = snapshot.state else {
+            return XCTFail("Expected terminal snapshot state")
         }
-        XCTAssertEqual(String(decoding: try JSONEncoder().encode(state), as: UTF8.self), json)
     }
 
-    func testEmptyObjectDecodesAsEmpty() throws {
-        let state = try JSONDecoder().decode(SnapshotState.self, from: Data("{}".utf8))
-        guard case .empty = state else {
-            return XCTFail("Expected empty snapshot state")
-        }
-        XCTAssertEqual(String(decoding: try JSONEncoder().encode(state), as: UTF8.self), "{}")
-    }
-
-    func testNonObjectStatesFailToDecode() {
-        for json in ["null", "[]", "42", #""state""#] {
-            XCTAssertThrowsError(
-                try JSONDecoder().decode(SnapshotState.self, from: Data(json.utf8)),
-                "Snapshot state must be an object: \(json)"
-            )
+    func testAnnotationsChannelDecodesAsAnnotations() throws {
+        let json = #"{"resource":"ahp-annotations:/s1","state":{"annotations":[]},"fromSeq":1}"#
+        let snapshot = try JSONDecoder().decode(Snapshot.self, from: Data(json.utf8))
+        guard case .annotations = snapshot.state else {
+            return XCTFail("Expected annotations snapshot state")
         }
     }
 }

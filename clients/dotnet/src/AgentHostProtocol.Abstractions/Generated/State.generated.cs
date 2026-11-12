@@ -2985,7 +2985,7 @@ public sealed class SessionState
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3324,7 +3324,7 @@ public sealed class SessionSummary
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3971,7 +3971,7 @@ public sealed record MessageAnnotationsAttachment
     /// <summary>Discriminant</summary>
     public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Annotations;
 
-    /// <summary>The annotations channel URI (typically `ahp-session:/&lt;uuid&gt;/annotations`).
+    /// <summary>The annotations channel URI (`ahp-annotations:/&lt;uuid&gt;`).
     /// Matches {@link AnnotationsSummary.resource}.</summary>
     public required string Resource { get; init; }
 
@@ -6633,9 +6633,8 @@ public sealed record ResourceChange
 public sealed record AnnotationsSummary
 {
     /// <summary>The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/&lt;uuid&gt;/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.</summary>
+    /// (`ahp-annotations:/&lt;uuid&gt;`, where `&lt;uuid&gt;` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.</summary>
     public required string Resource { get; init; }
 
     /// <summary>Total number of {@link Annotation} entries in the channel.</summary>
@@ -6646,7 +6645,7 @@ public sealed record AnnotationsSummary
 }
 
 /// <summary>Full state for a session's annotations channel, returned when a client
-/// subscribes to an `ahp-session:/&lt;uuid&gt;/annotations` URI.</summary>
+/// subscribes to an `ahp-annotations:/&lt;uuid&gt;` URI.</summary>
 public sealed record AnnotationsState
 {
     /// <summary>Annotations in this channel, keyed by {@link Annotation.id}.</summary>
@@ -8225,7 +8224,7 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// shared by all native clients (terminal content is checked before session lifecycle).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -8294,17 +8293,16 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
         }
-        else if (root.TryGetProperty("content", out _))
-        {
-            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
-        }
-        else if (root.TryGetProperty("lifecycle", out _))
-        {
-            result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
-        }
         else if (root.TryGetProperty("turns", out _))
         {
             result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+        }
+        else if (root.TryGetProperty("lifecycle", out _))
+        {
+            // SessionState is discriminated on its required `lifecycle` field.
+            // (It no longer carries `summary`; that field was removed when the
+            // session state was flattened.)
+            result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
         }
         else if (root.TryGetProperty("instanceId", out _) &&
             root.TryGetProperty("extensionId", out _) &&
@@ -8312,13 +8310,15 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
         }
-        else if (root.TryGetProperty("status", out _) &&
-            root.TryGetProperty("files", out _))
+        else if (root.TryGetProperty("content", out _))
+        {
+            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
+        }
+        else if (root.TryGetProperty("status", out _) && root.TryGetProperty("files", out _))
         {
             result.Changeset = root.Deserialize(AhpJsonTypeInfo.Get<ChangesetState>(options));
         }
-        else if (root.TryGetProperty("root", out _) &&
-            root.TryGetProperty("recursive", out _))
+        else if (root.TryGetProperty("root", out _) && root.TryGetProperty("recursive", out _))
         {
             result.ResourceWatch = root.Deserialize(AhpJsonTypeInfo.Get<ResourceWatchState>(options));
         }

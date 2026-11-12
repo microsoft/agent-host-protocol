@@ -81,7 +81,7 @@
           {
             "type": "annotations",
             "label": "Review",
-            "resource": "ahp-session:/s1/annotations",
+            "resource": "ahp-annotations:/s1",
             "future": true
           },
           {
@@ -431,7 +431,7 @@
             {
               "type": "annotations",
               "label": "Review",
-              "resource": "ahp-session:/s1/annotations",
+              "resource": "ahp-annotations:/s1",
               "future": true
             },
             {

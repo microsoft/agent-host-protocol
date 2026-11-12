@@ -2212,7 +2212,7 @@ public struct SessionState: Codable, Sendable, Equatable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
@@ -2638,7 +2638,7 @@ public struct SessionSummary: Codable, Sendable, Equatable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
@@ -3787,7 +3787,7 @@ public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
     public var meta: [String: AnyCodable]?
     /// Discriminant
     public var type: MessageAttachmentKind
-    /// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+    /// The annotations channel URI (`ahp-annotations:/<uuid>`).
     /// Matches {@link AnnotationsSummary.resource}.
     public var resource: String
     /// Specific {@link Annotation.id | annotation ids} to reference. When
@@ -7206,6 +7206,12 @@ public struct Snapshot: Codable, Sendable, Equatable {
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     public var fromSeq: Int
 
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case state
+        case fromSeq
+    }
+
     public init(
         resource: String,
         state: SnapshotState,
@@ -7214,6 +7220,13 @@ public struct Snapshot: Codable, Sendable, Equatable {
         self.resource = resource
         self.state = state
         self.fromSeq = fromSeq
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.state = try SnapshotState.decode(resource: resource, from: container.superDecoder(forKey: .state))
+        self.fromSeq = try container.decode(Int.self, forKey: .fromSeq)
     }
 }
 
@@ -7516,9 +7529,8 @@ public struct ChangesetOperation: Codable, Sendable, Equatable {
 
 public struct AnnotationsSummary: Codable, Sendable, Equatable {
     /// The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.
+    /// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.
     public var resource: String
     /// Total number of {@link Annotation} entries in the channel.
     public var annotationCount: Int
@@ -9864,7 +9876,9 @@ public enum ToolResultContent: Codable, Sendable, Equatable {
     }
 }
 
-/// The state payload of a snapshot.
+/// The state payload of a snapshot, selected by its resource's URI scheme.
+/// Standalone decoding preserves any JSON value as unknown; use Snapshot or
+/// decode(resource:from:) for typed decoding, which propagates known-channel errors.
 public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
@@ -9881,42 +9895,27 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     /// re-encodes unchanged.
     case unknown(AnyCodable)
 
-    private struct MemberKey: CodingKey {
-        var stringValue: String
-        var intValue: Int? { nil }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue: Int) { nil }
+    public init(from decoder: Decoder) throws {
+        self = .unknown(try AnyCodable(from: decoder))
     }
 
-    public init(from decoder: Decoder) throws {
-        let members = try decoder.container(keyedBy: MemberKey.self)
-        let keys = Set(members.allKeys.map { $0.stringValue })
-        // Select by shape before decoding so errors in recognized states propagate.
-        if keys.isEmpty {
-            self = .empty(EmptyState())
-        } else if keys.contains("automation") && keys.contains("origin") && keys.contains("sessions") {
-            self = .automationRun(try AutomationRunState(from: decoder))
-        } else if keys.contains("entries") {
-            self = .automations(try AutomationState(from: decoder))
-        } else if keys.contains("content") {
-            self = .terminal(try TerminalState(from: decoder))
-        } else if keys.contains("lifecycle") {
-            self = .session(try SessionState(from: decoder))
-        } else if keys.contains("turns") {
-            self = .chat(try ChatState(from: decoder))
-        } else if keys.contains("instanceId") && keys.contains("extensionId") && keys.contains("canvasId") {
-            self = .canvas(try CanvasState(from: decoder))
-        } else if keys.contains("status") && keys.contains("files") {
-            self = .changeset(try ChangesetState(from: decoder))
-        } else if keys.contains("root") && keys.contains("recursive") {
-            self = .resourceWatch(try ResourceWatchState(from: decoder))
-        } else if keys.contains("annotations") {
-            self = .annotations(try AnnotationsState(from: decoder))
-        } else if keys.contains("agents") {
-            self = .root(try RootState(from: decoder))
-        } else {
-            // A state from a later protocol version: keep it rather than fail.
-            self = .unknown(try AnyCodable(from: decoder))
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    public static func decode(resource: String, from decoder: Decoder) throws -> SnapshotState {
+        let scheme = resource.firstIndex(of: ":").map { resource[..<$0] } ?? ""
+        switch scheme {
+        case "ahp-root": return .root(try RootState(from: decoder))
+        case "ahp-automations": return .automations(try AutomationState(from: decoder))
+        case "ahp-session": return .session(try SessionState(from: decoder))
+        case "ahp-chat": return .chat(try ChatState(from: decoder))
+        case "ahp-canvas": return .canvas(try CanvasState(from: decoder))
+        case "ahp-terminal": return .terminal(try TerminalState(from: decoder))
+        case "ahp-changeset": return .changeset(try ChangesetState(from: decoder))
+        case "ahp-resource-watch": return .resourceWatch(try ResourceWatchState(from: decoder))
+        case "ahp-annotations": return .annotations(try AnnotationsState(from: decoder))
+        case "ahp-automation-run": return .automationRun(try AutomationRunState(from: decoder))
+        case "ahp-tcp": return .empty(try EmptyState(from: decoder))
+        case "ahp-otlp": return .empty(try EmptyState(from: decoder))
+        default: return .unknown(try AnyCodable(from: decoder))
         }
     }
 

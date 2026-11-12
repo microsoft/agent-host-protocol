@@ -448,7 +448,7 @@ public sealed record PartialSessionSummary
     public List<string>? WorkingDirectories { get; init; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

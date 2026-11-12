@@ -434,7 +434,7 @@ pub struct PartialSessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -391,7 +391,7 @@ public struct PartialSessionSummary: Codable, Sendable, Equatable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?

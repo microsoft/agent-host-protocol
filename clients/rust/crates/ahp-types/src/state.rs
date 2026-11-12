@@ -2404,7 +2404,7 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2744,7 +2744,7 @@ pub struct SessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3500,7 +3500,7 @@ pub struct MessageAnnotationsAttachment {
     /// host when sending the user message containing the accepted completion.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+    /// The annotations channel URI (`ahp-annotations:/<uuid>`).
     /// Matches {@link AnnotationsSummary.resource}.
     pub resource: Uri,
     /// Specific {@link Annotation.id | annotation ids} to reference. When
@@ -5554,7 +5554,7 @@ pub struct ErrorInfo {
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by
 /// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
@@ -5782,9 +5782,8 @@ pub struct ChangesetOperation {
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationsSummary {
     /// The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.
+    /// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.
     pub resource: Uri,
     /// Total number of {@link Annotation} entries in the channel.
     pub annotation_count: i64,
@@ -5793,7 +5792,7 @@ pub struct AnnotationsSummary {
 }
 
 /// Full state for a session's annotations channel, returned when a client
-/// subscribes to an `ahp-session:/<uuid>/annotations` URI.
+/// subscribes to an `ahp-annotations:/<uuid>` URI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationsState {
@@ -7017,11 +7016,10 @@ pub enum AutomationRunLifecycle {
     Cancelled(AutomationCancelledRunLifecycle),
 }
 
-/// The state payload of a snapshot.
+/// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
-/// Selects a variant by its distinctive object members, then decodes it strictly.
-/// The automation catalogue is identified by its required `entries` member.
-/// Only objects matching no known shape decode as `Unknown`, preserving raw JSON.
+/// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
+/// or from_resource for typed decoding, which propagates known-channel errors.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -7041,77 +7039,83 @@ pub enum SnapshotState {
     Unknown(serde_json::Value),
 }
 
+impl SnapshotState {
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    pub fn from_resource(
+        resource: &str,
+        value: serde_json::Value,
+    ) -> Result<Self, serde_json::Error> {
+        let scheme = resource
+            .split_once(':')
+            .map(|(scheme, _)| scheme)
+            .unwrap_or("");
+        match scheme {
+            "ahp-root" => serde_json::from_value::<RootState>(value)
+                .map(Box::new)
+                .map(Self::Root),
+            "ahp-automations" => serde_json::from_value::<AutomationState>(value)
+                .map(Box::new)
+                .map(Self::Automations),
+            "ahp-session" => serde_json::from_value::<SessionState>(value)
+                .map(Box::new)
+                .map(Self::Session),
+            "ahp-chat" => serde_json::from_value::<ChatState>(value)
+                .map(Box::new)
+                .map(Self::Chat),
+            "ahp-canvas" => serde_json::from_value::<CanvasState>(value)
+                .map(Box::new)
+                .map(Self::Canvas),
+            "ahp-terminal" => serde_json::from_value::<TerminalState>(value)
+                .map(Box::new)
+                .map(Self::Terminal),
+            "ahp-changeset" => serde_json::from_value::<ChangesetState>(value)
+                .map(Box::new)
+                .map(Self::Changeset),
+            "ahp-resource-watch" => serde_json::from_value::<ResourceWatchState>(value)
+                .map(Box::new)
+                .map(Self::ResourceWatch),
+            "ahp-annotations" => serde_json::from_value::<AnnotationsState>(value)
+                .map(Box::new)
+                .map(Self::Annotations),
+            "ahp-automation-run" => serde_json::from_value::<AutomationRunState>(value)
+                .map(Box::new)
+                .map(Self::AutomationRun),
+            "ahp-tcp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
+            "ahp-otlp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for SnapshotState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        let Some(object) = value.as_object() else {
-            return Err(serde::de::Error::custom(
-                "expected an object for SnapshotState",
-            ));
-        };
-        if object.is_empty() {
-            Ok(Self::Empty(EmptyState {}))
-        } else if object.contains_key("automation")
-            && object.contains_key("origin")
-            && object.contains_key("sessions")
-        {
-            serde_json::from_value::<AutomationRunState>(value)
-                .map(Box::new)
-                .map(Self::AutomationRun)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("entries") {
-            serde_json::from_value::<AutomationState>(value)
-                .map(Box::new)
-                .map(Self::Automations)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("content") {
-            serde_json::from_value::<TerminalState>(value)
-                .map(Box::new)
-                .map(Self::Terminal)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("lifecycle") {
-            serde_json::from_value::<SessionState>(value)
-                .map(Box::new)
-                .map(Self::Session)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("turns") {
-            serde_json::from_value::<ChatState>(value)
-                .map(Box::new)
-                .map(Self::Chat)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("instanceId")
-            && object.contains_key("extensionId")
-            && object.contains_key("canvasId")
-        {
-            serde_json::from_value::<CanvasState>(value)
-                .map(Box::new)
-                .map(Self::Canvas)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("status") && object.contains_key("files") {
-            serde_json::from_value::<ChangesetState>(value)
-                .map(Box::new)
-                .map(Self::Changeset)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("root") && object.contains_key("recursive") {
-            serde_json::from_value::<ResourceWatchState>(value)
-                .map(Box::new)
-                .map(Self::ResourceWatch)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("annotations") {
-            serde_json::from_value::<AnnotationsState>(value)
-                .map(Box::new)
-                .map(Self::Annotations)
-                .map_err(serde::de::Error::custom)
-        } else if object.contains_key("agents") {
-            serde_json::from_value::<RootState>(value)
-                .map(Box::new)
-                .map(Self::Root)
-                .map_err(serde::de::Error::custom)
-        } else {
-            Ok(Self::Unknown(value))
+        serde_json::Value::deserialize(deserializer).map(Self::Unknown)
+    }
+}
+
+impl<'de> Deserialize<'de> for Snapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireSnapshot {
+            resource: Uri,
+            state: serde_json::Value,
+            from_seq: i64,
         }
+
+        let wire = WireSnapshot::deserialize(deserializer)?;
+        let state = SnapshotState::from_resource(&wire.resource, wire.state)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            resource: wire.resource,
+            state,
+            from_seq: wire.from_seq,
+        })
     }
 }

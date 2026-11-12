@@ -1,10 +1,10 @@
 /**
  * Annotations Channel State Types — Per-session inline file-annotation state
- * exposed on the `ahp-session:/<uuid>/annotations` channel.
+ * exposed on the `ahp-annotations:/<uuid>` channel.
  *
  * Each session owns at most one annotations channel. The channel URI is
- * derived from the session URI by appending `/annotations` and is also
- * surfaced explicitly on {@link AnnotationsSummary.resource} for badge UI.
+ * `ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id.
+ * Clients should use {@link AnnotationsSummary.resource} rather than derive it.
  *
  * Stability: 1.1 - Active development
  *
@@ -25,9 +25,8 @@ import type { URI, StringOrMarkdown, TextRange } from '../common/state.js';
 export interface AnnotationsSummary {
   /**
    * The subscribable annotations channel URI for the owning session
-   * (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-   * though it is derivable from the session URI so badge UI does not need
-   * to know the derivation rule.
+   * (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+   * Clients should use this value rather than derive it from the session URI.
    */
   resource: URI;
   /** Total number of {@link Annotation} entries in the channel. */
@@ -40,7 +39,7 @@ export interface AnnotationsSummary {
 
 /**
  * Full state for a session's annotations channel, returned when a client
- * subscribes to an `ahp-session:/<uuid>/annotations` URI.
+ * subscribes to an `ahp-annotations:/<uuid>` URI.
  *
  * @category Annotations
  */

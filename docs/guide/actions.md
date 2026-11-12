@@ -175,7 +175,7 @@ See the [Terminals guide](/guide/terminals) for usage flows.
 
 ## Annotations Actions
 
-Annotations actions travel on a session's annotations channel (`ahp-session:/<uuid>/annotations`). Every annotations action is client-dispatchable — clients create, re-anchor, resolve, and delete annotations and their entries by dispatching these directly (assigning the `Annotation.id` / `AnnotationEntry.id` themselves and applying them optimistically), and the agent host MAY also originate them.
+Annotations actions travel on a session's annotations channel (`ahp-annotations:/<uuid>`). Every annotations action is client-dispatchable — clients create, re-anchor, resolve, and delete annotations and their entries by dispatching these directly (assigning the `Annotation.id` / `AnnotationEntry.id` themselves and applying them optimistically), and the agent host MAY also originate them.
 
 | Type | Client-dispatchable? | When |
 |---|---|---|

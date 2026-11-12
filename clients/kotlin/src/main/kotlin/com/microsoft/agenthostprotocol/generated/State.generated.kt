@@ -2082,7 +2082,7 @@ data class SessionState(
     val workingDirectories: List<String>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
-     * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+     * (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */
@@ -2487,7 +2487,7 @@ data class SessionSummary(
     val workingDirectories: List<String>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
-     * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+     * (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */
@@ -3329,7 +3329,7 @@ data class MessageAnnotationsAttachment(
      */
     val type: MessageAttachmentKind,
     /**
-     * The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+     * The annotations channel URI (`ahp-annotations:/<uuid>`).
      * Matches {@link AnnotationsSummary.resource}.
      */
     val resource: String,
@@ -5908,9 +5908,8 @@ data class ChangesetOperation(
 data class AnnotationsSummary(
     /**
      * The subscribable annotations channel URI for the owning session
-     * (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-     * though it is derivable from the session URI so badge UI does not need
-     * to know the derivation rule.
+     * (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+     * Clients should use this value rather than derive it from the session URI.
      */
     val resource: String,
     /**
@@ -8193,7 +8192,15 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Probe distinctive shapes in the shared order so lifecycle and annotations do not shadow other states.
+        // Try the most distinctive shape first. AutomationRunState has required
+        // `automation`, `origin`, and `sessions`; AutomationState has
+        // required `entries`; SessionState has required
+        // `lifecycle`; ChatState has required `turns`; ChangesetState has
+        // required `status` + `files`; ResourceWatchState has required
+        // `root` + `recursive`; AnnotationsState has required `annotations`
+        // (checked after session, whose optional annotations summary reuses the
+        // key); TerminalState has required `content`; RootState is the
+        // catch-all.
         // An object with no members is an empty state, used by channels whose state has no fields.
         return when {
             obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
@@ -8201,12 +8208,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
-            obj.containsKey("content") ->
-                SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
-            obj.containsKey("lifecycle") ->
-                SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
-            obj.containsKey("turns") ->
-                SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
+            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
                 SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -8215,8 +8218,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
-            obj.containsKey("agents") ->
-                SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
+            obj.containsKey("content") ->
+                SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
+            obj.containsKey("agents") -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
             // A state from a later protocol version: keep it rather than fail.
             else -> SnapshotState.Unknown(obj)
         }

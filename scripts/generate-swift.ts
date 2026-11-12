@@ -31,7 +31,7 @@ import {
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
 import { readActionOrigins } from './generate-action-origin.js';
-import { SNAPSHOT_STATE_SHAPES } from './snapshot-state-shapes.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
 import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
@@ -450,7 +450,7 @@ function generateSwiftStruct(
   }
 
   // CodingKeys if needed
-  const needsKeys = props.some(p => p.name !== p.wireName);
+  const needsKeys = props.some(p => p.name !== p.wireName) || swiftName === 'Snapshot';
   if (needsKeys || preserveUnknownMembers) {
     lines.push('');
     lines.push(`    enum CodingKeys: String, CodingKey${preserveUnknownMembers ? ', CaseIterable' : ''} {`);
@@ -480,6 +480,15 @@ function generateSwiftStruct(
   if (preserveUnknownMembers) lines.push('        self.extra = extra');
   lines.push('    }');
   if (preserveUnknownMembers) lines.push(generateUnknownMembersCodable(props));
+  if (swiftName === 'Snapshot') {
+    lines.push(`
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.state = try SnapshotState.decode(resource: resource, from: container.superDecoder(forKey: .state))
+        self.fromSeq = try container.decode(Int.self, forKey: .fromSeq)
+    }`);
+  }
 
   // Swift synthesizes equality for value types, but not recursive classes.
   if (isRecursive) {
@@ -1155,12 +1164,12 @@ public enum ToolInput: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  const branches = SNAPSHOT_STATE_SHAPES.map(({ variant, type, keys }) => {
-    const condition = keys.map(key => `keys.contains("${key}")`).join(' && ');
-    return `        } else if ${condition} {
-            self = .${toCamelCase(variant)}(try ${type}(from: decoder))`;
-  }).join('\n');
-  return `/// The state payload of a snapshot.
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `        case "${scheme}": return .${toCamelCase(variant)}(try ${type}(from: decoder))`
+  ).join('\n');
+  return `/// The state payload of a snapshot, selected by its resource's URI scheme.
+/// Standalone decoding preserves any JSON value as unknown; use Snapshot or
+/// decode(resource:from:) for typed decoding, which propagates known-channel errors.
 public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
@@ -1177,23 +1186,16 @@ public enum SnapshotState: Codable, Sendable, Equatable {
     /// re-encodes unchanged.
     case unknown(AnyCodable)
 
-    private struct MemberKey: CodingKey {
-        var stringValue: String
-        var intValue: Int? { nil }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue: Int) { nil }
+    public init(from decoder: Decoder) throws {
+        self = .unknown(try AnyCodable(from: decoder))
     }
 
-    public init(from decoder: Decoder) throws {
-        let members = try decoder.container(keyedBy: MemberKey.self)
-        let keys = Set(members.allKeys.map { $0.stringValue })
-        // Select by shape before decoding so errors in recognized states propagate.
-        if keys.isEmpty {
-            self = .empty(EmptyState())
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    public static func decode(resource: String, from decoder: Decoder) throws -> SnapshotState {
+        let scheme = resource.firstIndex(of: ":").map { resource[..<$0] } ?? ""
+        switch scheme {
 ${branches}
-        } else {
-            // A state from a later protocol version: keep it rather than fail.
-            self = .unknown(try AnyCodable(from: decoder))
+        default: return .unknown(try AnyCodable(from: decoder))
         }
     }
 

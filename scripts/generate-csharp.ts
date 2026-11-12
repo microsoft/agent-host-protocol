@@ -46,7 +46,6 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
-import { SNAPSHOT_STATE_SHAPES } from './snapshot-state-shapes.js';
 import { getDocumentation } from './read-stability.js';
 import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
@@ -1444,7 +1443,7 @@ function generateSnapshotState(): string {
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// automation-run, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// shared by all native clients (terminal content is checked before session lifecycle).
+/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -1503,12 +1502,53 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Empty = new EmptyState();
         }
-${SNAPSHOT_STATE_SHAPES.map(({ variant, type, keys }) =>
-    `        else if (${keys.map(key => `root.TryGetProperty("${key}", out _)`).join(' &&\n            ')})
+        else if (root.TryGetProperty("automation", out _) &&
+            root.TryGetProperty("origin", out _) &&
+            root.TryGetProperty("sessions", out _))
         {
-            result.${variant} = root.Deserialize(AhpJsonTypeInfo.Get<${type}>(options));
-        }`
-  ).join('\n')}
+            result.AutomationRun = root.Deserialize(AhpJsonTypeInfo.Get<AutomationRunState>(options));
+        }
+        else if (root.TryGetProperty("entries", out _))
+        {
+            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
+        }
+        else if (root.TryGetProperty("turns", out _))
+        {
+            result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+        }
+        else if (root.TryGetProperty("lifecycle", out _))
+        {
+            // SessionState is discriminated on its required \`lifecycle\` field.
+            // (It no longer carries \`summary\`; that field was removed when the
+            // session state was flattened.)
+            result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
+        }
+        else if (root.TryGetProperty("instanceId", out _) &&
+            root.TryGetProperty("extensionId", out _) &&
+            root.TryGetProperty("canvasId", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
+        else if (root.TryGetProperty("content", out _))
+        {
+            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
+        }
+        else if (root.TryGetProperty("status", out _) && root.TryGetProperty("files", out _))
+        {
+            result.Changeset = root.Deserialize(AhpJsonTypeInfo.Get<ChangesetState>(options));
+        }
+        else if (root.TryGetProperty("root", out _) && root.TryGetProperty("recursive", out _))
+        {
+            result.ResourceWatch = root.Deserialize(AhpJsonTypeInfo.Get<ResourceWatchState>(options));
+        }
+        else if (root.TryGetProperty("annotations", out _))
+        {
+            result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
+        }
+        else if (root.TryGetProperty("agents", out _))
+        {
+            result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
+        }
         else
         {
             // A state from a later protocol version: keep it rather than fail.

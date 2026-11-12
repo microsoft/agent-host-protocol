@@ -1049,7 +1049,7 @@ type SessionState struct {
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
-	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
@@ -1329,7 +1329,7 @@ type SessionSummary struct {
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
-	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
@@ -2315,7 +2315,7 @@ type MessageAnnotationsAttachment struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Discriminant
 	Type MessageAttachmentKind `json:"type"`
-	// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+	// The annotations channel URI (`ahp-annotations:/<uuid>`).
 	// Matches {@link AnnotationsSummary.resource}.
 	Resource URI `json:"resource"`
 	// Specific {@link Annotation.id | annotation ids} to reference. When
@@ -4468,9 +4468,8 @@ type ChangesetOperation struct {
 // entry counts without subscribing to the channel itself.
 type AnnotationsSummary struct {
 	// The subscribable annotations channel URI for the owning session
-	// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-	// though it is derivable from the session URI so badge UI does not need
-	// to know the derivation rule.
+	// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+	// Clients should use this value rather than derive it from the session URI.
 	Resource URI `json:"resource"`
 	// Total number of {@link Annotation} entries in the channel.
 	AnnotationCount int64 `json:"annotationCount"`
@@ -4479,7 +4478,7 @@ type AnnotationsSummary struct {
 }
 
 // Full state for a session's annotations channel, returned when a client
-// subscribes to an `ahp-session:/<uuid>/annotations` URI.
+// subscribes to an `ahp-annotations:/<uuid>` URI.
 type AnnotationsState struct {
 	// Annotations in this channel, keyed by {@link Annotation.id}.
 	Annotations []Annotation `json:"annotations"`
@@ -7097,8 +7096,9 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 // chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
 // automation-run, or empty state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the order shared by all native clients (terminal
-// content is checked before session lifecycle). An object with no members
+// for required fields in the canonical order
+// (empty → automationRun → automations → session → chat → canvas → terminal →
+// changeset → resourceWatch → annotations → root). An object with no members
 // is an empty state, used by channels whose state has no fields. A state that
 // matches none of these, such as the state of a channel added in a later
 // protocol version, is kept as raw JSON in Unknown.
@@ -7172,12 +7172,6 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Automations = &v
-	case containsAll(probe, "content"):
-		var v TerminalState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Terminal = &v
 	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {
@@ -7196,6 +7190,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Canvas = &v
+	case containsAll(probe, "content"):
+		var v TerminalState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Terminal = &v
 	case containsAll(probe, "status", "files"):
 		var v ChangesetState
 		if err := json.Unmarshal(data, &v); err != nil {
