@@ -86,46 +86,21 @@ itself changes, the server dispatches
 [`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
 fully replaces the catalogue or clears it when `changesets` is absent.
 
-### Canvas type registry
+### Canvas collections
 
-When the selected agent advertises
-[`AgentCapabilities.canvases`](/reference/root#agentcapabilities), an exact chat
-may expose a [`canvasRegistry`](/reference/chat#chatstate). This is the
-authoritative set of Canvas **types** the chat can currently open. It is
-separate from [`canvases`](/reference/chat#chatstate), which contains references
-to already-open live Canvas **instances**.
+An exact chat may advertise [`ChatState.canvasesUri`](/reference/chat#chatstate), an opaque `ahp-canvases:` URI. Its [`CanvasesState`](/reference/canvases#canvasesstate) contains a typed registry load state and live Canvas instance references. Ownership is chat-scoped for now: the host MUST resolve ownership through its explicit mapping, not infer a chat or future scope from URI grammar. Advertising the URI is cheap and MUST NOT require backing materialization.
 
-The registry normalizes extension/provider metadata: each
-[`CanvasExtension`](/reference/canvas#canvasextension) appears once and carries
-its own Canvas types. Clients key a type by its extension and Canvas type IDs.
+Subscribing to the collection MUST NOT create backing, resume a cold runtime, or start extensions. Hosts MAY enumerate or refresh an already-live runtime. Unsubscribing only ends observation and MUST NOT dispose instances. Hosts publish membership with `canvases/canvasSet` (full-reference upsert keyed by `resource`) and `canvases/canvasRemoved` (key-only removal). Clients subscribe to each `ahp-canvas:` instance for its presentation metadata and current source URI.
 
-For a live chat, hosts keep this registry synchronized with provider
-registration and dispatch
-[`chat/canvasRegistryChanged`](/reference/chat#chatcanvasregistrychangedaction)
-only when the authoritative set changes. Clients do not poll the list or use
-`ChatState.canvases` changes as a registry-invalidation signal.
+The registry is discriminated by `CanvasRegistryStatus`: `uninitialized`, `loading`, `ready`, or `error`. Only `ready` carries the normalized `extensions` array; `ready` with `extensions: []` means loaded and empty. An `error` carries `ErrorInfo`. Neither uninitialized, loading, nor failed registries imply empty live membership. Each [`CanvasExtension`](/reference/canvas#canvasextension) appears once and carries types keyed by extension ID and Canvas type ID. A type's full `inputSchema` describes accepted input; clients decide which types to offer. The opening command does not currently carry input.
 
-Absence of `canvasRegistry` means it has not been materialized or is not
-currently available. A client may dispatch
-[`chat/canvasRegistryRequested`](/reference/chat#chatcanvasregistryrequestedaction)
-to request materialization. This action is explicitly effectful: for a
-persisted cold chat, the host may resume its backing runtime, discover
-extensions, and execute extension startup code. The host MUST NOT create a
-backing for a brand-new chat, send a user message, or invoke a model. The
-action's reducer is a no-op; the host publishes the complete resulting registry
-through `chat/canvasRegistryChanged`.
+When [`AgentCapabilities.canvases`](/reference/root#agentcapabilities) is advertised, clients may dispatch [`canvases/registryRequested`](/reference/canvases#canvasesregistryrequestedaction) on the collection to ensure registry materialization. For persisted cold backing, this may resume the existing runtime and execute extension startup code. It MUST NOT create provisional backing for a brand-new chat, send a user message, or invoke a model. Concurrent requests MUST coalesce. Requests while loading or ready are ensure/no-ops; a request after error retries. The reducer is a no-op and the host publishes loading and terminal ready/error outcomes with `canvases/registryChanged`. Hosts keep already-live registries synchronized; clients do not poll or treat membership changes as registry invalidation.
 
-To open a no-input declaration, the client sends
-[`openCanvas`](/reference/canvas#opencanvas) with a client-chosen
-`ahp-canvas:` URI in `channel`, the exact owning chat URI, and the declaration's
-`extensionId` and `canvasId`. Reusing the same Canvas URI focuses or refreshes
-that logical instance. Live membership and presentation then flow through
-`ChatState.canvases` and the Canvas channel.
+To open a declaration accepting omitted input, send [`openCanvas`](/reference/canvas#opencanvas) with a client-chosen `ahp-canvas:` instance URI in `channel`, the advertised owning collection URI in `canvases`, and the type selector `extensionId` plus `canvasId`. Repeating the same command is idempotent; reusing the instance URI for another collection, extension, or type MUST fail with `Conflict`. Membership and presentation are authoritative in the collection and instance channels, not in command results.
 
-To close a live instance, the client sends
-[`disposeCanvas`](/reference/canvas#disposecanvas) with that instance's
-`ahp-canvas:` URI. The host removes the chat membership and disposes the
-provider-facing instance; disposing an already-removed resource is a no-op.
+To close an instance, send [`disposeCanvas`](/reference/canvas#disposecanvas) with its instance URI in `channel`. The host removes collection membership and disposes the provider-facing instance; disposing an already-removed resource is a no-op. The capability gates registry materialization and management, never observing unsolicited server instances.
+
+For compatibility, `ChatState.canvases` and `chat/canvasesChanged` remain deprecated projections from the same authoritative collection membership. Hosts MUST NOT maintain a second source of truth. New clients prefer the collection URI and fall back to legacy references only when the pointer is absent. The unreleased chat registry field and chat registry actions are replaced by collection state/actions; consumers migrate to the collection channel and `OpenCanvasParams.canvases`. Native SDK consumers must update affected model construction as well as action routing. No protocol version bump accompanies this development-only change; the new actions are introduced in 1.1.0.
 
 ### Per-chat configuration
 

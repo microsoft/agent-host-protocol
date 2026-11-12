@@ -647,10 +647,8 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			state.Canvases = append([]ahptypes.CanvasReference(nil), a.Canvases...)
 		}
 		return ReduceOutcomeApplied
-	case *ahptypes.ChatCanvasRegistryRequestedAction:
-		return ReduceOutcomeNoOp
-	case *ahptypes.ChatCanvasRegistryChangedAction:
-		state.CanvasRegistry = a.CanvasRegistry
+	case *ahptypes.ChatCanvasesUriChangedAction:
+		state.CanvasesUri = a.CanvasesUri
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatWorkingDirectorySetAction:
 		for _, d := range state.WorkingDirectories {
@@ -1741,6 +1739,38 @@ func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateActio
 		return ReduceOutcomeOutOfScope
 	}
 	*state = a.Canvas
+	return ReduceOutcomeApplied
+}
+
+// ApplyActionToCanvases applies registry and keyed membership mutations.
+func ApplyActionToCanvases(state *ahptypes.CanvasesState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.CanvasesRegistryRequestedAction:
+		return ReduceOutcomeNoOp
+	case *ahptypes.CanvasesRegistryChangedAction:
+		state.Registry = a.Registry
+	case *ahptypes.CanvasesCanvasSetAction:
+		next := append([]ahptypes.CanvasReference{}, state.Canvases...)
+		for i, canvas := range next {
+			if canvas.Resource == a.Canvas.Resource {
+				next[i] = a.Canvas
+				state.Canvases = next
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Canvases = append(next, a.Canvas)
+	case *ahptypes.CanvasesCanvasRemovedAction:
+		for i, canvas := range state.Canvases {
+			if canvas.Resource == a.Resource {
+				next := append([]ahptypes.CanvasReference{}, state.Canvases[:i]...)
+				state.Canvases = append(next, state.Canvases[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	default:
+		return ReduceOutcomeOutOfScope
+	}
 	return ReduceOutcomeApplied
 }
 

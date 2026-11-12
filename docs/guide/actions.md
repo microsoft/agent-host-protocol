@@ -77,13 +77,16 @@ When a client dispatches an action, the server applies it to the state and also 
 | `chat/turnResume` | **Yes** | Resume the latest resumable errored turn without adding another message |
 | `chat/truncated` | **Yes** | Turn history truncated (with optional `turnId` cutoff) |
 
-### Canvases (chat channel)
+### Canvases (collection and chat channels)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `chat/canvasesChanged` | No | The chat's live Canvas channel references changed |
-| `chat/canvasRegistryRequested` | **Yes** | A client asks the host to materialize the Canvas type registry |
-| `chat/canvasRegistryChanged` | No | The host replaces or clears the authoritative Canvas type registry |
+| `chat/canvasesUriChanged` | No | Replaces or clears the advertised collection URI |
+| `chat/canvasesChanged` | No | Deprecated legacy projection of live collection membership |
+| `canvases/registryRequested` | **Yes** | Ensures registry materialization; concurrent requests coalesce and errors may retry |
+| `canvases/registryChanged` | No | Replaces authoritative registry load state |
+| `canvases/canvasSet` | No | Upserts a complete canvas reference keyed by resource |
+| `canvases/canvasRemoved` | No | Removes membership by resource key only |
 
 ### Tool Calls (chat channel)
 

@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Experimental exact-chat Canvas registry state, explicit cold-registry materialization, and URI-addressed `openCanvas` and `disposeCanvas` support."
+  "message": "Experimental chat-scoped `ahp-canvases:` collections advertise typed registry load state and keyed live membership; `canvases/registryRequested` explicitly ensures materialization, and `openCanvas` targets an advertised collection. Legacy chat canvas references remain a deprecated projection."
 }

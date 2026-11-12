@@ -55,6 +55,18 @@ internal static class GeneratedActionMetadata
             case AutomationUpdateRequestedAction value:
                 actionType = value.Type;
                 return true;
+            case CanvasesCanvasRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasesCanvasSetAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasesRegistryChangedAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasesRegistryRequestedAction value:
+                actionType = value.Type;
+                return true;
             case CanvasStateChangedAction value:
                 actionType = value.Type;
                 return true;
@@ -94,10 +106,7 @@ internal static class GeneratedActionMetadata
             case ChatCanvasesChangedAction value:
                 actionType = value.Type;
                 return true;
-            case ChatCanvasRegistryChangedAction value:
-                actionType = value.Type;
-                return true;
-            case ChatCanvasRegistryRequestedAction value:
+            case ChatCanvasesUriChangedAction value:
                 actionType = value.Type;
                 return true;
             case ChatChangesetsChangedAction value:

@@ -55,6 +55,12 @@ public object CanvasReducer : Reducer<CanvasState, StateAction> {
         canvasReducer(state, action)
 }
 
+/** Pure canvas collection reducer as a [Reducer] instance. */
+public object CanvasesReducer : Reducer<CanvasesState, StateAction> {
+    override fun reduce(state: CanvasesState, action: StateAction): CanvasesState =
+        canvasesReducer(state, action)
+}
+
 /** Pure terminal reducer as a [Reducer] instance. Delegates to [terminalReducer]. */
 public object TerminalReducer : Reducer<TerminalState, StateAction> {
     override fun reduce(state: TerminalState, action: StateAction): TerminalState =
@@ -1082,11 +1088,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatCanvasesChanged ->
         state.copy(canvases = action.value.canvases)
 
-    is StateActionChatCanvasRegistryRequested ->
-        state
-
-    is StateActionChatCanvasRegistryChanged ->
-        state.copy(canvasRegistry = action.value.canvasRegistry)
+    is StateActionChatCanvasesUriChanged ->
+        state.copy(canvasesUri = action.value.canvasesUri)
 
     is StateActionChatWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
@@ -1709,6 +1712,23 @@ private data class CompleteCtx(
     val fromAuthRequired: Boolean = false,
 )
 
+
+/** Pure reducer for registry and keyed canvas collection membership. */
+public fun canvasesReducer(state: CanvasesState, action: StateAction): CanvasesState = when (action) {
+    is StateActionCanvasesRegistryRequested -> state
+    is StateActionCanvasesRegistryChanged -> state.copy(registry = action.value.registry)
+    is StateActionCanvasesCanvasSet -> {
+        val idx = state.canvases.indexOfFirst { it.resource == action.value.canvas.resource }
+        val next = state.canvases.toMutableList()
+        if (idx < 0) next.add(action.value.canvas) else next[idx] = action.value.canvas
+        state.copy(canvases = next)
+    }
+    is StateActionCanvasesCanvasRemoved -> {
+        val idx = state.canvases.indexOfFirst { it.resource == action.value.resource }
+        if (idx < 0) state else state.copy(canvases = state.canvases.toMutableList().also { it.removeAt(idx) })
+    }
+    else -> state
+}
 
 /** Pure reducer for live canvas state. */
 public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {

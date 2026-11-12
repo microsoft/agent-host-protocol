@@ -40,6 +40,39 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 
 // MARK: - Enums
 
+/// Registry materialization status.
+public enum CanvasRegistryStatus: Codable, Sendable, Equatable {
+    case uninitialized
+    case loading
+    case ready
+    case error
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "uninitialized": self = .uninitialized
+        case "loading": self = .loading
+        case "ready": self = .ready
+        case "error": self = .error
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .uninitialized: try container.encode("uninitialized")
+        case .loading: try container.encode("loading")
+        case .ready: try container.encode("ready")
+        case .error: try container.encode("error")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// How the server resumes sending data on a windowed subscription after
 /// reconnection.
 ///
@@ -1481,15 +1514,15 @@ public struct AgentInfo: Codable, Sendable {
 public struct AgentCapabilities: Codable, Sendable {
     /// Experimental Canvas API.
     ///
-    /// The agent can materialize an exact chat's
-    /// {@link ChatState.canvasRegistry | Canvas registry} through
-    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
-    /// Live instances are published through the chat's canvas references and
+    /// The agent can materialize an advertised chat-scoped collection's registry
+    /// through `canvases/registryRequested` and manage instances with `openCanvas`
+    /// and `disposeCanvas`. Live instances are published through the collection and
     /// their `ahp-canvas:` state channels.
     ///
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
     /// registry metadata while the Canvas channel remains experimental. This
-    /// capability does not gate server-published Canvas references.
+    /// capability does not gate observing unsolicited server-published collections
+    /// or Canvas instances.
     ///
     /// Stability: 1.0 - Early development.
     public var canvases: CanvasesCapability?
@@ -1889,17 +1922,14 @@ public struct ChatState: Codable, Sendable {
     /// absent from {@link ChatSummary}; clients obtain it by subscribing to the
     /// chat channel.
     public var backgroundWork: [BackgroundWork]?
-    /// Canvas types currently registered for this exact chat.
+    /// Advertised `ahp-canvases:` collection owned by this exact chat.
     ///
-    /// Absence means the registry has not been materialized or is not currently
-    /// available. Clients that need it MAY dispatch
-    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
-    /// registry through `chat/canvasRegistryChanged`. An empty
-    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
-    /// available canvas types.
+    /// Clients prefer this collection over legacy `canvases` references, falling
+    /// back to those references when this pointer is absent. Advertising the URI
+    /// does not require materializing backing or starting extensions.
     ///
     /// Stability: 1.0 - Early development.
-    public var canvasRegistry: CanvasRegistry?
+    public var canvasesUri: String?
     /// Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -1957,7 +1987,7 @@ public struct ChatState: Codable, Sendable {
         case workingDirectories
         case changesets
         case backgroundWork
-        case canvasRegistry
+        case canvasesUri
         case canvases
         case config
         case turns
@@ -1983,7 +2013,7 @@ public struct ChatState: Codable, Sendable {
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
         backgroundWork: [BackgroundWork]? = nil,
-        canvasRegistry: CanvasRegistry? = nil,
+        canvasesUri: String? = nil,
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
         turns: [Turn],
@@ -2007,7 +2037,7 @@ public struct ChatState: Codable, Sendable {
         self.workingDirectories = workingDirectories
         self.changesets = changesets
         self.backgroundWork = backgroundWork
-        self.canvasRegistry = canvasRegistry
+        self.canvasesUri = canvasesUri
         self.canvases = canvases
         self.config = config
         self.turns = turns
@@ -6266,19 +6296,20 @@ public struct CanvasType: Codable, Sendable {
     public var label: String
     /// Description of what the canvas type does.
     public var description: String
-    /// Whether opening this canvas requires an input flow.
-    public var requiresInput: Bool
+    /// Optional JSON Schema for the input accepted when opening this canvas.
+    /// Clients decide whether and how to collect input from this schema.
+    public var inputSchema: AnyCodable?
 
     public init(
         id: String,
         label: String,
         description: String,
-        requiresInput: Bool
+        inputSchema: AnyCodable? = nil
     ) {
         self.id = id
         self.label = label
         self.description = description
-        self.requiresInput = requiresInput
+        self.inputSchema = inputSchema
     }
 }
 
@@ -6307,11 +6338,10 @@ public struct CanvasReference: Codable, Sendable {
 }
 
 public struct CanvasState: Codable, Sendable {
-    /// Provider-facing instance identifier.
+    /// Provider-facing instance identifier used for correlation.
     ///
-    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
-    /// URI. They MUST NOT treat this provider identifier as a second resource
-    /// identity.
+    /// AHP commands and subscriptions address this canvas by its channel URI,
+    /// not by this identifier.
     public var instanceId: String
     /// Owning declaration namespace.
     public var extensionId: String
@@ -6355,6 +6385,82 @@ public struct CanvasState: Codable, Sendable {
         self.title = title
         self.status = status
         self.url = url
+    }
+}
+
+/// State of an advertised `ahp-canvases:` collection owned by one chat.
+///
+/// Advertising and subscribing are observation only: hosts MUST NOT create
+/// backing, resume a cold runtime, or start extensions to serve a subscription.
+/// Hosts MAY enumerate or refresh an already-live runtime. Collection ownership
+/// is established by the host, not inferred from URI grammar. Other ownership
+/// scopes are not currently defined.
+///
+/// Unsubscribing MUST NOT dispose canvases. Legacy chat canvas references MUST
+/// be projected from this same authoritative membership, not maintained as a
+/// second source of truth.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesState: Codable, Sendable {
+    public var registry: CanvasRegistryState
+    /// Live instances, keyed by their unique channel resource URI.
+    public var canvases: [CanvasReference]
+
+    public init(
+        registry: CanvasRegistryState,
+        canvases: [CanvasReference]
+    ) {
+        self.registry = registry
+        self.canvases = canvases
+    }
+}
+
+public struct CanvasRegistryUninitializedState: Codable, Sendable {
+    public var status: CanvasRegistryStatus
+
+    public init(
+        status: CanvasRegistryStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasRegistryLoadingState: Codable, Sendable {
+    public var status: CanvasRegistryStatus
+
+    public init(
+        status: CanvasRegistryStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasRegistryReadyState: Codable, Sendable {
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    public var extensions: [CanvasExtension]
+    public var status: CanvasRegistryStatus
+
+    public init(
+        extensions: [CanvasExtension],
+        status: CanvasRegistryStatus
+    ) {
+        self.extensions = extensions
+        self.status = status
+    }
+}
+
+public struct CanvasRegistryErrorState: Codable, Sendable {
+    public var status: CanvasRegistryStatus
+    public var error: ErrorInfo
+
+    public init(
+        status: CanvasRegistryStatus,
+        error: ErrorInfo
+    ) {
+        self.status = status
+        self.error = error
     }
 }
 
@@ -8179,6 +8285,49 @@ public enum CustomizationLoadState: Codable, Sendable {
         }
     }
 }
+public enum CanvasRegistryState: Codable, Sendable {
+    case uninitialized(CanvasRegistryUninitializedState)
+    case loading(CanvasRegistryLoadingState)
+    case ready(CanvasRegistryReadyState)
+    case error(CanvasRegistryErrorState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "uninitialized":
+            self = .uninitialized(try CanvasRegistryUninitializedState(from: decoder))
+        case "loading":
+            self = .loading(try CanvasRegistryLoadingState(from: decoder))
+        case "ready":
+            self = .ready(try CanvasRegistryReadyState(from: decoder))
+        case "error":
+            self = .error(try CanvasRegistryErrorState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .uninitialized(let value): try value.encode(to: encoder)
+        case .loading(let value): try value.encode(to: encoder)
+        case .ready(let value): try value.encode(to: encoder)
+        case .error(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
 
 public enum McpServerState: Codable, Sendable {
     case starting(McpServerStartingState)
@@ -8654,6 +8803,7 @@ public enum SnapshotState: Codable, Sendable {
     case session(SessionState)
     case chat(ChatState)
     case canvas(CanvasState)
+    case canvases(CanvasesState)
     case terminal(TerminalState)
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
@@ -8689,6 +8839,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .chat(chat)
         } else if let canvas = try? CanvasState(from: decoder) {
             self = .canvas(canvas)
+        } else if let canvases = try? CanvasesState(from: decoder) {
+            self = .canvases(canvases)
         } else if let terminal = try? TerminalState(from: decoder) {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {
@@ -8716,6 +8868,7 @@ public enum SnapshotState: Codable, Sendable {
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
         case .canvas(let state): try state.encode(to: encoder)
+        case .canvases(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)

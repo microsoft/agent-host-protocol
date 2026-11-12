@@ -176,8 +176,8 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -719,6 +719,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'CanvasRegistryStatus',
   'ChannelRecoveryKind',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
@@ -770,6 +771,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'CanvasExtension' },
   { name: 'CanvasType' },
   { name: 'CanvasRegistry' },
+  { name: 'CanvasesState' },
+  { name: 'CanvasRegistryUninitializedState' },
+  { name: 'CanvasRegistryLoadingState' },
+  { name: 'CanvasRegistryReadyState' },
+  { name: 'CanvasRegistryErrorState' },
   { name: 'CanvasReference' },
   { name: 'CanvasState' },
   { name: 'ChatSummary' },
@@ -1075,6 +1081,19 @@ const CHILD_CUSTOMIZATION_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_REGISTRY_STATE_UNION: UnionConfig = {
+  name: 'CanvasRegistryState',
+  discriminantField: 'status',
+  doc: 'Authoritative Canvas registry materialization state.',
+  variants: [
+    { variantName: 'Uninitialized', innerType: 'CanvasRegistryUninitializedState', wireValue: 'uninitialized' },
+    { variantName: 'Loading', innerType: 'CanvasRegistryLoadingState', wireValue: 'loading' },
+    { variantName: 'Ready', innerType: 'CanvasRegistryReadyState', wireValue: 'ready' },
+    { variantName: 'Error', innerType: 'CanvasRegistryErrorState', wireValue: 'error' },
+  ],
+  unknown: true,
+};
+
 const CUSTOMIZATION_LOAD_STATE_UNION: UnionConfig = {
   name: 'CustomizationLoadState',
   discriminantField: 'kind',
@@ -1331,6 +1350,7 @@ type SnapshotState struct {
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
 \tCanvas        *CanvasState        \`json:"-"\`
+\tCanvases      *CanvasesState      \`json:"-"\`
 \tTerminal      *TerminalState      \`json:"-"\`
 \tChangeset     *ChangesetState     \`json:"-"\`
 \tResourceWatch *ResourceWatchState \`json:"-"\`
@@ -1354,6 +1374,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Chat)
 \tcase s.Canvas != nil:
 \t\treturn json.Marshal(s.Canvas)
+\tcase s.Canvases != nil:
+\t\treturn json.Marshal(s.Canvases)
 \tcase s.Terminal != nil:
 \t\treturn json.Marshal(s.Terminal)
 \tcase s.Changeset != nil:
@@ -1412,6 +1434,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Canvas = &v
+\tcase containsAll(probe, "registry", "canvases"):
+\t\tvar v CanvasesState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Canvases = &v
 \tcase containsAll(probe, "content"):
 \t\tvar v TerminalState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1553,6 +1581,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, CHILD_CUSTOMIZATION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CUSTOMIZATION_LOAD_STATE_UNION));
+  lines.push(generateDiscriminatedUnion(project, CANVAS_REGISTRY_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
   lines.push('');
@@ -1622,8 +1651,11 @@ const ACTION_VARIANTS: {
   { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
-  { type: 'chat/canvasRegistryRequested', variantName: 'ChatCanvasRegistryRequested', tsInterface: 'ChatCanvasRegistryRequestedAction' },
-  { type: 'chat/canvasRegistryChanged', variantName: 'ChatCanvasRegistryChanged', tsInterface: 'ChatCanvasRegistryChangedAction' },
+  { type: 'chat/canvasesUriChanged', variantName: 'ChatCanvasesUriChanged', tsInterface: 'ChatCanvasesUriChangedAction' },
+  { type: 'canvases/registryRequested', variantName: 'CanvasesRegistryRequested', tsInterface: 'CanvasesRegistryRequestedAction' },
+  { type: 'canvases/registryChanged', variantName: 'CanvasesRegistryChanged', tsInterface: 'CanvasesRegistryChangedAction' },
+  { type: 'canvases/canvasSet', variantName: 'CanvasesCanvasSet', tsInterface: 'CanvasesCanvasSetAction' },
+  { type: 'canvases/canvasRemoved', variantName: 'CanvasesCanvasRemoved', tsInterface: 'CanvasesCanvasRemovedAction' },
   { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -2531,6 +2563,7 @@ function checkExhaustiveness(project: Project): void {
     'Customization',
     'ChildCustomization',
     'ChildCustomizationType',
+    'CanvasRegistryState',
     'CustomizationLoadState',
     'McpServerState',
     'ToolCallContributor',

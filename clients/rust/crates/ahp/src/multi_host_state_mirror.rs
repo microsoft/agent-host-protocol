@@ -40,14 +40,15 @@ use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
     AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, CanvasState,
-    ChangesetState, ChatState, ResourceWatchState, RootState, SessionState, SnapshotState,
-    TerminalState,
+    CanvasesState, ChangesetState, ChatState, ResourceWatchState, RootState, SessionState,
+    SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
     apply_action_to_automation, apply_action_to_automation_run, apply_action_to_canvas,
-    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_canvases, apply_action_to_chat, apply_action_to_root, apply_action_to_session,
+    apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -95,6 +96,7 @@ pub struct MultiHostStateMirror {
     sessions: HashMap<HostedResourceKey, SessionState>,
     chats: HashMap<HostedResourceKey, ChatState>,
     canvases: HashMap<HostedResourceKey, CanvasState>,
+    canvas_collections: HashMap<HostedResourceKey, CanvasesState>,
     terminals: HashMap<HostedResourceKey, TerminalState>,
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
@@ -128,6 +130,11 @@ impl MultiHostStateMirror {
     /// Borrow live canvases keyed by `(host_id, uri)`.
     pub fn canvases(&self) -> &HashMap<HostedResourceKey, CanvasState> {
         &self.canvases
+    }
+
+    /// Borrow canvas collections keyed by `(host_id, uri)`.
+    pub fn canvas_collections(&self) -> &HashMap<HostedResourceKey, CanvasesState> {
+        &self.canvas_collections
     }
 
     /// Borrow the terminal states map keyed by `(host_id, uri)`.
@@ -218,6 +225,10 @@ impl MultiHostStateMirror {
             apply_action_to_canvas(canvas, &envelope.action);
             return;
         }
+        if let Some(canvases) = self.canvas_collections.get_mut(&key) {
+            apply_action_to_canvases(canvases, &envelope.action);
+            return;
+        }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
             return;
@@ -252,6 +263,9 @@ impl MultiHostStateMirror {
             SnapshotState::Canvas(state) => {
                 self.canvases.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Canvases(state) => {
+                self.canvas_collections.insert(key, state.as_ref().clone());
+            }
             SnapshotState::Terminal(state) => {
                 self.terminals.insert(key, state.as_ref().clone());
             }
@@ -283,6 +297,8 @@ impl MultiHostStateMirror {
         self.sessions.retain(|key, _| &key.host_id != host);
         self.chats.retain(|key, _| &key.host_id != host);
         self.canvases.retain(|key, _| &key.host_id != host);
+        self.canvas_collections
+            .retain(|key, _| &key.host_id != host);
         self.terminals.retain(|key, _| &key.host_id != host);
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
@@ -298,6 +314,7 @@ impl MultiHostStateMirror {
         self.sessions.clear();
         self.chats.clear();
         self.canvases.clear();
+        self.canvas_collections.clear();
         self.terminals.clear();
         self.changesets.clear();
         self.annotations.clear();

@@ -73,6 +73,30 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 /**
+ * Registry materialization status.
+ */
+@Serializable(with = CanvasRegistryStatusSerializer::class)
+@JvmInline
+value class CanvasRegistryStatus(val rawValue: String) {
+    companion object {
+        val UNINITIALIZED: CanvasRegistryStatus = CanvasRegistryStatus("uninitialized")
+        val LOADING: CanvasRegistryStatus = CanvasRegistryStatus("loading")
+        val READY: CanvasRegistryStatus = CanvasRegistryStatus("ready")
+        val ERROR: CanvasRegistryStatus = CanvasRegistryStatus("error")
+    }
+}
+
+internal object CanvasRegistryStatusSerializer : KSerializer<CanvasRegistryStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasRegistryStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasRegistryStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasRegistryStatus =
+        CanvasRegistryStatus(decoder.decodeString())
+}
+
+/**
  * How the server resumes sending data on a windowed subscription after
  * reconnection.
  *
@@ -1510,15 +1534,15 @@ data class AgentCapabilities(
     /**
      * Experimental Canvas API.
      *
-     * The agent can materialize an exact chat's
-     * {@link ChatState.canvasRegistry | Canvas registry} through
-     * `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
-     * Live instances are published through the chat's canvas references and
+     * The agent can materialize an advertised chat-scoped collection's registry
+     * through `canvases/registryRequested` and manage instances with `openCanvas`
+     * and `disposeCanvas`. Live instances are published through the collection and
      * their `ahp-canvas:` state channels.
      *
      * Clients MUST treat absence as unsupported and SHOULD tolerate additive
      * registry metadata while the Canvas channel remains experimental. This
-     * capability does not gate server-published Canvas references.
+     * capability does not gate observing unsolicited server-published collections
+     * or Canvas instances.
      *
      * Stability: 1.0 - Early development.
      */
@@ -1884,18 +1908,15 @@ data class ChatState(
      */
     val backgroundWork: List<BackgroundWork>? = null,
     /**
-     * Canvas types currently registered for this exact chat.
+     * Advertised `ahp-canvases:` collection owned by this exact chat.
      *
-     * Absence means the registry has not been materialized or is not currently
-     * available. Clients that need it MAY dispatch
-     * `chat/canvasRegistryRequested`; the host publishes the authoritative
-     * registry through `chat/canvasRegistryChanged`. An empty
-     * {@link CanvasRegistry.extensions} array is a loaded registry with no
-     * available canvas types.
+     * Clients prefer this collection over legacy `canvases` references, falling
+     * back to those references when this pointer is absent. Advertising the URI
+     * does not require materializing backing or starting extensions.
      *
      * Stability: 1.0 - Early development.
      */
-    val canvasRegistry: CanvasRegistry? = null,
+    val canvasesUri: String? = null,
     /**
      * Live canvases currently exposed by this chat.
      *
@@ -2311,9 +2332,10 @@ data class CanvasType(
      */
     val description: String,
     /**
-     * Whether opening this canvas requires an input flow.
+     * Optional JSON Schema for the input accepted when opening this canvas.
+     * Clients decide whether and how to collect input from this schema.
      */
-    val requiresInput: Boolean
+    val inputSchema: JsonElement? = null
 )
 
 @Serializable
@@ -2337,11 +2359,10 @@ data class CanvasReference(
 @Serializable
 data class CanvasState(
     /**
-     * Provider-facing instance identifier.
+     * Provider-facing instance identifier used for correlation.
      *
-     * AHP clients address this instance by the subscribed `ahp-canvas:` channel
-     * URI. They MUST NOT treat this provider identifier as a second resource
-     * identity.
+     * AHP commands and subscriptions address this canvas by its channel URI,
+     * not by this identifier.
      */
     val instanceId: String,
     /**
@@ -2381,6 +2402,57 @@ data class CanvasState(
      * from persisted state after a provider or host restart.
      */
     val url: String? = null
+)
+
+/**
+ * State of an advertised `ahp-canvases:` collection owned by one chat.
+ *
+ * Advertising and subscribing are observation only: hosts MUST NOT create
+ * backing, resume a cold runtime, or start extensions to serve a subscription.
+ * Hosts MAY enumerate or refresh an already-live runtime. Collection ownership
+ * is established by the host, not inferred from URI grammar. Other ownership
+ * scopes are not currently defined.
+ *
+ * Unsubscribing MUST NOT dispose canvases. Legacy chat canvas references MUST
+ * be projected from this same authoritative membership, not maintained as a
+ * second source of truth.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CanvasesState(
+    val registry: CanvasRegistryState,
+    /**
+     * Live instances, keyed by their unique channel resource URI.
+     */
+    val canvases: List<CanvasReference>
+)
+
+@Serializable
+data class CanvasRegistryUninitializedState(
+    val status: CanvasRegistryStatus
+)
+
+@Serializable
+data class CanvasRegistryLoadingState(
+    val status: CanvasRegistryStatus
+)
+
+@Serializable
+data class CanvasRegistryReadyState(
+    /**
+     * Extensions and providers that declare canvas types. `id` MUST be unique
+     * within this array. An empty array is an authoritative loaded registry with
+     * no types.
+     */
+    val extensions: List<CanvasExtension>,
+    val status: CanvasRegistryStatus
+)
+
+@Serializable
+data class CanvasRegistryErrorState(
+    val status: CanvasRegistryStatus,
+    val error: ErrorInfo
 )
 
 @Serializable
@@ -7221,6 +7293,62 @@ internal object CustomizationLoadStateSerializer : KSerializer<CustomizationLoad
         output.encodeJsonElement(element)
     }
 }
+@Serializable(with = CanvasRegistryStateSerializer::class)
+sealed interface CanvasRegistryState
+
+@JvmInline
+value class CanvasRegistryStateUninitialized(val value: CanvasRegistryUninitializedState) : CanvasRegistryState
+@JvmInline
+value class CanvasRegistryStateLoading(val value: CanvasRegistryLoadingState) : CanvasRegistryState
+@JvmInline
+value class CanvasRegistryStateReady(val value: CanvasRegistryReadyState) : CanvasRegistryState
+@JvmInline
+value class CanvasRegistryStateError(val value: CanvasRegistryErrorState) : CanvasRegistryState
+/**
+ * Forward-compat catch-all for unknown CanvasRegistryState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class CanvasRegistryStateUnknown(val raw: JsonObject) : CanvasRegistryState
+
+internal object CanvasRegistryStateSerializer : KSerializer<CanvasRegistryState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasRegistryState")
+
+    override fun deserialize(decoder: Decoder): CanvasRegistryState {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasRegistryState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasRegistryState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return CanvasRegistryStateUnknown(obj)
+        return when (discriminant) {
+            "uninitialized" -> CanvasRegistryStateUninitialized(input.json.decodeFromJsonElement(CanvasRegistryUninitializedState.serializer(), element))
+            "loading" -> CanvasRegistryStateLoading(input.json.decodeFromJsonElement(CanvasRegistryLoadingState.serializer(), element))
+            "ready" -> CanvasRegistryStateReady(input.json.decodeFromJsonElement(CanvasRegistryReadyState.serializer(), element))
+            "error" -> CanvasRegistryStateError(input.json.decodeFromJsonElement(CanvasRegistryErrorState.serializer(), element))
+            else -> CanvasRegistryStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasRegistryState) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasRegistryState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasRegistryStateUninitialized -> output.json.encodeToJsonElement(CanvasRegistryUninitializedState.serializer(), value.value)
+            is CanvasRegistryStateLoading -> output.json.encodeToJsonElement(CanvasRegistryLoadingState.serializer(), value.value)
+            is CanvasRegistryStateReady -> output.json.encodeToJsonElement(CanvasRegistryReadyState.serializer(), value.value)
+            is CanvasRegistryStateError -> output.json.encodeToJsonElement(CanvasRegistryErrorState.serializer(), value.value)
+            is CanvasRegistryStateUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
 
 @Serializable(with = McpServerStateSerializer::class)
 sealed interface McpServerState
@@ -7833,6 +7961,7 @@ sealed interface SnapshotState {
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
     @JvmInline value class Canvas(val value: CanvasState) : SnapshotState
+    @JvmInline value class Canvases(val value: CanvasesState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
@@ -7873,6 +8002,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
                 SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
+            obj.containsKey("registry") && obj.containsKey("canvases") ->
+                SnapshotState.Canvases(input.json.decodeFromJsonElement(CanvasesState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
@@ -7896,6 +8027,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
             is SnapshotState.Canvas -> output.json.encodeToJsonElement(CanvasState.serializer(), value.value)
+            is SnapshotState.Canvases -> output.json.encodeToJsonElement(CanvasesState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)

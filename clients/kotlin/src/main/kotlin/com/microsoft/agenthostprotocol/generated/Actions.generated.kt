@@ -60,8 +60,11 @@ value class ActionType(val rawValue: String) {
         val CHAT_MOVABLE_CHANGED: ActionType = ActionType("chat/movableChanged")
         val CHAT_CHANGESETS_CHANGED: ActionType = ActionType("chat/changesetsChanged")
         val CHAT_CANVASES_CHANGED: ActionType = ActionType("chat/canvasesChanged")
-        val CHAT_CANVAS_REGISTRY_REQUESTED: ActionType = ActionType("chat/canvasRegistryRequested")
-        val CHAT_CANVAS_REGISTRY_CHANGED: ActionType = ActionType("chat/canvasRegistryChanged")
+        val CHAT_CANVASES_URI_CHANGED: ActionType = ActionType("chat/canvasesUriChanged")
+        val CANVASES_REGISTRY_REQUESTED: ActionType = ActionType("canvases/registryRequested")
+        val CANVASES_REGISTRY_CHANGED: ActionType = ActionType("canvases/registryChanged")
+        val CANVASES_CANVAS_SET: ActionType = ActionType("canvases/canvasSet")
+        val CANVASES_CANVAS_REMOVED: ActionType = ActionType("canvases/canvasRemoved")
         val CANVAS_STATE_CHANGED: ActionType = ActionType("canvas/stateChanged")
         val CHAT_WORKING_DIRECTORY_SET: ActionType = ActionType("chat/workingDirectorySet")
         val CHAT_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("chat/workingDirectoryRemoved")
@@ -796,40 +799,67 @@ data class ChatCanvasesChangedAction(
 )
 
 /**
- * Requests materialization of the chat's Canvas type registry.
- *
- * A host MUST reject the action when the chat's agent does not advertise
- * {@link AgentCapabilities.canvases} or when the chat cannot materialize the
- * registry. Materialization MUST NOT send a user message or invoke a model.
- *
- * The reducer is a no-op. The host remains authoritative and publishes the
- * complete result through
- * {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
- * Clients do not need to dispatch this action when
- * {@link ChatState.canvasRegistry} is already present.
+ * Replaces or clears the chat's advertised canvas collection URI.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
-data class ChatCanvasRegistryRequestedAction(
+data class ChatCanvasesUriChangedAction(
+    val type: ActionType,
+    /**
+     * Owning collection URI, or `undefined` to clear the pointer.
+     */
+    val canvasesUri: String? = null
+)
+
+/**
+ * Ensures the owning collection's registry is materialized.
+ *
+ * Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+ * Hosts MAY resume existing persisted backing and start extensions, but MUST
+ * NOT create provisional backing, send a user message, or invoke a model.
+ * Concurrent requests MUST coalesce. A request while loading or ready is an
+ * ensure/no-op; a request after an error retries. The reducer is a no-op;
+ * hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CanvasesRegistryRequestedAction(
     val type: ActionType
 )
 
 /**
- * The Canvas type registry for this chat changed.
- *
- * Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
- * Set to `undefined` when the registry is no longer materialized or available.
+ * Replaces the authoritative registry load state.
  *
  * Stability: 1.0 - Early development.
  */
 @Serializable
-data class ChatCanvasRegistryChangedAction(
+data class CanvasesRegistryChangedAction(
     val type: ActionType,
-    /**
-     * Authoritative registry, or `undefined` to clear it.
-     */
-    val canvasRegistry: CanvasRegistry? = null
+    val registry: CanvasRegistryState
+)
+
+/**
+ * Inserts or replaces a live canvas reference, keyed by resource.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CanvasesCanvasSetAction(
+    val type: ActionType,
+    val canvas: CanvasReference
+)
+
+/**
+ * Removes a live canvas reference by resource; absent resources are a no-op.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class CanvasesCanvasRemovedAction(
+    val type: ActionType,
+    val resource: String
 )
 
 @Serializable
@@ -1809,8 +1839,11 @@ sealed interface StateAction
 @JvmInline value class StateActionChatMovableChanged(val value: ChatMovableChangedAction) : StateAction
 @JvmInline value class StateActionChatChangesetsChanged(val value: ChatChangesetsChangedAction) : StateAction
 @JvmInline value class StateActionChatCanvasesChanged(val value: ChatCanvasesChangedAction) : StateAction
-@JvmInline value class StateActionChatCanvasRegistryRequested(val value: ChatCanvasRegistryRequestedAction) : StateAction
-@JvmInline value class StateActionChatCanvasRegistryChanged(val value: ChatCanvasRegistryChangedAction) : StateAction
+@JvmInline value class StateActionChatCanvasesUriChanged(val value: ChatCanvasesUriChangedAction) : StateAction
+@JvmInline value class StateActionCanvasesRegistryRequested(val value: CanvasesRegistryRequestedAction) : StateAction
+@JvmInline value class StateActionCanvasesRegistryChanged(val value: CanvasesRegistryChangedAction) : StateAction
+@JvmInline value class StateActionCanvasesCanvasSet(val value: CanvasesCanvasSetAction) : StateAction
+@JvmInline value class StateActionCanvasesCanvasRemoved(val value: CanvasesCanvasRemovedAction) : StateAction
 @JvmInline value class StateActionCanvasStateChanged(val value: CanvasStateChangedAction) : StateAction
 @JvmInline value class StateActionSessionTitleChanged(val value: SessionTitleChangedAction) : StateAction
 @JvmInline value class StateActionChatUsage(val value: ChatUsageAction) : StateAction
@@ -1934,8 +1967,11 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/movableChanged" -> StateActionChatMovableChanged(input.json.decodeFromJsonElement(ChatMovableChangedAction.serializer(), element))
             "chat/changesetsChanged" -> StateActionChatChangesetsChanged(input.json.decodeFromJsonElement(ChatChangesetsChangedAction.serializer(), element))
             "chat/canvasesChanged" -> StateActionChatCanvasesChanged(input.json.decodeFromJsonElement(ChatCanvasesChangedAction.serializer(), element))
-            "chat/canvasRegistryRequested" -> StateActionChatCanvasRegistryRequested(input.json.decodeFromJsonElement(ChatCanvasRegistryRequestedAction.serializer(), element))
-            "chat/canvasRegistryChanged" -> StateActionChatCanvasRegistryChanged(input.json.decodeFromJsonElement(ChatCanvasRegistryChangedAction.serializer(), element))
+            "chat/canvasesUriChanged" -> StateActionChatCanvasesUriChanged(input.json.decodeFromJsonElement(ChatCanvasesUriChangedAction.serializer(), element))
+            "canvases/registryRequested" -> StateActionCanvasesRegistryRequested(input.json.decodeFromJsonElement(CanvasesRegistryRequestedAction.serializer(), element))
+            "canvases/registryChanged" -> StateActionCanvasesRegistryChanged(input.json.decodeFromJsonElement(CanvasesRegistryChangedAction.serializer(), element))
+            "canvases/canvasSet" -> StateActionCanvasesCanvasSet(input.json.decodeFromJsonElement(CanvasesCanvasSetAction.serializer(), element))
+            "canvases/canvasRemoved" -> StateActionCanvasesCanvasRemoved(input.json.decodeFromJsonElement(CanvasesCanvasRemovedAction.serializer(), element))
             "canvas/stateChanged" -> StateActionCanvasStateChanged(input.json.decodeFromJsonElement(CanvasStateChangedAction.serializer(), element))
             "session/titleChanged" -> StateActionSessionTitleChanged(input.json.decodeFromJsonElement(SessionTitleChangedAction.serializer(), element))
             "chat/usage" -> StateActionChatUsage(input.json.decodeFromJsonElement(ChatUsageAction.serializer(), element))
@@ -2052,8 +2088,11 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatMovableChanged -> output.json.encodeToJsonElement(ChatMovableChangedAction.serializer(), value.value)
             is StateActionChatChangesetsChanged -> output.json.encodeToJsonElement(ChatChangesetsChangedAction.serializer(), value.value)
             is StateActionChatCanvasesChanged -> output.json.encodeToJsonElement(ChatCanvasesChangedAction.serializer(), value.value)
-            is StateActionChatCanvasRegistryRequested -> output.json.encodeToJsonElement(ChatCanvasRegistryRequestedAction.serializer(), value.value)
-            is StateActionChatCanvasRegistryChanged -> output.json.encodeToJsonElement(ChatCanvasRegistryChangedAction.serializer(), value.value)
+            is StateActionChatCanvasesUriChanged -> output.json.encodeToJsonElement(ChatCanvasesUriChangedAction.serializer(), value.value)
+            is StateActionCanvasesRegistryRequested -> output.json.encodeToJsonElement(CanvasesRegistryRequestedAction.serializer(), value.value)
+            is StateActionCanvasesRegistryChanged -> output.json.encodeToJsonElement(CanvasesRegistryChangedAction.serializer(), value.value)
+            is StateActionCanvasesCanvasSet -> output.json.encodeToJsonElement(CanvasesCanvasSetAction.serializer(), value.value)
+            is StateActionCanvasesCanvasRemoved -> output.json.encodeToJsonElement(CanvasesCanvasRemovedAction.serializer(), value.value)
             is StateActionCanvasStateChanged -> output.json.encodeToJsonElement(CanvasStateChangedAction.serializer(), value.value)
             is StateActionSessionTitleChanged -> output.json.encodeToJsonElement(SessionTitleChangedAction.serializer(), value.value)
             is StateActionChatUsage -> output.json.encodeToJsonElement(ChatUsageAction.serializer(), value.value)

@@ -57,6 +57,7 @@ import {
 import { PROTOCOL_VERSION } from '../src/types/version/registry.js';
 import { SessionStatus } from '../src/types/channels-session/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import { CanvasRegistryStatus, type CanvasesState } from '../src/types/channels-canvases/state.js';
 import { ActionType } from '../src/types/common/actions.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -344,6 +345,31 @@ test('MultiHostStateMirror applies root snapshots scoped to host', () => {
   });
   assert.equal(mirror.getRoot('host-a')?.agents[0]?.provider, 'copilot');
   assert.equal(mirror.getRoot('host-b')?.agents[0]?.provider, 'vscode');
+});
+
+test('MultiHostStateMirror routes collection actions to one host and clears collection state on reset', () => {
+  const mirror = new MultiHostStateMirror();
+  const resource = 'ahp-canvases:/opaque';
+  const initial: CanvasesState = { registry: { status: CanvasRegistryStatus.Uninitialized }, canvases: [] };
+  for (const host of ['host-a', 'host-b']) {
+    mirror.applySnapshot(host, { resource, state: initial, fromSeq: 1 });
+  }
+  mirror.applyEnvelope('host-a', {
+    channel: resource, serverSeq: 2, origin: undefined,
+    action: { type: ActionType.CanvasesCanvasSet, canvas: { resource: 'ahp-canvas:/live' } },
+  });
+  const updated = mirror.getCanvasCollection('host-a', resource);
+  mirror.resetHost('host-a');
+  const afterHostReset = {
+    removed: mirror.getCanvasCollection('host-a', resource),
+    retained: mirror.getCanvasCollection('host-b', resource),
+  };
+  mirror.reset();
+  assert.deepEqual({ updated, afterHostReset, remaining: mirror.canvasCollections.size }, {
+    updated: { ...initial, canvases: [{ resource: 'ahp-canvas:/live' }] },
+    afterHostReset: { removed: undefined, retained: initial },
+    remaining: 0,
+  });
 });
 
 test('MultiHostStateMirror isolates canvas updates and clears canvas state on reset', () => {

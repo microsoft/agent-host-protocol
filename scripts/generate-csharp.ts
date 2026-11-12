@@ -749,6 +749,7 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'CanvasRegistryStatus',
   'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind', 'CanvasExtensionSource',
@@ -797,6 +798,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'CanvasExtension' },
   { name: 'CanvasType' },
   { name: 'CanvasRegistry' },
+  { name: 'CanvasesState', mutable: true },
+  { name: 'CanvasRegistryUninitializedState' },
+  { name: 'CanvasRegistryLoadingState' },
+  { name: 'CanvasRegistryReadyState' },
+  { name: 'CanvasRegistryErrorState' },
   { name: 'CanvasReference' },
   { name: 'CanvasState', mutable: true },
   { name: 'ChatInputOption' },
@@ -1250,6 +1256,19 @@ const CHILD_CUSTOMIZATION_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_REGISTRY_STATE_UNION: UnionConfig = {
+  name: 'CanvasRegistryState',
+  discriminantField: 'status',
+  doc: 'Authoritative Canvas registry materialization state.',
+  variants: [
+    { variantName: 'Uninitialized', innerType: 'CanvasRegistryUninitializedState', wireValue: 'uninitialized' },
+    { variantName: 'Loading', innerType: 'CanvasRegistryLoadingState', wireValue: 'loading' },
+    { variantName: 'Ready', innerType: 'CanvasRegistryReadyState', wireValue: 'ready' },
+    { variantName: 'Error', innerType: 'CanvasRegistryErrorState', wireValue: 'error' },
+  ],
+  unknown: true,
+};
+
 const CUSTOMIZATION_LOAD_STATE_UNION: UnionConfig = {
   name: 'CustomizationLoadState',
   discriminantField: 'kind',
@@ -1455,6 +1474,9 @@ public sealed class SnapshotState
     /// <summary>Canvas state variant, when populated.</summary>
     public CanvasState? Canvas { get; set; }
 
+    /// <summary>Canvas collection state variant, when populated.</summary>
+    public CanvasesState? Canvases { get; set; }
+
     /// <summary>Terminal state variant, when populated.</summary>
     public TerminalState? Terminal { get; set; }
 
@@ -1520,6 +1542,10 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
         }
+        else if (root.TryGetProperty("registry", out _) && root.TryGetProperty("canvases", out _))
+        {
+            result.Canvases = root.Deserialize(AhpJsonTypeInfo.Get<CanvasesState>(options));
+        }
         else if (root.TryGetProperty("content", out _))
         {
             result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
@@ -1555,6 +1581,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
+        if (value.Canvases is not null) { JsonSerializer.Serialize(writer, value.Canvases, AhpJsonTypeInfo.Get<CanvasesState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }
@@ -1604,7 +1631,7 @@ function generateStateFile(project: Project): string {
     TERMINAL_CLAIM_UNION, TERMINAL_CONTENT_PART_UNION,
     CHAT_INPUT_QUESTION_UNION, CHAT_INPUT_ANSWER_VALUE_UNION, CHAT_INPUT_ANSWER_UNION,
     TOOL_RESULT_CONTENT_UNION, MESSAGE_ATTACHMENT_UNION, CUSTOMIZATION_UNION,
-    CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
+    CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION, CANVAS_REGISTRY_STATE_UNION,
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION,
@@ -1704,8 +1731,11 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
-  { type: 'chat/canvasRegistryRequested', variantName: 'ChatCanvasRegistryRequested', tsInterface: 'ChatCanvasRegistryRequestedAction' },
-  { type: 'chat/canvasRegistryChanged', variantName: 'ChatCanvasRegistryChanged', tsInterface: 'ChatCanvasRegistryChangedAction' },
+  { type: 'chat/canvasesUriChanged', variantName: 'ChatCanvasesUriChanged', tsInterface: 'ChatCanvasesUriChangedAction' },
+  { type: 'canvases/registryRequested', variantName: 'CanvasesRegistryRequested', tsInterface: 'CanvasesRegistryRequestedAction' },
+  { type: 'canvases/registryChanged', variantName: 'CanvasesRegistryChanged', tsInterface: 'CanvasesRegistryChangedAction' },
+  { type: 'canvases/canvasSet', variantName: 'CanvasesCanvasSet', tsInterface: 'CanvasesCanvasSetAction' },
+  { type: 'canvases/canvasRemoved', variantName: 'CanvasesCanvasRemoved', tsInterface: 'CanvasesCanvasRemovedAction' },
   { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
@@ -2918,7 +2948,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionToolCallConfirmedAction', 'PingParams', 'TerminalClaim',
     'TerminalContentPart', 'MessageAttachment', 'MessageAttachmentBase',
     'Customization', 'ChildCustomization', 'ChildCustomizationType',
-    'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
+    'CanvasRegistryState', 'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
     'AutomationRunOrigin', 'AutomationRunLifecycle',

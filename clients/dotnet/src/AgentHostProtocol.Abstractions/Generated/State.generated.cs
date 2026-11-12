@@ -9,6 +9,61 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// <summary>Registry materialization status.</summary>
+[JsonConverter(typeof(CanvasRegistryStatusConverter))]
+public readonly struct CanvasRegistryStatus : IEquatable<CanvasRegistryStatus>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CanvasRegistryStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly CanvasRegistryStatus Uninitialized = new CanvasRegistryStatus("uninitialized");
+
+    public static readonly CanvasRegistryStatus Loading = new CanvasRegistryStatus("loading");
+
+    public static readonly CanvasRegistryStatus Ready = new CanvasRegistryStatus("ready");
+
+    public static readonly CanvasRegistryStatus Error = new CanvasRegistryStatus("error");
+
+    /// <inheritdoc />
+    public bool Equals(CanvasRegistryStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CanvasRegistryStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CanvasRegistryStatus left, CanvasRegistryStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CanvasRegistryStatus left, CanvasRegistryStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CanvasRegistryStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CanvasRegistryStatusConverter : JsonConverter<CanvasRegistryStatus>
+{
+    /// <inheritdoc />
+    public override CanvasRegistryStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CanvasRegistryStatus(reader.GetString() ?? throw new JsonException("CanvasRegistryStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CanvasRegistryStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>How the server resumes sending data on a windowed subscription after
 /// reconnection.
 ///
@@ -2055,15 +2110,15 @@ public sealed record AgentCapabilities
 {
     /// <summary>Experimental Canvas API.
     ///
-    /// The agent can materialize an exact chat's
-    /// {@link ChatState.canvasRegistry | Canvas registry} through
-    /// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
-    /// Live instances are published through the chat's canvas references and
+    /// The agent can materialize an advertised chat-scoped collection's registry
+    /// through `canvases/registryRequested` and manage instances with `openCanvas`
+    /// and `disposeCanvas`. Live instances are published through the collection and
     /// their `ahp-canvas:` state channels.
     ///
     /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
     /// registry metadata while the Canvas channel remains experimental. This
-    /// capability does not gate server-published Canvas references.
+    /// capability does not gate observing unsolicited server-published collections
+    /// or Canvas instances.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2569,18 +2624,15 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<BackgroundWork>? BackgroundWork { get; set; }
 
-    /// <summary>Canvas types currently registered for this exact chat.
+    /// <summary>Advertised `ahp-canvases:` collection owned by this exact chat.
     ///
-    /// Absence means the registry has not been materialized or is not currently
-    /// available. Clients that need it MAY dispatch
-    /// `chat/canvasRegistryRequested`; the host publishes the authoritative
-    /// registry through `chat/canvasRegistryChanged`. An empty
-    /// {@link CanvasRegistry.extensions} array is a loaded registry with no
-    /// available canvas types.
+    /// Clients prefer this collection over legacy `canvases` references, falling
+    /// back to those references when this pointer is absent. Advertising the URI
+    /// does not require materializing backing or starting extensions.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CanvasRegistry? CanvasRegistry { get; set; }
+    public string? CanvasesUri { get; set; }
 
     /// <summary>Live canvases currently exposed by this chat.
     ///
@@ -2670,8 +2722,10 @@ public sealed record CanvasType
     /// <summary>Description of what the canvas type does.</summary>
     public required string Description { get; init; }
 
-    /// <summary>Whether opening this canvas requires an input flow.</summary>
-    public bool RequiresInput { get; init; }
+    /// <summary>Optional JSON Schema for the input accepted when opening this canvas.
+    /// Clients decide whether and how to collect input from this schema.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? InputSchema { get; init; }
 }
 
 /// <summary>Canvas types currently registered for one chat.</summary>
@@ -2681,6 +2735,59 @@ public sealed record CanvasRegistry
     /// within this array. An empty array is an authoritative loaded registry with
     /// no types.</summary>
     public required List<CanvasExtension> Extensions { get; init; }
+}
+
+/// <summary>State of an advertised `ahp-canvases:` collection owned by one chat.
+///
+/// Advertising and subscribing are observation only: hosts MUST NOT create
+/// backing, resume a cold runtime, or start extensions to serve a subscription.
+/// Hosts MAY enumerate or refresh an already-live runtime. Collection ownership
+/// is established by the host, not inferred from URI grammar. Other ownership
+/// scopes are not currently defined.
+///
+/// Unsubscribing MUST NOT dispose canvases. Legacy chat canvas references MUST
+/// be projected from this same authoritative membership, not maintained as a
+/// second source of truth.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed class CanvasesState
+{
+    public required CanvasRegistryState Registry { get; set; }
+
+    /// <summary>Live instances, keyed by their unique channel resource URI.</summary>
+    public required List<CanvasReference> Canvases { get; set; }
+}
+
+/// <summary>The registry has not been materialized.</summary>
+public sealed record CanvasRegistryUninitializedState
+{
+    public CanvasRegistryStatus Status { get; init; } = CanvasRegistryStatus.Uninitialized;
+}
+
+/// <summary>Registry materialization is in progress.</summary>
+public sealed record CanvasRegistryLoadingState
+{
+    public CanvasRegistryStatus Status { get; init; } = CanvasRegistryStatus.Loading;
+}
+
+/// <summary>The registry is loaded, extending {@link CanvasRegistry} with a required
+/// `extensions` array; an empty array is authoritative.</summary>
+public sealed record CanvasRegistryReadyState
+{
+    /// <summary>Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.</summary>
+    public required List<CanvasExtension> Extensions { get; init; }
+
+    public CanvasRegistryStatus Status { get; init; } = CanvasRegistryStatus.Ready;
+}
+
+/// <summary>Registry materialization failed; a later request may retry.</summary>
+public sealed record CanvasRegistryErrorState
+{
+    public CanvasRegistryStatus Status { get; init; } = CanvasRegistryStatus.Error;
+
+    public required ErrorInfo Error { get; init; }
 }
 
 /// <summary>Stable reference to a subscribable canvas channel.
@@ -2701,11 +2808,10 @@ public sealed record CanvasReference
 /// redundantly carry its channel URI.</summary>
 public sealed class CanvasState
 {
-    /// <summary>Provider-facing instance identifier.
+    /// <summary>Provider-facing instance identifier used for correlation.
     ///
-    /// AHP clients address this instance by the subscribed `ahp-canvas:` channel
-    /// URI. They MUST NOT treat this provider identifier as a second resource
-    /// identity.</summary>
+    /// AHP commands and subscriptions address this canvas by its channel URI,
+    /// not by this identifier.</summary>
     public required string InstanceId { get; set; }
 
     /// <summary>Owning declaration namespace.</summary>
@@ -7724,6 +7830,35 @@ internal sealed class CustomizationLoadStateConverter : UnionConverter<Customiza
     }
 }
 
+/// <summary>Authoritative Canvas registry materialization state.</summary>
+[JsonConverter(typeof(CanvasRegistryStateConverter))]
+public sealed class CanvasRegistryState : AhpUnion
+{
+    /// <summary>Creates an empty CanvasRegistryState (no active variant).</summary>
+    public CanvasRegistryState() { }
+
+    /// <summary>Creates a CanvasRegistryState wrapping the given variant value.</summary>
+    public CanvasRegistryState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the CanvasRegistryState discriminated union.</summary>
+internal sealed class CanvasRegistryStateConverter : UnionConverter<CanvasRegistryState>
+{
+    public CanvasRegistryStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["uninitialized"] = typeof(CanvasRegistryUninitializedState),
+        ["loading"] = typeof(CanvasRegistryLoadingState),
+        ["ready"] = typeof(CanvasRegistryReadyState),
+        ["error"] = typeof(CanvasRegistryErrorState),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
 /// <summary>McpServerState is the lifecycle state of an MCP server customization.</summary>
 [JsonConverter(typeof(McpServerStateConverter))]
 public sealed class McpServerState : AhpUnion
@@ -8142,6 +8277,9 @@ public sealed class SnapshotState
     /// <summary>Canvas state variant, when populated.</summary>
     public CanvasState? Canvas { get; set; }
 
+    /// <summary>Canvas collection state variant, when populated.</summary>
+    public CanvasesState? Canvases { get; set; }
+
     /// <summary>Terminal state variant, when populated.</summary>
     public TerminalState? Terminal { get; set; }
 
@@ -8207,6 +8345,10 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
         }
+        else if (root.TryGetProperty("registry", out _) && root.TryGetProperty("canvases", out _))
+        {
+            result.Canvases = root.Deserialize(AhpJsonTypeInfo.Get<CanvasesState>(options));
+        }
         else if (root.TryGetProperty("content", out _))
         {
             result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
@@ -8242,6 +8384,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
+        if (value.Canvases is not null) { JsonSerializer.Serialize(writer, value.Canvases, AhpJsonTypeInfo.Get<CanvasesState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }

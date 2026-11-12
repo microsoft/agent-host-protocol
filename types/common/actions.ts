@@ -71,8 +71,7 @@ import type {
   ChatMovableChangedAction,
   ChatChangesetsChangedAction,
   ChatCanvasesChangedAction,
-  ChatCanvasRegistryRequestedAction,
-  ChatCanvasRegistryChangedAction,
+  ChatCanvasesUriChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -95,6 +94,13 @@ import type {
 import type {
   CanvasStateChangedAction,
 } from '../channels-canvas/actions.js';
+
+import type {
+  CanvasesRegistryRequestedAction,
+  CanvasesRegistryChangedAction,
+  CanvasesCanvasSetAction,
+  CanvasesCanvasRemovedAction,
+} from '../channels-canvases/actions.js';
 
 import type {
   ChangesetStatusChangedAction,
@@ -186,8 +192,11 @@ export const enum ActionType {
   ChatMovableChanged = 'chat/movableChanged',
   ChatChangesetsChanged = 'chat/changesetsChanged',
   ChatCanvasesChanged = 'chat/canvasesChanged',
-  ChatCanvasRegistryRequested = 'chat/canvasRegistryRequested',
-  ChatCanvasRegistryChanged = 'chat/canvasRegistryChanged',
+  ChatCanvasesUriChanged = 'chat/canvasesUriChanged',
+  CanvasesRegistryRequested = 'canvases/registryRequested',
+  CanvasesRegistryChanged = 'canvases/registryChanged',
+  CanvasesCanvasSet = 'canvases/canvasSet',
+  CanvasesCanvasRemoved = 'canvases/canvasRemoved',
   CanvasStateChanged = 'canvas/stateChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
@@ -357,8 +366,11 @@ export type StateAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
-  | ChatCanvasRegistryRequestedAction
-  | ChatCanvasRegistryChangedAction
+  | ChatCanvasesUriChangedAction
+  | CanvasesRegistryRequestedAction
+  | CanvasesRegistryChangedAction
+  | CanvasesCanvasSetAction
+  | CanvasesCanvasRemovedAction
   | CanvasStateChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

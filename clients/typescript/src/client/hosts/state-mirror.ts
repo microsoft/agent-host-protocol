@@ -34,12 +34,14 @@ import type {
   ChangesetAction,
   AutomationAction,
   AutomationRunAction,
+  CanvasesAction,
   RootAction,
   SessionAction,
   TerminalAction,
 } from '../../types/action-origin.generated.js';
 import type { ChangesetState } from '../../types/channels-changeset/state.js';
 import type { CanvasState } from '../../types/channels-canvas/state.js';
+import type { CanvasesState } from '../../types/channels-canvases/state.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
@@ -47,6 +49,7 @@ import type { AutomationEntry, AutomationState } from '../../types/channels-auto
 import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
 import { canvasReducer } from '../../types/channels-canvas/reducer.js';
+import { canvasesReducer } from '../../types/channels-canvases/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import { sessionReducer } from '../../types/channels-session/reducer.js';
 import { terminalReducer } from '../../types/channels-terminal/reducer.js';
@@ -107,6 +110,7 @@ export class MultiHostStateMirror {
   private readonly rootStatesMap = new Map<HostId, RootState>();
   private readonly sessionsMap = new Map<string, SessionState>();
   private readonly canvasesMap = new Map<string, CanvasState>();
+  private readonly canvasCollectionsMap = new Map<string, CanvasesState>();
   private readonly terminalsMap = new Map<string, TerminalState>();
   private readonly changesetsMap = new Map<string, ChangesetState>();
   private readonly automationCatalogsMap = new Map<HostId, AutomationState>();
@@ -126,6 +130,11 @@ export class MultiHostStateMirror {
   /** Live canvases keyed by `hostedResourceKey(hostId, uri)`. */
   get canvases(): ReadonlyMap<string, CanvasState> {
     return this.canvasesMap;
+  }
+
+  /** Collections keyed by `hostedResourceKey(hostId, uri)`. */
+  get canvasCollections(): ReadonlyMap<string, CanvasesState> {
+    return this.canvasCollectionsMap;
   }
 
   /** All known terminal states keyed by `hostedResourceKey(hostId, uri)`. */
@@ -165,6 +174,10 @@ export class MultiHostStateMirror {
 
   getCanvas(hostId: HostId, uri: URI): CanvasState | undefined {
     return this.canvasesMap.get(hostedResourceKey(hostId, uri));
+  }
+
+  getCanvasCollection(hostId: HostId, uri: URI): CanvasesState | undefined {
+    return this.canvasCollectionsMap.get(hostedResourceKey(hostId, uri));
   }
 
   /** Look up a terminal by `(hostId, uri)`. */
@@ -212,6 +225,13 @@ export class MultiHostStateMirror {
       const current = this.sessionsMap.get(key);
       if (!current) return;
       this.sessionsMap.set(key, sessionReducer(current, action as SessionAction));
+      return;
+    }
+    if (channel.startsWith('ahp-canvases:')) {
+      const key = hostedResourceKey(hostId, channel);
+      const current = this.canvasCollectionsMap.get(key);
+      if (current === undefined) return;
+      this.canvasCollectionsMap.set(key, canvasesReducer(current, action as CanvasesAction));
       return;
     }
     if (channel.startsWith('ahp-canvas:')) {
@@ -266,6 +286,10 @@ export class MultiHostStateMirror {
       this.sessionsMap.set(key, snapshot.state as SessionState);
       return;
     }
+    if (resource.startsWith('ahp-canvases:')) {
+      this.canvasCollectionsMap.set(key, snapshot.state as CanvasesState);
+      return;
+    }
     if (resource.startsWith('ahp-canvas:')) {
       if (!isCanvasState(snapshot.state)) {
         throw new Error('Invalid canvas snapshot state');
@@ -302,6 +326,9 @@ export class MultiHostStateMirror {
     for (const key of this.canvasesMap.keys()) {
       if (key.startsWith(prefix)) this.canvasesMap.delete(key);
     }
+    for (const key of this.canvasCollectionsMap.keys()) {
+      if (key.startsWith(prefix)) this.canvasCollectionsMap.delete(key);
+    }
     for (const key of this.terminalsMap.keys()) {
       if (key.startsWith(prefix)) this.terminalsMap.delete(key);
     }
@@ -321,6 +348,7 @@ export class MultiHostStateMirror {
     this.rootStatesMap.clear();
     this.sessionsMap.clear();
     this.canvasesMap.clear();
+    this.canvasCollectionsMap.clear();
     this.terminalsMap.clear();
     this.changesetsMap.clear();
     this.automationCatalogsMap.clear();

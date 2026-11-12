@@ -1055,14 +1055,14 @@ pub struct MoveChatResult {
     pub session: Uri,
 }
 
-/// Opens one client-addressed canvas resource in a chat.
+/// Opens one client-addressed canvas resource in an advertised collection.
 ///
-/// The resulting live instance is published through the chat's
-/// {@link ChatState.canvases} references and its `ahp-canvas:` state channel.
+/// The resulting live instance is published through the collection's
+/// `canvases` references and its `ahp-canvas:` state channel.
 /// Repeating this command with the same `channel` is idempotent. Reusing it for
-/// a different chat, extension, or canvas type MUST fail with `Conflict`.
+/// a different collection, extension, or canvas type MUST fail with `Conflict`.
 /// Clients MUST observe
-/// {@link ChatState.canvases} and the referenced `ahp-canvas:` channel for
+/// the advertised collection and the referenced `ahp-canvas:` channel for
 /// authoritative membership, availability, and presentation state.
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises
@@ -1076,8 +1076,8 @@ pub struct OpenCanvasParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Exact chat URI that owns the canvas instance.
-    pub chat: Uri,
+    /// Advertised `ahp-canvases:` collection that owns the canvas instance.
+    pub canvases: Uri,
     /// Stable identifier of the extension that declares the canvas.
     pub extension_id: String,
     /// Provider-local canvas type identifier.
@@ -1086,8 +1086,8 @@ pub struct OpenCanvasParams {
 
 /// Closes and disposes one live canvas resource.
 ///
-/// The server removes the resource from the owning chat's
-/// {@link ChatState.canvases} references. Repeating this command after the
+/// The server removes the resource from the owning collection and its legacy
+/// {@link ChatState.canvases} projection. Repeating this command after the
 /// resource is gone is a no-op.
 ///
 /// Clients MUST NOT call this command unless the chat's agent advertises

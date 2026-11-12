@@ -59,8 +59,11 @@ import type {
   ChatMovableChangedAction,
   ChatChangesetsChangedAction,
   ChatCanvasesChangedAction,
-  ChatCanvasRegistryRequestedAction,
-  ChatCanvasRegistryChangedAction,
+  ChatCanvasesUriChangedAction,
+  CanvasesRegistryRequestedAction,
+  CanvasesRegistryChangedAction,
+  CanvasesCanvasSetAction,
+  CanvasesCanvasRemovedAction,
   CanvasStateChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
@@ -235,8 +238,7 @@ export type ChatAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
-  | ChatCanvasRegistryRequestedAction
-  | ChatCanvasRegistryChangedAction
+  | ChatCanvasesUriChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -265,7 +267,6 @@ export type ClientChatAction =
   | ChatToolCallContentChangedAction
   | ChatTurnCancelledAction
   | ChatTurnResumeAction
-  | ChatCanvasRegistryRequestedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatPendingMessageSetAction
@@ -297,7 +298,7 @@ export type ServerChatAction =
   | ChatMovableChangedAction
   | ChatChangesetsChangedAction
   | ChatCanvasesChangedAction
-  | ChatCanvasRegistryChangedAction
+  | ChatCanvasesUriChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatMovedAction
@@ -318,6 +319,26 @@ export type ClientCanvasAction =
 /** Union of canvas actions that only the server may produce. */
 export type ServerCanvasAction =
   | CanvasStateChangedAction
+;
+
+/** CanvasesAction for the canvases collection channel. */
+export type CanvasesAction =
+  | CanvasesRegistryRequestedAction
+  | CanvasesRegistryChangedAction
+  | CanvasesCanvasSetAction
+  | CanvasesCanvasRemovedAction
+;
+
+/** ClientCanvasesAction for the canvases collection channel. */
+export type ClientCanvasesAction =
+  | CanvasesRegistryRequestedAction
+;
+
+/** ServerCanvasesAction for the canvases collection channel. */
+export type ServerCanvasesAction =
+  | CanvasesRegistryChangedAction
+  | CanvasesCanvasSetAction
+  | CanvasesCanvasRemovedAction
 ;
 
 /** Union of all terminal-scoped actions. */
@@ -525,8 +546,11 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatMovableChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
   [ActionType.ChatCanvasesChanged]: false,
-  [ActionType.ChatCanvasRegistryRequested]: true,
-  [ActionType.ChatCanvasRegistryChanged]: false,
+  [ActionType.ChatCanvasesUriChanged]: false,
+  [ActionType.CanvasesRegistryRequested]: true,
+  [ActionType.CanvasesRegistryChanged]: false,
+  [ActionType.CanvasesCanvasSet]: false,
+  [ActionType.CanvasesCanvasRemoved]: false,
   [ActionType.CanvasStateChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,

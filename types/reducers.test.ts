@@ -22,6 +22,7 @@ import {
   sessionReducer,
   chatReducer,
   canvasReducer,
+  canvasesReducer,
   terminalReducer,
   changesetReducer,
   annotationsReducer,
@@ -32,7 +33,7 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, CanvasState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, CanvasState, CanvasesState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
   CustomizationType,
   McpServerStatus,
@@ -41,6 +42,7 @@ import {
   TurnState,
   MessageKind,
   PendingMessageKind,
+  CanvasRegistryStatus,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -58,6 +60,7 @@ function readChannelSources(baseName: string): string {
     'channels-session',
     'channels-chat',
     'channels-canvas',
+    'channels-canvases',
     'channels-terminal',
     'channels-changeset',
     'channels-annotations',
@@ -79,11 +82,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | CanvasState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | CanvasState | CanvasesState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'canvas' | 'canvases' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -127,6 +130,8 @@ describe('reducer fixtures', () => {
           state = chatReducer(state as ChatState, action as any);
         } else if (fixture.reducer === 'canvas') {
           state = canvasReducer(state as CanvasState, action as any);
+        } else if (fixture.reducer === 'canvases') {
+          state = canvasesReducer(state as CanvasesState, action as any);
         } else if (fixture.reducer === 'terminal') {
           state = terminalReducer(state as TerminalState, action as any);
         } else if (fixture.reducer === 'changeset') {
@@ -146,6 +151,18 @@ describe('reducer fixtures', () => {
       assert.deepStrictEqual(state, fixture.expected);
     });
   }
+});
+
+describe('canvas collection identity', () => {
+  it('keeps state identity for intent and absent removal, replacing matching entries without mutating input', () => {
+    const original = { resource: 'ahp-canvas:/existing' };
+    const state: CanvasesState = { registry: { status: CanvasRegistryStatus.Uninitialized }, canvases: [original] };
+    assert.strictEqual(canvasesReducer(state, { type: ActionType.CanvasesRegistryRequested }), state);
+    assert.strictEqual(canvasesReducer(state, { type: ActionType.CanvasesCanvasRemoved, resource: 'ahp-canvas:/absent' }), state);
+    const replacement = { ...original };
+    const replaced = canvasesReducer(state, { type: ActionType.CanvasesCanvasSet, canvas: replacement });
+    assert.deepStrictEqual([replaced.canvases[0] === replacement, state.canvases[0] === original, replaced.canvases !== state.canvases], [true, true, true]);
+  });
 });
 
 describe('session/customizationToggled identity', () => {

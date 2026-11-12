@@ -1037,9 +1037,9 @@ data class OpenCanvasParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Exact chat URI that owns the canvas instance.
+     * Advertised `ahp-canvases:` collection that owns the canvas instance.
      */
-    val chat: String,
+    val canvases: String,
     /**
      * Stable identifier of the extension that declares the canvas.
      */

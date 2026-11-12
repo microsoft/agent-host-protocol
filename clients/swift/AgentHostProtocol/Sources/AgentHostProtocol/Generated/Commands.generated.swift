@@ -1160,8 +1160,8 @@ public struct OpenCanvasParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Exact chat URI that owns the canvas instance.
-    public var chat: String
+    /// Advertised `ahp-canvases:` collection that owns the canvas instance.
+    public var canvases: String
     /// Stable identifier of the extension that declares the canvas.
     public var extensionId: String
     /// Provider-local canvas type identifier.
@@ -1170,7 +1170,7 @@ public struct OpenCanvasParams: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
-        case chat
+        case canvases
         case extensionId
         case canvasId
     }
@@ -1178,13 +1178,13 @@ public struct OpenCanvasParams: Codable, Sendable {
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
-        chat: String,
+        canvases: String,
         extensionId: String,
         canvasId: String
     ) {
         self.channel = channel
         self.meta = meta
-        self.chat = chat
+        self.canvases = canvases
         self.extensionId = extensionId
         self.canvasId = canvasId
     }

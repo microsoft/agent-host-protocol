@@ -17,7 +17,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
-type ActionScope = 'root' | 'session' | 'chat' | 'canvas' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+type ActionScope = 'root' | 'session' | 'chat' | 'canvas' | 'canvases' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
 
 interface ActionInfo {
   /** The interface name (e.g. 'RootAgentsChangedAction') */
@@ -152,6 +152,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
     const scope: ActionScope = category === 'Root Actions' ? 'root'
       : category === 'Chat Actions' ? 'chat'
       : category === 'Canvas Actions' ? 'canvas'
+      : category === 'Canvases Actions' ? 'canvases'
       : category === 'Terminal Actions' ? 'terminal'
       : category === 'Changeset Actions' ? 'changeset'
       : category === 'Annotations Actions' ? 'annotations'
@@ -207,6 +208,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const sessionActions = actions.filter(a => a.scope === 'session');
   const chatActions = actions.filter(a => a.scope === 'chat');
   const canvasActions = actions.filter(a => a.scope === 'canvas');
+  const canvasesActions = actions.filter(a => a.scope === 'canvases');
   const terminalActions = actions.filter(a => a.scope === 'terminal');
   const changesetActions = actions.filter(a => a.scope === 'changeset');
   const annotationsActions = actions.filter(a => a.scope === 'annotations');
@@ -221,6 +223,8 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const serverChatActions = chatActions.filter(a => !a.isClientDispatchable);
   const clientCanvasActions = canvasActions.filter(a => a.isClientDispatchable);
   const serverCanvasActions = canvasActions.filter(a => !a.isClientDispatchable);
+  const clientCanvasesActions = canvasesActions.filter(a => a.isClientDispatchable);
+  const serverCanvasesActions = canvasesActions.filter(a => !a.isClientDispatchable);
   const clientTerminalActions = terminalActions.filter(a => a.isClientDispatchable);
   const serverTerminalActions = terminalActions.filter(a => !a.isClientDispatchable);
   const clientChangesetActions = changesetActions.filter(a => a.isClientDispatchable);
@@ -362,6 +366,20 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   }
   lines.push(`;`);
   lines.push(``);
+
+  for (const [name, members] of [
+    ['CanvasesAction', canvasesActions],
+    ['ClientCanvasesAction', clientCanvasesActions],
+    ['ServerCanvasesAction', serverCanvasesActions],
+  ] as const) {
+    lines.push(`/** ${name} for the canvases collection channel. */`);
+    lines.push(`export type ${name} =`);
+    for (const action of members) {
+      lines.push(`  | ${action.name}`);
+    }
+    lines.push(`;`);
+    lines.push(``);
+  }
 
   // TerminalAction
   lines.push(`/** Union of all terminal-scoped actions. */`);

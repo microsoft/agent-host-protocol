@@ -100,8 +100,10 @@ test('API docs show stability on entrypoint fields and experimental actions', ()
     const tcp = readFileSync(join(out, 'tcp.md'), 'utf8');
     assert.ok(tcp.includes('## `createTcpConnection`\n\n<StabilityIndex level="1.0" />'));
     const chat = readFileSync(join(out, 'chat.md'), 'utf8');
-    for (const action of ['chat/canvasRegistryRequested', 'chat/canvasRegistryChanged']) {
-      assert.ok(chat.includes(`### \`${action}\`\n\n<StabilityIndex level="1.0" />`));
+    assert.ok(chat.includes('### `chat/canvasesUriChanged`\n\n<StabilityIndex level="1.0" />'));
+    const canvases = readFileSync(join(out, 'canvases.md'), 'utf8');
+    for (const action of ['canvases/registryRequested', 'canvases/registryChanged', 'canvases/canvasSet', 'canvases/canvasRemoved']) {
+      assert.ok(canvases.includes(`### \`${action}\`\n\n<StabilityIndex level="1.0" />`));
     }
     for (const action of ['chat/turnStarted', 'chat/delta']) {
       assert.ok(!chat.includes(`### \`${action}\`\n\n<StabilityIndex`));

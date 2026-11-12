@@ -1,0 +1,41 @@
+/**
+ * Canvases Channel Reducer — Pure reducer for `CanvasesState`.
+ *
+ * @module channels-canvases/reducer
+ */
+
+import { ActionType } from '../common/actions.js';
+import type { CanvasesAction } from '../action-origin.generated.js';
+import { softAssertNever } from '../common/reducer-helpers.js';
+import type { CanvasesState } from './state.js';
+
+/** Applies authoritative registry and keyed membership mutations. */
+export function canvasesReducer(state: CanvasesState, action: CanvasesAction, log?: (msg: string) => void): CanvasesState {
+  switch (action.type) {
+    case ActionType.CanvasesRegistryRequested:
+      return state;
+    case ActionType.CanvasesRegistryChanged:
+      return { ...state, registry: action.registry };
+    case ActionType.CanvasesCanvasSet: {
+      const idx = state.canvases.findIndex(canvas => canvas.resource === action.canvas.resource);
+      if (idx < 0) {
+        return { ...state, canvases: [...state.canvases, action.canvas] };
+      }
+      const next = state.canvases.slice();
+      next[idx] = action.canvas;
+      return { ...state, canvases: next };
+    }
+    case ActionType.CanvasesCanvasRemoved: {
+      const idx = state.canvases.findIndex(canvas => canvas.resource === action.resource);
+      if (idx < 0) {
+        return state;
+      }
+      const next = state.canvases.slice();
+      next.splice(idx, 1);
+      return { ...state, canvases: next };
+    }
+    default:
+      softAssertNever(action, log);
+      return state;
+  }
+}

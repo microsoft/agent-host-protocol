@@ -122,8 +122,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -675,6 +675,7 @@ function generatePartialStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'CanvasRegistryStatus',
   'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
@@ -753,6 +754,8 @@ const STATE_STRUCTS = [
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
   'UsageInfo', 'ErrorInfo', 'Snapshot', 'EmptyState',
   'CanvasExtension', 'CanvasType', 'CanvasRegistry', 'CanvasReference', 'CanvasState',
+  'CanvasesState', 'CanvasRegistryUninitializedState', 'CanvasRegistryLoadingState',
+  'CanvasRegistryReadyState', 'CanvasRegistryErrorState',
   'Changeset', 'ChangesetCapabilities', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
   'AnnotationsSummary', 'AnnotationsState', 'AnnotationOrigin', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
@@ -923,6 +926,18 @@ const CHILD_CUSTOMIZATION_UNION: UnionConfig = {
     { caseName: 'rule', structName: 'RuleCustomization', discriminantValue: 'rule' },
     { caseName: 'hook', structName: 'HookCustomization', discriminantValue: 'hook' },
     { caseName: 'mcpServer', structName: 'McpServerCustomization', discriminantValue: 'mcpServer' },
+  ],
+};
+
+const CANVAS_REGISTRY_STATE_UNION: UnionConfig = {
+  name: 'CanvasRegistryState',
+  discriminantField: 'status',
+  allowUnknown: true,
+  variants: [
+    { caseName: 'uninitialized', structName: 'CanvasRegistryUninitializedState', discriminantValue: 'uninitialized' },
+    { caseName: 'loading', structName: 'CanvasRegistryLoadingState', discriminantValue: 'loading' },
+    { caseName: 'ready', structName: 'CanvasRegistryReadyState', discriminantValue: 'ready' },
+    { caseName: 'error', structName: 'CanvasRegistryErrorState', discriminantValue: 'error' },
   ],
 };
 
@@ -1125,6 +1140,7 @@ public enum SnapshotState: Codable, Sendable {
     case session(SessionState)
     case chat(ChatState)
     case canvas(CanvasState)
+    case canvases(CanvasesState)
     case terminal(TerminalState)
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
@@ -1160,6 +1176,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .chat(chat)
         } else if let canvas = try? CanvasState(from: decoder) {
             self = .canvas(canvas)
+        } else if let canvases = try? CanvasesState(from: decoder) {
+            self = .canvases(canvases)
         } else if let terminal = try? TerminalState(from: decoder) {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {
@@ -1187,6 +1205,7 @@ public enum SnapshotState: Codable, Sendable {
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
         case .canvas(let state): try state.encode(to: encoder)
+        case .canvases(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
@@ -1395,6 +1414,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, CHILD_CUSTOMIZATION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CUSTOMIZATION_LOAD_STATE_UNION));
+  lines.push(generateDiscriminatedUnion(project, CANVAS_REGISTRY_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
   lines.push('');
@@ -1460,8 +1480,11 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/movableChanged', caseName: 'chatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'chatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/canvasesChanged', caseName: 'chatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
-  { type: 'chat/canvasRegistryRequested', caseName: 'chatCanvasRegistryRequested', tsInterface: 'ChatCanvasRegistryRequestedAction' },
-  { type: 'chat/canvasRegistryChanged', caseName: 'chatCanvasRegistryChanged', tsInterface: 'ChatCanvasRegistryChangedAction' },
+  { type: 'chat/canvasesUriChanged', caseName: 'chatCanvasesUriChanged', tsInterface: 'ChatCanvasesUriChangedAction' },
+  { type: 'canvases/registryRequested', caseName: 'canvasesRegistryRequested', tsInterface: 'CanvasesRegistryRequestedAction' },
+  { type: 'canvases/registryChanged', caseName: 'canvasesRegistryChanged', tsInterface: 'CanvasesRegistryChangedAction' },
+  { type: 'canvases/canvasSet', caseName: 'canvasesCanvasSet', tsInterface: 'CanvasesCanvasSetAction' },
+  { type: 'canvases/canvasRemoved', caseName: 'canvasesCanvasRemoved', tsInterface: 'CanvasesCanvasRemovedAction' },
   { type: 'canvas/stateChanged', caseName: 'canvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'chatUsage', tsInterface: 'ChatUsageAction' },
@@ -2514,6 +2537,7 @@ function checkExhaustiveness(project: Project): void {
     'Customization',                // CUSTOMIZATION_UNION discriminated union
     'ChildCustomization',           // CHILD_CUSTOMIZATION_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse the CustomizationType Swift enum
+    'CanvasRegistryState',
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union

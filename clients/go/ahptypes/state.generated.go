@@ -15,6 +15,16 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+// Registry materialization status.
+type CanvasRegistryStatus string
+
+const (
+	CanvasRegistryStatusUninitialized CanvasRegistryStatus = "uninitialized"
+	CanvasRegistryStatusLoading       CanvasRegistryStatus = "loading"
+	CanvasRegistryStatusReady         CanvasRegistryStatus = "ready"
+	CanvasRegistryStatusError         CanvasRegistryStatus = "error"
+)
+
 // How the server resumes sending data on a windowed subscription after
 // reconnection.
 //
@@ -788,15 +798,15 @@ type AgentInfo struct {
 type AgentCapabilities struct {
 	// Experimental Canvas API.
 	//
-	// The agent can materialize an exact chat's
-	// {@link ChatState.canvasRegistry | Canvas registry} through
-	// `chat/canvasRegistryRequested` and open a declared type with `openCanvas`.
-	// Live instances are published through the chat's canvas references and
+	// The agent can materialize an advertised chat-scoped collection's registry
+	// through `canvases/registryRequested` and manage instances with `openCanvas`
+	// and `disposeCanvas`. Live instances are published through the collection and
 	// their `ahp-canvas:` state channels.
 	//
 	// Clients MUST treat absence as unsupported and SHOULD tolerate additive
 	// registry metadata while the Canvas channel remains experimental. This
-	// capability does not gate server-published Canvas references.
+	// capability does not gate observing unsolicited server-published collections
+	// or Canvas instances.
 	//
 	// Stability: 1.0 - Early development.
 	Canvases *CanvasesCapability `json:"canvases,omitempty"`
@@ -1457,17 +1467,14 @@ type ChatState struct {
 	// absent from {@link ChatSummary}; clients obtain it by subscribing to the
 	// chat channel.
 	BackgroundWork *[]BackgroundWork `json:"backgroundWork,omitempty"`
-	// Canvas types currently registered for this exact chat.
+	// Advertised `ahp-canvases:` collection owned by this exact chat.
 	//
-	// Absence means the registry has not been materialized or is not currently
-	// available. Clients that need it MAY dispatch
-	// `chat/canvasRegistryRequested`; the host publishes the authoritative
-	// registry through `chat/canvasRegistryChanged`. An empty
-	// {@link CanvasRegistry.extensions} array is a loaded registry with no
-	// available canvas types.
+	// Clients prefer this collection over legacy `canvases` references, falling
+	// back to those references when this pointer is absent. Advertising the URI
+	// does not require materializing backing or starting extensions.
 	//
 	// Stability: 1.0 - Early development.
-	CanvasRegistry *CanvasRegistry `json:"canvasRegistry,omitempty"`
+	CanvasesUri *URI `json:"canvasesUri,omitempty"`
 	// Live canvases currently exposed by this chat.
 	//
 	// Entries intentionally contain only subscribable channel references.
@@ -1531,8 +1538,9 @@ type CanvasType struct {
 	Label string `json:"label"`
 	// Description of what the canvas type does.
 	Description string `json:"description"`
-	// Whether opening this canvas requires an input flow.
-	RequiresInput bool `json:"requiresInput"`
+	// Optional JSON Schema for the input accepted when opening this canvas.
+	// Clients decide whether and how to collect input from this schema.
+	InputSchema *json.RawMessage `json:"inputSchema,omitempty"`
 }
 
 // Canvas types currently registered for one chat.
@@ -1541,6 +1549,51 @@ type CanvasRegistry struct {
 	// within this array. An empty array is an authoritative loaded registry with
 	// no types.
 	Extensions []CanvasExtension `json:"extensions"`
+}
+
+// State of an advertised `ahp-canvases:` collection owned by one chat.
+//
+// Advertising and subscribing are observation only: hosts MUST NOT create
+// backing, resume a cold runtime, or start extensions to serve a subscription.
+// Hosts MAY enumerate or refresh an already-live runtime. Collection ownership
+// is established by the host, not inferred from URI grammar. Other ownership
+// scopes are not currently defined.
+//
+// Unsubscribing MUST NOT dispose canvases. Legacy chat canvas references MUST
+// be projected from this same authoritative membership, not maintained as a
+// second source of truth.
+//
+// Stability: 1.0 - Early development.
+type CanvasesState struct {
+	Registry CanvasRegistryState `json:"registry"`
+	// Live instances, keyed by their unique channel resource URI.
+	Canvases []CanvasReference `json:"canvases"`
+}
+
+// The registry has not been materialized.
+type CanvasRegistryUninitializedState struct {
+	Status CanvasRegistryStatus `json:"status"`
+}
+
+// Registry materialization is in progress.
+type CanvasRegistryLoadingState struct {
+	Status CanvasRegistryStatus `json:"status"`
+}
+
+// The registry is loaded, extending {@link CanvasRegistry} with a required
+// `extensions` array; an empty array is authoritative.
+type CanvasRegistryReadyState struct {
+	// Extensions and providers that declare canvas types. `id` MUST be unique
+	// within this array. An empty array is an authoritative loaded registry with
+	// no types.
+	Extensions []CanvasExtension    `json:"extensions"`
+	Status     CanvasRegistryStatus `json:"status"`
+}
+
+// Registry materialization failed; a later request may retry.
+type CanvasRegistryErrorState struct {
+	Status CanvasRegistryStatus `json:"status"`
+	Error  ErrorInfo            `json:"error"`
 }
 
 // Stable reference to a subscribable canvas channel.
@@ -1559,11 +1612,10 @@ type CanvasReference struct {
 // The client already knows the subscribed resource, so the state does not
 // redundantly carry its channel URI.
 type CanvasState struct {
-	// Provider-facing instance identifier.
+	// Provider-facing instance identifier used for correlation.
 	//
-	// AHP clients address this instance by the subscribed `ahp-canvas:` channel
-	// URI. They MUST NOT treat this provider identifier as a second resource
-	// identity.
+	// AHP commands and subscriptions address this canvas by its channel URI,
+	// not by this identifier.
 	InstanceId string `json:"instanceId"`
 	// Owning declaration namespace.
 	ExtensionId string `json:"extensionId"`
@@ -5759,6 +5811,80 @@ func (u CustomizationLoadState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// Authoritative Canvas registry materialization state.
+type CanvasRegistryState struct {
+	Value isCanvasRegistryState
+}
+
+// isCanvasRegistryState is the marker interface implemented by every
+// concrete variant of CanvasRegistryState.
+type isCanvasRegistryState interface{ isCanvasRegistryState() }
+
+func (*CanvasRegistryUninitializedState) isCanvasRegistryState() {}
+func (*CanvasRegistryLoadingState) isCanvasRegistryState()       {}
+func (*CanvasRegistryReadyState) isCanvasRegistryState()         {}
+func (*CanvasRegistryErrorState) isCanvasRegistryState()         {}
+
+// CanvasRegistryStateUnknown carries an unrecognized CanvasRegistryState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type CanvasRegistryStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*CanvasRegistryStateUnknown) isCanvasRegistryState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *CanvasRegistryState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "uninitialized":
+		var value CanvasRegistryUninitializedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "loading":
+		var value CanvasRegistryLoadingState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "ready":
+		var value CanvasRegistryReadyState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "error":
+		var value CanvasRegistryErrorState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &CanvasRegistryStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasRegistryState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*CanvasRegistryStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
 // McpServerState is the discriminated lifecycle status of an MCP server customization.
 type McpServerState struct {
 	Value isMcpServerState
@@ -6610,6 +6736,7 @@ type SnapshotState struct {
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
 	Canvas        *CanvasState        `json:"-"`
+	Canvases      *CanvasesState      `json:"-"`
 	Terminal      *TerminalState      `json:"-"`
 	Changeset     *ChangesetState     `json:"-"`
 	ResourceWatch *ResourceWatchState `json:"-"`
@@ -6633,6 +6760,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Chat)
 	case s.Canvas != nil:
 		return json.Marshal(s.Canvas)
+	case s.Canvases != nil:
+		return json.Marshal(s.Canvases)
 	case s.Terminal != nil:
 		return json.Marshal(s.Terminal)
 	case s.Changeset != nil:
@@ -6691,6 +6820,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Canvas = &v
+	case containsAll(probe, "registry", "canvases"):
+		var v CanvasesState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Canvases = &v
 	case containsAll(probe, "content"):
 		var v TerminalState
 		if err := json.Unmarshal(data, &v); err != nil {

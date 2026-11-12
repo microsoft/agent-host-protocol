@@ -1,0 +1,14 @@
+{
+  "name": "canvases-registry-requested-action",
+  "group": "A",
+  "description": "canvases/registryRequested explicitly ensures registry materialization on the owning collection.",
+  "type": "StateAction",
+  "input": {
+    "type": "canvases/registryRequested"
+  },
+  "acceptableOutputs": [
+    {
+      "type": "canvases/registryRequested"
+    }
+  ]
+}

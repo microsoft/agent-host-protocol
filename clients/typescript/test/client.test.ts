@@ -43,6 +43,7 @@ import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
 import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import { CanvasRegistryStatus, type CanvasesState } from '../src/types/channels-canvases/state.js';
 import type { Snapshot } from '../src/types/common/state.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -156,6 +157,27 @@ test('subscribe attaches before sending the request and fans out an action', asy
   assert.equal(event.params.serverSeq, 7);
 
   await client.shutdown();
+});
+
+test('state mirror seeds a collection and routes registry and keyed membership actions independently of instances', () => {
+  const mirror = new AhpStateMirror();
+  const resource = 'ahp-canvases:/opaque';
+  const state: CanvasesState = { registry: { status: CanvasRegistryStatus.Uninitialized }, canvases: [] };
+  mirror.apply({ channel: resource, serverSeq: 0, origin: undefined, action: { type: ActionType.CanvasesRegistryRequested } });
+  mirror.applySnapshot({ resource, state, fromSeq: 1 });
+  for (const [index, action] of [
+    { type: ActionType.CanvasesRegistryRequested },
+    { type: ActionType.CanvasesRegistryChanged, registry: { status: CanvasRegistryStatus.Ready, extensions: [] } },
+    { type: ActionType.CanvasesCanvasSet, canvas: { resource: 'ahp-canvas:/live' } },
+    { type: ActionType.CanvasesCanvasSet, canvas: { resource: 'ahp-canvas:/live' } },
+    { type: ActionType.CanvasesCanvasRemoved, resource: 'ahp-canvas:/absent' },
+  ].entries()) {
+    mirror.apply({ channel: resource, serverSeq: index + 2, origin: undefined, action: action as StateAction });
+  }
+  assert.deepEqual({ collection: mirror.getCanvasCollection(resource), instances: mirror.canvases.size }, {
+    collection: { registry: { status: CanvasRegistryStatus.Ready, extensions: [] }, canvases: [{ resource: 'ahp-canvas:/live' }] },
+    instances: 0,
+  });
 });
 
 test('state mirror replaces and clears live canvas sources', () => {

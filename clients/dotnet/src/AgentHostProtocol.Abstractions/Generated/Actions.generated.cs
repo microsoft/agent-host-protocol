@@ -87,9 +87,15 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatCanvasesChanged = new ActionType("chat/canvasesChanged");
 
-    public static readonly ActionType ChatCanvasRegistryRequested = new ActionType("chat/canvasRegistryRequested");
+    public static readonly ActionType ChatCanvasesUriChanged = new ActionType("chat/canvasesUriChanged");
 
-    public static readonly ActionType ChatCanvasRegistryChanged = new ActionType("chat/canvasRegistryChanged");
+    public static readonly ActionType CanvasesRegistryRequested = new ActionType("canvases/registryRequested");
+
+    public static readonly ActionType CanvasesRegistryChanged = new ActionType("canvases/registryChanged");
+
+    public static readonly ActionType CanvasesCanvasSet = new ActionType("canvases/canvasSet");
+
+    public static readonly ActionType CanvasesCanvasRemoved = new ActionType("canvases/canvasRemoved");
 
     public static readonly ActionType CanvasStateChanged = new ActionType("canvas/stateChanged");
 
@@ -1851,37 +1857,61 @@ public sealed record ChatCanvasesChangedAction
     public List<CanvasReference>? Canvases { get; init; }
 }
 
-/// <summary>Requests materialization of the chat's Canvas type registry.
-///
-/// A host MUST reject the action when the chat's agent does not advertise
-/// {@link AgentCapabilities.canvases} or when the chat cannot materialize the
-/// registry. Materialization MUST NOT send a user message or invoke a model.
-///
-/// The reducer is a no-op. The host remains authoritative and publishes the
-/// complete result through
-/// {@link ChatCanvasRegistryChangedAction | `chat/canvasRegistryChanged`}.
-/// Clients do not need to dispatch this action when
-/// {@link ChatState.canvasRegistry} is already present.
+/// <summary>Replaces or clears the chat's advertised canvas collection URI.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record ChatCanvasRegistryRequestedAction
+public sealed record ChatCanvasesUriChangedAction
 {
-    public ActionType Type { get; init; } = ActionType.ChatCanvasRegistryRequested;
+    public ActionType Type { get; init; } = ActionType.ChatCanvasesUriChanged;
+
+    /// <summary>Owning collection URI, or `undefined` to clear the pointer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CanvasesUri { get; init; }
 }
 
-/// <summary>The Canvas type registry for this chat changed.
+/// <summary>Ensures the owning collection's registry is materialized.
 ///
-/// Replaces {@link ChatState.canvasRegistry | `state.canvasRegistry`} entirely.
-/// Set to `undefined` when the registry is no longer materialized or available.
+/// Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+/// Hosts MAY resume existing persisted backing and start extensions, but MUST
+/// NOT create provisional backing, send a user message, or invoke a model.
+/// Concurrent requests MUST coalesce. A request while loading or ready is an
+/// ensure/no-op; a request after an error retries. The reducer is a no-op;
+/// hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record ChatCanvasRegistryChangedAction
+public sealed record CanvasesRegistryRequestedAction
 {
-    public ActionType Type { get; init; } = ActionType.ChatCanvasRegistryChanged;
+    public ActionType Type { get; init; } = ActionType.CanvasesRegistryRequested;
+}
 
-    /// <summary>Authoritative registry, or `undefined` to clear it.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CanvasRegistry? CanvasRegistry { get; init; }
+/// <summary>Replaces the authoritative registry load state.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesRegistryChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesRegistryChanged;
+
+    public required CanvasRegistryState Registry { get; init; }
+}
+
+/// <summary>Inserts or replaces a live canvas reference, keyed by resource.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCanvasSetAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesCanvasSet;
+
+    public required CanvasReference Canvas { get; init; }
+}
+
+/// <summary>Removes a live canvas reference by resource; absent resources are a no-op.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCanvasRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesCanvasRemoved;
+
+    public required string Resource { get; init; }
 }
 
 /// <summary>The presentation state for this canvas changed.
@@ -2959,8 +2989,11 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
-        ["chat/canvasRegistryRequested"] = typeof(ChatCanvasRegistryRequestedAction),
-        ["chat/canvasRegistryChanged"] = typeof(ChatCanvasRegistryChangedAction),
+        ["chat/canvasesUriChanged"] = typeof(ChatCanvasesUriChangedAction),
+        ["canvases/registryRequested"] = typeof(CanvasesRegistryRequestedAction),
+        ["canvases/registryChanged"] = typeof(CanvasesRegistryChangedAction),
+        ["canvases/canvasSet"] = typeof(CanvasesCanvasSetAction),
+        ["canvases/canvasRemoved"] = typeof(CanvasesCanvasRemovedAction),
         ["canvas/stateChanged"] = typeof(CanvasStateChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
