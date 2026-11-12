@@ -43,6 +43,14 @@ const (
 	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
 )
 
+// Native filesystem path grammar used by a host environment.
+type PathStyle string
+
+const (
+	PathStylePosix   PathStyle = "posix"
+	PathStyleWindows PathStyle = "windows"
+)
+
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -173,6 +181,23 @@ type InitializeParams struct {
 	Capabilities *ClientCapabilities `json:"capabilities,omitempty"`
 }
 
+// Describes the connection's default host-side execution environment.
+//
+// The descriptor applies to {@link InitializeResult.defaultDirectory},
+// session working directories, and `file:` resources handled by the server
+// through the `resource*` commands, unless more specific environment metadata
+// is available. It does not apply to resources provided by the client.
+//
+// A host that exposes mixed environments MUST only populate fields that have a
+// single connection-wide default.
+type HostEnvironment struct {
+	// Authoritative native path grammar for resources in this environment.
+	//
+	// Clients parsing or formatting native paths MUST use this field instead of
+	// inferring path semantics from their local environment.
+	PathStyle *PathStyle `json:"pathStyle,omitempty"`
+}
+
 // Result of the `initialize` command.
 //
 // `protocolVersion` is the version the server has selected from the client's
@@ -204,6 +229,10 @@ type InitializeResult struct {
 	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
 	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
+	// Default execution environment exposed by this host connection.
+	//
+	// Absence means no environment metadata is available.
+	Environment *HostEnvironment `json:"environment,omitempty"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -1325,6 +1354,11 @@ type AuthenticateParams struct {
 	// Without a target, resource/scope matching is unchanged; the token may
 	// satisfy every matching pending challenge. Older hosts ignore this field.
 	Target *AuthenticateTarget `json:"target,omitempty"`
+	// Optional identifier for the client's selected account, sent alongside the token.
+	// Hosts can compare `accountId` values to detect when the underlying account has changed.
+	// Hosts MUST treat `accountId` as an opaque string.
+	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+	AccountId *string `json:"accountId,omitempty"`
 }
 
 // Result of the `authenticate` command.

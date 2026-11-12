@@ -1749,11 +1749,11 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
-  'InitializeParams', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationCapabilities',
+  'InitializeParams', 'HostEnvironment', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
