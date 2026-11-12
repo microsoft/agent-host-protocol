@@ -940,6 +940,15 @@ public enum ChangesetStatus: Codable, Sendable, Equatable {
     }
 }
 
+/// Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+public struct ChangesetFileStatus: OptionSet, Codable, Sendable, Hashable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+
+    /// The host reports an ongoing edit to this file.
+    public static let editing = ChangesetFileStatus(rawValue: 1)
+}
+
 /// Execution lifecycle of a {@link ChangesetOperation}.
 ///
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1181,33 +1190,33 @@ public struct TcpConnectionsCapability: Codable, Sendable, Equatable {
 /// Limits on data that one peer receives on a windowed subscription.
 ///
 /// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// message's complete text, as sent. For a `channel/frame` notification, this
 /// includes its envelope and escape characters. The same size is used for the
-/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 /// size of a complete data message. Outstanding data is always less than
-/// `windowBytes + maximumFrameBytes`.
+/// `windowBytes + maxFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
 public struct ChannelReceiveLimits: Codable, Sendable, Equatable {
     /// The target amount of outstanding data. This is a soft target.
-    /// The sender MUST NOT send a data message or fragment while outstanding data
-    /// is equal to or greater than this value. The last message or fragment sent
+    /// The sender MUST NOT send a data message or frame while outstanding data
+    /// is equal to or greater than this value. The last message or frame sent
     /// before the window is full can go past it, so a message that fits within
-    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// `maxFrameBytes` can be sent whole even when it is larger than the
     /// remaining credit.
     public var windowBytes: Int
     /// The largest JSON-RPC message that the sender can send for a data message.
     /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
     /// notification, it includes the envelope and escape characters. A larger data
-    /// message MUST be split into smaller messages or sent in fragments.
-    public var maximumFrameBytes: Int
+    /// message MUST be split into smaller messages or sent in frames.
+    public var maxFrameBytes: Int
 
     public init(
         windowBytes: Int,
-        maximumFrameBytes: Int
+        maxFrameBytes: Int
     ) {
         self.windowBytes = windowBytes
-        self.maximumFrameBytes = maximumFrameBytes
+        self.maxFrameBytes = maxFrameBytes
     }
 }
 
@@ -1948,11 +1957,11 @@ public struct ChatState: Codable, Sendable, Equatable {
     /// compatibility.
     public var interactivity: ChatInteractivity?
     /// Agent provider ID backing this chat. Absent means the session's
-    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-    /// differs. The chat's agent never changes, but `provider` is reported
-    /// relative to its session, so `chat/moved` may set or clear it. Like
-    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-    /// side chats use the source chat's agent.
+    /// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+    /// differs. The chat's agent provider never changes, but `provider` is
+    /// reported relative to its session, so `chat/moved` may set or clear it.
+    /// `session/chatUpdated` does not carry it. Forks and side chats use the
+    /// source chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.
     public var provider: String?
@@ -2820,7 +2829,7 @@ public struct SessionConfigState: Codable, Sendable, Equatable {
 public struct ChatConfigState: Codable, Sendable, Equatable {
     /// Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
-    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// {@link ChatState.provider | agent provider} differs from the session's; when
     /// present, clients use it instead of the session's schema.
     ///
     /// Stability: 1.0 - Early development.
@@ -7285,7 +7294,7 @@ public struct CanvasState: Codable, Sendable, Equatable {
     ///
     /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
     /// from persisted state after a provider or host restart.
-    public var url: String?
+    public var uri: String?
 
     public init(
         instanceId: String,
@@ -7294,7 +7303,7 @@ public struct CanvasState: Codable, Sendable, Equatable {
         canvasId: String,
         title: String? = nil,
         status: String? = nil,
-        url: String? = nil
+        uri: String? = nil
     ) {
         self.instanceId = instanceId
         self.extensionId = extensionId
@@ -7302,7 +7311,7 @@ public struct CanvasState: Codable, Sendable, Equatable {
         self.canvasId = canvasId
         self.title = title
         self.status = status
-        self.url = url
+        self.uri = uri
     }
 }
 
@@ -7440,9 +7449,12 @@ public struct ChangesetFile: Codable, Sendable, Equatable {
     /// echo in {@link ChangesetOperationTarget.nonce}.
     /// Hosts SHOULD update a published nonce whenever contents of the file change.
     public var nonce: String?
-    /// Whether the host reports an ongoing edit to this file.
-    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
-    public var isEditing: Bool?
+    /// Host-reported activity on this file, as a bitset of
+    /// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+    /// reported. This is advisory; the absence of
+    /// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+    /// file is safe.
+    public var status: ChangesetFileStatus?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -7450,7 +7462,7 @@ public struct ChangesetFile: Codable, Sendable, Equatable {
         case reviewed
         case meta = "_meta"
         case nonce
-        case isEditing
+        case status
     }
 
     public init(
@@ -7459,14 +7471,14 @@ public struct ChangesetFile: Codable, Sendable, Equatable {
         reviewed: Bool? = nil,
         meta: [String: AnyCodable]? = nil,
         nonce: String? = nil,
-        isEditing: Bool? = nil
+        status: ChangesetFileStatus? = nil
     ) {
         self.id = id
         self.edit = edit
         self.reviewed = reviewed
         self.meta = meta
         self.nonce = nonce
-        self.isEditing = isEditing
+        self.status = status
     }
 }
 

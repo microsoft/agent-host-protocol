@@ -252,7 +252,7 @@
               "description": "The subset of the session's working directories this chat uses.\nSee {@link ChatState.workingDirectories} for the full semantics."
             }
           },
-          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\n`resource` is an identity field and never changes. `provider` is reported\nrelative to the owning session and changes only when the chat moves to\nanother session, which republishes the whole summary through\n`session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD\nignore them if present."
         }
       },
       "required": [
@@ -1545,8 +1545,9 @@
           "description": "Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value."
         },
         "duration": {
-          "type": "number",
-          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown."
+          "type": "integer",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.",
+          "minimum": 0
         },
         "_meta": {
           "type": "object",
@@ -1722,7 +1723,7 @@
     },
     "ChatConfigChangedAction": {
       "type": "object",
-      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/configChanged"
@@ -1744,7 +1745,7 @@
     },
     "ChatMovedAction": {
       "type": "object",
-      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | `provider`} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.",
+      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | agent provider} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/moved"
@@ -1755,7 +1756,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "The chat's provider in the new session; absent clears it."
+          "description": "The chat's agent provider ID in the new session; absent clears it."
         },
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
@@ -2722,24 +2723,24 @@
     },
     "ChannelReceiveLimits": {
       "type": "object",
-      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` notification, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maxFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maxFrameBytes`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "windowBytes": {
           "type": "integer",
-          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or frame while outstanding data\nis equal to or greater than this value. The last message or frame sent\nbefore the window is full can go past it, so a message that fits within\n`maxFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "maximumFrameBytes": {
+        "maxFrameBytes": {
           "type": "integer",
-          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in frames.",
           "minimum": 1024,
           "maximum": 9007199254740991
         }
       },
       "required": [
         "windowBytes",
-        "maximumFrameBytes"
+        "maxFrameBytes"
       ]
     },
     "ChannelFlowControl": {
@@ -5273,7 +5274,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. The chat's agent never changes, but `provider` is reported\nrelative to its session, so `chat/moved` may set or clear it. Like\n`resource`, it is omitted from `session/chatUpdated` changes. Forks and\nside chats use the source chat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | agent provider}; hosts set it when it\ndiffers. The chat's agent provider never changes, but `provider` is\nreported relative to its session, so `chat/moved` may set or clear it.\n`session/chatUpdated` does not carry it. Forks and side chats use the\nsource chat's agent provider.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -5539,7 +5540,7 @@
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
-          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | agent provider} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
         },
         "values": {
           "type": "object",
@@ -6477,8 +6478,9 @@
           "description": "Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown."
         },
         "duration": {
-          "type": "number",
-          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock."
+          "type": "integer",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.",
+          "minimum": 0
         }
       },
       "required": [
@@ -7518,7 +7520,7 @@
           "type": "string",
           "description": "Provider-supplied status text, when available."
         },
-        "url": {
+        "uri": {
           "$ref": "#/$defs/URI",
           "description": "Absolute URI of the canvas's live content, typically an HTTP(S) URL;\nabsent when the live source is unavailable. Hosts MUST clear this field\nwhen the provider becomes unavailable.\n\nA client that can't load this URI directly, for example because it is a\nloopback address in the host's environment or uses a scheme that the\nclient doesn't load, reads it with `resourceRead`. The client resolves the\nrelative references in its content and reads them the same way. Hosts\nSHOULD serve reads of this URI, and of other URLs on its origin when it is\nan HTTP(S) URL, to clients that can subscribe to the canvas. The provider\nchooses the URI, so the host decides which sources it is willing to read.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
         }
@@ -7852,9 +7854,9 @@
           "type": "string",
           "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
         },
-        "isEditing": {
-          "type": "boolean",
-          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
+        "status": {
+          "$ref": "#/$defs/ChangesetFileStatus",
+          "description": "Host-reported activity on this file, as a bitset of\n{@link ChangesetFileStatus} flags. Absent or `0` means no activity is\nreported. This is advisory; the absence of\n{@link ChangesetFileStatus.Editing} does not guarantee that modifying the\nfile is safe."
         }
       },
       "required": [
@@ -9811,6 +9813,12 @@
       ],
       "type": "string",
       "description": "Why a tool call was cancelled."
+    },
+    "ChangesetFileStatus": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset flags describing host-reported activity on a {@link ChangesetFile}.\n\nKnown flags:\n\n- `Editing` (1): The host reports an ongoing edit to this file."
     },
     "ChangesetOperationScope": {
       "enum": [

@@ -85,11 +85,11 @@ export interface ChatState {
   interactivity?: ChatInteractivity;
   /**
    * Agent provider ID backing this chat. Absent means the session's
-   * {@link SessionMetadata.provider | `provider`}; hosts set it when it
-   * differs. The chat's agent never changes, but `provider` is reported
-   * relative to its session, so `chat/moved` may set or clear it. Like
-   * `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-   * side chats use the source chat's agent.
+   * {@link SessionMetadata.provider | agent provider}; hosts set it when it
+   * differs. The chat's agent provider never changes, but `provider` is
+   * reported relative to its session, so `chat/moved` may set or clear it.
+   * `session/chatUpdated` does not carry it. Forks and side chats use the
+   * source chat's agent provider.
    * @stability 1.0
    */
   provider?: string;
@@ -448,7 +448,7 @@ export interface ChatConfigState {
   /**
    * Config schema for this chat's `chatMutable` properties. Absent means the
    * session's schema. Hosts set it, as the chat's own schema, when the chat's
-   * {@link ChatState.provider | `provider`} differs from the session's; when
+   * {@link ChatState.provider | agent provider} differs from the session's; when
    * present, clients use it instead of the session's schema.
    * @stability 1.0
    */
@@ -1158,7 +1158,11 @@ export interface ReasoningResponsePart {
   content: string;
   /** Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown. */
   startedAt?: string;
-  /** Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock. */
+  /**
+   * Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+   * @integer
+   * @minimum 0
+   */
   duration?: number;
 }
 

@@ -1470,6 +1470,14 @@ internal sealed class ChangesetStatusConverter : JsonConverter<ChangesetStatus>
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Bitset flags describing host-reported activity on a {@link ChangesetFile}.</summary>
+[Flags]
+public enum ChangesetFileStatus : uint
+{
+    /// <summary>The host reports an ongoing edit to this file.</summary>
+    Editing = 1,
+}
+
 /// <summary>Execution lifecycle of a {@link ChangesetOperation}.
 ///
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1798,28 +1806,28 @@ public sealed record TcpConnectionsCapability
 /// <summary>Limits on data that one peer receives on a windowed subscription.
 ///
 /// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// message's complete text, as sent. For a `channel/frame` notification, this
 /// includes its envelope and escape characters. The same size is used for the
-/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 /// size of a complete data message. Outstanding data is always less than
-/// `windowBytes + maximumFrameBytes`.
+/// `windowBytes + maxFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelReceiveLimits
 {
     /// <summary>The target amount of outstanding data. This is a soft target.
-    /// The sender MUST NOT send a data message or fragment while outstanding data
-    /// is equal to or greater than this value. The last message or fragment sent
+    /// The sender MUST NOT send a data message or frame while outstanding data
+    /// is equal to or greater than this value. The last message or frame sent
     /// before the window is full can go past it, so a message that fits within
-    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// `maxFrameBytes` can be sent whole even when it is larger than the
     /// remaining credit.</summary>
     public long WindowBytes { get; init; }
 
     /// <summary>The largest JSON-RPC message that the sender can send for a data message.
     /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
     /// notification, it includes the envelope and escape characters. A larger data
-    /// message MUST be split into smaller messages or sent in fragments.</summary>
-    public long MaximumFrameBytes { get; init; }
+    /// message MUST be split into smaller messages or sent in frames.</summary>
+    public long MaxFrameBytes { get; init; }
 }
 
 /// <summary>The limits that the server accepted for a windowed subscription.
@@ -2515,11 +2523,11 @@ public sealed class ChatState
     public ChatInteractivity? Interactivity { get; set; }
 
     /// <summary>Agent provider ID backing this chat. Absent means the session's
-    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-    /// differs. The chat's agent never changes, but `provider` is reported
-    /// relative to its session, so `chat/moved` may set or clear it. Like
-    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-    /// side chats use the source chat's agent.
+    /// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+    /// differs. The chat's agent provider never changes, but `provider` is
+    /// reported relative to its session, so `chat/moved` may set or clear it.
+    /// `session/chatUpdated` does not carry it. Forks and side chats use the
+    /// source chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2676,7 +2684,7 @@ public sealed class CanvasState
     /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
     /// from persisted state after a provider or host restart.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Url { get; set; }
+    public string? Uri { get; set; }
 }
 
 /// <summary>A choice in a select-style question.</summary>
@@ -3558,7 +3566,7 @@ public sealed class ChatConfigState
 {
     /// <summary>Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
-    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// {@link ChatState.provider | agent provider} differs from the session's; when
     /// present, clients use it instead of the session's schema.
     ///
     /// Stability: 1.0 - Early development.</summary>
@@ -6472,10 +6480,13 @@ public sealed record ChangesetFile
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
-    /// <summary>Whether the host reports an ongoing edit to this file.
-    /// This is advisory; false or absent does not guarantee that modifying the file is safe.</summary>
+    /// <summary>Host-reported activity on this file, as a bitset of
+    /// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+    /// reported. This is advisory; the absence of
+    /// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+    /// file is safe.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsEditing { get; init; }
+    public ChangesetFileStatus? Status { get; init; }
 }
 
 /// <summary>A server-declared invokable verb the client can run against a

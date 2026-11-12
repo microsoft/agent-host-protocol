@@ -232,8 +232,11 @@ data class SessionChatUpdatedAction(
     /**
      * Mutable summary fields that changed; omitted fields are unchanged.
      *
-     * Identity fields (`resource`, `provider`) never change and MUST be omitted by
-     * senders; receivers SHOULD ignore them if present.
+     * `resource` is an identity field and never changes. `provider` is reported
+     * relative to the owning session and changes only when the chat moves to
+     * another session, which republishes the whole summary through
+     * `session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD
+     * ignore them if present.
      */
     val changes: PartialChatSummary
 )
@@ -1067,6 +1070,17 @@ data class ChatIsArchivedChangedAction(
     val isArchived: Boolean
 )
 
+/**
+ * Config values set on a chat changed.
+ *
+ * Merges `config` into the chat's
+ * {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+ * `replace` is `true`; keys missing after a replace take their property's
+ * `default`. Only properties with `chatMutable: true` in
+ * the effective schema may be set.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class ChatConfigChangedAction(
     val type: ActionType,
@@ -1080,6 +1094,19 @@ data class ChatConfigChangedAction(
     val replace: Boolean? = null
 )
 
+/**
+ * The chat moved to another session.
+ *
+ * Dispatched by the host on the moved chat's channel after a cross-session
+ * `moveChat`. `provider` and `schema` are the chat's
+ * {@link ChatState.provider | agent provider} and
+ * {@link ChatConfigState.schema | `config.schema`} relative to the new
+ * session; absent clears them. `ChatState` has no session field, so the
+ * reducer does not store `session`; it tells subscribers which session now
+ * owns the chat.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
 data class ChatMovedAction(
     val type: ActionType,
@@ -1088,7 +1115,7 @@ data class ChatMovedAction(
      */
     val session: String,
     /**
-     * The chat's provider in the new session; absent clears it.
+     * The chat's agent provider ID in the new session; absent clears it.
      */
     val provider: String? = null,
     /**

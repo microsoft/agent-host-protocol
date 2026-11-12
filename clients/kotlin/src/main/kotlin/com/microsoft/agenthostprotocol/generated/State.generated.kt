@@ -961,6 +961,36 @@ internal object ChangesetStatusSerializer : KSerializer<ChangesetStatus> {
 }
 
 /**
+ * Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+ */
+@Serializable(with = ChangesetFileStatusSerializer::class)
+@JvmInline
+value class ChangesetFileStatus(val rawValue: UInt) {
+    operator fun contains(other: ChangesetFileStatus): Boolean =
+        (rawValue and other.rawValue) == other.rawValue
+
+    infix fun or(other: ChangesetFileStatus): ChangesetFileStatus = ChangesetFileStatus(rawValue or other.rawValue)
+    infix fun and(other: ChangesetFileStatus): ChangesetFileStatus = ChangesetFileStatus(rawValue and other.rawValue)
+
+    companion object {
+        /**
+         * The host reports an ongoing edit to this file.
+         */
+        val EDITING: ChangesetFileStatus = ChangesetFileStatus(1u)
+    }
+}
+
+internal object ChangesetFileStatusSerializer : KSerializer<ChangesetFileStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ChangesetFileStatus", PrimitiveKind.LONG)
+    override fun serialize(encoder: Encoder, value: ChangesetFileStatus) {
+        encoder.encodeLong(value.rawValue.toLong())
+    }
+    override fun deserialize(decoder: Decoder): ChangesetFileStatus =
+        ChangesetFileStatus(decoder.decodeLong().toUInt())
+}
+
+/**
  * Execution lifecycle of a {@link ChangesetOperation}.
  *
  * An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1245,11 +1275,11 @@ class TcpConnectionsCapability
  * Limits on data that one peer receives on a windowed subscription.
  *
  * All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
- * message's complete text, as sent. For a `channel/frame` fragment, this
+ * message's complete text, as sent. For a `channel/frame` notification, this
  * includes its envelope and escape characters. The same size is used for the
- * window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+ * window, credit, and `maxFrameBytes`. There is no negotiated limit on the
  * size of a complete data message. Outstanding data is always less than
- * `windowBytes + maximumFrameBytes`.
+ * `windowBytes + maxFrameBytes`.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1257,10 +1287,10 @@ class TcpConnectionsCapability
 data class ChannelReceiveLimits(
     /**
      * The target amount of outstanding data. This is a soft target.
-     * The sender MUST NOT send a data message or fragment while outstanding data
-     * is equal to or greater than this value. The last message or fragment sent
+     * The sender MUST NOT send a data message or frame while outstanding data
+     * is equal to or greater than this value. The last message or frame sent
      * before the window is full can go past it, so a message that fits within
-     * `maximumFrameBytes` can be sent whole even when it is larger than the
+     * `maxFrameBytes` can be sent whole even when it is larger than the
      * remaining credit.
      */
     val windowBytes: Long,
@@ -1268,9 +1298,9 @@ data class ChannelReceiveLimits(
      * The largest JSON-RPC message that the sender can send for a data message.
      * This is a hard limit, and MUST be at least 1024. For a `channel/frame`
      * notification, it includes the envelope and escape characters. A larger data
-     * message MUST be split into smaller messages or sent in fragments.
+     * message MUST be split into smaller messages or sent in frames.
      */
-    val maximumFrameBytes: Long
+    val maxFrameBytes: Long
 )
 
 /**
@@ -1855,11 +1885,11 @@ data class ChatState(
     val interactivity: ChatInteractivity? = null,
     /**
      * Agent provider ID backing this chat. Absent means the session's
-     * {@link SessionMetadata.provider | `provider`}; hosts set it when it
-     * differs. The chat's agent never changes, but `provider` is reported
-     * relative to its session, so `chat/moved` may set or clear it. Like
-     * `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-     * side chats use the source chat's agent.
+     * {@link SessionMetadata.provider | agent provider}; hosts set it when it
+     * differs. The chat's agent provider never changes, but `provider` is
+     * reported relative to its session, so `chat/moved` may set or clear it.
+     * `session/chatUpdated` does not carry it. Forks and side chats use the
+     * source chat's agent provider.
      *
      * Stability: 1.0 - Early development.
      */
@@ -2333,7 +2363,7 @@ data class CanvasState(
      * Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
      * from persisted state after a provider or host restart.
      */
-    val url: String? = null
+    val uri: String? = null
 )
 
 @Serializable
@@ -2623,7 +2653,7 @@ data class ChatConfigState(
     /**
      * Config schema for this chat's `chatMutable` properties. Absent means the
      * session's schema. Hosts set it, as the chat's own schema, when the chat's
-     * {@link ChatState.provider | `provider`} differs from the session's; when
+     * {@link ChatState.provider | agent provider} differs from the session's; when
      * present, clients use it instead of the session's schema.
      *
      * Stability: 1.0 - Early development.
@@ -5844,10 +5874,13 @@ data class ChangesetFile(
      */
     val nonce: String? = null,
     /**
-     * Whether the host reports an ongoing edit to this file.
-     * This is advisory; false or absent does not guarantee that modifying the file is safe.
+     * Host-reported activity on this file, as a bitset of
+     * {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+     * reported. This is advisory; the absence of
+     * {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+     * file is safe.
      */
-    val isEditing: Boolean? = null
+    val status: ChangesetFileStatus? = null
 )
 
 @Serializable

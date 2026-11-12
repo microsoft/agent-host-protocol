@@ -333,6 +333,19 @@ public struct CreateTcpConnectionParams: Codable, Sendable, Equatable {
     }
 }
 
+/// Result of the `createTcpConnection` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionResult: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
 public struct InitializeParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
@@ -471,8 +484,9 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
-    /// Present when chats in one session may be backed by different agents
-    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Present when chats in one session may be backed by different agent
+    /// providers (see {@link CreateChatParams.provider} and
+    /// {@link ChatState.provider}).
     /// Clients MUST NOT send `CreateChatParams.provider` without it.
     ///
     /// Stability: 1.0 - Early development.
@@ -1067,14 +1081,16 @@ public struct CreateChatParams: Codable, Sendable, Equatable {
     public var workingDirectories: [String]?
     /// Client-selected initial display title for the new chat.
     public var title: String?
-    /// Agent provider ID for the new chat. Absent means the session's provider.
+    /// Agent provider ID for the new chat. Absent means the session's agent
+    /// provider.
     ///
     /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-    /// `InvalidParams` a provider that is not in the root state's `agents` or
-    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// `InvalidParams` an agent provider that is not in the root state's `agents`
+    /// or that does not advertise `multipleChats`. Forks and side chats
     /// (`source` present) continue the source chat's history, so they always use
-    /// the source chat's agent: absent means that agent, and a different value is
-    /// rejected. Agent capability checks for this request use the chat's agent.
+    /// the source chat's agent provider: absent means that agent provider, and a
+    /// different value is rejected. Agent capability checks for this request use
+    /// the chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.
     public var provider: String?
@@ -2863,7 +2879,7 @@ extension CreateChatParams: AHPCommand {
 }
 
 extension CreateTcpConnectionParams: AHPCommand {
-    public typealias Result = AHPNullResult
+    public typealias Result = CreateTcpConnectionResult
     public static let method = "createTcpConnection"
 }
 

@@ -561,8 +561,11 @@ pub struct SessionChatUpdatedAction {
     pub chat: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
-    /// senders; receivers SHOULD ignore them if present.
+    /// `resource` is an identity field and never changes. `provider` is reported
+    /// relative to the owning session and changes only when the chat moves to
+    /// another session, which republishes the whole summary through
+    /// `session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD
+    /// ignore them if present.
     pub changes: PartialChatSummary,
 }
 
@@ -1564,6 +1567,8 @@ pub struct ChatIsArchivedChangedAction {
 /// `replace` is `true`; keys missing after a replace take their property's
 /// `default`. Only properties with `chatMutable: true` in
 /// the effective schema may be set.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatConfigChangedAction {
@@ -1578,17 +1583,19 @@ pub struct ChatConfigChangedAction {
 ///
 /// Dispatched by the host on the moved chat's channel after a cross-session
 /// `moveChat`. `provider` and `schema` are the chat's
-/// {@link ChatState.provider | `provider`} and
+/// {@link ChatState.provider | agent provider} and
 /// {@link ChatConfigState.schema | `config.schema`} relative to the new
 /// session; absent clears them. `ChatState` has no session field, so the
 /// reducer does not store `session`; it tells subscribers which session now
 /// owns the chat.
+///
+/// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMovedAction {
     /// The new owning session URI.
     pub session: Uri,
-    /// The chat's provider in the new session; absent clears it.
+    /// The chat's agent provider ID in the new session; absent clears it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     /// The chat's config schema in the new session; absent clears it.

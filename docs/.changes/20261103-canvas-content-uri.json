@@ -1,4 +1,4 @@
 {
   "type": "changed",
-  "message": "`CanvasState.url` is an absolute content URI, typically HTTP(S). A client that can't load it directly reads it, and the relative references in its content, with `resourceRead`."
+  "message": "Experimental `CanvasState.url` is renamed to `CanvasState.uri` and holds an absolute content URI, typically HTTP(S). A client that can't load it directly reads it, and the relative references in its content, with `resourceRead`."
 }

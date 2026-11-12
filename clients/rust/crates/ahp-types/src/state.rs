@@ -1214,6 +1214,83 @@ impl<'de> serde::Deserialize<'de> for ChangesetStatus {
     }
 }
 
+/// Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+///
+/// Wire form: a bare `u32` bitset. Unknown/forward-compat bits are
+/// preserved across a decode→encode round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct ChangesetFileStatus(pub u32);
+
+#[allow(non_upper_case_globals)]
+impl ChangesetFileStatus {
+    /// The host reports an ongoing edit to this file.
+    pub const Editing: ChangesetFileStatus = ChangesetFileStatus(1);
+
+    /// The raw `u32` bitset value (every set bit, known or not).
+    #[inline]
+    pub const fn bits(self) -> u32 {
+        self.0
+    }
+
+    /// Wrap a raw `u32` bitset value, preserving every bit verbatim.
+    #[inline]
+    pub const fn from_bits(bits: u32) -> Self {
+        ChangesetFileStatus(bits)
+    }
+
+    /// True when every bit set in `other` is also set in `self`.
+    #[inline]
+    pub const fn contains(self, other: ChangesetFileStatus) -> bool {
+        (self.0 & other.0) == other.0
+    }
+}
+
+impl From<u32> for ChangesetFileStatus {
+    #[inline]
+    fn from(value: u32) -> Self {
+        ChangesetFileStatus(value)
+    }
+}
+
+impl From<ChangesetFileStatus> for u32 {
+    #[inline]
+    fn from(value: ChangesetFileStatus) -> Self {
+        value.0
+    }
+}
+
+impl std::ops::BitOr for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn bitor(self, rhs: ChangesetFileStatus) -> ChangesetFileStatus {
+        ChangesetFileStatus(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for ChangesetFileStatus {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: ChangesetFileStatus) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl std::ops::BitAnd for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn bitand(self, rhs: ChangesetFileStatus) -> ChangesetFileStatus {
+        ChangesetFileStatus(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::Not for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn not(self) -> ChangesetFileStatus {
+        ChangesetFileStatus(!self.0)
+    }
+}
+
 /// Execution lifecycle of a {@link ChangesetOperation}.
 ///
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1537,28 +1614,28 @@ pub struct TcpConnectionsCapability {}
 /// Limits on data that one peer receives on a windowed subscription.
 ///
 /// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// message's complete text, as sent. For a `channel/frame` notification, this
 /// includes its envelope and escape characters. The same size is used for the
-/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 /// size of a complete data message. Outstanding data is always less than
-/// `windowBytes + maximumFrameBytes`.
+/// `windowBytes + maxFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReceiveLimits {
     /// The target amount of outstanding data. This is a soft target.
-    /// The sender MUST NOT send a data message or fragment while outstanding data
-    /// is equal to or greater than this value. The last message or fragment sent
+    /// The sender MUST NOT send a data message or frame while outstanding data
+    /// is equal to or greater than this value. The last message or frame sent
     /// before the window is full can go past it, so a message that fits within
-    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// `maxFrameBytes` can be sent whole even when it is larger than the
     /// remaining credit.
     pub window_bytes: i64,
     /// The largest JSON-RPC message that the sender can send for a data message.
     /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
     /// notification, it includes the envelope and escape characters. A larger data
-    /// message MUST be split into smaller messages or sent in fragments.
-    pub maximum_frame_bytes: i64,
+    /// message MUST be split into smaller messages or sent in frames.
+    pub max_frame_bytes: i64,
 }
 
 /// The limits that the server accepted for a windowed subscription.
@@ -2098,11 +2175,11 @@ pub struct ChatState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
     /// Agent provider ID backing this chat. Absent means the session's
-    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-    /// differs. The chat's agent never changes, but `provider` is reported
-    /// relative to its session, so `chat/moved` may set or clear it. Like
-    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-    /// side chats use the source chat's agent.
+    /// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+    /// differs. The chat's agent provider never changes, but `provider` is
+    /// reported relative to its session, so `chat/moved` may set or clear it.
+    /// `session/chatUpdated` does not carry it. Forks and side chats use the
+    /// source chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2242,7 +2319,7 @@ pub struct CanvasState {
     /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
     /// from persisted state after a provider or host restart.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<Uri>,
+    pub uri: Option<Uri>,
 }
 
 /// Lightweight catalog entry for a chat, carried in
@@ -2949,7 +3026,7 @@ pub struct SessionConfigState {
 pub struct ChatConfigState {
     /// Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
-    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// {@link ChatState.provider | agent provider} differs from the session's; when
     /// present, clients use it instead of the session's schema.
     ///
     /// Stability: 1.0 - Early development.
@@ -5721,10 +5798,13 @@ pub struct ChangesetFile {
     /// Hosts SHOULD update a published nonce whenever contents of the file change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
-    /// Whether the host reports an ongoing edit to this file.
-    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    /// Host-reported activity on this file, as a bitset of
+    /// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+    /// reported. This is advisory; the absence of
+    /// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+    /// file is safe.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub is_editing: Option<bool>,
+    pub status: Option<ChangesetFileStatus>,
 }
 
 /// A server-declared invokable verb the client can run against a
