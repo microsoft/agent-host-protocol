@@ -26,6 +26,7 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
 
@@ -309,11 +310,11 @@ function generateSwiftEnum(enumDecl: EnumDeclaration): string {
   const rawType = values.every(value => typeof value === 'number') ? 'Int' : 'String';
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
 
-  // Bitset enums (detected via JSDoc convention "Bitset of …") are emitted
+  // Bitset enums (`@bitset`) are emitted
   // as Swift `OptionSet` structs so OR'd combinations are representable and
   // Codable decoding accepts any int rawValue rather than only enumerated
   // cases.
-  const isBitset = rawType === 'Int' && desc !== undefined && /^bitset\b/i.test(desc);
+  const isBitset = isBitsetEnum(enumDecl);
 
   if (desc) {
     for (const docLine of desc.split('\n')) {
@@ -1728,11 +1729,11 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams',
-  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
+  'InitializeParams', 'HostEnvironment', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',

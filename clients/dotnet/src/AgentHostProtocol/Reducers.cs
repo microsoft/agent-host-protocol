@@ -2187,23 +2187,23 @@ public static class Reducers
                 state.Registry = a.Registry;
                 return ReduceOutcome.Applied;
             case CanvasesCanvasSetAction a:
-            {
-                var next = new List<CanvasReference>(state.Canvases);
-                var idx = next.FindIndex(canvas => canvas.Resource == a.Canvas.Resource);
-                if (idx < 0) next.Add(a.Canvas);
-                else next[idx] = a.Canvas;
-                state.Canvases = next;
-                return ReduceOutcome.Applied;
-            }
+                {
+                    var next = new List<CanvasReference>(state.Canvases);
+                    var idx = next.FindIndex(canvas => canvas.Resource == a.Canvas.Resource);
+                    if (idx < 0) next.Add(a.Canvas);
+                    else next[idx] = a.Canvas;
+                    state.Canvases = next;
+                    return ReduceOutcome.Applied;
+                }
             case CanvasesCanvasRemovedAction a:
-            {
-                var idx = state.Canvases.FindIndex(canvas => canvas.Resource == a.Resource);
-                if (idx < 0) return ReduceOutcome.NoOp;
-                var next = new List<CanvasReference>(state.Canvases);
-                next.RemoveAt(idx);
-                state.Canvases = next;
-                return ReduceOutcome.Applied;
-            }
+                {
+                    var idx = state.Canvases.FindIndex(canvas => canvas.Resource == a.Resource);
+                    if (idx < 0) return ReduceOutcome.NoOp;
+                    var next = new List<CanvasReference>(state.Canvases);
+                    next.RemoveAt(idx);
+                    state.Canvases = next;
+                    return ReduceOutcome.Applied;
+                }
             default:
                 return ReduceOutcome.OutOfScope;
         }

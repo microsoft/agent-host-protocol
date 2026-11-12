@@ -154,6 +154,24 @@ The RFC 9728 `resource` field identifies the protected resource, but not necessa
 
 The `target.kind` discriminant is extensible so future consumers, such as [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
 
+### Account selection hints
+
+Clients MAY include `accountId` alongside the token to identify their selected account. Hosts can compare `accountId` values to detect when the underlying account has changed. When present, `accountId` MUST be a nonempty string, and hosts MUST treat it as opaque.
+
+```jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "access_token",
+    "accountId": "client-selection-7"
+  }
+}
+```
+
 ## Error Handling
 
 ### `AuthRequired` Error Code

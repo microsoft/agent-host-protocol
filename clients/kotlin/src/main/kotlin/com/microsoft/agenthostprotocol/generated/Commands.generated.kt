@@ -90,6 +90,17 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 }
 
 /**
+ * Native filesystem path grammar used by a host environment.
+ */
+@Serializable
+enum class PathStyle {
+    @SerialName("posix")
+    POSIX,
+    @SerialName("windows")
+    WINDOWS
+}
+
+/**
  * Encoding of fetched content data.
  */
 @Serializable
@@ -415,6 +426,17 @@ data class InitializeParams(
 )
 
 @Serializable
+data class HostEnvironment(
+    /**
+     * Authoritative native path grammar for resources in this environment.
+     *
+     * Clients parsing or formatting native paths MUST use this field instead of
+     * inferring path semantics from their local environment.
+     */
+    val pathStyle: PathStyle? = null
+)
+
+@Serializable
 data class InitializeResult(
     /**
      * Protocol version selected by the server. MUST be one of the entries in
@@ -449,6 +471,12 @@ data class InitializeResult(
      * channel whose state has no fields ({@link EmptyState}).
      */
     val snapshots: List<Snapshot>,
+    /**
+     * Default execution environment exposed by this host connection.
+     *
+     * Absence means no environment metadata is available.
+     */
+    val environment: HostEnvironment? = null,
     /**
      * Suggested default directory for remote filesystem browsing
      */
@@ -1630,7 +1658,14 @@ data class AuthenticateParams(
      * Without a target, resource/scope matching is unchanged; the token may
      * satisfy every matching pending challenge. Older hosts ignore this field.
      */
-    val target: AuthenticateTarget? = null
+    val target: AuthenticateTarget? = null,
+    /**
+     * Optional identifier for the client's selected account, sent alongside the token.
+     * Hosts can compare `accountId` values to detect when the underlying account has changed.
+     * Hosts MUST treat `accountId` as an opaque string.
+     * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+     */
+    val accountId: String? = null
 )
 
 @Serializable

@@ -4,6 +4,7 @@ import { Project } from 'ts-morph';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
   validateEnumCompatibility,
 } from './enum-compatibility.js';
 
@@ -18,6 +19,32 @@ test('reads enum compatibility annotations', () => {
   const enumDecl = project.getSourceFileOrThrow('/types/example.ts').getEnumOrThrow('Open');
 
   assert.equal(getEnumCompatibility(enumDecl), 'nonexhaustive');
+});
+
+test('identifies bitsets by @bitset rather than numeric values or description prose', () => {
+  const project = projectFor(`
+    /** Status flags. @nonexhaustive @bitset */
+    export enum Tagged { First = 1, Second = 2, Combined = 1 | 2 }
+    /** Bitset is just prose here. @nonexhaustive */
+    export enum Untagged { First = 1, Second = 2 }
+  `);
+  const source = project.getSourceFileOrThrow('/types/example.ts');
+
+  assert.equal(isBitsetEnum(source.getEnumOrThrow('Tagged')), true);
+  assert.equal(isBitsetEnum(source.getEnumOrThrow('Untagged')), false);
+  assert.doesNotThrow(() => validateEnumCompatibility(project));
+});
+
+test('rejects @bitset members outside the uint32 wire representation', () => {
+  for (const value of ['"string"', '-1', '1.5', '4294967296']) {
+    assert.throws(
+      () => validateEnumCompatibility(projectFor(`
+        /** Status flags. @nonexhaustive @bitset */
+        export enum Invalid { Value = ${value} }
+      `)),
+      /enum Invalid.*@bitset.*uint32/,
+    );
+  }
 });
 
 test('rejects unannotated and ambiguously annotated enums', () => {

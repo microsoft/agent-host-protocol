@@ -222,6 +222,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(OpenCanvasParams.self, from: inputData))
         case "DisposeCanvasParams":
             return try reencode(dec.decode(DisposeCanvasParams.self, from: inputData))
+        case "AuthenticateParams":
+            return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
         default:
             throw FixtureError.message(
                 "round-trip fixture: unknown wire type \"\(type)\". Add a decode entry to decodeAndReencode.")

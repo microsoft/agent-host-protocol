@@ -6434,6 +6434,16 @@
         }
       }
     },
+    "HostEnvironment": {
+      "type": "object",
+      "description": "Describes the connection's default host-side execution environment.\n\nThe descriptor applies to {@link InitializeResult.defaultDirectory},\nsession working directories, and `file:` resources handled by the server\nthrough the `resource*` commands, unless more specific environment metadata\nis available. It does not apply to resources provided by the client.\n\nA host that exposes mixed environments MUST only populate fields that have a\nsingle connection-wide default.",
+      "properties": {
+        "pathStyle": {
+          "$ref": "#/$defs/PathStyle",
+          "description": "Authoritative native path grammar for resources in this environment.\n\nClients parsing or formatting native paths MUST use this field instead of\ninferring path semantics from their local environment."
+        }
+      }
+    },
     "InitializeResult": {
       "type": "object",
       "description": "Result of the `initialize` command.\n\n`protocolVersion` is the version the server has selected from the client's\n`protocolVersions` list. The client and server MUST use this version for\nthe rest of the connection. If the server cannot speak any of the offered\nversions it MUST return error code `-32005` (`UnsupportedProtocolVersion`)\nwith required `UnsupportedProtocolVersionErrorData` containing\n`supportedVersions`, instead of a result.",
@@ -6461,6 +6471,10 @@
             "$ref": "#/$defs/Snapshot"
           },
           "description": "Snapshots for each `initialSubscriptions` URI. The server MAY leave out a\nchannel whose state has no fields ({@link EmptyState})."
+        },
+        "environment": {
+          "$ref": "#/$defs/HostEnvironment",
+          "description": "Default execution environment exposed by this host connection.\n\nAbsence means no environment metadata is available."
         },
         "defaultDirectory": {
           "$ref": "#/$defs/URI",
@@ -7339,6 +7353,11 @@
         "target": {
           "$ref": "#/$defs/AuthenticateTarget",
           "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nWhen present, the host MUST apply the token only to that MCP server in\nthat session, never to sibling servers, other sessions, or agent-level\nresources, even if they share the resource and scopes. `resource` MUST\nstill equal that server's advertised `McpAuthRequirement.resource.resource`.\nThe host MUST reject an unknown session or customization, or a\ncustomization that is not an MCP server, with `InvalidParams` (-32602).\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
+          "minLength": 1
         }
       },
       "required": [
@@ -8332,16 +8351,10 @@
       "description": "Policy configuration state for a model."
     },
     "SessionStatus": {
-      "enum": [
-        1,
-        2,
-        8,
-        24,
-        32,
-        64
-      ],
-      "type": "number",
-      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input.\n\nKnown flags:\n\n- `Idle` (1): Session is idle — no turn is active.\n- `Error` (2): Session ended with an error.\n- `InProgress` (8): A turn is actively streaming.\n- `InputNeeded` (24): A turn is in progress but blocked waiting for user input or tool confirmation.\n- `IsRead` (32): The client has viewed this session since its last modification.\n- `IsArchived` (64): The session has been archived by the client."
     },
     "SessionOrigin": {
       "$ref": "#/$defs/AutomationSessionOrigin",
@@ -9047,6 +9060,14 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
+    },
+    "PathStyle": {
+      "enum": [
+        "posix",
+        "windows"
+      ],
+      "type": "string",
+      "description": "Native filesystem path grammar used by a host environment."
     },
     "ActionEnvelope": {
       "type": "object",
