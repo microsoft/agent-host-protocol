@@ -110,42 +110,12 @@ impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
 }
 
 /// Native filesystem path grammar used by a host environment.
-///
-/// This does not change URI syntax: AHP resources remain URIs with
-/// slash-separated, percent-encoded paths.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PathStyle {
+    #[serde(rename = "posix")]
     Posix,
+    #[serde(rename = "windows")]
     Windows,
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    Unknown(String),
-}
-
-impl serde::Serialize for PathStyle {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Posix => serializer.serialize_str("posix"),
-            Self::Windows => serializer.serialize_str("windows"),
-            Self::Unknown(value) => serializer.serialize_str(value),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for PathStyle {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            "posix" => Self::Posix,
-            "windows" => Self::Windows,
-            _ => Self::Unknown(raw),
-        })
-    }
 }
 
 /// Encoding of fetched content data.

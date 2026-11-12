@@ -44,9 +44,6 @@ const (
 )
 
 // Native filesystem path grammar used by a host environment.
-//
-// This does not change URI syntax: AHP resources remain URIs with
-// slash-separated, percent-encoded paths.
 type PathStyle string
 
 const (

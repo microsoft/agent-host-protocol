@@ -69,33 +69,9 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
 }
 
 /// Native filesystem path grammar used by a host environment.
-///
-/// This does not change URI syntax: AHP resources remain URIs with
-/// slash-separated, percent-encoded paths.
-public enum PathStyle: Codable, Sendable, Equatable {
-    case posix
-    case windows
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "posix": self = .posix
-        case "windows": self = .windows
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .posix: try container.encode("posix")
-        case .windows: try container.encode("windows")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
+public enum PathStyle: String, Codable, Sendable {
+    case posix = "posix"
+    case windows = "windows"
 }
 
 /// Encoding of fetched content data.

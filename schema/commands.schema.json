@@ -10678,7 +10678,7 @@
         "windows"
       ],
       "type": "string",
-      "description": "Native filesystem path grammar used by a host environment.\n\nThis does not change URI syntax: AHP resources remain URIs with\nslash-separated, percent-encoded paths."
+      "description": "Native filesystem path grammar used by a host environment."
     },
     "StateAction": {
       "oneOf": [

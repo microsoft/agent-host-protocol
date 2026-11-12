@@ -125,58 +125,14 @@ internal sealed class ChatMoveDestinationKindConverter : JsonConverter<ChatMoveD
         => writer.WriteStringValue(value.Value);
 }
 
-/// <summary>Native filesystem path grammar used by a host environment.
-///
-/// This does not change URI syntax: AHP resources remain URIs with
-/// slash-separated, percent-encoded paths.</summary>
-[JsonConverter(typeof(PathStyleConverter))]
-public readonly struct PathStyle : IEquatable<PathStyle>
+/// <summary>Native filesystem path grammar used by a host environment.</summary>
+[JsonConverter(typeof(WireEnumConverter<PathStyle>))]
+public enum PathStyle
 {
-    private readonly string? _value;
-
-    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
-    /// <param name="value">The raw wire string.</param>
-    public PathStyle(string value)
-    {
-        _value = value;
-    }
-
-    /// <summary>The raw wire value.</summary>
-    public string Value => _value ?? string.Empty;
-
-    public static readonly PathStyle Posix = new PathStyle("posix");
-
-    public static readonly PathStyle Windows = new PathStyle("windows");
-
-    /// <inheritdoc />
-    public bool Equals(PathStyle other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is PathStyle other && Equals(other);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
-
-    /// <inheritdoc />
-    public override string ToString() => Value;
-
-    /// <summary>Ordinal equality over the raw wire value.</summary>
-    public static bool operator ==(PathStyle left, PathStyle right) => left.Equals(right);
-
-    /// <summary>Ordinal inequality over the raw wire value.</summary>
-    public static bool operator !=(PathStyle left, PathStyle right) => !left.Equals(right);
-}
-
-/// <summary>Reads and writes <see cref="PathStyle"/> as its raw wire string, preserving unrecognized values.</summary>
-internal sealed class PathStyleConverter : JsonConverter<PathStyle>
-{
-    /// <inheritdoc />
-    public override PathStyle Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        => new PathStyle(reader.GetString() ?? throw new JsonException("PathStyle expects a JSON string."));
-
-    /// <inheritdoc />
-    public override void Write(Utf8JsonWriter writer, PathStyle value, JsonSerializerOptions options)
-        => writer.WriteStringValue(value.Value);
+    [WireValue("posix")]
+    Posix,
+    [WireValue("windows")]
+    Windows,
 }
 
 /// <summary>Encoding of fetched content data.</summary>

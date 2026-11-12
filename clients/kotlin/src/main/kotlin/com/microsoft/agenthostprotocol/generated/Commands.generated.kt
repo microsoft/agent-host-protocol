@@ -91,27 +91,13 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 
 /**
  * Native filesystem path grammar used by a host environment.
- *
- * This does not change URI syntax: AHP resources remain URIs with
- * slash-separated, percent-encoded paths.
  */
-@Serializable(with = PathStyleSerializer::class)
-@JvmInline
-value class PathStyle(val rawValue: String) {
-    companion object {
-        val POSIX: PathStyle = PathStyle("posix")
-        val WINDOWS: PathStyle = PathStyle("windows")
-    }
-}
-
-internal object PathStyleSerializer : KSerializer<PathStyle> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("PathStyle", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: PathStyle) {
-        encoder.encodeString(value.rawValue)
-    }
-    override fun deserialize(decoder: Decoder): PathStyle =
-        PathStyle(decoder.decodeString())
+@Serializable
+enum class PathStyle {
+    @SerialName("posix")
+    POSIX,
+    @SerialName("windows")
+    WINDOWS
 }
 
 /**

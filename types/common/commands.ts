@@ -234,11 +234,8 @@ export interface ClientCapabilities {
 /**
  * Native filesystem path grammar used by a host environment.
  *
- * This does not change URI syntax: AHP resources remain URIs with
- * slash-separated, percent-encoded paths.
- *
  * @category Commands
- * @nonexhaustive
+ * @exhaustive
  */
 export const enum PathStyle {
   Posix = 'posix',

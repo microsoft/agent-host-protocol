@@ -75,7 +75,7 @@ The client initiates the connection with an `initialize` **request**. The client
 
 `environment.pathStyle` optionally identifies the authoritative grammar for parsing and formatting native filesystem paths. `posix` selects POSIX path grammar and `windows` selects Windows path grammar. It does not change URI syntax: AHP resources remain slash-separated, percent-encoded URIs. Clients MUST NOT infer host path semantics from their local environment.
 
-Older hosts omit `environment`, and older clients ignore it as an unknown optional field. When `environment.pathStyle` is absent or unrecognized, the client SHOULD keep resource handling URI-based and disable or fall back from behavior that requires native path parsing. It MUST NOT substitute the client's local path semantics.
+Older hosts omit `environment`, and older clients ignore it as an unknown optional field. When `environment.pathStyle` is absent, the client SHOULD keep resource handling URI-based and disable or fall back from behavior that requires native path parsing. It MUST NOT substitute the client's local path semantics.
 
 If present, `defaultDirectory` provides a server-local starting location for remote filesystem browsing.
 
