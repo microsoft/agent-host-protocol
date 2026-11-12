@@ -29,6 +29,7 @@ package com.microsoft.agenthostprotocol
 // generated types and re-encodes with Ahp.json.
 
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
+import com.microsoft.agenthostprotocol.generated.AuthenticateParams
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.CreateChatParams
@@ -281,6 +282,7 @@ class RoundTripCorpusTest {
             "CreateTcpConnectionParams" -> rt(CreateTcpConnectionParams.serializer())
             "ResourceReadParams" -> rt(ResourceReadParams.serializer())
             "ResourceReadResult" -> rt(ResourceReadResult.serializer())
+            "AuthenticateParams" -> rt(AuthenticateParams.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +
                     "Add a decode entry to decodeAndReencode.",

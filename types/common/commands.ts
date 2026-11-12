@@ -1462,6 +1462,15 @@ export interface AuthenticateParams extends BaseParams {
    * satisfy every matching pending challenge. Older hosts ignore this field.
    */
   target?: AuthenticateTarget;
+  /**
+   * Optional identifier for the client's selected account, sent alongside the token.
+   * Hosts can compare `accountId` values to detect when the underlying account has changed.
+   * Hosts MUST treat `accountId` as an opaque string.
+   * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+   *
+   * @minLength 1
+   */
+  accountId?: string;
 }
 
 /**

@@ -1887,6 +1887,11 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
     public var target: AuthenticateTarget?
+    /// Optional identifier for the client's selected account, sent alongside the token.
+    /// Hosts can compare `accountId` values to detect when the underlying account has changed.
+    /// Hosts MUST treat `accountId` as an opaque string.
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    public var accountId: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1896,6 +1901,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case expiresIn
         case scopes
         case target
+        case accountId
     }
 
     public init(
@@ -1905,7 +1911,8 @@ public struct AuthenticateParams: Codable, Sendable {
         token: String,
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
-        target: AuthenticateTarget? = nil
+        target: AuthenticateTarget? = nil,
+        accountId: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1914,6 +1921,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.expiresIn = expiresIn
         self.scopes = scopes
         self.target = target
+        self.accountId = accountId
     }
 }
 

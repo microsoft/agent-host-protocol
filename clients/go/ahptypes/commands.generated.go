@@ -1325,6 +1325,11 @@ type AuthenticateParams struct {
 	// Without a target, resource/scope matching is unchanged; the token may
 	// satisfy every matching pending challenge. Older hosts ignore this field.
 	Target *AuthenticateTarget `json:"target,omitempty"`
+	// Optional identifier for the client's selected account, sent alongside the token.
+	// Hosts can compare `accountId` values to detect when the underlying account has changed.
+	// Hosts MUST treat `accountId` as an opaque string.
+	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+	AccountId *string `json:"accountId,omitempty"`
 }
 
 // Result of the `authenticate` command.

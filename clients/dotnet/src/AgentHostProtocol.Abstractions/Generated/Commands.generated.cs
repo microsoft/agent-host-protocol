@@ -1849,6 +1849,13 @@ public sealed record AuthenticateParams
     /// satisfy every matching pending challenge. Older hosts ignore this field.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AuthenticateTarget? Target { get; init; }
+
+    /// <summary>Optional identifier for the client's selected account, sent alongside the token.
+    /// Hosts can compare `accountId` values to detect when the underlying account has changed.
+    /// Hosts MUST treat `accountId` as an opaque string.
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AccountId { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.

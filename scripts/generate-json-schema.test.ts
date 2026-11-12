@@ -398,6 +398,19 @@ describe('generated JSON schemas', () => {
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
       });
 
+      it('accepts an optional account-selection hint without requiring it for authentication', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const base = { channel: 'ahp-root://', resource: 'https://api.example.com', token: 'test-token' };
+        const values = [base, ...['selection-1', '', 42, null, {}, []].map(accountId => ({ ...base, accountId }))];
+        assert.deepEqual(values.map(value => schemaAccepts(schema, authenticate as JsonNode, value)), [
+          true, true, false, false, false, false, false,
+        ]);
+      });
+
       it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const afterRuns = { kind: 'afterRuns', max: 3 };

@@ -1590,7 +1590,14 @@ data class AuthenticateParams(
      * Without a target, resource/scope matching is unchanged; the token may
      * satisfy every matching pending challenge. Older hosts ignore this field.
      */
-    val target: AuthenticateTarget? = null
+    val target: AuthenticateTarget? = null,
+    /**
+     * Optional identifier for the client's selected account, sent alongside the token.
+     * Hosts can compare `accountId` values to detect when the underlying account has changed.
+     * Hosts MUST treat `accountId` as an opaque string.
+     * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+     */
+    val accountId: String? = null
 )
 
 @Serializable
