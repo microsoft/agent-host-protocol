@@ -24,6 +24,7 @@ import kotlinx.serialization.json.contentOrNull
 
 import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.Json
 import com.microsoft.agenthostprotocol.UnknownMembersSerializer
 
 // ─── Type Aliases ───────────────────────────────────────────────────────────
@@ -5673,7 +5674,8 @@ internal object ErrorInfoSerializer : UnknownMembersSerializer<ErrorInfo>(
     { value, extra -> value.copy(extra = extra) },
 )
 
-@Serializable
+@KeepGeneratedSerializer
+@Serializable(with = SnapshotSerializer::class)
 data class Snapshot(
     /**
      * The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
@@ -8163,7 +8165,9 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 }
 
 /**
- * The state payload of a snapshot.
+ * The state payload of a snapshot, selected by its resource's URI scheme.
+ * Standalone decoding preserves any JSON value as [Unknown]. Use [Snapshot] or
+ * [decode] for typed decoding, which propagates known-channel errors.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -8179,7 +8183,27 @@ sealed interface SnapshotState {
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
     /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
-    @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
+    @JvmInline value class Unknown(val raw: JsonElement) : SnapshotState
+
+    companion object {
+        /** Decodes a known channel strictly, or preserves raw JSON for an unknown scheme. */
+        fun decode(resource: URI, element: JsonElement, json: Json): SnapshotState =
+            when (resource.substringBefore(":", "")) {
+                "ahp-root" -> Root(json.decodeFromJsonElement(RootState.serializer(), element))
+                "ahp-automations" -> Automations(json.decodeFromJsonElement(AutomationState.serializer(), element))
+                "ahp-session" -> Session(json.decodeFromJsonElement(SessionState.serializer(), element))
+                "ahp-chat" -> Chat(json.decodeFromJsonElement(ChatState.serializer(), element))
+                "ahp-canvas" -> Canvas(json.decodeFromJsonElement(CanvasState.serializer(), element))
+                "ahp-terminal" -> Terminal(json.decodeFromJsonElement(TerminalState.serializer(), element))
+                "ahp-changeset" -> Changeset(json.decodeFromJsonElement(ChangesetState.serializer(), element))
+                "ahp-resource-watch" -> ResourceWatch(json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
+                "ahp-annotations" -> Annotations(json.decodeFromJsonElement(AnnotationsState.serializer(), element))
+                "ahp-automation-run" -> AutomationRun(json.decodeFromJsonElement(AutomationRunState.serializer(), element))
+                "ahp-tcp" -> Empty(json.decodeFromJsonElement(EmptyState.serializer(), element))
+                "ahp-otlp" -> Empty(json.decodeFromJsonElement(EmptyState.serializer(), element))
+                else -> Unknown(element)
+            }
+    }
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -8189,41 +8213,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
     override fun deserialize(decoder: Decoder): SnapshotState {
         val input = decoder as? JsonDecoder
             ?: error("SnapshotState can only be deserialized from JSON")
-        val element = input.decodeJsonElement()
-        val obj = element as? JsonObject
-            ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. AutomationRunState has required
-        // `automation`, `origin`, and `sessions`; AutomationState has
-        // required `entries`; SessionState has required
-        // `lifecycle`; ChatState has required `turns`; ChangesetState has
-        // required `status` + `files`; ResourceWatchState has required
-        // `root` + `recursive`; AnnotationsState has required `annotations`
-        // (checked after session, whose optional annotations summary reuses the
-        // key); TerminalState has required `content`; RootState is the
-        // catch-all.
-        // An object with no members is an empty state, used by channels whose state has no fields.
-        return when {
-            obj.isEmpty() -> SnapshotState.Empty(input.json.decodeFromJsonElement(EmptyState.serializer(), element))
-            obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
-                SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
-            obj.containsKey("entries") ->
-                SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
-            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
-            obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
-            obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
-                SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
-            obj.containsKey("status") && obj.containsKey("files") ->
-                SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
-            obj.containsKey("root") && obj.containsKey("recursive") ->
-                SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
-            obj.containsKey("annotations") ->
-                SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
-            obj.containsKey("content") ->
-                SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
-            obj.containsKey("agents") -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
-            // A state from a later protocol version: keep it rather than fail.
-            else -> SnapshotState.Unknown(obj)
-        }
+        return SnapshotState.Unknown(input.decodeJsonElement())
     }
 
     override fun serialize(encoder: Encoder, value: SnapshotState) {
@@ -8245,4 +8235,25 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         }
         output.encodeJsonElement(element)
     }
+}
+
+@Serializable
+private data class SnapshotWire(
+    val resource: URI,
+    val state: JsonElement,
+    val fromSeq: Long,
+)
+
+internal object SnapshotSerializer : KSerializer<Snapshot> {
+    private val delegate = Snapshot.generatedSerializer()
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): Snapshot {
+        val input = decoder as? JsonDecoder
+            ?: error("Snapshot can only be deserialized from JSON")
+        val wire = input.json.decodeFromJsonElement(SnapshotWire.serializer(), input.decodeJsonElement())
+        return Snapshot(wire.resource, SnapshotState.decode(wire.resource, wire.state, input.json), wire.fromSeq)
+    }
+
+    override fun serialize(encoder: Encoder, value: Snapshot) = delegate.serialize(encoder, value)
 }

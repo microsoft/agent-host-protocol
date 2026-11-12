@@ -40,6 +40,7 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
@@ -1335,16 +1336,20 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 function generateSnapshotState(): string {
-  return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// automation-run, or empty state. The active
-// variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
-// is an empty state, used by channels whose state has no fields. A state that
-// matches none of these, such as the state of a channel added in a later
-// protocol version, is kept as raw JSON in Unknown.
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `\tcase "${scheme}":
+\t\tvar value *${type}
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn SnapshotState{}, err
+\t\t}
+\t\tif value == nil {
+\t\t\treturn SnapshotState{}, fmt.Errorf("expected ${type} object")
+\t\t}
+\t\treturn SnapshotState{${variant}: value}, nil`
+  ).join('\n');
+  return `// SnapshotState is the state payload of a snapshot, selected by its resource's URI scheme.
+// Standalone decoding preserves any JSON value in Unknown. Use Snapshot or
+// SnapshotStateFromResource for typed decoding, which propagates known-channel errors.
 type SnapshotState struct {
 \tEmpty         *EmptyState         \`json:"-"\`
 \tUnknown       json.RawMessage     \`json:"-"\`
@@ -1392,91 +1397,47 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t}
 }
 
-// UnmarshalJSON tries each concrete variant in turn and keeps the first
-// one that decodes without losing any of its required fields.
+// UnmarshalJSON preserves standalone state payloads without guessing their channel.
 func (s *SnapshotState) UnmarshalJSON(data []byte) error {
-\t*s = SnapshotState{}
-\tvar probe map[string]json.RawMessage
-\tif err := json.Unmarshal(data, &probe); err != nil {
+\tvar raw json.RawMessage
+\tif err := json.Unmarshal(data, &raw); err != nil {
 \t\treturn err
 \t}
-\tswitch {
-\tcase len(probe) == 0:
-\t\ts.Empty = &EmptyState{}
-\tcase containsAll(probe, "automation", "origin", "sessions"):
-\t\tvar v AutomationRunState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.AutomationRun = &v
-\tcase containsAll(probe, "entries"):
-\t\tvar v AutomationState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Automations = &v
-\tcase containsAll(probe, "lifecycle"):
-\t\tvar v SessionState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Session = &v
-\tcase containsAll(probe, "turns"):
-\t\tvar v ChatState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Chat = &v
-\tcase containsAll(probe, "instanceId", "extensionId", "canvasId"):
-\t\tvar v CanvasState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Canvas = &v
-\tcase containsAll(probe, "content"):
-\t\tvar v TerminalState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Terminal = &v
-\tcase containsAll(probe, "status", "files"):
-\t\tvar v ChangesetState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Changeset = &v
-\tcase containsAll(probe, "root", "recursive"):
-\t\tvar v ResourceWatchState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.ResourceWatch = &v
-\tcase containsAll(probe, "annotations"):
-\t\tvar v AnnotationsState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Annotations = &v
-\tcase containsAll(probe, "agents"):
-\t\tvar v RootState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Root = &v
-\tdefault:
-\t\t// A state from a later protocol version: keep it rather than fail.
-\t\ts.Unknown = append(json.RawMessage(nil), data...)
-\t}
+\t*s = SnapshotState{Unknown: raw}
 \treturn nil
 }
 
-func containsAll(m map[string]json.RawMessage, keys ...string) bool {
-\tfor _, k := range keys {
-\t\tif _, ok := m[k]; !ok {
-\t\t\treturn false
-\t\t}
+// SnapshotStateFromResource decodes a known channel strictly, or preserves raw JSON for an unknown scheme.
+func SnapshotStateFromResource(resource URI, data []byte) (SnapshotState, error) {
+\tscheme, _, found := strings.Cut(resource, ":")
+\tif !found {
+\t\tscheme = ""
 \t}
-\treturn true
+\tswitch scheme {
+${branches}
+\tdefault:
+\t\tvar state SnapshotState
+\t\terr := json.Unmarshal(data, &state)
+\t\treturn state, err
+\t}
+}
+
+// UnmarshalJSON decodes snapshot state using the resource's URI scheme.
+func (s *Snapshot) UnmarshalJSON(data []byte) error {
+\tvar wire struct {
+\t\tResource URI \`json:"resource"\`
+\t\tState json.RawMessage \`json:"state"\`
+\t\tFromSeq int64 \`json:"fromSeq"\`
+\t}
+\tif err := json.Unmarshal(data, &wire); err != nil {
+\t\treturn err
+\t}
+\tstate, err := SnapshotStateFromResource(wire.Resource, wire.State)
+\tif err != nil {
+\t\treturn err
+\t}
+\t*s = Snapshot{Resource: wire.Resource, State: state, FromSeq: wire.FromSeq}
+\treturn nil
 }`;
 }
 
@@ -1514,7 +1475,7 @@ func (t *ToolInput) UnmarshalJSON(data []byte) error {
 }
 
 function generateStateFile(project: Project): string {
-  const lines: string[] = [HEADER_WITH_IMPORTS];
+  const lines: string[] = [HEADER_WITH_IMPORTS.replace('"encoding/json"', '"encoding/json"\n\t"fmt"\n\t"strings"')];
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of STATE_ENUMS) {

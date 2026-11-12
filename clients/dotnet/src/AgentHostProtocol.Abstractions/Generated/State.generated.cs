@@ -6296,6 +6296,7 @@ public sealed record ErrorInfo
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
 /// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.</summary>
+[JsonConverter(typeof(SnapshotConverter))]
 public sealed record Snapshot
 {
     /// <summary>The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/&lt;uuid&gt;`, `ahp-chat:/&lt;uuid&gt;`, or `ahp-canvas:/&lt;uuid&gt;`)</summary>
@@ -8220,12 +8221,9 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 }
 
 /// <summary>
-/// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// automation-run, or empty state. Read
-/// probes for distinctive fields in an order where no probe shadows another
-/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
-/// An object with no members is an empty state, used by channels whose state has no fields.
+/// The state payload of a snapshot, selected by its resource's URI scheme.
+/// Standalone decoding preserves any JSON value as Unknown. Use Snapshot or
+/// FromResource for typed decoding, which propagates known-channel errors.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
@@ -8268,78 +8266,45 @@ public sealed class SnapshotState
     /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
     /// </summary>
     public JsonElement? Unknown { get; set; }
+
+    /// <summary>Decodes a known channel strictly, or preserves raw JSON for an unknown scheme.</summary>
+    public static SnapshotState FromResource(string resource, JsonElement value, JsonSerializerOptions options)
+    {
+        var separator = resource.IndexOf(':');
+        var scheme = separator < 0 ? "" : resource.Substring(0, separator);
+        return scheme switch
+        {
+            "ahp-root" => new SnapshotState { Root = value.Deserialize(AhpJsonTypeInfo.Get<RootState>(options)) ?? throw new JsonException("Expected RootState.") },
+            "ahp-automations" => new SnapshotState { Automations = value.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options)) ?? throw new JsonException("Expected AutomationState.") },
+            "ahp-session" => new SnapshotState { Session = value.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options)) ?? throw new JsonException("Expected SessionState.") },
+            "ahp-chat" => new SnapshotState { Chat = value.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options)) ?? throw new JsonException("Expected ChatState.") },
+            "ahp-canvas" => new SnapshotState { Canvas = value.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options)) ?? throw new JsonException("Expected CanvasState.") },
+            "ahp-terminal" => new SnapshotState { Terminal = value.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options)) ?? throw new JsonException("Expected TerminalState.") },
+            "ahp-changeset" => new SnapshotState { Changeset = value.Deserialize(AhpJsonTypeInfo.Get<ChangesetState>(options)) ?? throw new JsonException("Expected ChangesetState.") },
+            "ahp-resource-watch" => new SnapshotState { ResourceWatch = value.Deserialize(AhpJsonTypeInfo.Get<ResourceWatchState>(options)) ?? throw new JsonException("Expected ResourceWatchState.") },
+            "ahp-annotations" => new SnapshotState { Annotations = value.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options)) ?? throw new JsonException("Expected AnnotationsState.") },
+            "ahp-automation-run" => new SnapshotState { AutomationRun = value.Deserialize(AhpJsonTypeInfo.Get<AutomationRunState>(options)) ?? throw new JsonException("Expected AutomationRunState.") },
+            "ahp-tcp" => new SnapshotState { Empty = value.Deserialize(AhpJsonTypeInfo.Get<EmptyState>(options)) ?? throw new JsonException("Expected EmptyState.") },
+            "ahp-otlp" => new SnapshotState { Empty = value.Deserialize(AhpJsonTypeInfo.Get<EmptyState>(options)) ?? throw new JsonException("Expected EmptyState.") },
+            _ => new SnapshotState { Unknown = value.Clone() },
+        };
+    }
 }
 
-/// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
+/// <summary>Preserves standalone state payloads without guessing their channel.</summary>
 internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 {
+    public override bool HandleNull => true;
+
     public override SnapshotState Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         using var doc = JsonDocument.ParseValue(ref reader);
-        var root = doc.RootElement;
-        var result = new SnapshotState();
-        var members = root.EnumerateObject();
-        if (!members.MoveNext())
-        {
-            result.Empty = new EmptyState();
-        }
-        else if (root.TryGetProperty("automation", out _) &&
-            root.TryGetProperty("origin", out _) &&
-            root.TryGetProperty("sessions", out _))
-        {
-            result.AutomationRun = root.Deserialize(AhpJsonTypeInfo.Get<AutomationRunState>(options));
-        }
-        else if (root.TryGetProperty("entries", out _))
-        {
-            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
-        }
-        else if (root.TryGetProperty("turns", out _))
-        {
-            result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
-        }
-        else if (root.TryGetProperty("lifecycle", out _))
-        {
-            // SessionState is discriminated on its required `lifecycle` field.
-            // (It no longer carries `summary`; that field was removed when the
-            // session state was flattened.)
-            result.Session = root.Deserialize(AhpJsonTypeInfo.Get<SessionState>(options));
-        }
-        else if (root.TryGetProperty("instanceId", out _) &&
-            root.TryGetProperty("extensionId", out _) &&
-            root.TryGetProperty("canvasId", out _))
-        {
-            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
-        }
-        else if (root.TryGetProperty("content", out _))
-        {
-            result.Terminal = root.Deserialize(AhpJsonTypeInfo.Get<TerminalState>(options));
-        }
-        else if (root.TryGetProperty("status", out _) && root.TryGetProperty("files", out _))
-        {
-            result.Changeset = root.Deserialize(AhpJsonTypeInfo.Get<ChangesetState>(options));
-        }
-        else if (root.TryGetProperty("root", out _) && root.TryGetProperty("recursive", out _))
-        {
-            result.ResourceWatch = root.Deserialize(AhpJsonTypeInfo.Get<ResourceWatchState>(options));
-        }
-        else if (root.TryGetProperty("annotations", out _))
-        {
-            result.Annotations = root.Deserialize(AhpJsonTypeInfo.Get<AnnotationsState>(options));
-        }
-        else if (root.TryGetProperty("agents", out _))
-        {
-            result.Root = root.Deserialize(AhpJsonTypeInfo.Get<RootState>(options));
-        }
-        else
-        {
-            // A state from a later protocol version: keep it rather than fail.
-            result.Unknown = root.Clone();
-        }
-        return result;
+        return new SnapshotState { Unknown = doc.RootElement.Clone() };
     }
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value is null) { writer.WriteNullValue(); return; }
         if (value.Empty is not null) { writer.WriteStartObject(); writer.WriteEndObject(); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
@@ -8353,5 +8318,32 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, AhpJsonTypeInfo.Get<RootState>(options)); return; }
         if (value.Unknown is { } unknown) { unknown.WriteTo(writer); return; }
         writer.WriteNullValue();
+    }
+}
+
+/// <summary>Decodes snapshot state using the resource's URI scheme.</summary>
+internal sealed class SnapshotConverter : JsonConverter<Snapshot>
+{
+    public override Snapshot Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        using var doc = JsonDocument.ParseValue(ref reader);
+        var root = doc.RootElement;
+        var resource = root.GetProperty("resource").GetString() ?? throw new JsonException("Expected snapshot resource.");
+        return new Snapshot
+        {
+            Resource = resource,
+            State = SnapshotState.FromResource(resource, root.GetProperty("state"), options),
+            FromSeq = root.GetProperty("fromSeq").GetInt64(),
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, Snapshot value, JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("resource", value.Resource);
+        writer.WritePropertyName("state");
+        JsonSerializer.Serialize(writer, value.State, AhpJsonTypeInfo.Get<SnapshotState>(options));
+        writer.WriteNumber("fromSeq", value.FromSeq);
+        writer.WriteEndObject();
     }
 }

@@ -26,6 +26,8 @@ import com.microsoft.agenthostprotocol.generated.ChatSourceUnknown
 import com.microsoft.agenthostprotocol.generated.ForkChatSource
 import com.microsoft.agenthostprotocol.generated.SideChatSource
 import com.microsoft.agenthostprotocol.generated.SideChatSelection
+import com.microsoft.agenthostprotocol.generated.Snapshot
+import com.microsoft.agenthostprotocol.generated.SnapshotState
 import com.microsoft.agenthostprotocol.generated.StringOrMarkdown
 import com.microsoft.agenthostprotocol.generated.ToolResultContent
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +36,7 @@ import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -352,5 +355,34 @@ class DiscriminatedUnionTest {
         val reEncoded = json.encodeToString(ResponsePart.serializer(), decoded)
         val reTree = json.parseToJsonElement(reEncoded).jsonObject
         assertEquals(json.parseToJsonElement(wire).jsonObject, reTree)
+    }
+
+    @Test
+    fun `snapshot state without a known resource preserves any JSON`() {
+        for (wire in listOf("null", "false", "42", "\"state\"", "[]", "{}", """{"content":null,"lifecycle":false,"entries":0}""")) {
+            val element = json.parseToJsonElement(wire)
+            val standalone = json.decodeFromString(SnapshotState.serializer(), wire)
+            assertEquals(element, assertIs<SnapshotState.Unknown>(standalone).raw)
+            assertEquals(element, json.parseToJsonElement(json.encodeToString(SnapshotState.serializer(), standalone)))
+
+            for (resource in listOf("x-ext:/a", "ahp-root")) {
+                val state = SnapshotState.decode(resource, element, json)
+                assertEquals(element, assertIs<SnapshotState.Unknown>(state).raw)
+            }
+            val snapshot = json.decodeFromString(Snapshot.serializer(), """{"resource":"x-ext:/a","state":$wire,"fromSeq":0}""")
+            assertEquals(element, assertIs<SnapshotState.Unknown>(snapshot.state).raw)
+        }
+    }
+
+    @Test
+    fun `known snapshot resources propagate state decode errors`() {
+        for (wire in listOf("null", "false", """{"lifecycle":"ready"}""")) {
+            assertFails {
+                SnapshotState.decode("ahp-terminal:/t1", json.parseToJsonElement(wire), json)
+            }
+            assertFails {
+                json.decodeFromString(Snapshot.serializer(), """{"resource":"ahp-terminal:/t1","state":$wire,"fromSeq":0}""")
+            }
+        }
     }
 }
