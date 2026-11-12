@@ -68,6 +68,12 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Native filesystem path grammar used by a host environment.
+public enum PathStyle: String, Codable, Sendable {
+    case posix = "posix"
+    case windows = "windows"
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -397,6 +403,20 @@ public struct InitializeParams: Codable, Sendable, Equatable {
     }
 }
 
+public struct HostEnvironment: Codable, Sendable, Equatable {
+    /// Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.
+    public var pathStyle: PathStyle?
+
+    public init(
+        pathStyle: PathStyle? = nil
+    ) {
+        self.pathStyle = pathStyle
+    }
+}
+
 public struct InitializeResult: Codable, Sendable, Equatable {
     /// Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
@@ -420,6 +440,10 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
+    /// Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.
+    public var environment: HostEnvironment?
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -460,6 +484,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         case serverInfo
         case meta = "_meta"
         case snapshots
+        case environment
         case defaultDirectory
         case completionTriggerCharacters
         case terminalCommandPrefix
@@ -475,6 +500,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         serverInfo: Implementation? = nil,
         meta: [String: AnyCodable]? = nil,
         snapshots: [Snapshot],
+        environment: HostEnvironment? = nil,
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
@@ -488,6 +514,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         self.serverInfo = serverInfo
         self.meta = meta
         self.snapshots = snapshots
+        self.environment = environment
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
         self.terminalCommandPrefix = terminalCommandPrefix
@@ -1908,6 +1935,11 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
     public var target: AuthenticateTarget?
+    /// Optional identifier for the client's selected account, sent alongside the token.
+    /// Hosts can compare `accountId` values to detect when the underlying account has changed.
+    /// Hosts MUST treat `accountId` as an opaque string.
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    public var accountId: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1917,6 +1949,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         case expiresIn
         case scopes
         case target
+        case accountId
     }
 
     public init(
@@ -1926,7 +1959,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         token: String,
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
-        target: AuthenticateTarget? = nil
+        target: AuthenticateTarget? = nil,
+        accountId: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1935,6 +1969,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         self.expiresIn = expiresIn
         self.scopes = scopes
         self.target = target
+        self.accountId = accountId
     }
 }
 

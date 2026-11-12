@@ -218,6 +218,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ResourceReadParams.self, from: inputData))
         case "ResourceReadResult":
             return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
+        case "AuthenticateParams":
+            return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
         default:
             throw FixtureError.message(
                 "round-trip fixture: unknown wire type \"\(type)\". Add a decode entry to decodeAndReencode.")
