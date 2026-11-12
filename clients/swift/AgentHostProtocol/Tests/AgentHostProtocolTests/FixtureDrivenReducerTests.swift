@@ -196,6 +196,10 @@ final class FixtureDrivenReducerTests: XCTestCase {
             try compareFixture(file: file, fixture: fixture, stateType: CanvasState.self) { state in
                 actions.reduce(state) { canvasReducer(state: $0, action: $1) }
             }
+        case "canvases":
+            try compareFixture(file: file, fixture: fixture, stateType: CanvasesState.self) { state in
+                actions.reduce(state) { canvasesReducer(state: $0, action: $1) }
+            }
         case "annotations":
             try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self) { state in
                 actions.reduce(state) { annotationsReducer(state: $0, action: $1) }

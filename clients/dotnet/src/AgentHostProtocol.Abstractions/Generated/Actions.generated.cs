@@ -87,6 +87,16 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatCanvasesChanged = new ActionType("chat/canvasesChanged");
 
+    public static readonly ActionType ChatCanvasesUriChanged = new ActionType("chat/canvasesUriChanged");
+
+    public static readonly ActionType CanvasesRegistryRequested = new ActionType("canvases/registryRequested");
+
+    public static readonly ActionType CanvasesRegistryChanged = new ActionType("canvases/registryChanged");
+
+    public static readonly ActionType CanvasesCanvasSet = new ActionType("canvases/canvasSet");
+
+    public static readonly ActionType CanvasesCanvasRemoved = new ActionType("canvases/canvasRemoved");
+
     public static readonly ActionType CanvasStateChanged = new ActionType("canvas/stateChanged");
 
     public static readonly ActionType ChatWorkingDirectorySet = new ActionType("chat/workingDirectorySet");
@@ -1847,6 +1857,63 @@ public sealed record ChatCanvasesChangedAction
     public List<CanvasReference>? Canvases { get; init; }
 }
 
+/// <summary>Replaces or clears the chat's advertised canvas collection URI.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatCanvasesUriChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatCanvasesUriChanged;
+
+    /// <summary>Owning collection URI, or `undefined` to clear the pointer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CanvasesUri { get; init; }
+}
+
+/// <summary>Ensures the owning collection's registry is materialized.
+///
+/// Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+/// Hosts MAY resume existing persisted backing and start extensions, but MUST
+/// NOT create provisional backing, send a user message, or invoke a model.
+/// Concurrent requests MUST coalesce. A request while loading or ready is an
+/// ensure/no-op; a request after an error retries. The reducer is a no-op;
+/// hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesRegistryRequestedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesRegistryRequested;
+}
+
+/// <summary>Replaces the authoritative registry load state.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesRegistryChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesRegistryChanged;
+
+    public required CanvasRegistryState Registry { get; init; }
+}
+
+/// <summary>Inserts or replaces a live canvas reference, keyed by resource.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCanvasSetAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesCanvasSet;
+
+    public required CanvasReference Canvas { get; init; }
+}
+
+/// <summary>Removes a live canvas reference by resource; absent resources are a no-op.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CanvasesCanvasRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.CanvasesCanvasRemoved;
+
+    public required string Resource { get; init; }
+}
+
 /// <summary>The presentation state for this canvas changed.
 ///
 /// Replaces the subscribed canvas channel state entirely. Full-replacement
@@ -2922,6 +2989,11 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/movableChanged"] = typeof(ChatMovableChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
+        ["chat/canvasesUriChanged"] = typeof(ChatCanvasesUriChangedAction),
+        ["canvases/registryRequested"] = typeof(CanvasesRegistryRequestedAction),
+        ["canvases/registryChanged"] = typeof(CanvasesRegistryChangedAction),
+        ["canvases/canvasSet"] = typeof(CanvasesCanvasSetAction),
+        ["canvases/canvasRemoved"] = typeof(CanvasesCanvasRemovedAction),
         ["canvas/stateChanged"] = typeof(CanvasStateChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),

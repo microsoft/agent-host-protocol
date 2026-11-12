@@ -1,0 +1,54 @@
+{
+  "name": "agent-canvas-capability",
+  "group": "A",
+  "description": "AgentInfo preserves the presence of the empty canvases capability object.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 3,
+    "snapshots": [
+      {
+        "resource": "ahp-root://",
+        "state": {
+          "agents": [
+            {
+              "provider": "example",
+              "displayName": "Example",
+              "description": "Example agent",
+              "models": [],
+              "capabilities": {
+                "canvases": {}
+              }
+            }
+          ]
+        },
+        "fromSeq": 3
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 3,
+      "snapshots": [
+        {
+          "resource": "ahp-root://",
+          "state": {
+            "agents": [
+              {
+                "provider": "example",
+                "displayName": "Example",
+                "description": "Example agent",
+                "models": [],
+                "capabilities": {
+                  "canvases": {}
+                }
+              }
+            ]
+          },
+          "fromSeq": 3
+        }
+      ]
+    }
+  ]
+}

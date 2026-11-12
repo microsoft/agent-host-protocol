@@ -15,6 +15,7 @@ public actor AHPStateMirror {
     public private(set) var sessions: [String: SessionState] = [:]
     public private(set) var chats: [String: ChatState] = [:]
     public private(set) var canvases: [String: CanvasState] = [:]
+    public private(set) var canvasCollections: [String: CanvasesState] = [:]
     public private(set) var terminals: [String: TerminalState] = [:]
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
@@ -46,6 +47,10 @@ public actor AHPStateMirror {
         if channel.hasPrefix("ahp-chat:"), var chat = chats[channel] {
             chat = chatReducer(state: chat, action: action)
             chats[channel] = chat
+            return
+        }
+        if channel.hasPrefix("ahp-canvases:"), let collection = canvasCollections[channel] {
+            canvasCollections[channel] = canvasesReducer(state: collection, action: action)
             return
         }
         if channel.hasPrefix("ahp-canvas:"), let canvas = canvases[channel] {
@@ -99,6 +104,8 @@ public actor AHPStateMirror {
             chats[snapshot.resource] = state
         case .canvas(let state):
             canvases[snapshot.resource] = state
+        case .canvases(let state):
+            canvasCollections[snapshot.resource] = state
         case .terminal(let state):
             terminals[snapshot.resource] = state
         case .changeset(let state):
@@ -129,6 +136,7 @@ public actor AHPStateMirror {
         sessions.removeAll()
         chats.removeAll()
         canvases.removeAll()
+        canvasCollections.removeAll()
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()

@@ -1,0 +1,8 @@
+{
+  "name": "canvases-future-registry",
+  "group": "A",
+  "description": "The nonexhaustive registry state preserves an unknown future status.",
+  "type": "Snapshot",
+  "input": { "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "future", "details": { "retry": true } }, "canvases": [] }, "fromSeq": 3 },
+  "acceptableOutputs": [{ "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "future", "details": { "retry": true } }, "canvases": [] }, "fromSeq": 3 }]
+}

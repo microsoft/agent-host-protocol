@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Experimental chat-scoped `ahp-canvases:` collections advertise typed registry load state and keyed live membership; `canvases/registryRequested` explicitly ensures materialization, and `openCanvas` targets an advertised collection. Legacy chat canvas references remain a deprecated projection."
+}

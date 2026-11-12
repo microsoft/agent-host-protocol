@@ -1,0 +1,20 @@
+{
+  "name": "open-canvas-client-addressed-resource",
+  "group": "A",
+  "description": "openCanvas targets a client-chosen ahp-canvas resource and names its advertised owning collection and declaration type.",
+  "type": "OpenCanvasParams",
+  "input": {
+    "channel": "ahp-canvas:/diagram",
+    "canvases": "ahp-canvases:/peer",
+    "extensionId": "opaque-provider-id",
+    "canvasId": "diagram"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-canvas:/diagram",
+      "canvases": "ahp-canvases:/peer",
+      "extensionId": "opaque-provider-id",
+      "canvasId": "diagram"
+    }
+  ]
+}

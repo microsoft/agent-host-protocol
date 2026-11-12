@@ -13,6 +13,48 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// Registry materialization status.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasRegistryStatus {
+    Uninitialized,
+    Loading,
+    Ready,
+    Error,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasRegistryStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Uninitialized => serializer.serialize_str("uninitialized"),
+            Self::Loading => serializer.serialize_str("loading"),
+            Self::Ready => serializer.serialize_str("ready"),
+            Self::Error => serializer.serialize_str("error"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasRegistryStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "uninitialized" => Self::Uninitialized,
+            "loading" => Self::Loading,
+            "ready" => Self::Ready,
+            "error" => Self::Error,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// How the server resumes sending data on a windowed subscription after
 /// reconnection.
 ///
@@ -1773,6 +1815,21 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// Experimental Canvas API.
+    ///
+    /// The agent can materialize an advertised chat-scoped collection's registry
+    /// through `canvases/registryRequested` and manage instances with `openCanvas`
+    /// and `disposeCanvas`. Live instances are published through the collection and
+    /// their `ahp-canvas:` state channels.
+    ///
+    /// Clients MUST treat absence as unsupported and SHOULD tolerate additive
+    /// registry metadata while the Canvas channel remains experimental. This
+    /// capability does not gate observing unsolicited server-published collections
+    /// or Canvas instances.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<CanvasesCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1792,6 +1849,14 @@ pub struct AgentCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
 }
+
+/// Presence capability for the experimental Canvas registry and lifecycle
+/// commands.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesCapability {}
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -2106,6 +2171,15 @@ pub struct ChatState {
     /// chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background_work: Option<Vec<BackgroundWork>>,
+    /// Advertised `ahp-canvases:` collection owned by this exact chat.
+    ///
+    /// Clients prefer this collection over legacy `canvases` references, falling
+    /// back to those references when this pointer is absent. Advertising the URI
+    /// does not require materializing backing or starting extensions.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases_uri: Option<Uri>,
     /// Live canvases currently exposed by this chat.
     ///
     /// Entries intentionally contain only subscribable channel references.
@@ -2158,6 +2232,95 @@ pub struct ChatState {
     pub meta: Option<JsonObject>,
 }
 
+/// One extension or provider that declares canvas types for a chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasExtension {
+    /// Stable opaque identifier.
+    pub id: String,
+    /// Human-readable label, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Canvas types declared by this extension/provider. `id` MUST be
+    /// unique within this array.
+    pub canvases: Vec<CanvasType>,
+}
+
+/// One canvas type currently available to open.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasType {
+    /// Provider-local canvas type identifier.
+    pub id: String,
+    /// Human-readable canvas type label.
+    pub label: String,
+    /// Description of what the canvas type does.
+    pub description: String,
+    /// Optional JSON Schema for the input accepted when opening this canvas.
+    /// Clients decide whether and how to collect input from this schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+}
+
+/// Canvas types currently registered for one chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistry {
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    pub extensions: Vec<CanvasExtension>,
+}
+
+/// State of an advertised `ahp-canvases:` collection owned by one chat.
+///
+/// Advertising and subscribing are observation only: hosts MUST NOT create
+/// backing, resume a cold runtime, or start extensions to serve a subscription.
+/// Hosts MAY enumerate or refresh an already-live runtime. Collection ownership
+/// is established by the host, not inferred from URI grammar. Other ownership
+/// scopes are not currently defined.
+///
+/// Unsubscribing MUST NOT dispose canvases. Legacy chat canvas references MUST
+/// be projected from this same authoritative membership, not maintained as a
+/// second source of truth.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesState {
+    pub registry: CanvasRegistryState,
+    /// Live instances, keyed by their unique channel resource URI.
+    pub canvases: Vec<CanvasReference>,
+}
+
+/// The registry has not been materialized.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistryUninitializedState {}
+
+/// Registry materialization is in progress.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistryLoadingState {}
+
+/// The registry is loaded, extending {@link CanvasRegistry} with a required
+/// `extensions` array; an empty array is authoritative.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistryReadyState {
+    /// Extensions and providers that declare canvas types. `id` MUST be unique
+    /// within this array. An empty array is an authoritative loaded registry with
+    /// no types.
+    pub extensions: Vec<CanvasExtension>,
+}
+
+/// Registry materialization failed; a later request may retry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRegistryErrorState {
+    pub error: ErrorInfo,
+}
+
 /// Stable reference to a subscribable canvas channel.
 ///
 /// Chat state intentionally carries only this reference so the experimental
@@ -2178,11 +2341,14 @@ pub struct CanvasReference {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasState {
-    /// Stable caller-supplied instance identifier.
+    /// Provider-facing instance identifier used for correlation.
+    ///
+    /// AHP commands and subscriptions address this canvas by its channel URI,
+    /// not by this identifier.
     pub instance_id: String,
-    /// Owning extension/provider identifier.
+    /// Owning declaration namespace.
     pub extension_id: String,
-    /// Owning extension display name, when available.
+    /// Owning namespace title, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension_name: Option<String>,
     /// Provider-local canvas type identifier.
@@ -6695,6 +6861,23 @@ pub enum CustomizationLoadState {
     #[serde(rename = "error")]
     Error(CustomizationErrorState),
 }
+/// Authoritative Canvas registry materialization state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum CanvasRegistryState {
+    #[serde(rename = "uninitialized")]
+    Uninitialized(CanvasRegistryUninitializedState),
+    #[serde(rename = "loading")]
+    Loading(CanvasRegistryLoadingState),
+    #[serde(rename = "ready")]
+    Ready(CanvasRegistryReadyState),
+    #[serde(rename = "error")]
+    Error(CanvasRegistryErrorState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
 
 /// Discriminated lifecycle status of an MCP server customization.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -6862,6 +7045,7 @@ pub enum SnapshotState {
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),
+    Canvases(Box<CanvasesState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),

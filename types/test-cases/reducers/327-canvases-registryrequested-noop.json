@@ -1,0 +1,7 @@
+{
+  "description": "canvases/registryRequested leaves authoritative state unchanged",
+  "reducer": "canvases",
+  "initial": { "registry": { "status": "uninitialized" }, "canvases": [] },
+  "actions": [{ "type": "canvases/registryRequested" }],
+  "expected": { "registry": { "status": "uninitialized" }, "canvases": [] }
+}

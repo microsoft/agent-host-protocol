@@ -37,6 +37,11 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatMovableChanged
     case chatChangesetsChanged
     case chatCanvasesChanged
+    case chatCanvasesUriChanged
+    case canvasesRegistryRequested
+    case canvasesRegistryChanged
+    case canvasesCanvasSet
+    case canvasesCanvasRemoved
     case canvasStateChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
@@ -152,6 +157,11 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/movableChanged": self = .chatMovableChanged
         case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/canvasesChanged": self = .chatCanvasesChanged
+        case "chat/canvasesUriChanged": self = .chatCanvasesUriChanged
+        case "canvases/registryRequested": self = .canvasesRegistryRequested
+        case "canvases/registryChanged": self = .canvasesRegistryChanged
+        case "canvases/canvasSet": self = .canvasesCanvasSet
+        case "canvases/canvasRemoved": self = .canvasesCanvasRemoved
         case "canvas/stateChanged": self = .canvasStateChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
@@ -267,6 +277,11 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatMovableChanged: try container.encode("chat/movableChanged")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatCanvasesChanged: try container.encode("chat/canvasesChanged")
+        case .chatCanvasesUriChanged: try container.encode("chat/canvasesUriChanged")
+        case .canvasesRegistryRequested: try container.encode("canvases/registryRequested")
+        case .canvasesRegistryChanged: try container.encode("canvases/registryChanged")
+        case .canvasesCanvasSet: try container.encode("canvases/canvasSet")
+        case .canvasesCanvasRemoved: try container.encode("canvases/canvasRemoved")
         case .canvasStateChanged: try container.encode("canvas/stateChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
@@ -1294,6 +1309,91 @@ public struct ChatCanvasesChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.canvases = canvases
+    }
+}
+
+/// Replaces or clears the chat's advertised canvas collection URI.
+///
+/// Stability: 1.0 - Early development.
+public struct ChatCanvasesUriChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Owning collection URI, or `undefined` to clear the pointer.
+    public var canvasesUri: String?
+
+    public init(
+        type: ActionType,
+        canvasesUri: String? = nil
+    ) {
+        self.type = type
+        self.canvasesUri = canvasesUri
+    }
+}
+
+/// Ensures the owning collection's registry is materialized.
+///
+/// Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+/// Hosts MAY resume existing persisted backing and start extensions, but MUST
+/// NOT create provisional backing, send a user message, or invoke a model.
+/// Concurrent requests MUST coalesce. A request while loading or ready is an
+/// ensure/no-op; a request after an error retries. The reducer is a no-op;
+/// hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesRegistryRequestedAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
+/// Replaces the authoritative registry load state.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesRegistryChangedAction: Codable, Sendable {
+    public var type: ActionType
+    public var registry: CanvasRegistryState
+
+    public init(
+        type: ActionType,
+        registry: CanvasRegistryState
+    ) {
+        self.type = type
+        self.registry = registry
+    }
+}
+
+/// Inserts or replaces a live canvas reference, keyed by resource.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesCanvasSetAction: Codable, Sendable {
+    public var type: ActionType
+    public var canvas: CanvasReference
+
+    public init(
+        type: ActionType,
+        canvas: CanvasReference
+    ) {
+        self.type = type
+        self.canvas = canvas
+    }
+}
+
+/// Removes a live canvas reference by resource; absent resources are a no-op.
+///
+/// Stability: 1.0 - Early development.
+public struct CanvasesCanvasRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    public var resource: String
+
+    public init(
+        type: ActionType,
+        resource: String
+    ) {
+        self.type = type
+        self.resource = resource
     }
 }
 
@@ -2671,6 +2771,11 @@ public enum StateAction: Codable, Sendable {
     case chatMovableChanged(ChatMovableChangedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
     case chatCanvasesChanged(ChatCanvasesChangedAction)
+    case chatCanvasesUriChanged(ChatCanvasesUriChangedAction)
+    case canvasesRegistryRequested(CanvasesRegistryRequestedAction)
+    case canvasesRegistryChanged(CanvasesRegistryChangedAction)
+    case canvasesCanvasSet(CanvasesCanvasSetAction)
+    case canvasesCanvasRemoved(CanvasesCanvasRemovedAction)
     case canvasStateChanged(CanvasStateChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
@@ -2822,6 +2927,16 @@ public enum StateAction: Codable, Sendable {
             self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
         case "chat/canvasesChanged":
             self = .chatCanvasesChanged(try ChatCanvasesChangedAction(from: decoder))
+        case "chat/canvasesUriChanged":
+            self = .chatCanvasesUriChanged(try ChatCanvasesUriChangedAction(from: decoder))
+        case "canvases/registryRequested":
+            self = .canvasesRegistryRequested(try CanvasesRegistryRequestedAction(from: decoder))
+        case "canvases/registryChanged":
+            self = .canvasesRegistryChanged(try CanvasesRegistryChangedAction(from: decoder))
+        case "canvases/canvasSet":
+            self = .canvasesCanvasSet(try CanvasesCanvasSetAction(from: decoder))
+        case "canvases/canvasRemoved":
+            self = .canvasesCanvasRemoved(try CanvasesCanvasRemovedAction(from: decoder))
         case "canvas/stateChanged":
             self = .canvasStateChanged(try CanvasStateChangedAction(from: decoder))
         case "session/titleChanged":
@@ -3014,6 +3129,11 @@ public enum StateAction: Codable, Sendable {
         case .chatMovableChanged(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .chatCanvasesChanged(let v): try v.encode(to: encoder)
+        case .chatCanvasesUriChanged(let v): try v.encode(to: encoder)
+        case .canvasesRegistryRequested(let v): try v.encode(to: encoder)
+        case .canvasesRegistryChanged(let v): try v.encode(to: encoder)
+        case .canvasesCanvasSet(let v): try v.encode(to: encoder)
+        case .canvasesCanvasRemoved(let v): try v.encode(to: encoder)
         case .canvasStateChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)

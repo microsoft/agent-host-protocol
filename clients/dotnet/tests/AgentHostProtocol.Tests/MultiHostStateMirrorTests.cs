@@ -17,6 +17,34 @@ namespace Microsoft.AgentHostProtocol.Tests;
 public sealed class MultiHostStateMirrorTests
 {
     [Fact]
+    public void CanvasCollection_IsIsolatedAndDroppedWithItsResourceAndHost()
+    {
+        var mirror = new MultiHostStateMirror();
+        const string uri = "ahp-canvases:/opaque";
+        CanvasesState State() => new()
+        {
+            Registry = new CanvasRegistryState(new CanvasRegistryUninitializedState()),
+            Canvases = new(),
+        };
+        mirror.PutCanvasCollection("host-a", uri, State());
+        mirror.PutCanvasCollection("host-b", uri, State());
+        var (target, _) = mirror.CanvasCollection("host-a", uri);
+        Reducers.ApplyToCanvases(target!, new StateAction(new CanvasesCanvasSetAction
+        {
+            Canvas = new CanvasReference { Resource = "ahp-canvas:/live" },
+        }));
+        var (other, _) = mirror.CanvasCollection("host-b", uri);
+        var targeted = new[] { target!.Canvases.Count, other!.Canvases.Count };
+        mirror.DropResource("host-a", uri);
+        var (_, resourceFound) = mirror.CanvasCollection("host-a", uri);
+        mirror.PutCanvasCollection("host-a", uri, State());
+        mirror.DropHost("host-a");
+        var (_, hostFound) = mirror.CanvasCollection("host-a", uri);
+        var (_, otherFound) = mirror.CanvasCollection("host-b", uri);
+        Assert.Equal(new[] { 1, 0, 0, 0, 1 }, new[] { targeted[0], targeted[1], resourceFound ? 1 : 0, hostFound ? 1 : 0, otherFound ? 1 : 0 });
+    }
+
+    [Fact]
     public void CanvasState_IsIsolatedAndDroppedWithItsResourceAndHost()
     {
         var mirror = new MultiHostStateMirror();

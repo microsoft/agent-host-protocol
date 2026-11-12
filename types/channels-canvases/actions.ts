@@ -1,0 +1,62 @@
+/**
+ * Canvases Channel Actions — Registry materialization and live membership.
+ *
+ * @module channels-canvases/actions
+ */
+
+import { ActionType } from '../common/actions.js';
+import type { URI } from '../common/state.js';
+import type { CanvasReference } from '../channels-canvas/state.js';
+import type { CanvasRegistryState } from './state.js';
+
+/**
+ * Ensures the owning collection's registry is materialized.
+ *
+ * Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+ * Hosts MAY resume existing persisted backing and start extensions, but MUST
+ * NOT create provisional backing, send a user message, or invoke a model.
+ * Concurrent requests MUST coalesce. A request while loading or ready is an
+ * ensure/no-op; a request after an error retries. The reducer is a no-op;
+ * hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+ *
+ * @category Canvases Actions
+ * @version 1
+ * @stability 1.0
+ * @clientDispatchable
+ */
+export interface CanvasesRegistryRequestedAction {
+  type: ActionType.CanvasesRegistryRequested;
+}
+
+/**
+ * Replaces the authoritative registry load state.
+ * @category Canvases Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface CanvasesRegistryChangedAction {
+  type: ActionType.CanvasesRegistryChanged;
+  registry: CanvasRegistryState;
+}
+
+/**
+ * Inserts or replaces a live canvas reference, keyed by resource.
+ * @category Canvases Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface CanvasesCanvasSetAction {
+  type: ActionType.CanvasesCanvasSet;
+  canvas: CanvasReference;
+}
+
+/**
+ * Removes a live canvas reference by resource; absent resources are a no-op.
+ * @category Canvases Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface CanvasesCanvasRemovedAction {
+  type: ActionType.CanvasesCanvasRemoved;
+  resource: URI;
+}

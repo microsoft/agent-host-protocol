@@ -50,6 +50,11 @@ const (
 	ActionTypeChatMovableChanged                  ActionType = "chat/movableChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
 	ActionTypeChatCanvasesChanged                 ActionType = "chat/canvasesChanged"
+	ActionTypeChatCanvasesUriChanged              ActionType = "chat/canvasesUriChanged"
+	ActionTypeCanvasesRegistryRequested           ActionType = "canvases/registryRequested"
+	ActionTypeCanvasesRegistryChanged             ActionType = "canvases/registryChanged"
+	ActionTypeCanvasesCanvasSet                   ActionType = "canvases/canvasSet"
+	ActionTypeCanvasesCanvasRemoved               ActionType = "canvases/canvasRemoved"
 	ActionTypeCanvasStateChanged                  ActionType = "canvas/stateChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
@@ -719,6 +724,53 @@ type ChatCanvasesChangedAction struct {
 	Type ActionType `json:"type"`
 	// New canvas channel references, or `undefined` to clear the collection.
 	Canvases []CanvasReference `json:"canvases,omitempty"`
+}
+
+// Replaces or clears the chat's advertised canvas collection URI.
+//
+// Stability: 1.0 - Early development.
+type ChatCanvasesUriChangedAction struct {
+	Type ActionType `json:"type"`
+	// Owning collection URI, or `undefined` to clear the pointer.
+	CanvasesUri *URI `json:"canvasesUri,omitempty"`
+}
+
+// Ensures the owning collection's registry is materialized.
+//
+// Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+// Hosts MAY resume existing persisted backing and start extensions, but MUST
+// NOT create provisional backing, send a user message, or invoke a model.
+// Concurrent requests MUST coalesce. A request while loading or ready is an
+// ensure/no-op; a request after an error retries. The reducer is a no-op;
+// hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+//
+// Stability: 1.0 - Early development.
+type CanvasesRegistryRequestedAction struct {
+	Type ActionType `json:"type"`
+}
+
+// Replaces the authoritative registry load state.
+//
+// Stability: 1.0 - Early development.
+type CanvasesRegistryChangedAction struct {
+	Type     ActionType          `json:"type"`
+	Registry CanvasRegistryState `json:"registry"`
+}
+
+// Inserts or replaces a live canvas reference, keyed by resource.
+//
+// Stability: 1.0 - Early development.
+type CanvasesCanvasSetAction struct {
+	Type   ActionType      `json:"type"`
+	Canvas CanvasReference `json:"canvas"`
+}
+
+// Removes a live canvas reference by resource; absent resources are a no-op.
+//
+// Stability: 1.0 - Early development.
+type CanvasesCanvasRemovedAction struct {
+	Type     ActionType `json:"type"`
+	Resource URI        `json:"resource"`
 }
 
 // The presentation state for this canvas changed.
@@ -1883,6 +1935,11 @@ func (*ChatBackgroundWorkRemovedAction) isStateAction()           {}
 func (*ChatMovableChangedAction) isStateAction()                  {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
 func (*ChatCanvasesChangedAction) isStateAction()                 {}
+func (*ChatCanvasesUriChangedAction) isStateAction()              {}
+func (*CanvasesRegistryRequestedAction) isStateAction()           {}
+func (*CanvasesRegistryChangedAction) isStateAction()             {}
+func (*CanvasesCanvasSetAction) isStateAction()                   {}
+func (*CanvasesCanvasRemovedAction) isStateAction()               {}
 func (*CanvasStateChangedAction) isStateAction()                  {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
@@ -2162,6 +2219,36 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/canvasesChanged":
 		var value ChatCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasesUriChanged":
+		var value ChatCanvasesUriChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvases/registryRequested":
+		var value CanvasesRegistryRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvases/registryChanged":
+		var value CanvasesRegistryChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvases/canvasSet":
+		var value CanvasesCanvasSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvases/canvasRemoved":
+		var value CanvasesCanvasRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

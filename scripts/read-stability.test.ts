@@ -70,7 +70,7 @@ test('invalid, missing, and repeated stability values fail explicitly', () => {
   assert.equal(getDocumentation(ordinary), '');
 });
 
-test('API docs show stability on entrypoint fields and notification methods only', () => {
+test('API docs show stability on entrypoint fields and experimental actions', () => {
   const out = mkdtempSync(join(tmpdir(), 'ahp-stability-'));
   try {
     const project = new Project({ tsConfigFilePath: resolve(root, 'types/tsconfig.json') });
@@ -99,6 +99,15 @@ test('API docs show stability on entrypoint fields and notification methods only
     assert.ok(!common.includes('### `reconnect`\n\n<StabilityIndex'));
     const tcp = readFileSync(join(out, 'tcp.md'), 'utf8');
     assert.ok(tcp.includes('## `createTcpConnection`\n\n<StabilityIndex level="1.0" />'));
+    const chat = readFileSync(join(out, 'chat.md'), 'utf8');
+    assert.ok(chat.includes('### `chat/canvasesUriChanged`\n\n<StabilityIndex level="1.0" />'));
+    const canvases = readFileSync(join(out, 'canvases.md'), 'utf8');
+    for (const action of ['canvases/registryRequested', 'canvases/registryChanged', 'canvases/canvasSet', 'canvases/canvasRemoved']) {
+      assert.ok(canvases.includes(`### \`${action}\`\n\n<StabilityIndex level="1.0" />`));
+    }
+    for (const action of ['chat/turnStarted', 'chat/delta']) {
+      assert.ok(!chat.includes(`### \`${action}\`\n\n<StabilityIndex`));
+    }
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

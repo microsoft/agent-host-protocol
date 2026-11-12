@@ -58,17 +58,18 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
-    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
-    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
-    ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
-    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
-    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
-    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    CanvasesState, ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState,
+    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization,
+    CustomizationEnablement, ErrorResponsePart, InputRequestResponsePart, McpServerCustomization,
+    McpServerStartingState, McpServerState, McpServerStoppedState, PendingMessage,
+    PendingMessageKind, ResourceWatchState, ResponsePart, RootState, SessionInputRequest,
+    SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
+    TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState, TerminalUnclassifiedPart,
+    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
+    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
+    TurnState,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -1221,6 +1222,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.canvases = a.canvases.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatCanvasesUriChanged(a) => {
+            state.canvases_uri = a.canvases_uri.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatWorkingDirectorySet(a) => {
             let list = state.working_directories.get_or_insert_with(Vec::new);
             if list.contains(&a.directory) {
@@ -1951,6 +1956,38 @@ pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> 
     }
 }
 
+/// Apply registry and keyed membership mutations to a canvas collection.
+pub fn apply_action_to_canvases(state: &mut CanvasesState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::CanvasesRegistryRequested(_) => ReduceOutcome::NoOp,
+        StateAction::CanvasesRegistryChanged(a) => {
+            state.registry = a.registry.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::CanvasesCanvasSet(a) => {
+            if let Some(idx) = state
+                .canvases
+                .iter()
+                .position(|c| c.resource == a.canvas.resource)
+            {
+                state.canvases[idx] = a.canvas.clone();
+            } else {
+                state.canvases.push(a.canvas.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::CanvasesCanvasRemoved(a) => {
+            if let Some(idx) = state.canvases.iter().position(|c| c.resource == a.resource) {
+                state.canvases.remove(idx);
+                ReduceOutcome::Applied
+            } else {
+                ReduceOutcome::NoOp
+            }
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
 // ─── Terminal Reducer ─────────────────────────────────────────────────
 
 /// Apply a [`StateAction`] to a [`TerminalState`] in place.
@@ -2378,6 +2415,7 @@ mod tests {
             provider: None,
             working_directories: None,
             changesets: None,
+            canvases_uri: None,
             canvases: None,
             config: None,
             turns: Vec::new(),
@@ -2796,6 +2834,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_chat,
+                    &file_name,
+                    description,
+                ),
+                "canvases" => run_fixture::<CanvasesState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_canvases,
                     &file_name,
                     description,
                 ),

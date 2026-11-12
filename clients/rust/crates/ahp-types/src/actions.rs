@@ -15,8 +15,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    BackgroundWork, CanvasReference, CanvasState, ChangesSummary, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    BackgroundWork, CanvasReference, CanvasRegistryState, CanvasState, ChangesSummary, Changeset,
+    ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
@@ -62,6 +62,11 @@ pub enum ActionType {
     ChatMovableChanged,
     ChatChangesetsChanged,
     ChatCanvasesChanged,
+    ChatCanvasesUriChanged,
+    CanvasesRegistryRequested,
+    CanvasesRegistryChanged,
+    CanvasesCanvasSet,
+    CanvasesCanvasRemoved,
     CanvasStateChanged,
     ChatWorkingDirectorySet,
     ChatWorkingDirectoryRemoved,
@@ -190,6 +195,13 @@ impl serde::Serialize for ActionType {
             Self::ChatMovableChanged => serializer.serialize_str("chat/movableChanged"),
             Self::ChatChangesetsChanged => serializer.serialize_str("chat/changesetsChanged"),
             Self::ChatCanvasesChanged => serializer.serialize_str("chat/canvasesChanged"),
+            Self::ChatCanvasesUriChanged => serializer.serialize_str("chat/canvasesUriChanged"),
+            Self::CanvasesRegistryRequested => {
+                serializer.serialize_str("canvases/registryRequested")
+            }
+            Self::CanvasesRegistryChanged => serializer.serialize_str("canvases/registryChanged"),
+            Self::CanvasesCanvasSet => serializer.serialize_str("canvases/canvasSet"),
+            Self::CanvasesCanvasRemoved => serializer.serialize_str("canvases/canvasRemoved"),
             Self::CanvasStateChanged => serializer.serialize_str("canvas/stateChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
             Self::ChatWorkingDirectoryRemoved => {
@@ -364,6 +376,11 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/movableChanged" => Self::ChatMovableChanged,
             "chat/changesetsChanged" => Self::ChatChangesetsChanged,
             "chat/canvasesChanged" => Self::ChatCanvasesChanged,
+            "chat/canvasesUriChanged" => Self::ChatCanvasesUriChanged,
+            "canvases/registryRequested" => Self::CanvasesRegistryRequested,
+            "canvases/registryChanged" => Self::CanvasesRegistryChanged,
+            "canvases/canvasSet" => Self::CanvasesCanvasSet,
+            "canvases/canvasRemoved" => Self::CanvasesCanvasRemoved,
             "canvas/stateChanged" => Self::CanvasStateChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
             "chat/workingDirectoryRemoved" => Self::ChatWorkingDirectoryRemoved,
@@ -1161,6 +1178,58 @@ pub struct ChatCanvasesChangedAction {
     /// New canvas channel references, or `undefined` to clear the collection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvases: Option<Vec<CanvasReference>>,
+}
+
+/// Replaces or clears the chat's advertised canvas collection URI.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatCanvasesUriChangedAction {
+    /// Owning collection URI, or `undefined` to clear the pointer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases_uri: Option<Uri>,
+}
+
+/// Ensures the owning collection's registry is materialized.
+///
+/// Requires the owning chat's agent to advertise `AgentCapabilities.canvases`.
+/// Hosts MAY resume existing persisted backing and start extensions, but MUST
+/// NOT create provisional backing, send a user message, or invoke a model.
+/// Concurrent requests MUST coalesce. A request while loading or ready is an
+/// ensure/no-op; a request after an error retries. The reducer is a no-op;
+/// hosts publish loading, ready, or error outcomes with `canvases/registryChanged`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesRegistryRequestedAction {}
+
+/// Replaces the authoritative registry load state.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesRegistryChangedAction {
+    pub registry: CanvasRegistryState,
+}
+
+/// Inserts or replaces a live canvas reference, keyed by resource.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesCanvasSetAction {
+    pub canvas: CanvasReference,
+}
+
+/// Removes a live canvas reference by resource; absent resources are a no-op.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasesCanvasRemovedAction {
+    pub resource: Uri,
 }
 
 /// The presentation state for this canvas changed.
@@ -2506,6 +2575,16 @@ pub enum StateAction {
     ChatChangesetsChanged(ChatChangesetsChangedAction),
     #[serde(rename = "chat/canvasesChanged")]
     ChatCanvasesChanged(ChatCanvasesChangedAction),
+    #[serde(rename = "chat/canvasesUriChanged")]
+    ChatCanvasesUriChanged(ChatCanvasesUriChangedAction),
+    #[serde(rename = "canvases/registryRequested")]
+    CanvasesRegistryRequested(CanvasesRegistryRequestedAction),
+    #[serde(rename = "canvases/registryChanged")]
+    CanvasesRegistryChanged(CanvasesRegistryChangedAction),
+    #[serde(rename = "canvases/canvasSet")]
+    CanvasesCanvasSet(CanvasesCanvasSetAction),
+    #[serde(rename = "canvases/canvasRemoved")]
+    CanvasesCanvasRemoved(CanvasesCanvasRemovedAction),
     #[serde(rename = "canvas/stateChanged")]
     CanvasStateChanged(CanvasStateChangedAction),
     #[serde(rename = "session/titleChanged")]

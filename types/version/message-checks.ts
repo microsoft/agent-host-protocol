@@ -60,6 +60,8 @@ type _ExpectedCommands =
   | 'createTcpConnection'
   | 'moveChat'
   | 'disposeChat'
+  | 'openCanvas'
+  | 'disposeCanvas'
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'

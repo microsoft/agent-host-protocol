@@ -20,6 +20,7 @@ export const PROTOCOL_SOURCE_DIRS: readonly string[] = [
   'channels-session',
   'channels-chat',
   'channels-canvas',
+  'channels-canvases',
   'channels-terminal',
   'channels-changeset',
   'channels-annotations',

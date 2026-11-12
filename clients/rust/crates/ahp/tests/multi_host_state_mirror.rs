@@ -131,6 +131,45 @@ fn root_agents_changed_envelope(agents: Vec<AgentInfo>, server_seq: u64) -> Acti
 }
 
 #[test]
+fn canvas_collections_are_decoded_reduced_and_reset_per_host() {
+    let mut mirror = MultiHostStateMirror::new();
+    let uri = "ahp-canvases:/opaque";
+    let alpha = HostId::new("alpha");
+    let beta = HostId::new("beta");
+    let snapshot: Snapshot = serde_json::from_value(serde_json::json!({
+        "resource": uri,
+        "state": { "registry": { "status": "uninitialized" }, "canvases": [] },
+        "fromSeq": 1
+    }))
+    .unwrap();
+    mirror.apply_snapshot(&alpha, &snapshot);
+    mirror.apply_snapshot(&beta, &snapshot);
+    let envelope: ActionEnvelope = serde_json::from_value(serde_json::json!({
+        "channel": uri,
+        "action": { "type": "canvases/canvasSet", "canvas": { "resource": "ahp-canvas:/live" } },
+        "serverSeq": 2
+    }))
+    .unwrap();
+    mirror.apply_envelope(&alpha, &envelope);
+    let alpha_key = HostedResourceKey::new(alpha.clone(), uri);
+    let beta_key = HostedResourceKey::new(beta, uri);
+    let targeted = (
+        mirror.canvas_collections()[&alpha_key].canvases.len(),
+        mirror.canvas_collections()[&beta_key].canvases.len(),
+    );
+    mirror.reset_host(&alpha);
+    let reset = (
+        mirror.canvas_collections().contains_key(&alpha_key),
+        mirror.canvas_collections().contains_key(&beta_key),
+    );
+    mirror.reset();
+    assert_eq!(
+        (targeted, reset, mirror.canvas_collections().len()),
+        ((1, 0), (false, true), 0)
+    );
+}
+
+#[test]
 fn canvases_are_reduced_and_reset_per_host() {
     let mut mirror = MultiHostStateMirror::new();
     let uri = "ahp-canvas:/preview";

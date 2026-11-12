@@ -6,6 +6,26 @@ import AgentHostProtocol
 
 final class AHPStateMirrorTests: XCTestCase {
 
+    func testCanvasCollectionSnapshotActionsAndReset() async throws {
+        let mirror = AHPStateMirror()
+        let resource = "ahp-canvases:/opaque"
+        let snapshot = try JSONDecoder().decode(Snapshot.self, from: Data("""
+        {"resource":"ahp-canvases:/opaque","state":{"registry":{"status":"uninitialized"},"canvases":[]},"fromSeq":1}
+        """.utf8))
+        await mirror.applySnapshot(snapshot)
+        await mirror.apply(ActionEnvelope(
+            channel: resource,
+            action: .canvasesCanvasSet(CanvasesCanvasSetAction(
+                type: .canvasesCanvasSet, canvas: CanvasReference(resource: "ahp-canvas:/live")
+            )),
+            serverSeq: 2
+        ))
+        let collections = await mirror.canvasCollections
+        await mirror.reset()
+        let remaining = await mirror.canvasCollections
+        XCTAssertEqual([collections[resource]?.canvases.count, remaining.count], [1, 0])
+    }
+
     func testCanvasSourcesAreReplacedClearedAndReset() async {
         let mirror = AHPStateMirror()
         let resource = "ahp-canvas:/preview"

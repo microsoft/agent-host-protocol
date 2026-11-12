@@ -6,6 +6,34 @@ import AgentHostProtocol
 
 final class MultiHostStateMirrorTests: XCTestCase {
 
+    func testCanvasCollectionsAreIsolatedAndResetPerHost() async throws {
+        let mirror = MultiHostStateMirror()
+        let resource = "ahp-canvases:/opaque"
+        let snapshot = try JSONDecoder().decode(Snapshot.self, from: Data("""
+        {"resource":"ahp-canvases:/opaque","state":{"registry":{"status":"loading"},"canvases":[]},"fromSeq":1}
+        """.utf8))
+        await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
+        await mirror.applySnapshot(host: "beta", snapshot: snapshot)
+        await mirror.apply(host: "alpha", envelope: ActionEnvelope(
+            channel: resource,
+            action: .canvasesCanvasSet(CanvasesCanvasSetAction(
+                type: .canvasesCanvasSet, canvas: CanvasReference(resource: "ahp-canvas:/live")
+            )),
+            serverSeq: 2
+        ))
+        let alpha = HostedResourceKey(hostId: "alpha", uri: resource)
+        let beta = HostedResourceKey(hostId: "beta", uri: resource)
+        let updated = await mirror.canvasCollections
+        await mirror.reset(host: "alpha")
+        let reset = await mirror.canvasCollections
+        await mirror.reset()
+        let remaining = await mirror.canvasCollections
+        XCTAssertEqual([
+            updated[alpha]?.canvases.count, updated[beta]?.canvases.count,
+            reset[alpha]?.canvases.count, reset[beta]?.canvases.count, remaining.count,
+        ], [1, 0, nil, 0, 0])
+    }
+
     func testCanvasUpdatesAndResetAreIsolatedPerHost() async {
         let mirror = MultiHostStateMirror()
         let resource = "ahp-canvas:/preview"

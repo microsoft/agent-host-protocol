@@ -18,12 +18,14 @@ import type {
   ChangesetAction,
   AutomationAction,
   AutomationRunAction,
+  CanvasesAction,
   RootAction,
   SessionAction,
   TerminalAction,
 } from '../types/action-origin.generated.js';
 import type { ChangesetState } from '../types/channels-changeset/state.js';
 import type { CanvasState } from '../types/channels-canvas/state.js';
+import type { CanvasesState } from '../types/channels-canvases/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
@@ -31,6 +33,7 @@ import type { AutomationEntry, AutomationState } from '../types/channels-automat
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
 import { canvasReducer } from '../types/channels-canvas/reducer.js';
+import { canvasesReducer } from '../types/channels-canvases/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
 import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
@@ -49,6 +52,7 @@ export class AhpStateMirror {
   private rootState: RootState = INITIAL_ROOT;
   private readonly sessionsMap = new Map<URI, SessionState>();
   private readonly canvasesMap = new Map<URI, CanvasState>();
+  private readonly canvasCollectionsMap = new Map<URI, CanvasesState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
   private automationCatalogState: AutomationState = INITIAL_AUTOMATION_CATALOG;
@@ -68,6 +72,11 @@ export class AhpStateMirror {
   /** All known live canvases keyed by their channel URI. */
   get canvases(): ReadonlyMap<URI, CanvasState> {
     return this.canvasesMap;
+  }
+
+  /** Canvas collections keyed by their advertised channel URI. */
+  get canvasCollections(): ReadonlyMap<URI, CanvasesState> {
+    return this.canvasCollectionsMap;
   }
 
   /** All known terminals keyed by URI. */
@@ -104,6 +113,10 @@ export class AhpStateMirror {
     return this.canvasesMap.get(uri);
   }
 
+  getCanvasCollection(uri: URI): CanvasesState | undefined {
+    return this.canvasCollectionsMap.get(uri);
+  }
+
   /** Look up a terminal by URI. */
   getTerminal(uri: URI): TerminalState | undefined {
     return this.terminalsMap.get(uri);
@@ -126,6 +139,10 @@ export class AhpStateMirror {
     }
     if (resource.startsWith('ahp-session:')) {
       this.sessionsMap.set(resource, snapshot.state as SessionState);
+      return;
+    }
+    if (resource.startsWith('ahp-canvases:')) {
+      this.canvasCollectionsMap.set(resource, snapshot.state as CanvasesState);
       return;
     }
     if (resource.startsWith('ahp-canvas:')) {
@@ -173,6 +190,12 @@ export class AhpStateMirror {
       const current = this.sessionsMap.get(channel);
       if (!current) return;
       this.sessionsMap.set(channel, sessionReducer(current, action as SessionAction));
+      return;
+    }
+    if (channel.startsWith('ahp-canvases:')) {
+      const current = this.canvasCollectionsMap.get(channel);
+      if (current === undefined) return;
+      this.canvasCollectionsMap.set(channel, canvasesReducer(current, action as CanvasesAction));
       return;
     }
     if (channel.startsWith('ahp-canvas:')) {
