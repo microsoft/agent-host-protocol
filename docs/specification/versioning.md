@@ -84,6 +84,11 @@ AHP follows standard SemVer compatibility:
 
 Within a compatible range, additive changes — new optional fields on existing types, new action types, new commands — are introduced in `PATCH` (or `MINOR`, while `MAJOR` is `0`) bumps and MUST be ignored by older peers that do not understand them.
 
+Types annotated `@preserveUnknownMembers` MUST retain unknown members on decode
+and re-emit them without duplicating known keys, wherever those types are used.
+This covers automation patch replacement objects and nested types, so older
+editors do not erase newer fields. Other recognized objects may discard them.
+
 ## Capabilities First, Then Required
 
 New behavior generally lands in two stages:

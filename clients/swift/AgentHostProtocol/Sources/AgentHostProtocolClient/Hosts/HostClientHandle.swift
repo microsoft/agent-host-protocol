@@ -73,6 +73,17 @@ public struct HostClientHandle: Sendable {
         }
     }
 
+    /// Send a typed protocol command, refusing if the connection has been replaced.
+    @discardableResult
+    public func request<C: AHPCommand>(_ params: C) async throws -> C.Result {
+        try await checkAlive()
+        do {
+            return try await client.request(params)
+        } catch let error as AHPClientError {
+            throw HostError.client(error)
+        }
+    }
+
     /// Issue an arbitrary JSON-RPC request through this connection, refusing
     /// if the connection has been replaced by a reconnect.
     ///

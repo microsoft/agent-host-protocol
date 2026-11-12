@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Swift subscriptions and client events now report undecodable action envelopes as `SubscriptionEvent.actionDecodingFailed` (a new case, so exhaustive switches must handle it) and advance the reconnect cursor past them.",
+  "issues": [589],
+  "targets": ["swift"]
+}

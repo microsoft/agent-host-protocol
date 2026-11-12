@@ -33,7 +33,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
         }
     }
 
-    private struct MarkdownWrapper: Codable {
+    private struct MarkdownWrapper: Codable, Equatable {
         let markdown: String
     }
 }
@@ -1170,7 +1170,7 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
 /// notifications. TCP connections do not survive the loss of the AHP connection.
 ///
 /// Stability: 1.0 - Early development.
-public struct TcpConnectionsCapability: Codable, Sendable {
+public struct TcpConnectionsCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1188,7 +1188,7 @@ public struct TcpConnectionsCapability: Codable, Sendable {
 /// `windowBytes + maximumFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelReceiveLimits: Codable, Sendable {
+public struct ChannelReceiveLimits: Codable, Sendable, Equatable {
     /// The target amount of outstanding data. This is a soft target.
     /// The sender MUST NOT send a data message or fragment while outstanding data
     /// is equal to or greater than this value. The last message or fragment sent
@@ -1217,7 +1217,7 @@ public struct ChannelReceiveLimits: Codable, Sendable {
 /// zero when the subscription starts.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelFlowControl: Codable, Sendable {
+public struct ChannelFlowControl: Codable, Sendable, Equatable {
     /// Limits for data that the server sends to the client.
     public var clientReceive: ChannelReceiveLimits
     /// Limits for data that the client sends to the server.
@@ -1240,7 +1240,7 @@ public struct ChannelFlowControl: Codable, Sendable {
 /// closes the stream.
 ///
 /// Stability: 1.0 - Early development.
-public struct ResumedChannelSubscription: Codable, Sendable {
+public struct ResumedChannelSubscription: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// The limits that the server accepted for the new connection, as in a
@@ -1261,7 +1261,7 @@ public struct ResumedChannelSubscription: Codable, Sendable {
     }
 }
 
-public struct Icon: Codable, Sendable {
+public struct Icon: Codable, Sendable, Equatable {
     /// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
     /// `data:` URI with Base64-encoded image data.
     ///
@@ -1285,21 +1285,50 @@ public struct Icon: Codable, Sendable {
     ///
     /// If not provided, the client should assume the icon can be used with any theme.
     public var theme: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case src
+        case contentType
+        case sizes
+        case theme
+    }
 
     public init(
         src: String,
         contentType: String? = nil,
         sizes: [String]? = nil,
-        theme: String? = nil
+        theme: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.src = src
         self.contentType = contentType
         self.sizes = sizes
         self.theme = theme
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.src = try container.decode(String.self, forKey: .src)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.sizes = try container.decodeIfPresent([String].self, forKey: .sizes)
+        self.theme = try container.decodeIfPresent(String.self, forKey: .theme)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.src, forKey: .src)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.sizes, forKey: .sizes)
+        try container.encodeIfPresent(self.theme, forKey: .theme)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct ProtectedResourceMetadata: Codable, Sendable {
+public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
     /// REQUIRED. The protected resource's resource identifier, a URL using the
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
     public var resource: String
@@ -1331,8 +1360,10 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
     ///
     /// Clients SHOULD treat an absent field the same as `true`.
     public var required: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case resource
         case resourceName = "resource_name"
         case authorizationServers = "authorization_servers"
@@ -1357,7 +1388,8 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         resourceDocumentation: String? = nil,
         resourcePolicyUri: String? = nil,
         resourceTosUri: String? = nil,
-        required: Bool? = nil
+        required: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.resource = resource
         self.resourceName = resourceName
@@ -1370,10 +1402,43 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         self.resourcePolicyUri = resourcePolicyUri
         self.resourceTosUri = resourceTosUri
         self.required = required
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.resourceName = try container.decodeIfPresent(String.self, forKey: .resourceName)
+        self.authorizationServers = try container.decodeIfPresent([String].self, forKey: .authorizationServers)
+        self.jwksUri = try container.decodeIfPresent(String.self, forKey: .jwksUri)
+        self.scopesSupported = try container.decodeIfPresent([String].self, forKey: .scopesSupported)
+        self.bearerMethodsSupported = try container.decodeIfPresent([String].self, forKey: .bearerMethodsSupported)
+        self.resourceSigningAlgValuesSupported = try container.decodeIfPresent([String].self, forKey: .resourceSigningAlgValuesSupported)
+        self.resourceDocumentation = try container.decodeIfPresent(String.self, forKey: .resourceDocumentation)
+        self.resourcePolicyUri = try container.decodeIfPresent(String.self, forKey: .resourcePolicyUri)
+        self.resourceTosUri = try container.decodeIfPresent(String.self, forKey: .resourceTosUri)
+        self.required = try container.decodeIfPresent(Bool.self, forKey: .required)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.resourceName, forKey: .resourceName)
+        try container.encodeIfPresent(self.authorizationServers, forKey: .authorizationServers)
+        try container.encodeIfPresent(self.jwksUri, forKey: .jwksUri)
+        try container.encodeIfPresent(self.scopesSupported, forKey: .scopesSupported)
+        try container.encodeIfPresent(self.bearerMethodsSupported, forKey: .bearerMethodsSupported)
+        try container.encodeIfPresent(self.resourceSigningAlgValuesSupported, forKey: .resourceSigningAlgValuesSupported)
+        try container.encodeIfPresent(self.resourceDocumentation, forKey: .resourceDocumentation)
+        try container.encodeIfPresent(self.resourcePolicyUri, forKey: .resourcePolicyUri)
+        try container.encodeIfPresent(self.resourceTosUri, forKey: .resourceTosUri)
+        try container.encodeIfPresent(self.required, forKey: .required)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct RootState: Codable, Sendable {
+public struct RootState: Codable, Sendable, Equatable {
     /// Available agent backends and their models
     public var agents: [AgentInfo]
     /// Number of active (non-disposed) sessions on the server
@@ -1410,7 +1475,7 @@ public struct RootState: Codable, Sendable {
     }
 }
 
-public struct RootConfigState: Codable, Sendable {
+public struct RootConfigState: Codable, Sendable, Equatable {
     /// JSON Schema describing available configuration properties
     public var schema: ConfigSchema
     /// Current configuration values
@@ -1425,7 +1490,7 @@ public struct RootConfigState: Codable, Sendable {
     }
 }
 
-public struct AgentInfo: Codable, Sendable {
+public struct AgentInfo: Codable, Sendable, Equatable {
     /// Agent provider ID (e.g. `'copilot'`)
     public var provider: String
     /// Human-readable name
@@ -1478,7 +1543,7 @@ public struct AgentInfo: Codable, Sendable {
     }
 }
 
-public struct AgentCapabilities: Codable, Sendable {
+public struct AgentCapabilities: Codable, Sendable, Equatable {
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1505,7 +1570,7 @@ public struct AgentCapabilities: Codable, Sendable {
     }
 }
 
-public struct MultipleChatsCapability: Codable, Sendable {
+public struct MultipleChatsCapability: Codable, Sendable, Equatable {
     /// The agent can fork a chat from a specific turn. When absent or `false`,
     /// clients MUST NOT pass a {@link ChatSource} with `kind: "fork"` to
     /// `createChat`.
@@ -1532,7 +1597,7 @@ public struct MultipleChatsCapability: Codable, Sendable {
     }
 }
 
-public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
+public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable {
     /// The agent's **first** working directory (index `0` of
     /// {@link CreateSessionParams.workingDirectories}) is an immutable primary:
     /// its URI is fixed for the lifetime of the session — clients MUST NOT remove,
@@ -1570,7 +1635,7 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
     }
 }
 
-public struct SessionModelInfo: Codable, Sendable {
+public struct SessionModelInfo: Codable, Sendable, Equatable {
     /// Model identifier
     public var id: String
     /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
@@ -1646,35 +1711,78 @@ public struct SessionModelInfo: Codable, Sendable {
     }
 }
 
-public struct ModelSelection: Codable, Sendable {
+public struct ModelSelection: Codable, Sendable, Equatable {
     /// Model identifier
     public var id: String
     /// Model-specific configuration values. Values are JSON primitives: most
     /// pickers produce strings, but some (e.g. a numeric context-size picker)
     /// produce numbers or booleans, which are carried through as-is.
     public var config: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case config
+    }
 
     public init(
         id: String,
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.config = config
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AgentSelection: Codable, Sendable {
+public struct AgentSelection: Codable, Sendable, Equatable {
     /// Stable agent URI (matches an {@link AgentCustomization.uri}).
     public var uri: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+    }
 
     public init(
-        uri: String
+        uri: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.uri = uri
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public final class ConfigPropertySchema: Codable, @unchecked Sendable {
+public final class ConfigPropertySchema: Codable, @unchecked Sendable, Equatable {
     /// JSON Schema: property type
     public var type: String
     /// JSON Schema: human-readable label for the property
@@ -1752,9 +1860,26 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
         self.required = required
         self.additionalProperties = additionalProperties
     }
+
+    public static func == (lhs: ConfigPropertySchema, rhs: ConfigPropertySchema) -> Bool {
+        lhs.type == rhs.type &&
+        lhs.title == rhs.title &&
+        lhs.description == rhs.description &&
+        lhs.`default` == rhs.`default` &&
+        lhs.`enum` == rhs.`enum` &&
+        lhs.enumLabels == rhs.enumLabels &&
+        lhs.enumDescriptions == rhs.enumDescriptions &&
+        lhs.readOnly == rhs.readOnly &&
+        lhs.items == rhs.items &&
+        lhs.minItems == rhs.minItems &&
+        lhs.maxItems == rhs.maxItems &&
+        lhs.properties == rhs.properties &&
+        lhs.required == rhs.required &&
+        lhs.additionalProperties == rhs.additionalProperties
+    }
 }
 
-public struct ConfigSchema: Codable, Sendable {
+public struct ConfigSchema: Codable, Sendable, Equatable {
     /// JSON Schema: always `'object'`
     public var type: String
     /// JSON Schema: property descriptors keyed by property id
@@ -1773,7 +1898,7 @@ public struct ConfigSchema: Codable, Sendable {
     }
 }
 
-public struct PendingMessage: Codable, Sendable {
+public struct PendingMessage: Codable, Sendable, Equatable {
     /// Unique identifier for this pending message
     public var id: String
     /// Delivery kind, defaults to {@link PendingMessageKind.Queued}.
@@ -1792,7 +1917,7 @@ public struct PendingMessage: Codable, Sendable {
     }
 }
 
-public struct ChatState: Codable, Sendable {
+public struct ChatState: Codable, Sendable, Equatable {
     /// Chat URI
     public var resource: String
     /// Chat title
@@ -1978,7 +2103,7 @@ public struct ChatState: Codable, Sendable {
     }
 }
 
-public struct ChatSummary: Codable, Sendable {
+public struct ChatSummary: Codable, Sendable, Equatable {
     /// Chat URI
     public var resource: String
     /// Chat title
@@ -2041,7 +2166,7 @@ public struct ChatSummary: Codable, Sendable {
     }
 }
 
-public struct SideChatSelection: Codable, Sendable {
+public struct SideChatSelection: Codable, Sendable, Equatable {
     /// Exact selected-text snapshot captured at `createChat` acceptance.
     ///
     /// MUST be non-empty.
@@ -2062,7 +2187,7 @@ public struct SideChatSelection: Codable, Sendable {
     }
 }
 
-public struct SessionState: Codable, Sendable {
+public struct SessionState: Codable, Sendable, Equatable {
     /// Agent provider ID
     public var provider: String
     /// Session title
@@ -2087,7 +2212,7 @@ public struct SessionState: Codable, Sendable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
@@ -2235,7 +2360,7 @@ public struct SessionState: Codable, Sendable {
     }
 }
 
-public struct SessionActiveClient: Codable, Sendable {
+public struct SessionActiveClient: Codable, Sendable, Equatable {
     /// Client identifier (matches `clientId` from `initialize`)
     public var clientId: String
     /// Human-readable client name (e.g. `"VS Code"`)
@@ -2263,7 +2388,7 @@ public struct SessionActiveClient: Codable, Sendable {
     }
 }
 
-public struct BackgroundShellWork: Codable, Sendable {
+public struct BackgroundShellWork: Codable, Sendable, Equatable {
     /// Identifier of this entry, unique within the owning chat across all kinds.
     /// The host derives it however it likes (for example from the kind plus the
     /// agent's own task id); consumers MUST treat it as opaque. It is the key for
@@ -2314,7 +2439,7 @@ public struct BackgroundShellWork: Codable, Sendable {
     }
 }
 
-public struct BackgroundSubagentWork: Codable, Sendable {
+public struct BackgroundSubagentWork: Codable, Sendable, Equatable {
     /// Identifier of this entry, unique within the owning chat across all kinds.
     /// The host derives it however it likes (for example from the kind plus the
     /// agent's own task id); consumers MUST treat it as opaque. It is the key for
@@ -2358,7 +2483,7 @@ public struct BackgroundSubagentWork: Codable, Sendable {
     }
 }
 
-public struct SessionChatInputRequest: Codable, Sendable {
+public struct SessionChatInputRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2386,7 +2511,7 @@ public struct SessionChatInputRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolConfirmationRequest: Codable, Sendable {
+public struct SessionToolConfirmationRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2418,7 +2543,7 @@ public struct SessionToolConfirmationRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolClientExecutionRequest: Codable, Sendable {
+public struct SessionToolClientExecutionRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2456,7 +2581,7 @@ public struct SessionToolClientExecutionRequest: Codable, Sendable {
     }
 }
 
-public struct SessionToolAuthenticationRequest: Codable, Sendable {
+public struct SessionToolAuthenticationRequest: Codable, Sendable, Equatable {
     /// Stable key for this entry, unique within the session's
     /// {@link SessionState.inputNeeded} list. The host derives it however it likes
     /// (for example from the chat URI plus the underlying request or tool-call
@@ -2488,7 +2613,7 @@ public struct SessionToolAuthenticationRequest: Codable, Sendable {
     }
 }
 
-public struct SessionSummary: Codable, Sendable {
+public struct SessionSummary: Codable, Sendable, Equatable {
     /// Agent provider ID
     public var provider: String
     /// Session title
@@ -2513,7 +2638,7 @@ public struct SessionSummary: Codable, Sendable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
@@ -2591,7 +2716,7 @@ public struct SessionSummary: Codable, Sendable {
     }
 }
 
-public struct SessionChatSummary: Codable, Sendable {
+public struct SessionChatSummary: Codable, Sendable, Equatable {
     /// Canonical chat URI
     public var resource: String
     /// Human-readable chat title
@@ -2643,7 +2768,7 @@ public struct SessionChatSummary: Codable, Sendable {
     }
 }
 
-public struct ChangesSummary: Codable, Sendable {
+public struct ChangesSummary: Codable, Sendable, Equatable {
     /// Total number of inserted lines across all changed files.
     public var additions: Int?
     /// Total number of deleted lines across all changed files.
@@ -2662,7 +2787,7 @@ public struct ChangesSummary: Codable, Sendable {
     }
 }
 
-public struct ProjectInfo: Codable, Sendable {
+public struct ProjectInfo: Codable, Sendable, Equatable {
     /// Project URI
     public var uri: String
     /// Human-readable project name
@@ -2677,7 +2802,7 @@ public struct ProjectInfo: Codable, Sendable {
     }
 }
 
-public struct SessionConfigState: Codable, Sendable {
+public struct SessionConfigState: Codable, Sendable, Equatable {
     /// JSON Schema describing available configuration properties
     public var schema: SessionConfigSchema
     /// Current configuration values
@@ -2692,7 +2817,7 @@ public struct SessionConfigState: Codable, Sendable {
     }
 }
 
-public struct ChatConfigState: Codable, Sendable {
+public struct ChatConfigState: Codable, Sendable, Equatable {
     /// Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
     /// {@link ChatState.provider | `provider`} differs from the session's; when
@@ -2714,7 +2839,7 @@ public struct ChatConfigState: Codable, Sendable {
     }
 }
 
-public struct Turn: Codable, Sendable {
+public struct Turn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String
     /// ISO 8601 timestamp when this turn started.
@@ -2752,7 +2877,7 @@ public struct Turn: Codable, Sendable {
     }
 }
 
-public struct ActiveTurn: Codable, Sendable {
+public struct ActiveTurn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String
     /// ISO 8601 timestamp when this turn started.
@@ -2781,7 +2906,7 @@ public struct ActiveTurn: Codable, Sendable {
     }
 }
 
-public struct Message: Codable, Sendable {
+public struct Message: Codable, Sendable, Equatable {
     /// Message text
     public var text: String
     /// The origin of the message
@@ -2808,8 +2933,10 @@ public struct Message: Codable, Sendable {
     /// agent hosts MAY use it to carry context that does not fit any other
     /// field. Mirrors the MCP `_meta` convention.
     public var meta: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case text
         case origin
         case attachments
@@ -2824,7 +2951,8 @@ public struct Message: Codable, Sendable {
         attachments: [MessageAttachment]? = nil,
         model: ModelSelection? = nil,
         agent: AgentSelection? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.text = text
         self.origin = origin
@@ -2832,21 +2960,64 @@ public struct Message: Codable, Sendable {
         self.model = model
         self.agent = agent
         self.meta = meta
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.origin = try container.decode(MessageOrigin.self, forKey: .origin)
+        self.attachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments)
+        self.model = try container.decodeIfPresent(ModelSelection.self, forKey: .model)
+        self.agent = try container.decodeIfPresent(AgentSelection.self, forKey: .agent)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.text, forKey: .text)
+        try container.encode(self.origin, forKey: .origin)
+        try container.encodeIfPresent(self.attachments, forKey: .attachments)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.agent, forKey: .agent)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MessageOrigin: Codable, Sendable {
+public struct MessageOrigin: Codable, Sendable, Equatable {
     /// The kind of actor that produced the message.
     public var kind: MessageKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: MessageKind
+        kind: MessageKind,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(MessageKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct ChatInputOption: Codable, Sendable {
+public struct ChatInputOption: Codable, Sendable, Equatable {
     /// Stable option identifier; for MCP enum values this is the enum string
     public var id: String
     /// Display label
@@ -2869,7 +3040,7 @@ public struct ChatInputOption: Codable, Sendable {
     }
 }
 
-public struct ChatInputTextAnswerValue: Codable, Sendable {
+public struct ChatInputTextAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: String
 
@@ -2882,7 +3053,7 @@ public struct ChatInputTextAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputNumberAnswerValue: Codable, Sendable {
+public struct ChatInputNumberAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: Double
 
@@ -2895,7 +3066,7 @@ public struct ChatInputNumberAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputBooleanAnswerValue: Codable, Sendable {
+public struct ChatInputBooleanAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: Bool
 
@@ -2908,7 +3079,7 @@ public struct ChatInputBooleanAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputSelectedAnswerValue: Codable, Sendable {
+public struct ChatInputSelectedAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: String
     /// Free-form text entered instead of selecting an option
@@ -2925,7 +3096,7 @@ public struct ChatInputSelectedAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputSelectedManyAnswerValue: Codable, Sendable {
+public struct ChatInputSelectedManyAnswerValue: Codable, Sendable, Equatable {
     public var kind: ChatInputAnswerValueKind
     public var value: [String]
     /// Free-form text entered in addition to selected options
@@ -2942,7 +3113,7 @@ public struct ChatInputSelectedManyAnswerValue: Codable, Sendable {
     }
 }
 
-public struct ChatInputAnswered: Codable, Sendable {
+public struct ChatInputAnswered: Codable, Sendable, Equatable {
     /// Answer state
     public var state: ChatInputAnswerState
     /// Answer value
@@ -2957,7 +3128,7 @@ public struct ChatInputAnswered: Codable, Sendable {
     }
 }
 
-public struct ChatInputSkipped: Codable, Sendable {
+public struct ChatInputSkipped: Codable, Sendable, Equatable {
     /// Answer state
     public var state: ChatInputAnswerState
     /// Free-form reason or value captured while skipping, if any
@@ -2972,7 +3143,7 @@ public struct ChatInputSkipped: Codable, Sendable {
     }
 }
 
-public struct ChatInputTextQuestion: Codable, Sendable {
+public struct ChatInputTextQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3014,7 +3185,7 @@ public struct ChatInputTextQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputNumberQuestion: Codable, Sendable {
+public struct ChatInputNumberQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3052,7 +3223,7 @@ public struct ChatInputNumberQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputBooleanQuestion: Codable, Sendable {
+public struct ChatInputBooleanQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3082,7 +3253,7 @@ public struct ChatInputBooleanQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputSingleSelectQuestion: Codable, Sendable {
+public struct ChatInputSingleSelectQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3116,7 +3287,7 @@ public struct ChatInputSingleSelectQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputMultiSelectQuestion: Codable, Sendable {
+public struct ChatInputMultiSelectQuestion: Codable, Sendable, Equatable {
     /// Stable question identifier used as the key in `answers`
     public var id: String
     /// Short display title
@@ -3158,7 +3329,7 @@ public struct ChatInputMultiSelectQuestion: Codable, Sendable {
     }
 }
 
-public struct ChatInputRequest: Codable, Sendable {
+public struct ChatInputRequest: Codable, Sendable, Equatable {
     /// Stable request identifier
     public var id: String
     /// Display message for the request as a whole
@@ -3185,48 +3356,114 @@ public struct ChatInputRequest: Codable, Sendable {
     }
 }
 
-public struct TextPosition: Codable, Sendable {
+public struct TextPosition: Codable, Sendable, Equatable {
     /// Zero-based line number.
     public var line: Int
     /// Zero-based character offset within the line.
     public var character: Int
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case line
+        case character
+    }
 
     public init(
         line: Int,
-        character: Int
+        character: Int,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.line = line
         self.character = character
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.line = try container.decode(Int.self, forKey: .line)
+        self.character = try container.decode(Int.self, forKey: .character)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.line, forKey: .line)
+        try container.encode(self.character, forKey: .character)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct TextRange: Codable, Sendable {
+public struct TextRange: Codable, Sendable, Equatable {
     /// Start position of the range.
     public var start: TextPosition
     /// End position of the range.
     public var end: TextPosition
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case start
+        case end
+    }
 
     public init(
         start: TextPosition,
-        end: TextPosition
+        end: TextPosition,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.start = start
         self.end = end
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.start = try container.decode(TextPosition.self, forKey: .start)
+        self.end = try container.decode(TextPosition.self, forKey: .end)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.start, forKey: .start)
+        try container.encode(self.end, forKey: .end)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct TextSelection: Codable, Sendable {
+public struct TextSelection: Codable, Sendable, Equatable {
     /// The range covered by the selection.
     public var range: TextRange
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case range
+    }
 
     public init(
-        range: TextRange
+        range: TextRange,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.range = range
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.range = try container.decode(TextRange.self, forKey: .range)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.range, forKey: .range)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct SimpleMessageAttachment: Codable, Sendable {
+public struct SimpleMessageAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3260,8 +3497,10 @@ public struct SimpleMessageAttachment: Codable, Sendable {
     /// property MAY be omitted when the attachment originated from a
     /// `completions` response.
     public var modelRepresentation: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3276,7 +3515,8 @@ public struct SimpleMessageAttachment: Codable, Sendable {
         displayKind: String? = nil,
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
-        modelRepresentation: String? = nil
+        modelRepresentation: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3284,10 +3524,33 @@ public struct SimpleMessageAttachment: Codable, Sendable {
         self.meta = meta
         self.type = type
         self.modelRepresentation = modelRepresentation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.modelRepresentation = try container.decodeIfPresent(String.self, forKey: .modelRepresentation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.modelRepresentation, forKey: .modelRepresentation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
+public struct MessageEmbeddedResourceAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3322,8 +3585,10 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
     ///
     /// Only meaningful for textual resources.
     public var selection: TextSelection?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3342,7 +3607,8 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
         type: MessageAttachmentKind,
         data: String,
         contentType: String,
-        selection: TextSelection? = nil
+        selection: TextSelection? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3352,10 +3618,37 @@ public struct MessageEmbeddedResourceAttachment: Codable, Sendable {
         self.data = data
         self.contentType = contentType
         self.selection = selection
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.data = try container.decode(String.self, forKey: .data)
+        self.contentType = try container.decode(String.self, forKey: .contentType)
+        self.selection = try container.decodeIfPresent(TextSelection.self, forKey: .selection)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.data, forKey: .data)
+        try container.encode(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.selection, forKey: .selection)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MessageResourceAttachment: Codable, Sendable {
+public struct MessageResourceAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3394,8 +3687,10 @@ public struct MessageResourceAttachment: Codable, Sendable {
     ///
     /// Only meaningful for textual resources.
     public var selection: TextSelection?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3418,7 +3713,8 @@ public struct MessageResourceAttachment: Codable, Sendable {
         contentType: String? = nil,
         nonce: String? = nil,
         type: MessageAttachmentKind,
-        selection: TextSelection? = nil
+        selection: TextSelection? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3430,10 +3726,41 @@ public struct MessageResourceAttachment: Codable, Sendable {
         self.nonce = nonce
         self.type = type
         self.selection = selection
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.sizeHint = try container.decodeIfPresent(Int.self, forKey: .sizeHint)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.selection = try container.decodeIfPresent(TextSelection.self, forKey: .selection)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encodeIfPresent(self.sizeHint, forKey: .sizeHint)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.selection, forKey: .selection)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MessageAnnotationsAttachment: Codable, Sendable {
+public struct MessageAnnotationsAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3460,14 +3787,16 @@ public struct MessageAnnotationsAttachment: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Discriminant
     public var type: MessageAttachmentKind
-    /// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+    /// The annotations channel URI (`ahp-annotations:/<uuid>`).
     /// Matches {@link AnnotationsSummary.resource}.
     public var resource: String
     /// Specific {@link Annotation.id | annotation ids} to reference. When
     /// omitted, the attachment references all annotations on the channel.
     public var annotationIds: [String]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3484,7 +3813,8 @@ public struct MessageAnnotationsAttachment: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
         resource: String,
-        annotationIds: [String]? = nil
+        annotationIds: [String]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3493,10 +3823,35 @@ public struct MessageAnnotationsAttachment: Codable, Sendable {
         self.type = type
         self.resource = resource
         self.annotationIds = annotationIds
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.annotationIds = try container.decodeIfPresent([String].self, forKey: .annotationIds)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.annotationIds, forKey: .annotationIds)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MessageChatAttachment: Codable, Sendable {
+public struct MessageChatAttachment: Codable, Sendable, Equatable {
     /// A human-readable label for the attachment (e.g. the filename of a file
     /// attachment). Used for display in UI.
     public var label: String
@@ -3528,8 +3883,10 @@ public struct MessageChatAttachment: Codable, Sendable {
     /// Last completed turn included in the referenced transcript. When omitted,
     /// the host pins the latest completed turn when accepting the message.
     public var endTurn: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case label
         case range
         case displayKind
@@ -3546,7 +3903,8 @@ public struct MessageChatAttachment: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         type: MessageAttachmentKind,
         resource: String,
-        endTurn: String? = nil
+        endTurn: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.label = label
         self.range = range
@@ -3555,10 +3913,35 @@ public struct MessageChatAttachment: Codable, Sendable {
         self.type = type
         self.resource = resource
         self.endTurn = endTurn
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.displayKind = try container.decodeIfPresent(String.self, forKey: .displayKind)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(MessageAttachmentKind.self, forKey: .type)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.endTurn = try container.decodeIfPresent(String.self, forKey: .endTurn)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.label, forKey: .label)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.displayKind, forKey: .displayKind)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.endTurn, forKey: .endTurn)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct MarkdownResponsePart: Codable, Sendable {
+public struct MarkdownResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Part identifier, used by `chat/delta` to target this part for content appends
@@ -3577,7 +3960,7 @@ public struct MarkdownResponsePart: Codable, Sendable {
     }
 }
 
-public struct ContentRef: Codable, Sendable {
+public struct ContentRef: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -3586,21 +3969,50 @@ public struct ContentRef: Codable, Sendable {
     public var contentType: String?
     /// Content nonce
     public var nonce: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+        case sizeHint
+        case contentType
+        case nonce
+    }
 
     public init(
         uri: String,
         sizeHint: Int? = nil,
         contentType: String? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
         self.nonce = nonce
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.sizeHint = try container.decodeIfPresent(Int.self, forKey: .sizeHint)
+        self.contentType = try container.decodeIfPresent(String.self, forKey: .contentType)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encodeIfPresent(self.sizeHint, forKey: .sizeHint)
+        try container.encodeIfPresent(self.contentType, forKey: .contentType)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct ResourceResponsePart: Codable, Sendable {
+public struct ResourceResponsePart: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -3627,7 +4039,7 @@ public struct ResourceResponsePart: Codable, Sendable {
     }
 }
 
-public struct ToolCallResponsePart: Codable, Sendable {
+public struct ToolCallResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Full tool call lifecycle state
@@ -3642,7 +4054,7 @@ public struct ToolCallResponsePart: Codable, Sendable {
     }
 }
 
-public struct ReasoningResponsePart: Codable, Sendable {
+public struct ReasoningResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Part identifier, used by `chat/reasoning` to target this part for content appends
@@ -3669,7 +4081,7 @@ public struct ReasoningResponsePart: Codable, Sendable {
     }
 }
 
-public struct SystemNotificationResponsePart: Codable, Sendable {
+public struct SystemNotificationResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// The text of the system notification
@@ -3700,7 +4112,7 @@ public struct SystemNotificationResponsePart: Codable, Sendable {
     }
 }
 
-public struct InputRequestResponsePart: Codable, Sendable {
+public struct InputRequestResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// The request, carrying its `id`, `message`, `url`, `questions`, and current
@@ -3721,7 +4133,7 @@ public struct InputRequestResponsePart: Codable, Sendable {
     }
 }
 
-public struct ErrorResponsePart: Codable, Sendable {
+public struct ErrorResponsePart: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ResponsePartKind
     /// Error details.
@@ -3740,7 +4152,7 @@ public struct ErrorResponsePart: Codable, Sendable {
     }
 }
 
-public struct ToolCallResult: Codable, Sendable {
+public struct ToolCallResult: Codable, Sendable, Equatable {
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -3777,7 +4189,7 @@ public struct ToolCallResult: Codable, Sendable {
     }
 }
 
-public struct ToolCallStreamingState: Codable, Sendable {
+public struct ToolCallStreamingState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -3835,7 +4247,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
     }
 }
 
-public struct ToolCallPendingConfirmationState: Codable, Sendable {
+public struct ToolCallPendingConfirmationState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -3926,7 +4338,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRunningState: Codable, Sendable {
+public struct ToolCallRunningState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4007,7 +4419,7 @@ public struct ToolCallRunningState: Codable, Sendable {
     }
 }
 
-public struct ToolCallAuthRequiredState: Codable, Sendable {
+public struct ToolCallAuthRequiredState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4090,7 +4502,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     }
 }
 
-public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
+public struct ToolCallPendingResultConfirmationState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4199,7 +4611,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     }
 }
 
-public struct ToolCallCompletedState: Codable, Sendable {
+public struct ToolCallCompletedState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4308,7 +4720,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
     }
 }
 
-public struct ToolCallCancelledState: Codable, Sendable {
+public struct ToolCallCancelledState: Codable, Sendable, Equatable {
     /// Unique tool call identifier
     public var toolCallId: String
     /// Internal tool name (for debugging/logging)
@@ -4391,7 +4803,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable {
+public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable, Equatable {
     public var kind: ToolCallRiskAssessmentKind
     public var status: ToolCallRiskAssessmentStatus
 
@@ -4404,7 +4816,7 @@ public struct ToolCallRiskAssessmentLoadingState: Codable, Sendable {
     }
 }
 
-public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable {
+public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable, Equatable {
     public var kind: ToolCallRiskAssessmentKind
     public var status: ToolCallRiskAssessmentStatus
     public var reason: StringOrMarkdown
@@ -4424,7 +4836,7 @@ public struct ToolCallRiskAssessmentCompleteState: Codable, Sendable {
     }
 }
 
-public struct ConfirmationOption: Codable, Sendable {
+public struct ConfirmationOption: Codable, Sendable, Equatable {
     /// Unique identifier for the option, returned in the confirmed action
     public var id: String
     /// Human-readable label displayed to the user
@@ -4451,7 +4863,7 @@ public struct ConfirmationOption: Codable, Sendable {
     }
 }
 
-public struct ToolDefinition: Codable, Sendable {
+public struct ToolDefinition: Codable, Sendable, Equatable {
     /// Unique tool identifier
     public var name: String
     /// Human-readable display name
@@ -4503,7 +4915,7 @@ public struct ToolDefinition: Codable, Sendable {
     }
 }
 
-public struct ToolAnnotations: Codable, Sendable {
+public struct ToolAnnotations: Codable, Sendable, Equatable {
     /// Alternate human-readable title
     public var title: String?
     /// Tool does not modify its environment (default: false)
@@ -4530,7 +4942,7 @@ public struct ToolAnnotations: Codable, Sendable {
     }
 }
 
-public struct ToolResultTextContent: Codable, Sendable {
+public struct ToolResultTextContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// The text content
     public var text: String
@@ -4544,7 +4956,7 @@ public struct ToolResultTextContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultEmbeddedResourceContent: Codable, Sendable {
+public struct ToolResultEmbeddedResourceContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Base64-encoded data
     public var data: String
@@ -4562,7 +4974,7 @@ public struct ToolResultEmbeddedResourceContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultResourceContent: Codable, Sendable {
+public struct ToolResultResourceContent: Codable, Sendable, Equatable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -4588,7 +5000,7 @@ public struct ToolResultResourceContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultFileEditContent: Codable, Sendable {
+public struct ToolResultFileEditContent: Codable, Sendable, Equatable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
@@ -4610,7 +5022,7 @@ public struct ToolResultFileEditContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultTerminalContent: Codable, Sendable {
+public struct ToolResultTerminalContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Terminal URI (subscribable for live or retained terminal state)
     public var resource: String
@@ -4638,7 +5050,7 @@ public struct ToolResultTerminalContent: Codable, Sendable {
     }
 }
 
-public struct ToolResultSubagentContent: Codable, Sendable {
+public struct ToolResultSubagentContent: Codable, Sendable, Equatable {
     public var type: ToolResultContentType
     /// Worker chat URI (subscribable for full chat state)
     public var resource: String
@@ -4664,55 +5076,141 @@ public struct ToolResultSubagentContent: Codable, Sendable {
     }
 }
 
-public struct CustomizationLoadingState: Codable, Sendable {
+public struct CustomizationLoadingState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: CustomizationLoadStatus
+        kind: CustomizationLoadStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct CustomizationLoadedState: Codable, Sendable {
+public struct CustomizationLoadedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: CustomizationLoadStatus
+        kind: CustomizationLoadStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct CustomizationDegradedState: Codable, Sendable {
+public struct CustomizationDegradedState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable description of the warning.
     public var message: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case message
+    }
 
     public init(
         kind: CustomizationLoadStatus,
-        message: String
+        message: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.message = message
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.message, forKey: .message)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct CustomizationErrorState: Codable, Sendable {
+public struct CustomizationErrorState: Codable, Sendable, Equatable {
     public var kind: CustomizationLoadStatus
     /// Human-readable error message.
     public var message: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case message
+    }
 
     public init(
         kind: CustomizationLoadStatus,
-        message: String
+        message: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.message = message
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(CustomizationLoadStatus.self, forKey: .kind)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.message, forKey: .message)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct PluginCustomization: Codable, Sendable {
+public struct PluginCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -4762,8 +5260,10 @@ public struct PluginCustomization: Codable, Sendable {
     /// has no version concept. Provenance / display only: the host neither
     /// parses nor enforces it.
     public var version: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -4790,7 +5290,8 @@ public struct PluginCustomization: Codable, Sendable {
         children: [ChildCustomization]? = nil,
         type: CustomizationType,
         enablement: [CustomizationEnablement]? = nil,
-        version: String? = nil
+        version: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -4804,10 +5305,45 @@ public struct PluginCustomization: Codable, Sendable {
         self.type = type
         self.enablement = enablement
         self.version = version
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+        self.load = try container.decodeIfPresent(CustomizationLoadState.self, forKey: .load)
+        self.children = try container.decodeIfPresent([ChildCustomization].self, forKey: .children)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.version = try container.decodeIfPresent(String.self, forKey: .version)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.load, forKey: .load)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encodeIfPresent(self.version, forKey: .version)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct ClientPluginCustomization: Codable, Sendable {
+public struct ClientPluginCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -4868,8 +5404,10 @@ public struct ClientPluginCustomization: Codable, Sendable {
     /// carries the client's global decision for each one; the host applies it
     /// under the child's durable key.
     public var childEnablement: [String: [CustomizationEnablement]]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -4900,7 +5438,8 @@ public struct ClientPluginCustomization: Codable, Sendable {
         enablement: [CustomizationEnablement]? = nil,
         version: String? = nil,
         nonce: String? = nil,
-        childEnablement: [String: [CustomizationEnablement]]? = nil
+        childEnablement: [String: [CustomizationEnablement]]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -4916,10 +5455,49 @@ public struct ClientPluginCustomization: Codable, Sendable {
         self.version = version
         self.nonce = nonce
         self.childEnablement = childEnablement
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+        self.load = try container.decodeIfPresent(CustomizationLoadState.self, forKey: .load)
+        self.children = try container.decodeIfPresent([ChildCustomization].self, forKey: .children)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.version = try container.decodeIfPresent(String.self, forKey: .version)
+        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
+        self.childEnablement = try container.decodeIfPresent([String: [CustomizationEnablement]].self, forKey: .childEnablement)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.load, forKey: .load)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encodeIfPresent(self.version, forKey: .version)
+        try container.encodeIfPresent(self.nonce, forKey: .nonce)
+        try container.encodeIfPresent(self.childEnablement, forKey: .childEnablement)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct DirectoryCustomization: Codable, Sendable {
+public struct DirectoryCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5014,7 +5592,7 @@ public struct DirectoryCustomization: Codable, Sendable {
     }
 }
 
-public struct AgentCustomization: Codable, Sendable {
+public struct AgentCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5080,8 +5658,10 @@ public struct AgentCustomization: Codable, Sendable {
     /// in a picker); it remains available for the agent to auto-delegate
     /// to. Absent or `false` means the user may select it.
     public var disableUserInvocation: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5110,7 +5690,8 @@ public struct AgentCustomization: Codable, Sendable {
         model: String? = nil,
         tools: [String]? = nil,
         disableModelInvocation: Bool? = nil,
-        disableUserInvocation: Bool? = nil
+        disableUserInvocation: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5125,10 +5706,47 @@ public struct AgentCustomization: Codable, Sendable {
         self.tools = tools
         self.disableModelInvocation = disableModelInvocation
         self.disableUserInvocation = disableUserInvocation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.model = try container.decodeIfPresent(String.self, forKey: .model)
+        self.tools = try container.decodeIfPresent([String].self, forKey: .tools)
+        self.disableModelInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableModelInvocation)
+        self.disableUserInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableUserInvocation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.tools, forKey: .tools)
+        try container.encodeIfPresent(self.disableModelInvocation, forKey: .disableModelInvocation)
+        try container.encodeIfPresent(self.disableUserInvocation, forKey: .disableUserInvocation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct SkillCustomization: Codable, Sendable {
+public struct SkillCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5182,8 +5800,10 @@ public struct SkillCustomization: Codable, Sendable {
     /// as a slash command); it remains available for the agent to
     /// auto-invoke. Absent or `false` means the user may invoke it.
     public var disableUserInvocation: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5208,7 +5828,8 @@ public struct SkillCustomization: Codable, Sendable {
         type: CustomizationType,
         description: String? = nil,
         disableModelInvocation: Bool? = nil,
-        disableUserInvocation: Bool? = nil
+        disableUserInvocation: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5221,10 +5842,43 @@ public struct SkillCustomization: Codable, Sendable {
         self.description = description
         self.disableModelInvocation = disableModelInvocation
         self.disableUserInvocation = disableUserInvocation
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.disableModelInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableModelInvocation)
+        self.disableUserInvocation = try container.decodeIfPresent(Bool.self, forKey: .disableUserInvocation)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.disableModelInvocation, forKey: .disableModelInvocation)
+        try container.encodeIfPresent(self.disableUserInvocation, forKey: .disableUserInvocation)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct PromptCustomization: Codable, Sendable {
+public struct PromptCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5269,8 +5923,10 @@ public struct PromptCustomization: Codable, Sendable {
     public var type: CustomizationType
     /// Short description of what the prompt does.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5291,7 +5947,8 @@ public struct PromptCustomization: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5302,10 +5959,39 @@ public struct PromptCustomization: Codable, Sendable {
         self.enabled = enabled
         self.type = type
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct RuleCustomization: Codable, Sendable {
+public struct RuleCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5357,8 +6043,10 @@ public struct RuleCustomization: Codable, Sendable {
     /// Glob patterns the rule applies to. When present, the rule is only
     /// active for matching files.
     public var globs: [String]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5383,7 +6071,8 @@ public struct RuleCustomization: Codable, Sendable {
         type: CustomizationType,
         description: String? = nil,
         alwaysApply: Bool? = nil,
-        globs: [String]? = nil
+        globs: [String]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5396,10 +6085,43 @@ public struct RuleCustomization: Codable, Sendable {
         self.description = description
         self.alwaysApply = alwaysApply
         self.globs = globs
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.alwaysApply = try container.decodeIfPresent(Bool.self, forKey: .alwaysApply)
+        self.globs = try container.decodeIfPresent([String].self, forKey: .globs)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encodeIfPresent(self.alwaysApply, forKey: .alwaysApply)
+        try container.encodeIfPresent(self.globs, forKey: .globs)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct HookCustomization: Codable, Sendable {
+public struct HookCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5442,8 +6164,10 @@ public struct HookCustomization: Codable, Sendable {
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
     public var enabled: Bool?
     public var type: CustomizationType
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5462,7 +6186,8 @@ public struct HookCustomization: Codable, Sendable {
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
-        type: CustomizationType
+        type: CustomizationType,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5472,10 +6197,37 @@ public struct HookCustomization: Codable, Sendable {
         self.meta = meta
         self.enabled = enabled
         self.type = type
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encodeIfPresent(self.enabled, forKey: .enabled)
+        try container.encode(self.type, forKey: .type)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerCustomization: Codable, Sendable {
+public struct McpServerCustomization: Codable, Sendable, Equatable {
     /// Session-unique opaque identifier. Used by every action that targets a
     /// specific customization. Minted by whoever publishes the customization
     /// (typically the agent host).
@@ -5552,8 +6304,10 @@ public struct McpServerCustomization: Codable, Sendable {
     /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
     /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
     public var children: [SkillCustomization]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case uri
         case name
@@ -5580,7 +6334,8 @@ public struct McpServerCustomization: Codable, Sendable {
         state: McpServerState,
         channel: String? = nil,
         mcpApp: McpServerCustomizationApps? = nil,
-        children: [SkillCustomization]? = nil
+        children: [SkillCustomization]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.uri = uri
@@ -5594,25 +6349,80 @@ public struct McpServerCustomization: Codable, Sendable {
         self.channel = channel
         self.mcpApp = mcpApp
         self.children = children
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.uri = try container.decode(String.self, forKey: .uri)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
+        self.range = try container.decodeIfPresent(TextRange.self, forKey: .range)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.type = try container.decode(CustomizationType.self, forKey: .type)
+        self.enablement = try container.decodeIfPresent([CustomizationEnablement].self, forKey: .enablement)
+        self.state = try container.decode(McpServerState.self, forKey: .state)
+        self.channel = try container.decodeIfPresent(String.self, forKey: .channel)
+        self.mcpApp = try container.decodeIfPresent(McpServerCustomizationApps.self, forKey: .mcpApp)
+        self.children = try container.decodeIfPresent([SkillCustomization].self, forKey: .children)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.name, forKey: .name)
+        try container.encodeIfPresent(self.icons, forKey: .icons)
+        try container.encodeIfPresent(self.range, forKey: .range)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try container.encode(self.type, forKey: .type)
+        try container.encodeIfPresent(self.enablement, forKey: .enablement)
+        try container.encode(self.state, forKey: .state)
+        try container.encodeIfPresent(self.channel, forKey: .channel)
+        try container.encodeIfPresent(self.mcpApp, forKey: .mcpApp)
+        try container.encodeIfPresent(self.children, forKey: .children)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerCustomizationApps: Codable, Sendable {
+public struct McpServerCustomizationApps: Codable, Sendable, Equatable {
     /// The subset of MCP App
     /// [`HostCapabilities`](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx)
     /// the AHP host can satisfy for Views backed by this server. The
     /// client feeds these straight through into the `hostCapabilities` of
     /// the `ui/initialize` response delivered to the View.
     public var capabilities: AhpMcpUiHostCapabilities
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case capabilities
+    }
 
     public init(
-        capabilities: AhpMcpUiHostCapabilities
+        capabilities: AhpMcpUiHostCapabilities,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.capabilities = capabilities
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.capabilities = try container.decode(AhpMcpUiHostCapabilities.self, forKey: .capabilities)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.capabilities, forKey: .capabilities)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AhpMcpUiHostCapabilities: Codable, Sendable {
+public struct AhpMcpUiHostCapabilities: Codable, Sendable, Equatable {
     /// Producer proxies the MCP `tools/*` methods to the upstream server.
     public var serverTools: AnyCodable?
     /// Producer proxies the MCP `resources/*` methods to the upstream server.
@@ -5621,21 +6431,50 @@ public struct AhpMcpUiHostCapabilities: Codable, Sendable {
     public var logging: [String: AnyCodable]?
     /// Producer serves `sampling/createMessage` via `mcpMethodCall`.
     public var sampling: AnyCodable?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case serverTools
+        case serverResources
+        case logging
+        case sampling
+    }
 
     public init(
         serverTools: AnyCodable? = nil,
         serverResources: AnyCodable? = nil,
         logging: [String: AnyCodable]? = nil,
-        sampling: AnyCodable? = nil
+        sampling: AnyCodable? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.serverTools = serverTools
         self.serverResources = serverResources
         self.logging = logging
         self.sampling = sampling
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.serverTools = try container.decodeIfPresent(AnyCodable.self, forKey: .serverTools)
+        self.serverResources = try container.decodeIfPresent(AnyCodable.self, forKey: .serverResources)
+        self.logging = try container.decodeIfPresent([String: AnyCodable].self, forKey: .logging)
+        self.sampling = try container.decodeIfPresent(AnyCodable.self, forKey: .sampling)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.serverTools, forKey: .serverTools)
+        try container.encodeIfPresent(self.serverResources, forKey: .serverResources)
+        try container.encodeIfPresent(self.logging, forKey: .logging)
+        try container.encodeIfPresent(self.sampling, forKey: .sampling)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerStartingState: Codable, Sendable {
+public struct McpServerStartingState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
     /// Hosts SHOULD set this to `true` when this server's startup will hold back
     /// the processing of new messages (for example, the next turn) while the
@@ -5646,27 +6485,70 @@ public struct McpServerStartingState: Codable, Sendable {
     /// through an appropriate affordance to ask the host to background the
     /// startup.
     public var blocking: Bool?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case blocking
+    }
 
     public init(
         kind: McpServerStatus,
-        blocking: Bool? = nil
+        blocking: Bool? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.blocking = blocking
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.blocking = try container.decodeIfPresent(Bool.self, forKey: .blocking)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encodeIfPresent(self.blocking, forKey: .blocking)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerReadyState: Codable, Sendable {
+public struct McpServerReadyState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerAuthRequiredState: Codable, Sendable {
+public struct McpServerAuthRequiredState: Codable, Sendable, Equatable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
     /// Pre-registered OAuth client to use for authorization. When present, clients
@@ -5686,6 +6568,17 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
     /// Human-readable hint, typically from the OAuth `error_description`.
     public var description: String?
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case reason
+        case oauthClient
+        case resource
+        case requiredScopes
+        case description
+        case kind
+    }
 
     public init(
         reason: McpAuthRequiredReason,
@@ -5693,7 +6586,8 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
         description: String? = nil,
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
         self.oauthClient = oauthClient
@@ -5701,50 +6595,139 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
         self.requiredScopes = requiredScopes
         self.description = description
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reason = try container.decode(McpAuthRequiredReason.self, forKey: .reason)
+        self.oauthClient = try container.decodeIfPresent(McpOAuthClient.self, forKey: .oauthClient)
+        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
+        self.requiredScopes = try container.decodeIfPresent([String].self, forKey: .requiredScopes)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.reason, forKey: .reason)
+        try container.encodeIfPresent(self.oauthClient, forKey: .oauthClient)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.requiredScopes, forKey: .requiredScopes)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerErrorState: Codable, Sendable {
+public struct McpServerErrorState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
     /// Error details.
     public var error: ErrorInfo
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case error
+    }
 
     public init(
         kind: McpServerStatus,
-        error: ErrorInfo
+        error: ErrorInfo,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.error = error
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.error = try container.decode(ErrorInfo.self, forKey: .error)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.error, forKey: .error)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpServerStoppedState: Codable, Sendable {
+public struct McpServerStoppedState: Codable, Sendable, Equatable {
     public var kind: McpServerStatus
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
 
     public init(
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(McpServerStatus.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpOAuthClient: Codable, Sendable {
+public struct McpOAuthClient: Codable, Sendable, Equatable {
     /// OAuth client identifier registered with the authorization server.
     public var clientId: String
     /// OAuth client secret for a confidential client. Absence means the client is
     /// public and uses a secretless flow such as authorization code with PKCE.
     public var clientSecret: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case clientId
+        case clientSecret
+    }
 
     public init(
         clientId: String,
-        clientSecret: String? = nil
+        clientSecret: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.clientId = clientId
         self.clientSecret = clientSecret
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.clientId = try container.decode(String.self, forKey: .clientId)
+        self.clientSecret = try container.decodeIfPresent(String.self, forKey: .clientSecret)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.clientSecret, forKey: .clientSecret)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct McpAuthRequirement: Codable, Sendable {
+public struct McpAuthRequirement: Codable, Sendable, Equatable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
     /// Pre-registered OAuth client to use for authorization. When present, clients
@@ -5763,23 +6746,55 @@ public struct McpAuthRequirement: Codable, Sendable {
     public var requiredScopes: [String]?
     /// Human-readable hint, typically from the OAuth `error_description`.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case reason
+        case oauthClient
+        case resource
+        case requiredScopes
+        case description
+    }
 
     public init(
         reason: McpAuthRequiredReason,
         oauthClient: McpOAuthClient? = nil,
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
         self.oauthClient = oauthClient
         self.resource = resource
         self.requiredScopes = requiredScopes
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reason = try container.decode(McpAuthRequiredReason.self, forKey: .reason)
+        self.oauthClient = try container.decodeIfPresent(McpOAuthClient.self, forKey: .oauthClient)
+        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
+        self.requiredScopes = try container.decodeIfPresent([String].self, forKey: .requiredScopes)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.reason, forKey: .reason)
+        try container.encodeIfPresent(self.oauthClient, forKey: .oauthClient)
+        try container.encode(self.resource, forKey: .resource)
+        try container.encodeIfPresent(self.requiredScopes, forKey: .requiredScopes)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct ToolCallClientContributor: Codable, Sendable {
+public struct ToolCallClientContributor: Codable, Sendable, Equatable {
     public var kind: ToolCallContributorKind
     /// If this tool is provided by a client, the `clientId` of the owning client.
     /// Absent for server-side tools.
@@ -5797,7 +6812,7 @@ public struct ToolCallClientContributor: Codable, Sendable {
     }
 }
 
-public struct ToolCallMcpContributor: Codable, Sendable {
+public struct ToolCallMcpContributor: Codable, Sendable, Equatable {
     public var kind: ToolCallContributorKind
     /// Customization ID of the corresponding MCP server in {@link SessionState.customizations}.
     public var customizationId: String
@@ -5811,7 +6826,7 @@ public struct ToolCallMcpContributor: Codable, Sendable {
     }
 }
 
-public struct FileEditSide: Codable, Sendable {
+public struct FileEditSide: Codable, Sendable, Equatable {
     /// URI of the file on this side of the edit
     public var uri: String
     /// Reference to the file content on this side of the edit
@@ -5826,7 +6841,7 @@ public struct FileEditSide: Codable, Sendable {
     }
 }
 
-public struct FileEditDiffStats: Codable, Sendable {
+public struct FileEditDiffStats: Codable, Sendable, Equatable {
     /// Number of items added (e.g., lines for text files, cells for notebooks)
     public var added: Int?
     /// Number of items removed (e.g., lines for text files, cells for notebooks)
@@ -5841,7 +6856,7 @@ public struct FileEditDiffStats: Codable, Sendable {
     }
 }
 
-public struct FileEdit: Codable, Sendable {
+public struct FileEdit: Codable, Sendable, Equatable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
@@ -5860,7 +6875,7 @@ public struct FileEdit: Codable, Sendable {
     }
 }
 
-public struct FileEditCollection: Codable, Sendable {
+public struct FileEditCollection: Codable, Sendable, Equatable {
     public var items: [FileEdit]
 
     public init(
@@ -5870,7 +6885,7 @@ public struct FileEditCollection: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandResult: Codable, Sendable {
+public struct TerminalCommandResult: Codable, Sendable, Equatable {
     /// Exit code from the completed command, if reported by the runtime
     public var exitCode: Int?
     /// Preview of the command's output, for clients that are not subscribed
@@ -5892,7 +6907,7 @@ public struct TerminalCommandResult: Codable, Sendable {
     }
 }
 
-public struct TerminalInfo: Codable, Sendable {
+public struct TerminalInfo: Codable, Sendable, Equatable {
     /// Terminal URI (subscribable for full terminal state)
     public var resource: String
     /// Human-readable terminal title
@@ -5915,7 +6930,7 @@ public struct TerminalInfo: Codable, Sendable {
     }
 }
 
-public struct TerminalClientClaim: Codable, Sendable {
+public struct TerminalClientClaim: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: TerminalClaimKind
     /// The `clientId` of the claiming client
@@ -5930,7 +6945,7 @@ public struct TerminalClientClaim: Codable, Sendable {
     }
 }
 
-public struct TerminalSessionClaim: Codable, Sendable {
+public struct TerminalSessionClaim: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: TerminalClaimKind
     /// Session URI that claimed the terminal
@@ -5957,7 +6972,7 @@ public struct TerminalSessionClaim: Codable, Sendable {
     }
 }
 
-public struct TerminalRunningLifecycleState: Codable, Sendable {
+public struct TerminalRunningLifecycleState: Codable, Sendable, Equatable {
     public var status: TerminalLifecycleStatus
 
     public init(
@@ -5967,7 +6982,7 @@ public struct TerminalRunningLifecycleState: Codable, Sendable {
     }
 }
 
-public struct TerminalExitedLifecycleState: Codable, Sendable {
+public struct TerminalExitedLifecycleState: Codable, Sendable, Equatable {
     public var status: TerminalLifecycleStatus
     /// Process exit code, if the runtime reported one.
     public var exitCode: Int?
@@ -5981,7 +6996,7 @@ public struct TerminalExitedLifecycleState: Codable, Sendable {
     }
 }
 
-public struct TerminalState: Codable, Sendable {
+public struct TerminalState: Codable, Sendable, Equatable {
     /// Human-readable terminal title
     public var title: String
     /// Current working directory of the terminal process
@@ -6036,7 +7051,7 @@ public struct TerminalState: Codable, Sendable {
     }
 }
 
-public struct TerminalUnclassifiedPart: Codable, Sendable {
+public struct TerminalUnclassifiedPart: Codable, Sendable, Equatable {
     public var type: String
     /// Accumulated VT output. Appended to by `terminal/data` when no command is executing.
     public var value: String
@@ -6050,7 +7065,7 @@ public struct TerminalUnclassifiedPart: Codable, Sendable {
     }
 }
 
-public struct TerminalCommandPart: Codable, Sendable {
+public struct TerminalCommandPart: Codable, Sendable, Equatable {
     public var type: String
     /// Stable id matching the `commandId` on the corresponding
     /// `terminal/commandExecuted` and `terminal/commandFinished` actions.
@@ -6090,7 +7105,7 @@ public struct TerminalCommandPart: Codable, Sendable {
     }
 }
 
-public struct UsageInfo: Codable, Sendable {
+public struct UsageInfo: Codable, Sendable, Equatable {
     /// Input tokens consumed
     public var inputTokens: Int?
     /// Output tokens generated
@@ -6126,7 +7141,7 @@ public struct UsageInfo: Codable, Sendable {
     }
 }
 
-public struct ErrorInfo: Codable, Sendable {
+public struct ErrorInfo: Codable, Sendable, Equatable {
     /// Error type identifier
     public var errorType: String
     /// Human-readable error message
@@ -6137,8 +7152,10 @@ public struct ErrorInfo: Codable, Sendable {
     /// Clients MAY look for well-known optional keys here to provide enhanced UI
     /// (e.g. a structured chat fetch error for richer, localized messaging).
     public var meta: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case errorType
         case message
         case stack
@@ -6149,16 +7166,36 @@ public struct ErrorInfo: Codable, Sendable {
         errorType: String,
         message: String,
         stack: String? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.errorType = errorType
         self.message = message
         self.stack = stack
         self.meta = meta
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.errorType = try container.decode(String.self, forKey: .errorType)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.stack = try container.decodeIfPresent(String.self, forKey: .stack)
+        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.errorType, forKey: .errorType)
+        try container.encode(self.message, forKey: .message)
+        try container.encodeIfPresent(self.stack, forKey: .stack)
+        try container.encodeIfPresent(self.meta, forKey: .meta)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct Snapshot: Codable, Sendable {
+public struct Snapshot: Codable, Sendable, Equatable {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
     public var resource: String
     /// The current state of the resource. A channel with no state fields, such as a
@@ -6169,6 +7206,12 @@ public struct Snapshot: Codable, Sendable {
     /// The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`.
     public var fromSeq: Int
 
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case state
+        case fromSeq
+    }
+
     public init(
         resource: String,
         state: SnapshotState,
@@ -6177,6 +7220,13 @@ public struct Snapshot: Codable, Sendable {
         self.resource = resource
         self.state = state
         self.fromSeq = fromSeq
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.state = try SnapshotState.decode(resource: resource, from: container.superDecoder(forKey: .state))
+        self.fromSeq = try container.decode(Int.self, forKey: .fromSeq)
     }
 }
 
@@ -6189,7 +7239,7 @@ public struct Snapshot: Codable, Sendable {
 /// the server MAY omit a snapshot whose state is an `EmptyState`.
 ///
 /// Stability: 1.0 - Early development.
-public struct EmptyState: Codable, Sendable {
+public struct EmptyState: Codable, Sendable, Equatable {
 
     public init(
 
@@ -6197,7 +7247,7 @@ public struct EmptyState: Codable, Sendable {
     }
 }
 
-public struct CanvasReference: Codable, Sendable {
+public struct CanvasReference: Codable, Sendable, Equatable {
     /// Canvas channel URI. Subscribe to this resource for the full state.
     public var resource: String
 
@@ -6208,7 +7258,7 @@ public struct CanvasReference: Codable, Sendable {
     }
 }
 
-public struct CanvasState: Codable, Sendable {
+public struct CanvasState: Codable, Sendable, Equatable {
     /// Stable caller-supplied instance identifier.
     public var instanceId: String
     /// Owning extension/provider identifier.
@@ -6256,7 +7306,7 @@ public struct CanvasState: Codable, Sendable {
     }
 }
 
-public struct Changeset: Codable, Sendable {
+public struct Changeset: Codable, Sendable, Equatable {
     /// Human-readable label, e.g. `"Uncommitted Changes"`.
     public var label: String
     /// RFC 6570 URI template. Clients parse the variables directly out of the
@@ -6320,7 +7370,7 @@ public struct Changeset: Codable, Sendable {
     }
 }
 
-public struct ChangesetCapabilities: Codable, Sendable {
+public struct ChangesetCapabilities: Codable, Sendable, Equatable {
     /// The changeset supports the per-file **review** workflow. When declared,
     /// clients MAY surface a GitHub-style "Viewed" toggle per file and dispatch
     /// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
@@ -6335,7 +7385,7 @@ public struct ChangesetCapabilities: Codable, Sendable {
     }
 }
 
-public struct ChangesetState: Codable, Sendable {
+public struct ChangesetState: Codable, Sendable, Equatable {
     /// Computation lifecycle.
     public var status: ChangesetStatus
     /// Present iff `status === ChangesetStatus.Error`.
@@ -6359,7 +7409,7 @@ public struct ChangesetState: Codable, Sendable {
     }
 }
 
-public struct ChangesetFile: Codable, Sendable {
+public struct ChangesetFile: Codable, Sendable, Equatable {
     /// Stable identifier within the changeset. Typically `after.uri`
     /// (or `before.uri` for deletions).
     public var id: String
@@ -6420,7 +7470,7 @@ public struct ChangesetFile: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperation: Codable, Sendable {
+public struct ChangesetOperation: Codable, Sendable, Equatable {
     /// Stable identifier, unique within this changeset.
     public var id: String
     /// Human-readable button/menu label.
@@ -6477,11 +7527,10 @@ public struct ChangesetOperation: Codable, Sendable {
     }
 }
 
-public struct AnnotationsSummary: Codable, Sendable {
+public struct AnnotationsSummary: Codable, Sendable, Equatable {
     /// The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.
+    /// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.
     public var resource: String
     /// Total number of {@link Annotation} entries in the channel.
     public var annotationCount: Int
@@ -6499,7 +7548,7 @@ public struct AnnotationsSummary: Codable, Sendable {
     }
 }
 
-public struct AnnotationsState: Codable, Sendable {
+public struct AnnotationsState: Codable, Sendable, Equatable {
     /// Annotations in this channel, keyed by {@link Annotation.id}.
     public var annotations: [Annotation]
 
@@ -6510,7 +7559,7 @@ public struct AnnotationsState: Codable, Sendable {
     }
 }
 
-public struct AnnotationOrigin: Codable, Sendable {
+public struct AnnotationOrigin: Codable, Sendable, Equatable {
     /// Owning session URI.
     public var session: String
     /// Owning chat URI, when the annotation is scoped to a chat.
@@ -6529,7 +7578,7 @@ public struct AnnotationOrigin: Codable, Sendable {
     }
 }
 
-public struct Annotation: Codable, Sendable {
+public struct Annotation: Codable, Sendable, Equatable {
     /// Stable identifier within the annotations channel. Assigned by the client
     /// that dispatches the creating {@link AnnotationsSetAction}.
     public var id: String
@@ -6582,7 +7631,7 @@ public struct Annotation: Codable, Sendable {
     }
 }
 
-public struct AnnotationEntry: Codable, Sendable {
+public struct AnnotationEntry: Codable, Sendable, Equatable {
     /// Stable identifier within the enclosing annotation. Assigned by the client
     /// that dispatches the {@link AnnotationsEntrySetAction} (or the enclosing
     /// {@link AnnotationsSetAction}) introducing the entry.
@@ -6612,7 +7661,7 @@ public struct AnnotationEntry: Codable, Sendable {
     }
 }
 
-public struct TelemetryCapabilities: Codable, Sendable {
+public struct TelemetryCapabilities: Codable, Sendable, Equatable {
     /// Channel URI (or RFC 6570 URI template) for OTLP log records
     /// (`otlp/exportLogs` notifications).
     ///
@@ -6651,7 +7700,7 @@ public struct TelemetryCapabilities: Codable, Sendable {
     }
 }
 
-public struct ResourceWatchState: Codable, Sendable {
+public struct ResourceWatchState: Codable, Sendable, Equatable {
     /// The URI being watched. For recursive watches this is the root of the
     /// subtree; for non-recursive watches this is the single file or
     /// directory.
@@ -6681,7 +7730,7 @@ public struct ResourceWatchState: Codable, Sendable {
     }
 }
 
-public struct ResourceChange: Codable, Sendable {
+public struct ResourceChange: Codable, Sendable, Equatable {
     /// The URI of the resource that changed.
     public var uri: String
     /// The kind of change observed.
@@ -6696,7 +7745,7 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
-public struct AutomationSessionOrigin: Codable, Sendable {
+public struct AutomationSessionOrigin: Codable, Sendable, Equatable {
     public var kind: SessionOriginKind
     /// Owning {@link AutomationEntry.resource}.
     public var automation: String
@@ -6714,23 +7763,46 @@ public struct AutomationSessionOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationSchedule: Codable, Sendable {
+public struct AutomationSchedule: Codable, Sendable, Equatable {
     /// Five-field AHP cron expression described by {@link AutomationSchedule}.
     public var expression: String
     /// IANA Time Zone Database identifier used to interpret the expression, for
     /// example `"UTC"` or `"Europe/Berlin"`.
     public var timeZone: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case expression
+        case timeZone
+    }
 
     public init(
         expression: String,
-        timeZone: String
+        timeZone: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.expression = expression
         self.timeZone = timeZone
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.expression = try container.decode(String.self, forKey: .expression)
+        self.timeZone = try container.decode(String.self, forKey: .timeZone)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.expression, forKey: .expression)
+        try container.encode(self.timeZone, forKey: .timeZone)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationScheduleTrigger: Codable, Sendable {
+public struct AutomationScheduleTrigger: Codable, Sendable, Equatable {
     /// Identifier unique and stable within this automation definition. Recorded in
     /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
     /// run.
@@ -6741,21 +7813,50 @@ public struct AutomationScheduleTrigger: Codable, Sendable {
     /// Policy for missed occurrences. Omission is equivalent to
     /// {@link AutomationMisfirePolicy.RunOnce}.
     public var misfirePolicy: AutomationMisfirePolicy?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case schedule
+        case misfirePolicy
+    }
 
     public init(
         id: String,
         kind: AutomationTriggerKind,
         schedule: AutomationSchedule,
-        misfirePolicy: AutomationMisfirePolicy? = nil
+        misfirePolicy: AutomationMisfirePolicy? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.kind = kind
         self.schedule = schedule
         self.misfirePolicy = misfirePolicy
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.schedule = try container.decode(AutomationSchedule.self, forKey: .schedule)
+        self.misfirePolicy = try container.decodeIfPresent(AutomationMisfirePolicy.self, forKey: .misfirePolicy)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.schedule, forKey: .schedule)
+        try container.encodeIfPresent(self.misfirePolicy, forKey: .misfirePolicy)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationEventTrigger: Codable, Sendable {
+public struct AutomationEventTrigger: Codable, Sendable, Equatable {
     /// Identifier unique and stable within this automation definition. Recorded in
     /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
     /// run.
@@ -6775,6 +7876,18 @@ public struct AutomationEventTrigger: Codable, Sendable {
     /// Values described by {@link AutomationTriggerDefinition.configSchema}.
     /// Clients MUST preserve unknown entries when editing other fields.
     public var config: [String: AnyCodable]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case type
+        case title
+        case description
+        case events
+        case config
+    }
 
     public init(
         id: String,
@@ -6783,7 +7896,8 @@ public struct AutomationEventTrigger: Codable, Sendable {
         title: String,
         description: String? = nil,
         events: [AutomationTriggerEventDefinition],
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.kind = kind
@@ -6792,29 +7906,80 @@ public struct AutomationEventTrigger: Codable, Sendable {
         self.description = description
         self.events = events
         self.config = config
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.events = try container.decode([AutomationTriggerEventDefinition].self, forKey: .events)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.type, forKey: .type)
+        try container.encode(self.title, forKey: .title)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try container.encode(self.events, forKey: .events)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationTriggerEventDefinition: Codable, Sendable {
+public struct AutomationTriggerEventDefinition: Codable, Sendable, Equatable {
     /// Stable event id.
     public var id: String
     /// Human-readable event name.
     public var title: String
     /// Optional longer explanation of when this event fires.
     public var description: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case title
+        case description
+    }
 
     public init(
         id: String,
         title: String,
-        description: String? = nil
+        description: String? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.id = id
         self.title = title
         self.description = description
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.title, forKey: .title)
+        try container.encodeIfPresent(self.description, forKey: .description)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationTriggerDefinition: Codable, Sendable {
+public struct AutomationTriggerDefinition: Codable, Sendable, Equatable {
     /// Stable type id stored in {@link AutomationEventTrigger.type}.
     public var type: String
     /// Human-readable trigger type name.
@@ -6841,7 +8006,7 @@ public struct AutomationTriggerDefinition: Codable, Sendable {
     }
 }
 
-public struct AutomationSessionTemplate: Codable, Sendable {
+public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
     /// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
     public var provider: String?
     /// Optional model selection resolved when a run starts. Its
@@ -6882,6 +8047,17 @@ public struct AutomationSessionTemplate: Codable, Sendable {
     /// Clients MUST NOT set this field unless the host advertises
     /// {@link AutomationCapabilities.customizations}.
     public var customizations: [ClientPluginCustomization]?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case provider
+        case model
+        case agent
+        case workingDirectories
+        case config
+        case customizations
+    }
 
     public init(
         provider: String? = nil,
@@ -6889,7 +8065,8 @@ public struct AutomationSessionTemplate: Codable, Sendable {
         agent: AgentSelection? = nil,
         workingDirectories: [String]? = nil,
         config: [String: AnyCodable]? = nil,
-        customizations: [ClientPluginCustomization]? = nil
+        customizations: [ClientPluginCustomization]? = nil,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.provider = provider
         self.model = model
@@ -6897,10 +8074,33 @@ public struct AutomationSessionTemplate: Codable, Sendable {
         self.workingDirectories = workingDirectories
         self.config = config
         self.customizations = customizations
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.provider = try container.decodeIfPresent(String.self, forKey: .provider)
+        self.model = try container.decodeIfPresent(ModelSelection.self, forKey: .model)
+        self.agent = try container.decodeIfPresent(AgentSelection.self, forKey: .agent)
+        self.workingDirectories = try container.decodeIfPresent([String].self, forKey: .workingDirectories)
+        self.config = try container.decodeIfPresent([String: AnyCodable].self, forKey: .config)
+        self.customizations = try container.decodeIfPresent([ClientPluginCustomization].self, forKey: .customizations)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(self.provider, forKey: .provider)
+        try container.encodeIfPresent(self.model, forKey: .model)
+        try container.encodeIfPresent(self.agent, forKey: .agent)
+        try container.encodeIfPresent(self.workingDirectories, forKey: .workingDirectories)
+        try container.encodeIfPresent(self.config, forKey: .config)
+        try container.encodeIfPresent(self.customizations, forKey: .customizations)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationDefinition: Codable, Sendable {
+public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
     /// Initial message sent to every newly created run session. Its
@@ -6960,7 +8160,7 @@ public struct AutomationDefinition: Codable, Sendable {
     }
 }
 
-public struct AutomationDefinitionPatch: Codable, Sendable {
+public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Replacement {@link AutomationDefinition.title}.
     public var title: String?
     /// Replacement {@link AutomationDefinition.message}.
@@ -7012,35 +8212,81 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     }
 }
 
-public struct AutomationAfterRunsCondition: Codable, Sendable {
+public struct AutomationAfterRunsCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// Positive-integer cap on scheduled runs.
     public var max: Int
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case max
+    }
 
     public init(
         kind: AutomationDisableConditionKind,
-        max: Int
+        max: Int,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.max = max
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationDisableConditionKind.self, forKey: .kind)
+        self.max = try container.decode(Int.self, forKey: .max)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.max, forKey: .max)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationAfterDateCondition: Codable, Sendable {
+public struct AutomationAfterDateCondition: Codable, Sendable, Equatable {
     public var kind: AutomationDisableConditionKind
     /// ISO 8601 timestamp after which scheduling stops.
     public var date: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case date
+    }
 
     public init(
         kind: AutomationDisableConditionKind,
-        date: String
+        date: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.kind = kind
         self.date = date
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationDisableConditionKind.self, forKey: .kind)
+        self.date = try container.decode(String.self, forKey: .date)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.date, forKey: .date)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct AutomationEntry: Codable, Sendable {
+public struct AutomationEntry: Codable, Sendable, Equatable {
     /// Stable `ahp-automation:/<id>` resource identifier.
     public var resource: String
     /// Current durable definition.
@@ -7129,7 +8375,7 @@ public struct AutomationEntry: Codable, Sendable {
     }
 }
 
-public struct AutomationState: Codable, Sendable {
+public struct AutomationState: Codable, Sendable, Equatable {
     /// Full automation entries keyed by {@link AutomationEntry.resource}.
     public var entries: [AutomationEntry]
     /// Opaque host-defined catalogue metadata.
@@ -7149,7 +8395,7 @@ public struct AutomationState: Codable, Sendable {
     }
 }
 
-public struct AutomationManualRunOrigin: Codable, Sendable {
+public struct AutomationManualRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
 
     public init(
@@ -7159,7 +8405,7 @@ public struct AutomationManualRunOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationTriggeredRunOrigin: Codable, Sendable {
+public struct AutomationTriggeredRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
     /// Matches the stable {@link AutomationScheduleTrigger.id} or
     /// {@link AutomationEventTrigger.id} in the definition.
@@ -7189,7 +8435,7 @@ public struct AutomationTriggeredRunOrigin: Codable, Sendable {
     }
 }
 
-public struct AutomationPendingRunLifecycle: Codable, Sendable {
+public struct AutomationPendingRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7203,7 +8449,7 @@ public struct AutomationPendingRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationRunningRunLifecycle: Codable, Sendable {
+public struct AutomationRunningRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7221,7 +8467,7 @@ public struct AutomationRunningRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationCompletedRunLifecycle: Codable, Sendable {
+public struct AutomationCompletedRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7247,7 +8493,7 @@ public struct AutomationCompletedRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationFailedRunLifecycle: Codable, Sendable {
+public struct AutomationFailedRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7273,7 +8519,7 @@ public struct AutomationFailedRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationCancelledRunLifecycle: Codable, Sendable {
+public struct AutomationCancelledRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
@@ -7295,7 +8541,7 @@ public struct AutomationCancelledRunLifecycle: Codable, Sendable {
     }
 }
 
-public struct AutomationRunSummary: Codable, Sendable {
+public struct AutomationRunSummary: Codable, Sendable, Equatable {
     /// Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}.
     public var resource: String
     /// Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}.
@@ -7340,7 +8586,7 @@ public struct AutomationRunSummary: Codable, Sendable {
     }
 }
 
-public struct AutomationRunState: Codable, Sendable {
+public struct AutomationRunState: Codable, Sendable, Equatable {
     /// URI of this automation-run channel.
     public var resource: String
     /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
@@ -7390,7 +8636,7 @@ public struct AutomationRunState: Codable, Sendable {
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
-public enum CustomizationEnablement: Codable, Sendable {
+public enum CustomizationEnablement: Codable, Sendable, Equatable {
     case global(CustomizationEnablementGlobal)
     case workspace(CustomizationEnablementWorkspace)
     case session(CustomizationEnablementSession)
@@ -7422,39 +8668,124 @@ public enum CustomizationEnablement: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementGlobal: Codable, Sendable {
-    public var kind: String = "global"
+public struct CustomizationEnablementGlobal: Codable, Sendable, Equatable {
     public var enabled: Bool
+    public var kind: String = "global"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case enabled
+        case kind
+    }
+
+    public init(
+        enabled: Bool,
+        kind: String = "global",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct CustomizationEnablementWorkspace: Codable, Sendable {
-    public var kind: String = "workspace"
+public struct CustomizationEnablementWorkspace: Codable, Sendable, Equatable {
     public var uri: URI
     public var enabled: Bool
+    public var kind: String = "workspace"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(uri: URI, enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case uri
+        case enabled
+        case kind
+    }
+
+    public init(
+        uri: URI,
+        enabled: Bool,
+        kind: String = "workspace",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.uri = uri
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.uri = try container.decode(URI.self, forKey: .uri)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.uri, forKey: .uri)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-public struct CustomizationEnablementSession: Codable, Sendable {
-    public var kind: String = "session"
+public struct CustomizationEnablementSession: Codable, Sendable, Equatable {
     public var enabled: Bool
+    public var kind: String = "session"
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
 
-    public init(enabled: Bool) {
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case enabled
+        case kind
+    }
+
+    public init(
+        enabled: Bool,
+        kind: String = "session",
+        extra: [String: AnyCodable] = [:]
+    ) {
         self.enabled = enabled
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try container.decode(Bool.self, forKey: .enabled)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.enabled, forKey: .enabled)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 // MARK: - Tool Input
 
 /// Raw tool input represented inline or by content reference.
-public enum ToolInput: Codable, Sendable {
+public enum ToolInput: Codable, Sendable, Equatable {
     case inline(String)
     case contentRef(ContentRef)
 
@@ -7478,7 +8809,7 @@ public enum ToolInput: Codable, Sendable {
 
 // MARK: - Discriminated Unions
 
-public struct ChatOriginUser: Codable, Sendable {
+public struct ChatOriginUser: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
 
     public init(kind: ChatOriginKind = .user) {
@@ -7486,7 +8817,7 @@ public struct ChatOriginUser: Codable, Sendable {
     }
 }
 
-public struct ChatOriginFork: Codable, Sendable {
+public struct ChatOriginFork: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -7498,7 +8829,7 @@ public struct ChatOriginFork: Codable, Sendable {
     }
 }
 
-public struct ChatOriginTool: Codable, Sendable {
+public struct ChatOriginTool: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var toolCallId: String
@@ -7510,7 +8841,7 @@ public struct ChatOriginTool: Codable, Sendable {
     }
 }
 
-public struct ChatOriginSideChat: Codable, Sendable {
+public struct ChatOriginSideChat: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -7524,7 +8855,7 @@ public struct ChatOriginSideChat: Codable, Sendable {
     }
 }
 
-public enum ChatOrigin: Codable, Sendable {
+public enum ChatOrigin: Codable, Sendable, Equatable {
     case user(ChatOriginUser)
     case fork(ChatOriginFork)
     case sideChat(ChatOriginSideChat)
@@ -7555,7 +8886,7 @@ public enum ChatOrigin: Codable, Sendable {
     }
 }
 
-public enum ResponsePart: Codable, Sendable {
+public enum ResponsePart: Codable, Sendable, Equatable {
     case markdown(MarkdownResponsePart)
     case contentRef(ResourceResponsePart)
     case toolCall(ToolCallResponsePart)
@@ -7611,7 +8942,7 @@ public enum ResponsePart: Codable, Sendable {
     }
 }
 
-public enum ToolCallState: Codable, Sendable {
+public enum ToolCallState: Codable, Sendable, Equatable {
     case streaming(ToolCallStreamingState)
     case pendingConfirmation(ToolCallPendingConfirmationState)
     case running(ToolCallRunningState)
@@ -7667,7 +8998,7 @@ public enum ToolCallState: Codable, Sendable {
     }
 }
 
-public enum ToolCallConfirmationState: Codable, Sendable {
+public enum ToolCallConfirmationState: Codable, Sendable, Equatable {
     case pendingConfirmation(ToolCallPendingConfirmationState)
     case pendingResultConfirmation(ToolCallPendingResultConfirmationState)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -7703,7 +9034,7 @@ public enum ToolCallConfirmationState: Codable, Sendable {
     }
 }
 
-public enum TerminalClaim: Codable, Sendable {
+public enum TerminalClaim: Codable, Sendable, Equatable {
     case client(TerminalClientClaim)
     case session(TerminalSessionClaim)
 
@@ -7732,7 +9063,7 @@ public enum TerminalClaim: Codable, Sendable {
     }
 }
 
-public enum TerminalContentPart: Codable, Sendable {
+public enum TerminalContentPart: Codable, Sendable, Equatable {
     case unclassified(TerminalUnclassifiedPart)
     case command(TerminalCommandPart)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -7768,7 +9099,7 @@ public enum TerminalContentPart: Codable, Sendable {
     }
 }
 
-public enum ChatInputQuestion: Codable, Sendable {
+public enum ChatInputQuestion: Codable, Sendable, Equatable {
     case text(ChatInputTextQuestion)
     case number(ChatInputNumberQuestion)
     case integer(ChatInputNumberQuestion)
@@ -7820,7 +9151,7 @@ public enum ChatInputQuestion: Codable, Sendable {
     }
 }
 
-public enum ChatInputAnswerValue: Codable, Sendable {
+public enum ChatInputAnswerValue: Codable, Sendable, Equatable {
     case text(ChatInputTextAnswerValue)
     case number(ChatInputNumberAnswerValue)
     case boolean(ChatInputBooleanAnswerValue)
@@ -7868,7 +9199,7 @@ public enum ChatInputAnswerValue: Codable, Sendable {
     }
 }
 
-public enum ChatInputAnswer: Codable, Sendable {
+public enum ChatInputAnswer: Codable, Sendable, Equatable {
     case draft(ChatInputAnswered)
     case submitted(ChatInputAnswered)
     case skipped(ChatInputSkipped)
@@ -7901,7 +9232,7 @@ public enum ChatInputAnswer: Codable, Sendable {
     }
 }
 
-public enum MessageAttachment: Codable, Sendable {
+public enum MessageAttachment: Codable, Sendable, Equatable {
     case simple(SimpleMessageAttachment)
     case embeddedResource(MessageEmbeddedResourceAttachment)
     case resource(MessageResourceAttachment)
@@ -7949,7 +9280,7 @@ public enum MessageAttachment: Codable, Sendable {
     }
 }
 
-public enum Customization: Codable, Sendable {
+public enum Customization: Codable, Sendable, Equatable {
     case plugin(PluginCustomization)
     case directory(DirectoryCustomization)
     case mcpServer(McpServerCustomization)
@@ -7989,7 +9320,7 @@ public enum Customization: Codable, Sendable {
     }
 }
 
-public enum ChildCustomization: Codable, Sendable {
+public enum ChildCustomization: Codable, Sendable, Equatable {
     case agent(AgentCustomization)
     case skill(SkillCustomization)
     case prompt(PromptCustomization)
@@ -8041,7 +9372,7 @@ public enum ChildCustomization: Codable, Sendable {
     }
 }
 
-public enum CustomizationLoadState: Codable, Sendable {
+public enum CustomizationLoadState: Codable, Sendable, Equatable {
     case loading(CustomizationLoadingState)
     case loaded(CustomizationLoadedState)
     case degraded(CustomizationDegradedState)
@@ -8078,7 +9409,7 @@ public enum CustomizationLoadState: Codable, Sendable {
     }
 }
 
-public enum McpServerState: Codable, Sendable {
+public enum McpServerState: Codable, Sendable, Equatable {
     case starting(McpServerStartingState)
     case ready(McpServerReadyState)
     case authRequired(McpServerAuthRequiredState)
@@ -8126,7 +9457,7 @@ public enum McpServerState: Codable, Sendable {
     }
 }
 
-public enum ToolCallContributor: Codable, Sendable {
+public enum ToolCallContributor: Codable, Sendable, Equatable {
     case client(ToolCallClientContributor)
     case mcp(ToolCallMcpContributor)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8162,7 +9493,7 @@ public enum ToolCallContributor: Codable, Sendable {
     }
 }
 
-public enum ToolCallRiskAssessment: Codable, Sendable {
+public enum ToolCallRiskAssessment: Codable, Sendable, Equatable {
     case loading(ToolCallRiskAssessmentLoadingState)
     case complete(ToolCallRiskAssessmentCompleteState)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8198,7 +9529,7 @@ public enum ToolCallRiskAssessment: Codable, Sendable {
     }
 }
 
-public enum TerminalLifecycleState: Codable, Sendable {
+public enum TerminalLifecycleState: Codable, Sendable, Equatable {
     case running(TerminalRunningLifecycleState)
     case exited(TerminalExitedLifecycleState)
 
@@ -8227,7 +9558,7 @@ public enum TerminalLifecycleState: Codable, Sendable {
     }
 }
 
-public enum SessionInputRequest: Codable, Sendable {
+public enum SessionInputRequest: Codable, Sendable, Equatable {
     case chatInput(SessionChatInputRequest)
     case toolConfirmation(SessionToolConfirmationRequest)
     case toolClientExecution(SessionToolClientExecutionRequest)
@@ -8270,7 +9601,7 @@ public enum SessionInputRequest: Codable, Sendable {
         }
     }
 }
-public enum BackgroundWork: Codable, Sendable {
+public enum BackgroundWork: Codable, Sendable, Equatable {
     case shell(BackgroundShellWork)
     case subagent(BackgroundSubagentWork)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -8306,7 +9637,7 @@ public enum BackgroundWork: Codable, Sendable {
     }
 }
 
-public enum SessionOrigin: Codable, Sendable {
+public enum SessionOrigin: Codable, Sendable, Equatable {
     case automation(AutomationSessionOrigin)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
@@ -8340,7 +9671,7 @@ public enum SessionOrigin: Codable, Sendable {
     }
 }
 
-public enum AutomationTrigger: Codable, Sendable {
+public enum AutomationTrigger: Codable, Sendable, Equatable {
     case schedule(AutomationScheduleTrigger)
     case event(AutomationEventTrigger)
 
@@ -8373,7 +9704,7 @@ public enum AutomationTrigger: Codable, Sendable {
     }
 }
 
-public enum AutomationDisableCondition: Codable, Sendable {
+public enum AutomationDisableCondition: Codable, Sendable, Equatable {
     case afterRuns(AutomationAfterRunsCondition)
     case afterDate(AutomationAfterDateCondition)
 
@@ -8406,7 +9737,7 @@ public enum AutomationDisableCondition: Codable, Sendable {
     }
 }
 
-public enum AutomationRunOrigin: Codable, Sendable {
+public enum AutomationRunOrigin: Codable, Sendable, Equatable {
     case manual(AutomationManualRunOrigin)
     case trigger(AutomationTriggeredRunOrigin)
 
@@ -8439,7 +9770,7 @@ public enum AutomationRunOrigin: Codable, Sendable {
     }
 }
 
-public enum AutomationRunLifecycle: Codable, Sendable {
+public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
     case pending(AutomationPendingRunLifecycle)
     case running(AutomationRunningRunLifecycle)
     case completed(AutomationCompletedRunLifecycle)
@@ -8490,7 +9821,7 @@ public enum AutomationRunLifecycle: Codable, Sendable {
     }
 }
 
-public enum ToolResultContent: Codable, Sendable {
+public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
     case resource(ToolResultResourceContent)
@@ -8545,8 +9876,10 @@ public enum ToolResultContent: Codable, Sendable {
     }
 }
 
-/// The state payload of a snapshot.
-public enum SnapshotState: Codable, Sendable {
+/// The state payload of a snapshot, selected by its resource's URI scheme.
+/// Standalone decoding preserves any JSON value as unknown; use Snapshot or
+/// decode(resource:from:) for typed decoding, which propagates known-channel errors.
+public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
@@ -8562,48 +9895,27 @@ public enum SnapshotState: Codable, Sendable {
     /// re-encodes unchanged.
     case unknown(AnyCodable)
 
-    private struct MemberKey: CodingKey {
-        var stringValue: String
-        var intValue: Int? { nil }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue: Int) { nil }
+    public init(from decoder: Decoder) throws {
+        self = .unknown(try AnyCodable(from: decoder))
     }
 
-    public init(from decoder: Decoder) throws {
-        // An object with no members is an empty state, used by channels whose state has no fields.
-        // EmptyState would decode any object, so check for members explicitly.
-        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
-            self = .empty(EmptyState())
-            return
-        }
-        // Try the most distinctive shapes first. SessionState has required
-        // `lifecycle` / `activeClients` / `chats`; ChatState has required
-        // `turns`; CanvasState has required instance/provider/type identifiers;
-        // the remaining variants follow, with RootState as the
-        // catch-all.
-        if let session = try? SessionState(from: decoder) {
-            self = .session(session)
-        } else if let chat = try? ChatState(from: decoder) {
-            self = .chat(chat)
-        } else if let canvas = try? CanvasState(from: decoder) {
-            self = .canvas(canvas)
-        } else if let terminal = try? TerminalState(from: decoder) {
-            self = .terminal(terminal)
-        } else if let changeset = try? ChangesetState(from: decoder) {
-            self = .changeset(changeset)
-        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
-            self = .resourceWatch(resourceWatch)
-        } else if let annotations = try? AnnotationsState(from: decoder) {
-            self = .annotations(annotations)
-        } else if let automations = try? AutomationState(from: decoder) {
-            self = .automations(automations)
-        } else if let automationRun = try? AutomationRunState(from: decoder) {
-            self = .automationRun(automationRun)
-        } else if let root = try? RootState(from: decoder) {
-            self = .root(root)
-        } else {
-            // A state from a later protocol version: keep it rather than fail.
-            self = .unknown(try AnyCodable(from: decoder))
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    public static func decode(resource: String, from decoder: Decoder) throws -> SnapshotState {
+        let scheme = resource.firstIndex(of: ":").map { resource[..<$0] } ?? ""
+        switch scheme {
+        case "ahp-root": return .root(try RootState(from: decoder))
+        case "ahp-automations": return .automations(try AutomationState(from: decoder))
+        case "ahp-session": return .session(try SessionState(from: decoder))
+        case "ahp-chat": return .chat(try ChatState(from: decoder))
+        case "ahp-canvas": return .canvas(try CanvasState(from: decoder))
+        case "ahp-terminal": return .terminal(try TerminalState(from: decoder))
+        case "ahp-changeset": return .changeset(try ChangesetState(from: decoder))
+        case "ahp-resource-watch": return .resourceWatch(try ResourceWatchState(from: decoder))
+        case "ahp-annotations": return .annotations(try AnnotationsState(from: decoder))
+        case "ahp-automation-run": return .automationRun(try AutomationRunState(from: decoder))
+        case "ahp-tcp": return .empty(try EmptyState(from: decoder))
+        case "ahp-otlp": return .empty(try EmptyState(from: decoder))
+        default: return .unknown(try AnyCodable(from: decoder))
         }
     }
 

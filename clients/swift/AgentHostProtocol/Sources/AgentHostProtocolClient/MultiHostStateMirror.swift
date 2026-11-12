@@ -59,7 +59,8 @@ public actor MultiHostStateMirror {
     /// Convenience: apply a `HostSubscriptionEvent` produced by
     /// `MultiHostClient.events()`. Action envelopes are routed through
     /// the reducer; non-action events are dropped (they don't affect
-    /// reducer state).
+    /// reducer state). On `actionDecodingFailed`, the caller should resubscribe
+    /// and apply the fresh snapshot to restore this mirror's consistency.
     public func apply(event: HostSubscriptionEvent) {
         if case .action(let envelope) = event.event {
             apply(host: event.hostId, envelope: envelope)
@@ -69,7 +70,9 @@ public actor MultiHostStateMirror {
     /// Apply a single action envelope, scoped to `host`. Routing uses
     /// `envelope.channel`: `RootResourceURI` is the root channel, every
     /// other channel is identified by the URI the server announces.
+    /// Rejected envelopes leave state unchanged.
     public func apply(host: HostId, envelope: ActionEnvelope) {
+        guard envelope.rejectionReason == nil else { return }
         let channel = envelope.channel
         let action = envelope.action
         if channel == RootResourceURI {

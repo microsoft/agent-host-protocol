@@ -1891,6 +1891,10 @@ public sealed record Icon
     /// If not provided, the client should assume the icon can be used with any theme.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes a protected resource's authentication requirements using
@@ -1960,6 +1964,10 @@ public sealed record ProtectedResourceMetadata
     /// Clients SHOULD treat an absent field the same as `true`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Global state shared with every client subscribed to `ahp-root://`.</summary>
@@ -2202,6 +2210,10 @@ public sealed record ModelSelection
     /// produce numbers or booleans, which are carried through as-is.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selected custom agent for a session.
@@ -2216,6 +2228,10 @@ public sealed record AgentSelection
 {
     /// <summary>Stable agent URI (matches an {@link AgentCustomization.uri}).</summary>
     public required string Uri { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A JSON Schema-compatible property descriptor with display extensions.
@@ -2969,7 +2985,7 @@ public sealed class SessionState
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3308,7 +3324,7 @@ public sealed class SessionSummary
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3635,6 +3651,10 @@ public sealed record MessageOrigin
 {
     /// <summary>The kind of actor that produced the message.</summary>
     public MessageKind Kind { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A message that initiates or steers a turn. Messages can originate from the
@@ -3683,6 +3703,10 @@ public sealed class Message
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A zero-based position within a textual document.</summary>
@@ -3693,6 +3717,10 @@ public sealed record TextPosition
 
     /// <summary>Zero-based character offset within the line.</summary>
     public long Character { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A range within a textual document.</summary>
@@ -3703,6 +3731,10 @@ public sealed record TextRange
 
     /// <summary>End position of the range.</summary>
     public required TextPosition End { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selection within a textual resource.
@@ -3714,6 +3746,10 @@ public sealed record TextSelection
 {
     /// <summary>The range covered by the selection.</summary>
     public required TextRange Range { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A simple, opaque attachment whose model representation is described by
@@ -3763,6 +3799,10 @@ public sealed record SimpleMessageAttachment
     /// `completions` response.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModelRepresentation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment whose data is embedded inline as a base64 string.
@@ -3817,6 +3857,10 @@ public sealed record MessageEmbeddedResourceAttachment
     /// Only meaningful for textual resources.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TextSelection? Selection { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a resource by URI. The content is not
@@ -3878,6 +3922,10 @@ public sealed record MessageResourceAttachment
     /// Only meaningful for textual resources.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TextSelection? Selection { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references annotations on a session's annotations
@@ -3923,7 +3971,7 @@ public sealed record MessageAnnotationsAttachment
     /// <summary>Discriminant</summary>
     public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Annotations;
 
-    /// <summary>The annotations channel URI (typically `ahp-session:/&lt;uuid&gt;/annotations`).
+    /// <summary>The annotations channel URI (`ahp-annotations:/&lt;uuid&gt;`).
     /// Matches {@link AnnotationsSummary.resource}.</summary>
     public required string Resource { get; init; }
 
@@ -3931,6 +3979,10 @@ public sealed record MessageAnnotationsAttachment
     /// omitted, the attachment references all annotations on the channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? AnnotationIds { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a chat transcript through a fixed completed
@@ -3997,6 +4049,10 @@ public sealed record MessageChatAttachment
     /// the host pins the latest completed turn when accepting the message.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? EndTurn { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed class MarkdownResponsePart
@@ -4028,6 +4084,10 @@ public sealed record ContentRef
     /// <summary>Content nonce</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A content part that's a reference to large content stored outside the state tree.</summary>
@@ -4917,12 +4977,20 @@ public sealed record ToolResultSubagentContent
 public sealed record CustomizationLoadingState
 {
     public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loading;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container loaded successfully.</summary>
 public sealed record CustomizationLoadedState
 {
     public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loaded;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container partially loaded but has warnings.</summary>
@@ -4932,6 +5000,10 @@ public sealed record CustomizationDegradedState
 
     /// <summary>Human-readable description of the warning.</summary>
     public required string Message { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container failed to load.</summary>
@@ -4941,6 +5013,10 @@ public sealed record CustomizationErrorState
 
     /// <summary>Human-readable error message.</summary>
     public required string Message { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An [Open Plugins](https://open-plugins.com/) plugin.</summary>
@@ -5015,6 +5091,10 @@ public sealed class PluginCustomization
     /// parses nor enforces it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Version { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A {@link PluginCustomization} as published by a client. Extends the
@@ -5112,6 +5192,10 @@ public sealed record ClientPluginCustomization
     /// under the child's durable key.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, List<CustomizationEnablement>>? ChildEnablement { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A directory the host watches for this session.
@@ -5286,6 +5370,10 @@ public sealed record AgentCustomization
     /// to. Absent or `false` means the user may select it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? DisableUserInvocation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A skill contributed by a plugin, directory, or MCP server.
@@ -5367,6 +5455,10 @@ public sealed record SkillCustomization
     /// auto-invoke. Absent or `false` means the user may invoke it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? DisableUserInvocation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A prompt contributed by a plugin or directory.</summary>
@@ -5430,6 +5522,10 @@ public sealed record PromptCustomization
     /// <summary>Short description of what the prompt does.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A rule contributed by a plugin or directory.
@@ -5512,6 +5608,10 @@ public sealed record RuleCustomization
     /// active for matching files.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Globs { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A hook manifest contributed by a plugin or directory.</summary>
@@ -5571,6 +5671,10 @@ public sealed record HookCustomization
     public bool? Enabled { get; init; }
 
     public CustomizationType Type { get; init; } = CustomizationType.Hook;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An MCP server contributed by a plugin or directory.
@@ -5678,6 +5782,10 @@ public sealed class McpServerCustomization
     /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SkillCustomization>? Children { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Information from the agent host needed to render MCP Apps served
@@ -5690,6 +5798,10 @@ public sealed record McpServerCustomizationApps
     /// client feeds these straight through into the `hostCapabilities` of
     /// the `ui/initialize` response delivered to the View.</summary>
     public required AhpMcpUiHostCapabilities Capabilities { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>The subset of MCP App
@@ -5743,6 +5855,10 @@ public sealed record AhpMcpUiHostCapabilities
     /// <summary>Producer serves `sampling/createMessage` via `mcpMethodCall`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Sampling { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is registered with the host but has not yet started.</summary>
@@ -5760,12 +5876,20 @@ public sealed record McpServerStartingState
     /// startup.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Blocking { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is running and serving requests.</summary>
 public sealed record McpServerReadyState
 {
     public McpServerStatus Kind { get; init; } = McpServerStatus.Ready;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A pre-registered OAuth client that clients use instead of dynamic client
@@ -5779,6 +5903,10 @@ public sealed record McpOAuthClient
     /// public and uses a secretless flow such as authorization code with PKCE.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ClientSecret { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Reusable MCP authentication challenge — the RFC 9728 discovery info a
@@ -5825,6 +5953,10 @@ public sealed record McpAuthRequirement
     /// <summary>Human-readable hint, typically from the OAuth `error_description`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is reachable but cannot serve requests until the client
@@ -5877,6 +6009,10 @@ public sealed record McpServerAuthRequiredState
     public string? Description { get; init; }
 
     public McpServerStatus Kind { get; init; } = McpServerStatus.AuthRequired;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server failed to start, crashed, or otherwise transitioned to a
@@ -5888,6 +6024,10 @@ public sealed record McpServerErrorState
 
     /// <summary>Error details.</summary>
     public required ErrorInfo Error { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server has been shut down. The host MAY remove the server from the
@@ -5895,6 +6035,10 @@ public sealed record McpServerErrorState
 public sealed record McpServerStoppedState
 {
     public McpServerStatus Kind { get; init; } = McpServerStatus.Stopped;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record ToolCallClientContributor
@@ -6144,6 +6288,10 @@ public sealed record ErrorInfo
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
@@ -6485,9 +6633,8 @@ public sealed record ResourceChange
 public sealed record AnnotationsSummary
 {
     /// <summary>The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/&lt;uuid&gt;/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.</summary>
+    /// (`ahp-annotations:/&lt;uuid&gt;`, where `&lt;uuid&gt;` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.</summary>
     public required string Resource { get; init; }
 
     /// <summary>Total number of {@link Annotation} entries in the channel.</summary>
@@ -6498,7 +6645,7 @@ public sealed record AnnotationsSummary
 }
 
 /// <summary>Full state for a session's annotations channel, returned when a client
-/// subscribes to an `ahp-session:/&lt;uuid&gt;/annotations` URI.</summary>
+/// subscribes to an `ahp-annotations:/&lt;uuid&gt;` URI.</summary>
 public sealed record AnnotationsState
 {
     /// <summary>Annotations in this channel, keyed by {@link Annotation.id}.</summary>
@@ -6650,6 +6797,10 @@ public sealed record AutomationSchedule
     /// <summary>IANA Time Zone Database identifier used to interpret the expression, for
     /// example `"UTC"` or `"Europe/Berlin"`.</summary>
     public required string TimeZone { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from a recurring cron schedule evaluated by the host.</summary>
@@ -6669,6 +6820,10 @@ public sealed record AutomationScheduleTrigger
     /// {@link AutomationMisfirePolicy.RunOnce}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationMisfirePolicy? MisfirePolicy { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from events understood by the owning host.
@@ -6707,6 +6862,10 @@ public sealed record AutomationEventTrigger
     /// Clients MUST preserve unknown entries when editing other fields.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined trigger event.</summary>
@@ -6721,6 +6880,10 @@ public sealed record AutomationTriggerEventDefinition
     /// <summary>Optional longer explanation of when this event fires.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined event trigger type available for a prospective
@@ -6806,6 +6969,10 @@ public sealed record AutomationSessionTemplate
     /// {@link AutomationCapabilities.customizations}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ClientPluginCustomization>? Customizations { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Durable, client-editable definition of an automation.
@@ -6859,7 +7026,10 @@ public sealed record AutomationDefinition
 /// <summary>Partial replacement of editable {@link AutomationDefinition} fields.
 ///
 /// Omitted fields are unchanged. Supplied arrays and objects replace their
-/// corresponding values in full; they are not merged recursively.</summary>
+/// corresponding values in full; they are not merged recursively. Runtime
+/// decoders MUST preserve unrecognized members on these replacement objects
+/// and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
+/// them, so editing known fields does not erase fields from newer versions.</summary>
 public sealed record AutomationDefinitionPatch
 {
     /// <summary>Replacement {@link AutomationDefinition.title}.</summary>
@@ -6906,6 +7076,10 @@ public sealed record AutomationAfterRunsCondition
 
     /// <summary>Positive-integer cap on scheduled runs.</summary>
     public long Max { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Stops scheduling once a wall-clock date passes.</summary>
@@ -6915,6 +7089,10 @@ public sealed record AutomationAfterDateCondition
 
     /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
     public required string Date { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
@@ -7202,6 +7380,8 @@ public sealed record CustomizationEnablementGlobal
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementWorkspace
@@ -7209,12 +7389,16 @@ public sealed record CustomizationEnablementWorkspace
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Workspace;
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementSession
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>

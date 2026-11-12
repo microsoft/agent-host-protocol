@@ -1,5 +1,5 @@
 /**
- * Annotations Channel Actions — Mutations of an `ahp-session:/<uuid>/annotations`
+ * Annotations Channel Actions — Mutations of an `ahp-annotations:/<uuid>`
  * channel's state.
  *
  * Every annotations action is client-dispatchable: rather than issuing

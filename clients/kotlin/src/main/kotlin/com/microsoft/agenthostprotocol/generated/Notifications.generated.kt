@@ -394,7 +394,7 @@ data class PartialSessionSummary(
     val workingDirectories: List<String>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
-     * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+     * (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */

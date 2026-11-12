@@ -44,7 +44,7 @@ public enum AuthRequiredReason: Codable, Sendable, Equatable {
 /// after the AHP connection is lost.
 ///
 /// Stability: 1.0 - Early development.
-public struct TcpDataParams: Codable, Sendable {
+public struct TcpDataParams: Codable, Sendable, Equatable {
     /// The URI of the TCP channel.
     public var channel: String
     /// The bytes, as padded RFC 4648 base64 without whitespace.
@@ -68,7 +68,7 @@ public struct TcpDataParams: Codable, Sendable {
 /// the bytes, without waiting for `tcp/eof`.
 ///
 /// Stability: 1.0 - Early development.
-public struct TcpEofParams: Codable, Sendable {
+public struct TcpEofParams: Codable, Sendable, Equatable {
     /// The URI of the TCP channel.
     public var channel: String
 
@@ -92,7 +92,7 @@ public struct TcpEofParams: Codable, Sendable {
 /// window, so it can be sent when the window is full.
 ///
 /// Stability: 1.0 - Early development.
-public struct TcpResetParams: Codable, Sendable {
+public struct TcpResetParams: Codable, Sendable, Equatable {
     /// The URI of the TCP channel.
     public var channel: String
 
@@ -123,7 +123,7 @@ public struct TcpResetParams: Codable, Sendable {
 /// waits for credit before it sends the next fragment.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelFrameParams: Codable, Sendable {
+public struct ChannelFrameParams: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// The next piece of the serialized JSON-RPC message.
@@ -160,7 +160,7 @@ public struct ChannelFrameParams: Codable, Sendable {
 /// sent; an implementation can log the error or close the connection.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelCreditParams: Codable, Sendable {
+public struct ChannelCreditParams: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// Total UTF-16 bytes of data messages and fragments that the receiver has released.
@@ -193,7 +193,7 @@ public struct ChannelCreditParams: Codable, Sendable {
 /// The server does not send this notification on ordinary subscriptions.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelSnapshotParams: Codable, Sendable {
+public struct ChannelSnapshotParams: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// The channel's state.
@@ -208,7 +208,7 @@ public struct ChannelSnapshotParams: Codable, Sendable {
     }
 }
 
-public struct SessionAddedParams: Codable, Sendable {
+public struct SessionAddedParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (the root channel)
     public var channel: String
     /// Summary of the new session
@@ -223,7 +223,7 @@ public struct SessionAddedParams: Codable, Sendable {
     }
 }
 
-public struct SessionRemovedParams: Codable, Sendable {
+public struct SessionRemovedParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (the root channel)
     public var channel: String
     /// URI of the removed session
@@ -238,7 +238,7 @@ public struct SessionRemovedParams: Codable, Sendable {
     }
 }
 
-public struct SessionSummaryChangedParams: Codable, Sendable {
+public struct SessionSummaryChangedParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (the root channel)
     public var channel: String
     /// URI of the session whose summary changed
@@ -261,7 +261,7 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
     }
 }
 
-public struct ProgressParams: Codable, Sendable {
+public struct ProgressParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (the root channel).
     public var channel: String
     /// Echoes the `progressToken` the client supplied on the originating request
@@ -294,7 +294,7 @@ public struct ProgressParams: Codable, Sendable {
     }
 }
 
-public struct AuthRequiredParams: Codable, Sendable {
+public struct AuthRequiredParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to
     public var channel: String
     /// Complete RFC 9728 metadata for the protected resource that requires authentication
@@ -313,7 +313,7 @@ public struct AuthRequiredParams: Codable, Sendable {
     }
 }
 
-public struct OtlpExportLogsParams: Codable, Sendable {
+public struct OtlpExportLogsParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (an `ahp-otlp:` URI advertised on `TelemetryCapabilities.logs`).
     public var channel: String
     /// OTLP/JSON `ExportLogsServiceRequest` value. The top-level field is
@@ -330,7 +330,7 @@ public struct OtlpExportLogsParams: Codable, Sendable {
     }
 }
 
-public struct OtlpExportTracesParams: Codable, Sendable {
+public struct OtlpExportTracesParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (an `ahp-otlp:` URI advertised on `TelemetryCapabilities.traces`).
     public var channel: String
     /// OTLP/JSON `ExportTraceServiceRequest` value. The top-level field is
@@ -347,7 +347,7 @@ public struct OtlpExportTracesParams: Codable, Sendable {
     }
 }
 
-public struct OtlpExportMetricsParams: Codable, Sendable {
+public struct OtlpExportMetricsParams: Codable, Sendable, Equatable {
     /// Channel URI this notification belongs to (an `ahp-otlp:` URI advertised on `TelemetryCapabilities.metrics`).
     public var channel: String
     /// OTLP/JSON `ExportMetricsServiceRequest` value. The top-level field is
@@ -366,7 +366,7 @@ public struct OtlpExportMetricsParams: Codable, Sendable {
 
 // MARK: - Partial Summary Types
 
-public struct PartialSessionSummary: Codable, Sendable {
+public struct PartialSessionSummary: Codable, Sendable, Equatable {
     /// Agent provider ID
     public var provider: String?
     /// Session title
@@ -391,7 +391,7 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?

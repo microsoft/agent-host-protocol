@@ -1,7 +1,7 @@
 {
   "name": "file-edit-unknown-fields",
   "group": "B",
-  "description": "Typed file-edit models drop unknown keys while intentional metadata stays raw.",
+  "description": "Typed file-edit models drop unknown keys while intentional metadata stays raw. ContentRef is annotated @preserveUnknownMembers, so its unknown keys survive.",
   "type": "StateAction",
   "input": {
     "type": "chat/toolCallReady",
@@ -27,7 +27,7 @@
     "_meta": {"vendor":{"keep":true}},
     "edits": {
       "items": [{
-        "after": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/file"}},
+        "after": {"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/file","futureContent":4}},
         "diff": {"added":1}
       }]
     }

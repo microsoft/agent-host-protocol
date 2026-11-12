@@ -23,7 +23,9 @@ All channels use the same `subscribe` and `unsubscribe` messages.
 |---|---|---|
 | `ahp-root://` | `RootState` | Agents, terminals, and host configuration. This channel always exists. |
 | `ahp-automations://` | `AutomationState` | All automations visible to the client. This channel exists when `InitializeResult.automations` is present. |
+| `ahp-automation-run:/<id>` | `AutomationRunState` | One automation run: lifecycle, provenance, and linked sessions. |
 | `ahp-session:/<uuid>` | `SessionState` | Session metadata and the session's list of chats. |
+| `ahp-annotations:/<uuid>` | `AnnotationsState` | One session's inline file annotations. Use `AnnotationsSummary.resource`; `<uuid>` is the owning session's id. |
 | `ahp-chat:/<cid>` | `ChatState` | One chat: turns, streamed responses, tool calls, pending messages, input requests, and changesets. See [Chat Channel](/specification/chat-channel). |
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. The URI is listed in `ChatState.canvases`. See [Canvas Channel](/reference/canvas). |
 | `ahp-terminal:/<id>` | `TerminalState` | One terminal. See [Terminal Channel](/specification/terminal-channel). |

@@ -850,6 +850,7 @@ export enum MessageKind {
  * turn; for steering or queued messages it is just the origin of that message.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageOrigin {
   /** The kind of actor that produced the message. */
@@ -867,6 +868,7 @@ export interface MessageOrigin {
  * in the text.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface Message {
   /** Message text */
@@ -907,6 +909,7 @@ export interface Message {
  * Common fields shared by all {@link MessageAttachment} variants.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageAttachmentBase {
   /**
@@ -951,6 +954,7 @@ export interface MessageAttachmentBase {
  * the producer.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface SimpleMessageAttachment extends MessageAttachmentBase {
   /** Discriminant */
@@ -974,6 +978,7 @@ export interface SimpleMessageAttachment extends MessageAttachmentBase {
  * delivered with the user message itself rather than fetched separately.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageEmbeddedResourceAttachment extends MessageAttachmentBase {
   /** Discriminant */
@@ -995,6 +1000,7 @@ export interface MessageEmbeddedResourceAttachment extends MessageAttachmentBase
  * delivered inline; consumers can fetch it via `resourceRead` when needed.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageResourceAttachment extends MessageAttachmentBase, ContentRef {
   /** Discriminant */
@@ -1016,12 +1022,13 @@ export interface MessageResourceAttachment extends MessageAttachmentBase, Conten
  * {@link Annotation.id | annotation ids}.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageAnnotationsAttachment extends MessageAttachmentBase {
   /** Discriminant */
   type: MessageAttachmentKind.Annotations;
   /**
-   * The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+   * The annotations channel URI (`ahp-annotations:/<uuid>`).
    * Matches {@link AnnotationsSummary.resource}.
    */
   resource: URI;
@@ -1055,6 +1062,7 @@ export interface MessageAnnotationsAttachment extends MessageAttachmentBase {
  * referenced chat is later pruned, and treat opening `resource` as best-effort.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageChatAttachment extends MessageAttachmentBase {
   /** Discriminant */

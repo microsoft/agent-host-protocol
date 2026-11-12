@@ -360,7 +360,7 @@ type PartialSessionSummary struct {
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
-	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
