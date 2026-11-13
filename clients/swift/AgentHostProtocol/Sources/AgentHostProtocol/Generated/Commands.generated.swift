@@ -1968,6 +1968,11 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Hosts MUST treat `accountId` as an opaque string.
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
     public var accountId: String?
+    /// Optional human-readable label for the client's selected account.
+    /// Display-only metadata; labels need not be unique or stable.
+    /// Hosts MUST NOT use this label to identify accounts, detect account changes,
+    /// or authorize access.
+    public var accountLabel: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1978,6 +1983,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         case scopes
         case target
         case accountId
+        case accountLabel
     }
 
     public init(
@@ -1988,7 +1994,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
         target: AuthenticateTarget? = nil,
-        accountId: String? = nil
+        accountId: String? = nil,
+        accountLabel: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1998,6 +2005,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
         self.scopes = scopes
         self.target = target
         self.accountId = accountId
+        self.accountLabel = accountLabel
     }
 }
 

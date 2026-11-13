@@ -1770,6 +1770,12 @@ pub struct AuthenticateParams {
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_id: Option<String>,
+    /// Optional human-readable label for the client's selected account.
+    /// Display-only metadata; labels need not be unique or stable.
+    /// Hosts MUST NOT use this label to identify accounts, detect account changes,
+    /// or authorize access.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_label: Option<String>,
 }
 
 /// Result of the `authenticate` command.

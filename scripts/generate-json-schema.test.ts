@@ -411,6 +411,27 @@ describe('generated JSON schemas', () => {
         ]);
       });
 
+      it('accepts an optional account label with or without an account-selection hint', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const base = { channel: 'ahp-root://', resource: 'https://api.example.com', token: 'test-token' };
+        for (const value of [
+          base,
+          { ...base, accountId: 'selection-1', accountLabel: 'Example account' },
+          { ...base, accountLabel: 'Example account' },
+          { ...base, accountLabel: '' },
+        ]) {
+          assert.equal(schemaAccepts(schema, authenticate as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const accountLabel of [42, true, null, {}, []]) {
+          const value = { ...base, accountLabel };
+          assert.equal(schemaAccepts(schema, authenticate as JsonNode, value), false, JSON.stringify(value));
+        }
+      });
+
       it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const afterRuns = { kind: 'afterRuns', max: 3 };

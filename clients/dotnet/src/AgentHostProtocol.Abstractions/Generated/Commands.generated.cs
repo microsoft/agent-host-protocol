@@ -1912,6 +1912,13 @@ public sealed record AuthenticateParams
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AccountId { get; init; }
+
+    /// <summary>Optional human-readable label for the client's selected account.
+    /// Display-only metadata; labels need not be unique or stable.
+    /// Hosts MUST NOT use this label to identify accounts, detect account changes,
+    /// or authorize access.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AccountLabel { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.

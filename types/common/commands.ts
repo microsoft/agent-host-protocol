@@ -1521,6 +1521,13 @@ export interface AuthenticateParams extends BaseParams {
    * @minLength 1
    */
   accountId?: string;
+  /**
+   * Optional human-readable label for the client's selected account.
+   * Display-only metadata; labels need not be unique or stable.
+   * Hosts MUST NOT use this label to identify accounts, detect account changes,
+   * or authorize access.
+   */
+  accountLabel?: string;
 }
 
 /**

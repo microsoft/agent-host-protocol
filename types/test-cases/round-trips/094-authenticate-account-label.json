@@ -1,0 +1,22 @@
+{
+  "name": "authenticate-account-label",
+  "group": "A",
+  "description": "Authentication preserves an optional display label alongside the opaque account-selection hint.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com",
+    "token": "test-token",
+    "accountId": "client-selection-7",
+    "accountLabel": "Example account"
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.com",
+      "token": "test-token",
+      "accountId": "client-selection-7",
+      "accountLabel": "Example account"
+    }
+  ]
+}
