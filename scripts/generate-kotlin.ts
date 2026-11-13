@@ -1872,7 +1872,7 @@ const COMMAND_STRUCTS = [
   'RepositorySource',
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
   'InitializeParams', 'HostEnvironment', 'InitializeResult',
-  'RepositoryPreparationCapabilities',
+  'RepositoryPreparationCapability', 'WorkingDirectoryInfoCapability',
   'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',

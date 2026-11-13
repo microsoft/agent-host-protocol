@@ -41,7 +41,7 @@ A host can prepare repositories for a new session. The client supplies sources; 
 
 ##### Capability and field constraints
 
-The **host**, not an individual agent, opts in through [`InitializeResult.repositoryPreparation`](/reference/common#initialize):
+The **host**, not an individual agent, opts in through [`InitializeResult.repositoryPreparation`](/reference/common#initialize), a [`RepositoryPreparationCapability`](/reference/common#repositorypreparationcapability):
 
 | Capability | Meaning |
 |---|---|
@@ -125,7 +125,7 @@ Repository preparation does not change the agent's existing multi-directory, imm
 
 ##### Compatibility and host authority
 
-Clients opt into rich records with `initialize.capabilities.workingDirectoryInfo: {}`. New clients MUST also accept URI-only and mixed lists, including responses from older hosts.
+Clients opt into rich records with `initialize.capabilities.workingDirectoryInfo: {}` ([`WorkingDirectoryInfoCapability`](/reference/common#workingdirectoryinfocapability)). New clients MUST also accept URI-only and mixed lists, including responses from older hosts.
 
 Hosts MUST retain authoritative rich state and project every record to its `uri` for clients without this capability. Projection is per client and MUST NOT erase metadata from shared state or the replay log. It applies to **every carrier**:
 

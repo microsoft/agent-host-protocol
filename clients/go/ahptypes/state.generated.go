@@ -3879,7 +3879,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
@@ -4413,7 +4413,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review *map[string]json.RawMessage `json:"review,omitempty"`
+	Review map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to

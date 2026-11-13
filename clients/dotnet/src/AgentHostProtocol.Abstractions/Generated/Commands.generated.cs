@@ -512,7 +512,7 @@ public sealed record InitializeResult
 
     /// <summary>Host repository preparation support; absent when unsupported.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RepositoryPreparationCapabilities? RepositoryPreparation { get; init; }
+    public RepositoryPreparationCapability? RepositoryPreparation { get; init; }
 
     /// <summary>Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
@@ -598,7 +598,7 @@ public sealed record ClientCapabilities
     /// <summary>Client accepts rich {@link WorkingDirectory} records as well as URI strings.
     /// Hosts project records to URIs when absent and retain this choice on reconnect.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? WorkingDirectoryInfo { get; init; }
+    public WorkingDirectoryInfoCapability? WorkingDirectoryInfo { get; init; }
 
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -615,8 +615,9 @@ public sealed record ClientCapabilities
     public Dictionary<string, JsonElement>? McpApps { get; init; }
 }
 
-/// <summary>An empty object supports one repository at its default revision.</summary>
-public sealed record RepositoryPreparationCapabilities
+/// <summary>Host support for repository preparation at session creation. Presence
+/// alone supports one repository at its default revision.</summary>
+public sealed record RepositoryPreparationCapability
 {
     /// <summary>When true, clients may supply {@link RepositorySource.revision}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -625,6 +626,11 @@ public sealed record RepositoryPreparationCapabilities
     /// <summary>When true, clients may supply more than one repository.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? MultipleRepositories { get; init; }
+}
+
+/// <summary>Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.</summary>
+public sealed record WorkingDirectoryInfoCapability
+{
 }
 
 /// <summary>Automation features supported by this host authority.

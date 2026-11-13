@@ -6372,8 +6372,7 @@
       "description": "Optional capabilities a client declares during `initialize`.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities\nare reserved for future per-capability options.",
       "properties": {
         "workingDirectoryInfo": {
-          "type": "object",
-          "additionalProperties": {},
+          "$ref": "#/$defs/WorkingDirectoryInfoCapability",
           "description": "Client accepts rich {@link WorkingDirectory} records as well as URI strings.\nHosts project records to URIs when absent and retain this choice on reconnect."
         },
         "mcpApps": {
@@ -6382,6 +6381,11 @@
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
         }
       }
+    },
+    "WorkingDirectoryInfoCapability": {
+      "type": "object",
+      "description": "Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.",
+      "properties": {}
     },
     "HostEnvironment": {
       "type": "object",
@@ -6430,7 +6434,7 @@
           "description": "Suggested default directory for remote filesystem browsing"
         },
         "repositoryPreparation": {
-          "$ref": "#/$defs/RepositoryPreparationCapabilities",
+          "$ref": "#/$defs/RepositoryPreparationCapability",
           "description": "Host repository preparation support; absent when unsupported."
         },
         "completionTriggerCharacters": {
@@ -6472,9 +6476,9 @@
       "description": "Presence capability for {@link InitializeResult.multipleChatProviders}.\n\nStability: 1.0 - Early development.",
       "properties": {}
     },
-    "RepositoryPreparationCapabilities": {
+    "RepositoryPreparationCapability": {
       "type": "object",
-      "description": "An empty object supports one repository at its default revision.",
+      "description": "Host support for repository preparation at session creation. Presence\nalone supports one repository at its default revision.",
       "properties": {
         "revision": {
           "type": "boolean",

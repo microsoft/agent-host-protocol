@@ -510,7 +510,7 @@ data class InitializeResult(
     /**
      * Host repository preparation support; absent when unsupported.
      */
-    val repositoryPreparation: RepositoryPreparationCapabilities? = null,
+    val repositoryPreparation: RepositoryPreparationCapability? = null,
     /**
      * Characters that, when typed in a {@link Message} input, SHOULD cause
      * the client to issue a `completions` request with
@@ -558,7 +558,7 @@ data class InitializeResult(
 )
 
 @Serializable
-data class RepositoryPreparationCapabilities(
+data class RepositoryPreparationCapability(
     /**
      * When true, clients may supply {@link RepositorySource.revision}.
      */
@@ -570,12 +570,15 @@ data class RepositoryPreparationCapabilities(
 )
 
 @Serializable
+class WorkingDirectoryInfoCapability
+
+@Serializable
 data class ClientCapabilities(
     /**
      * Client accepts rich {@link WorkingDirectory} records as well as URI strings.
      * Hosts project records to URIs when absent and retain this choice on reconnect.
      */
-    val workingDirectoryInfo: Map<String, JsonElement>? = null,
+    val workingDirectoryInfo: WorkingDirectoryInfoCapability? = null,
     /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.

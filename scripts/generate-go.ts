@@ -362,9 +362,8 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     // token: optional null-able stays a single pointer (avoid `**T`).
     const alreadyPointer = goType.startsWith('*');
     const optional = hasQuestionToken || hasUnionUndefined || alreadyPointer;
-    const presenceSensitiveCollection = /^Record<string,\s*never>$/.test(tsType)
-      || (iface.getName() === 'AutomationDefinitionPatch'
-        && (tsName === 'triggers' || tsName === '_meta'))
+    const presenceSensitiveCollection = (iface.getName() === 'AutomationDefinitionPatch'
+      && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
         && tsName === 'disableConditions')
       || (tsName === 'backgroundWork' && iface.getName() === 'ChatState');
@@ -1897,7 +1896,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'RepositorySource' },
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
-  { name: 'RepositoryPreparationCapabilities' },
+  { name: 'RepositoryPreparationCapability' }, { name: 'WorkingDirectoryInfoCapability' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },

@@ -479,7 +479,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
     /// Host repository preparation support; absent when unsupported.
-    public var repositoryPreparation: RepositoryPreparationCapabilities?
+    public var repositoryPreparation: RepositoryPreparationCapability?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -538,7 +538,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         snapshots: [Snapshot],
         environment: HostEnvironment? = nil,
         defaultDirectory: String? = nil,
-        repositoryPreparation: RepositoryPreparationCapabilities? = nil,
+        repositoryPreparation: RepositoryPreparationCapability? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
@@ -587,7 +587,7 @@ public struct PingParams: Codable, Sendable, Equatable {
 public struct ClientCapabilities: Codable, Sendable, Equatable {
     /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
     /// Hosts project records to URIs when absent and retain this choice on reconnect.
-    public var workingDirectoryInfo: [String: AnyCodable]?
+    public var workingDirectoryInfo: WorkingDirectoryInfoCapability?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -602,7 +602,7 @@ public struct ClientCapabilities: Codable, Sendable, Equatable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
-        workingDirectoryInfo: [String: AnyCodable]? = nil,
+        workingDirectoryInfo: WorkingDirectoryInfoCapability? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
         self.workingDirectoryInfo = workingDirectoryInfo
@@ -645,7 +645,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     }
 }
 
-public struct RepositoryPreparationCapabilities: Codable, Sendable, Equatable {
+public struct RepositoryPreparationCapability: Codable, Sendable, Equatable {
     /// When true, clients may supply {@link RepositorySource.revision}.
     public var revision: Bool?
     /// When true, clients may supply more than one repository.
@@ -657,6 +657,14 @@ public struct RepositoryPreparationCapabilities: Codable, Sendable, Equatable {
     ) {
         self.revision = revision
         self.multipleRepositories = multipleRepositories
+    }
+}
+
+public struct WorkingDirectoryInfoCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
     }
 }
 

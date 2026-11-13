@@ -647,7 +647,7 @@ function getActionTypeValue(iface: InterfaceDeclaration): string | undefined {
  * table, and a result table looked up from the registry.
  */
 function emitCommandsSection(project: Project, sourceFiles: SourceFile[]): string {
-  const supportingTypes = new Set(['RepositorySource', 'RepositoryPreparationCapabilities', 'ClientCapabilities']);
+  const supportingTypes = new Set(['RepositorySource', 'RepositoryPreparationCapability', 'ClientCapabilities', 'WorkingDirectoryInfoCapability']);
   const commandMap = parseRegistryInterface(project, 'CommandMap', true);
   const methodByParams = new Map<string, RegistryEntry>();
   for (const entry of commandMap) methodByParams.set(entry.paramsType, entry);

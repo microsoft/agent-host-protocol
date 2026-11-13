@@ -547,6 +547,8 @@ describe('generated JSON schemas', () => {
         }
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const capabilities = defs.ClientCapabilities;
+        const properties = capabilities.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.workingDirectoryInfo.$ref, '#/$defs/WorkingDirectoryInfoCapability');
         for (const value of [{}, { workingDirectoryInfo: {} }, { mcpApps: {}, workingDirectoryInfo: {} }]) {
           assert.equal(schemaAccepts(schema, capabilities, value), true);
         }
@@ -591,8 +593,8 @@ describe('generated JSON schemas', () => {
           return;
         }
         const properties = defs.InitializeResult.properties as Record<string, Record<string, unknown>>;
-        assert.equal(properties.repositoryPreparation.$ref, '#/$defs/RepositoryPreparationCapabilities');
-        const hostCapabilities = defs.RepositoryPreparationCapabilities;
+        assert.equal(properties.repositoryPreparation.$ref, '#/$defs/RepositoryPreparationCapability');
+        const hostCapabilities = defs.RepositoryPreparationCapability;
         assert.equal(hostCapabilities.required, undefined);
         const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
         assert.equal(schemaAccepts(schema, defs.InitializeResult, base), true);

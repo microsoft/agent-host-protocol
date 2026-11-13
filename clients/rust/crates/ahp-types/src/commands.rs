@@ -431,7 +431,7 @@ pub struct InitializeResult {
     pub default_directory: Option<Uri>,
     /// Host repository preparation support; absent when unsupported.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_preparation: Option<RepositoryPreparationCapabilities>,
+    pub repository_preparation: Option<RepositoryPreparationCapability>,
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -472,10 +472,11 @@ pub struct InitializeResult {
     pub multiple_chat_providers: Option<MultipleChatProvidersCapability>,
 }
 
-/// An empty object supports one repository at its default revision.
+/// Host support for repository preparation at session creation. Presence
+/// alone supports one repository at its default revision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct RepositoryPreparationCapabilities {
+pub struct RepositoryPreparationCapability {
     /// When true, clients may supply {@link RepositorySource.revision}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revision: Option<bool>,
@@ -483,6 +484,11 @@ pub struct RepositoryPreparationCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_repositories: Option<bool>,
 }
+
+/// Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkingDirectoryInfoCapability {}
 
 /// Optional capabilities a client declares during `initialize`.
 ///
@@ -495,7 +501,7 @@ pub struct ClientCapabilities {
     /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
     /// Hosts project records to URIs when absent and retain this choice on reconnect.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_directory_info: Option<JsonObject>,
+    pub working_directory_info: Option<WorkingDirectoryInfoCapability>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,

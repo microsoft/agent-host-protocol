@@ -1953,7 +1953,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'RepositorySource' },
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
-  { name: 'RepositoryPreparationCapabilities' },
+  { name: 'RepositoryPreparationCapability' }, { name: 'WorkingDirectoryInfoCapability' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },

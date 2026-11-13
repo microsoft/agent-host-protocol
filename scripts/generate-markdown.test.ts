@@ -25,13 +25,15 @@ test('command helper types have public reference anchors and fields', () => {
       subdirectory: session.includes('| `subdirectory` |'),
       clientCapabilities: common.includes('### `ClientCapabilities`'),
       workingDirectoryInfo: common.includes('| `workingDirectoryInfo` |'),
-      preparation: common.includes('### `RepositoryPreparationCapabilities`'),
+      preparation: common.includes('### `RepositoryPreparationCapability`'),
+      workingDirectoryInfoCapability: common.includes('### `WorkingDirectoryInfoCapability`'),
     }, {
       source: true,
       subdirectory: true,
       clientCapabilities: true,
       workingDirectoryInfo: true,
       preparation: true,
+      workingDirectoryInfoCapability: true,
     });
   } finally {
     rmSync(output, { recursive: true, force: true });

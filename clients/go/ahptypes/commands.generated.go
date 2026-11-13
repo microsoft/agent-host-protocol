@@ -254,7 +254,7 @@ type InitializeResult struct {
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
 	// Host repository preparation support; absent when unsupported.
-	RepositoryPreparation *RepositoryPreparationCapabilities `json:"repositoryPreparation,omitempty"`
+	RepositoryPreparation *RepositoryPreparationCapability `json:"repositoryPreparation,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause
 	// the client to issue a `completions` request with
 	// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -289,12 +289,17 @@ type InitializeResult struct {
 	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
-// An empty object supports one repository at its default revision.
-type RepositoryPreparationCapabilities struct {
+// Host support for repository preparation at session creation. Presence
+// alone supports one repository at its default revision.
+type RepositoryPreparationCapability struct {
 	// When true, clients may supply {@link RepositorySource.revision}.
 	Revision *bool `json:"revision,omitempty"`
 	// When true, clients may supply more than one repository.
 	MultipleRepositories *bool `json:"multipleRepositories,omitempty"`
+}
+
+// Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.
+type WorkingDirectoryInfoCapability struct {
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -305,7 +310,7 @@ type RepositoryPreparationCapabilities struct {
 type ClientCapabilities struct {
 	// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
 	// Hosts project records to URIs when absent and retain this choice on reconnect.
-	WorkingDirectoryInfo *map[string]json.RawMessage `json:"workingDirectoryInfo,omitempty"`
+	WorkingDirectoryInfo *WorkingDirectoryInfoCapability `json:"workingDirectoryInfo,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -317,7 +322,7 @@ type ClientCapabilities struct {
 	// {@link McpServerCustomization.channel | `mcp://` channel}) when this
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
-	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
 }
 
 // Automation features supported by this host authority.
