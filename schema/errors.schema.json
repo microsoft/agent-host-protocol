@@ -5806,14 +5806,14 @@
             }
           ]
         },
-        "target": {
-          "$ref": "#/$defs/AutomationTarget",
-          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that\n{@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST\nreject requests that do."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
           "description": "Opaque implementation-defined metadata. Clients MUST preserve unknown\nentries when updating the definition."
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that\n{@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST\nreject requests that do."
         }
       },
       "required": [
@@ -11929,14 +11929,14 @@
             }
           ]
         },
-        "target": {
-          "$ref": "#/$defs/AutomationTarget",
-          "description": "Replacement {@link AutomationDefinition.target}.\n{@link AutomationNewSessionTarget} resets it to a new session per run."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
           "description": "Complete replacement {@link AutomationDefinition._meta}."
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Replacement {@link AutomationDefinition.target}.\n{@link AutomationNewSessionTarget} resets it to a new session per run."
         }
       }
     }

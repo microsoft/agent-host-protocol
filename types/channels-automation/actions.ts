@@ -59,13 +59,13 @@ export interface AutomationDefinitionPatch {
    * @uniqueItemsBy kind
    */
   disableConditions?: AutomationDisableCondition[];
+  /** Complete replacement {@link AutomationDefinition._meta}. */
+  _meta?: Record<string, unknown>;
   /**
    * Replacement {@link AutomationDefinition.target}.
    * {@link AutomationNewSessionTarget} resets it to a new session per run.
    */
   target?: AutomationTarget;
-  /** Complete replacement {@link AutomationDefinition._meta}. */
-  _meta?: Record<string, unknown>;
 }
 
 /**

@@ -464,17 +464,17 @@ export interface AutomationDefinition {
    */
   disableConditions?: AutomationDisableCondition[];
   /**
+   * Opaque implementation-defined metadata. Clients MUST preserve unknown
+   * entries when updating the definition.
+   */
+  _meta?: Record<string, unknown>;
+  /**
    * Where each run sends {@link AutomationDefinition.message}. Absence means
    * {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
    * {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
    * reject requests that do.
    */
   target?: AutomationTarget;
-  /**
-   * Opaque implementation-defined metadata. Clients MUST preserve unknown
-   * entries when updating the definition.
-   */
-  _meta?: Record<string, unknown>;
 }
 
 /**

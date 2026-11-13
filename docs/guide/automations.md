@@ -117,8 +117,8 @@ AutomationDefinition {
   enabled: boolean
   triggers: AutomationTrigger[]
   disableConditions?: AutomationDisableCondition[]
-  target?: AutomationTarget
   _meta?: Record<string, unknown>
+  target?: AutomationTarget
 }
 ```
 

@@ -6322,16 +6322,16 @@ pub struct AutomationDefinition {
     /// {@link /guide/automations | Automations Guide}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_conditions: Option<Vec<AutomationDisableCondition>>,
+    /// Opaque implementation-defined metadata. Clients MUST preserve unknown
+    /// entries when updating the definition.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Where each run sends {@link AutomationDefinition.message}. Absence means
     /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
     /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
     /// reject requests that do.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<AutomationTarget>,
-    /// Opaque implementation-defined metadata. Clients MUST preserve unknown
-    /// entries when updating the definition.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
 }
 
 /// Partial replacement of editable {@link AutomationDefinition} fields.
@@ -6369,13 +6369,13 @@ pub struct AutomationDefinitionPatch {
     /// Clearing conditions does not change {@link AutomationDefinition.enabled}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_conditions: Option<Vec<AutomationDisableCondition>>,
+    /// Complete replacement {@link AutomationDefinition._meta}.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Replacement {@link AutomationDefinition.target}.
     /// {@link AutomationNewSessionTarget} resets it to a new session per run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<AutomationTarget>,
-    /// Complete replacement {@link AutomationDefinition._meta}.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
 }
 
 /// Stops scheduling after a fixed number of scheduled runs.

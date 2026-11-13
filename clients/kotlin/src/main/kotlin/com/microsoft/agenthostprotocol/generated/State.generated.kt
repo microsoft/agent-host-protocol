@@ -6409,18 +6409,18 @@ data class AutomationDefinition(
      */
     val disableConditions: List<AutomationDisableCondition>? = null,
     /**
+     * Opaque implementation-defined metadata. Clients MUST preserve unknown
+     * entries when updating the definition.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Where each run sends {@link AutomationDefinition.message}. Absence means
      * {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
      * {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
      * reject requests that do.
      */
-    val target: AutomationTarget? = null,
-    /**
-     * Opaque implementation-defined metadata. Clients MUST preserve unknown
-     * entries when updating the definition.
-     */
-    @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val target: AutomationTarget? = null
 )
 
 @Serializable
@@ -6457,15 +6457,15 @@ data class AutomationDefinitionPatch(
      */
     val disableConditions: List<AutomationDisableCondition>? = null,
     /**
-     * Replacement {@link AutomationDefinition.target}.
-     * {@link AutomationNewSessionTarget} resets it to a new session per run.
-     */
-    val target: AutomationTarget? = null,
-    /**
      * Complete replacement {@link AutomationDefinition._meta}.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Replacement {@link AutomationDefinition.target}.
+     * {@link AutomationNewSessionTarget} resets it to a new session per run.
+     */
+    val target: AutomationTarget? = null
 )
 
 @KeepGeneratedSerializer

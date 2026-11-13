@@ -4912,14 +4912,14 @@ type AutomationDefinition struct {
 	// conditions does not re-enable a disabled automation. See the
 	// {@link /guide/automations | Automations Guide}.
 	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
+	// Opaque implementation-defined metadata. Clients MUST preserve unknown
+	// entries when updating the definition.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Where each run sends {@link AutomationDefinition.message}. Absence means
 	// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
 	// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
 	// reject requests that do.
 	Target *AutomationTarget `json:"target,omitempty"`
-	// Opaque implementation-defined metadata. Clients MUST preserve unknown
-	// entries when updating the definition.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Partial replacement of editable {@link AutomationDefinition} fields.
@@ -4949,11 +4949,11 @@ type AutomationDefinitionPatch struct {
 	// Each kind may appear at most once; hosts MUST reject duplicate kinds.
 	// Clearing conditions does not change {@link AutomationDefinition.enabled}.
 	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
+	// Complete replacement {@link AutomationDefinition._meta}.
+	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Replacement {@link AutomationDefinition.target}.
 	// {@link AutomationNewSessionTarget} resets it to a new session per run.
 	Target *AutomationTarget `json:"target,omitempty"`
-	// Complete replacement {@link AutomationDefinition._meta}.
-	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Stops scheduling after a fixed number of scheduled runs.

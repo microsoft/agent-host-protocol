@@ -8169,14 +8169,14 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// conditions does not re-enable a disabled automation. See the
     /// {@link /guide/automations | Automations Guide}.
     public var disableConditions: [AutomationDisableCondition]?
+    /// Opaque implementation-defined metadata. Clients MUST preserve unknown
+    /// entries when updating the definition.
+    public var meta: [String: AnyCodable]?
     /// Where each run sends {@link AutomationDefinition.message}. Absence means
     /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
     /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
     /// reject requests that do.
     public var target: AutomationTarget?
-    /// Opaque implementation-defined metadata. Clients MUST preserve unknown
-    /// entries when updating the definition.
-    public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -8185,8 +8185,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         case enabled
         case triggers
         case disableConditions
-        case target
         case meta = "_meta"
+        case target
     }
 
     public init(
@@ -8196,8 +8196,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         enabled: Bool,
         triggers: [AutomationTrigger],
         disableConditions: [AutomationDisableCondition]? = nil,
-        target: AutomationTarget? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        target: AutomationTarget? = nil
     ) {
         self.title = title
         self.message = message
@@ -8205,8 +8205,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         self.enabled = enabled
         self.triggers = triggers
         self.disableConditions = disableConditions
-        self.target = target
         self.meta = meta
+        self.target = target
     }
 }
 
@@ -8230,11 +8230,11 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Each kind may appear at most once; hosts MUST reject duplicate kinds.
     /// Clearing conditions does not change {@link AutomationDefinition.enabled}.
     public var disableConditions: [AutomationDisableCondition]?
+    /// Complete replacement {@link AutomationDefinition._meta}.
+    public var meta: [String: AnyCodable]?
     /// Replacement {@link AutomationDefinition.target}.
     /// {@link AutomationNewSessionTarget} resets it to a new session per run.
     public var target: AutomationTarget?
-    /// Complete replacement {@link AutomationDefinition._meta}.
-    public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -8243,8 +8243,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         case enabled
         case triggers
         case disableConditions
-        case target
         case meta = "_meta"
+        case target
     }
 
     public init(
@@ -8254,8 +8254,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         enabled: Bool? = nil,
         triggers: [AutomationTrigger]? = nil,
         disableConditions: [AutomationDisableCondition]? = nil,
-        target: AutomationTarget? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        target: AutomationTarget? = nil
     ) {
         self.title = title
         self.message = message
@@ -8263,8 +8263,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         self.enabled = enabled
         self.triggers = triggers
         self.disableConditions = disableConditions
-        self.target = target
         self.meta = meta
+        self.target = target
     }
 }
 

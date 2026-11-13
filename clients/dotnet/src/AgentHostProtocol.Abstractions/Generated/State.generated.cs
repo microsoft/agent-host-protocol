@@ -7083,18 +7083,18 @@ public sealed record AutomationDefinition
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationDisableCondition>? DisableConditions { get; init; }
 
+    /// <summary>Opaque implementation-defined metadata. Clients MUST preserve unknown
+    /// entries when updating the definition.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
     /// <summary>Where each run sends {@link AutomationDefinition.message}. Absence means
     /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
     /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
     /// reject requests that do.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationTarget? Target { get; init; }
-
-    /// <summary>Opaque implementation-defined metadata. Clients MUST preserve unknown
-    /// entries when updating the definition.</summary>
-    [JsonPropertyName("_meta")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
 /// <summary>Partial replacement of editable {@link AutomationDefinition} fields.
@@ -7137,15 +7137,15 @@ public sealed record AutomationDefinitionPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationDisableCondition>? DisableConditions { get; init; }
 
-    /// <summary>Replacement {@link AutomationDefinition.target}.
-    /// {@link AutomationNewSessionTarget} resets it to a new session per run.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationTarget? Target { get; init; }
-
     /// <summary>Complete replacement {@link AutomationDefinition._meta}.</summary>
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Replacement {@link AutomationDefinition.target}.
+    /// {@link AutomationNewSessionTarget} resets it to a new session per run.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTarget? Target { get; init; }
 }
 
 /// <summary>Stops scheduling after a fixed number of scheduled runs.</summary>
