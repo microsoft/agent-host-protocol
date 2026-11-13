@@ -4,6 +4,7 @@ applyTo: 'types/**/*.ts'
 ---
 
 - Treat [AHP Doctrine](../../docs/guide/doctrine.md) as the design compass for protocol changes. Before adding or changing protocol types, check the doctrine's principles and design tests: durable user-visible results should be represented in state, the host should remain authoritative, minimal clients should keep a coherent experience, and agent implementation details should stay behind the host boundary.
+- Name things using the [protocol naming dictionary](./protocol-naming.instructions.md): reuse its established terms, identifier and unit conventions, and message-naming patterns, and don't copy the legacy names it lists.
 - Always prefer dispatching state actions (that can cause side effects) rather than making imperative RPC calls. For example, rather than a `sendMessage` command, we have a `session/turnStarted` message.
 - If a state is invalid, it should be inexpressible. For example, don't do something like
 
