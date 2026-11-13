@@ -3,7 +3,7 @@
 import Foundation
 
 /// Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
-public let PROTOCOL_VERSION: String = "1.1.0"
+public let PROTOCOL_VERSION: String = "1.2.0"
 
 /// Every protocol version this package is willing to negotiate,
 /// ordered most-preferred-first, independently of the development
