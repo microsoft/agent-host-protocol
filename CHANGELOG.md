@@ -23,9 +23,51 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
-## [1.1.0] — Unreleased
+## [1.1.0] — 2026-11-12
 
 Spec version: `1.1.0`
+
+### Added
+
+- Optional typed `InitializeResult.environment.pathStyle` metadata for authoritative host path semantics.
+- Optional `CreateChatParams.title` for a client-selected initial display title.
+- Optional `SessionModelInfo.vendor` for the model vendor as the provider reports it. (#503)
+- Experimental subscription-negotiated flow-control types using UTF-16 byte accounting, framed delivery and consumption credit notifications, and independent `reconnect.windows` metadata. (#492)
+- `EmptyState` variant of `Snapshot.state` for channels whose state has no fields, such as telemetry. Every experimental windowed subscription starts with `channel/snapshot`.
+- Experimental TCP channel: `createTcpConnection` opens a TCP connection on the host's network and returns an empty `CreateTcpConnectionResult`. The client forwards it over a windowed subscription with `tcp/data`, `tcp/eof`, and `tcp/reset`. TCP channels do not survive the loss of the AHP connection. (#488)
+- Each client exposes the notification methods that do not count against the window on a windowed subscription (`WINDOW_EXEMPT_METHODS` and `countsAgainstWindow` in TypeScript, with equivalents in the other clients), generated from the new `@windowExempt` annotation.
+- `ChatState.config`, the `chat/configChanged` action, and `chatMutable` on session config properties give each chat its own config for selected settings, such as tool auto-approval, so changing them in one chat no longer changes every chat in the session. `ChatConfigState.values` holds the chat's `chatMutable` properties and does not inherit from the session; missing keys take the schema default. Optional `ChatConfigState.schema` replaces the session's schema for a chat whose agent differs from the session's.
+- Optional per-chat agent provider: `CreateChatParams.provider` and `ChatSummary.provider` (mirrored on `ChatState` and `SessionChatSummary`), gated by the host-level `InitializeResult.multipleChatProviders` capability, let one session contain chats backed by different agent providers. Absent `provider` means the session's agent provider; forks and side chats keep their source chat's agent provider.
+- Optional `ChangesetFile.status`, a bitset of `ChangesetFileStatus` flags (initially `Editing`), reports per-file activity through existing changeset snapshots and actions without requiring provider-specific metadata. (#538)
+- Optional changeset file and operation-target nonces let hosts reject operations on superseded changes without requiring a capability or a nonce from every client. (#538)
+- Adds `chat/moved`, dispatched on a chat's channel after a cross-session move with its new session, `provider` and `config.schema`.
+- Optional producer-recorded `startedAt` and `duration` fields on reasoning response parts and `chat/reasoning` updates preserve each contiguous reasoning run's timing across state snapshots and history restoration.
+- Optional `ToolCallResult.resultMetadata` carries MCP `CallToolResult._meta` separately from host/provider tool-call metadata and is preserved through result confirmation.
+- Optional `ResourceReadParams.position` and `ResourceReadParams.length` request a byte range from `resourceRead`, and optional `ResourceReadResult.size` reports the total size of the resource when the receiver honored the range. A result without `size` is the whole resource, and a ranged `utf-8` result does not split a UTF-8 sequence. (#554)
+- `resourceRead` guidance: a peer SHOULD serve reads of the URIs it publishes as content, including HTTP(S) URLs that the other peer might not be able to reach.
+- Optional `McpServerCustomization.children` for MCP-served skills (SEP-2640), toggleable by id with `session/customizationToggled`.
+- Optional `authenticate.accountId` carries an opaque client-local account-selection hint without changing token validation or legacy authentication.
+
+### Changed
+
+- Experimental windowed subscriptions count every data notification against the window, whether sent whole or in `channel/frame` notifications. Frames carry messages larger than `maxFrameBytes` and let subscriptions share the connection.
+- `Snapshot.state` can be an `EmptyState` (`{}`) for channels whose state has no fields, such as telemetry. With ordinary delivery, a server may send such a snapshot or omit it, so clients must accept both. Clients must not fail on a snapshot state that they do not recognize.
+- Experimental windowed delivery removes `maximumMessageBytes` and uses one size for everything: the UTF-16 size of each JSON-RPC data message as sent, including `channel/frame` envelopes. Each message and frame counts against `windowBytes`, which is a soft target; `maxFrameBytes` remains a hard limit on each message, and receivers can return credit for stored frames.
+- Store steering and queued input in one `queuedMessages` list with optional `PendingMessage.kind` (absent means queued), using the existing per-ID pending actions. New IDs append, kind changes replace in place, and UIs group steering first without changing raw order. Mirror the latest steering update in the deprecated `steeringMessage` slot for older clients.
+- Experimental windowed subscriptions no longer carry byte counters across `reconnect`. Their counters start at zero on the new connection, and each `reconnect.windows` item offers new limits in `flowControl`, which the result accepts as in `subscribe`. Removes `ChannelReceiveProgress` and the `clientReceive`/`hostReceive` counters from reconnect.
+- Remove the User-only restriction on client-submitted messages in `chat/turnStarted` and `chat/pendingMessageSet`. (#542)
+- Experimental `CanvasState.url` is renamed to `CanvasState.uri` and holds an absolute content URI, typically HTTP(S). A client that can't load it directly reads it, and the relative references in its content, with `resourceRead`.
+- Preserve unknown members on automation patch objects and nested shared types (`extra` in Rust/Swift/Kotlin, `Extra` in Go/.NET). Rust struct literals must initialize `extra` and exhaustive patterns need `..`; Go map-bearing structs lose `==` comparability; .NET record equality compares `Extra` by reference; Swift/Kotlin consumers must recompile. (#592)
+- Annotations channels use `ahp-annotations:/<uuid>` with the owning session's id; clients should use `AnnotationsSummary.resource` rather than derive the URI.
+
+### Fixed
+
+- JSON Schemas accept `SessionStatus` flag combinations and forward-compatible bits as unsigned 32-bit integers, using explicit `@bitset` annotations and documenting each named flag's value and meaning. (#581)
+- Removed an empty `StateAction` reference from the actions JSON Schema so validators can resolve every union member. (#580)
+
+### Security
+
+- Add an optional `authenticate.target` identifying an MCP server by session URI and customization ID, preventing tokens from reaching other consumers that share a protected resource and scopes.
 
 ## [1.0.0] — 2026-10-02
 

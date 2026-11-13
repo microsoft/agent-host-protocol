@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "Annotations channels use `ahp-annotations:/<uuid>` with the owning session's id; clients should use `AnnotationsSummary.resource` rather than derive the URI."
-}

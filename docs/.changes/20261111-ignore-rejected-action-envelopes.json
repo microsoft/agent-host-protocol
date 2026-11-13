@@ -1,6 +1,0 @@
-{
-  "type": "fixed",
-  "message": "State mirrors leave confirmed state unchanged when an action envelope carries a rejection reason.",
-  "targets": ["typescript", "swift", "rust", "dotnet"],
-  "issues": [586]
-}

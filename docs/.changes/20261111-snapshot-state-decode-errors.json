@@ -1,6 +1,0 @@
-{
-  "type": "fixed",
-  "message": "Swift and Rust select snapshot state types from `Snapshot.resource`, propagating errors for malformed known-channel states and preserving unrecognized schemes as raw JSON.",
-  "targets": ["swift", "rust"],
-  "issues": [590]
-}

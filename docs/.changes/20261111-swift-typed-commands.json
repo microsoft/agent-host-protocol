@@ -1,6 +1,0 @@
-{
-  "type": "added",
-  "message": "Generated `AHPCommand` conformances and typed `request(_:)` APIs for every Swift protocol command, including null results.",
-  "targets": ["swift"],
-  "issues": [588]
-}
