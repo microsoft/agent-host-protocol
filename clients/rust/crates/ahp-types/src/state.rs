@@ -6154,7 +6154,8 @@ pub struct AutomationEventTrigger {
 /// Starts one run at a fixed time evaluated by the host.
 ///
 /// The trigger fires at most once for a given {@link runAt}. Updating
-/// {@link runAt} schedules a new occurrence.
+/// {@link runAt} moves the occurrence to the new time; the previous time no
+/// longer fires.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationOneTimeTrigger {

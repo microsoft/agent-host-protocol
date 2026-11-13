@@ -305,8 +305,8 @@ AutomationOneTimeTrigger {
 }
 ```
 
-The trigger fires at most once for a given `runAt`. Updating `runAt` schedules
-a new occurrence. `misfirePolicy` applies as it does for scheduled triggers
+The trigger fires at most once for a given `runAt`. Updating `runAt` moves the
+occurrence to the new time; the previous time no longer fires. `misfirePolicy` applies as it does for scheduled triggers
 when `runAt` passes while automatic execution is unavailable. The run records
 `runAt` as `origin.scheduledFor`.
 

@@ -98,7 +98,8 @@ seconds, years, macros, or Quartz extensions. See the
 grammar and day-field semantics.
 
 When `automations.oneTime` is advertised, a `oneTime` trigger fires at most
-once for a given `runAt`; updating `runAt` schedules a new occurrence. See the
+once for a given `runAt`; updating `runAt` moves the occurrence to the new time,
+and the previous time no longer fires. See the
 [Automations guide](/guide/automations#one-time-triggers).
 
 `enabled` controls automatic triggers only; manual runs remain available when

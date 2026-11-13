@@ -4771,7 +4771,8 @@ func (v AutomationEventTrigger) MarshalJSON() ([]byte, error) {
 // Starts one run at a fixed time evaluated by the host.
 //
 // The trigger fires at most once for a given {@link runAt}. Updating
-// {@link runAt} schedules a new occurrence.
+// {@link runAt} moves the occurrence to the new time; the previous time no
+// longer fires.
 type AutomationOneTimeTrigger struct {
 	// Identifier unique and stable within this automation definition. Recorded in
 	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
