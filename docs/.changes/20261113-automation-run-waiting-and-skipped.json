@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`AutomationPendingRunLifecycle.waiting` explains why a run hasn't started, and the new terminal `skipped` run status records trigger occurrences dropped by misfire, overlap, or quota policies.",
+  "issues": [570]
+}

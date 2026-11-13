@@ -814,6 +814,7 @@ const STATE_STRUCTS = [
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
+  'AutomationSkippedRunLifecycle', 'AutomationRunWaiting',
   'AutomationRunSummary', 'AutomationRunState',
 ];
 
@@ -1347,6 +1348,7 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
     { caseName: 'completed', structName: 'AutomationCompletedRunLifecycle', discriminantValue: 'completed' },
     { caseName: 'failed', structName: 'AutomationFailedRunLifecycle', discriminantValue: 'failed' },
     { caseName: 'cancelled', structName: 'AutomationCancelledRunLifecycle', discriminantValue: 'cancelled' },
+    { caseName: 'skipped', structName: 'AutomationSkippedRunLifecycle', discriminantValue: 'skipped' },
   ],
   injectDiscriminantOnEncode: true,
 };

@@ -10,6 +10,7 @@ import type { Message, MessageKind } from '../channels-chat/state.js';
 import type { ConfigSchema, URI } from '../common/state.js';
 import type {
   AutomationRunSummary,
+  AutomationSkippedRunLifecycle,
   AutomationTriggeredRunOrigin,
 } from '../channels-automation-run/state.js';
 import type { ResolveSessionConfigResult } from '../channels-root/commands.js';
@@ -104,11 +105,17 @@ export interface AutomationSchedule {
  * @nonexhaustive
  */
 export const enum AutomationMisfirePolicy {
-  /** Discard missed occurrences and wait for the next future occurrence. */
+  /**
+   * Discard missed occurrences and wait for the next future occurrence. The
+   * host SHOULD record the discarded occurrences as one
+   * {@link AutomationSkippedRunLifecycle | skipped} run with reason
+   * `misfire`.
+   */
   Skip = 'skip',
   /**
    * Start at most one catch-up run when execution becomes available, regardless
-   * of how many occurrences were missed.
+   * of how many occurrences were missed. The host MAY record the other missed
+   * occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.
    */
   RunOnce = 'runOnce',
 }
@@ -456,7 +463,9 @@ export interface AutomationEntry {
    * {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
    * reconstructed from {@link runs} (a bounded, prunable window). The host
    * increments it atomically when it admits a scheduled run, including runs
-   * later cancelled or failed.
+   * later cancelled, failed, or skipped. Runs created directly as
+   * {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+   * count.
    *
    * Absent when {@link AutomationDefinition.disableConditions} contains no
    * {@link AutomationAfterRunsCondition}.

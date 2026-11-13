@@ -2384,8 +2384,8 @@ pub struct AutomationRunPrimarySessionChangedAction {
 /// revalidates that the run is non-terminal. The authoritative outcome arrives
 /// later through
 /// {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
-/// `cancelled`, or the run may complete or fail before cancellation takes
-/// effect.
+/// `cancelled`, or the run may complete, fail, or be skipped before
+/// cancellation takes effect.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancelRequestedAction {}

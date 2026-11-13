@@ -1033,6 +1033,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationCompletedRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationFailedRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationSkippedRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationRunWaiting' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
 ];
@@ -1337,6 +1339,7 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
     { variantName: 'Completed', innerType: 'AutomationCompletedRunLifecycle', wireValue: 'completed' },
     { variantName: 'Failed', innerType: 'AutomationFailedRunLifecycle', wireValue: 'failed' },
     { variantName: 'Cancelled', innerType: 'AutomationCancelledRunLifecycle', wireValue: 'cancelled' },
+    { variantName: 'Skipped', innerType: 'AutomationSkippedRunLifecycle', wireValue: 'skipped' },
   ],
 };
 

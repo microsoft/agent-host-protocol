@@ -1,0 +1,30 @@
+{
+  "name": "automation-run-skipped",
+  "group": "A",
+  "description": "A skipped lifecycle preserves its reason and coalesced occurrence count.",
+  "type": "StateAction",
+  "input": {
+    "type": "automationRun/lifecycleChanged",
+    "lifecycle": {
+      "status": "skipped",
+      "createdAt": "2026-08-05T09:00:00Z",
+      "completedAt": "2026-08-05T09:00:00Z",
+      "reason": "misfire",
+      "message": "The host was offline.",
+      "occurrenceCount": 3
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "automationRun/lifecycleChanged",
+      "lifecycle": {
+        "status": "skipped",
+        "createdAt": "2026-08-05T09:00:00Z",
+        "completedAt": "2026-08-05T09:00:00Z",
+        "reason": "misfire",
+        "message": "The host was offline.",
+        "occurrenceCount": 3
+      }
+    }
+  ]
+}

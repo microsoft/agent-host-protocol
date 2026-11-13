@@ -539,10 +539,14 @@ const (
 type AutomationMisfirePolicy string
 
 const (
-	// Discard missed occurrences and wait for the next future occurrence.
+	// Discard missed occurrences and wait for the next future occurrence. The
+	// host SHOULD record the discarded occurrences as one
+	// {@link AutomationSkippedRunLifecycle | skipped} run with reason
+	// `misfire`.
 	AutomationMisfirePolicySkip AutomationMisfirePolicy = "skip"
 	// Start at most one catch-up run when execution becomes available, regardless
-	// of how many occurrences were missed.
+	// of how many occurrences were missed. The host MAY record the other missed
+	// occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.
 	AutomationMisfirePolicyRunOnce AutomationMisfirePolicy = "runOnce"
 )
 
@@ -570,7 +574,7 @@ const (
 
 // Lifecycle status of one automation run.
 //
-// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+// `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
 // while any linked session awaits input or client-side work; linked session
 // state is authoritative for those interactions.
 type AutomationRunStatus string
@@ -586,6 +590,8 @@ const (
 	AutomationRunStatusFailed AutomationRunStatus = "failed"
 	// Execution ended because cancellation was accepted.
 	AutomationRunStatusCancelled AutomationRunStatus = "cancelled"
+	// A trigger occurrence was recorded but deliberately not executed.
+	AutomationRunStatusSkipped AutomationRunStatus = "skipped"
 )
 
 // Discriminant describing what created an automation run.
@@ -5024,7 +5030,9 @@ type AutomationEntry struct {
 	// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
 	// reconstructed from {@link runs} (a bounded, prunable window). The host
 	// increments it atomically when it admits a scheduled run, including runs
-	// later cancelled or failed.
+	// later cancelled, failed, or skipped. Runs created directly as
+	// {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+	// count.
 	//
 	// Absent when {@link AutomationDefinition.disableConditions} contains no
 	// {@link AutomationAfterRunsCondition}.
@@ -5101,6 +5109,11 @@ type AutomationPendingRunLifecycle struct {
 	Status AutomationRunStatus `json:"status"`
 	// Run creation timestamp in ISO 8601 format.
 	CreatedAt string `json:"createdAt"`
+	// Why the run has not started yet, when the host knows. The host updates it
+	// by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+	// to `pending`. A run that cannot proceed and will not retry transitions to
+	// `failed` instead.
+	Waiting *AutomationRunWaiting `json:"waiting,omitempty"`
 }
 
 // The run is executing linked sessions or awaiting interaction on them.
@@ -5157,6 +5170,74 @@ type AutomationCancelledRunLifecycle struct {
 	StartedAt *string `json:"startedAt,omitempty"`
 	// Cancellation completion timestamp in ISO 8601 format.
 	CompletedAt string `json:"completedAt"`
+}
+
+// Terminal lifecycle for a trigger occurrence that the host recorded but
+// deliberately did not execute.
+//
+// A skipped run never starts and links no sessions. The host either creates
+// the run directly as `skipped` or transitions a `pending` run to `skipped`,
+// for example when an overlap policy coalesces it. Its
+// {@link AutomationTriggeredRunOrigin.scheduledFor} or
+// {@link AutomationTriggeredRunOrigin.event} identifies the occurrence.
+//
+// Skipped runs appear in {@link AutomationEntry.runs} alongside executed runs,
+// so clients can explain a missing result without extra state.
+type AutomationSkippedRunLifecycle struct {
+	Status AutomationRunStatus `json:"status"`
+	// Run creation timestamp in ISO 8601 format.
+	CreatedAt string `json:"createdAt"`
+	// Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence.
+	CompletedAt string `json:"completedAt"`
+	// Machine-readable reason the occurrence was skipped. Common values
+	// include:
+	//
+	// - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+	// - `'overlap'`: dropped by an overlap or concurrency policy
+	// - `'quota'`: dropped because a budget or rate limit was exhausted
+	Reason string `json:"reason"`
+	// Human-readable detail suitable for display.
+	Message *string `json:"message,omitempty"`
+	// Number of consecutive occurrences of the same trigger and reason that this
+	// record represents, for example every occurrence missed while the host was
+	// offline. The origin identifies the most recent of them. Absent means `1`.
+	//
+	// Hosts SHOULD coalesce consecutive skips this way rather than recording one
+	// run per occurrence, so skipped runs don't push executed runs out of the
+	// bounded {@link AutomationEntry.runs} window.
+	OccurrenceCount *int64 `json:"occurrenceCount,omitempty"`
+}
+
+// Host-reported detail explaining why a pending run is waiting.
+type AutomationRunWaiting struct {
+	// Machine-readable reason the run is waiting. Common values include:
+	//
+	// - `'capacity'`: the host has no execution capacity right now
+	// - `'concurrency'`: waiting for earlier runs of the same automation to finish
+	// - `'quota'`: a budget or rate limit was reached
+	// - `'authentication'`: waiting for credentials, such as a connected,
+	//   authenticated client
+	// - `'targetBusy'`: the session or chat the run delivers into is busy
+	// - `'retry'`: backing off after a transient failure
+	// - `'unavailable'`: the host is paused, draining, or otherwise not running
+	//   automations
+	Reason string `json:"reason"`
+	// Human-readable detail suitable for display.
+	Message *string `json:"message,omitempty"`
+	// When the host expects to try again, as an ISO 8601 timestamp.
+	RetryAt *string `json:"retryAt,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationRunWaiting) UnmarshalJSON(data []byte) error {
+	type wire AutomationRunWaiting
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "reason", "message", "retryAt")
+}
+
+func (v AutomationRunWaiting) MarshalJSON() ([]byte, error) {
+	type wire AutomationRunWaiting
+	return marshalWithExtra(wire(v), v.Extra, "reason", "message", "retryAt")
 }
 
 // Lightweight projection of a run retained in its automation's history.
@@ -6977,6 +7058,7 @@ func (*AutomationRunningRunLifecycle) isAutomationRunLifecycle()   {}
 func (*AutomationCompletedRunLifecycle) isAutomationRunLifecycle() {}
 func (*AutomationFailedRunLifecycle) isAutomationRunLifecycle()    {}
 func (*AutomationCancelledRunLifecycle) isAutomationRunLifecycle() {}
+func (*AutomationSkippedRunLifecycle) isAutomationRunLifecycle()   {}
 
 // UnmarshalJSON decodes the variant indicated by the "status" discriminator.
 func (u *AutomationRunLifecycle) UnmarshalJSON(data []byte) error {
@@ -7018,6 +7100,12 @@ func (u *AutomationRunLifecycle) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "skipped":
+		var value AutomationSkippedRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	default:
 		return unknownDiscriminatorError("AutomationRunLifecycle", "status", disc)
 	}
@@ -7051,6 +7139,8 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 		object["status"] = json.RawMessage("\"failed\"")
 	case *AutomationCancelledRunLifecycle:
 		object["status"] = json.RawMessage("\"cancelled\"")
+	case *AutomationSkippedRunLifecycle:
+		object["status"] = json.RawMessage("\"skipped\"")
 	}
 	return json.Marshal(object)
 }
