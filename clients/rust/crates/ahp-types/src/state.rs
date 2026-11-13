@@ -1527,7 +1527,6 @@ pub enum AutomationTriggerKind {
     /// A host-defined external event discovered from trigger definitions.
     #[serde(rename = "event")]
     Event,
-    /// One run at an absolute UTC instant, including catch-up after unavailability.
     #[serde(rename = "oneTime")]
     OneTime,
 }
@@ -6055,8 +6054,7 @@ pub struct ResourceChange {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionOrigin {
-    /// Immutable purpose copied from the run, including after its definition is
-    /// removed. Existing conversation targets retain their original provenance.
+    /// Immutable run purpose; existing targets keep their original provenance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     /// Owning {@link AutomationEntry.resource}.
@@ -6155,15 +6153,9 @@ pub struct AutomationEventTrigger {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// Admits one run at an absolute instant.
-///
-/// Requires {@link AutomationCapabilities.oneTime}. This MUST be the
-/// definition's only trigger. The host atomically persists
-/// {@link AutomationEntry.oneTimeRun} before dispatch, including for manual
-/// execution before the due time. Missed occurrences catch up once. Failed,
-/// cancelled, or interrupted execution never rearms the occurrence. Once
-/// admitted, definition updates are rejected and repeated manual requests
-/// return the existing run, even with a different request id.
+/// Requires {@link AutomationCapabilities.oneTime} and must be the definition's
+/// only trigger. Admission is durable and never rearmed; missed instants catch
+/// up once. See the {@link /guide/automations | Automations Guide}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationOneTimeTrigger {
@@ -6273,13 +6265,11 @@ pub struct AutomationSessionTemplate {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// An exact existing execution target, without session creation or ownership.
+/// Exact host-advertised target, including non-default chats; not owned by the automation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationConversation {
-    /// Exact host-advertised owner session URI.
     pub session: Uri,
-    /// Exact host-advertised chat URI; it need not be the session's default chat.
     pub chat: Uri,
 }
 
@@ -6294,25 +6284,14 @@ pub struct AutomationConversation {
 pub struct AutomationDefinition {
     /// Human-readable automation name.
     pub title: String,
-    /// A captured user request scheduled for later. Requires
-    /// {@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and
-    /// enabled creation. Disabling it before admission permanently cancels it:
-    /// the host MUST reject subsequent definition updates and manual runs.
+    /// Requires one one-time trigger and enabled creation. Disabling before
+    /// admission permanently cancels the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
-    /// Existing conversation receiving a one-time scheduled-chat request.
-    ///
-    /// Requires {@link AutomationCapabilities.existingConversation} and
-    /// `purpose: 'scheduledChat'`. Immutable after creation. The host MUST
-    /// revalidate authorization and that the chat belongs to the advertised
-    /// session. It MUST NOT create a replacement conversation, apply the
-    /// session template or message model/agent, or acquire ownership of the
-    /// existing session. The required {@link session} field is ignored.
-    ///
-    /// Delivery joins the ordinary message queue without steering or cancelling
-    /// another turn. Completion means accepted queue handoff, not turn completion.
-    /// The delivery-only run has no owned sessions: its `sessions` is empty and
-    /// `primarySession` is absent.
+    /// Immutable scheduled-chat target; requires
+    /// {@link AutomationCapabilities.existingConversation}. Queues without
+    /// interrupting active turns or applying session/model/agent overrides.
+    /// Completes on queue acceptance and owns no sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<AutomationConversation>,
     /// Initial message sent to each new run session or existing conversation. Its
@@ -6320,9 +6299,8 @@ pub struct AutomationDefinition {
     pub message: Message,
     /// Template used to create fresh sessions; ignored when {@link conversation} is set.
     pub session: AutomationSessionTemplate,
-    /// Whether automatic triggers may create runs. Manual runs remain available
-    /// whenever {@link AutomationOperation.Run} is advertised, except that
-    /// disabling a scheduled chat permanently cancels its unconsumed occurrence.
+    /// Controls automatic triggers; see {@link purpose} for scheduled-chat
+    /// cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
     pub enabled: bool,
     /// Automatic triggers. An empty list means manual-only.
     pub triggers: Vec<AutomationTrigger>,
@@ -6360,7 +6338,6 @@ pub struct AutomationDefinitionPatch {
     /// Replacement {@link AutomationDefinition.title}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     /// Replacement {@link AutomationDefinition.message}.
@@ -6427,22 +6404,16 @@ pub struct AutomationEntry {
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
-    /// Durable one-time admission receipt. Retained independently of the
-    /// run-history window; consuming the occurrence never depends on retained
-    /// summaries. Absent before admission.
+    /// Durable admission receipt, retained after run-history pruning; absent before admission.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time_run: Option<Uri>,
-    /// ISO 8601 timestamp when the one-time run's initial request was accepted
-    /// for dispatch. Retained independently of run history. Admission or session
-    /// allocation alone MUST NOT set this receipt. Absence does not prove
-    /// non-dispatch after interrupted or uncertain execution.
+    /// ISO 8601 dispatch-acceptance time, retained after history pruning.
+    /// Absence does not prove non-dispatch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time_dispatched_at: Option<String>,
-    /// ISO 8601 timestamp positively confirming that a consumed occurrence
-    /// failed before submission was attempted. Only this receipt permits
-    /// explicit recovery as a sendable draft; failure plus absent
-    /// {@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish
-    /// both dispatch receipts for the same occurrence.
+    /// ISO 8601 confirmation of failure before submission; permits explicit draft
+    /// recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
+    /// after history pruning.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time_dispatch_rejected_at: Option<String>,
     /// Host-owned count of scheduled runs consumed against the current
@@ -6695,7 +6666,7 @@ pub struct AutomationRunSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunState {
-    /// Immutable purpose copied from the admitted definition, independent of catalogue retention.
+    /// Immutable purpose copied at admission; survives definition removal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     /// URI of this automation-run channel.

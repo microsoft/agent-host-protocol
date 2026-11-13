@@ -90,10 +90,7 @@ export const enum SessionOriginKind {
  */
 export interface AutomationSessionOrigin {
   kind: SessionOriginKind.Automation;
-  /**
-   * Immutable purpose copied from the run, including after its definition is
-   * removed. Existing conversation targets retain their original provenance.
-   */
+  /** Immutable run purpose; existing targets keep their original provenance. */
   purpose?: 'scheduledChat';
   /** Owning {@link AutomationEntry.resource}. */
   automation: URI;

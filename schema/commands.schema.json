@@ -230,11 +230,11 @@
         },
         "oneTime": {
           "$ref": "#/$defs/AutomationOneTimeCapability",
-          "description": "Present when absolute one-time triggers, durable receipts, and conditional updates are supported."
+          "description": "Enables one-time triggers, durable receipts, and guarded updates."
         },
         "existingConversation": {
           "$ref": "#/$defs/AutomationExistingConversationCapability",
-          "description": "Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}."
+          "description": "Enables existing-conversation targets for scheduled chats; requires {@link oneTime}."
         },
         "runCancellation": {
           "$ref": "#/$defs/AutomationRunCancellationCapability",
@@ -257,12 +257,10 @@
     },
     "AutomationOneTimeCapability": {
       "type": "object",
-      "description": "Supports one-time runs, atomic manual admission, durable admission and\ndispatch receipts, and conditional definition updates.\n\nHosts MUST preserve supported message attachments durably without requiring\na connected client and reject unsupported content before accepting a\ndefinition or update. Execution still requires a running, available host;\nthis capability does not imply host wake-up or continuous availability.",
       "properties": {}
     },
     "AutomationExistingConversationCapability": {
       "type": "object",
-      "description": "Supports immutable existing-conversation targets without creating or owning\nsessions. Requires {@link AutomationCapabilities.oneTime}.",
       "properties": {}
     },
     "AutomationCreateCapability": {
@@ -1854,7 +1852,7 @@
     },
     "RunAutomationParams": {
       "type": "object",
-      "description": "Start a manual run of an automation.\n\nManual execution is independent of {@link AutomationDefinition.enabled}.\nThe host persists the run before beginning session side effects.\n\nA one-time trigger shares one durable admission with automatic execution:\nthe first accepted request consumes it, and later requests return\n{@link AutomationEntry.oneTimeRun}, including requests with different ids.\nA scheduled chat disabled before admission is permanently cancelled and\nMUST reject manual execution instead.",
+      "description": "Start a manual run of an automation.\n\nManual execution is independent of {@link AutomationDefinition.enabled}.\nThe host persists the run before beginning session side effects.\n\nOne-time requests return the same admitted run regardless of request id.\nScheduled chats disabled before admission reject manual execution.",
       "properties": {
         "channel": {
           "type": "string",
@@ -2824,7 +2822,7 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Immutable purpose copied from the run, including after its definition is\nremoved. Existing conversation targets retain their original provenance."
+          "description": "Immutable run purpose; existing targets keep their original provenance."
         },
         "automation": {
           "$ref": "#/$defs/URI",
@@ -7495,7 +7493,7 @@
     },
     "AutomationOneTimeTrigger": {
       "type": "object",
-      "description": "Admits one run at an absolute instant.\n\nRequires {@link AutomationCapabilities.oneTime}. This MUST be the\ndefinition's only trigger. The host atomically persists\n{@link AutomationEntry.oneTimeRun} before dispatch, including for manual\nexecution before the due time. Missed occurrences catch up once. Failed,\ncancelled, or interrupted execution never rearms the occurrence. Once\nadmitted, definition updates are rejected and repeated manual requests\nreturn the existing run, even with a different request id.",
+      "description": "Requires {@link AutomationCapabilities.oneTime} and must be the definition's\nonly trigger. Admission is durable and never rearmed; missed instants catch\nup once. See the {@link /guide/automations | Automations Guide}.",
       "properties": {
         "id": {
           "type": "string",
@@ -7715,15 +7713,13 @@
     },
     "AutomationConversation": {
       "type": "object",
-      "description": "An exact existing execution target, without session creation or ownership.",
+      "description": "Exact host-advertised target, including non-default chats; not owned by the automation.",
       "properties": {
         "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Exact host-advertised owner session URI."
+          "$ref": "#/$defs/URI"
         },
         "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Exact host-advertised chat URI; it need not be the session's default chat."
+          "$ref": "#/$defs/URI"
         }
       },
       "required": [
@@ -7744,11 +7740,11 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "A captured user request scheduled for later. Requires\n{@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and\nenabled creation. Disabling it before admission permanently cancels it:\nthe host MUST reject subsequent definition updates and manual runs."
+          "description": "Requires one one-time trigger and enabled creation. Disabling before\nadmission permanently cancels the request."
         },
         "conversation": {
           "$ref": "#/$defs/AutomationConversation",
-          "description": "Existing conversation receiving a one-time scheduled-chat request.\n\nRequires {@link AutomationCapabilities.existingConversation} and\n`purpose: 'scheduledChat'`. Immutable after creation. The host MUST\nrevalidate authorization and that the chat belongs to the advertised\nsession. It MUST NOT create a replacement conversation, apply the\nsession template or message model/agent, or acquire ownership of the\nexisting session. The required {@link session} field is ignored.\n\nDelivery joins the ordinary message queue without steering or cancelling\nanother turn. Completion means accepted queue handoff, not turn completion.\nThe delivery-only run has no owned sessions: its `sessions` is empty and\n`primarySession` is absent."
+          "description": "Immutable scheduled-chat target; requires\n{@link AutomationCapabilities.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
         },
         "message": {
           "$ref": "#/$defs/Message",
@@ -7760,7 +7756,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether automatic triggers may create runs. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised, except that\ndisabling a scheduled chat permanently cancels its unconsumed occurrence."
+          "description": "Controls automatic triggers; see {@link purpose} for scheduled-chat\ncancellation. Other manual runs depend on {@link AutomationOperation.Run}."
         },
         "triggers": {
           "type": "array",
@@ -7840,15 +7836,15 @@
         },
         "oneTimeRun": {
           "$ref": "#/$defs/URI",
-          "description": "Durable one-time admission receipt. Retained independently of the\nrun-history window; consuming the occurrence never depends on retained\nsummaries. Absent before admission."
+          "description": "Durable admission receipt, retained after run-history pruning; absent before admission."
         },
         "oneTimeDispatchedAt": {
           "type": "string",
-          "description": "ISO 8601 timestamp when the one-time run's initial request was accepted\nfor dispatch. Retained independently of run history. Admission or session\nallocation alone MUST NOT set this receipt. Absence does not prove\nnon-dispatch after interrupted or uncertain execution."
+          "description": "ISO 8601 dispatch-acceptance time, retained after history pruning.\nAbsence does not prove non-dispatch."
         },
         "oneTimeDispatchRejectedAt": {
           "type": "string",
-          "description": "ISO 8601 timestamp positively confirming that a consumed occurrence\nfailed before submission was attempted. Only this receipt permits\nexplicit recovery as a sendable draft; failure plus absent\n{@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish\nboth dispatch receipts for the same occurrence."
+          "description": "ISO 8601 confirmation of failure before submission; permits explicit draft\nrecovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained\nafter history pruning."
         },
         "runCount": {
           "type": "number",
@@ -8143,7 +8139,7 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Immutable purpose copied from the admitted definition, independent of catalogue retention."
+          "description": "Immutable purpose copied at admission; survives definition removal."
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -10557,8 +10553,7 @@
           "type": "string",
           "enum": [
             "scheduledChat"
-          ],
-          "description": "Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints."
+          ]
         },
         "message": {
           "$ref": "#/$defs/Message",
@@ -10627,7 +10622,7 @@
     },
     "AutomationCreateRequestedAction": {
       "type": "object",
-      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates trigger ids and configuration, normalizes event-trigger\ntitles and descriptions, captures any\n{@link AutomationSessionTemplate.customizations | session customizations}\nfrom the dispatching client, persists the definition, then publishes the\nauthoritative result with {@link AutomationSetAction | `automation/set`}.\nRejections leave the catalogue unchanged.\n\nWhen {@link AutomationCapabilities.oneTime} is advertised, retries of an\nunchanged one-time definition at the same resource MUST return its current\nauthoritative entry without creating another occurrence, even after its\ndue time. A conflicting definition MUST be rejected. A removed one-time\nresource MUST NOT be reused to recreate a request, including after restart.",
+      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates trigger ids and configuration, normalizes event-trigger\ntitles and descriptions, captures any\n{@link AutomationSessionTemplate.customizations | session customizations}\nfrom the dispatching client, persists the definition, then publishes the\nauthoritative result with {@link AutomationSetAction | `automation/set`}.\nRejections leave the catalogue unchanged.\n\nFor one-time definitions, same-resource retries return the current entry\nunless the definition conflicts. Removed resources cannot be reused, even\nafter restart.",
       "properties": {
         "type": {
           "const": "automation/createRequested"
@@ -10664,7 +10659,7 @@
         },
         "expectedModifiedAt": {
           "type": "string",
-          "description": "Apply the patch only if this exactly matches\n{@link AutomationEntry.modifiedAt}. Requires\n{@link AutomationCapabilities.oneTime}. The host checks and persists the\nupdate atomically, rejects a mismatch without changing state, and\nadvances `modifiedAt` on each accepted definition update so stale guards\ncannot match a different revision. Omission retains ordered patch semantics."
+          "description": "Atomically requires an exact {@link AutomationEntry.modifiedAt} match.\nRequires {@link AutomationCapabilities.oneTime}; every accepted update\nadvances the timestamp. Omit for ordered patches."
         }
       },
       "required": [

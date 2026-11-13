@@ -59,11 +59,8 @@ export interface ListAutomationTriggerDefinitionsResult {
  * Manual execution is independent of {@link AutomationDefinition.enabled}.
  * The host persists the run before beginning session side effects.
  *
- * A one-time trigger shares one durable admission with automatic execution:
- * the first accepted request consumes it, and later requests return
- * {@link AutomationEntry.oneTimeRun}, including requests with different ids.
- * A scheduled chat disabled before admission is permanently cancelled and
- * MUST reject manual execution instead.
+ * One-time requests return the same admitted run regardless of request id.
+ * Scheduled chats disabled before admission reject manual execution.
  *
  * @category Commands
  * @method runAutomation

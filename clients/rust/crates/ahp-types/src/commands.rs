@@ -496,10 +496,10 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
-    /// Present when absolute one-time triggers, durable receipts, and conditional updates are supported.
+    /// Enables one-time triggers, durable receipts, and guarded updates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time: Option<AutomationOneTimeCapability>,
-    /// Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.
+    /// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub existing_conversation: Option<AutomationExistingConversationCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
@@ -558,19 +558,10 @@ pub struct AutomationRunCancellationCapability {}
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
 
-/// Supports one-time runs, atomic manual admission, durable admission and
-/// dispatch receipts, and conditional definition updates.
-///
-/// Hosts MUST preserve supported message attachments durably without requiring
-/// a connected client and reject unsupported content before accepting a
-/// definition or update. Execution still requires a running, available host;
-/// this capability does not imply host wake-up or continuous availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationOneTimeCapability {}
 
-/// Supports immutable existing-conversation targets without creating or owning
-/// sessions. Requires {@link AutomationCapabilities.oneTime}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationExistingConversationCapability {}
@@ -2100,11 +2091,8 @@ pub struct ListAutomationTriggerDefinitionsResult {
 /// Manual execution is independent of {@link AutomationDefinition.enabled}.
 /// The host persists the run before beginning session side effects.
 ///
-/// A one-time trigger shares one durable admission with automatic execution:
-/// the first accepted request consumes it, and later requests return
-/// {@link AutomationEntry.oneTimeRun}, including requests with different ids.
-/// A scheduled chat disabled before admission is permanently cancelled and
-/// MUST reject manual execution instead.
+/// One-time requests return the same admitted run regardless of request id.
+/// Scheduled chats disabled before admission reject manual execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunAutomationParams {

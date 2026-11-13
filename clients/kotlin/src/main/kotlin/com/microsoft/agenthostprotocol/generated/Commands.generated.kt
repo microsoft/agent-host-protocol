@@ -566,11 +566,11 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
-     * Present when absolute one-time triggers, durable receipts, and conditional updates are supported.
+     * Enables one-time triggers, durable receipts, and guarded updates.
      */
     val oneTime: AutomationOneTimeCapability? = null,
     /**
-     * Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.
+     * Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
      */
     val existingConversation: AutomationExistingConversationCapability? = null,
     /**

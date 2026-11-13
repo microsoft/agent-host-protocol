@@ -586,9 +586,9 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public var create: AutomationCreateCapability?
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     public var schedules: AutomationScheduleCapabilities?
-    /// Present when absolute one-time triggers, durable receipts, and conditional updates are supported.
+    /// Enables one-time triggers, durable receipts, and guarded updates.
     public var oneTime: AutomationOneTimeCapability?
-    /// Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.
+    /// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
     public var existingConversation: AutomationExistingConversationCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.

@@ -232,7 +232,7 @@ export interface AutomationRunSummary {
  * @category Automation Run State
  */
 export interface AutomationRunState {
-  /** Immutable purpose copied from the admitted definition, independent of catalogue retention. */
+  /** Immutable purpose copied at admission; survives definition removal. */
   purpose?: 'scheduledChat';
   /** URI of this automation-run channel. */
   resource: URI;

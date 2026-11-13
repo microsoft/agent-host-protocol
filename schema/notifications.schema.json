@@ -1158,7 +1158,7 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Immutable purpose copied from the run, including after its definition is\nremoved. Existing conversation targets retain their original provenance."
+          "description": "Immutable run purpose; existing targets keep their original provenance."
         },
         "automation": {
           "$ref": "#/$defs/URI",
@@ -5829,7 +5829,7 @@
     },
     "AutomationOneTimeTrigger": {
       "type": "object",
-      "description": "Admits one run at an absolute instant.\n\nRequires {@link AutomationCapabilities.oneTime}. This MUST be the\ndefinition's only trigger. The host atomically persists\n{@link AutomationEntry.oneTimeRun} before dispatch, including for manual\nexecution before the due time. Missed occurrences catch up once. Failed,\ncancelled, or interrupted execution never rearms the occurrence. Once\nadmitted, definition updates are rejected and repeated manual requests\nreturn the existing run, even with a different request id.",
+      "description": "Requires {@link AutomationCapabilities.oneTime} and must be the definition's\nonly trigger. Admission is durable and never rearmed; missed instants catch\nup once. See the {@link /guide/automations | Automations Guide}.",
       "properties": {
         "id": {
           "type": "string",
@@ -6049,15 +6049,13 @@
     },
     "AutomationConversation": {
       "type": "object",
-      "description": "An exact existing execution target, without session creation or ownership.",
+      "description": "Exact host-advertised target, including non-default chats; not owned by the automation.",
       "properties": {
         "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Exact host-advertised owner session URI."
+          "$ref": "#/$defs/URI"
         },
         "chat": {
-          "$ref": "#/$defs/URI",
-          "description": "Exact host-advertised chat URI; it need not be the session's default chat."
+          "$ref": "#/$defs/URI"
         }
       },
       "required": [
@@ -6078,11 +6076,11 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "A captured user request scheduled for later. Requires\n{@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and\nenabled creation. Disabling it before admission permanently cancels it:\nthe host MUST reject subsequent definition updates and manual runs."
+          "description": "Requires one one-time trigger and enabled creation. Disabling before\nadmission permanently cancels the request."
         },
         "conversation": {
           "$ref": "#/$defs/AutomationConversation",
-          "description": "Existing conversation receiving a one-time scheduled-chat request.\n\nRequires {@link AutomationCapabilities.existingConversation} and\n`purpose: 'scheduledChat'`. Immutable after creation. The host MUST\nrevalidate authorization and that the chat belongs to the advertised\nsession. It MUST NOT create a replacement conversation, apply the\nsession template or message model/agent, or acquire ownership of the\nexisting session. The required {@link session} field is ignored.\n\nDelivery joins the ordinary message queue without steering or cancelling\nanother turn. Completion means accepted queue handoff, not turn completion.\nThe delivery-only run has no owned sessions: its `sessions` is empty and\n`primarySession` is absent."
+          "description": "Immutable scheduled-chat target; requires\n{@link AutomationCapabilities.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
         },
         "message": {
           "$ref": "#/$defs/Message",
@@ -6094,7 +6092,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether automatic triggers may create runs. Manual runs remain available\nwhenever {@link AutomationOperation.Run} is advertised, except that\ndisabling a scheduled chat permanently cancels its unconsumed occurrence."
+          "description": "Controls automatic triggers; see {@link purpose} for scheduled-chat\ncancellation. Other manual runs depend on {@link AutomationOperation.Run}."
         },
         "triggers": {
           "type": "array",
@@ -6174,15 +6172,15 @@
         },
         "oneTimeRun": {
           "$ref": "#/$defs/URI",
-          "description": "Durable one-time admission receipt. Retained independently of the\nrun-history window; consuming the occurrence never depends on retained\nsummaries. Absent before admission."
+          "description": "Durable admission receipt, retained after run-history pruning; absent before admission."
         },
         "oneTimeDispatchedAt": {
           "type": "string",
-          "description": "ISO 8601 timestamp when the one-time run's initial request was accepted\nfor dispatch. Retained independently of run history. Admission or session\nallocation alone MUST NOT set this receipt. Absence does not prove\nnon-dispatch after interrupted or uncertain execution."
+          "description": "ISO 8601 dispatch-acceptance time, retained after history pruning.\nAbsence does not prove non-dispatch."
         },
         "oneTimeDispatchRejectedAt": {
           "type": "string",
-          "description": "ISO 8601 timestamp positively confirming that a consumed occurrence\nfailed before submission was attempted. Only this receipt permits\nexplicit recovery as a sendable draft; failure plus absent\n{@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish\nboth dispatch receipts for the same occurrence."
+          "description": "ISO 8601 confirmation of failure before submission; permits explicit draft\nrecovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained\nafter history pruning."
         },
         "runCount": {
           "type": "number",
@@ -6477,7 +6475,7 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Immutable purpose copied from the admitted definition, independent of catalogue retention."
+          "description": "Immutable purpose copied at admission; survives definition removal."
         },
         "resource": {
           "$ref": "#/$defs/URI",

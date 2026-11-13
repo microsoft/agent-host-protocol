@@ -1133,7 +1133,6 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case schedule = "schedule"
     /// A host-defined external event discovered from trigger definitions.
     case event = "event"
-    /// One run at an absolute UTC instant, including catch-up after unavailability.
     case oneTime = "oneTime"
 }
 
@@ -7761,8 +7760,7 @@ public struct ResourceChange: Codable, Sendable, Equatable {
 
 public struct AutomationSessionOrigin: Codable, Sendable, Equatable {
     public var kind: SessionOriginKind
-    /// Immutable purpose copied from the run, including after its definition is
-    /// removed. Existing conversation targets retain their original provenance.
+    /// Immutable run purpose; existing targets keep their original provenance.
     public var purpose: String?
     /// Owning {@link AutomationEntry.resource}.
     public var automation: String
@@ -8164,9 +8162,7 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
 }
 
 public struct AutomationConversation: Codable, Sendable, Equatable {
-    /// Exact host-advertised owner session URI.
     public var session: String
-    /// Exact host-advertised chat URI; it need not be the session's default chat.
     public var chat: String
 
     public init(
@@ -8181,33 +8177,21 @@ public struct AutomationConversation: Codable, Sendable, Equatable {
 public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
-    /// A captured user request scheduled for later. Requires
-    /// {@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and
-    /// enabled creation. Disabling it before admission permanently cancels it:
-    /// the host MUST reject subsequent definition updates and manual runs.
+    /// Requires one one-time trigger and enabled creation. Disabling before
+    /// admission permanently cancels the request.
     public var purpose: String?
-    /// Existing conversation receiving a one-time scheduled-chat request.
-    ///
-    /// Requires {@link AutomationCapabilities.existingConversation} and
-    /// `purpose: 'scheduledChat'`. Immutable after creation. The host MUST
-    /// revalidate authorization and that the chat belongs to the advertised
-    /// session. It MUST NOT create a replacement conversation, apply the
-    /// session template or message model/agent, or acquire ownership of the
-    /// existing session. The required {@link session} field is ignored.
-    ///
-    /// Delivery joins the ordinary message queue without steering or cancelling
-    /// another turn. Completion means accepted queue handoff, not turn completion.
-    /// The delivery-only run has no owned sessions: its `sessions` is empty and
-    /// `primarySession` is absent.
+    /// Immutable scheduled-chat target; requires
+    /// {@link AutomationCapabilities.existingConversation}. Queues without
+    /// interrupting active turns or applying session/model/agent overrides.
+    /// Completes on queue acceptance and owns no sessions.
     public var conversation: AutomationConversation?
     /// Initial message sent to each new run session or existing conversation. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     public var message: Message
     /// Template used to create fresh sessions; ignored when {@link conversation} is set.
     public var session: AutomationSessionTemplate
-    /// Whether automatic triggers may create runs. Manual runs remain available
-    /// whenever {@link AutomationOperation.Run} is advertised, except that
-    /// disabling a scheduled chat permanently cancels its unconsumed occurrence.
+    /// Controls automatic triggers; see {@link purpose} for scheduled-chat
+    /// cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
     public var enabled: Bool
     /// Automatic triggers. An empty list means manual-only.
     public var triggers: [AutomationTrigger]
@@ -8267,7 +8251,6 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
 public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Replacement {@link AutomationDefinition.title}.
     public var title: String?
-    /// Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints.
     public var purpose: String?
     /// Replacement {@link AutomationDefinition.message}.
     public var message: Message?
@@ -8402,20 +8385,14 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
     public var definition: AutomationDefinition
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
-    /// Durable one-time admission receipt. Retained independently of the
-    /// run-history window; consuming the occurrence never depends on retained
-    /// summaries. Absent before admission.
+    /// Durable admission receipt, retained after run-history pruning; absent before admission.
     public var oneTimeRun: String?
-    /// ISO 8601 timestamp when the one-time run's initial request was accepted
-    /// for dispatch. Retained independently of run history. Admission or session
-    /// allocation alone MUST NOT set this receipt. Absence does not prove
-    /// non-dispatch after interrupted or uncertain execution.
+    /// ISO 8601 dispatch-acceptance time, retained after history pruning.
+    /// Absence does not prove non-dispatch.
     public var oneTimeDispatchedAt: String?
-    /// ISO 8601 timestamp positively confirming that a consumed occurrence
-    /// failed before submission was attempted. Only this receipt permits
-    /// explicit recovery as a sendable draft; failure plus absent
-    /// {@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish
-    /// both dispatch receipts for the same occurrence.
+    /// ISO 8601 confirmation of failure before submission; permits explicit draft
+    /// recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
+    /// after history pruning.
     public var oneTimeDispatchRejectedAt: String?
     /// Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -8721,7 +8698,7 @@ public struct AutomationRunSummary: Codable, Sendable, Equatable {
 }
 
 public struct AutomationRunState: Codable, Sendable, Equatable {
-    /// Immutable purpose copied from the admitted definition, independent of catalogue retention.
+    /// Immutable purpose copied at admission; survives definition removal.
     public var purpose: String?
     /// URI of this automation-run channel.
     public var resource: String

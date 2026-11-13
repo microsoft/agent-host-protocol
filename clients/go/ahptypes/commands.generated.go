@@ -311,9 +311,9 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
-	// Present when absolute one-time triggers, durable receipts, and conditional updates are supported.
+	// Enables one-time triggers, durable receipts, and guarded updates.
 	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
-	// Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.
+	// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
 	ExistingConversation *AutomationExistingConversationCapability `json:"existingConversation,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
@@ -362,18 +362,9 @@ type AutomationRunCancellationCapability struct {
 type AutomationCustomizationsCapability struct {
 }
 
-// Supports one-time runs, atomic manual admission, durable admission and
-// dispatch receipts, and conditional definition updates.
-//
-// Hosts MUST preserve supported message attachments durably without requiring
-// a connected client and reject unsupported content before accepting a
-// definition or update. Execution still requires a running, available host;
-// this capability does not imply host wake-up or continuous availability.
 type AutomationOneTimeCapability struct {
 }
 
-// Supports immutable existing-conversation targets without creating or owning
-// sessions. Requires {@link AutomationCapabilities.oneTime}.
 type AutomationExistingConversationCapability struct {
 }
 
@@ -1645,11 +1636,8 @@ type ListAutomationTriggerDefinitionsResult struct {
 // Manual execution is independent of {@link AutomationDefinition.enabled}.
 // The host persists the run before beginning session side effects.
 //
-// A one-time trigger shares one durable admission with automatic execution:
-// the first accepted request consumes it, and later requests return
-// {@link AutomationEntry.oneTimeRun}, including requests with different ids.
-// A scheduled chat disabled before admission is permanently cancelled and
-// MUST reject manual execution instead.
+// One-time requests return the same admitted run regardless of request id.
+// Scheduled chats disabled before admission reject manual execution.
 type RunAutomationParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`

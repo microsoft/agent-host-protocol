@@ -1630,12 +1630,9 @@ data class AutomationUpdateRequestedAction(
      */
     val changes: AutomationDefinitionPatch,
     /**
-     * Apply the patch only if this exactly matches
-     * {@link AutomationEntry.modifiedAt}. Requires
-     * {@link AutomationCapabilities.oneTime}. The host checks and persists the
-     * update atomically, rejects a mismatch without changing state, and
-     * advances `modifiedAt` on each accepted definition update so stale guards
-     * cannot match a different revision. Omission retains ordered patch semantics.
+     * Atomically requires an exact {@link AutomationEntry.modifiedAt} match.
+     * Requires {@link AutomationCapabilities.oneTime}; every accepted update
+     * advances the timestamp. Omit for ordered patches.
      */
     val expectedModifiedAt: String? = null
 )

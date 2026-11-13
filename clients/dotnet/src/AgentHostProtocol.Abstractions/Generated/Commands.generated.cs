@@ -610,11 +610,11 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
-    /// <summary>Present when absolute one-time triggers, durable receipts, and conditional updates are supported.</summary>
+    /// <summary>Enables one-time triggers, durable receipts, and guarded updates.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationOneTimeCapability? OneTime { get; init; }
 
-    /// <summary>Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.</summary>
+    /// <summary>Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationExistingConversationCapability? ExistingConversation { get; init; }
 
@@ -675,19 +675,10 @@ public sealed record AutomationCustomizationsCapability
 {
 }
 
-/// <summary>Supports one-time runs, atomic manual admission, durable admission and
-/// dispatch receipts, and conditional definition updates.
-///
-/// Hosts MUST preserve supported message attachments durably without requiring
-/// a connected client and reject unsupported content before accepting a
-/// definition or update. Execution still requires a running, available host;
-/// this capability does not imply host wake-up or continuous availability.</summary>
 public sealed record AutomationOneTimeCapability
 {
 }
 
-/// <summary>Supports immutable existing-conversation targets without creating or owning
-/// sessions. Requires {@link AutomationCapabilities.oneTime}.</summary>
 public sealed record AutomationExistingConversationCapability
 {
 }
@@ -2269,11 +2260,8 @@ public sealed record ListAutomationTriggerDefinitionsResult
 /// Manual execution is independent of {@link AutomationDefinition.enabled}.
 /// The host persists the run before beginning session side effects.
 ///
-/// A one-time trigger shares one durable admission with automatic execution:
-/// the first accepted request consumes it, and later requests return
-/// {@link AutomationEntry.oneTimeRun}, including requests with different ids.
-/// A scheduled chat disabled before admission is permanently cancelled and
-/// MUST reject manual execution instead.</summary>
+/// One-time requests return the same admitted run regardless of request id.
+/// Scheduled chats disabled before admission reject manual execution.</summary>
 public sealed record RunAutomationParams
 {
     /// <summary>Manual runs are scoped to the catalogue channel.</summary>
