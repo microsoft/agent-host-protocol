@@ -16,11 +16,10 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTargetKind, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl,
-    ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection,
-    ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary,
-    SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities,
-    TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
+    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
+    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
+    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -513,7 +512,7 @@ pub struct AutomationCapabilities {
     /// Present when definitions may set {@link AutomationDefinition.target}.
     /// Absence means each run creates a session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub targets: Option<AutomationTargetsCapability>,
+    pub targets: Option<AutomationTargetsCapabilities>,
 }
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
@@ -558,12 +557,24 @@ pub struct AutomationRunCancellationCapability {}
 pub struct AutomationCustomizationsCapability {}
 
 /// Run targets supported for {@link AutomationDefinition.target}.
+/// {@link AutomationNewSessionTarget} is always supported.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTargetsCapabilities {
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_session: Option<AutomationPreviousSessionTargetCapability>,
+}
+
+/// Presence capability for {@link AutomationPreviousSessionTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationTargetsCapability {
-    /// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
-    pub kinds: Vec<AutomationTargetKind>,
-}
+pub struct AutomationPreviousSessionTargetCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///

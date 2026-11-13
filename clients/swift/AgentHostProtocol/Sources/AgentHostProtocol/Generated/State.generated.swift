@@ -8173,9 +8173,7 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// entries when updating the definition.
     public var meta: [String: AnyCodable]?
     /// Where each run sends {@link AutomationDefinition.message}. Absence means
-    /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
-    /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
-    /// reject requests that do.
+    /// {@link AutomationTargetKind.NewSession}.
     public var target: AutomationTarget?
 
     enum CodingKeys: String, CodingKey {
@@ -8233,7 +8231,6 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Complete replacement {@link AutomationDefinition._meta}.
     public var meta: [String: AnyCodable]?
     /// Replacement {@link AutomationDefinition.target}.
-    /// {@link AutomationNewSessionTarget} resets it to a new session per run.
     public var target: AutomationTarget?
 
     enum CodingKeys: String, CodingKey {

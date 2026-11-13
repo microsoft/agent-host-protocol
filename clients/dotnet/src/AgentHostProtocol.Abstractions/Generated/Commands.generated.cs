@@ -629,7 +629,7 @@ public sealed record AutomationCapabilities
     /// <summary>Present when definitions may set {@link AutomationDefinition.target}.
     /// Absence means each run creates a session.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationTargetsCapability? Targets { get; init; }
+    public AutomationTargetsCapabilities? Targets { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationCreateRequestedAction |
@@ -672,11 +672,23 @@ public sealed record AutomationCustomizationsCapability
 {
 }
 
-/// <summary>Run targets supported for {@link AutomationDefinition.target}.</summary>
-public sealed record AutomationTargetsCapability
+/// <summary>Run targets supported for {@link AutomationDefinition.target}.
+/// {@link AutomationNewSessionTarget} is always supported.</summary>
+public sealed record AutomationTargetsCapabilities
 {
-    /// <summary>Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.</summary>
-    public required List<AutomationTargetKind> Kinds { get; init; }
+    /// <summary>Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationPreviousSessionTargetCapability? PreviousSession { get; init; }
+}
+
+/// <summary>Presence capability for {@link AutomationPreviousSessionTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.</summary>
+public sealed record AutomationPreviousSessionTargetCapability
+{
 }
 
 /// <summary>Presence capability for {@link InitializeResult.multipleChatProviders}.

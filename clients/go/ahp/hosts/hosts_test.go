@@ -178,8 +178,8 @@ func TestAutomationTargetsNotSharedBetweenHandles(t *testing.T) {
 		go runFakeServerWithInitializeResult(t, serverSide, ahptypes.InitializeResult{
 			ProtocolVersion: ahptypes.ProtocolVersion,
 			Automations: &ahptypes.AutomationCapabilities{
-				Targets: &ahptypes.AutomationTargetsCapability{
-					Kinds: []ahptypes.AutomationTargetKind{ahptypes.AutomationTargetKindNewSession, ahptypes.AutomationTargetKindPreviousSession},
+				Targets: &ahptypes.AutomationTargetsCapabilities{
+					PreviousSession: &ahptypes.AutomationPreviousSessionTargetCapability{},
 				},
 			},
 		})
@@ -190,10 +190,10 @@ func TestAutomationTargetsNotSharedBetweenHandles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddHost: %v", err)
 	}
-	handle.Automations.Targets.Kinds[0] = "mutated"
+	handle.Automations.Targets.PreviousSession = nil
 
-	if got := multi.Host(cfg.ID).Automations.Targets.Kinds; len(got) != 2 || got[0] != ahptypes.AutomationTargetKindNewSession {
-		t.Fatalf("target kinds = %v, want [newSession previousSession]", got)
+	if got := multi.Host(cfg.ID).Automations.Targets; got == nil || got.PreviousSession == nil {
+		t.Fatalf("targets = %+v, want previousSession present", got)
 	}
 }
 

@@ -585,7 +585,7 @@ data class AutomationCapabilities(
      * Present when definitions may set {@link AutomationDefinition.target}.
      * Absence means each run creates a session.
      */
-    val targets: AutomationTargetsCapability? = null
+    val targets: AutomationTargetsCapabilities? = null
 )
 
 @Serializable
@@ -608,12 +608,17 @@ class AutomationRunCancellationCapability
 class AutomationCustomizationsCapability
 
 @Serializable
-data class AutomationTargetsCapability(
+data class AutomationTargetsCapabilities(
     /**
-     * Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
+     * Present when {@link AutomationDefinition.target} may be an
+     * {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+     * target when this is absent.
      */
-    val kinds: List<AutomationTargetKind>
+    val previousSession: AutomationPreviousSessionTargetCapability? = null
 )
+
+@Serializable
+class AutomationPreviousSessionTargetCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

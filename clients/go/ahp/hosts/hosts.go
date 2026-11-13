@@ -755,7 +755,10 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 	}
 	if capabilities.Targets != nil {
 		value := *capabilities.Targets
-		value.Kinds = append([]ahptypes.AutomationTargetKind(nil), capabilities.Targets.Kinds...)
+		if capabilities.Targets.PreviousSession != nil {
+			previousSession := *capabilities.Targets.PreviousSession
+			value.PreviousSession = &previousSession
+		}
 		clone.Targets = &value
 	}
 	return &clone

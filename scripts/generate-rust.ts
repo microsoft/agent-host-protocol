@@ -1918,7 +1918,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
-  { name: 'AutomationTargetsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
@@ -2005,7 +2006,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTargetKind, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');

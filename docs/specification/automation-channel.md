@@ -32,7 +32,18 @@ host-defined type plus schema-defined configuration returned by
 
 The session template can select a provider, model, and custom agent, and carries
 the same schema-defined configuration values used for ordinary session
-creation. Hosts revalidate all selections when a run starts.
+creation. Hosts revalidate the provider and configuration whenever a run
+creates a session, and the model and custom agent for every run's message.
+
+The optional `target` says where each run sends its message. Omitting it, or
+`newSession`, creates a session per run. `previousSession` continues the
+primary session of the automation's previous run while it is usable, adding the
+message to that session's default chat as a queued pending message; otherwise
+the run creates a session. Clients SHOULD NOT author a `previousSession`
+target unless `InitializeResult.automations.targets.previousSession` is
+present.
+See the [Automations guide](/guide/automations#run-targets) for target
+resolution and run lifecycle.
 
 ## Subscription and reconnect
 
@@ -104,5 +115,6 @@ occurrence with at most one run.
 ## Security
 
 Definitions contain no credentials or durable permission grants. The host
-authorizes every operation and revalidates session configuration at execution
-time.
+authorizes every operation, revalidates the session template whenever a run
+creates a session, and checks that the automation may still drive a session
+before a run continues it.

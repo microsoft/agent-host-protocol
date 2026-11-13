@@ -24,7 +24,8 @@ import type {
   AutomationSessionTemplate,
   AutomationEntry,
   AutomationState,
-  AutomationTargetKind,
+  AutomationNewSessionTarget,
+  AutomationPreviousSessionTarget,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
 import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
@@ -412,18 +413,33 @@ export interface AutomationCapabilities {
    * Present when definitions may set {@link AutomationDefinition.target}.
    * Absence means each run creates a session.
    */
-  targets?: AutomationTargetsCapability;
+  targets?: AutomationTargetsCapabilities;
 }
 
 /**
  * Run targets supported for {@link AutomationDefinition.target}.
+ * {@link AutomationNewSessionTarget} is always supported.
  *
  * @category Commands
  */
-export interface AutomationTargetsCapability {
-  /** Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}. */
-  kinds: AutomationTargetKind[];
+export interface AutomationTargetsCapabilities {
+  /**
+   * Present when {@link AutomationDefinition.target} may be an
+   * {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+   * target when this is absent.
+   */
+  previousSession?: AutomationPreviousSessionTargetCapability;
 }
+
+/**
+ * Presence capability for {@link AutomationPreviousSessionTarget}.
+ *
+ * The empty object means "supported"; fields are reserved for future
+ * options.
+ *
+ * @category Commands
+ */
+export interface AutomationPreviousSessionTargetCapability {}
 
 /**
  * Presence capability for

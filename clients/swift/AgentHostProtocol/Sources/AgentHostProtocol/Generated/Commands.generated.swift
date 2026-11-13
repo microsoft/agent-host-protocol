@@ -598,7 +598,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public var customizations: AutomationCustomizationsCapability?
     /// Present when definitions may set {@link AutomationDefinition.target}.
     /// Absence means each run creates a session.
-    public var targets: AutomationTargetsCapability?
+    public var targets: AutomationTargetsCapabilities?
 
     public init(
         create: AutomationCreateCapability? = nil,
@@ -606,7 +606,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
         customizations: AutomationCustomizationsCapability? = nil,
-        targets: AutomationTargetsCapability? = nil
+        targets: AutomationTargetsCapabilities? = nil
     ) {
         self.create = create
         self.schedules = schedules
@@ -654,14 +654,24 @@ public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
     }
 }
 
-public struct AutomationTargetsCapability: Codable, Sendable, Equatable {
-    /// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
-    public var kinds: [AutomationTargetKind]
+public struct AutomationTargetsCapabilities: Codable, Sendable, Equatable {
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.
+    public var previousSession: AutomationPreviousSessionTargetCapability?
 
     public init(
-        kinds: [AutomationTargetKind]
+        previousSession: AutomationPreviousSessionTargetCapability? = nil
     ) {
-        self.kinds = kinds
+        self.previousSession = previousSession
+    }
+}
+
+public struct AutomationPreviousSessionTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
     }
 }
 

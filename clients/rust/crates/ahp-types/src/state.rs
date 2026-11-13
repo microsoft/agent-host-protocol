@@ -6227,10 +6227,10 @@ pub struct AutomationTriggerDefinition {
 }
 
 /// Template from which the host creates a session for an automation run.
-/// {@link AutomationDefinition.target} decides whether a run creates one.
-///
-/// The host revalidates every selection when the run starts. Definitions never
-/// carry credentials, confirmation decisions, or durable permission grants.
+/// {@link AutomationDefinition.target} decides whether a run creates one. In a
+/// session a run continues, only {@link AutomationSessionTemplate.model |
+/// `model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the
+/// run's message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionTemplate {
@@ -6327,9 +6327,7 @@ pub struct AutomationDefinition {
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
     /// Where each run sends {@link AutomationDefinition.message}. Absence means
-    /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
-    /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
-    /// reject requests that do.
+    /// {@link AutomationTargetKind.NewSession}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<AutomationTarget>,
 }
@@ -6373,7 +6371,6 @@ pub struct AutomationDefinitionPatch {
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
     /// Replacement {@link AutomationDefinition.target}.
-    /// {@link AutomationNewSessionTarget} resets it to a new session per run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<AutomationTarget>,
 }
@@ -6412,25 +6409,45 @@ pub struct AutomationNewSessionTarget {
 /// Each run continues the session of the automation's previous run, so a
 /// recurring automation keeps one conversation.
 ///
-/// Runs resolve their session and start their turns in the order they were
-/// created. The previous session is the
-/// {@link AutomationRunState.primarySession} of the latest earlier run that has
-/// one, even if that run was pruned from {@link AutomationEntry.runs}. The run
-/// links it and sends {@link AutomationDefinition.message} in its
-/// {@link SessionState.defaultChat | default chat}. If that session no longer
-/// exists, is archived, or has no default chat, the run creates a session from
-/// {@link AutomationDefinition.session} instead, which later runs continue. The
-/// host MAY also do so when the session can't honor the current template, for
-/// example after its agent provider, working directories, or configuration
-/// changed.
+/// The previous run's session is the
+/// {@link AutomationRunState.primarySession | primary session} of the most
+/// recently created earlier run of this automation that has one, even if that
+/// run was pruned from {@link AutomationEntry.runs}. The host decides whether
+/// that session is still usable. A session that was removed or archived, that
+/// has no {@link SessionState.defaultChat | default chat}, or that the
+/// automation may no longer drive, is never usable. The host MAY also treat a
+/// session as unusable when it can't honor the current template, for example
+/// after its agent provider, working directories, or configuration changed.
+/// When there is no usable session, the run creates one from
+/// {@link AutomationDefinition.session}, as with
+/// {@link AutomationNewSessionTarget}, and later runs continue that session.
+/// The host resolves targets and starts turns in run creation order, so
+/// overlapping runs share one session instead of each creating one.
 ///
-/// Model and agent selections apply to the run's turn as in a session the run
-/// creates; the template's other settings are not reapplied. The host MAY first
-/// update the session's copy of {@link AutomationEntry.customizations}.
+/// When a run reuses a session, the host:
 ///
-/// A run stays `pending` while the chat runs another turn, becomes `running`
-/// when its own turn starts, and ends with that turn. Cancelling a run cancels
-/// only its own turn, if it started.
+/// - links the session to the run with
+///   {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and
+///   makes it the run's primary session before delivering the message;
+/// - adds {@link AutomationDefinition.message} to the session's default chat
+///   as a {@link PendingMessageKind.Queued | queued} pending message, so it
+///   never steers an active turn and starts a turn once the chat is idle;
+/// - does not reapply {@link AutomationDefinition.session}, so the session
+///   keeps its agent provider, configuration, and working directories. The
+///   template's `model` and `agent` still apply to the queued message, as for
+///   every run. The host MAY update the session's copies of the automation's
+///   customizations to match {@link AutomationEntry.customizations}.
+///
+/// The run stays `pending` while its message waits and becomes `running` when
+/// a turn starts from it. It ends with the outcome of that turn. If its
+/// queued message is withdrawn without a turn starting from it, the run is
+/// `cancelled`. Cancelling the run removes its queued message or cancels its
+/// turn, and never affects other turns in the session. If the session becomes
+/// unusable before a turn starts from the message, the host removes the queued
+/// message, if its chat still exists, and the run fails.
+///
+/// {@link SessionMetadata.origin} keeps naming the run that created the
+/// session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationPreviousSessionTarget {

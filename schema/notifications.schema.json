@@ -5939,7 +5939,7 @@
     },
     "AutomationPreviousSessionTarget": {
       "type": "object",
-      "description": "Each run continues the session of the automation's previous run, so a\nrecurring automation keeps one conversation.\n\nRuns resolve their session and start their turns in the order they were\ncreated. The previous session is the\n{@link AutomationRunState.primarySession} of the latest earlier run that has\none, even if that run was pruned from {@link AutomationEntry.runs}. The run\nlinks it and sends {@link AutomationDefinition.message} in its\n{@link SessionState.defaultChat | default chat}. If that session no longer\nexists, is archived, or has no default chat, the run creates a session from\n{@link AutomationDefinition.session} instead, which later runs continue. The\nhost MAY also do so when the session can't honor the current template, for\nexample after its agent provider, working directories, or configuration\nchanged.\n\nModel and agent selections apply to the run's turn as in a session the run\ncreates; the template's other settings are not reapplied. The host MAY first\nupdate the session's copy of {@link AutomationEntry.customizations}.\n\nA run stays `pending` while the chat runs another turn, becomes `running`\nwhen its own turn starts, and ends with that turn. Cancelling a run cancels\nonly its own turn, if it started.",
+      "description": "Each run continues the session of the automation's previous run, so a\nrecurring automation keeps one conversation.\n\nThe previous run's session is the\n{@link AutomationRunState.primarySession | primary session} of the most\nrecently created earlier run of this automation that has one, even if that\nrun was pruned from {@link AutomationEntry.runs}. The host decides whether\nthat session is still usable. A session that was removed or archived, that\nhas no {@link SessionState.defaultChat | default chat}, or that the\nautomation may no longer drive, is never usable. The host MAY also treat a\nsession as unusable when it can't honor the current template, for example\nafter its agent provider, working directories, or configuration changed.\nWhen there is no usable session, the run creates one from\n{@link AutomationDefinition.session}, as with\n{@link AutomationNewSessionTarget}, and later runs continue that session.\nThe host resolves targets and starts turns in run creation order, so\noverlapping runs share one session instead of each creating one.\n\nWhen a run reuses a session, the host:\n\n- links the session to the run with\n  {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and\n  makes it the run's primary session before delivering the message;\n- adds {@link AutomationDefinition.message} to the session's default chat\n  as a {@link PendingMessageKind.Queued | queued} pending message, so it\n  never steers an active turn and starts a turn once the chat is idle;\n- does not reapply {@link AutomationDefinition.session}, so the session\n  keeps its agent provider, configuration, and working directories. The\n  template's `model` and `agent` still apply to the queued message, as for\n  every run. The host MAY update the session's copies of the automation's\n  customizations to match {@link AutomationEntry.customizations}.\n\nThe run stays `pending` while its message waits and becomes `running` when\na turn starts from it. It ends with the outcome of that turn. If its\nqueued message is withdrawn without a turn starting from it, the run is\n`cancelled`. Cancelling the run removes its queued message or cancels its\nturn, and never affects other turns in the session. If the session becomes\nunusable before a turn starts from the message, the host removes the queued\nmessage, if its chat still exists, and the run fails.\n\n{@link SessionMetadata.origin} keeps naming the run that created the\nsession.",
       "properties": {
         "kind": {
           "const": "previousSession"
@@ -6007,7 +6007,7 @@
     },
     "AutomationSessionTemplate": {
       "type": "object",
-      "description": "Template from which the host creates a session for an automation run.\n{@link AutomationDefinition.target} decides whether a run creates one.\n\nThe host revalidates every selection when the run starts. Definitions never\ncarry credentials, confirmation decisions, or durable permission grants.",
+      "description": "Template from which the host creates a session for an automation run.\n{@link AutomationDefinition.target} decides whether a run creates one. In a\nsession a run continues, only {@link AutomationSessionTemplate.model |\n`model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the\nrun's message.",
       "properties": {
         "provider": {
           "type": "string",
@@ -6115,7 +6115,7 @@
         },
         "target": {
           "$ref": "#/$defs/AutomationTarget",
-          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that\n{@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST\nreject requests that do."
+          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}."
         }
       },
       "required": [
@@ -7206,7 +7206,7 @@
           "$ref": "#/$defs/AutomationPreviousSessionTarget"
         }
       ],
-      "description": "Where the runs of an automation send {@link AutomationDefinition.message}."
+      "description": "Where the runs of an automation send {@link AutomationDefinition.message}.\n\nClients SHOULD NOT author {@link AutomationPreviousSessionTarget} unless\nthe host advertises\n{@link AutomationTargetsCapabilities.previousSession}."
     },
     "AutomationOperation": {
       "enum": [

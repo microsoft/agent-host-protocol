@@ -61,10 +61,7 @@ export interface AutomationDefinitionPatch {
   disableConditions?: AutomationDisableCondition[];
   /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
-  /**
-   * Replacement {@link AutomationDefinition.target}.
-   * {@link AutomationNewSessionTarget} resets it to a new session per run.
-   */
+  /** Replacement {@link AutomationDefinition.target}. */
   target?: AutomationTarget;
 }
 

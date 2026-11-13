@@ -323,7 +323,7 @@ type AutomationCapabilities struct {
 	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
 	// Present when definitions may set {@link AutomationDefinition.target}.
 	// Absence means each run creates a session.
-	Targets *AutomationTargetsCapability `json:"targets,omitempty"`
+	Targets *AutomationTargetsCapabilities `json:"targets,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -362,9 +362,19 @@ type AutomationCustomizationsCapability struct {
 }
 
 // Run targets supported for {@link AutomationDefinition.target}.
-type AutomationTargetsCapability struct {
-	// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
-	Kinds []AutomationTargetKind `json:"kinds"`
+// {@link AutomationNewSessionTarget} is always supported.
+type AutomationTargetsCapabilities struct {
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+	// target when this is absent.
+	PreviousSession *AutomationPreviousSessionTargetCapability `json:"previousSession,omitempty"`
+}
+
+// Presence capability for {@link AutomationPreviousSessionTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationPreviousSessionTargetCapability struct {
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.
