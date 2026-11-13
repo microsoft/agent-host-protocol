@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional per-chat agent provider: `CreateChatParams.provider` and `ChatSummary.provider` (mirrored on `ChatState` and `SessionChatSummary`), gated by the host-level `InitializeResult.multipleChatProviders` capability, let one session contain chats backed by different agent providers. Absent `provider` means the session's agent provider; forks and side chats keep their source chat's agent provider."
-}

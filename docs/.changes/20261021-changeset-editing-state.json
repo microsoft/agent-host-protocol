@@ -1,5 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `ChangesetFile.status`, a bitset of `ChangesetFileStatus` flags (initially `Editing`), reports per-file activity through existing changeset snapshots and actions without requiring provider-specific metadata.",
-  "issues": [538]
-}

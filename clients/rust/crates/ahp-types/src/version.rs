@@ -5,7 +5,7 @@
 #![allow(missing_docs)]
 
 /// Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
-pub const PROTOCOL_VERSION: &str = "1.1.0";
+pub const PROTOCOL_VERSION: &str = "1.2.0";
 
 /// Every protocol version this crate is willing to negotiate, ordered
 /// most-preferred-first, independently of the development [`PROTOCOL_VERSION`].
