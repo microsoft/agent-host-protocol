@@ -50,16 +50,21 @@ internal static class Program
         JsonRpcMessage decoded = serializer.DecodeMessage(encoded);
         Ensure(decoded.Request is { Method: "smoke" }, "JSON-RPC message round-trip failed.");
 
-        var snapshot = new SnapshotState
+        var snapshot = new Snapshot
         {
-            Root = new RootState
+            Resource = ProtocolVersion.RootResourceUri,
+            FromSeq = 0,
+            State = new SnapshotState
             {
-                Agents = new List<AgentInfo>(),
+                Root = new RootState
+                {
+                    Agents = new List<AgentInfo>(),
+                },
             },
         };
         string snapshotJson = serializer.Serialize(snapshot);
-        SnapshotState snapshotRoundTrip = serializer.Deserialize<SnapshotState>(snapshotJson);
-        Ensure(snapshotRoundTrip.Root is not null, "SnapshotState round-trip failed.");
+        Snapshot snapshotRoundTrip = serializer.Deserialize<Snapshot>(snapshotJson);
+        Ensure(snapshotRoundTrip.State.Root is not null, "Snapshot round-trip failed.");
 
         StringOrMarkdown markdown = StringOrMarkdown.FromMarkdown("**native**");
         string markdownJson = serializer.Serialize(markdown);

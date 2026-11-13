@@ -6,6 +6,8 @@ package ahptypes
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 // Reference the encoding/json import to keep gofmt -d from
@@ -7109,16 +7111,9 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 	return json.Marshal(o.Value)
 }
 
-// SnapshotState is the state payload of a snapshot — root, session,
-// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-// automation-run, or empty state. The active
-// variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the canonical order
-// (empty → automationRun → automations → session → chat → canvas → terminal →
-// changeset → resourceWatch → annotations → root). An object with no members
-// is an empty state, used by channels whose state has no fields. A state that
-// matches none of these, such as the state of a channel added in a later
-// protocol version, is kept as raw JSON in Unknown.
+// SnapshotState is the state payload of a snapshot, selected by its resource's URI scheme.
+// Standalone decoding preserves any JSON value in Unknown. Use Snapshot or
+// SnapshotStateFromResource for typed decoding, which propagates known-channel errors.
 type SnapshotState struct {
 	Empty         *EmptyState         `json:"-"`
 	Unknown       json.RawMessage     `json:"-"`
@@ -7166,89 +7161,152 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// UnmarshalJSON tries each concrete variant in turn and keeps the first
-// one that decodes without losing any of its required fields.
+// UnmarshalJSON preserves standalone state payloads without guessing their channel.
 func (s *SnapshotState) UnmarshalJSON(data []byte) error {
-	*s = SnapshotState{}
-	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(data, &probe); err != nil {
+	var raw json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	switch {
-	case len(probe) == 0:
-		s.Empty = &EmptyState{}
-	case containsAll(probe, "automation", "origin", "sessions"):
-		var v AutomationRunState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.AutomationRun = &v
-	case containsAll(probe, "entries"):
-		var v AutomationState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Automations = &v
-	case containsAll(probe, "lifecycle"):
-		var v SessionState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Session = &v
-	case containsAll(probe, "turns"):
-		var v ChatState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Chat = &v
-	case containsAll(probe, "instanceId", "extensionId", "canvasId"):
-		var v CanvasState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Canvas = &v
-	case containsAll(probe, "content"):
-		var v TerminalState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Terminal = &v
-	case containsAll(probe, "status", "files"):
-		var v ChangesetState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Changeset = &v
-	case containsAll(probe, "root", "recursive"):
-		var v ResourceWatchState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.ResourceWatch = &v
-	case containsAll(probe, "annotations"):
-		var v AnnotationsState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Annotations = &v
-	case containsAll(probe, "agents"):
-		var v RootState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Root = &v
-	default:
-		// A state from a later protocol version: keep it rather than fail.
-		s.Unknown = append(json.RawMessage(nil), data...)
-	}
+	*s = SnapshotState{Unknown: raw}
 	return nil
 }
 
-func containsAll(m map[string]json.RawMessage, keys ...string) bool {
-	for _, k := range keys {
-		if _, ok := m[k]; !ok {
-			return false
-		}
+// SnapshotStateFromResource decodes a known channel strictly, or preserves raw JSON for an unknown scheme.
+func SnapshotStateFromResource(resource URI, data []byte) (SnapshotState, error) {
+	scheme, _, found := strings.Cut(resource, ":")
+	if !found {
+		scheme = ""
 	}
-	return true
+	switch scheme {
+	case "ahp-root":
+		var value *RootState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected RootState object")
+		}
+		return SnapshotState{Root: value}, nil
+	case "ahp-automations":
+		var value *AutomationState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected AutomationState object")
+		}
+		return SnapshotState{Automations: value}, nil
+	case "ahp-session":
+		var value *SessionState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected SessionState object")
+		}
+		return SnapshotState{Session: value}, nil
+	case "ahp-chat":
+		var value *ChatState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected ChatState object")
+		}
+		return SnapshotState{Chat: value}, nil
+	case "ahp-canvas":
+		var value *CanvasState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected CanvasState object")
+		}
+		return SnapshotState{Canvas: value}, nil
+	case "ahp-terminal":
+		var value *TerminalState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected TerminalState object")
+		}
+		return SnapshotState{Terminal: value}, nil
+	case "ahp-changeset":
+		var value *ChangesetState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected ChangesetState object")
+		}
+		return SnapshotState{Changeset: value}, nil
+	case "ahp-resource-watch":
+		var value *ResourceWatchState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected ResourceWatchState object")
+		}
+		return SnapshotState{ResourceWatch: value}, nil
+	case "ahp-annotations":
+		var value *AnnotationsState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected AnnotationsState object")
+		}
+		return SnapshotState{Annotations: value}, nil
+	case "ahp-automation-run":
+		var value *AutomationRunState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected AutomationRunState object")
+		}
+		return SnapshotState{AutomationRun: value}, nil
+	case "ahp-tcp":
+		var value *EmptyState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected EmptyState object")
+		}
+		return SnapshotState{Empty: value}, nil
+	case "ahp-otlp":
+		var value *EmptyState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return SnapshotState{}, err
+		}
+		if value == nil {
+			return SnapshotState{}, fmt.Errorf("expected EmptyState object")
+		}
+		return SnapshotState{Empty: value}, nil
+	default:
+		var state SnapshotState
+		err := json.Unmarshal(data, &state)
+		return state, err
+	}
+}
+
+// UnmarshalJSON decodes snapshot state using the resource's URI scheme.
+func (s *Snapshot) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Resource URI             `json:"resource"`
+		State    json.RawMessage `json:"state"`
+		FromSeq  int64           `json:"fromSeq"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	state, err := SnapshotStateFromResource(wire.Resource, wire.State)
+	if err != nil {
+		return err
+	}
+	*s = Snapshot{Resource: wire.Resource, State: state, FromSeq: wire.FromSeq}
+	return nil
 }

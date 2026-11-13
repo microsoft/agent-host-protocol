@@ -561,7 +561,14 @@ public sealed class ClientTests
                     FromSeq = 7,
                     State = new SnapshotState
                     {
-                        Root = new RootState { Agents = new System.Collections.Generic.List<AgentInfo>() },
+                        Session = new SessionState
+                        {
+                            Provider = "test",
+                            Title = "Session",
+                            Lifecycle = SessionLifecycle.Ready,
+                            ActiveClients = new System.Collections.Generic.List<SessionActiveClient>(),
+                            Chats = new System.Collections.Generic.List<ChatSummary>(),
+                        },
                     },
                 },
             },
@@ -627,7 +634,14 @@ public sealed class ClientTests
                 FromSeq = 3,
                 State = new SnapshotState
                 {
-                    Root = new RootState { Agents = new System.Collections.Generic.List<AgentInfo>() },
+                    Session = new SessionState
+                    {
+                        Provider = "test",
+                        Title = "Session",
+                        Lifecycle = SessionLifecycle.Ready,
+                        ActiveClients = new System.Collections.Generic.List<SessionActiveClient>(),
+                        Chats = new System.Collections.Generic.List<ChatSummary>(),
+                    },
                 },
             },
         };
