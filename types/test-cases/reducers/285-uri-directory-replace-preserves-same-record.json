@@ -1,0 +1,15 @@
+{
+  "description": "Same-URI legacy replacement retains known metadata",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "origin": { "kind": "local" } }, "file:///b"]
+  },
+  "actions": [{ "type": "session/workingDirectoryReplaced", "directory": "file:///a", "replacement": "file:///a" }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "origin": { "kind": "local" } }, "file:///b"]
+  }
+}

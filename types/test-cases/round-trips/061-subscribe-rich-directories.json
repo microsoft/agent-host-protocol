@@ -1,0 +1,32 @@
+{
+  "name": "subscribe-rich-directories",
+  "group": "A",
+  "description": "Subscribe carries resolved directory metadata in its full session snapshot.",
+  "type": "SubscribeResult",
+  "input": {
+    "snapshot": {
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", {
+          "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+          "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+        }]
+      }
+    }
+  },
+  "acceptableOutputs": [{
+    "snapshot": {
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", {
+          "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+          "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+        }]
+      }
+    }
+  }]
+}

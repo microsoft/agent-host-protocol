@@ -1,0 +1,14 @@
+{
+  "name": "directory-unknown-origin",
+  "group": "A",
+  "description": "Future working-directory origin kinds survive typed decoders without losing their payload.",
+  "type": "StateAction",
+  "input": {
+    "type": "session/workingDirectorySet",
+    "directory": { "uri": "file:///future", "origin": { "kind": "future", "location": "host-defined" } }
+  },
+  "acceptableOutputs": [{
+    "type": "session/workingDirectorySet",
+    "directory": { "uri": "file:///future", "origin": { "kind": "future", "location": "host-defined" } }
+  }]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "initialize-legacy-directories",
+  "group": "A",
+  "description": "The legacy initialize snapshot format remains decodable by new clients.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0", "serverSeq": 2,
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+    }]
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0", "serverSeq": 2,
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+    }]
+  }]
+}

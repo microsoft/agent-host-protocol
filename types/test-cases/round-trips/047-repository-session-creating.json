@@ -1,0 +1,30 @@
+{
+  "name": "repository-session-creating",
+  "group": "A",
+  "description": "A creating session does not claim unresolved directories or echo the original repository request.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "creating",
+      "activeClients": [],
+      "chats": []
+    },
+    "fromSeq": 0
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "creating",
+      "activeClients": [],
+      "chats": []
+    },
+    "fromSeq": 0
+  }]
+}

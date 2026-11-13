@@ -1,0 +1,20 @@
+{
+  "name": "session-summary-rich-directories",
+  "group": "A",
+  "description": "Summary deltas replace the directory list with complete mixed-format entries.",
+  "type": "SessionSummaryChangedParams",
+  "input": {
+    "channel": "ahp-root://", "session": "ahp-session:/directories",
+    "changes": { "workingDirectories": ["file:///legacy", {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    }] }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://", "session": "ahp-session:/directories",
+    "changes": { "workingDirectories": ["file:///legacy", {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    }] }
+  }]
+}

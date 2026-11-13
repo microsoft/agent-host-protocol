@@ -1,0 +1,34 @@
+{
+  "name": "reconnect-snapshot-rich-directories",
+  "group": "A",
+  "description": "Full-snapshot reconnect recovery preserves actual directory provenance.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 9,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", {
+          "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+          "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+        }]
+      }
+    }]
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 9,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", {
+          "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+          "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+        }]
+      }
+    }]
+  }]
+}

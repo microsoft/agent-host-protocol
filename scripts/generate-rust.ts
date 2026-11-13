@@ -155,6 +155,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'URI') return 'Uri';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
+  if (tsType === 'URI | WorkingDirectory') return 'WorkingDirectoryEntry';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -855,7 +856,7 @@ const STATE_ENUMS = [
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -878,6 +879,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
+  { name: 'WorkingDirectory' },
+  { name: 'LocalWorkingDirectoryOrigin', omitDiscriminants: true },
+  { name: 'RepoWorkingDirectoryOrigin', omitDiscriminants: true },
+  { name: 'WorktreeWorkingDirectoryOrigin', omitDiscriminants: true },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -1287,6 +1292,18 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
   unknown: true,
 };
 
+const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
+  name: 'WorkingDirectoryOrigin',
+  discriminantField: 'kind',
+  doc: 'Host-reported working-directory provenance.',
+  variants: [
+    { variantName: 'Local', innerType: 'LocalWorkingDirectoryOrigin', wireValue: 'local' },
+    { variantName: 'Repo', innerType: 'RepoWorkingDirectoryOrigin', wireValue: 'repo' },
+    { variantName: 'Worktree', innerType: 'WorktreeWorkingDirectoryOrigin', wireValue: 'worktree' },
+  ],
+  unknown: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1462,6 +1479,37 @@ impl<'de> Deserialize<'de> for Snapshot {
 }`;
 }
 
+function generateWorkingDirectoryEntry(): string {
+  return `/// A legacy URI or a complete working-directory record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WorkingDirectoryEntry {
+    Uri(Uri),
+    Directory(WorkingDirectory),
+}
+
+impl WorkingDirectoryEntry {
+    pub fn uri(&self) -> &Uri {
+        match self {
+            Self::Uri(uri) => uri,
+            Self::Directory(directory) => &directory.uri,
+        }
+    }
+}
+
+impl From<Uri> for WorkingDirectoryEntry {
+    fn from(uri: Uri) -> Self {
+        Self::Uri(uri)
+    }
+}
+
+impl From<WorkingDirectory> for WorkingDirectoryEntry {
+    fn from(directory: WorkingDirectory) -> Self {
+        Self::Directory(directory)
+    }
+}`;
+}
+
 function generateToolInput(): string {
   return `/// Raw tool input represented inline or by content reference.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1540,6 +1588,8 @@ where D: serde::Deserializer<'de>,
 
   lines.push(generateToolInput());
   lines.push('');
+  lines.push(generateWorkingDirectoryEntry());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin(project));
@@ -1582,6 +1632,8 @@ where D: serde::Deserializer<'de>,
   lines.push(generateDiscriminatedUnion(project, BACKGROUND_WORK_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, WORKING_DIRECTORY_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
@@ -1792,7 +1844,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, WorkingDirectoryEntry};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -1898,8 +1950,10 @@ pub struct ActionEnvelope {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+  { name: 'RepositorySource' },
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
+  { name: 'RepositoryPreparationCapability' }, { name: 'WorkingDirectoryInfoCapability' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
@@ -2166,7 +2220,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary, Snapshot};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus, SessionSummary, Snapshot, WorkingDirectoryEntry};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2535,6 +2589,7 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
     'SessionOrigin',
+    'WorkingDirectoryOrigin',
     'AutomationTrigger',
     'AutomationDisableCondition',
     'AutomationRunOrigin',

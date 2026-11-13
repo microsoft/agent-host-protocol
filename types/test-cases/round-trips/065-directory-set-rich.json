@@ -1,0 +1,20 @@
+{
+  "name": "directory-set-rich",
+  "group": "A",
+  "description": "Live set actions carry the full URI-keyed record rather than parallel metadata.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/directories", "serverSeq": 3,
+    "action": { "type": "session/workingDirectorySet", "directory": {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    } }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/directories", "serverSeq": 3,
+    "action": { "type": "session/workingDirectorySet", "directory": {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    } }
+  }]
+}

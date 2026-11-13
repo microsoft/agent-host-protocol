@@ -288,6 +288,25 @@ public struct SideChatSource: Codable, Sendable, Equatable {
     }
 }
 
+public struct RepositorySource: Codable, Sendable, Equatable {
+    /// Credential-free repository source URI.
+    public var source: String
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
+    public var revision: String?
+    /// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+    public var subdirectory: String?
+
+    public init(
+        source: String,
+        revision: String? = nil,
+        subdirectory: String? = nil
+    ) {
+        self.source = source
+        self.revision = revision
+        self.subdirectory = subdirectory
+    }
+}
+
 /// Opens a TCP connection from the host to a destination on the host's network.
 ///
 /// The client chooses the channel URI. This command does not subscribe: after it
@@ -459,6 +478,8 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     public var environment: HostEnvironment?
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
+    /// Host repository preparation support; absent when unsupported.
+    public var repositoryPreparation: RepositoryPreparationCapability?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -500,6 +521,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         case snapshots
         case environment
         case defaultDirectory
+        case repositoryPreparation
         case completionTriggerCharacters
         case terminalCommandPrefix
         case telemetry
@@ -516,6 +538,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         snapshots: [Snapshot],
         environment: HostEnvironment? = nil,
         defaultDirectory: String? = nil,
+        repositoryPreparation: RepositoryPreparationCapability? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
@@ -530,6 +553,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         self.snapshots = snapshots
         self.environment = environment
         self.defaultDirectory = defaultDirectory
+        self.repositoryPreparation = repositoryPreparation
         self.completionTriggerCharacters = completionTriggerCharacters
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
@@ -561,6 +585,9 @@ public struct PingParams: Codable, Sendable, Equatable {
 }
 
 public struct ClientCapabilities: Codable, Sendable, Equatable {
+    /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.
+    public var workingDirectoryInfo: WorkingDirectoryInfoCapability?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -575,8 +602,10 @@ public struct ClientCapabilities: Codable, Sendable, Equatable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
+        workingDirectoryInfo: WorkingDirectoryInfoCapability? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
+        self.workingDirectoryInfo = workingDirectoryInfo
         self.mcpApps = mcpApps
     }
 }
@@ -613,6 +642,29 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
+    }
+}
+
+public struct RepositoryPreparationCapability: Codable, Sendable, Equatable {
+    /// When true, clients may supply {@link RepositorySource.revision}.
+    public var revision: Bool?
+    /// When true, clients may supply more than one repository.
+    public var multipleRepositories: Bool?
+
+    public init(
+        revision: Bool? = nil,
+        multipleRepositories: Bool? = nil
+    ) {
+        self.revision = revision
+        self.multipleRepositories = multipleRepositories
+    }
+}
+
+public struct WorkingDirectoryInfoCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -985,6 +1037,9 @@ public struct CreateSessionParams: Codable, Sendable, Equatable {
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
     public var workingDirectories: [String]?
+    /// Repositories to prepare instead of an explicit `workingDirectories` list.
+    /// An empty list is equivalent to omission.
+    public var repositories: [RepositorySource]?
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
     public var config: [String: AnyCodable]?
@@ -1012,6 +1067,7 @@ public struct CreateSessionParams: Codable, Sendable, Equatable {
         case meta = "_meta"
         case provider
         case workingDirectories
+        case repositories
         case config
         case activeClient
         case progressToken
@@ -1022,6 +1078,7 @@ public struct CreateSessionParams: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectories: [String]? = nil,
+        repositories: [RepositorySource]? = nil,
         config: [String: AnyCodable]? = nil,
         activeClient: SessionActiveClient? = nil,
         progressToken: String? = nil
@@ -1030,6 +1087,7 @@ public struct CreateSessionParams: Codable, Sendable, Equatable {
         self.meta = meta
         self.provider = provider
         self.workingDirectories = workingDirectories
+        self.repositories = repositories
         self.config = config
         self.activeClient = activeClient
         self.progressToken = progressToken
@@ -1082,9 +1140,9 @@ public struct CreateChatParams: Codable, Sendable, Equatable {
     /// also snapshots and preserves that exact selected text in the created chat's
     /// origin; any `responsePartId` there is provenance only, not a live range.
     public var source: ChatSource?
-    /// Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -2086,6 +2144,8 @@ public struct ResolveSessionConfigParams: Codable, Sendable, Equatable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
+    public var repositories: [RepositorySource]?
     /// Current user-filled configuration values
     public var config: [String: AnyCodable]?
 
@@ -2094,6 +2154,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable, Equatable {
         case meta = "_meta"
         case provider
         case workingDirectory
+        case repositories
         case config
     }
 
@@ -2102,12 +2163,14 @@ public struct ResolveSessionConfigParams: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
+        repositories: [RepositorySource]? = nil,
         config: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
+        self.repositories = repositories
         self.config = config
     }
 }
@@ -2255,6 +2318,8 @@ public struct SessionConfigCompletionsParams: Codable, Sendable, Equatable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
+    /// Repositories used as configuration context; an empty list is equivalent to omission.
+    public var repositories: [RepositorySource]?
     /// Current user-filled configuration values (provides context for the query)
     public var config: [String: AnyCodable]?
     /// Property id from the schema to query values for
@@ -2267,6 +2332,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable, Equatable {
         case meta = "_meta"
         case provider
         case workingDirectory
+        case repositories
         case config
         case property
         case query
@@ -2277,6 +2343,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
+        repositories: [RepositorySource]? = nil,
         config: [String: AnyCodable]? = nil,
         property: String,
         query: String? = nil
@@ -2285,6 +2352,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable, Equatable {
         self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
+        self.repositories = repositories
         self.config = config
         self.property = property
         self.query = query

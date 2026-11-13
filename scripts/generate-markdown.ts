@@ -647,6 +647,7 @@ function getActionTypeValue(iface: InterfaceDeclaration): string | undefined {
  * table, and a result table looked up from the registry.
  */
 function emitCommandsSection(project: Project, sourceFiles: SourceFile[]): string {
+  const supportingTypes = new Set(['RepositorySource', 'RepositoryPreparationCapability', 'ClientCapabilities', 'WorkingDirectoryInfoCapability']);
   const commandMap = parseRegistryInterface(project, 'CommandMap', true);
   const methodByParams = new Map<string, RegistryEntry>();
   for (const entry of commandMap) methodByParams.set(entry.paramsType, entry);
@@ -663,6 +664,10 @@ function emitCommandsSection(project: Project, sourceFiles: SourceFile[]): strin
     for (const stmt of sf.getStatements()) {
       if (!Node.isInterfaceDeclaration(stmt) || !stmt.isExported()) continue;
       const name = stmt.getName();
+      if (supportingTypes.has(name)) {
+        lines.push(renderInterfaceBlock(stmt));
+        continue;
+      }
       const entry = methodByParams.get(name);
       // Fallback: any *Params interface with a @method tag we missed.
       if (!entry) {

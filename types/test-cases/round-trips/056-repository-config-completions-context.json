@@ -1,0 +1,22 @@
+{
+  "name": "repository-config-completions-context",
+  "group": "A",
+  "description": "Configuration completions preserve the repository list and optional existing directory context.",
+  "type": "SessionConfigCompletionsParams",
+  "input": {
+    "channel": "ahp-root://",
+    "workingDirectory": "file:///work/context",
+    "repositories": [{ "source": "https://example.org/team/project.git", "subdirectory": "packages/api" }],
+    "config": { "mode": "review" },
+    "property": "mode",
+    "query": "re"
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "workingDirectory": "file:///work/context",
+    "repositories": [{ "source": "https://example.org/team/project.git", "subdirectory": "packages/api" }],
+    "config": { "mode": "review" },
+    "property": "mode",
+    "query": "re"
+  }]
+}

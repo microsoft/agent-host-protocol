@@ -176,6 +176,59 @@ internal sealed class SessionOriginKindConverter : JsonConverter<SessionOriginKi
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>How a working directory was prepared.</summary>
+[JsonConverter(typeof(WorkingDirectoryOriginKindConverter))]
+public readonly struct WorkingDirectoryOriginKind : IEquatable<WorkingDirectoryOriginKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public WorkingDirectoryOriginKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly WorkingDirectoryOriginKind Local = new WorkingDirectoryOriginKind("local");
+
+    public static readonly WorkingDirectoryOriginKind Repo = new WorkingDirectoryOriginKind("repo");
+
+    public static readonly WorkingDirectoryOriginKind Worktree = new WorkingDirectoryOriginKind("worktree");
+
+    /// <inheritdoc />
+    public bool Equals(WorkingDirectoryOriginKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is WorkingDirectoryOriginKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(WorkingDirectoryOriginKind left, WorkingDirectoryOriginKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(WorkingDirectoryOriginKind left, WorkingDirectoryOriginKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="WorkingDirectoryOriginKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class WorkingDirectoryOriginKindConverter : JsonConverter<WorkingDirectoryOriginKind>
+{
+    /// <inheritdoc />
+    public override WorkingDirectoryOriginKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new WorkingDirectoryOriginKind(reader.GetString() ?? throw new JsonException("WorkingDirectoryOriginKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, WorkingDirectoryOriginKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Discriminant for {@link ChatOrigin} — how a chat came into existence.</summary>
 [JsonConverter(typeof(ChatOriginKindConverter))]
 public readonly struct ChatOriginKind : IEquatable<ChatOriginKind>
@@ -2152,6 +2205,39 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
+/// <summary>An actual working directory, uniquely keyed by `uri` within the session.</summary>
+public sealed record WorkingDirectory
+{
+    /// <summary>Actual selected directory, which may be a repository subdirectory.</summary>
+    public required string Uri { get; init; }
+
+    /// <summary>Credential-free repository source association, not a checkout identity.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Repo { get; init; }
+
+    /// <summary>Host-reported provenance; omission means unspecified.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkingDirectoryOrigin? Origin { get; init; }
+}
+
+public sealed record LocalWorkingDirectoryOrigin
+{
+    public WorkingDirectoryOriginKind Kind { get; init; } = WorkingDirectoryOriginKind.Local;
+}
+
+public sealed record RepoWorkingDirectoryOrigin
+{
+    public WorkingDirectoryOriginKind Kind { get; init; } = WorkingDirectoryOriginKind.Repo;
+}
+
+public sealed record WorktreeWorkingDirectoryOrigin
+{
+    public WorkingDirectoryOriginKind Kind { get; init; } = WorkingDirectoryOriginKind.Worktree;
+
+    /// <summary>Main worktree associated with the host-prepared worktree.</summary>
+    public required string MainWorktree { get; init; }
+}
+
 public sealed record SessionModelInfo
 {
     /// <summary>Model identifier</summary>
@@ -2538,13 +2624,14 @@ public sealed class ChatState
 
     /// <summary>The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
-    /// chat's agent has tool access to. Every entry MUST be present in the owning
-    /// session's `workingDirectories`; servers MUST reject a
+    /// chat's agent has tool access to. Every URI MUST match a URI string or a
+    /// record's `uri` in the owning session's set; servers MUST reject a
     /// `chat/workingDirectorySet` action that violates this constraint.
     ///
     /// When absent, the chat inherits the full session set. When present but empty
     /// (not recommended), the chat has no working-directory tool access at all.
     ///
+    /// Directory metadata belongs to the session, not the chat.
     /// Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
     /// update the subset on a running chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2991,9 +3078,11 @@ public sealed class SessionState
     /// (the first entry is a protected, replaceable primary slot). Individual chats
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
-    /// chat that sets none operates against this full set.</summary>
+    /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? WorkingDirectories { get; set; }
+    public List<WorkingDirectoryEntry>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
@@ -3330,9 +3419,11 @@ public sealed class SessionSummary
     /// (the first entry is a protected, replaceable primary slot). Individual chats
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
-    /// chat that sets none operates against this full set.</summary>
+    /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? WorkingDirectories { get; set; }
+    public List<WorkingDirectoryEntry>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
@@ -8035,6 +8126,34 @@ internal sealed class SessionOriginConverter : UnionConverter<SessionOrigin>
     }
 }
 
+/// <summary>Host-reported working-directory provenance.</summary>
+[JsonConverter(typeof(WorkingDirectoryOriginConverter))]
+public sealed class WorkingDirectoryOrigin : AhpUnion
+{
+    /// <summary>Creates an empty WorkingDirectoryOrigin (no active variant).</summary>
+    public WorkingDirectoryOrigin() { }
+
+    /// <summary>Creates a WorkingDirectoryOrigin wrapping the given variant value.</summary>
+    public WorkingDirectoryOrigin(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the WorkingDirectoryOrigin discriminated union.</summary>
+internal sealed class WorkingDirectoryOriginConverter : UnionConverter<WorkingDirectoryOrigin>
+{
+    public WorkingDirectoryOriginConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["local"] = typeof(LocalWorkingDirectoryOrigin),
+        ["repo"] = typeof(RepoWorkingDirectoryOrigin),
+        ["worktree"] = typeof(WorktreeWorkingDirectoryOrigin),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
 /// <summary>AutomationTrigger is an automatic trigger for an automation.</summary>
 [JsonConverter(typeof(AutomationTriggerConverter))]
 public sealed class AutomationTrigger : AhpUnion
@@ -8259,6 +8378,37 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
             return;
         }
         writer.WriteNullValue();
+    }
+}
+
+/// <summary>A legacy URI or a complete working-directory record.</summary>
+[JsonConverter(typeof(WorkingDirectoryEntryConverter))]
+public sealed class WorkingDirectoryEntry
+{
+    public WorkingDirectoryEntry(string uri) { Uri = uri; }
+    public WorkingDirectoryEntry(WorkingDirectory directory) { Uri = directory.Uri; Directory = directory; }
+
+    public string Uri { get; }
+    public WorkingDirectory? Directory { get; }
+}
+
+internal sealed class WorkingDirectoryEntryConverter : JsonConverter<WorkingDirectoryEntry>
+{
+    public override WorkingDirectoryEntry Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            return new WorkingDirectoryEntry(reader.GetString()!);
+        }
+        return new WorkingDirectoryEntry(
+            JsonSerializer.Deserialize(ref reader, AhpJsonTypeInfo.Get<WorkingDirectory>(options))
+                ?? throw new JsonException("WorkingDirectoryEntry requires a URI or directory"));
+    }
+
+    public override void Write(Utf8JsonWriter writer, WorkingDirectoryEntry value, JsonSerializerOptions options)
+    {
+        if (value.Directory is null) { writer.WriteStringValue(value.Uri); return; }
+        JsonSerializer.Serialize(writer, value.Directory, AhpJsonTypeInfo.Get<WorkingDirectory>(options));
     }
 }
 

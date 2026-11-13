@@ -1,0 +1,38 @@
+{
+  "name": "session-directory-provenance",
+  "group": "A",
+  "description": "A ready session preserves multiple actual directories associated with the same source and different preparation results.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": [
+        { "uri": "file:///work/project", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/project-worktree/packages/api", "repo": "https://example.org/team/project.git", "origin": { "kind": "worktree", "mainWorktree": "file:///work/project" } }
+      ]
+    },
+    "fromSeq": 2
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": [
+        { "uri": "file:///work/project", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/project-worktree/packages/api", "repo": "https://example.org/team/project.git", "origin": { "kind": "worktree", "mainWorktree": "file:///work/project" } }
+      ]
+    },
+    "fromSeq": 2
+  }]
+}

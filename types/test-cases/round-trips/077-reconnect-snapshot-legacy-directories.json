@@ -1,0 +1,24 @@
+{
+  "name": "reconnect-snapshot-legacy-directories",
+  "group": "A",
+  "description": "Legacy full-snapshot reconnect recovery remains URI-only.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 9,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+    }]
+  },
+  "acceptableOutputs": [{
+    "type": "snapshot",
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 9,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+    }]
+  }]
+}

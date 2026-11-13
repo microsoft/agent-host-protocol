@@ -1,0 +1,28 @@
+{
+  "name": "session-added-rich-directories",
+  "group": "A",
+  "description": "Session-added notifications preserve rich directory metadata.",
+  "type": "SessionAddedParams",
+  "input": {
+    "channel": "ahp-root://",
+    "summary": {
+      "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+      "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+      "workingDirectories": ["file:///legacy", {
+        "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+        "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "summary": {
+      "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+      "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+      "workingDirectories": ["file:///legacy", {
+        "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+        "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+      }]
+    }
+  }]
+}

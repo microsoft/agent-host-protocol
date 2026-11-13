@@ -1,0 +1,18 @@
+{
+  "name": "subscribe-legacy-directories",
+  "group": "A",
+  "description": "Subscribe snapshots from legacy hosts contain only directory URIs.",
+  "type": "SubscribeResult",
+  "input": {
+    "snapshot": { "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] } }
+  },
+  "acceptableOutputs": [{
+    "snapshot": { "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": { "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] } }
+  }]
+}

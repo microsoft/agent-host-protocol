@@ -1,0 +1,28 @@
+{
+  "name": "reconnect-replay-rich-directories",
+  "group": "A",
+  "description": "Reconnect replay carries both rich and URI-only actions under the retained capability.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay", "missing": [],
+    "actions": [
+      { "channel": "ahp-session:/directories", "serverSeq": 5,
+        "action": { "type": "session/workingDirectorySet", "directory": "file:///legacy" } },
+      { "channel": "ahp-session:/directories", "serverSeq": 6,
+        "action": { "type": "session/workingDirectoryReplaced", "directory": "file:///legacy",
+          "replacement": { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+            "origin": { "kind": "worktree", "mainWorktree": "file:///main" } } } }
+    ]
+  },
+  "acceptableOutputs": [{
+    "type": "replay", "missing": [],
+    "actions": [
+      { "channel": "ahp-session:/directories", "serverSeq": 5,
+        "action": { "type": "session/workingDirectorySet", "directory": "file:///legacy" } },
+      { "channel": "ahp-session:/directories", "serverSeq": 6,
+        "action": { "type": "session/workingDirectoryReplaced", "directory": "file:///legacy",
+          "replacement": { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+            "origin": { "kind": "worktree", "mainWorktree": "file:///main" } } } }
+    ]
+  }]
+}

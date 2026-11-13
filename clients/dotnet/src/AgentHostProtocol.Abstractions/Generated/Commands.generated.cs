@@ -331,6 +331,21 @@ internal sealed class AuthenticateTargetKindConverter : JsonConverter<Authentica
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// <summary>Requested repository source, not a resolved working directory.</summary>
+public sealed record RepositorySource
+{
+    /// <summary>Credential-free repository source URI.</summary>
+    public required string Source { get; init; }
+
+    /// <summary>Requested branch, tag, or commit. Omit to use the host's default revision.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Revision { get; init; }
+
+    /// <summary>Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Subdirectory { get; init; }
+}
+
 /// <summary>Opens a TCP connection from the host to a destination on the host's network.
 ///
 /// The client chooses the channel URI. This command does not subscribe: after it
@@ -495,6 +510,10 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultDirectory { get; init; }
 
+    /// <summary>Host repository preparation support; absent when unsupported.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RepositoryPreparationCapability? RepositoryPreparation { get; init; }
+
     /// <summary>Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -576,6 +595,11 @@ public sealed record Implementation
 /// are reserved for future per-capability options.</summary>
 public sealed record ClientCapabilities
 {
+    /// <summary>Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkingDirectoryInfoCapability? WorkingDirectoryInfo { get; init; }
+
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -589,6 +613,24 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+}
+
+/// <summary>Host support for repository preparation at session creation. Presence
+/// alone supports one repository at its default revision.</summary>
+public sealed record RepositoryPreparationCapability
+{
+    /// <summary>When true, clients may supply {@link RepositorySource.revision}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Revision { get; init; }
+
+    /// <summary>When true, clients may supply more than one repository.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MultipleRepositories { get; init; }
+}
+
+/// <summary>Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.</summary>
+public sealed record WorkingDirectoryInfoCapability
+{
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -947,6 +989,11 @@ public sealed record CreateSessionParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
+    /// <summary>Repositories to prepare instead of an explicit `workingDirectories` list.
+    /// An empty list is equivalent to omission.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RepositorySource>? Repositories { get; init; }
+
     /// <summary>Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1070,9 +1117,9 @@ public sealed record CreateChatParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatSource? Source { get; init; }
 
-    /// <summary>Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// <summary>Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -2002,6 +2049,10 @@ public sealed record ResolveSessionConfigParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
+    /// <summary>Repositories used as configuration context; an empty list is equivalent to omission.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RepositorySource>? Repositories { get; init; }
+
     /// <summary>Current user-filled configuration values</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
@@ -2039,6 +2090,10 @@ public sealed record SessionConfigCompletionsParams
     /// <summary>Working directory for the session</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
+
+    /// <summary>Repositories used as configuration context; an empty list is equivalent to omission.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RepositorySource>? Repositories { get; init; }
 
     /// <summary>Current user-filled configuration values (provides context for the query)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

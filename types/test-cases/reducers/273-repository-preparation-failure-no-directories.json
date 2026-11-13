@@ -1,0 +1,24 @@
+{
+  "description": "Failed preparation does not fabricate directories or echo repository inputs",
+  "reducer": "session",
+  "initial": {
+    "provider": "example",
+    "title": "Repository session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    { "type": "session/creationFailed", "error": { "errorType": "preparationFailed", "message": "Preparation failed" } }
+  ],
+  "expected": {
+    "provider": "example",
+    "title": "Repository session",
+    "status": 1,
+    "lifecycle": "failed",
+    "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
+    "activeClients": [],
+    "chats": []
+  }
+}

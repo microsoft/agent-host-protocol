@@ -216,6 +216,11 @@ export interface InitializeParams extends BaseParams {
  */
 export interface ClientCapabilities {
   /**
+   * Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+   * Hosts project records to URIs when absent and retain this choice on reconnect.
+   */
+  workingDirectoryInfo?: WorkingDirectoryInfoCapability;
+  /**
    * Client can render
    * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
    * it can host the View sandbox, run the `ui/*` protocol against it,
@@ -230,6 +235,13 @@ export interface ClientCapabilities {
    */
   mcpApps?: Record<string, never>;
 }
+
+/**
+ * Presence capability for {@link ClientCapabilities.workingDirectoryInfo}.
+ *
+ * @category Commands
+ */
+export interface WorkingDirectoryInfoCapability {}
 
 /**
  * Native filesystem path grammar used by a host environment.
@@ -314,6 +326,8 @@ export interface InitializeResult {
   environment?: HostEnvironment;
   /** Suggested default directory for remote filesystem browsing */
   defaultDirectory?: URI;
+  /** Host repository preparation support; absent when unsupported. */
+  repositoryPreparation?: RepositoryPreparationCapability;
   /**
    * Characters that, when typed in a {@link Message} input, SHOULD cause
    * the client to issue a `completions` request with
@@ -371,6 +385,19 @@ export interface InitializeResult {
  * @stability 1.0
  */
 export interface MultipleChatProvidersCapability {}
+
+/**
+ * Host support for repository preparation at session creation. Presence
+ * alone supports one repository at its default revision.
+ *
+ * @category Commands
+ */
+export interface RepositoryPreparationCapability {
+  /** When true, clients may supply {@link RepositorySource.revision}. */
+  revision?: boolean;
+  /** When true, clients may supply more than one repository. */
+  multipleRepositories?: boolean;
+}
 
 /**
  * Automation features supported by this host authority.

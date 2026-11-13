@@ -58,15 +58,17 @@ import type {
   Customization,
   SessionSummary,
 } from '../src/types/channels-session/state.js';
-import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
+import type { SessionAddedParams, SessionSummaryChangedParams } from '../src/types/channels-root/notifications.js';
 import type {
-  Implementation, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
+  Implementation, InitializeParams, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
   ResourceReadParams, ResourceReadResult, AuthenticateParams,
 } from '../src/types/common/commands.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
 import type { ChatSource, CreateChatParams } from '../src/types/channels-chat/commands.js';
+import type { CreateSessionParams } from '../src/types/channels-session/commands.js';
+import type { ListSessionsResult, ResolveSessionConfigParams, SessionConfigCompletionsParams } from '../src/types/channels-root/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
 
@@ -249,6 +251,12 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'PartialSessionSummary': void (parsed as Partial<SessionSummary>); break;
     case 'Implementation':     void (parsed as Implementation); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
+    case 'InitializeParams':    void (parsed as InitializeParams); break;
+    case 'ListSessionsResult':  void (parsed as ListSessionsResult); break;
+    case 'SessionSummaryChangedParams': void (parsed as SessionSummaryChangedParams); break;
+    case 'CreateSessionParams': void (parsed as CreateSessionParams); break;
+    case 'ResolveSessionConfigParams': void (parsed as ResolveSessionConfigParams); break;
+    case 'SessionConfigCompletionsParams': void (parsed as SessionConfigCompletionsParams); break;
     case 'CreateChatParams':    void (parsed as CreateChatParams); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;
