@@ -753,6 +753,18 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 		value := *capabilities.RunHistoryLimit
 		clone.RunHistoryLimit = &value
 	}
+	if capabilities.Targets != nil {
+		value := *capabilities.Targets
+		if capabilities.Targets.PreviousSession != nil {
+			previousSession := *capabilities.Targets.PreviousSession
+			value.PreviousSession = &previousSession
+		}
+		if capabilities.Targets.Chat != nil {
+			chat := *capabilities.Targets.Chat
+			value.Chat = &chat
+		}
+		clone.Targets = &value
+	}
 	return &clone
 }
 

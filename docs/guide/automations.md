@@ -1,6 +1,6 @@
 # Automations
 
-Automations are durable, host-owned definitions that create fresh agent
+Automations are durable, host-owned definitions that start or continue agent
 sessions manually or in response to recurring schedules and external events.
 They let multiple AHP clients share one catalogue, scheduler, execution claim,
 and run history instead of each client maintaining a local copy.
@@ -37,6 +37,10 @@ AutomationCapabilities {
   runCancellation?: {}
   runHistoryLimit?: number
   customizations?: {}
+  targets?: {
+    previousSession?: {}
+    chat?: {}
+  }
 }
 ```
 
@@ -51,6 +55,12 @@ allowed.
 `create`, `oneTime`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
 the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
+
+`targets` describes the [run targets](#run-targets) a definition may use.
+`newSession` is always supported. `targets.previousSession` and
+`targets.chat` are presence capabilities for the `previousSession` and `chat`
+targets; clients shouldn't author those targets without them. When `targets`
+is absent, every run creates a session.
 
 ## Resource model
 
@@ -113,18 +123,19 @@ AutomationDefinition {
   triggers: AutomationTrigger[]
   disableConditions?: AutomationDisableCondition[]
   _meta?: Record<string, unknown>
+  target?: AutomationTarget
 }
 ```
 
-`message` is the initial message sent to every newly created run session. Its
+`message` is the message each run sends (see [Run targets](#run-targets)). Its
 origin must be `automation`, allowing clients to distinguish the generated turn
 from direct user input. The definition does not carry credentials,
 confirmation decisions, or durable permission grants.
 
 ### Session template
 
-The session template selects the context used to create a fresh session for
-each run:
+The session template selects the context used to create a session for a
+run:
 
 ```typescript
 AutomationSessionTemplate {
@@ -139,9 +150,9 @@ AutomationSessionTemplate {
 
 Omitting `provider` uses the host's default provider. Omitting
 `workingDirectories` creates a workspace-less session. The host revalidates
-the provider, model, agent, directories, and configuration every time a run
-starts because availability and policy may have changed since the definition
-was saved.
+the provider, directories, and configuration every time it creates a session,
+and the model and agent for every run's message, because availability and
+policy may have changed since the definition was saved.
 
 After a run creates a session, that session's `SessionState.workingDirectories`
 is authoritative for the directories it actually uses. This keeps per-run
@@ -185,7 +196,7 @@ sequenceDiagram
 - `AutomationEntry.customizations` reports the host-owned copies, matched to
   template entries by `id`. Each copy has a host `uri` that clients can browse,
   plus `children` and `load` describing what the host found.
-- Every run session receives the copies in `SessionState.customizations`
+- Every session a run creates receives the copies in `SessionState.customizations`
   without a `clientId`, using the template entry's enablement.
 - To pick up local changes, a client compares its current `nonce` with the
   template entry and re-submits the entry with the new `nonce`. Hosts never
@@ -200,6 +211,112 @@ sequenceDiagram
 started manually when its state advertises the `run` operation. This allows a
 user to pause scheduling without losing the definition or its ability to run
 on demand.
+
+### Run targets
+
+`target` decides where each run sends `message`:
+
+```typescript
+AutomationTarget =
+  | { kind: 'newSession' }       // default: each run creates a session
+  | { kind: 'previousSession' }  // each run continues the previous run's session
+  | { kind: 'chat', session: URI, chat: URI }  // each run sends to one chat
+```
+
+`AutomationTargetKind` is non-exhaustive, and later protocol versions may add
+kinds. Clients author `previousSession` or `chat` only when the host
+advertises `automations.targets.previousSession` or
+`automations.targets.chat`. An update that omits `target` leaves it
+unchanged; `{ kind: 'newSession' }` resets it.
+
+#### Continuing the previous session
+
+With `previousSession`, a recurring automation keeps one conversation, such as
+a daily report that builds on yesterday's.
+
+The previous run's session is the `primarySession` of the most recently
+created earlier run of the automation that has one, even if that run was
+pruned from history. The host decides whether that session is still usable. A
+session that was removed or archived, that has no default chat, or that the
+automation may no longer drive, is never usable, so archiving the session
+starts the conversation over. The host may also start over when the session
+can't honor the current template, for example after the user changes the
+agent provider or working directories. When there is no usable session, the
+run creates one from the template, and later runs continue that session.
+
+The host resolves targets and starts turns in run creation order. When runs
+overlap, a later run continues the session an earlier run is still creating,
+rather than creating another.
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Run as ahp-automation-run:/run-2
+    participant Chat as default chat of session S
+
+    Note over Host: run-1 created session S
+    Host->>Run: automationRun/sessionSet (S), primarySessionChanged (S)
+    Host->>Chat: chat/pendingMessageSet (kind: queued, message)
+    Note over Run: pending while the message waits
+    Host->>Chat: chat/turnStarted (from the queued message)
+    Host->>Run: automationRun/lifecycleChanged (running)
+    Host->>Chat: chat/turnComplete
+    Host->>Run: automationRun/lifecycleChanged (completed)
+```
+
+When a run reuses a session, the host:
+
+- links the session to the run with `automationRun/sessionSet` and makes it
+  the run's `primarySession` before delivering the message;
+- adds `message` to the session's `defaultChat` as a **queued** pending
+  message. It never steers an active turn: a busy chat starts it after the
+  current turn, and an idle chat starts it right away;
+- doesn't reapply the session template, so the session keeps its agent
+  provider, configuration, and working directories. The template's `model`
+  and `agent` still apply to the queued message, as for every run, unless the
+  message sets its own. The host may update the session's copies of the
+  automation's [customizations](#customizations).
+
+The run's lifecycle follows its own message, not the rest of the session:
+
+- It stays `pending` while its message waits in the queue, and becomes
+  `running` when a turn starts from that message.
+- It becomes `completed`, `failed`, or `cancelled` when that turn completes,
+  errors, or is cancelled.
+- If its queued message is withdrawn without a turn starting from it, the run
+  is `cancelled`.
+- Cancelling the run removes its queued message, or cancels its turn if the
+  turn has started. It never affects other turns in the session.
+- If the session becomes unusable before a turn starts from the message, the
+  host removes the queued message, if its chat still exists, and the run
+  fails.
+
+Several runs may link the same session. The session's `origin` keeps recording
+the run that created it.
+
+#### Sending to a chat
+
+With `chat`, every run sends `message` to one existing chat, such as the
+conversation in which a user asked for an hourly check on a deployment.
+
+The host rejects a create or update whose chat doesn't exist or that the
+automation may not drive. When it accepts one, it sets `session` to the session
+that currently owns the chat, replacing any submitted value, so clients can't
+write back an outdated session. When the chat moves to another session, the
+host updates `session` and publishes the definition with `automation/set`.
+
+Each run delivers its message as a `previousSession` run does when it reuses a
+session, with the same run lifecycle: the host links the session to the run,
+makes it the `primarySession`, and queues `message` in the chat. Unlike
+`previousSession`, a `chat` run never creates a session:
+
+- The host applies only the template's `model` and `agent`, to the queued
+  message. It doesn't change the session's agent provider, configuration,
+  working directories, or customizations, because the automation doesn't own
+  that session.
+- If the chat no longer exists, or the automation may no longer drive it, the
+  run fails. When that happens after the message was queued, the host first
+  removes the queued message, if the chat still exists.
 
 ## Triggers
 
@@ -476,7 +593,7 @@ field, the later action in server order wins. The host rejects actions that are
 unauthorized, no longer permitted, or invalid for the current definition.
 
 Runtime-decoder clients preserve unknown members on `message`, `session`,
-`triggers`, and `disableConditions`, including nested objects and shared types
+`triggers`, `disableConditions`, and `target`, including nested objects and shared types
 annotated `@preserveUnknownMembers`. Editors should modify decoded values (or
 copy them with their preserved members), not rebuild replacements from known
 fields alone, so they do not erase fields added by newer protocol versions.
@@ -542,7 +659,7 @@ stateDiagram-v2
 `cancelled.startedAt` are optional because validation, workspace preparation,
 or cancellation may finish before execution begins.
 
-The run remains `running` while a linked session awaits user input,
+The run remains `running` while its work in a linked session awaits user input,
 confirmation, authentication, or client-side tool execution. Linked
 `SessionSummary.status` values provide lightweight attention state, and
 `SessionState.inputNeeded` contains the actionable requests. The run channel
@@ -550,8 +667,10 @@ does not duplicate that interaction state.
 
 ### Linked sessions
 
-A run's `sessions` list may contain one local attempt, several retries, or
-parallel workers. `primarySession` tells clients which one to open first.
+A run's `sessions` list may contain one local attempt, several retries,
+parallel workers, or a session continued from an earlier run (see
+[Run targets](#run-targets)). `primarySession` tells clients which one to open
+first.
 
 Every automation-created session records:
 
@@ -616,8 +735,10 @@ applications.
 - Definitions contain no credentials or reusable confirmation decisions.
   Captured customizations follow the same rule; they carry plugin content,
   not secrets.
-- The host revalidates provider, model, agent, workspace, and session
-  configuration when each run starts.
+- The host revalidates provider, workspace, and session configuration
+  whenever a run creates a session, and the model and agent for every run.
+- A run continues a previous session only while the automation may still
+  drive it.
 - State-level operations are authoritative; clients do not infer permission
   from capabilities.
 - Event provenance and `_meta` values must not contain secrets.

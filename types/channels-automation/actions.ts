@@ -12,9 +12,11 @@ import type {
   AutomationDefinition,
   AutomationDisableCondition,
   AutomationEntry,
+  AutomationNewSessionTarget,
   AutomationOperation,
   AutomationSessionTemplate,
   AutomationState,
+  AutomationTarget,
   AutomationTrigger,
 } from './state.js';
 
@@ -59,6 +61,8 @@ export interface AutomationDefinitionPatch {
   disableConditions?: AutomationDisableCondition[];
   /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
+  /** Replacement {@link AutomationDefinition.target}. */
+  target?: AutomationTarget;
 }
 
 /**

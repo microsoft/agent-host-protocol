@@ -1,0 +1,48 @@
+{
+  "name": "automation-previous-session-target-snapshot",
+  "group": "A",
+  "description": "A catalogue snapshot preserves a definition whose runs continue the previous run's session.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [{
+        "resource": "ahp-automation:/german",
+        "definition": {
+          "title": "German word of the day",
+          "message": { "text": "Teach me one new German word.", "origin": { "kind": "automation" } },
+          "session": { "provider": "copilot" },
+          "enabled": true,
+          "triggers": [],
+          "target": { "kind": "previousSession" }
+        },
+        "runs": [],
+        "operations": ["update", "remove", "run"],
+        "createdAt": "2026-11-13T00:00:00Z",
+        "modifiedAt": "2026-11-13T00:00:00Z"
+      }]
+    },
+    "fromSeq": 4
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [{
+        "resource": "ahp-automation:/german",
+        "definition": {
+          "title": "German word of the day",
+          "message": { "text": "Teach me one new German word.", "origin": { "kind": "automation" } },
+          "session": { "provider": "copilot" },
+          "enabled": true,
+          "triggers": [],
+          "target": { "kind": "previousSession" }
+        },
+        "runs": [],
+        "operations": ["update", "remove", "run"],
+        "createdAt": "2026-11-13T00:00:00Z",
+        "modifiedAt": "2026-11-13T00:00:00Z"
+      }]
+    },
+    "fromSeq": 4
+  }]
+}

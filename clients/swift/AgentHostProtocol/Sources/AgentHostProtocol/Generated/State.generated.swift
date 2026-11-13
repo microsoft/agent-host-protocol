@@ -324,7 +324,7 @@ public enum MessageKind: Codable, Sendable, Equatable {
     /// Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.
     case tool
-    /// Emitted automatically when an automation run starts a session.
+    /// Sent by an automation run.
     case automation
     /// A system-generated notification rather than a direct user message.
     case systemNotification
@@ -1145,15 +1145,48 @@ public enum AutomationDisableConditionKind: String, Codable, Sendable {
     case afterDate = "afterDate"
 }
 
+/// Discriminant for an {@link AutomationTarget}.
+public enum AutomationTargetKind: Codable, Sendable, Equatable {
+    /// Each run creates a session.
+    case newSession
+    /// Each run continues the session of the automation's previous run.
+    case previousSession
+    /// Each run sends its message to one existing chat.
+    case chat
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "newSession": self = .newSession
+        case "previousSession": self = .previousSession
+        case "chat": self = .chat
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .newSession: try container.encode("newSession")
+        case .previousSession: try container.encode("previousSession")
+        case .chat: try container.encode("chat")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-/// while any linked session awaits input or client-side work; linked session
-/// state is authoritative for those interactions.
+/// while its work in a linked session awaits input or client-side work; linked
+/// session state is authoritative for those interactions.
 public enum AutomationRunStatus: String, Codable, Sendable {
     /// The durable run record exists but execution has not started.
     case pending = "pending"
-    /// One or more linked sessions are executing or awaiting interaction.
+    /// The run's work in linked sessions is executing or awaiting interaction.
     case running = "running"
     /// Execution finished successfully.
     case completed = "completed"
@@ -8091,7 +8124,7 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
     /// {@link CreateSessionParams.config}, normally obtained from
     /// {@link ResolveSessionConfigResult.values}.
     public var config: [String: AnyCodable]?
-    /// Client plugins to make available in every run session, in the same
+    /// Client plugins to make available in every session a run creates, in the same
     /// published shape as
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
     /// Entries are keyed by `id`.
@@ -8171,10 +8204,11 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
 public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
-    /// Initial message sent to every newly created run session. Its
+    /// Message each run sends (see {@link AutomationDefinition.target}). Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     public var message: Message
-    /// Template used to create fresh sessions for each run.
+    /// Template for the sessions runs create. Its model and agent also apply to
+    /// a run's turn in a continued session.
     public var session: AutomationSessionTemplate
     /// Whether automatic triggers may create runs. Manual runs remain available
     /// whenever {@link AutomationOperation.Run} is advertised.
@@ -8198,6 +8232,9 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.
     public var meta: [String: AnyCodable]?
+    /// Where each run sends {@link AutomationDefinition.message}. Absence means
+    /// {@link AutomationTargetKind.NewSession}.
+    public var target: AutomationTarget?
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -8207,6 +8244,7 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         case triggers
         case disableConditions
         case meta = "_meta"
+        case target
     }
 
     public init(
@@ -8216,7 +8254,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         enabled: Bool,
         triggers: [AutomationTrigger],
         disableConditions: [AutomationDisableCondition]? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        target: AutomationTarget? = nil
     ) {
         self.title = title
         self.message = message
@@ -8225,6 +8264,7 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         self.triggers = triggers
         self.disableConditions = disableConditions
         self.meta = meta
+        self.target = target
     }
 }
 
@@ -8250,6 +8290,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     public var disableConditions: [AutomationDisableCondition]?
     /// Complete replacement {@link AutomationDefinition._meta}.
     public var meta: [String: AnyCodable]?
+    /// Replacement {@link AutomationDefinition.target}.
+    public var target: AutomationTarget?
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -8259,6 +8301,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         case triggers
         case disableConditions
         case meta = "_meta"
+        case target
     }
 
     public init(
@@ -8268,7 +8311,8 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         enabled: Bool? = nil,
         triggers: [AutomationTrigger]? = nil,
         disableConditions: [AutomationDisableCondition]? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        target: AutomationTarget? = nil
     ) {
         self.title = title
         self.message = message
@@ -8277,6 +8321,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         self.triggers = triggers
         self.disableConditions = disableConditions
         self.meta = meta
+        self.target = target
     }
 }
 
@@ -8354,6 +8399,113 @@ public struct AutomationAfterDateCondition: Codable, Sendable, Equatable {
     }
 }
 
+public struct AutomationNewSessionTarget: Codable, Sendable, Equatable {
+    public var kind: AutomationTargetKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
+
+    public init(
+        kind: AutomationTargetKind,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationTargetKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+public struct AutomationPreviousSessionTarget: Codable, Sendable, Equatable {
+    public var kind: AutomationTargetKind
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+    }
+
+    public init(
+        kind: AutomationTargetKind,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationTargetKind.self, forKey: .kind)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+public struct AutomationChatTarget: Codable, Sendable, Equatable {
+    public var kind: AutomationTargetKind
+    /// Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.
+    public var session: String
+    /// Chat that receives each run's message.
+    public var chat: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case session
+        case chat
+    }
+
+    public init(
+        kind: AutomationTargetKind,
+        session: String,
+        chat: String,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.session = session
+        self.chat = chat
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationTargetKind.self, forKey: .kind)
+        self.session = try container.decode(String.self, forKey: .session)
+        self.chat = try container.decode(String.self, forKey: .chat)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.session, forKey: .session)
+        try container.encode(self.chat, forKey: .chat)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
 public struct AutomationEntry: Codable, Sendable, Equatable {
     /// Stable `ahp-automation:/<id>` resource identifier.
     public var resource: String
@@ -8391,7 +8543,7 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
     /// connected. `clientId` is absent because the copy no longer depends on a
     /// client.
     ///
-    /// Every run session receives these plugins in
+    /// Every session a run creates receives these plugins in
     /// {@link SessionState.customizations}, with the enablement from the
     /// matching template entry.
     public var customizations: [PluginCustomization]?
@@ -8544,7 +8696,7 @@ public struct AutomationCompletedRunLifecycle: Codable, Sendable, Equatable {
     public var startedAt: String
     /// Completion timestamp in ISO 8601 format.
     public var completedAt: String
-    /// Optional aggregate model usage across all linked sessions.
+    /// Optional aggregate model usage of the run's work in its linked sessions.
     public var usage: UsageInfo?
 
     public init(
@@ -8666,7 +8818,7 @@ public struct AutomationRunState: Codable, Sendable, Equatable {
     public var lifecycle: AutomationRunLifecycle
     /// Ordered, unique session URIs belonging to this run, each matching
     /// {@link SessionState.resource}. Entries may represent retries, parallel
-    /// workers, or delegated attempts.
+    /// workers, delegated attempts, or a session continued from an earlier run.
     public var sessions: [String]
     /// Member of {@link AutomationRunState.sessions} that the host recommends opening first.
     public var primarySession: String?
@@ -9808,6 +9960,52 @@ public enum AutomationDisableCondition: Codable, Sendable, Equatable {
         case .afterDate(var value):
             value.kind = .afterDate
             try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationTarget: Codable, Sendable, Equatable {
+    case newSession(AutomationNewSessionTarget)
+    case previousSession(AutomationPreviousSessionTarget)
+    case chat(AutomationChatTarget)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "newSession":
+            self = .newSession(try AutomationNewSessionTarget(from: decoder))
+        case "previousSession":
+            self = .previousSession(try AutomationPreviousSessionTarget(from: decoder))
+        case "chat":
+            self = .chat(try AutomationChatTarget(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .newSession(var value):
+            value.kind = .newSession
+            try value.encode(to: encoder)
+        case .previousSession(var value):
+            value.kind = .previousSession
+            try value.encode(to: encoder)
+        case .chat(var value):
+            value.kind = .chat
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
