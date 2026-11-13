@@ -39,9 +39,12 @@ The optional `target` says where each run sends its message. Omitting it, or
 `newSession`, creates a session per run. `previousSession` continues the
 primary session of the automation's previous run while it is usable, adding the
 message to that session's default chat as a queued pending message; otherwise
-the run creates a session. Clients SHOULD NOT author a `previousSession`
-target unless `InitializeResult.automations.targets.previousSession` is
-present.
+the run creates a session. `chat` sends every run's message to one existing
+chat as a queued pending message and never creates a session; the host keeps
+its `session` field set to the chat's current owner. Clients SHOULD NOT author
+a `previousSession` or `chat` target unless
+`InitializeResult.automations.targets.previousSession` or
+`InitializeResult.automations.targets.chat`, respectively, is present.
 See the [Automations guide](/guide/automations#run-targets) for target
 resolution and run lifecycle.
 

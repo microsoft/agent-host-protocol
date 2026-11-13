@@ -924,6 +924,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationAfterDateCondition' },
   { name: 'AutomationNewSessionTarget' },
   { name: 'AutomationPreviousSessionTarget' },
+  { name: 'AutomationChatTarget' },
   { name: 'AutomationEntry' },
   { name: 'AutomationState' },
   { name: 'AutomationManualRunOrigin' },
@@ -1221,6 +1222,7 @@ const AUTOMATION_TARGET_UNION: UnionConfig = {
   variants: [
     { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
     { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1848,6 +1850,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'AutomationTargetsCapabilities' },
   { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },

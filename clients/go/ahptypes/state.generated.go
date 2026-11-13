@@ -574,6 +574,8 @@ const (
 	AutomationTargetKindNewSession AutomationTargetKind = "newSession"
 	// Each run continues the session of the automation's previous run.
 	AutomationTargetKindPreviousSession AutomationTargetKind = "previousSession"
+	// Each run sends its message to one existing chat.
+	AutomationTargetKindChat AutomationTargetKind = "chat"
 )
 
 // Lifecycle status of one automation run.
@@ -5066,6 +5068,50 @@ func (v AutomationPreviousSessionTarget) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
+// Each run sends its message to one existing chat, such as the conversation
+// in which a user asked for a recurring check.
+//
+// The host MUST reject a create or update request whose chat doesn't exist or
+// that the automation may not drive. When it accepts one, it sets
+// {@link AutomationChatTarget.session | `session`} to the session that
+// currently owns the chat, replacing any submitted value.
+//
+// Each run delivers its message the way an
+// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+// with the same run lifecycle: the host links the session to the run, makes it
+// the run's primary session, and adds {@link AutomationDefinition.message} to
+// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+// The run never creates a session, and the host applies only the template's
+// `model` and `agent`, to the queued message. It does not change the
+// session's agent provider, configuration, working directories, or
+// customizations.
+//
+// If the chat no longer exists, or the automation may no longer drive it, the
+// run fails. When that happens after the message was queued, the host first
+// removes the queued message, if the chat still exists.
+type AutomationChatTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Session that currently owns {@link AutomationChatTarget.chat}. The host
+	// maintains it: when the chat moves to another session, the host updates
+	// the definition and publishes it with
+	// {@link AutomationSetAction | `automation/set`}.
+	Session URI `json:"session"`
+	// Chat that receives each run's message.
+	Chat URI `json:"chat"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationChatTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationChatTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "session", "chat")
+}
+
+func (v AutomationChatTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationChatTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind", "session", "chat")
+}
+
 // Authoritative state of one automation in {@link AutomationState.entries}.
 //
 // The host owns trigger evaluation, run claims, run retention, and operation
@@ -6962,6 +7008,7 @@ type isAutomationTarget interface{ isAutomationTarget() }
 
 func (*AutomationNewSessionTarget) isAutomationTarget()      {}
 func (*AutomationPreviousSessionTarget) isAutomationTarget() {}
+func (*AutomationChatTarget) isAutomationTarget()            {}
 
 // AutomationTargetUnknown carries an unrecognized AutomationTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type AutomationTargetUnknown struct {
@@ -6985,6 +7032,12 @@ func (u *AutomationTarget) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "previousSession":
 		var value AutomationPreviousSessionTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat":
+		var value AutomationChatTarget
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -7024,6 +7077,8 @@ func (u AutomationTarget) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"newSession\"")
 	case *AutomationPreviousSessionTarget:
 		object["kind"] = json.RawMessage("\"previousSession\"")
+	case *AutomationChatTarget:
+		object["kind"] = json.RawMessage("\"chat\"")
 	}
 	return json.Marshal(object)
 }

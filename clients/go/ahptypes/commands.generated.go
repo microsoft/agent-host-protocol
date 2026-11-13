@@ -368,6 +368,10 @@ type AutomationTargetsCapabilities struct {
 	// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
 	// target when this is absent.
 	PreviousSession *AutomationPreviousSessionTargetCapability `json:"previousSession,omitempty"`
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+	// this is absent.
+	Chat *AutomationChatTargetCapability `json:"chat,omitempty"`
 }
 
 // Presence capability for {@link AutomationPreviousSessionTarget}.
@@ -375,6 +379,13 @@ type AutomationTargetsCapabilities struct {
 // The empty object means "supported"; fields are reserved for future
 // options.
 type AutomationPreviousSessionTargetCapability struct {
+}
+
+// Presence capability for {@link AutomationChatTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationChatTargetCapability struct {
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.

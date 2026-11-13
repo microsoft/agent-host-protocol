@@ -1774,6 +1774,9 @@ public readonly struct AutomationTargetKind : IEquatable<AutomationTargetKind>
     /// <summary>Each run continues the session of the automation's previous run.</summary>
     public static readonly AutomationTargetKind PreviousSession = new AutomationTargetKind("previousSession");
 
+    /// <summary>Each run sends its message to one existing chat.</summary>
+    public static readonly AutomationTargetKind Chat = new AutomationTargetKind("chat");
+
     /// <inheritdoc />
     public bool Equals(AutomationTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
 
@@ -7232,6 +7235,45 @@ public sealed record AutomationPreviousSessionTarget
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
+/// <summary>Each run sends its message to one existing chat, such as the conversation
+/// in which a user asked for a recurring check.
+///
+/// The host MUST reject a create or update request whose chat doesn't exist or
+/// that the automation may not drive. When it accepts one, it sets
+/// {@link AutomationChatTarget.session | `session`} to the session that
+/// currently owns the chat, replacing any submitted value.
+///
+/// Each run delivers its message the way an
+/// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+/// with the same run lifecycle: the host links the session to the run, makes it
+/// the run's primary session, and adds {@link AutomationDefinition.message} to
+/// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+/// The run never creates a session, and the host applies only the template's
+/// `model` and `agent`, to the queued message. It does not change the
+/// session's agent provider, configuration, working directories, or
+/// customizations.
+///
+/// If the chat no longer exists, or the automation may no longer drive it, the
+/// run fails. When that happens after the message was queued, the host first
+/// removes the queued message, if the chat still exists.</summary>
+public sealed record AutomationChatTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.Chat;
+
+    /// <summary>Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Chat that receives each run's message.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
 ///
 /// The host owns trigger evaluation, run claims, run retention, and operation
@@ -8207,6 +8249,7 @@ internal sealed class AutomationTargetConverter : UnionConverter<AutomationTarge
             {
         ["newSession"] = typeof(AutomationNewSessionTarget),
         ["previousSession"] = typeof(AutomationPreviousSessionTarget),
+        ["chat"] = typeof(AutomationChatTarget),
             },
             allowUnknown: true)
     {

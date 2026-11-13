@@ -759,6 +759,10 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 			previousSession := *capabilities.Targets.PreviousSession
 			value.PreviousSession = &previousSession
 		}
+		if capabilities.Targets.Chat != nil {
+			chat := *capabilities.Targets.Chat
+			value.Chat = &chat
+		}
 		clone.Targets = &value
 	}
 	return &clone

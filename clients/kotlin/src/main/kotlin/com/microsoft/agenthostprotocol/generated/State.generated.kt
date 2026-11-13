@@ -1218,6 +1218,10 @@ value class AutomationTargetKind(val rawValue: String) {
          * Each run continues the session of the automation's previous run.
          */
         val PREVIOUS_SESSION: AutomationTargetKind = AutomationTargetKind("previousSession")
+        /**
+         * Each run sends its message to one existing chat.
+         */
+        val CHAT: AutomationTargetKind = AutomationTargetKind("chat")
     }
 }
 
@@ -6529,6 +6533,31 @@ internal object AutomationPreviousSessionTargetSerializer : UnknownMembersSerial
     { value, extra -> value.copy(extra = extra) },
 )
 
+@KeepGeneratedSerializer
+@Serializable(with = AutomationChatTargetSerializer::class)
+data class AutomationChatTarget(
+    val kind: AutomationTargetKind,
+    /**
+     * Session that currently owns {@link AutomationChatTarget.chat}. The host
+     * maintains it: when the chat moves to another session, the host updates
+     * the definition and publishes it with
+     * {@link AutomationSetAction | `automation/set`}.
+     */
+    val session: String,
+    /**
+     * Chat that receives each run's message.
+     */
+    val chat: String,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationChatTargetSerializer : UnknownMembersSerializer<AutomationChatTarget>(
+    AutomationChatTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
 @Serializable
 data class AutomationEntry(
     /**
@@ -8108,6 +8137,8 @@ sealed interface AutomationTarget
 value class AutomationTargetNewSession(val value: AutomationNewSessionTarget) : AutomationTarget
 @JvmInline
 value class AutomationTargetPreviousSession(val value: AutomationPreviousSessionTarget) : AutomationTarget
+@JvmInline
+value class AutomationTargetChat(val value: AutomationChatTarget) : AutomationTarget
 /**
  * Forward-compat catch-all for unknown AutomationTarget discriminators.
  *
@@ -8134,6 +8165,7 @@ internal object AutomationTargetSerializer : KSerializer<AutomationTarget> {
         return when (discriminant) {
             "newSession" -> AutomationTargetNewSession(input.json.decodeFromJsonElement(AutomationNewSessionTarget.serializer(), element))
             "previousSession" -> AutomationTargetPreviousSession(input.json.decodeFromJsonElement(AutomationPreviousSessionTarget.serializer(), element))
+            "chat" -> AutomationTargetChat(input.json.decodeFromJsonElement(AutomationChatTarget.serializer(), element))
             else -> AutomationTargetUnknown(obj)
         }
     }
@@ -8144,12 +8176,14 @@ internal object AutomationTargetSerializer : KSerializer<AutomationTarget> {
         val element: JsonElement = when (value) {
             is AutomationTargetNewSession -> output.json.encodeToJsonElement(AutomationNewSessionTarget.serializer(), value.value)
             is AutomationTargetPreviousSession -> output.json.encodeToJsonElement(AutomationPreviousSessionTarget.serializer(), value.value)
+            is AutomationTargetChat -> output.json.encodeToJsonElement(AutomationChatTarget.serializer(), value.value)
             is AutomationTargetUnknown -> value.raw
         }
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
             is AutomationTargetNewSession -> "newSession"
             is AutomationTargetPreviousSession -> "previousSession"
+            is AutomationTargetChat -> "chat"
             is AutomationTargetUnknown -> null
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)

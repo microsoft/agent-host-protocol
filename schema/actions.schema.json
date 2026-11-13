@@ -8278,6 +8278,28 @@
         "kind"
       ]
     },
+    "AutomationChatTarget": {
+      "type": "object",
+      "description": "Each run sends its message to one existing chat, such as the conversation\nin which a user asked for a recurring check.\n\nThe host MUST reject a create or update request whose chat doesn't exist or\nthat the automation may not drive. When it accepts one, it sets\n{@link AutomationChatTarget.session | `session`} to the session that\ncurrently owns the chat, replacing any submitted value.\n\nEach run delivers its message the way an\n{@link AutomationPreviousSessionTarget} run does when it reuses a session,\nwith the same run lifecycle: the host links the session to the run, makes it\nthe run's primary session, and adds {@link AutomationDefinition.message} to\nthe chat as a {@link PendingMessageKind.Queued | queued} pending message.\nThe run never creates a session, and the host applies only the template's\n`model` and `agent`, to the queued message. It does not change the\nsession's agent provider, configuration, working directories, or\ncustomizations.\n\nIf the chat no longer exists, or the automation may no longer drive it, the\nrun fails. When that happens after the message was queued, the host first\nremoves the queued message, if the chat still exists.",
+      "properties": {
+        "kind": {
+          "const": "chat"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session that currently owns {@link AutomationChatTarget.chat}. The host\nmaintains it: when the chat moves to another session, the host updates\nthe definition and publishes it with\n{@link AutomationSetAction | `automation/set`}."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat that receives each run's message."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "chat"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -9348,9 +9370,12 @@
         },
         {
           "$ref": "#/$defs/AutomationPreviousSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationChatTarget"
         }
       ],
-      "description": "Where the runs of an automation send {@link AutomationDefinition.message}.\n\nClients SHOULD NOT author {@link AutomationPreviousSessionTarget} unless\nthe host advertises\n{@link AutomationTargetsCapabilities.previousSession}."
+      "description": "Where the runs of an automation send {@link AutomationDefinition.message}.\n\nClients SHOULD NOT author {@link AutomationPreviousSessionTarget} or\n{@link AutomationChatTarget} unless the host advertises\n{@link AutomationTargetsCapabilities.previousSession} or\n{@link AutomationTargetsCapabilities.chat}, respectively."
     },
     "AutomationRunOrigin": {
       "oneOf": [

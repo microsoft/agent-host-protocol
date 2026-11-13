@@ -566,6 +566,11 @@ pub struct AutomationTargetsCapabilities {
     /// target when this is absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_session: Option<AutomationPreviousSessionTargetCapability>,
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<AutomationChatTargetCapability>,
 }
 
 /// Presence capability for {@link AutomationPreviousSessionTarget}.
@@ -575,6 +580,14 @@ pub struct AutomationTargetsCapabilities {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationPreviousSessionTargetCapability {}
+
+/// Presence capability for {@link AutomationChatTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationChatTargetCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///

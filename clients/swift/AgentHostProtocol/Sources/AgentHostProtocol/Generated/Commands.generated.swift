@@ -659,15 +659,29 @@ public struct AutomationTargetsCapabilities: Codable, Sendable, Equatable {
     /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
     /// target when this is absent.
     public var previousSession: AutomationPreviousSessionTargetCapability?
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.
+    public var chat: AutomationChatTargetCapability?
 
     public init(
-        previousSession: AutomationPreviousSessionTargetCapability? = nil
+        previousSession: AutomationPreviousSessionTargetCapability? = nil,
+        chat: AutomationChatTargetCapability? = nil
     ) {
         self.previousSession = previousSession
+        self.chat = chat
     }
 }
 
 public struct AutomationPreviousSessionTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationChatTargetCapability: Codable, Sendable, Equatable {
 
     public init(
 

@@ -941,6 +941,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationAfterDateCondition' },
   { name: 'AutomationNewSessionTarget' },
   { name: 'AutomationPreviousSessionTarget' },
+  { name: 'AutomationChatTarget' },
   { name: 'AutomationEntry', mutable: true },
   { name: 'AutomationState', mutable: true },
   { name: 'AutomationManualRunOrigin' },
@@ -1367,6 +1368,7 @@ const AUTOMATION_TARGET_UNION: UnionConfig = {
   variants: [
     { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
     { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
   ],
 };
 
@@ -2341,6 +2343,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationCustomizationsCapability' },
   { name: 'AutomationTargetsCapabilities' },
   { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },

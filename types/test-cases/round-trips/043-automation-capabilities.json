@@ -1,7 +1,7 @@
 {
   "name": "automation-capabilities",
   "group": "A",
-  "description": "Automation capability markers preserve present empty objects such as customizations, nested schedule configuration, and the nested previousSession target marker.",
+  "description": "Automation capability markers preserve present empty objects such as customizations, nested schedule configuration, and the nested previousSession and chat target markers.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "0.8.0",
@@ -16,7 +16,8 @@
       "runHistoryLimit": 50,
       "customizations": {},
       "targets": {
-        "previousSession": {}
+        "previousSession": {},
+        "chat": {}
       }
     }
   },
@@ -33,7 +34,8 @@
       "runHistoryLimit": 50,
       "customizations": {},
       "targets": {
-        "previousSession": {}
+        "previousSession": {},
+        "chat": {}
       }
     }
   }]

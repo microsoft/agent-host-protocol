@@ -1149,6 +1149,8 @@ public enum AutomationTargetKind: Codable, Sendable, Equatable {
     case newSession
     /// Each run continues the session of the automation's previous run.
     case previousSession
+    /// Each run sends its message to one existing chat.
+    case chat
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -1158,6 +1160,7 @@ public enum AutomationTargetKind: Codable, Sendable, Equatable {
         switch raw {
         case "newSession": self = .newSession
         case "previousSession": self = .previousSession
+        case "chat": self = .chat
         default: self = .unknown(raw)
         }
     }
@@ -1167,6 +1170,7 @@ public enum AutomationTargetKind: Codable, Sendable, Equatable {
         switch self {
         case .newSession: try container.encode("newSession")
         case .previousSession: try container.encode("previousSession")
+        case .chat: try container.encode("chat")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -8399,6 +8403,53 @@ public struct AutomationPreviousSessionTarget: Codable, Sendable, Equatable {
     }
 }
 
+public struct AutomationChatTarget: Codable, Sendable, Equatable {
+    public var kind: AutomationTargetKind
+    /// Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.
+    public var session: String
+    /// Chat that receives each run's message.
+    public var chat: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case kind
+        case session
+        case chat
+    }
+
+    public init(
+        kind: AutomationTargetKind,
+        session: String,
+        chat: String,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.kind = kind
+        self.session = session
+        self.chat = chat
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(AutomationTargetKind.self, forKey: .kind)
+        self.session = try container.decode(String.self, forKey: .session)
+        self.chat = try container.decode(String.self, forKey: .chat)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.session, forKey: .session)
+        try container.encode(self.chat, forKey: .chat)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
 public struct AutomationEntry: Codable, Sendable, Equatable {
     /// Stable `ahp-automation:/<id>` resource identifier.
     public var resource: String
@@ -9853,6 +9904,7 @@ public enum AutomationDisableCondition: Codable, Sendable, Equatable {
 public enum AutomationTarget: Codable, Sendable, Equatable {
     case newSession(AutomationNewSessionTarget)
     case previousSession(AutomationPreviousSessionTarget)
+    case chat(AutomationChatTarget)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -9872,6 +9924,8 @@ public enum AutomationTarget: Codable, Sendable, Equatable {
             self = .newSession(try AutomationNewSessionTarget(from: decoder))
         case "previousSession":
             self = .previousSession(try AutomationPreviousSessionTarget(from: decoder))
+        case "chat":
+            self = .chat(try AutomationChatTarget(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -9884,6 +9938,9 @@ public enum AutomationTarget: Codable, Sendable, Equatable {
             try value.encode(to: encoder)
         case .previousSession(var value):
             value.kind = .previousSession
+            try value.encode(to: encoder)
+        case .chat(var value):
+            value.kind = .chat
             try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }

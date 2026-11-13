@@ -681,6 +681,12 @@ public sealed record AutomationTargetsCapabilities
     /// target when this is absent.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationPreviousSessionTargetCapability? PreviousSession { get; init; }
+
+    /// <summary>Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationChatTargetCapability? Chat { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationPreviousSessionTarget}.
@@ -688,6 +694,14 @@ public sealed record AutomationTargetsCapabilities
 /// The empty object means "supported"; fields are reserved for future
 /// options.</summary>
 public sealed record AutomationPreviousSessionTargetCapability
+{
+}
+
+/// <summary>Presence capability for {@link AutomationChatTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.</summary>
+public sealed record AutomationChatTargetCapability
 {
 }
 

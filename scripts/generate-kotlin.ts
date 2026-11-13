@@ -1088,6 +1088,7 @@ const STATE_STRUCTS = [
   'AutomationDefinitionPatch',
   'AutomationAfterRunsCondition', 'AutomationAfterDateCondition',
   'AutomationNewSessionTarget', 'AutomationPreviousSessionTarget',
+  'AutomationChatTarget',
   'AutomationEntry', 'AutomationState',
   'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
@@ -1412,6 +1413,7 @@ const AUTOMATION_TARGET_UNION: UnionConfig = {
   variants: [
     { caseName: 'NewSession', structName: 'AutomationNewSessionTarget', discriminantValue: 'newSession' },
     { caseName: 'PreviousSession', structName: 'AutomationPreviousSessionTarget', discriminantValue: 'previousSession' },
+    { caseName: 'Chat', structName: 'AutomationChatTarget', discriminantValue: 'chat' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1827,6 +1829,7 @@ const COMMAND_STRUCTS = [
   'AutomationCustomizationsCapability',
   'AutomationTargetsCapabilities',
   'AutomationPreviousSessionTargetCapability',
+  'AutomationChatTargetCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',

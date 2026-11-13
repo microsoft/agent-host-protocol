@@ -266,6 +266,8 @@ export const enum AutomationTargetKind {
   NewSession = 'newSession',
   /** Each run continues the session of the automation's previous run. */
   PreviousSession = 'previousSession',
+  /** Each run sends its message to one existing chat. */
+  Chat = 'chat',
 }
 
 /**
@@ -330,17 +332,58 @@ export interface AutomationPreviousSessionTarget {
 }
 
 /**
+ * Each run sends its message to one existing chat, such as the conversation
+ * in which a user asked for a recurring check.
+ *
+ * The host MUST reject a create or update request whose chat doesn't exist or
+ * that the automation may not drive. When it accepts one, it sets
+ * {@link AutomationChatTarget.session | `session`} to the session that
+ * currently owns the chat, replacing any submitted value.
+ *
+ * Each run delivers its message the way an
+ * {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+ * with the same run lifecycle: the host links the session to the run, makes it
+ * the run's primary session, and adds {@link AutomationDefinition.message} to
+ * the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+ * The run never creates a session, and the host applies only the template's
+ * `model` and `agent`, to the queued message. It does not change the
+ * session's agent provider, configuration, working directories, or
+ * customizations.
+ *
+ * If the chat no longer exists, or the automation may no longer drive it, the
+ * run fails. When that happens after the message was queued, the host first
+ * removes the queued message, if the chat still exists.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationChatTarget {
+  kind: AutomationTargetKind.Chat;
+  /**
+   * Session that currently owns {@link AutomationChatTarget.chat}. The host
+   * maintains it: when the chat moves to another session, the host updates
+   * the definition and publishes it with
+   * {@link AutomationSetAction | `automation/set`}.
+   */
+  session: URI;
+  /** Chat that receives each run's message. */
+  chat: URI;
+}
+
+/**
  * Where the runs of an automation send {@link AutomationDefinition.message}.
  *
- * Clients SHOULD NOT author {@link AutomationPreviousSessionTarget} unless
- * the host advertises
- * {@link AutomationTargetsCapabilities.previousSession}.
+ * Clients SHOULD NOT author {@link AutomationPreviousSessionTarget} or
+ * {@link AutomationChatTarget} unless the host advertises
+ * {@link AutomationTargetsCapabilities.previousSession} or
+ * {@link AutomationTargetsCapabilities.chat}, respectively.
  *
  * @category Automation State
  */
 export type AutomationTarget =
   | AutomationNewSessionTarget
-  | AutomationPreviousSessionTarget;
+  | AutomationPreviousSessionTarget
+  | AutomationChatTarget;
 
 /**
  * Describes one host-defined trigger event.

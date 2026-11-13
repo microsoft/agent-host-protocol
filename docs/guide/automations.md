@@ -38,6 +38,7 @@ AutomationCapabilities {
   customizations?: {}
   targets?: {
     previousSession?: {}
+    chat?: {}
   }
 }
 ```
@@ -55,9 +56,10 @@ the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
 
 `targets` describes the [run targets](#run-targets) a definition may use.
-`newSession` is always supported. `targets.previousSession` is a presence
-capability for the `previousSession` target; clients shouldn't author that
-target without it. When `targets` is absent, every run creates a session.
+`newSession` is always supported. `targets.previousSession` and
+`targets.chat` are presence capabilities for the `previousSession` and `chat`
+targets; clients shouldn't author those targets without them. When `targets`
+is absent, every run creates a session.
 
 ## Resource model
 
@@ -217,11 +219,13 @@ on demand.
 AutomationTarget =
   | { kind: 'newSession' }       // default: each run creates a session
   | { kind: 'previousSession' }  // each run continues the previous run's session
+  | { kind: 'chat', session: URI, chat: URI }  // each run sends to one chat
 ```
 
 `AutomationTargetKind` is non-exhaustive, and later protocol versions may add
-kinds. Clients author `previousSession` only when the host advertises
-`automations.targets.previousSession`. An update that omits `target` leaves it
+kinds. Clients author `previousSession` or `chat` only when the host
+advertises `automations.targets.previousSession` or
+`automations.targets.chat`. An update that omits `target` leaves it
 unchanged; `{ kind: 'newSession' }` resets it.
 
 #### Continuing the previous session
@@ -288,6 +292,30 @@ The run's lifecycle follows its own message, not the rest of the session:
 
 Several runs may link the same session. The session's `origin` keeps recording
 the run that created it.
+
+#### Sending to a chat
+
+With `chat`, every run sends `message` to one existing chat, such as the
+conversation in which a user asked for an hourly check on a deployment.
+
+The host rejects a create or update whose chat doesn't exist or that the
+automation may not drive. When it accepts one, it sets `session` to the session
+that currently owns the chat, replacing any submitted value, so clients can't
+write back an outdated session. When the chat moves to another session, the
+host updates `session` and publishes the definition with `automation/set`.
+
+Each run delivers its message as a `previousSession` run does when it reuses a
+session, with the same run lifecycle: the host links the session to the run,
+makes it the `primarySession`, and queues `message` in the chat. Unlike
+`previousSession`, a `chat` run never creates a session:
+
+- The host applies only the template's `model` and `agent`, to the queued
+  message. It doesn't change the session's agent provider, configuration,
+  working directories, or customizations, because the automation doesn't own
+  that session.
+- If the chat no longer exists, or the automation may no longer drive it, the
+  run fails. When that happens after the message was queued, the host first
+  removes the queued message, if the chat still exists.
 
 ## Triggers
 

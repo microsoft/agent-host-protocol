@@ -1547,6 +1547,8 @@ pub enum AutomationTargetKind {
     NewSession,
     /// Each run continues the session of the automation's previous run.
     PreviousSession,
+    /// Each run sends its message to one existing chat.
+    Chat,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -1559,6 +1561,7 @@ impl serde::Serialize for AutomationTargetKind {
         match self {
             Self::NewSession => serializer.serialize_str("newSession"),
             Self::PreviousSession => serializer.serialize_str("previousSession"),
+            Self::Chat => serializer.serialize_str("chat"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -1573,6 +1576,7 @@ impl<'de> serde::Deserialize<'de> for AutomationTargetKind {
         Ok(match raw.as_str() {
             "newSession" => Self::NewSession,
             "previousSession" => Self::PreviousSession,
+            "chat" => Self::Chat,
             _ => Self::Unknown(raw),
         })
     }
@@ -6456,6 +6460,42 @@ pub struct AutomationPreviousSessionTarget {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
+/// Each run sends its message to one existing chat, such as the conversation
+/// in which a user asked for a recurring check.
+///
+/// The host MUST reject a create or update request whose chat doesn't exist or
+/// that the automation may not drive. When it accepts one, it sets
+/// {@link AutomationChatTarget.session | `session`} to the session that
+/// currently owns the chat, replacing any submitted value.
+///
+/// Each run delivers its message the way an
+/// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+/// with the same run lifecycle: the host links the session to the run, makes it
+/// the run's primary session, and adds {@link AutomationDefinition.message} to
+/// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+/// The run never creates a session, and the host applies only the template's
+/// `model` and `agent`, to the queued message. It does not change the
+/// session's agent provider, configuration, working directories, or
+/// customizations.
+///
+/// If the chat no longer exists, or the automation may no longer drive it, the
+/// run fails. When that happens after the message was queued, the host first
+/// removes the queued message, if the chat still exists.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationChatTarget {
+    /// Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.
+    pub session: Uri,
+    /// Chat that receives each run's message.
+    pub chat: Uri,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
 /// Authoritative state of one automation in {@link AutomationState.entries}.
 ///
 /// The host owns trigger evaluation, run claims, run retention, and operation
@@ -7187,6 +7227,8 @@ pub enum AutomationTarget {
     NewSession(AutomationNewSessionTarget),
     #[serde(rename = "previousSession")]
     PreviousSession(AutomationPreviousSessionTarget),
+    #[serde(rename = "chat")]
+    Chat(AutomationChatTarget),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

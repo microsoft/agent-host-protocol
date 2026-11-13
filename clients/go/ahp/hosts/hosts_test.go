@@ -180,6 +180,7 @@ func TestAutomationTargetsNotSharedBetweenHandles(t *testing.T) {
 			Automations: &ahptypes.AutomationCapabilities{
 				Targets: &ahptypes.AutomationTargetsCapabilities{
 					PreviousSession: &ahptypes.AutomationPreviousSessionTargetCapability{},
+					Chat:            &ahptypes.AutomationChatTargetCapability{},
 				},
 			},
 		})
@@ -191,9 +192,10 @@ func TestAutomationTargetsNotSharedBetweenHandles(t *testing.T) {
 		t.Fatalf("AddHost: %v", err)
 	}
 	handle.Automations.Targets.PreviousSession = nil
+	handle.Automations.Targets.Chat = nil
 
-	if got := multi.Host(cfg.ID).Automations.Targets; got == nil || got.PreviousSession == nil {
-		t.Fatalf("targets = %+v, want previousSession present", got)
+	if got := multi.Host(cfg.ID).Automations.Targets; got == nil || got.PreviousSession == nil || got.Chat == nil {
+		t.Fatalf("targets = %+v, want previousSession and chat present", got)
 	}
 }
 

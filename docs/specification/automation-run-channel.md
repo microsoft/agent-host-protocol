@@ -38,10 +38,10 @@ The run remains `running` while its work in linked sessions awaits interaction. 
 `SessionSummary.status` and `SessionState.inputNeeded` fields remain
 authoritative for attention state and response routing.
 
-When a run continues an existing session (a `previousSession` target), its
-lifecycle follows its own queued message: the run is `pending` while the
-message waits, `running` once a turn starts from it, and ends with that turn's
-outcome. Withdrawing the queued message cancels the run, and cancelling the run
+When a run sends its message to an existing session (a `previousSession` or
+`chat` target), its lifecycle follows its own queued message: the run is
+`pending` while the message waits, `running` once a turn starts from it, and
+ends with that turn's outcome. Withdrawing the queued message cancels the run, and cancelling the run
 never affects other turns in the session.
 
 When `InitializeResult.automations.runCancellation` is present, clients may

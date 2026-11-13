@@ -24,6 +24,7 @@ import type {
   AutomationSessionTemplate,
   AutomationEntry,
   AutomationState,
+  AutomationChatTarget,
   AutomationNewSessionTarget,
   AutomationPreviousSessionTarget,
 } from '../channels-automation/state.js';
@@ -429,6 +430,12 @@ export interface AutomationTargetsCapabilities {
    * target when this is absent.
    */
   previousSession?: AutomationPreviousSessionTargetCapability;
+  /**
+   * Present when {@link AutomationDefinition.target} may be an
+   * {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+   * this is absent.
+   */
+  chat?: AutomationChatTargetCapability;
 }
 
 /**
@@ -440,6 +447,16 @@ export interface AutomationTargetsCapabilities {
  * @category Commands
  */
 export interface AutomationPreviousSessionTargetCapability {}
+
+/**
+ * Presence capability for {@link AutomationChatTarget}.
+ *
+ * The empty object means "supported"; fields are reserved for future
+ * options.
+ *
+ * @category Commands
+ */
+export interface AutomationChatTargetCapability {}
 
 /**
  * Presence capability for
