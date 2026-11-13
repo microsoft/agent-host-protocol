@@ -90,8 +90,6 @@ export const enum SessionOriginKind {
  */
 export interface AutomationSessionOrigin {
   kind: SessionOriginKind.Automation;
-  /** Immutable run purpose; existing targets keep their original provenance. */
-  purpose?: 'scheduledChat';
   /** Owning {@link AutomationEntry.resource}. */
   automation: URI;
   /** Owning {@link AutomationRunState.resource}. */

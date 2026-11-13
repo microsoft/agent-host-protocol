@@ -1628,13 +1628,7 @@ data class AutomationUpdateRequestedAction(
     /**
      * Editable {@link AutomationDefinition} fields to replace.
      */
-    val changes: AutomationDefinitionPatch,
-    /**
-     * Atomically requires an exact {@link AutomationEntry.modifiedAt} match.
-     * Requires {@link AutomationCapabilities.oneTime}; every accepted update
-     * advances the timestamp. Omit for ordered patches.
-     */
-    val expectedModifiedAt: String? = null
+    val changes: AutomationDefinitionPatch
 )
 
 @Serializable

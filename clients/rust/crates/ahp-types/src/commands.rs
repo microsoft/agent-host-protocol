@@ -455,7 +455,7 @@ pub struct InitializeResult {
     pub multiple_chat_providers: Option<MultipleChatProvidersCapability>,
 }
 
-/// Optional capabilities a client declares during `initialize` or `reconnect`.
+/// Optional capabilities a client declares during `initialize`.
 ///
 /// Each field is a presence flag: an empty object `{}` means "supported",
 /// absence means "not supported". Sub-fields on individual capabilities
@@ -463,9 +463,6 @@ pub struct InitializeResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
-    /// Selects the connection's automation catalogue format.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub automations: Option<AutomationClientCapabilities>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -479,14 +476,6 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationClientCapabilities {
-    /// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub one_time: Option<AutomationOneTimeClientCapability>,
 }
 
 /// Automation features supported by this host authority.
@@ -507,7 +496,7 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
-    /// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time: Option<AutomationOneTimeCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
@@ -566,21 +555,10 @@ pub struct AutomationRunCancellationCapability {}
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationOneTimeCapability {
-    /// Enables existing-conversation targets for scheduled chats.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub existing_conversation: Option<AutomationExistingConversationCapability>,
-}
-
+/// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationOneTimeClientCapability {}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationExistingConversationCapability {}
+pub struct AutomationOneTimeCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///
@@ -641,9 +619,6 @@ pub struct ReconnectParams {
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub windows: Option<ChannelDeliveryResumeOptions>,
-    /// Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub capabilities: Option<ClientCapabilities>,
 }
 
 /// One windowed subscription that the client wants to keep after reconnection.
@@ -2109,9 +2084,6 @@ pub struct ListAutomationTriggerDefinitionsResult {
 ///
 /// Manual execution is independent of {@link AutomationDefinition.enabled}.
 /// The host persists the run before beginning session side effects.
-///
-/// One-time requests return the same admitted run regardless of request id.
-/// Scheduled chats disabled before admission reject manual execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunAutomationParams {

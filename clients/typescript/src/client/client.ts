@@ -14,7 +14,6 @@
 import type { StateAction } from '../types/actions.js';
 import type {
   DispatchActionParams,
-  ClientCapabilities,
   InitializeParams,
   InitializeResult,
   PingParams,
@@ -352,7 +351,6 @@ export class AhpClient {
     protocolVersions: readonly string[];
     initialSubscriptions?: readonly URI[];
     locale?: string;
-    capabilities?: ClientCapabilities;
   }): Promise<InitializeResult> {
     const params: InitializeParams = {
       channel: 'ahp-root://',
@@ -362,7 +360,6 @@ export class AhpClient {
         ? { initialSubscriptions: [...args.initialSubscriptions] }
         : {}),
       ...(args.locale !== undefined ? { locale: args.locale } : {}),
-      ...(args.capabilities !== undefined ? { capabilities: args.capabilities } : {}),
     };
     return this.request('initialize', params);
   }
@@ -372,14 +369,12 @@ export class AhpClient {
     clientId: string;
     lastSeenServerSeq: number;
     subscriptions: readonly URI[];
-    capabilities?: ClientCapabilities;
   }): Promise<ReconnectResult> {
     const params: ReconnectParams = {
       channel: 'ahp-root://',
       clientId: args.clientId,
       lastSeenServerSeq: args.lastSeenServerSeq,
       subscriptions: [...args.subscriptions],
-      ...(args.capabilities !== undefined ? { capabilities: args.capabilities } : {}),
     };
     return this.request('reconnect', params);
   }

@@ -206,7 +206,7 @@ export interface InitializeParams extends BaseParams {
 }
 
 /**
- * Optional capabilities a client declares during `initialize` or `reconnect`.
+ * Optional capabilities a client declares during `initialize`.
  *
  * Each field is a presence flag: an empty object `{}` means "supported",
  * absence means "not supported". Sub-fields on individual capabilities
@@ -215,8 +215,6 @@ export interface InitializeParams extends BaseParams {
  * @category Commands
  */
 export interface ClientCapabilities {
-  /** Selects the connection's automation catalogue format. */
-  automations?: AutomationClientCapabilities;
   /**
    * Client can render
    * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -232,17 +230,6 @@ export interface ClientCapabilities {
    */
   mcpApps?: Record<string, never>;
 }
-
-/**
- * @category Commands
- */
-export interface AutomationClientCapabilities {
-  /** Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view. */
-  oneTime?: AutomationOneTimeClientCapability;
-}
-
-/** @category Commands */
-export interface AutomationOneTimeClientCapability {}
 
 /**
  * Native filesystem path grammar used by a host environment.
@@ -403,7 +390,7 @@ export interface AutomationCapabilities {
   create?: AutomationCreateCapability;
   /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
-  /** Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}. */
+  /** Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}. */
   oneTime?: AutomationOneTimeCapability;
   /**
    * Present when clients may request cancellation of `pending` or `running`
@@ -434,14 +421,12 @@ export interface AutomationCapabilities {
  */
 export interface AutomationCustomizationsCapability {}
 
-/** @category Commands */
-export interface AutomationOneTimeCapability {
-  /** Enables existing-conversation targets for scheduled chats. */
-  existingConversation?: AutomationExistingConversationCapability;
-}
-
-/** @category Commands */
-export interface AutomationExistingConversationCapability {}
+/**
+ * Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+ *
+ * @category Commands
+ */
+export interface AutomationOneTimeCapability {}
 
 /**
  * Presence capability for {@link AutomationCreateRequestedAction |
@@ -542,8 +527,6 @@ export interface ReconnectParams extends BaseParams {
    * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
    */
   windows?: ChannelDeliveryResumeOptions;
-  /** Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId. */
-  capabilities?: ClientCapabilities;
 }
 
 /**

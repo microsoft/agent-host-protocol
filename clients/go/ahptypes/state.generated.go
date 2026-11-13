@@ -553,7 +553,8 @@ const (
 	// A portable recurring {@link AutomationSchedule}.
 	AutomationTriggerKindSchedule AutomationTriggerKind = "schedule"
 	// A host-defined external event discovered from trigger definitions.
-	AutomationTriggerKindEvent   AutomationTriggerKind = "event"
+	AutomationTriggerKindEvent AutomationTriggerKind = "event"
+	// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
 	AutomationTriggerKindOneTime AutomationTriggerKind = "oneTime"
 )
 
@@ -4651,8 +4652,6 @@ type ResourceChange struct {
 // for this session's transcript, tools, confirmations, and changes.
 type AutomationSessionOrigin struct {
 	Kind SessionOriginKind `json:"kind"`
-	// Immutable run purpose; existing targets keep their original provenance.
-	Purpose *string `json:"purpose,omitempty"`
 	// Owning {@link AutomationEntry.resource}.
 	Automation URI `json:"automation"`
 	// Owning {@link AutomationRunState.resource}.
@@ -4769,27 +4768,33 @@ func (v AutomationEventTrigger) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "type", "title", "description", "events", "config")
 }
 
-// Requires {@link AutomationCapabilities.oneTime} and must be the definition's
-// only trigger. Admission is durable and never rearmed; missed instants catch
-// up once. See the {@link /guide/automations | Automations Guide}.
+// Starts one run at a fixed time evaluated by the host.
+//
+// The trigger fires at most once for a given {@link runAt}. Updating
+// {@link runAt} schedules a new occurrence.
 type AutomationOneTimeTrigger struct {
-	// Identifier unique and stable within this automation definition.
+	// Identifier unique and stable within this automation definition. Recorded in
+	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+	// run.
 	Id   string                `json:"id"`
 	Kind AutomationTriggerKind `json:"kind"`
-	// Absolute ISO 8601 UTC timestamp ending in `Z`.
+	// Scheduled run timestamp in ISO 8601 format.
 	RunAt string `json:"runAt"`
+	// Policy when {@link runAt} passes while automatic execution is unavailable.
+	// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
 	Extra map[string]json.RawMessage `json:"-"`
 }
 
 func (v *AutomationOneTimeTrigger) UnmarshalJSON(data []byte) error {
 	type wire AutomationOneTimeTrigger
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "runAt")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "runAt", "misfirePolicy")
 }
 
 func (v AutomationOneTimeTrigger) MarshalJSON() ([]byte, error) {
 	type wire AutomationOneTimeTrigger
-	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "runAt")
+	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "runAt", "misfirePolicy")
 }
 
 // Describes one host-defined trigger event.
@@ -4892,24 +4897,6 @@ func (v AutomationSessionTemplate) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(wire(v), v.Extra, "provider", "model", "agent", "workingDirectories", "config", "customizations")
 }
 
-// Exact host-advertised target, including non-default chats; not owned by the automation.
-type AutomationConversation struct {
-	Session URI `json:"session"`
-	Chat    URI `json:"chat"`
-	// Extra contains unrecognized wire members retained for full-object edits.
-	Extra map[string]json.RawMessage `json:"-"`
-}
-
-func (v *AutomationConversation) UnmarshalJSON(data []byte) error {
-	type wire AutomationConversation
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "session", "chat")
-}
-
-func (v AutomationConversation) MarshalJSON() ([]byte, error) {
-	type wire AutomationConversation
-	return marshalWithExtra(wire(v), v.Extra, "session", "chat")
-}
-
 // Durable, client-editable definition of an automation.
 //
 // A definition combines the initial automation message, the session template
@@ -4919,21 +4906,13 @@ func (v AutomationConversation) MarshalJSON() ([]byte, error) {
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Immutable after creation. Requires one one-time trigger and enabled creation.
-	// Disabling before admission permanently cancels the request.
-	Purpose *string `json:"purpose,omitempty"`
-	// Immutable scheduled-chat target; requires
-	// {@link AutomationOneTimeCapability.existingConversation}. Queues without
-	// interrupting active turns or applying session/model/agent overrides.
-	// Completes on queue acceptance and owns no sessions.
-	Conversation *AutomationConversation `json:"conversation,omitempty"`
-	// Initial message sent to each new run session or existing conversation. Its
+	// Initial message sent to every newly created run session. Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
 	Message Message `json:"message"`
-	// Template used to create fresh sessions; ignored when {@link conversation} is set.
+	// Template used to create fresh sessions for each run.
 	Session AutomationSessionTemplate `json:"session"`
-	// Controls automatic triggers; see {@link purpose} for scheduled-chat
-	// cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
+	// Whether automatic triggers may create runs. Manual runs remain available
+	// whenever {@link AutomationOperation.Run} is advertised.
 	Enabled bool `json:"enabled"`
 	// Automatic triggers. An empty list means manual-only.
 	Triggers []AutomationTrigger `json:"triggers"`
@@ -5035,17 +5014,8 @@ type AutomationEntry struct {
 	Resource URI `json:"resource"`
 	// Current durable definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+	// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
-	// Durable admission receipt, retained after run-history pruning; absent before admission.
-	OneTimeRun *URI `json:"oneTimeRun,omitempty"`
-	// ISO 8601 dispatch-acceptance time, retained after history pruning.
-	// Absence does not prove non-dispatch.
-	OneTimeDispatchedAt *string `json:"oneTimeDispatchedAt,omitempty"`
-	// ISO 8601 confirmation of failure before submission; permits explicit draft
-	// recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
-	// after history pruning.
-	OneTimeDispatchRejectedAt *string `json:"oneTimeDispatchRejectedAt,omitempty"`
 	// Host-owned count of scheduled runs consumed against the current
 	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
 	// **current** allowance, not a lifetime total: the host resets it to `0` when
@@ -5110,15 +5080,15 @@ type AutomationManualRunOrigin struct {
 // Origin recorded for a run created by one of the automation's triggers.
 type AutomationTriggeredRunOrigin struct {
 	Kind AutomationRunOriginKind `json:"kind"`
-	// Matches the stable {@link AutomationScheduleTrigger.id} or
-	// {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+	// Matches the stable {@link AutomationScheduleTrigger.id},
+	// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
 	// in the definition.
 	TriggerId string `json:"triggerId"`
 	// Intended schedule occurrence as an ISO 8601 timestamp. Present for
 	// schedule and one-time triggers and normally absent for event triggers.
 	ScheduledFor *string `json:"scheduledFor,omitempty"`
 	// `true` when this is a catch-up run created by
-	// {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
+	// {@link AutomationMisfirePolicy.RunOnce}.
 	CatchUp *bool `json:"catchUp,omitempty"`
 	// Host-defined, non-secret event provenance suitable for display or audit.
 	// This is descriptive context, not an input that clients replay.
@@ -5216,8 +5186,6 @@ type AutomationRunSummary struct {
 // transcripts, tools, interaction requirements, changesets, and per-session
 // lifecycle.
 type AutomationRunState struct {
-	// Immutable purpose copied at admission; survives definition removal.
-	Purpose *string `json:"purpose,omitempty"`
 	// URI of this automation-run channel.
 	Resource URI `json:"resource"`
 	// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.

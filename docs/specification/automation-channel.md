@@ -4,7 +4,7 @@
 
 The automation catalogue channel synchronizes every durable automation
 definition visible to a client. Automations launch fresh agent sessions manually
-or from host-owned triggers. With negotiated support, one-time scheduled chats can instead deliver into an existing conversation.
+or from host-owned triggers.
 
 ## URI
 
@@ -41,24 +41,6 @@ When `InitializeResult.automations` is present, clients subscribe to
 `AutomationState` snapshot. Later catalogue changes use normal ordered
 actions and therefore participate in reconnect replay. If replay is unavailable,
 the host returns a fresh catalogue snapshot.
-
-### One-time catalogue opt-in
-
-A client MUST declare `initialize.capabilities.automations.oneTime: {}` before receiving one-time entries. Host support alone is not acknowledgement: `AutomationTriggerKind` is exhaustive and older decoders reject `oneTime`.
-
-For a connection without this declaration, the host MUST:
-
-- Omit `automations.oneTime`, including its nested `existingConversation` option, from `InitializeResult`.
-- Exclude entries containing a one-time trigger from every catalogue snapshot, including initialize, subscribe, reconnect fallback, and windowed-delivery snapshots.
-- Project a one-time `automation/set` into `automation/removed` for the same resource. This removes a formerly visible entry if its trigger changes to one-time; removing an unseen resource is a no-op.
-- Suppress create/update request echoes containing one-time triggers, including rejected echoes.
-- Reject requests to create or operate on one-time definitions before mutation, without echoing an incompatible payload.
-
-The same projection MUST apply to live actions and replay, before encoding direct notifications or flow-control frames. Preserve the original action envelope's sequencing and correlation metadata; omitted actions do not renumber the stream.
-
-Clients MUST repeat the opt-in in `reconnect.capabilities.automations.oneTime`; it is never inherited from `clientId`. The host MUST retain the previous connection's opt-in. If it differs, or the host cannot establish the previous view, the host MUST reject reconnect with `InvalidParams` before sending catalogue data and require a fresh `initialize`. This renegotiates host capabilities and returns a snapshot for the new view instead of replaying the old one.
-
-Opted-in connections receive the full authorized catalogue. Hosts MUST NOT mutate the shared catalogue to accommodate a legacy reader. The TypeScript helpers `automationCapabilitiesForClient`, `automationStateForClient`, and `automationActionForClient` implement the outgoing projections; `canResumeAutomationCatalogue` checks for a view change. Hosts still enforce incoming request checks and retain connection negotiation state.
 
 ## Commands
 
@@ -97,8 +79,6 @@ in server order wins. The host MUST reject an action that is unauthorized, is
 not permitted by the current operations, or is invalid for the current
 definition.
 
-Hosts advertising `automations.oneTime` MUST support the optional `expectedModifiedAt` on `automation/updateRequested`: it compares exactly with the current `AutomationEntry.modifiedAt`, and a mismatch rejects the entire action without mutation. The comparison and update MUST be atomic, and each accepted definition update MUST advance `modifiedAt` to prevent stale guards matching a different revision. Omitted guards preserve the ordered-patch semantics above.
-
 Before dispatching `automation/removed`, a client SHOULD verify that the target
 advertises `AutomationOperation.Remove`. The host MUST revalidate the operation
 and the client's authorization. If removal is no longer allowed, the host
@@ -117,27 +97,13 @@ seconds, years, macros, or Quartz extensions. See the
 [Automations guide](/guide/automations#scheduled-triggers) for the complete
 grammar and day-field semantics.
 
+When `automations.oneTime` is advertised, a `oneTime` trigger fires at most
+once for a given `runAt`; updating `runAt` schedules a new occurrence. See the
+[Automations guide](/guide/automations#one-time-triggers).
+
 `enabled` controls automatic triggers only; manual runs remain available when
 the operation is advertised. A host atomically associates a scheduled
 occurrence with at most one run.
-
-### One-time execution
-
-`automations.oneTime` enables `AutomationOneTimeTrigger` (`kind: 'oneTime'`, `runAt` an absolute ISO 8601 UTC timestamp ending in `Z`). It MUST be the definition's only trigger. The host MUST atomically persist `AutomationEntry.oneTimeRun` before dispatch; manual and automatic execution share that admission. Later manual requests MUST return the same run URI regardless of request id. Once admitted, definition updates MUST be rejected. Failure, cancellation, interruption, or history pruning MUST NOT rearm the occurrence. Missed instants catch up once when the host is available.
-
-Unchanged one-time create retries at the same resource MUST return its current authoritative entry without admitting another occurrence, including after the due time. Conflicting definitions MUST be rejected. Hosts MUST durably prevent reuse of removed one-time resource identities so replay after restart cannot recreate the request.
-
-A `purpose: 'scheduledChat'` definition requires this trigger and enabled creation. Purpose is immutable after creation and absent from `AutomationDefinitionPatch`; hosts MUST reject updates that add, remove, or change it, including conversion of an existing disabled or recurring definition. Disabling a scheduled chat before admission permanently cancels it: subsequent updates and manual runs MUST be rejected. The purpose is copied into the admitted run and any newly created session's automation origin, independently of catalogue retention.
-
-`oneTimeDispatchedAt` records accepted dispatch, not run completion. `oneTimeDispatchRejectedAt` positively confirms failure before submission was attempted. Both require `oneTimeRun`, survive run-history pruning, and MUST NOT coexist for one occurrence. Missing dispatch confirmation, even with a failed run, MUST NOT be interpreted as safe to resend after an uncertain handoff. Only a positive rejection receipt permits explicit recovery of a consumed request as a sendable draft.
-
-Hosts MUST capture supported message attachments durably at acceptance and reject unsupported content before accepting a definition or update. Clients MUST NOT author this extension without the corresponding capability. The new trigger extends an exhaustive union, so deployments MUST account for older catalogue decoders that reject it. See [One-time triggers and scheduled chats](/guide/automations#one-time-triggers-and-scheduled-chats).
-
-### Existing-conversation targets
-
-`automations.oneTime.existingConversation` enables an immutable `AutomationDefinition.conversation: { session, chat }` on scheduled chats. These MUST be exact advertised URIs, including non-default chats. Clients MUST preserve unknown target members on decode/re-encode. Hosts MUST revalidate authorization and membership and MUST NOT create a replacement target, apply the session template or message model/agent, change session provenance, or acquire session ownership. Delivery MUST join the ordinary queue without steering or cancelling another turn. Completion means accepted queue handoff rather than turn completion; cancelling the delivery run MUST NOT cancel unrelated work in the existing conversation.
-
-The delivery run MUST have empty `sessions` and no `primarySession`; the existing target is not an owned run session.
 
 ## Security
 

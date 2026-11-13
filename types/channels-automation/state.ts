@@ -124,23 +124,8 @@ export const enum AutomationTriggerKind {
   Schedule = 'schedule',
   /** A host-defined external event discovered from trigger definitions. */
   Event = 'event',
+  /** A single {@link AutomationOneTimeTrigger.runAt | scheduled time}. */
   OneTime = 'oneTime',
-}
-
-/**
- * Requires {@link AutomationCapabilities.oneTime} and must be the definition's
- * only trigger. Admission is durable and never rearmed; missed instants catch
- * up once. See the {@link /guide/automations | Automations Guide}.
- *
- * @category Automation State
- * @preserveUnknownMembers
- */
-export interface AutomationOneTimeTrigger {
-  /** Identifier unique and stable within this automation definition. */
-  id: string;
-  kind: AutomationTriggerKind.OneTime;
-  /** Absolute ISO 8601 UTC timestamp ending in `Z`. */
-  runAt: string;
 }
 
 /**
@@ -162,6 +147,32 @@ export interface AutomationScheduleTrigger {
   /**
    * Policy for missed occurrences. Omission is equivalent to
    * {@link AutomationMisfirePolicy.RunOnce}.
+   */
+  misfirePolicy?: AutomationMisfirePolicy;
+}
+
+/**
+ * Starts one run at a fixed time evaluated by the host.
+ *
+ * The trigger fires at most once for a given {@link runAt}. Updating
+ * {@link runAt} schedules a new occurrence.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationOneTimeTrigger {
+  /**
+   * Identifier unique and stable within this automation definition. Recorded in
+   * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+   * run.
+   */
+  id: string;
+  kind: AutomationTriggerKind.OneTime;
+  /** Scheduled run timestamp in ISO 8601 format. */
+  runAt: string;
+  /**
+   * Policy when {@link runAt} passes while automatic execution is unavailable.
+   * Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
    */
   misfirePolicy?: AutomationMisfirePolicy;
 }
@@ -369,17 +380,6 @@ export interface AutomationSessionTemplate {
 }
 
 /**
- * Exact host-advertised target, including non-default chats; not owned by the automation.
- *
- * @category Automation State
- * @preserveUnknownMembers
- */
-export interface AutomationConversation {
-  session: URI;
-  chat: URI;
-}
-
-/**
  * Durable, client-editable definition of an automation.
  *
  * A definition combines the initial automation message, the session template
@@ -393,27 +393,15 @@ export interface AutomationDefinition {
   /** Human-readable automation name. */
   title: string;
   /**
-   * Immutable after creation. Requires one one-time trigger and enabled creation.
-   * Disabling before admission permanently cancels the request.
-   */
-  purpose?: 'scheduledChat';
-  /**
-   * Immutable scheduled-chat target; requires
-   * {@link AutomationOneTimeCapability.existingConversation}. Queues without
-   * interrupting active turns or applying session/model/agent overrides.
-   * Completes on queue acceptance and owns no sessions.
-   */
-  conversation?: AutomationConversation;
-  /**
-   * Initial message sent to each new run session or existing conversation. Its
+   * Initial message sent to every newly created run session. Its
    * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
    */
   message: Message;
-  /** Template used to create fresh sessions; ignored when {@link conversation} is set. */
+  /** Template used to create fresh sessions for each run. */
   session: AutomationSessionTemplate;
   /**
-   * Controls automatic triggers; see {@link purpose} for scheduled-chat
-   * cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
+   * Whether automatic triggers may create runs. Manual runs remain available
+   * whenever {@link AutomationOperation.Run} is advertised.
    */
   enabled: boolean;
   /** Automatic triggers. An empty list means manual-only. */
@@ -457,21 +445,8 @@ export interface AutomationEntry {
   resource: URI;
   /** Current durable definition. */
   definition: AutomationDefinition;
-  /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
+  /** Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
   nextRunAt?: string;
-  /** Durable admission receipt, retained after run-history pruning; absent before admission. */
-  oneTimeRun?: URI;
-  /**
-   * ISO 8601 dispatch-acceptance time, retained after history pruning.
-   * Absence does not prove non-dispatch.
-   */
-  oneTimeDispatchedAt?: string;
-  /**
-   * ISO 8601 confirmation of failure before submission; permits explicit draft
-   * recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
-   * after history pruning.
-   */
-  oneTimeDispatchRejectedAt?: string;
   /**
    * Host-owned count of scheduled runs consumed against the current
    * {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the

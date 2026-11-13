@@ -258,10 +258,6 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v InitializeResult
 		dec(&v)
 		return enc(&v)
-	case "InitializeParams":
-		var v InitializeParams
-		dec(&v)
-		return enc(&v)
 	case "CreateChatParams":
 		var v CreateChatParams
 		dec(&v)

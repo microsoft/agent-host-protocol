@@ -569,17 +569,13 @@ public sealed record Implementation
     public string? Title { get; init; }
 }
 
-/// <summary>Optional capabilities a client declares during `initialize` or `reconnect`.
+/// <summary>Optional capabilities a client declares during `initialize`.
 ///
 /// Each field is a presence flag: an empty object `{}` means "supported",
 /// absence means "not supported". Sub-fields on individual capabilities
 /// are reserved for future per-capability options.</summary>
 public sealed record ClientCapabilities
 {
-    /// <summary>Selects the connection's automation catalogue format.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationClientCapabilities? Automations { get; init; }
-
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -593,13 +589,6 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
-}
-
-public sealed record AutomationClientCapabilities
-{
-    /// <summary>Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationOneTimeClientCapability? OneTime { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -621,7 +610,7 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
-    /// <summary>Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.</summary>
+    /// <summary>Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationOneTimeCapability? OneTime { get; init; }
 
@@ -682,18 +671,8 @@ public sealed record AutomationCustomizationsCapability
 {
 }
 
+/// <summary>Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
 public sealed record AutomationOneTimeCapability
-{
-    /// <summary>Enables existing-conversation targets for scheduled chats.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationExistingConversationCapability? ExistingConversation { get; init; }
-}
-
-public sealed record AutomationOneTimeClientCapability
-{
-}
-
-public sealed record AutomationExistingConversationCapability
 {
 }
 
@@ -732,10 +711,6 @@ public sealed record ReconnectParams
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChannelDeliveryResumeOptions? Windows { get; init; }
-
-    /// <summary>Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ClientCapabilities? Capabilities { get; init; }
 }
 
 /// <summary>One windowed subscription that the client wants to keep after reconnection.
@@ -2276,10 +2251,7 @@ public sealed record ListAutomationTriggerDefinitionsResult
 /// <summary>Start a manual run of an automation.
 ///
 /// Manual execution is independent of {@link AutomationDefinition.enabled}.
-/// The host persists the run before beginning session side effects.
-///
-/// One-time requests return the same admitted run regardless of request id.
-/// Scheduled chats disabled before admission reject manual execution.</summary>
+/// The host persists the run before beginning session side effects.</summary>
 public sealed record RunAutomationParams
 {
     /// <summary>Manual runs are scoped to the catalogue channel.</summary>

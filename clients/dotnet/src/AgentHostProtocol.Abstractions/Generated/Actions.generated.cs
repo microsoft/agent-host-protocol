@@ -2647,11 +2647,7 @@ public sealed record AnnotationsUpdatedAction
 /// {@link AutomationSessionTemplate.customizations | session customizations}
 /// from the dispatching client, persists the definition, then publishes the
 /// authoritative result with {@link AutomationSetAction | `automation/set`}.
-/// Rejections leave the catalogue unchanged.
-///
-/// For one-time definitions, same-resource retries return the current entry
-/// unless the definition conflicts. Removed resources cannot be reused, even
-/// after restart.</summary>
+/// Rejections leave the catalogue unchanged.</summary>
 public sealed record AutomationCreateRequestedAction
 {
     public ActionType Type { get; init; } = ActionType.AutomationCreateRequested;
@@ -2685,12 +2681,6 @@ public sealed record AutomationUpdateRequestedAction
 
     /// <summary>Editable {@link AutomationDefinition} fields to replace.</summary>
     public required AutomationDefinitionPatch Changes { get; init; }
-
-    /// <summary>Atomically requires an exact {@link AutomationEntry.modifiedAt} match.
-    /// Requires {@link AutomationCapabilities.oneTime}; every accepted update
-    /// advances the timestamp. Omit for ordered patches.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ExpectedModifiedAt { get; init; }
 }
 
 /// <summary>Add or replace one full automation state in

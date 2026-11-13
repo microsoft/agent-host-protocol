@@ -111,36 +111,6 @@ test('initialize round-trip', async () => {
   await client.shutdown();
 });
 
-test('one-time catalogue opt-in is sent on both initialize and reconnect', async t => {
-  const [c, s] = InMemoryTransport.pair();
-  const client = new AhpClient(c);
-  client.connect();
-  t.after(() => client.shutdown());
-  const capabilities = { automations: { oneTime: {} } };
-  const initialize = client.initialize({
-    clientId: 'scheduling-client',
-    protocolVersions: ['1.0.0'],
-    initialSubscriptions: [AUTOMATIONS],
-    capabilities,
-  });
-  const initialRequest = await readRequest(s);
-  reply(s, initialRequest.id, { protocolVersion: '1.0.0', serverSeq: 0, snapshots: [] });
-  await initialize;
-  const reconnect = client.reconnect({
-    clientId: 'scheduling-client',
-    lastSeenServerSeq: 42,
-    subscriptions: [AUTOMATIONS],
-    capabilities,
-  });
-  const reconnectRequest = await readRequest(s);
-  reply(s, reconnectRequest.id, { type: 'replay', actions: [], missing: [] });
-  await reconnect;
-  assert.deepEqual([initialRequest.params, reconnectRequest.params], [
-    { channel: ROOT, clientId: 'scheduling-client', protocolVersions: ['1.0.0'], initialSubscriptions: [AUTOMATIONS], capabilities },
-    { channel: ROOT, clientId: 'scheduling-client', lastSeenServerSeq: 42, subscriptions: [AUTOMATIONS], capabilities },
-  ]);
-});
-
 test('subscribe attaches before sending the request and fans out an action', async () => {
   const [c, s] = InMemoryTransport.pair();
   const client = new AhpClient(c);

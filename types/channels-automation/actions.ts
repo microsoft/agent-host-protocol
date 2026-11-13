@@ -77,10 +77,6 @@ export interface AutomationDefinitionPatch {
  * authoritative result with {@link AutomationSetAction | `automation/set`}.
  * Rejections leave the catalogue unchanged.
  *
- * For one-time definitions, same-resource retries return the current entry
- * unless the definition conflicts. Removed resources cannot be reused, even
- * after restart.
- *
  * @category Automation Actions
  * @version 1
  * @clientDispatchable
@@ -118,12 +114,6 @@ export interface AutomationUpdateRequestedAction {
   resource: URI;
   /** Editable {@link AutomationDefinition} fields to replace. */
   changes: AutomationDefinitionPatch;
-  /**
-   * Atomically requires an exact {@link AutomationEntry.modifiedAt} match.
-   * Requires {@link AutomationCapabilities.oneTime}; every accepted update
-   * advances the timestamp. Omit for ordered patches.
-   */
-  expectedModifiedAt?: string;
 }
 
 /**

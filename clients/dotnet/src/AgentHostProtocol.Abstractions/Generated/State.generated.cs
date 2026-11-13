@@ -1738,6 +1738,7 @@ public enum AutomationTriggerKind
     /// <summary>A host-defined external event discovered from trigger definitions.</summary>
     [WireValue("event")]
     Event,
+    /// <summary>A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.</summary>
     [WireValue("oneTime")]
     OneTime,
 }
@@ -6756,10 +6757,6 @@ public sealed record AutomationSessionOrigin
 {
     public SessionOriginKind Kind { get; init; } = SessionOriginKind.Automation;
 
-    /// <summary>Immutable run purpose; existing targets keep their original provenance.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Purpose { get; init; }
-
     /// <summary>Owning {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
 
@@ -6885,18 +6882,26 @@ public sealed record AutomationEventTrigger
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>Requires {@link AutomationCapabilities.oneTime} and must be the definition's
-/// only trigger. Admission is durable and never rearmed; missed instants catch
-/// up once. See the {@link /guide/automations | Automations Guide}.</summary>
+/// <summary>Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} schedules a new occurrence.</summary>
 public sealed record AutomationOneTimeTrigger
 {
-    /// <summary>Identifier unique and stable within this automation definition.</summary>
+    /// <summary>Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.</summary>
     public required string Id { get; init; }
 
     public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.OneTime;
 
-    /// <summary>Absolute ISO 8601 UTC timestamp ending in `Z`.</summary>
+    /// <summary>Scheduled run timestamp in ISO 8601 format.</summary>
     public required string RunAt { get; init; }
+
+    /// <summary>Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationMisfirePolicy? MisfirePolicy { get; init; }
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
@@ -7010,18 +7015,6 @@ public sealed record AutomationSessionTemplate
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>Exact host-advertised target, including non-default chats; not owned by the automation.</summary>
-public sealed record AutomationConversation
-{
-    public required string Session { get; init; }
-
-    public required string Chat { get; init; }
-
-    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
-}
-
 /// <summary>Durable, client-editable definition of an automation.
 ///
 /// A definition combines the initial automation message, the session template
@@ -7033,27 +7026,15 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Immutable after creation. Requires one one-time trigger and enabled creation.
-    /// Disabling before admission permanently cancels the request.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Purpose { get; init; }
-
-    /// <summary>Immutable scheduled-chat target; requires
-    /// {@link AutomationOneTimeCapability.existingConversation}. Queues without
-    /// interrupting active turns or applying session/model/agent overrides.
-    /// Completes on queue acceptance and owns no sessions.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationConversation? Conversation { get; init; }
-
-    /// <summary>Initial message sent to each new run session or existing conversation. Its
+    /// <summary>Initial message sent to every newly created run session. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.</summary>
     public required Message Message { get; init; }
 
-    /// <summary>Template used to create fresh sessions; ignored when {@link conversation} is set.</summary>
+    /// <summary>Template used to create fresh sessions for each run.</summary>
     public required AutomationSessionTemplate Session { get; init; }
 
-    /// <summary>Controls automatic triggers; see {@link purpose} for scheduled-chat
-    /// cancellation. Other manual runs depend on {@link AutomationOperation.Run}.</summary>
+    /// <summary>Whether automatic triggers may create runs. Manual runs remain available
+    /// whenever {@link AutomationOperation.Run} is advertised.</summary>
     public bool Enabled { get; init; }
 
     /// <summary>Automatic triggers. An empty list means manual-only.</summary>
@@ -7167,24 +7148,9 @@ public sealed class AutomationEntry
     /// <summary>Current durable definition.</summary>
     public required AutomationDefinition Definition { get; set; }
 
-    /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
+    /// <summary>Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
-
-    /// <summary>Durable admission receipt, retained after run-history pruning; absent before admission.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? OneTimeRun { get; set; }
-
-    /// <summary>ISO 8601 dispatch-acceptance time, retained after history pruning.
-    /// Absence does not prove non-dispatch.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? OneTimeDispatchedAt { get; set; }
-
-    /// <summary>ISO 8601 confirmation of failure before submission; permits explicit draft
-    /// recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
-    /// after history pruning.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? OneTimeDispatchRejectedAt { get; set; }
 
     /// <summary>Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -7269,8 +7235,8 @@ public sealed record AutomationTriggeredRunOrigin
 {
     public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
-    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
     /// in the definition.</summary>
     public required string TriggerId { get; init; }
 
@@ -7280,7 +7246,7 @@ public sealed record AutomationTriggeredRunOrigin
     public string? ScheduledFor { get; init; }
 
     /// <summary>`true` when this is a catch-up run created by
-    /// {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.</summary>
+    /// {@link AutomationMisfirePolicy.RunOnce}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? CatchUp { get; init; }
 
@@ -7414,10 +7380,6 @@ public sealed record AutomationRunSummary
 /// lifecycle.</summary>
 public sealed class AutomationRunState
 {
-    /// <summary>Immutable purpose copied at admission; survives definition removal.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Purpose { get; set; }
-
     /// <summary>URI of this automation-run channel.</summary>
     public required string Resource { get; set; }
 

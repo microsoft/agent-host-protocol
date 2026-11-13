@@ -1527,6 +1527,7 @@ pub enum AutomationTriggerKind {
     /// A host-defined external event discovered from trigger definitions.
     #[serde(rename = "event")]
     Event,
+    /// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
     #[serde(rename = "oneTime")]
     OneTime,
 }
@@ -6054,9 +6055,6 @@ pub struct ResourceChange {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionOrigin {
-    /// Immutable run purpose; existing targets keep their original provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub purpose: Option<String>,
     /// Owning {@link AutomationEntry.resource}.
     pub automation: Uri,
     /// Owning {@link AutomationRunState.resource}.
@@ -6153,16 +6151,23 @@ pub struct AutomationEventTrigger {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// Requires {@link AutomationCapabilities.oneTime} and must be the definition's
-/// only trigger. Admission is durable and never rearmed; missed instants catch
-/// up once. See the {@link /guide/automations | Automations Guide}.
+/// Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} schedules a new occurrence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationOneTimeTrigger {
-    /// Identifier unique and stable within this automation definition.
+    /// Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.
     pub id: String,
-    /// Absolute ISO 8601 UTC timestamp ending in `Z`.
+    /// Scheduled run timestamp in ISO 8601 format.
     pub run_at: String,
+    /// Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misfire_policy: Option<AutomationMisfirePolicy>,
     /// Unrecognized wire members retained for full-object edits.
     #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
     pub extra: serde_json::Map<String, serde_json::Value>,
@@ -6265,17 +6270,6 @@ pub struct AutomationSessionTemplate {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// Exact host-advertised target, including non-default chats; not owned by the automation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationConversation {
-    pub session: Uri,
-    pub chat: Uri,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
-}
-
 /// Durable, client-editable definition of an automation.
 ///
 /// A definition combines the initial automation message, the session template
@@ -6287,23 +6281,13 @@ pub struct AutomationConversation {
 pub struct AutomationDefinition {
     /// Human-readable automation name.
     pub title: String,
-    /// Immutable after creation. Requires one one-time trigger and enabled creation.
-    /// Disabling before admission permanently cancels the request.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub purpose: Option<String>,
-    /// Immutable scheduled-chat target; requires
-    /// {@link AutomationOneTimeCapability.existingConversation}. Queues without
-    /// interrupting active turns or applying session/model/agent overrides.
-    /// Completes on queue acceptance and owns no sessions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conversation: Option<AutomationConversation>,
-    /// Initial message sent to each new run session or existing conversation. Its
+    /// Initial message sent to every newly created run session. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     pub message: Message,
-    /// Template used to create fresh sessions; ignored when {@link conversation} is set.
+    /// Template used to create fresh sessions for each run.
     pub session: AutomationSessionTemplate,
-    /// Controls automatic triggers; see {@link purpose} for scheduled-chat
-    /// cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
+    /// Whether automatic triggers may create runs. Manual runs remain available
+    /// whenever {@link AutomationOperation.Run} is advertised.
     pub enabled: bool,
     /// Automatic triggers. An empty list means manual-only.
     pub triggers: Vec<AutomationTrigger>,
@@ -6402,21 +6386,9 @@ pub struct AutomationEntry {
     pub resource: Uri,
     /// Current durable definition.
     pub definition: AutomationDefinition,
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
-    /// Durable admission receipt, retained after run-history pruning; absent before admission.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub one_time_run: Option<Uri>,
-    /// ISO 8601 dispatch-acceptance time, retained after history pruning.
-    /// Absence does not prove non-dispatch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub one_time_dispatched_at: Option<String>,
-    /// ISO 8601 confirmation of failure before submission; permits explicit draft
-    /// recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
-    /// after history pruning.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub one_time_dispatch_rejected_at: Option<String>,
     /// Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
     /// **current** allowance, not a lifetime total: the host resets it to `0` when
@@ -6544,8 +6516,8 @@ pub struct AutomationManualRunOrigin {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationTriggeredRunOrigin {
-    /// Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+    /// Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
     /// in the definition.
     pub trigger_id: String,
     /// Intended schedule occurrence as an ISO 8601 timestamp. Present for
@@ -6553,7 +6525,7 @@ pub struct AutomationTriggeredRunOrigin {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduled_for: Option<String>,
     /// `true` when this is a catch-up run created by
-    /// {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
+    /// {@link AutomationMisfirePolicy.RunOnce}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catch_up: Option<bool>,
     /// Host-defined, non-secret event provenance suitable for display or audit.
@@ -6667,9 +6639,6 @@ pub struct AutomationRunSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunState {
-    /// Immutable purpose copied at admission; survives definition removal.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub purpose: Option<String>,
     /// URI of this automation-run channel.
     pub resource: Uri,
     /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.

@@ -70,8 +70,8 @@ export interface AutomationManualRunOrigin {
 export interface AutomationTriggeredRunOrigin {
   kind: AutomationRunOriginKind.Trigger;
   /**
-   * Matches the stable {@link AutomationScheduleTrigger.id} or
-   * {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+   * Matches the stable {@link AutomationScheduleTrigger.id},
+   * {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
    * in the definition.
    */
   triggerId: string;
@@ -82,7 +82,7 @@ export interface AutomationTriggeredRunOrigin {
   scheduledFor?: string;
   /**
    * `true` when this is a catch-up run created by
-   * {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
+   * {@link AutomationMisfirePolicy.RunOnce}.
    */
   catchUp?: boolean;
   /**
@@ -232,8 +232,6 @@ export interface AutomationRunSummary {
  * @category Automation Run State
  */
 export interface AutomationRunState {
-  /** Immutable purpose copied at admission; survives definition removal. */
-  purpose?: 'scheduledChat';
   /** URI of this automation-run channel. */
   resource: URI;
   /** Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}. */

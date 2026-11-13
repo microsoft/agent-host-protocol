@@ -277,14 +277,12 @@ type InitializeResult struct {
 	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
-// Optional capabilities a client declares during `initialize` or `reconnect`.
+// Optional capabilities a client declares during `initialize`.
 //
 // Each field is a presence flag: an empty object `{}` means "supported",
 // absence means "not supported". Sub-fields on individual capabilities
 // are reserved for future per-capability options.
 type ClientCapabilities struct {
-	// Selects the connection's automation catalogue format.
-	Automations *AutomationClientCapabilities `json:"automations,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -297,11 +295,6 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
-}
-
-type AutomationClientCapabilities struct {
-	// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
-	OneTime *AutomationOneTimeClientCapability `json:"oneTime,omitempty"`
 }
 
 // Automation features supported by this host authority.
@@ -318,7 +311,7 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
-	// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
+	// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
 	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
@@ -367,15 +360,8 @@ type AutomationRunCancellationCapability struct {
 type AutomationCustomizationsCapability struct {
 }
 
+// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
 type AutomationOneTimeCapability struct {
-	// Enables existing-conversation targets for scheduled chats.
-	ExistingConversation *AutomationExistingConversationCapability `json:"existingConversation,omitempty"`
-}
-
-type AutomationOneTimeClientCapability struct {
-}
-
-type AutomationExistingConversationCapability struct {
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.
@@ -428,8 +414,6 @@ type ReconnectParams struct {
 	//
 	// Stability: 1.0 - Early development.
 	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
-	// Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
-	Capabilities *ClientCapabilities `json:"capabilities,omitempty"`
 }
 
 // One windowed subscription that the client wants to keep after reconnection.
@@ -1647,9 +1631,6 @@ type ListAutomationTriggerDefinitionsResult struct {
 //
 // Manual execution is independent of {@link AutomationDefinition.enabled}.
 // The host persists the run before beginning session side effects.
-//
-// One-time requests return the same admitted run regardless of request id.
-// Scheduled chats disabled before admission reject manual execution.
 type RunAutomationParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`

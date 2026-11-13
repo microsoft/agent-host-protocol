@@ -1184,6 +1184,9 @@ enum class AutomationTriggerKind {
      */
     @SerialName("event")
     EVENT,
+    /**
+     * A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+     */
     @SerialName("oneTime")
     ONE_TIME
 }
@@ -6123,10 +6126,6 @@ data class ResourceChange(
 data class AutomationSessionOrigin(
     val kind: SessionOriginKind,
     /**
-     * Immutable run purpose; existing targets keep their original provenance.
-     */
-    val purpose: String? = null,
-    /**
      * Owning {@link AutomationEntry.resource}.
      */
     val automation: String,
@@ -6235,14 +6234,21 @@ internal object AutomationEventTriggerSerializer : UnknownMembersSerializer<Auto
 @Serializable(with = AutomationOneTimeTriggerSerializer::class)
 data class AutomationOneTimeTrigger(
     /**
-     * Identifier unique and stable within this automation definition.
+     * Identifier unique and stable within this automation definition. Recorded in
+     * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+     * run.
      */
     val id: String,
     val kind: AutomationTriggerKind,
     /**
-     * Absolute ISO 8601 UTC timestamp ending in `Z`.
+     * Scheduled run timestamp in ISO 8601 format.
      */
     val runAt: String,
+    /**
+     * Policy when {@link runAt} passes while automatic execution is unavailable.
+     * Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+     */
+    val misfirePolicy: AutomationMisfirePolicy? = null,
     @Transient
     val extra: Map<String, JsonElement> = emptyMap()
 )
@@ -6367,21 +6373,6 @@ internal object AutomationSessionTemplateSerializer : UnknownMembersSerializer<A
     { value, extra -> value.copy(extra = extra) },
 )
 
-@KeepGeneratedSerializer
-@Serializable(with = AutomationConversationSerializer::class)
-data class AutomationConversation(
-    val session: String,
-    val chat: String,
-    @Transient
-    val extra: Map<String, JsonElement> = emptyMap()
-)
-
-internal object AutomationConversationSerializer : UnknownMembersSerializer<AutomationConversation>(
-    AutomationConversation.generatedSerializer(),
-    { it.extra },
-    { value, extra -> value.copy(extra = extra) },
-)
-
 @Serializable
 data class AutomationDefinition(
     /**
@@ -6389,29 +6380,17 @@ data class AutomationDefinition(
      */
     val title: String,
     /**
-     * Immutable after creation. Requires one one-time trigger and enabled creation.
-     * Disabling before admission permanently cancels the request.
-     */
-    val purpose: String? = null,
-    /**
-     * Immutable scheduled-chat target; requires
-     * {@link AutomationOneTimeCapability.existingConversation}. Queues without
-     * interrupting active turns or applying session/model/agent overrides.
-     * Completes on queue acceptance and owns no sessions.
-     */
-    val conversation: AutomationConversation? = null,
-    /**
-     * Initial message sent to each new run session or existing conversation. Its
+     * Initial message sent to every newly created run session. Its
      * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
      */
     val message: Message,
     /**
-     * Template used to create fresh sessions; ignored when {@link conversation} is set.
+     * Template used to create fresh sessions for each run.
      */
     val session: AutomationSessionTemplate,
     /**
-     * Controls automatic triggers; see {@link purpose} for scheduled-chat
-     * cancellation. Other manual runs depend on {@link AutomationOperation.Run}.
+     * Whether automatic triggers may create runs. Manual runs remain available
+     * whenever {@link AutomationOperation.Run} is advertised.
      */
     val enabled: Boolean,
     /**
@@ -6529,24 +6508,9 @@ data class AutomationEntry(
      */
     val definition: AutomationDefinition,
     /**
-     * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+     * Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
-    /**
-     * Durable admission receipt, retained after run-history pruning; absent before admission.
-     */
-    val oneTimeRun: String? = null,
-    /**
-     * ISO 8601 dispatch-acceptance time, retained after history pruning.
-     * Absence does not prove non-dispatch.
-     */
-    val oneTimeDispatchedAt: String? = null,
-    /**
-     * ISO 8601 confirmation of failure before submission; permits explicit draft
-     * recovery. Mutually exclusive with {@link oneTimeDispatchedAt} and retained
-     * after history pruning.
-     */
-    val oneTimeDispatchRejectedAt: String? = null,
     /**
      * Host-owned count of scheduled runs consumed against the current
      * {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -6628,8 +6592,8 @@ data class AutomationManualRunOrigin(
 data class AutomationTriggeredRunOrigin(
     val kind: AutomationRunOriginKind,
     /**
-     * Matches the stable {@link AutomationScheduleTrigger.id} or
-     * {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+     * Matches the stable {@link AutomationScheduleTrigger.id},
+     * {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
      * in the definition.
      */
     val triggerId: String,
@@ -6640,7 +6604,7 @@ data class AutomationTriggeredRunOrigin(
     val scheduledFor: String? = null,
     /**
      * `true` when this is a catch-up run created by
-     * {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
+     * {@link AutomationMisfirePolicy.RunOnce}.
      */
     val catchUp: Boolean? = null,
     /**
@@ -6766,10 +6730,6 @@ data class AutomationRunSummary(
 
 @Serializable
 data class AutomationRunState(
-    /**
-     * Immutable purpose copied at admission; survives definition removal.
-     */
-    val purpose: String? = null,
     /**
      * URI of this automation-run channel.
      */

@@ -101,8 +101,6 @@ See [Authentication](/specification/authentication) for the full specification.
 
 If the transport connection drops, the client reconnects and sends a `reconnect` **request**:
 
-Clients using [one-time automations](/specification/automation-channel#one-time-catalogue-opt-in) MUST repeat their capability declaration in `reconnect.capabilities`. A changed catalogue opt-in requires a fresh `initialize`, not resumption of the previous view.
-
 ```json
 {
   "jsonrpc": "2.0",

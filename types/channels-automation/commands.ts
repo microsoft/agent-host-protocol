@@ -59,9 +59,6 @@ export interface ListAutomationTriggerDefinitionsResult {
  * Manual execution is independent of {@link AutomationDefinition.enabled}.
  * The host persists the run before beginning session side effects.
  *
- * One-time requests return the same admitted run regardless of request id.
- * Scheduled chats disabled before admission reject manual execution.
- *
  * @category Commands
  * @method runAutomation
  * @direction Client → Server

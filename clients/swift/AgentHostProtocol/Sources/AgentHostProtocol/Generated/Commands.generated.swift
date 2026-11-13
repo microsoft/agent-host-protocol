@@ -561,8 +561,6 @@ public struct PingParams: Codable, Sendable, Equatable {
 }
 
 public struct ClientCapabilities: Codable, Sendable, Equatable {
-    /// Selects the connection's automation catalogue format.
-    public var automations: AutomationClientCapabilities?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -577,22 +575,9 @@ public struct ClientCapabilities: Codable, Sendable, Equatable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
-        automations: AutomationClientCapabilities? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
-        self.automations = automations
         self.mcpApps = mcpApps
-    }
-}
-
-public struct AutomationClientCapabilities: Codable, Sendable, Equatable {
-    /// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
-    public var oneTime: AutomationOneTimeClientCapability?
-
-    public init(
-        oneTime: AutomationOneTimeClientCapability? = nil
-    ) {
-        self.oneTime = oneTime
     }
 }
 
@@ -601,7 +586,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public var create: AutomationCreateCapability?
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     public var schedules: AutomationScheduleCapabilities?
-    /// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
     public var oneTime: AutomationOneTimeCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
@@ -669,25 +654,6 @@ public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
 }
 
 public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
-    /// Enables existing-conversation targets for scheduled chats.
-    public var existingConversation: AutomationExistingConversationCapability?
-
-    public init(
-        existingConversation: AutomationExistingConversationCapability? = nil
-    ) {
-        self.existingConversation = existingConversation
-    }
-}
-
-public struct AutomationExistingConversationCapability: Codable, Sendable, Equatable {
-
-    public init(
-
-    ) {
-    }
-}
-
-public struct AutomationOneTimeClientCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -744,8 +710,6 @@ public struct ReconnectParams: Codable, Sendable, Equatable {
     ///
     /// Stability: 1.0 - Early development.
     public var windows: ChannelDeliveryResumeOptions?
-    /// Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
-    public var capabilities: ClientCapabilities?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -754,7 +718,6 @@ public struct ReconnectParams: Codable, Sendable, Equatable {
         case lastSeenServerSeq
         case subscriptions
         case windows
-        case capabilities
     }
 
     public init(
@@ -763,8 +726,7 @@ public struct ReconnectParams: Codable, Sendable, Equatable {
         clientId: String,
         lastSeenServerSeq: Int,
         subscriptions: [String],
-        windows: ChannelDeliveryResumeOptions? = nil,
-        capabilities: ClientCapabilities? = nil
+        windows: ChannelDeliveryResumeOptions? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -772,7 +734,6 @@ public struct ReconnectParams: Codable, Sendable, Equatable {
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
         self.windows = windows
-        self.capabilities = capabilities
     }
 }
 
