@@ -753,6 +753,11 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 		value := *capabilities.RunHistoryLimit
 		clone.RunHistoryLimit = &value
 	}
+	if capabilities.Targets != nil {
+		value := *capabilities.Targets
+		value.Kinds = append([]ahptypes.AutomationTargetKind(nil), capabilities.Targets.Kinds...)
+		clone.Targets = &value
+	}
 	return &clone
 }
 

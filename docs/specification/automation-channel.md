@@ -3,8 +3,8 @@
 <StabilityIndex level="1.0" />
 
 The automation catalogue channel synchronizes every durable automation
-definition visible to a client. Automations launch fresh agent sessions manually
-or from host-owned triggers.
+definition visible to a client. Automations start or continue agent sessions
+manually or from host-owned triggers.
 
 ## URI
 

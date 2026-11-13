@@ -1,7 +1,7 @@
 {
   "name": "automation-patch-unknown-members",
   "group": "A",
-  "description": "Known automation patch objects preserve unknown members through decode and re-encode, including nested message attachments, session customization trees, trigger variants and disable-condition variants. StateAction is registered in every client round-trip harness.",
+  "description": "Known automation patch objects preserve unknown members through decode and re-encode, including nested message attachments, session customization trees, trigger variants, disable-condition variants and target variants. StateAction is registered in every client round-trip harness.",
   "type": "StateAction",
   "input": {
     "type": "automation/updateRequested",
@@ -349,7 +349,11 @@
           "date": "2026-12-01T00:00:00Z",
           "future": true
         }
-      ]
+      ],
+      "target": {
+        "kind": "previousSession",
+        "future": true
+      }
     }
   },
   "acceptableOutputs": [
@@ -699,7 +703,11 @@
             "date": "2026-12-01T00:00:00Z",
             "future": true
           }
-        ]
+        ],
+        "target": {
+          "kind": "previousSession",
+          "future": true
+        }
       }
     }
   ]

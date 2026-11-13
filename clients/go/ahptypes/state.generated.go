@@ -201,7 +201,7 @@ const (
 	// Produced by a tool rather than the user — for example, a tool that spawns a
 	// worker chat whose first message carries a seed prompt.
 	MessageKindTool MessageKind = "tool"
-	// Emitted automatically when an automation run starts a session.
+	// Sent by an automation run.
 	MessageKindAutomation MessageKind = "automation"
 	// A system-generated notification rather than a direct user message.
 	MessageKindSystemNotification MessageKind = "systemNotification"
@@ -566,17 +566,27 @@ const (
 	AutomationDisableConditionKindAfterDate AutomationDisableConditionKind = "afterDate"
 )
 
+// Discriminant for an {@link AutomationTarget}.
+type AutomationTargetKind string
+
+const (
+	// Each run creates a session.
+	AutomationTargetKindNewSession AutomationTargetKind = "newSession"
+	// Each run continues the session of the automation's previous run.
+	AutomationTargetKindPreviousSession AutomationTargetKind = "previousSession"
+)
+
 // Lifecycle status of one automation run.
 //
 // `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-// while any linked session awaits input or client-side work; linked session
-// state is authoritative for those interactions.
+// while its work in a linked session awaits input or client-side work; linked
+// session state is authoritative for those interactions.
 type AutomationRunStatus string
 
 const (
 	// The durable run record exists but execution has not started.
 	AutomationRunStatusPending AutomationRunStatus = "pending"
-	// One or more linked sessions are executing or awaiting interaction.
+	// The run's work in linked sessions is executing or awaiting interaction.
 	AutomationRunStatusRunning AutomationRunStatus = "running"
 	// Execution finished successfully.
 	AutomationRunStatusCompleted AutomationRunStatus = "completed"
@@ -4643,7 +4653,8 @@ type ResourceChange struct {
 	Type ResourceChangeType `json:"type"`
 }
 
-// Provenance recorded on a session created for an automation run.
+// Provenance recorded on a session created for an automation run. Runs that
+// later continue the session don't change it.
 //
 // The links let clients navigate from an ordinary session to the task-level
 // run and its durable definition. The session channel remains authoritative
@@ -4807,7 +4818,8 @@ type AutomationTriggerDefinition struct {
 	ConfigSchema *ConfigSchema `json:"configSchema,omitempty"`
 }
 
-// Template from which the host creates a fresh session for each automation run.
+// Template from which the host creates a session for an automation run.
+// {@link AutomationDefinition.target} decides whether a run creates one.
 //
 // The host revalidates every selection when the run starts. Definitions never
 // carry credentials, confirmation decisions, or durable permission grants.
@@ -4828,7 +4840,7 @@ type AutomationSessionTemplate struct {
 	// {@link CreateSessionParams.config}, normally obtained from
 	// {@link ResolveSessionConfigResult.values}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
-	// Client plugins to make available in every run session, in the same
+	// Client plugins to make available in every session a run creates, in the same
 	// published shape as
 	// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
 	// Entries are keyed by `id`.
@@ -4868,17 +4880,18 @@ func (v AutomationSessionTemplate) MarshalJSON() ([]byte, error) {
 
 // Durable, client-editable definition of an automation.
 //
-// A definition combines the initial automation message, the session template
-// used for each run, and zero or more automatic triggers. Run history,
+// A definition combines the message each run sends, the session template, the
+// run target, and zero or more automatic triggers. Run history,
 // timestamps, and currently allowed operations live on
 // {@link AutomationEntry} rather than in the definition.
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Initial message sent to every newly created run session. Its
+	// Message each run sends (see {@link AutomationDefinition.target}). Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
 	Message Message `json:"message"`
-	// Template used to create fresh sessions for each run.
+	// Template for the sessions runs create. Its model and agent also apply to
+	// a run's turn in a continued session.
 	Session AutomationSessionTemplate `json:"session"`
 	// Whether automatic triggers may create runs. Manual runs remain available
 	// whenever {@link AutomationOperation.Run} is advertised.
@@ -4899,6 +4912,11 @@ type AutomationDefinition struct {
 	// conditions does not re-enable a disabled automation. See the
 	// {@link /guide/automations | Automations Guide}.
 	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
+	// Where each run sends {@link AutomationDefinition.message}. Absence means
+	// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
+	// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
+	// reject requests that do.
+	Target *AutomationTarget `json:"target,omitempty"`
 	// Opaque implementation-defined metadata. Clients MUST preserve unknown
 	// entries when updating the definition.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -4931,6 +4949,9 @@ type AutomationDefinitionPatch struct {
 	// Each kind may appear at most once; hosts MUST reject duplicate kinds.
 	// Clearing conditions does not change {@link AutomationDefinition.enabled}.
 	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
+	// Replacement {@link AutomationDefinition.target}.
+	// {@link AutomationNewSessionTarget} resets it to a new session per run.
+	Target *AutomationTarget `json:"target,omitempty"`
 	// Complete replacement {@link AutomationDefinition._meta}.
 	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
 }
@@ -4971,6 +4992,61 @@ func (v *AutomationAfterDateCondition) UnmarshalJSON(data []byte) error {
 func (v AutomationAfterDateCondition) MarshalJSON() ([]byte, error) {
 	type wire AutomationAfterDateCondition
 	return marshalWithExtra(wire(v), v.Extra, "kind", "date")
+}
+
+// Each run creates a session from {@link AutomationDefinition.session}.
+type AutomationNewSessionTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationNewSessionTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationNewSessionTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v AutomationNewSessionTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationNewSessionTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// Each run continues the session of the automation's previous run, so a
+// recurring automation keeps one conversation.
+//
+// Runs resolve their session and start their turns in the order they were
+// created. The previous session is the
+// {@link AutomationRunState.primarySession} of the latest earlier run that has
+// one, even if that run was pruned from {@link AutomationEntry.runs}. The run
+// links it and sends {@link AutomationDefinition.message} in its
+// {@link SessionState.defaultChat | default chat}. If that session no longer
+// exists, is archived, or has no default chat, the run creates a session from
+// {@link AutomationDefinition.session} instead, which later runs continue. The
+// host MAY also do so when the session can't honor the current template, for
+// example after its agent provider, working directories, or configuration
+// changed.
+//
+// Model and agent selections apply to the run's turn as in a session the run
+// creates; the template's other settings are not reapplied. The host MAY first
+// update the session's copy of {@link AutomationEntry.customizations}.
+//
+// A run stays `pending` while the chat runs another turn, becomes `running`
+// when its own turn starts, and ends with that turn. Cancelling a run cancels
+// only its own turn, if it started.
+type AutomationPreviousSessionTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationPreviousSessionTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationPreviousSessionTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v AutomationPreviousSessionTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationPreviousSessionTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // Authoritative state of one automation in {@link AutomationState.entries}.
@@ -5015,7 +5091,7 @@ type AutomationEntry struct {
 	// connected. `clientId` is absent because the copy no longer depends on a
 	// client.
 	//
-	// Every run session receives these plugins in
+	// Every session a run creates receives these plugins in
 	// {@link SessionState.customizations}, with the enablement from the
 	// matching template entry.
 	Customizations []PluginCustomization `json:"customizations,omitempty"`
@@ -5063,14 +5139,16 @@ type AutomationTriggeredRunOrigin struct {
 	Event map[string]json.RawMessage `json:"event,omitempty"`
 }
 
-// A durable run exists but has not begun external execution.
+// A durable run exists but has not begun external execution. A run that
+// continues a session also stays pending while that session's chat runs
+// another turn (see {@link AutomationPreviousSessionTarget}).
 type AutomationPendingRunLifecycle struct {
 	Status AutomationRunStatus `json:"status"`
 	// Run creation timestamp in ISO 8601 format.
 	CreatedAt string `json:"createdAt"`
 }
 
-// The run is executing linked sessions or awaiting interaction on them.
+// The run's work in linked sessions is executing or awaiting interaction.
 //
 // Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
 // remain authoritative for whether user attention or client-side work is
@@ -5092,7 +5170,7 @@ type AutomationCompletedRunLifecycle struct {
 	StartedAt string `json:"startedAt"`
 	// Completion timestamp in ISO 8601 format.
 	CompletedAt string `json:"completedAt"`
-	// Optional aggregate model usage across all linked sessions.
+	// Optional aggregate model usage of the run's work in its linked sessions.
 	Usage *UsageInfo `json:"usage,omitempty"`
 }
 
@@ -5164,7 +5242,7 @@ type AutomationRunState struct {
 	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
 	// Ordered, unique session URIs belonging to this run, each matching
 	// {@link SessionState.resource}. Entries may represent retries, parallel
-	// workers, or delegated attempts.
+	// workers, delegated attempts, or a session continued from an earlier run.
 	Sessions []URI `json:"sessions"`
 	// Member of {@link AutomationRunState.sessions} that the host recommends opening first.
 	PrimarySession *URI `json:"primarySession,omitempty"`
@@ -6852,6 +6930,83 @@ func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"afterRuns\"")
 	case *AutomationAfterDateCondition:
 		object["kind"] = json.RawMessage("\"afterDate\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationTarget is where an automation's runs send their message.
+type AutomationTarget struct {
+	Value isAutomationTarget
+}
+
+// isAutomationTarget is the marker interface implemented by every
+// concrete variant of AutomationTarget.
+type isAutomationTarget interface{ isAutomationTarget() }
+
+func (*AutomationNewSessionTarget) isAutomationTarget()      {}
+func (*AutomationPreviousSessionTarget) isAutomationTarget() {}
+
+// AutomationTargetUnknown carries an unrecognized AutomationTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AutomationTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AutomationTargetUnknown) isAutomationTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "newSession":
+		var value AutomationNewSessionTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "previousSession":
+		var value AutomationPreviousSessionTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AutomationTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AutomationTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *AutomationNewSessionTarget:
+		object["kind"] = json.RawMessage("\"newSession\"")
+	case *AutomationPreviousSessionTarget:
+		object["kind"] = json.RawMessage("\"previousSession\"")
 	}
 	return json.Marshal(object)
 }

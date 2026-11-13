@@ -596,19 +596,24 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     /// Present when {@link AutomationSessionTemplate.customizations} may contain
     /// client plugins for the host to capture.
     public var customizations: AutomationCustomizationsCapability?
+    /// Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.
+    public var targets: AutomationTargetsCapability?
 
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
-        customizations: AutomationCustomizationsCapability? = nil
+        customizations: AutomationCustomizationsCapability? = nil,
+        targets: AutomationTargetsCapability? = nil
     ) {
         self.create = create
         self.schedules = schedules
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
+        self.targets = targets
     }
 }
 
@@ -646,6 +651,17 @@ public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
     public init(
 
     ) {
+    }
+}
+
+public struct AutomationTargetsCapability: Codable, Sendable, Equatable {
+    /// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
+    public var kinds: [AutomationTargetKind]
+
+    public init(
+        kinds: [AutomationTargetKind]
+    ) {
+        self.kinds = kinds
     }
 }
 

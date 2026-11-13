@@ -10,6 +10,7 @@ import type { ErrorInfo, URI, UsageInfo } from '../common/state.js';
 import type {
   AutomationEventTrigger,
   AutomationMisfirePolicy,
+  AutomationPreviousSessionTarget,
   AutomationScheduleTrigger,
   AutomationEntry,
 } from '../channels-automation/state.js';
@@ -20,8 +21,8 @@ import type { SessionState } from '../channels-session/state.js';
  * Lifecycle status of one automation run.
  *
  * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
- * while any linked session awaits input or client-side work; linked session
- * state is authoritative for those interactions.
+ * while its work in a linked session awaits input or client-side work; linked
+ * session state is authoritative for those interactions.
  *
  * @category Automation Run State
  * @exhaustive
@@ -29,7 +30,7 @@ import type { SessionState } from '../channels-session/state.js';
 export const enum AutomationRunStatus {
   /** The durable run record exists but execution has not started. */
   Pending = 'pending',
-  /** One or more linked sessions are executing or awaiting interaction. */
+  /** The run's work in linked sessions is executing or awaiting interaction. */
   Running = 'running',
   /** Execution finished successfully. */
   Completed = 'completed',
@@ -100,7 +101,9 @@ export type AutomationRunOrigin =
   | AutomationTriggeredRunOrigin;
 
 /**
- * A durable run exists but has not begun external execution.
+ * A durable run exists but has not begun external execution. A run that
+ * continues a session also stays pending while that session's chat runs
+ * another turn (see {@link AutomationPreviousSessionTarget}).
  *
  * @category Automation Run State
  */
@@ -111,7 +114,7 @@ export interface AutomationPendingRunLifecycle {
 }
 
 /**
- * The run is executing linked sessions or awaiting interaction on them.
+ * The run's work in linked sessions is executing or awaiting interaction.
  *
  * Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
  * remain authoritative for whether user attention or client-side work is
@@ -140,7 +143,7 @@ export interface AutomationCompletedRunLifecycle {
   startedAt: string;
   /** Completion timestamp in ISO 8601 format. */
   completedAt: string;
-  /** Optional aggregate model usage across all linked sessions. */
+  /** Optional aggregate model usage of the run's work in its linked sessions. */
   usage?: UsageInfo;
 }
 
@@ -241,7 +244,7 @@ export interface AutomationRunState {
   /**
    * Ordered, unique session URIs belonging to this run, each matching
    * {@link SessionState.resource}. Entries may represent retries, parallel
-   * workers, or delegated attempts.
+   * workers, delegated attempts, or a session continued from an earlier run.
    */
   sessions: URI[];
   /** Member of {@link AutomationRunState.sessions} that the host recommends opening first. */

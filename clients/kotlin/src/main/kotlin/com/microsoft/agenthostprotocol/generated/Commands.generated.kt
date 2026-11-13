@@ -580,7 +580,12 @@ data class AutomationCapabilities(
      * Present when {@link AutomationSessionTemplate.customizations} may contain
      * client plugins for the host to capture.
      */
-    val customizations: AutomationCustomizationsCapability? = null
+    val customizations: AutomationCustomizationsCapability? = null,
+    /**
+     * Present when definitions may set {@link AutomationDefinition.target}.
+     * Absence means each run creates a session.
+     */
+    val targets: AutomationTargetsCapability? = null
 )
 
 @Serializable
@@ -601,6 +606,14 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+@Serializable
+data class AutomationTargetsCapability(
+    /**
+     * Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
+     */
+    val kinds: List<AutomationTargetKind>
+)
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

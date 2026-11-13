@@ -18,11 +18,13 @@ import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
 import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
 import type {
+  AutomationDefinition,
   AutomationSchedule,
   AutomationScheduleTrigger,
   AutomationSessionTemplate,
   AutomationEntry,
   AutomationState,
+  AutomationTargetKind,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
 import type { TcpConnectionsCapability } from '../channels-tcp/state.js';
@@ -406,6 +408,21 @@ export interface AutomationCapabilities {
    * client plugins for the host to capture.
    */
   customizations?: AutomationCustomizationsCapability;
+  /**
+   * Present when definitions may set {@link AutomationDefinition.target}.
+   * Absence means each run creates a session.
+   */
+  targets?: AutomationTargetsCapability;
+}
+
+/**
+ * Run targets supported for {@link AutomationDefinition.target}.
+ *
+ * @category Commands
+ */
+export interface AutomationTargetsCapability {
+  /** Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}. */
+  kinds: AutomationTargetKind[];
 }
 
 /**

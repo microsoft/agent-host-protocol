@@ -321,6 +321,9 @@ type AutomationCapabilities struct {
 	// Present when {@link AutomationSessionTemplate.customizations} may contain
 	// client plugins for the host to capture.
 	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
+	// Present when definitions may set {@link AutomationDefinition.target}.
+	// Absence means each run creates a session.
+	Targets *AutomationTargetsCapability `json:"targets,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -356,6 +359,12 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Run targets supported for {@link AutomationDefinition.target}.
+type AutomationTargetsCapability struct {
+	// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
+	Kinds []AutomationTargetKind `json:"kinds"`
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.

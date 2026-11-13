@@ -625,6 +625,11 @@ public sealed record AutomationCapabilities
     /// client plugins for the host to capture.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCustomizationsCapability? Customizations { get; init; }
+
+    /// <summary>Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTargetsCapability? Targets { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationCreateRequestedAction |
@@ -665,6 +670,13 @@ public sealed record AutomationRunCancellationCapability
 /// capture options and limits.</summary>
 public sealed record AutomationCustomizationsCapability
 {
+}
+
+/// <summary>Run targets supported for {@link AutomationDefinition.target}.</summary>
+public sealed record AutomationTargetsCapability
+{
+    /// <summary>Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.</summary>
+    public required List<AutomationTargetKind> Kinds { get; init; }
 }
 
 /// <summary>Presence capability for {@link InitializeResult.multipleChatProviders}.

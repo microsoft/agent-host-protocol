@@ -16,10 +16,11 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl, ChannelReceiveLimits,
-    ContentRef, Message, MessageAttachment, ModelSelection, ResumedChannelSubscription,
-    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
-    SnapshotState, TcpConnectionsCapability, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTargetKind, AutomationTrigger, AutomationTriggerDefinition, ChannelFlowControl,
+    ChannelReceiveLimits, ContentRef, Message, MessageAttachment, ModelSelection,
+    ResumedChannelSubscription, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TcpConnectionsCapability, TelemetryCapabilities,
+    TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -509,6 +510,10 @@ pub struct AutomationCapabilities {
     /// client plugins for the host to capture.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<AutomationCustomizationsCapability>,
+    /// Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub targets: Option<AutomationTargetsCapability>,
 }
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
@@ -551,6 +556,14 @@ pub struct AutomationRunCancellationCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
+
+/// Run targets supported for {@link AutomationDefinition.target}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTargetsCapability {
+    /// Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}.
+    pub kinds: Vec<AutomationTargetKind>,
+}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///

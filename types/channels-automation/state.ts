@@ -9,6 +9,7 @@
 import type { Message, MessageKind } from '../channels-chat/state.js';
 import type { ConfigSchema, URI } from '../common/state.js';
 import type {
+  AutomationRunState,
   AutomationRunSummary,
   AutomationTriggeredRunOrigin,
 } from '../channels-automation-run/state.js';
@@ -22,7 +23,7 @@ import type {
   SessionActiveClient,
   SessionState,
 } from '../channels-session/state.js';
-import type { AutomationCapabilities } from '../common/commands.js';
+import type { AutomationCapabilities, AutomationTargetsCapability } from '../common/commands.js';
 import type {
   AutomationCreateRequestedAction,
   AutomationRemovedAction,
@@ -253,6 +254,69 @@ export type AutomationDisableCondition =
   | AutomationAfterDateCondition;
 
 /**
+ * Discriminant for an {@link AutomationTarget}.
+ *
+ * @category Automation State
+ * @nonexhaustive
+ */
+export const enum AutomationTargetKind {
+  /** Each run creates a session. */
+  NewSession = 'newSession',
+  /** Each run continues the session of the automation's previous run. */
+  PreviousSession = 'previousSession',
+}
+
+/**
+ * Each run creates a session from {@link AutomationDefinition.session}.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationNewSessionTarget {
+  kind: AutomationTargetKind.NewSession;
+}
+
+/**
+ * Each run continues the session of the automation's previous run, so a
+ * recurring automation keeps one conversation.
+ *
+ * Runs resolve their session and start their turns in the order they were
+ * created. The previous session is the
+ * {@link AutomationRunState.primarySession} of the latest earlier run that has
+ * one, even if that run was pruned from {@link AutomationEntry.runs}. The run
+ * links it and sends {@link AutomationDefinition.message} in its
+ * {@link SessionState.defaultChat | default chat}. If that session no longer
+ * exists, is archived, or has no default chat, the run creates a session from
+ * {@link AutomationDefinition.session} instead, which later runs continue. The
+ * host MAY also do so when the session can't honor the current template, for
+ * example after its agent provider, working directories, or configuration
+ * changed.
+ *
+ * Model and agent selections apply to the run's turn as in a session the run
+ * creates; the template's other settings are not reapplied. The host MAY first
+ * update the session's copy of {@link AutomationEntry.customizations}.
+ *
+ * A run stays `pending` while the chat runs another turn, becomes `running`
+ * when its own turn starts, and ends with that turn. Cancelling a run cancels
+ * only its own turn, if it started.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationPreviousSessionTarget {
+  kind: AutomationTargetKind.PreviousSession;
+}
+
+/**
+ * Where the runs of an automation send {@link AutomationDefinition.message}.
+ *
+ * @category Automation State
+ */
+export type AutomationTarget =
+  | AutomationNewSessionTarget
+  | AutomationPreviousSessionTarget;
+
+/**
  * Describes one host-defined trigger event.
  *
  * @category Automation State
@@ -291,7 +355,8 @@ export interface AutomationTriggerDefinition {
 }
 
 /**
- * Template from which the host creates a fresh session for each automation run.
+ * Template from which the host creates a session for an automation run.
+ * {@link AutomationDefinition.target} decides whether a run creates one.
  *
  * The host revalidates every selection when the run starts. Definitions never
  * carry credentials, confirmation decisions, or durable permission grants.
@@ -323,7 +388,7 @@ export interface AutomationSessionTemplate {
    */
   config?: Record<string, unknown>;
   /**
-   * Client plugins to make available in every run session, in the same
+   * Client plugins to make available in every session a run creates, in the same
    * published shape as
    * {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
    * Entries are keyed by `id`.
@@ -353,8 +418,8 @@ export interface AutomationSessionTemplate {
 /**
  * Durable, client-editable definition of an automation.
  *
- * A definition combines the initial automation message, the session template
- * used for each run, and zero or more automatic triggers. Run history,
+ * A definition combines the message each run sends, the session template, the
+ * run target, and zero or more automatic triggers. Run history,
  * timestamps, and currently allowed operations live on
  * {@link AutomationEntry} rather than in the definition.
  *
@@ -364,11 +429,14 @@ export interface AutomationDefinition {
   /** Human-readable automation name. */
   title: string;
   /**
-   * Initial message sent to every newly created run session. Its
+   * Message each run sends (see {@link AutomationDefinition.target}). Its
    * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
    */
   message: Message;
-  /** Template used to create fresh sessions for each run. */
+  /**
+   * Template for the sessions runs create. Its model and agent also apply to
+   * a run's turn in a continued session.
+   */
   session: AutomationSessionTemplate;
   /**
    * Whether automatic triggers may create runs. Manual runs remain available
@@ -395,6 +463,13 @@ export interface AutomationDefinition {
    * @uniqueItemsBy kind
    */
   disableConditions?: AutomationDisableCondition[];
+  /**
+   * Where each run sends {@link AutomationDefinition.message}. Absence means
+   * {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
+   * {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
+   * reject requests that do.
+   */
+  target?: AutomationTarget;
   /**
    * Opaque implementation-defined metadata. Clients MUST preserve unknown
    * entries when updating the definition.
@@ -453,7 +528,7 @@ export interface AutomationEntry {
    * connected. `clientId` is absent because the copy no longer depends on a
    * client.
    *
-   * Every run session receives these plugins in
+   * Every session a run creates receives these plugins in
    * {@link SessionState.customizations}, with the enablement from the
    * matching template entry.
    */

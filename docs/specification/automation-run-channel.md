@@ -34,7 +34,7 @@ stateDiagram-v2
   running --> cancelled
 ```
 
-The run remains `running` while linked sessions await interaction. Their
+The run remains `running` while its work in linked sessions awaits interaction. Their
 `SessionSummary.status` and `SessionState.inputNeeded` fields remain
 authoritative for attention state and response routing.
 
@@ -57,5 +57,5 @@ durable result arrives through `lifecycleChanged`.
 ## Reconciliation
 
 The host persists a run before external side effects and records each session
-URI before sending its first message. Retrying `runAutomation` with the same
+URI before sending the run's message to it. Retrying `runAutomation` with the same
 request ID returns the existing run URI.

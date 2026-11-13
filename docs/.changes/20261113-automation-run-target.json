@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`AutomationDefinition.target` and `AutomationCapabilities.targets`. With `previousSession`, each automation run continues the previous run's session instead of creating one.",
+  "issues": [572]
+}

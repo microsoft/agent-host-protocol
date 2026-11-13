@@ -846,7 +846,7 @@
     },
     "AutomationSessionOrigin": {
       "type": "object",
-      "description": "Provenance recorded on a session created for an automation run.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
+      "description": "Provenance recorded on a session created for an automation run. Runs that\nlater continue the session don't change it.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
       "properties": {
         "kind": {
           "const": "automation"
@@ -5623,6 +5623,30 @@
         "date"
       ]
     },
+    "AutomationNewSessionTarget": {
+      "type": "object",
+      "description": "Each run creates a session from {@link AutomationDefinition.session}.",
+      "properties": {
+        "kind": {
+          "const": "newSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationPreviousSessionTarget": {
+      "type": "object",
+      "description": "Each run continues the session of the automation's previous run, so a\nrecurring automation keeps one conversation.\n\nRuns resolve their session and start their turns in the order they were\ncreated. The previous session is the\n{@link AutomationRunState.primarySession} of the latest earlier run that has\none, even if that run was pruned from {@link AutomationEntry.runs}. The run\nlinks it and sends {@link AutomationDefinition.message} in its\n{@link SessionState.defaultChat | default chat}. If that session no longer\nexists, is archived, or has no default chat, the run creates a session from\n{@link AutomationDefinition.session} instead, which later runs continue. The\nhost MAY also do so when the session can't honor the current template, for\nexample after its agent provider, working directories, or configuration\nchanged.\n\nModel and agent selections apply to the run's turn as in a session the run\ncreates; the template's other settings are not reapplied. The host MAY first\nupdate the session's copy of {@link AutomationEntry.customizations}.\n\nA run stays `pending` while the chat runs another turn, becomes `running`\nwhen its own turn starts, and ends with that turn. Cancelling a run cancels\nonly its own turn, if it started.",
+      "properties": {
+        "kind": {
+          "const": "previousSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -5681,7 +5705,7 @@
     },
     "AutomationSessionTemplate": {
       "type": "object",
-      "description": "Template from which the host creates a fresh session for each automation run.\n\nThe host revalidates every selection when the run starts. Definitions never\ncarry credentials, confirmation decisions, or durable permission grants.",
+      "description": "Template from which the host creates a session for an automation run.\n{@link AutomationDefinition.target} decides whether a run creates one.\n\nThe host revalidates every selection when the run starts. Definitions never\ncarry credentials, confirmation decisions, or durable permission grants.",
       "properties": {
         "provider": {
           "type": "string",
@@ -5712,13 +5736,13 @@
           "items": {
             "$ref": "#/$defs/ClientPluginCustomization"
           },
-          "description": "Client plugins to make available in every run session, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
+          "description": "Client plugins to make available in every session a run creates, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
         }
       }
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the message each run sends, the session template, the\nrun target, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -5726,11 +5750,11 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Message each run sends (see {@link AutomationDefinition.target}). Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Template used to create fresh sessions for each run."
+          "description": "Template for the sessions runs create. Its model and agent also apply to\na run's turn in a continued session."
         },
         "enabled": {
           "type": "boolean",
@@ -5781,6 +5805,10 @@
               "maxContains": 1
             }
           ]
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that\n{@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST\nreject requests that do."
         },
         "_meta": {
           "type": "object",
@@ -5839,7 +5867,7 @@
           "items": {
             "$ref": "#/$defs/PluginCustomization"
           },
-          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery run session receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
+          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery session a run creates receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
         },
         "createdAt": {
           "type": "string",
@@ -5929,7 +5957,7 @@
     },
     "AutomationPendingRunLifecycle": {
       "type": "object",
-      "description": "A durable run exists but has not begun external execution.",
+      "description": "A durable run exists but has not begun external execution. A run that\ncontinues a session also stays pending while that session's chat runs\nanother turn (see {@link AutomationPreviousSessionTarget}).",
       "properties": {
         "status": {
           "const": "pending"
@@ -5946,7 +5974,7 @@
     },
     "AutomationRunningRunLifecycle": {
       "type": "object",
-      "description": "The run is executing linked sessions or awaiting interaction on them.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
+      "description": "The run's work in linked sessions is executing or awaiting interaction.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
       "properties": {
         "status": {
           "const": "running"
@@ -5987,7 +6015,7 @@
         },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
-          "description": "Optional aggregate model usage across all linked sessions."
+          "description": "Optional aggregate model usage of the run's work in its linked sessions."
         }
       },
       "required": [
@@ -6121,7 +6149,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, or delegated attempts."
+          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, delegated attempts, or a session continued from an earlier run."
         },
         "primarySession": {
           "$ref": "#/$defs/URI",
@@ -6380,8 +6408,28 @@
         "customizations": {
           "$ref": "#/$defs/AutomationCustomizationsCapability",
           "description": "Present when {@link AutomationSessionTemplate.customizations} may contain\nclient plugins for the host to capture."
+        },
+        "targets": {
+          "$ref": "#/$defs/AutomationTargetsCapability",
+          "description": "Present when definitions may set {@link AutomationDefinition.target}.\nAbsence means each run creates a session."
         }
       }
+    },
+    "AutomationTargetsCapability": {
+      "type": "object",
+      "description": "Run targets supported for {@link AutomationDefinition.target}.",
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTargetKind"
+          },
+          "description": "Target kinds clients may set. MUST include {@link AutomationTargetKind.NewSession}."
+        }
+      },
+      "required": [
+        "kinds"
+      ]
     },
     "AutomationCustomizationsCapability": {
       "type": "object",
@@ -8802,6 +8850,17 @@
       ],
       "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
     },
+    "AutomationTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationNewSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationPreviousSessionTarget"
+        }
+      ],
+      "description": "Where the runs of an automation send {@link AutomationDefinition.message}."
+    },
     "AutomationOperation": {
       "enum": [
         "update",
@@ -8849,6 +8908,14 @@
       ],
       "type": "string",
       "description": "Native filesystem path grammar used by a host environment."
+    },
+    "AutomationTargetKind": {
+      "enum": [
+        "newSession",
+        "previousSession"
+      ],
+      "type": "string",
+      "description": "Discriminant for an {@link AutomationTarget}."
     },
     "ActionEnvelope": {
       "type": "object",
@@ -11861,6 +11928,10 @@
               "maxContains": 1
             }
           ]
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Replacement {@link AutomationDefinition.target}.\n{@link AutomationNewSessionTarget} resets it to a new session per run."
         },
         "_meta": {
           "type": "object",

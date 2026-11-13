@@ -1,0 +1,16 @@
+{
+  "name": "automation-target-unknown-kind-preserved",
+  "group": "A",
+  "description": "An unknown target kind from a newer protocol version is preserved verbatim, with its members, instead of failing the action.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/german",
+    "changes": { "target": { "kind": "future-target-xyz", "chat": "ahp-chat:/s1/c1" } }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/german",
+    "changes": { "target": { "kind": "future-target-xyz", "chat": "ahp-chat:/s1/c1" } }
+  }]
+}

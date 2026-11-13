@@ -166,6 +166,37 @@ func TestAutomationCapabilitiesUpdatedAcrossReconnect(t *testing.T) {
 	}
 }
 
+func TestAutomationTargetsNotSharedBetweenHandles(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	multi := NewMultiHostClient()
+	defer multi.Shutdown(context.Background())
+
+	cfg := NewHostConfig("targets-host", "Targets Host", func(_ context.Context, _ HostID) (ahp.Transport, error) {
+		clientSide, serverSide := newFakePair()
+		go runFakeServerWithInitializeResult(t, serverSide, ahptypes.InitializeResult{
+			ProtocolVersion: ahptypes.ProtocolVersion,
+			Automations: &ahptypes.AutomationCapabilities{
+				Targets: &ahptypes.AutomationTargetsCapability{
+					Kinds: []ahptypes.AutomationTargetKind{ahptypes.AutomationTargetKindNewSession, ahptypes.AutomationTargetKindPreviousSession},
+				},
+			},
+		})
+		return clientSide, nil
+	})
+
+	handle, err := multi.AddHost(ctx, cfg)
+	if err != nil {
+		t.Fatalf("AddHost: %v", err)
+	}
+	handle.Automations.Targets.Kinds[0] = "mutated"
+
+	if got := multi.Host(cfg.ID).Automations.Targets.Kinds; len(got) != 2 || got[0] != ahptypes.AutomationTargetKindNewSession {
+		t.Fatalf("target kinds = %v, want [newSession previousSession]", got)
+	}
+}
+
 // TestSingleHostHandshake exercises the [Single] one-line constructor
 // against a fake server and confirms the host transitions to the
 // Connected state with a populated protocol version.

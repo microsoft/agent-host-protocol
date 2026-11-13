@@ -1,7 +1,7 @@
 {
   "name": "automation-capabilities",
   "group": "A",
-  "description": "Automation capability markers preserve present empty objects, including customizations, and nested schedule configuration.",
+  "description": "Automation capability markers preserve present empty objects such as customizations, nested schedule configuration, and target kinds, even one unknown to this protocol version.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "0.8.0",
@@ -14,7 +14,10 @@
       },
       "runCancellation": {},
       "runHistoryLimit": 50,
-      "customizations": {}
+      "customizations": {},
+      "targets": {
+        "kinds": ["newSession", "previousSession", "future-target-xyz"]
+      }
     }
   },
   "acceptableOutputs": [{
@@ -28,7 +31,10 @@
       },
       "runCancellation": {},
       "runHistoryLimit": 50,
-      "customizations": {}
+      "customizations": {},
+      "targets": {
+        "kinds": ["newSession", "previousSession", "future-target-xyz"]
+      }
     }
   }]
 }

@@ -501,7 +501,7 @@ public readonly struct MessageKind : IEquatable<MessageKind>
     /// worker chat whose first message carries a seed prompt.</summary>
     public static readonly MessageKind Tool = new MessageKind("tool");
 
-    /// <summary>Emitted automatically when an automation run starts a session.</summary>
+    /// <summary>Sent by an automation run.</summary>
     public static readonly MessageKind Automation = new MessageKind("automation");
 
     /// <summary>A system-generated notification rather than a direct user message.</summary>
@@ -1752,18 +1752,71 @@ public enum AutomationDisableConditionKind
     AfterDate,
 }
 
+/// <summary>Discriminant for an {@link AutomationTarget}.</summary>
+[JsonConverter(typeof(AutomationTargetKindConverter))]
+public readonly struct AutomationTargetKind : IEquatable<AutomationTargetKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AutomationTargetKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Each run creates a session.</summary>
+    public static readonly AutomationTargetKind NewSession = new AutomationTargetKind("newSession");
+
+    /// <summary>Each run continues the session of the automation's previous run.</summary>
+    public static readonly AutomationTargetKind PreviousSession = new AutomationTargetKind("previousSession");
+
+    /// <inheritdoc />
+    public bool Equals(AutomationTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AutomationTargetKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AutomationTargetKind left, AutomationTargetKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AutomationTargetKind left, AutomationTargetKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AutomationTargetKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AutomationTargetKindConverter : JsonConverter<AutomationTargetKind>
+{
+    /// <inheritdoc />
+    public override AutomationTargetKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AutomationTargetKind(reader.GetString() ?? throw new JsonException("AutomationTargetKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AutomationTargetKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-/// while any linked session awaits input or client-side work; linked session
-/// state is authoritative for those interactions.</summary>
+/// while its work in a linked session awaits input or client-side work; linked
+/// session state is authoritative for those interactions.</summary>
 [JsonConverter(typeof(WireEnumConverter<AutomationRunStatus>))]
 public enum AutomationRunStatus
 {
     /// <summary>The durable run record exists but execution has not started.</summary>
     [WireValue("pending")]
     Pending,
-    /// <summary>One or more linked sessions are executing or awaiting interaction.</summary>
+    /// <summary>The run's work in linked sessions is executing or awaiting interaction.</summary>
     [WireValue("running")]
     Running,
     /// <summary>Execution finished successfully.</summary>
@@ -6745,7 +6798,8 @@ public sealed record AnnotationEntry
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Provenance recorded on a session created for an automation run.
+/// <summary>Provenance recorded on a session created for an automation run. Runs that
+/// later continue the session don't change it.
 ///
 /// The links let clients navigate from an ordinary session to the task-level
 /// run and its durable definition. The session channel remains authoritative
@@ -6923,7 +6977,8 @@ public sealed record AutomationTriggerDefinition
     public ConfigSchema? ConfigSchema { get; init; }
 }
 
-/// <summary>Template from which the host creates a fresh session for each automation run.
+/// <summary>Template from which the host creates a session for an automation run.
+/// {@link AutomationDefinition.target} decides whether a run creates one.
 ///
 /// The host revalidates every selection when the run starts. Definitions never
 /// carry credentials, confirmation decisions, or durable permission grants.</summary>
@@ -6955,7 +7010,7 @@ public sealed record AutomationSessionTemplate
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
 
-    /// <summary>Client plugins to make available in every run session, in the same
+    /// <summary>Client plugins to make available in every session a run creates, in the same
     /// published shape as
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
     /// Entries are keyed by `id`.
@@ -6988,8 +7043,8 @@ public sealed record AutomationSessionTemplate
 
 /// <summary>Durable, client-editable definition of an automation.
 ///
-/// A definition combines the initial automation message, the session template
-/// used for each run, and zero or more automatic triggers. Run history,
+/// A definition combines the message each run sends, the session template, the
+/// run target, and zero or more automatic triggers. Run history,
 /// timestamps, and currently allowed operations live on
 /// {@link AutomationEntry} rather than in the definition.</summary>
 public sealed record AutomationDefinition
@@ -6997,11 +7052,12 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Initial message sent to every newly created run session. Its
+    /// <summary>Message each run sends (see {@link AutomationDefinition.target}). Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.</summary>
     public required Message Message { get; init; }
 
-    /// <summary>Template used to create fresh sessions for each run.</summary>
+    /// <summary>Template for the sessions runs create. Its model and agent also apply to
+    /// a run's turn in a continued session.</summary>
     public required AutomationSessionTemplate Session { get; init; }
 
     /// <summary>Whether automatic triggers may create runs. Manual runs remain available
@@ -7026,6 +7082,13 @@ public sealed record AutomationDefinition
     /// {@link /guide/automations | Automations Guide}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationDisableCondition>? DisableConditions { get; init; }
+
+    /// <summary>Where each run sends {@link AutomationDefinition.message}. Absence means
+    /// {@link AutomationTargetKind.NewSession}. Clients MUST NOT set a kind that
+    /// {@link AutomationTargetsCapability.kinds} doesn't list, and hosts MUST
+    /// reject requests that do.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTarget? Target { get; init; }
 
     /// <summary>Opaque implementation-defined metadata. Clients MUST preserve unknown
     /// entries when updating the definition.</summary>
@@ -7074,6 +7137,11 @@ public sealed record AutomationDefinitionPatch
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AutomationDisableCondition>? DisableConditions { get; init; }
 
+    /// <summary>Replacement {@link AutomationDefinition.target}.
+    /// {@link AutomationNewSessionTarget} resets it to a new session per run.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTarget? Target { get; init; }
+
     /// <summary>Complete replacement {@link AutomationDefinition._meta}.</summary>
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -7100,6 +7168,47 @@ public sealed record AutomationAfterDateCondition
 
     /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
     public required string Date { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Each run creates a session from {@link AutomationDefinition.session}.</summary>
+public sealed record AutomationNewSessionTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.NewSession;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Each run continues the session of the automation's previous run, so a
+/// recurring automation keeps one conversation.
+///
+/// Runs resolve their session and start their turns in the order they were
+/// created. The previous session is the
+/// {@link AutomationRunState.primarySession} of the latest earlier run that has
+/// one, even if that run was pruned from {@link AutomationEntry.runs}. The run
+/// links it and sends {@link AutomationDefinition.message} in its
+/// {@link SessionState.defaultChat | default chat}. If that session no longer
+/// exists, is archived, or has no default chat, the run creates a session from
+/// {@link AutomationDefinition.session} instead, which later runs continue. The
+/// host MAY also do so when the session can't honor the current template, for
+/// example after its agent provider, working directories, or configuration
+/// changed.
+///
+/// Model and agent selections apply to the run's turn as in a session the run
+/// creates; the template's other settings are not reapplied. The host MAY first
+/// update the session's copy of {@link AutomationEntry.customizations}.
+///
+/// A run stays `pending` while the chat runs another turn, becomes `running`
+/// when its own turn starts, and ends with that turn. Cancelling a run cancels
+/// only its own turn, if it started.</summary>
+public sealed record AutomationPreviousSessionTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.PreviousSession;
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
@@ -7159,7 +7268,7 @@ public sealed class AutomationEntry
     /// connected. `clientId` is absent because the copy no longer depends on a
     /// client.
     ///
-    /// Every run session receives these plugins in
+    /// Every session a run creates receives these plugins in
     /// {@link SessionState.customizations}, with the enablement from the
     /// matching template entry.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -7226,7 +7335,9 @@ public sealed record AutomationTriggeredRunOrigin
     public Dictionary<string, JsonElement>? Event { get; init; }
 }
 
-/// <summary>A durable run exists but has not begun external execution.</summary>
+/// <summary>A durable run exists but has not begun external execution. A run that
+/// continues a session also stays pending while that session's chat runs
+/// another turn (see {@link AutomationPreviousSessionTarget}).</summary>
 public sealed record AutomationPendingRunLifecycle
 {
     public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Pending;
@@ -7235,7 +7346,7 @@ public sealed record AutomationPendingRunLifecycle
     public required string CreatedAt { get; init; }
 }
 
-/// <summary>The run is executing linked sessions or awaiting interaction on them.
+/// <summary>The run's work in linked sessions is executing or awaiting interaction.
 ///
 /// Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
 /// remain authoritative for whether user attention or client-side work is
@@ -7265,7 +7376,7 @@ public sealed record AutomationCompletedRunLifecycle
     /// <summary>Completion timestamp in ISO 8601 format.</summary>
     public required string CompletedAt { get; init; }
 
-    /// <summary>Optional aggregate model usage across all linked sessions.</summary>
+    /// <summary>Optional aggregate model usage of the run's work in its linked sessions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UsageInfo? Usage { get; init; }
 }
@@ -7364,7 +7475,7 @@ public sealed class AutomationRunState
 
     /// <summary>Ordered, unique session URIs belonging to this run, each matching
     /// {@link SessionState.resource}. Entries may represent retries, parallel
-    /// workers, or delegated attempts.</summary>
+    /// workers, delegated attempts, or a session continued from an earlier run.</summary>
     public required List<string> Sessions { get; set; }
 
     /// <summary>Member of {@link AutomationRunState.sessions} that the host recommends opening first.</summary>
@@ -8054,6 +8165,33 @@ internal sealed class AutomationDisableConditionConverter : UnionConverter<Autom
         ["afterDate"] = typeof(AutomationAfterDateCondition),
             },
             allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>AutomationTarget is where an automation's runs send their message.</summary>
+[JsonConverter(typeof(AutomationTargetConverter))]
+public sealed class AutomationTarget : AhpUnion
+{
+    /// <summary>Creates an empty AutomationTarget (no active variant).</summary>
+    public AutomationTarget() { }
+
+    /// <summary>Creates a AutomationTarget wrapping the given variant value.</summary>
+    public AutomationTarget(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AutomationTarget discriminated union.</summary>
+internal sealed class AutomationTargetConverter : UnionConverter<AutomationTarget>
+{
+    public AutomationTargetConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["newSession"] = typeof(AutomationNewSessionTarget),
+        ["previousSession"] = typeof(AutomationPreviousSessionTarget),
+            },
+            allowUnknown: true)
     {
     }
 }
