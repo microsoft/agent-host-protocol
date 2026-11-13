@@ -96,24 +96,24 @@
     },
     "ChannelReceiveLimits": {
       "type": "object",
-      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` notification, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maxFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maxFrameBytes`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "windowBytes": {
           "type": "integer",
-          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or frame while outstanding data\nis equal to or greater than this value. The last message or frame sent\nbefore the window is full can go past it, so a message that fits within\n`maxFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "maximumFrameBytes": {
+        "maxFrameBytes": {
           "type": "integer",
-          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in frames.",
           "minimum": 1024,
           "maximum": 9007199254740991
         }
       },
       "required": [
         "windowBytes",
-        "maximumFrameBytes"
+        "maxFrameBytes"
       ]
     },
     "ChannelFlowControl": {
@@ -969,7 +969,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         }
       },
       "required": [
@@ -1022,7 +1022,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "lifecycle": {
           "$ref": "#/$defs/SessionLifecycle",
@@ -1337,7 +1337,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -2727,7 +2727,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. The chat's agent never changes, but `provider` is reported\nrelative to its session, so `chat/moved` may set or clear it. Like\n`resource`, it is omitted from `session/chatUpdated` changes. Forks and\nside chats use the source chat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | agent provider}; hosts set it when it\ndiffers. The chat's agent provider never changes, but `provider` is\nreported relative to its session, so `chat/moved` may set or clear it.\n`session/chatUpdated` does not carry it. Forks and side chats use the\nsource chat's agent provider.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -2993,7 +2993,7 @@
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
-          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | agent provider} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
         },
         "values": {
           "type": "object",
@@ -3784,7 +3784,7 @@
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).\nMatches {@link AnnotationsSummary.resource}."
+          "description": "The annotations channel URI (`ahp-annotations:/<uuid>`).\nMatches {@link AnnotationsSummary.resource}."
         },
         "annotationIds": {
           "type": "array",
@@ -3931,8 +3931,9 @@
           "description": "Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown."
         },
         "duration": {
-          "type": "number",
-          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock."
+          "type": "integer",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.",
+          "minimum": 0
         }
       },
       "required": [
@@ -4972,7 +4973,7 @@
           "type": "string",
           "description": "Provider-supplied status text, when available."
         },
-        "url": {
+        "uri": {
           "$ref": "#/$defs/URI",
           "description": "Absolute URI of the canvas's live content, typically an HTTP(S) URL;\nabsent when the live source is unavailable. Hosts MUST clear this field\nwhen the provider becomes unavailable.\n\nA client that can't load this URI directly, for example because it is a\nloopback address in the host's environment or uses a scheme that the\nclient doesn't load, reads it with `resourceRead`. The client resolves the\nrelative references in its content and reads them the same way. Hosts\nSHOULD serve reads of this URI, and of other URLs on its origin when it is\nan HTTP(S) URL, to clients that can subscribe to the canvas. The provider\nchooses the URI, so the host decides which sources it is willing to read.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
         }
@@ -5306,9 +5307,9 @@
           "type": "string",
           "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
         },
-        "isEditing": {
-          "type": "boolean",
-          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
+        "status": {
+          "$ref": "#/$defs/ChangesetFileStatus",
+          "description": "Host-reported activity on this file, as a bitset of\n{@link ChangesetFileStatus} flags. Absent or `0` means no activity is\nreported. This is advisory; the absence of\n{@link ChangesetFileStatus.Editing} does not guarantee that modifying the\nfile is safe."
         }
       },
       "required": [
@@ -5373,7 +5374,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribable annotations channel URI for the owning session\n(typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even\nthough it is derivable from the session URI so badge UI does not need\nto know the derivation rule."
+          "description": "The subscribable annotations channel URI for the owning session\n(`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).\nClients should use this value rather than derive it from the session URI."
         },
         "annotationCount": {
           "type": "number",
@@ -5392,7 +5393,7 @@
     },
     "AnnotationsState": {
       "type": "object",
-      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-session:/<uuid>/annotations` URI.",
+      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-annotations:/<uuid>` URI.",
       "properties": {
         "annotations": {
           "type": "array",
@@ -5621,6 +5622,32 @@
         "id",
         "kind",
         "schedule"
+      ]
+    },
+    "AutomationOneTimeTrigger": {
+      "type": "object",
+      "description": "Starts one run at a fixed time evaluated by the host.\n\nThe trigger fires at most once for a given {@link runAt}. Updating\n{@link runAt} moves the occurrence to the new time; the previous time no\nlonger fires.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a\nrun."
+        },
+        "kind": {
+          "const": "oneTime"
+        },
+        "runAt": {
+          "type": "string",
+          "description": "Scheduled run timestamp in ISO 8601 format."
+        },
+        "misfirePolicy": {
+          "$ref": "#/$defs/AutomationMisfirePolicy",
+          "description": "Policy when {@link runAt} passes while automatic execution is unavailable.\nOmission is equivalent to {@link AutomationMisfirePolicy.RunOnce}."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "runAt"
       ]
     },
     "AutomationEventTrigger": {
@@ -5889,7 +5916,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+          "description": "Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runCount": {
           "type": "number",
@@ -5985,11 +6012,11 @@
         },
         "triggerId": {
           "type": "string",
-          "description": "Matches the stable {@link AutomationScheduleTrigger.id} or\n{@link AutomationEventTrigger.id} in the definition."
+          "description": "Matches the stable {@link AutomationScheduleTrigger.id},\n{@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}\nin the definition."
         },
         "scheduledFor": {
           "type": "string",
-          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule triggers and normally absent for event triggers."
+          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule and one-time triggers and normally absent for event triggers."
         },
         "catchUp": {
           "type": "boolean",
@@ -6356,6 +6383,16 @@
         }
       }
     },
+    "HostEnvironment": {
+      "type": "object",
+      "description": "Describes the connection's default host-side execution environment.\n\nThe descriptor applies to {@link InitializeResult.defaultDirectory},\nsession working directories, and `file:` resources handled by the server\nthrough the `resource*` commands, unless more specific environment metadata\nis available. It does not apply to resources provided by the client.\n\nA host that exposes mixed environments MUST only populate fields that have a\nsingle connection-wide default.",
+      "properties": {
+        "pathStyle": {
+          "$ref": "#/$defs/PathStyle",
+          "description": "Authoritative native path grammar for resources in this environment.\n\nClients parsing or formatting native paths MUST use this field instead of\ninferring path semantics from their local environment."
+        }
+      }
+    },
     "InitializeResult": {
       "type": "object",
       "description": "Result of the `initialize` command.\n\n`protocolVersion` is the version the server has selected from the client's\n`protocolVersions` list. The client and server MUST use this version for\nthe rest of the connection. If the server cannot speak any of the offered\nversions it MUST return error code `-32005` (`UnsupportedProtocolVersion`)\nwith required `UnsupportedProtocolVersionErrorData` containing\n`supportedVersions`, instead of a result.",
@@ -6383,6 +6420,10 @@
             "$ref": "#/$defs/Snapshot"
           },
           "description": "Snapshots for each `initialSubscriptions` URI. The server MAY leave out a\nchannel whose state has no fields ({@link EmptyState})."
+        },
+        "environment": {
+          "$ref": "#/$defs/HostEnvironment",
+          "description": "Default execution environment exposed by this host connection.\n\nAbsence means no environment metadata is available."
         },
         "defaultDirectory": {
           "$ref": "#/$defs/URI",
@@ -6417,7 +6458,7 @@
         },
         "multipleChatProviders": {
           "$ref": "#/$defs/MultipleChatProvidersCapability",
-          "description": "Present when chats in one session may be backed by different agents\n(see {@link CreateChatParams.provider} and {@link ChatState.provider}).\nClients MUST NOT send `CreateChatParams.provider` without it.\n\nStability: 1.0 - Early development."
+          "description": "Present when chats in one session may be backed by different agent\nproviders (see {@link CreateChatParams.provider} and\n{@link ChatState.provider}).\nClients MUST NOT send `CreateChatParams.provider` without it.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -6457,6 +6498,10 @@
           "$ref": "#/$defs/AutomationScheduleCapabilities",
           "description": "Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}."
         },
+        "oneTime": {
+          "$ref": "#/$defs/AutomationOneTimeCapability",
+          "description": "Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}."
+        },
         "runCancellation": {
           "$ref": "#/$defs/AutomationRunCancellationCapability",
           "description": "Present when clients may request cancellation of `pending` or `running`\nautomation runs."
@@ -6474,6 +6519,11 @@
     "AutomationCustomizationsCapability": {
       "type": "object",
       "description": "Presence capability for\n{@link AutomationSessionTemplate.customizations | automation customizations}.\n\nThe empty object means \"supported\"; fields are reserved for future\ncapture options and limits.",
+      "properties": {}
+    },
+    "AutomationOneTimeCapability": {
+      "type": "object",
+      "description": "Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.",
       "properties": {}
     },
     "AutomationCreateCapability": {
@@ -7279,6 +7329,11 @@
         "target": {
           "$ref": "#/$defs/AuthenticateTarget",
           "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nWhen present, the host MUST apply the token only to that MCP server in\nthat session, never to sibling servers, other sessions, or agent-level\nresources, even if they share the resource and scopes. `resource` MUST\nstill equal that server's advertised `McpAuthRequirement.resource.resource`.\nThe host MUST reject an unknown session or customization, or a\ncustomization that is not an MCP server, with `InvalidParams` (-32602).\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
+          "minLength": 1
         }
       },
       "required": [
@@ -7764,7 +7819,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID for the new chat. Absent means the session's provider.\n\nRequires {@link InitializeResult.multipleChatProviders}. Hosts reject with\n`InvalidParams` a provider that is not in the root state's `agents` or\nwhose agent does not advertise `multipleChats`. Forks and side chats\n(`source` present) continue the source chat's history, so they always use\nthe source chat's agent: absent means that agent, and a different value is\nrejected. Agent capability checks for this request use the chat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID for the new chat. Absent means the session's agent\nprovider.\n\nRequires {@link InitializeResult.multipleChatProviders}. Hosts reject with\n`InvalidParams` an agent provider that is not in the root state's `agents`\nor that does not advertise `multipleChats`. Forks and side chats\n(`source` present) continue the source chat's history, so they always use\nthe source chat's agent provider: absent means that agent provider, and a\ndifferent value is rejected. Agent capability checks for this request use\nthe chat's agent provider.\n\nStability: 1.0 - Early development."
         }
       },
       "required": [
@@ -7809,7 +7864,7 @@
     },
     "MoveChatParams": {
       "type": "object",
-      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nA moved chat keeps its agent. After the move the host reports\n{@link ChatState.provider | `provider`} on the chat whenever it differs from\nthe destination session's provider, including when the chat had none\nbecause it matched its old session. Hosts MAY refuse, as an unsupported\ndestination, a move they cannot support, such as one that changes whether\nthe chat's agent matches its session's.\n\nA moved chat's `config.values` move with it unchanged. If a move changes\nwhether the chat needs its own `config.schema`, the host sets or clears it,\nor refuses the move as an unsupported destination. After a cross-session\nmove the host dispatches `chat/moved` on the chat's channel with its new\nsession, `provider` and `config.schema`.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
+      "description": "Atomically moves a host-authorized chat within or between sessions.\n\nThe source is the chat named by `channel`. When a `session` destination is\nthe source's current session, only the requested entry is repositioned in\nthat session's public chat catalog. When it names another session, the host\ntransfers the requested chat and its complete host-managed descendant\nhierarchy. The optional `after` anchor positions the requested chat in the\ndestination catalog; when omitted, the requested chat is placed first.\n\nA `newSession` destination allocates a session, transfers the complete\nhierarchy, and makes the requested chat that session's non-movable default\nchat. The host owns descendant relationships; AHP does not expose them as\nchat state.\n\nClients MUST only request a move when the source chat advertises\n`movable: true` in its `ChatState` or `ChatSummary`. This is structural\neligibility, not a guarantee that request-specific validation will succeed.\n\nThe host MUST validate the complete operation before committing it and MAY\nreject unsupported destinations or transient source conditions. At minimum,\nthe source MUST exist and advertise `movable: true`; the destination and\noptional anchor MUST resolve; and the source MUST NOT anchor itself.\nRejection leaves ownership, catalog order, chat state, and root summaries\nunchanged.\n\nA moved chat keeps its agent provider. After the move the host reports\n{@link ChatState.provider | `provider`} on the chat whenever it differs from\nthe destination session's agent provider, including when the chat had none\nbecause it matched its old session. Hosts MAY refuse, as an unsupported\ndestination, a move they cannot support, such as one that changes whether\nthe chat's agent provider matches its session's.\n\nA moved chat's `config.values` move with it unchanged. If a move changes\nwhether the chat needs its own `config.schema`, the host sets or clears it,\nor refuses the move as an unsupported destination. After a cross-session\nmove the host dispatches `chat/moved` on the chat's channel with its new\nsession, `provider` and `config.schema`.\n\nOn success every moved chat keeps its URI, state, and immutable\n`ChatOrigin`. The host commits ownership and catalog order before publishing\n`session/chatRemoved`, `session/chatAdded`, `session/chatsReordered`, and\nroot summary updates as applicable. Session and root snapshots are the\ndurable recovery path after reconnect or an uncertain response.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -8208,6 +8263,11 @@
         "host",
         "port"
       ]
+    },
+    "CreateTcpConnectionResult": {
+      "type": "object",
+      "description": "Result of the `createTcpConnection` command.\n\nAn empty object on success.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "URI": {
       "type": "string",
@@ -8872,6 +8932,12 @@
       "type": "string",
       "description": "Computation lifecycle of a {@link ChangesetState}."
     },
+    "ChangesetFileStatus": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset flags describing host-reported activity on a {@link ChangesetFile}.\n\nKnown flags:\n\n- `Editing` (1): The host reports an ongoing edit to this file."
+    },
     "ChangesetOperationScope": {
       "enum": [
         "changeset",
@@ -8915,6 +8981,9 @@
         },
         {
           "$ref": "#/$defs/AutomationEventTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationOneTimeTrigger"
         }
       ],
       "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
@@ -8969,6 +9038,14 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
+    },
+    "PathStyle": {
+      "enum": [
+        "posix",
+        "windows"
+      ],
+      "type": "string",
+      "description": "Native filesystem path grammar used by a host environment."
     },
     "ActionEnvelope": {
       "type": "object",
@@ -9442,7 +9519,7 @@
           ]
         }
       ],
-      "description": "Identifies the file or range a {@link ChangesetOperation} should act on.\n\nThe `kind` MUST match one of the operation's declared\n{@link ChangesetOperation.scopes}.\nClients MAY echo {@link ChangesetFile.nonce} from the displayed file.\nIf both nonces are present, a mismatch MUST fail with {@link AhpErrorCodes.Conflict};\nomission on either side adds no nonce precondition."
+      "description": "Identifies the file or range a {@link ChangesetOperation} should act on.\n\nThe `kind` MUST match one of the operation's declared\n{@link ChangesetOperation.scopes}.\nClients MAY echo {@link ChangesetFile.nonce} from the displayed file.\nIf both nonces are present and differ, the host MAY reject the invocation\nwith {@link AhpErrorCodes.Conflict}; omission on either side adds no nonce\nprecondition."
     },
     "ActionOrigin": {
       "type": "object",
@@ -9664,7 +9741,7 @@
               "description": "The subset of the session's working directories this chat uses.\nSee {@link ChatState.workingDirectories} for the full semantics."
             }
           },
-          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\n`resource` is an identity field and never changes. `provider` is reported\nrelative to the owning session and changes only when the chat moves to\nanother session, which republishes the whole summary through\n`session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD\nignore them if present."
         }
       },
       "required": [
@@ -10877,8 +10954,9 @@
           "description": "Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value."
         },
         "duration": {
-          "type": "number",
-          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown."
+          "type": "integer",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.",
+          "minimum": 0
         },
         "_meta": {
           "type": "object",
@@ -11014,7 +11092,7 @@
     },
     "ChatConfigChangedAction": {
       "type": "object",
-      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.",
+      "description": "Config values set on a chat changed.\n\nMerges `config` into the chat's\n{@link ChatConfigState | `ChatState.config`} values, or replaces them when\n`replace` is `true`; keys missing after a replace take their property's\n`default`. Only properties with `chatMutable: true` in\nthe effective schema may be set.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/configChanged"
@@ -11036,7 +11114,7 @@
     },
     "ChatMovedAction": {
       "type": "object",
-      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | `provider`} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.",
+      "description": "The chat moved to another session.\n\nDispatched by the host on the moved chat's channel after a cross-session\n`moveChat`. `provider` and `schema` are the chat's\n{@link ChatState.provider | agent provider} and\n{@link ChatConfigState.schema | `config.schema`} relative to the new\nsession; absent clears them. `ChatState` has no session field, so the\nreducer does not store `session`; it tells subscribers which session now\nowns the chat.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/moved"
@@ -11047,7 +11125,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "The chat's provider in the new session; absent clears it."
+          "description": "The chat's agent provider ID in the new session; absent clears it."
         },
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
@@ -11931,7 +12009,7 @@
     },
     "AutomationDefinitionPatch": {
       "type": "object",
-      "description": "Partial replacement of editable {@link AutomationDefinition} fields.\n\nOmitted fields are unchanged. Supplied arrays and objects replace their\ncorresponding values in full; they are not merged recursively.",
+      "description": "Partial replacement of editable {@link AutomationDefinition} fields.\n\nOmitted fields are unchanged. Supplied arrays and objects replace their\ncorresponding values in full; they are not merged recursively. Runtime\ndecoders MUST preserve unrecognized members on these replacement objects\nand their nested objects (annotated `@preserveUnknownMembers`) and re-encode\nthem, so editing known fields does not erase fields from newer versions.",
       "properties": {
         "title": {
           "type": "string",

@@ -1025,59 +1025,6 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
     }
 }
 
-// MARK: - Client Dispatchable
-
-/// Set of action types that clients are allowed to dispatch.
-public let clientDispatchableActions: Set<String> = [
-    "chat/turnStarted",
-    "chat/turnResume",
-    "chat/toolCallConfirmed",
-    "chat/toolCallComplete",
-    "chat/toolCallResultConfirmed",
-    "chat/turnCancelled",
-    "session/activeClientSet",
-    "session/activeClientRemoved",
-    "chat/pendingMessageSet",
-    "chat/pendingMessageRemoved",
-    "chat/queuedMessagesReordered",
-    "chat/isReadChanged",
-    "chat/isArchivedChanged",
-    "chat/configChanged",
-    "chat/inputAnswerChanged",
-    "chat/inputCompleted",
-    "session/customizationToggled",
-    "session/mcpServerStartRequested",
-    "session/mcpServerStopRequested",
-    "session/mcpServerBackgroundRequested",
-    "session/isReadChanged",
-    "session/isArchivedChanged",
-    "automationRun/cancelRequested",
-]
-
-/// Checks whether an action may be dispatched by a client.
-public func isClientDispatchable(_ action: StateAction) -> Bool {
-    switch action {
-    case .chatTurnStarted, .chatTurnResume,
-         .chatToolCallConfirmed, .chatToolCallComplete,
-         .chatToolCallResultConfirmed, .chatTurnCancelled,
-         .sessionActiveClientSet,
-         .sessionActiveClientRemoved,
-         .chatPendingMessageSet,
-         .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
-         .chatIsReadChanged, .chatIsArchivedChanged, .chatConfigChanged,
-         .chatInputAnswerChanged, .chatInputCompleted,
-         .sessionCustomizationToggled,
-         .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,
-         .sessionMcpServerBackgroundRequested,
-         .sessionIsReadChanged,
-         .sessionIsArchivedChanged,
-         .automationRunCancelRequested:
-        return true
-    default:
-        return false
-    }
-}
-
 // MARK: - Helpers
 
 private func addMillisecondsToTimestamp(_ timestamp: String, _ duration: Int) -> String {

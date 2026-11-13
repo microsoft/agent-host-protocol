@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `CreateChatParams.title` for a client-selected initial display title."
-}

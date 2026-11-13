@@ -291,7 +291,7 @@ describe('generated JSON schemas', () => {
         }
       });
 
-      it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
+      it('enforces delivery counter, limit, and nonempty-frame bounds', () => {
         if (file !== 'notifications.schema.json') return;
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
@@ -459,6 +459,19 @@ describe('generated JSON schemas', () => {
             assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories }), false);
           }
         }
+      });
+
+      it('accepts an optional account-selection hint without requiring it for authentication', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const base = { channel: 'ahp-root://', resource: 'https://api.example.com', token: 'test-token' };
+        const values = [base, ...['selection-1', '', 42, null, {}, []].map(accountId => ({ ...base, accountId }))];
+        assert.deepEqual(values.map(value => schemaAccepts(schema, authenticate as JsonNode, value)), [
+          true, true, false, false, false, false, false,
+        ]);
       });
 
       it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
@@ -642,6 +655,35 @@ describe('generated JSON schemas', () => {
           ]) {
             assert.equal(schemaAccepts(schema, properties.disableConditions, value), false, `${type}: ${JSON.stringify(value)}`);
           }
+        }
+      });
+
+      it('optionally describes host path semantics in an extensible environment descriptor', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const initializeResult = defs.InitializeResult;
+        const properties = initializeResult.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.environment.$ref, '#/$defs/HostEnvironment');
+
+        const environment = defs.HostEnvironment;
+        assert.equal(environment.required, undefined);
+
+        const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
+        assert.equal(schemaAccepts(schema, initializeResult, base), true);
+        for (const value of [
+          {},
+          { pathStyle: 'posix' },
+          { pathStyle: 'windows' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), true);
+        }
+        for (const value of [
+          null,
+          { pathStyle: 'unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), false);
         }
       });
 

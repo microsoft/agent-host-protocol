@@ -4,6 +4,7 @@ applyTo: 'types/**/*.ts'
 ---
 
 - Treat [AHP Doctrine](../../docs/guide/doctrine.md) as the design compass for protocol changes. Before adding or changing protocol types, check the doctrine's principles and design tests: durable user-visible results should be represented in state, the host should remain authoritative, minimal clients should keep a coherent experience, and agent implementation details should stay behind the host boundary.
+- Name things using the [protocol naming dictionary](./protocol-naming.instructions.md): reuse its established terms, identifier and unit conventions, and message-naming patterns, and don't copy the legacy names it lists.
 - Always prefer dispatching state actions (that can cause side effects) rather than making imperative RPC calls. For example, rather than a `sendMessage` command, we have a `session/turnStarted` message.
 - If a state is invalid, it should be inexpressible. For example, don't do something like
 
@@ -58,6 +59,8 @@ applyTo: 'types/**/*.ts'
   - **Partial update** (`Foo*Updated`): the action carries the **key plus the optional fields that changed**; the reducer merges them onto the existing entry and is a **no-op returning `state`** when no entry matches. Ignore the key inside any `changes` payload so it can't be reassigned.
   - Prefer a key-only **remove** action over an upsert that accepts a nullable/sentinel "unset" value (e.g. do not model removal as `Changed` with `entry: null`).
   - Reducer mechanics are uniform: `const idx = list.findIndex(x => x.<key> === action.<key>)`, branch on `idx < 0`, copy immutably (`list.slice()` / `[...list]`), then write or `splice`, and return `{ ...state, <collection>: next }`. Every branch (insert, replace, remove, no-op) needs a fixture in `types/test-cases/reducers/` to keep `types/reducers.ts` at 100% branch coverage.
+- Keep `@preserveUnknownMembers` on automation patch replacement types, shared
+  types, and union variants; annotate new nested fixed-schema objects too.
 - Never update the protocol version unless you were instructed to do so.
 
 ## Finalizing changes

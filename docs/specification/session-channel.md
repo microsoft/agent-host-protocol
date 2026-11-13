@@ -167,7 +167,7 @@ independent of `defaultChat`.
 |---|---|---|
 | `session/chatAdded` | `summary: ChatSummary` | Upsert by `summary.resource`. Appends when no entry has the same URI; otherwise replaces the existing entry. Mirrors `root/sessionAdded`. |
 | `session/chatRemoved` | `chat: URI` | Removes the matching entry. No-op when no entry matches. If `state.defaultChat` referenced the removed URI, the reducer clears it. Mirrors `root/sessionRemoved`. |
-| `session/chatUpdated` | `chat: URI, changes: Partial<ChatSummary>` | Merges the non-identity fields of `changes` onto the matching entry. No-op when no entry matches; clients SHOULD then wait for a `session/chatAdded`. Identity fields (`resource`) MUST NOT be carried in `changes`. Mirrors `root/sessionSummaryChanged`. |
+| `session/chatUpdated` | `chat: URI, changes: Partial<ChatSummary>` | Merges the non-identity fields of `changes` onto the matching entry. No-op when no entry matches; clients SHOULD then wait for a `session/chatAdded`. `resource` (an identity field) and `provider` (which changes only when the chat moves to another session and is republished through `session/chatAdded`) MUST NOT be carried in `changes`. Mirrors `root/sessionSummaryChanged`. |
 | `session/chatsReordered` | `chats: URI[]` | Replaces the catalog order from the complete authoritative URI list while preserving summaries. Invalid or incomplete orders are ignored. Emitted when [`moveChat`](./chat-channel#moving-chats) changes ordering. |
 
 The producer of the chat's own [`ChatState`](./chat-channel#state) is responsible

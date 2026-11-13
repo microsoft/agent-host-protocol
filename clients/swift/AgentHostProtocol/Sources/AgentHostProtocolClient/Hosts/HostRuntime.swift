@@ -356,7 +356,7 @@ internal final class HostRuntime: Sendable {
         // connect; kept in sync by notifications afterward. Failures are
         // non-fatal: the cache stays as-is.
         let summaries: ListSessionsResult? = if config.refreshSessionSummariesOnConnect {
-            try? await client.request(method: "listSessions", params: ListSessionsParams(channel: RootResourceURI))
+            try? await client.request(ListSessionsParams(channel: RootResourceURI))
         } else {
             nil
         }
@@ -593,6 +593,10 @@ internal final class HostRuntime: Sendable {
         switch event.event {
         case .action(let envelope):
             await applyAction(envelope)
+        case .actionDecodingFailed(_, let serverSeq, _, _, _):
+            await shared.update { state in
+                state.serverSeq = max(state.serverSeq, serverSeq)
+            }
         case .sessionAdded(let n):
             await shared.update { state in
                 state.sessionSummaries[n.summary.resource] = n.summary
@@ -627,7 +631,7 @@ internal final class HostRuntime: Sendable {
             // Best-effort root state mirror update via the existing pure
             // reducer. Non-root channels slip through without effect — that's
             // the same posture as the Rust SDK.
-            if envelope.channel == RootResourceURI {
+            if envelope.channel == RootResourceURI && envelope.rejectionReason == nil {
                 state.rootState = rootReducer(state: state.rootState, action: envelope.action)
             }
         }

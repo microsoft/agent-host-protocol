@@ -6,6 +6,7 @@ import os from 'os';
 import path from 'path';
 import { pipeline } from 'stream/promises';
 import { fileURLToPath } from 'url';
+import { readDocSidebarSource } from './read-doc-sidebar.js';
 import {
   STABLE_DOC_VERSIONS,
   VERSIONED_SECTIONS,
@@ -76,11 +77,12 @@ async function materialize(version: string): Promise<void> {
     });
 
     const sidebarFile = path.join(directory, 'sidebar.json');
+    const sidebarSource = readDocSidebarSource(
+      fs.readFileSync(path.join(directory, 'docs/.vitepress/config.mts'), 'utf8'),
+    );
     execFileSync('npx', ['tsx', '--eval', `
       import { writeFileSync } from 'node:fs';
-      import('./docs/.vitepress/config.mts').then(({ default: config }) => {
-        writeFileSync(process.env.AHP_DOCS_SIDEBAR, JSON.stringify(config.themeConfig.sidebar));
-      });
+      writeFileSync(process.env.AHP_DOCS_SIDEBAR, JSON.stringify(${sidebarSource}));
     `], {
       cwd: directory,
       stdio: 'inherit',

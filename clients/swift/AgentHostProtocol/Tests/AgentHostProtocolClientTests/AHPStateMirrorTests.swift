@@ -6,23 +6,54 @@ import AgentHostProtocol
 
 final class AHPStateMirrorTests: XCTestCase {
 
+    func testRejectedActionEnvelopesLeaveStateUnchanged() async {
+        let mirror = AHPStateMirror()
+        let resource = "ahp-session:/s1"
+        let initial = SessionState(
+            provider: "test", title: "Old", status: .idle,
+            lifecycle: .ready, activeClients: [], chats: []
+        )
+        let snapshot = Snapshot(resource: resource, state: .session(initial), fromSeq: 0)
+        await mirror.applySnapshot(snapshot)
+        var envelope = ActionEnvelope(
+            channel: resource,
+            action: .sessionTitleChanged(SessionTitleChangedAction(
+                type: .sessionTitleChanged, title: "New"
+            )),
+            serverSeq: 1
+        )
+
+        for reason in ["not allowed", ""] {
+            envelope.rejectionReason = reason
+            await mirror.apply(envelope)
+            let sessions = await mirror.sessions
+            XCTAssertEqual(sessions[resource]?.title, "Old")
+        }
+
+        envelope.rejectionReason = nil
+        envelope.serverSeq = 2
+        await mirror.apply(envelope)
+        let sessions = await mirror.sessions
+        XCTAssertEqual(sessions[resource]?.title, "New")
+    }
+
     func testCanvasSourcesAreReplacedClearedAndReset() async {
         let mirror = AHPStateMirror()
         let resource = "ahp-canvas:/preview"
         let initial = CanvasState(
             instanceId: "preview", extensionId: "project:preview", canvasId: "preview",
-            url: "https://example.test/old"
+            uri: "https://example.test/old"
         )
         await mirror.applySnapshot(Snapshot(resource: resource, state: .canvas(initial), fromSeq: 1))
         var replacement = initial
-        replacement.url = "https://example.test/new"
+        replacement.uri = "https://example.test/new"
         await mirror.apply(ActionEnvelope(
             channel: resource,
             action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: replacement)),
             serverSeq: 2
         ))
         let replaced = await mirror.canvases
-        replacement.url = nil
+        replacement.uri = nil
         await mirror.apply(ActionEnvelope(
             channel: resource,
             action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: replacement)),
@@ -32,7 +63,7 @@ final class AHPStateMirrorTests: XCTestCase {
         await mirror.reset()
         let remaining = await mirror.canvases
         XCTAssertEqual(
-            [replaced[resource]?.url, unavailable[resource]?.instanceId, unavailable[resource]?.url],
+            [replaced[resource]?.uri, unavailable[resource]?.instanceId, unavailable[resource]?.uri],
             ["https://example.test/new", "preview", nil]
         )
         XCTAssertTrue(remaining.isEmpty)

@@ -24,6 +24,8 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
@@ -569,10 +571,13 @@ function generateRustEnum(enumDecl: EnumDeclaration): string {
 // ─── Rust Struct Generation ──────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
   /** Omit Serialize derive when a hand-written implementation is emitted. */
   omitSerialize?: boolean;
+  /** Omit Deserialize derive when a hand-written implementation is emitted. */
+  omitDeserialize?: boolean;
   /** Force `Default` derive (synthesizes Default impl when all fields optional). */
   deriveDefault?: boolean;
   /** Docstring for the struct itself. */
@@ -593,7 +598,7 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
   if (!opts.omitSerialize) {
     derives.push('Serialize');
   }
-  derives.push('Deserialize');
+  if (!opts.omitDeserialize) derives.push('Deserialize');
   if (wantsDefault) derives.push('Default');
   lines.push(`#[derive(${derives.join(', ')})]`);
   lines.push('#[serde(rename_all = "camelCase")]');
@@ -630,6 +635,13 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
     lines.push(`    pub ${p.rustName}: ${rustType},`);
   }
 
+  if (opts.preserveUnknownMembers) {
+    lines.push('    /// Unrecognized wire members retained for full-object edits.');
+    const omitted = props.filter(p => opts.omitDiscriminants && p.isLiteralDiscriminant);
+    const attrs = ['flatten', ...omitted.map(p => `deserialize_with = "deserialize_extra_without_${p.wireName}"`)];
+    lines.push(`    #[serde(${attrs.join(', ')})]`);
+    lines.push('    pub extra: serde_json::Map<String, serde_json::Value>,');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -824,7 +836,7 @@ function generateStructFromInterface(
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
+  return generateRustStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
@@ -843,7 +855,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
@@ -1009,6 +1021,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger', omitDiscriminants: true },
   { name: 'AutomationEventTrigger', omitDiscriminants: true },
+  { name: 'AutomationOneTimeTrigger', omitDiscriminants: true },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -1307,6 +1320,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -1394,19 +1408,14 @@ ${unknownVariant}}`;
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot.
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `            "${scheme}" => serde_json::from_value::<${type}>(value)${variant === 'Empty' ? '' : '.map(Box::new)'}.map(Self::${variant}),`
+  ).join('\n');
+  return `/// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
-/// Deserialized by trying the empty state first (an object with no members,
-/// used by channels whose state has no fields), then session (has required \`lifecycle\`), then
-/// chat (has required \`turns\`), then canvas (has required instance/provider/type
-/// identifiers), then terminal (has required \`content\`),
-/// then changeset (has required \`status\` and \`files\`), then resource-watch
-/// (has required \`root\` and \`recursive\`), then annotations (has required
-/// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root (has required \`agents\`). A state that matches
-/// none of these, such as the state of a channel added in a later protocol
-/// version, decodes as \`Unknown\` and keeps its raw JSON.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
+/// or from_resource for typed decoding, which propagates known-channel errors.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Empty(EmptyState),
@@ -1423,6 +1432,50 @@ pub enum SnapshotState {
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     Unknown(serde_json::Value),
+}
+
+impl SnapshotState {
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    pub fn from_resource(resource: &str, value: serde_json::Value) -> Result<Self, serde_json::Error> {
+        let scheme = resource.split_once(':').map(|(scheme, _)| scheme).unwrap_or("");
+        match scheme {
+${branches}
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SnapshotState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde_json::Value::deserialize(deserializer).map(Self::Unknown)
+    }
+}
+
+impl<'de> Deserialize<'de> for Snapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireSnapshot {
+            resource: Uri,
+            state: serde_json::Value,
+            from_seq: i64,
+        }
+
+        let wire = WireSnapshot::deserialize(deserializer)?;
+        let state = SnapshotState::from_resource(&wire.resource, wire.state)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            resource: wire.resource,
+            state,
+            from_seq: wire.from_seq,
+        })
+    }
 }`;
 }
 
@@ -1482,14 +1535,31 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  const omittedDiscriminants = new Set(STATE_STRUCTS.flatMap(entry => {
+    const iface = findInterface(project, entry.name);
+    return iface && entry.omitDiscriminants && preservesUnknownMembers(iface)
+      ? extractProps(iface, project).filter(p => p.isLiteralDiscriminant).map(p => p.wireName)
+      : [];
+  }));
+  for (const key of omittedDiscriminants) {
+    lines.push(`fn deserialize_extra_without_${key}<'de, D>(deserializer: D) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove(${JSON.stringify(key)});
+    Ok(extra)
+}`);
+    lines.push('');
+  }
+
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
       const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
+        omitDeserialize: entry.name === 'Snapshot',
       });
-      // EmptyState must match only `{}`, so the untagged SnapshotState does not
-      // decode an unknown state shape as empty.
+      // EmptyState must match only `{}`, including when decoded directly.
       lines.push(entry.name === 'EmptyState'
         ? struct.replace('pub struct EmptyState', '#[serde(deny_unknown_fields)]\npub struct EmptyState')
         : struct);
@@ -1877,18 +1947,19 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'RepositorySource' },
-  { name: 'CreateTcpConnectionParams' },
-  { name: 'InitializeParams' }, { name: 'InitializeResult' },
+  { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
+  { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   { name: 'RepositoryPreparationCapabilities' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
@@ -2029,6 +2100,9 @@ function generateCommandsFile(project: Project): string {
 }
 
 function generateCustomizationEnablementRust(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '        #[serde(flatten)]\n        extra: serde_json::Map<String, serde_json::Value>,\n'
+    : '';
   const kind = findEnum(project, 'CustomizationEnablementKind');
   if (!kind) throw new Error('CustomizationEnablementKind enum not found');
   const unknownVariant = getEnumCompatibility(kind) === 'nonexhaustive'
@@ -2043,16 +2117,16 @@ pub enum CustomizationEnablement {
     #[serde(rename = "global")]
     Global {
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "workspace")]
     Workspace {
         uri: Uri,
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "session")]
     Session {
         enabled: bool,
-    },
+${extra}    },
 ${unknownVariant}}`;
 }
 

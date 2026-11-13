@@ -125,6 +125,16 @@ internal sealed class ChatMoveDestinationKindConverter : JsonConverter<ChatMoveD
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Native filesystem path grammar used by a host environment.</summary>
+[JsonConverter(typeof(WireEnumConverter<PathStyle>))]
+public enum PathStyle
+{
+    [WireValue("posix")]
+    Posix,
+    [WireValue("windows")]
+    Windows,
+}
+
 /// <summary>Encoding of fetched content data.</summary>
 [JsonConverter(typeof(WireEnumConverter<ContentEncoding>))]
 public enum ContentEncoding
@@ -368,6 +378,15 @@ public sealed record CreateTcpConnectionParams
     public long Port { get; init; }
 }
 
+/// <summary>Result of the `createTcpConnection` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateTcpConnectionResult
+{
+}
+
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
 public sealed record InitializeParams
@@ -422,6 +441,25 @@ public sealed record InitializeParams
     public ClientCapabilities? Capabilities { get; init; }
 }
 
+/// <summary>Describes the connection's default host-side execution environment.
+///
+/// The descriptor applies to {@link InitializeResult.defaultDirectory},
+/// session working directories, and `file:` resources handled by the server
+/// through the `resource*` commands, unless more specific environment metadata
+/// is available. It does not apply to resources provided by the client.
+///
+/// A host that exposes mixed environments MUST only populate fields that have a
+/// single connection-wide default.</summary>
+public sealed record HostEnvironment
+{
+    /// <summary>Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PathStyle? PathStyle { get; init; }
+}
+
 /// <summary>Result of the `initialize` command.
 ///
 /// `protocolVersion` is the version the server has selected from the client's
@@ -461,6 +499,12 @@ public sealed record InitializeResult
     /// <summary>Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).</summary>
     public required List<Snapshot> Snapshots { get; init; }
+
+    /// <summary>Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public HostEnvironment? Environment { get; init; }
 
     /// <summary>Suggested default directory for remote filesystem browsing</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -505,8 +549,9 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TcpConnectionsCapability? TcpConnections { get; init; }
 
-    /// <summary>Present when chats in one session may be backed by different agents
-    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// <summary>Present when chats in one session may be backed by different agent
+    /// providers (see {@link CreateChatParams.provider} and
+    /// {@link ChatState.provider}).
     /// Clients MUST NOT send `CreateChatParams.provider` without it.
     ///
     /// Stability: 1.0 - Early development.</summary>
@@ -601,6 +646,10 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
+    /// <summary>Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationOneTimeCapability? OneTime { get; init; }
+
     /// <summary>Present when clients may request cancellation of `pending` or `running`
     /// automation runs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -655,6 +704,11 @@ public sealed record AutomationRunCancellationCapability
 /// The empty object means "supported"; fields are reserved for future
 /// capture options and limits.</summary>
 public sealed record AutomationCustomizationsCapability
+{
+}
+
+/// <summary>Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+public sealed record AutomationOneTimeCapability
 {
 }
 
@@ -1072,14 +1126,16 @@ public sealed record CreateChatParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
 
-    /// <summary>Agent provider ID for the new chat. Absent means the session's provider.
+    /// <summary>Agent provider ID for the new chat. Absent means the session's agent
+    /// provider.
     ///
     /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-    /// `InvalidParams` a provider that is not in the root state's `agents` or
-    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// `InvalidParams` an agent provider that is not in the root state's `agents`
+    /// or that does not advertise `multipleChats`. Forks and side chats
     /// (`source` present) continue the source chat's history, so they always use
-    /// the source chat's agent: absent means that agent, and a different value is
-    /// rejected. Agent capability checks for this request use the chat's agent.
+    /// the source chat's agent provider: absent means that agent provider, and a
+    /// different value is rejected. Agent capability checks for this request use
+    /// the chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1148,12 +1204,12 @@ public sealed record ChatMoveToNewSessionDestination
 /// Rejection leaves ownership, catalog order, chat state, and root summaries
 /// unchanged.
 ///
-/// A moved chat keeps its agent. After the move the host reports
+/// A moved chat keeps its agent provider. After the move the host reports
 /// {@link ChatState.provider | `provider`} on the chat whenever it differs from
-/// the destination session's provider, including when the chat had none
+/// the destination session's agent provider, including when the chat had none
 /// because it matched its old session. Hosts MAY refuse, as an unsupported
 /// destination, a move they cannot support, such as one that changes whether
-/// the chat's agent matches its session's.
+/// the chat's agent provider matches its session's.
 ///
 /// A moved chat's `config.values` move with it unchanged. If a move changes
 /// whether the chat needs its own `config.schema`, the host sets or clears it,
@@ -1890,6 +1946,13 @@ public sealed record AuthenticateParams
     /// satisfy every matching pending challenge. Older hosts ignore this field.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AuthenticateTarget? Target { get; init; }
+
+    /// <summary>Optional identifier for the client's selected account, sent alongside the token.
+    /// Hosts can compare `accountId` values to detect when the underlying account has changed.
+    /// Hosts MUST treat `accountId` as an opaque string.
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AccountId { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.

@@ -1214,6 +1214,83 @@ impl<'de> serde::Deserialize<'de> for ChangesetStatus {
     }
 }
 
+/// Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+///
+/// Wire form: a bare `u32` bitset. Unknown/forward-compat bits are
+/// preserved across a decode→encode round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct ChangesetFileStatus(pub u32);
+
+#[allow(non_upper_case_globals)]
+impl ChangesetFileStatus {
+    /// The host reports an ongoing edit to this file.
+    pub const Editing: ChangesetFileStatus = ChangesetFileStatus(1);
+
+    /// The raw `u32` bitset value (every set bit, known or not).
+    #[inline]
+    pub const fn bits(self) -> u32 {
+        self.0
+    }
+
+    /// Wrap a raw `u32` bitset value, preserving every bit verbatim.
+    #[inline]
+    pub const fn from_bits(bits: u32) -> Self {
+        ChangesetFileStatus(bits)
+    }
+
+    /// True when every bit set in `other` is also set in `self`.
+    #[inline]
+    pub const fn contains(self, other: ChangesetFileStatus) -> bool {
+        (self.0 & other.0) == other.0
+    }
+}
+
+impl From<u32> for ChangesetFileStatus {
+    #[inline]
+    fn from(value: u32) -> Self {
+        ChangesetFileStatus(value)
+    }
+}
+
+impl From<ChangesetFileStatus> for u32 {
+    #[inline]
+    fn from(value: ChangesetFileStatus) -> Self {
+        value.0
+    }
+}
+
+impl std::ops::BitOr for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn bitor(self, rhs: ChangesetFileStatus) -> ChangesetFileStatus {
+        ChangesetFileStatus(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for ChangesetFileStatus {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: ChangesetFileStatus) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl std::ops::BitAnd for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn bitand(self, rhs: ChangesetFileStatus) -> ChangesetFileStatus {
+        ChangesetFileStatus(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::Not for ChangesetFileStatus {
+    type Output = ChangesetFileStatus;
+    #[inline]
+    fn not(self) -> ChangesetFileStatus {
+        ChangesetFileStatus(!self.0)
+    }
+}
+
 /// Execution lifecycle of a {@link ChangesetOperation}.
 ///
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1489,6 +1566,9 @@ pub enum AutomationTriggerKind {
     /// A host-defined external event discovered from trigger definitions.
     #[serde(rename = "event")]
     Event,
+    /// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+    #[serde(rename = "oneTime")]
+    OneTime,
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -1537,6 +1617,28 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
+fn deserialize_extra_without_type<'de, D>(
+    deserializer: D,
+) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove("type");
+    Ok(extra)
+}
+
+fn deserialize_extra_without_kind<'de, D>(
+    deserializer: D,
+) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove("kind");
+    Ok(extra)
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// Present when the host supports `createTcpConnection`.
@@ -1554,28 +1656,28 @@ pub struct TcpConnectionsCapability {}
 /// Limits on data that one peer receives on a windowed subscription.
 ///
 /// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// message's complete text, as sent. For a `channel/frame` notification, this
 /// includes its envelope and escape characters. The same size is used for the
-/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 /// size of a complete data message. Outstanding data is always less than
-/// `windowBytes + maximumFrameBytes`.
+/// `windowBytes + maxFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelReceiveLimits {
     /// The target amount of outstanding data. This is a soft target.
-    /// The sender MUST NOT send a data message or fragment while outstanding data
-    /// is equal to or greater than this value. The last message or fragment sent
+    /// The sender MUST NOT send a data message or frame while outstanding data
+    /// is equal to or greater than this value. The last message or frame sent
     /// before the window is full can go past it, so a message that fits within
-    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// `maxFrameBytes` can be sent whole even when it is larger than the
     /// remaining credit.
     pub window_bytes: i64,
     /// The largest JSON-RPC message that the sender can send for a data message.
     /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
     /// notification, it includes the envelope and escape characters. A larger data
-    /// message MUST be split into smaller messages or sent in fragments.
-    pub maximum_frame_bytes: i64,
+    /// message MUST be split into smaller messages or sent in frames.
+    pub max_frame_bytes: i64,
 }
 
 /// The limits that the server accepted for a windowed subscription.
@@ -1644,6 +1746,9 @@ pub struct Icon {
     /// If not provided, the client should assume the icon can be used with any theme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Describes a protected resource's authentication requirements using
@@ -1727,6 +1832,9 @@ pub struct ProtectedResourceMetadata {
     /// Clients SHOULD treat an absent field the same as `true`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Global state shared with every client subscribed to `ahp-root://`.
@@ -1979,6 +2087,9 @@ pub struct ModelSelection {
     /// produce numbers or booleans, which are carried through as-is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<std::collections::HashMap<String, AnyValue>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A selected custom agent for a session.
@@ -1994,6 +2105,9 @@ pub struct ModelSelection {
 pub struct AgentSelection {
     /// Stable agent URI (matches an {@link AgentCustomization.uri}).
     pub uri: Uri,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A JSON Schema-compatible property descriptor with display extensions.
@@ -2132,11 +2246,11 @@ pub struct ChatState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
     /// Agent provider ID backing this chat. Absent means the session's
-    /// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-    /// differs. The chat's agent never changes, but `provider` is reported
-    /// relative to its session, so `chat/moved` may set or clear it. Like
-    /// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-    /// side chats use the source chat's agent.
+    /// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+    /// differs. The chat's agent provider never changes, but `provider` is
+    /// reported relative to its session, so `chat/moved` may set or clear it.
+    /// `session/chatUpdated` does not carry it. Forks and side chats use the
+    /// source chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2277,7 +2391,7 @@ pub struct CanvasState {
     /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
     /// from persisted state after a provider or host restart.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<Uri>,
+    pub uri: Option<Uri>,
 }
 
 /// Lightweight catalog entry for a chat, carried in
@@ -2441,7 +2555,7 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<WorkingDirectoryEntry>>,
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2783,7 +2897,7 @@ pub struct SessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<WorkingDirectoryEntry>>,
     /// Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2988,7 +3102,7 @@ pub struct SessionConfigState {
 pub struct ChatConfigState {
     /// Config schema for this chat's `chatMutable` properties. Absent means the
     /// session's schema. Hosts set it, as the chat's own schema, when the chat's
-    /// {@link ChatState.provider | `provider`} differs from the session's; when
+    /// {@link ChatState.provider | agent provider} differs from the session's; when
     /// present, clients use it instead of the session's schema.
     ///
     /// Stability: 1.0 - Early development.
@@ -3086,6 +3200,9 @@ pub struct Message {
     /// field. Mirrors the MCP `_meta` convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Identifies the origin of a {@link Message} — who produced it. For the message
@@ -3096,6 +3213,9 @@ pub struct Message {
 pub struct MessageOrigin {
     /// The kind of actor that produced the message.
     pub kind: MessageKind,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A choice in a select-style question.
@@ -3318,6 +3438,9 @@ pub struct TextPosition {
     pub line: i64,
     /// Zero-based character offset within the line.
     pub character: i64,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A range within a textual document.
@@ -3328,6 +3451,9 @@ pub struct TextRange {
     pub start: TextPosition,
     /// End position of the range.
     pub end: TextPosition,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A selection within a textual resource.
@@ -3340,6 +3466,9 @@ pub struct TextRange {
 pub struct TextSelection {
     /// The range covered by the selection.
     pub range: TextRange,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A simple, opaque attachment whose model representation is described by
@@ -3382,6 +3511,9 @@ pub struct SimpleMessageAttachment {
     /// `completions` response.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_representation: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An attachment whose data is embedded inline as a base64 string.
@@ -3427,6 +3559,9 @@ pub struct MessageEmbeddedResourceAttachment {
     /// Only meaningful for textual resources.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<TextSelection>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An attachment that references a resource by URI. The content is not
@@ -3477,6 +3612,9 @@ pub struct MessageResourceAttachment {
     /// Only meaningful for textual resources.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<TextSelection>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An attachment that references annotations on a session's annotations
@@ -3515,13 +3653,16 @@ pub struct MessageAnnotationsAttachment {
     /// host when sending the user message containing the accepted completion.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+    /// The annotations channel URI (`ahp-annotations:/<uuid>`).
     /// Matches {@link AnnotationsSummary.resource}.
     pub resource: Uri,
     /// Specific {@link Annotation.id | annotation ids} to reference. When
     /// omitted, the attachment references all annotations on the channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation_ids: Option<Vec<String>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An attachment that references a chat transcript through a fixed completed
@@ -3580,6 +3721,9 @@ pub struct MessageChatAttachment {
     /// the host pins the latest completed turn when accepting the message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_turn: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3606,6 +3750,9 @@ pub struct ContentRef {
     /// Content nonce
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A content part that's a reference to large content stored outside the state tree.
@@ -4322,12 +4469,20 @@ pub struct ToolResultSubagentContent {
 /// Container is being loaded by the host.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CustomizationLoadingState {}
+pub struct CustomizationLoadingState {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
 
 /// Container loaded successfully.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CustomizationLoadedState {}
+pub struct CustomizationLoadedState {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
 
 /// Container partially loaded but has warnings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -4335,6 +4490,9 @@ pub struct CustomizationLoadedState {}
 pub struct CustomizationDegradedState {
     /// Human-readable description of the warning.
     pub message: String,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Container failed to load.
@@ -4343,6 +4501,9 @@ pub struct CustomizationDegradedState {
 pub struct CustomizationErrorState {
     /// Human-readable error message.
     pub message: String,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An [Open Plugins](https://open-plugins.com/) plugin.
@@ -4405,6 +4566,9 @@ pub struct PluginCustomization {
     /// parses nor enforces it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A {@link PluginCustomization} as published by a client. Extends the
@@ -4489,6 +4653,9 @@ pub struct ClientPluginCustomization {
     /// under the child's durable key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub child_enablement: Option<std::collections::HashMap<String, Vec<CustomizationEnablement>>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A directory the host watches for this session.
@@ -4637,6 +4804,9 @@ pub struct AgentCustomization {
     /// to. Absent or `false` means the user may select it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_user_invocation: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A skill contributed by a plugin, directory, or MCP server.
@@ -4707,6 +4877,9 @@ pub struct SkillCustomization {
     /// auto-invoke. Absent or `false` means the user may invoke it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_user_invocation: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A prompt contributed by a plugin or directory.
@@ -4761,6 +4934,9 @@ pub struct PromptCustomization {
     /// Short description of what the prompt does.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A rule contributed by a plugin or directory.
@@ -4832,6 +5008,9 @@ pub struct RuleCustomization {
     /// active for matching files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub globs: Option<Vec<String>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A hook manifest contributed by a plugin or directory.
@@ -4883,6 +5062,9 @@ pub struct HookCustomization {
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An MCP server contributed by a plugin or directory.
@@ -4983,6 +5165,9 @@ pub struct McpServerCustomization {
         deserialize_with = "deserialize_mcp_server_skills"
     )]
     pub children: Option<Vec<SkillCustomization>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_type")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 fn serialize_mcp_server_skills<S>(
@@ -5046,6 +5231,9 @@ pub struct McpServerCustomizationApps {
     /// client feeds these straight through into the `hostCapabilities` of
     /// the `ui/initialize` response delivered to the View.
     pub capabilities: AhpMcpUiHostCapabilities,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// The subset of MCP App
@@ -5097,6 +5285,9 @@ pub struct AhpMcpUiHostCapabilities {
     /// Producer serves `sampling/createMessage` via `mcpMethodCall`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sampling: Option<AnyValue>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Server is registered with the host but has not yet started.
@@ -5113,12 +5304,19 @@ pub struct McpServerStartingState {
     /// startup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocking: Option<bool>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Server is running and serving requests.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerReadyState {}
+pub struct McpServerReadyState {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
 
 /// Server is reachable but cannot serve requests until the client
 /// authenticates. Mirrors the discovery flow defined by
@@ -5165,6 +5363,9 @@ pub struct McpServerAuthRequiredState {
     /// Human-readable hint, typically from the OAuth `error_description`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Server failed to start, crashed, or otherwise transitioned to a
@@ -5175,13 +5376,20 @@ pub struct McpServerAuthRequiredState {
 pub struct McpServerErrorState {
     /// Error details.
     pub error: ErrorInfo,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Server has been shut down. The host MAY remove the server from the
 /// session entirely shortly after this state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerStoppedState {}
+pub struct McpServerStoppedState {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
 
 /// A pre-registered OAuth client that clients use instead of dynamic client
 /// registration when resolving an MCP authentication challenge.
@@ -5194,6 +5402,9 @@ pub struct McpOAuthClient {
     /// public and uses a secretless flow such as authorization code with PKCE.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_secret: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Reusable MCP authentication challenge — the RFC 9728 discovery info a
@@ -5237,6 +5448,9 @@ pub struct McpAuthRequirement {
     /// Human-readable hint, typically from the OAuth `error_description`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -5486,11 +5700,14 @@ pub struct ErrorInfo {
     /// (e.g. a structured chat fetch error for richer, localized messaging).
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by
 /// `initialize`, `reconnect`, and `subscribe`, or sent in `channel/snapshot`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     /// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, `ahp-chat:/<uuid>`, or `ahp-canvas:/<uuid>`)
@@ -5657,10 +5874,13 @@ pub struct ChangesetFile {
     /// Hosts SHOULD update a published nonce whenever contents of the file change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
-    /// Whether the host reports an ongoing edit to this file.
-    /// This is advisory; false or absent does not guarantee that modifying the file is safe.
+    /// Host-reported activity on this file, as a bitset of
+    /// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+    /// reported. This is advisory; the absence of
+    /// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+    /// file is safe.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub is_editing: Option<bool>,
+    pub status: Option<ChangesetFileStatus>,
 }
 
 /// A server-declared invokable verb the client can run against a
@@ -5718,9 +5938,8 @@ pub struct ChangesetOperation {
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationsSummary {
     /// The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.
+    /// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.
     pub resource: Uri,
     /// Total number of {@link Annotation} entries in the channel.
     pub annotation_count: i64,
@@ -5729,7 +5948,7 @@ pub struct AnnotationsSummary {
 }
 
 /// Full state for a session's annotations channel, returned when a client
-/// subscribes to an `ahp-session:/<uuid>/annotations` URI.
+/// subscribes to an `ahp-annotations:/<uuid>` URI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationsState {
@@ -5946,6 +6165,9 @@ pub struct AutomationSchedule {
     /// IANA Time Zone Database identifier used to interpret the expression, for
     /// example `"UTC"` or `"Europe/Berlin"`.
     pub time_zone: String,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Starts runs from a recurring cron schedule evaluated by the host.
@@ -5962,6 +6184,9 @@ pub struct AutomationScheduleTrigger {
     /// {@link AutomationMisfirePolicy.RunOnce}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub misfire_policy: Option<AutomationMisfirePolicy>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Starts runs from events understood by the owning host.
@@ -5994,6 +6219,32 @@ pub struct AutomationEventTrigger {
     /// Clients MUST preserve unknown entries when editing other fields.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} moves the occurrence to the new time; the previous time no
+/// longer fires.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOneTimeTrigger {
+    /// Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.
+    pub id: String,
+    /// Scheduled run timestamp in ISO 8601 format.
+    pub run_at: String,
+    /// Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misfire_policy: Option<AutomationMisfirePolicy>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Describes one host-defined trigger event.
@@ -6007,6 +6258,9 @@ pub struct AutomationTriggerEventDefinition {
     /// Optional longer explanation of when this event fires.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Describes one host-defined event trigger type available for a prospective
@@ -6085,6 +6339,9 @@ pub struct AutomationSessionTemplate {
     /// {@link AutomationCapabilities.customizations}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<Vec<ClientPluginCustomization>>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Durable, client-editable definition of an automation.
@@ -6132,7 +6389,10 @@ pub struct AutomationDefinition {
 /// Partial replacement of editable {@link AutomationDefinition} fields.
 ///
 /// Omitted fields are unchanged. Supplied arrays and objects replace their
-/// corresponding values in full; they are not merged recursively.
+/// corresponding values in full; they are not merged recursively. Runtime
+/// decoders MUST preserve unrecognized members on these replacement objects
+/// and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
+/// them, so editing known fields does not erase fields from newer versions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationDefinitionPatch {
@@ -6172,6 +6432,9 @@ pub struct AutomationDefinitionPatch {
 pub struct AutomationAfterRunsCondition {
     /// Positive-integer cap on scheduled runs.
     pub max: i64,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Stops scheduling once a wall-clock date passes.
@@ -6180,6 +6443,9 @@ pub struct AutomationAfterRunsCondition {
 pub struct AutomationAfterDateCondition {
     /// ISO 8601 timestamp after which scheduling stops.
     pub date: String,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Authoritative state of one automation in {@link AutomationState.entries}.
@@ -6194,7 +6460,7 @@ pub struct AutomationEntry {
     pub resource: Uri,
     /// Current durable definition.
     pub definition: AutomationDefinition,
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
     /// Host-owned count of scheduled runs consumed against the current
@@ -6324,11 +6590,12 @@ pub struct AutomationManualRunOrigin {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationTriggeredRunOrigin {
-    /// Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.
+    /// Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.
     pub trigger_id: String,
     /// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.
+    /// schedule and one-time triggers and normally absent for event triggers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduled_for: Option<String>,
     /// `true` when this is a catch-up run created by
@@ -6473,11 +6740,24 @@ pub struct AutomationRunState {
 #[serde(tag = "kind")]
 pub enum CustomizationEnablement {
     #[serde(rename = "global")]
-    Global { enabled: bool },
+    Global {
+        enabled: bool,
+        #[serde(flatten)]
+        extra: serde_json::Map<String, serde_json::Value>,
+    },
     #[serde(rename = "workspace")]
-    Workspace { uri: Uri, enabled: bool },
+    Workspace {
+        uri: Uri,
+        enabled: bool,
+        #[serde(flatten)]
+        extra: serde_json::Map<String, serde_json::Value>,
+    },
     #[serde(rename = "session")]
-    Session { enabled: bool },
+    Session {
+        enabled: bool,
+        #[serde(flatten)]
+        extra: serde_json::Map<String, serde_json::Value>,
+    },
     #[serde(untagged)]
     Unknown(serde_json::Value),
 }
@@ -6923,6 +7203,8 @@ pub enum AutomationTrigger {
     Schedule(AutomationScheduleTrigger),
     #[serde(rename = "event")]
     Event(AutomationEventTrigger),
+    #[serde(rename = "oneTime")]
+    OneTime(AutomationOneTimeTrigger),
 }
 
 /// Self-disable rule for an automation.
@@ -6961,19 +7243,11 @@ pub enum AutomationRunLifecycle {
     Cancelled(AutomationCancelledRunLifecycle),
 }
 
-/// The state payload of a snapshot.
+/// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
-/// Deserialized by trying the empty state first (an object with no members,
-/// used by channels whose state has no fields), then session (has required `lifecycle`), then
-/// chat (has required `turns`), then canvas (has required instance/provider/type
-/// identifiers), then terminal (has required `content`),
-/// then changeset (has required `status` and `files`), then resource-watch
-/// (has required `root` and `recursive`), then annotations (has required
-/// `annotations`), then the automation catalogue (has required
-/// `automations`), then root (has required `agents`). A state that matches
-/// none of these, such as the state of a channel added in a later protocol
-/// version, decodes as `Unknown` and keeps its raw JSON.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
+/// or from_resource for typed decoding, which propagates known-channel errors.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Empty(EmptyState),
@@ -6990,4 +7264,85 @@ pub enum SnapshotState {
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     Unknown(serde_json::Value),
+}
+
+impl SnapshotState {
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    pub fn from_resource(
+        resource: &str,
+        value: serde_json::Value,
+    ) -> Result<Self, serde_json::Error> {
+        let scheme = resource
+            .split_once(':')
+            .map(|(scheme, _)| scheme)
+            .unwrap_or("");
+        match scheme {
+            "ahp-root" => serde_json::from_value::<RootState>(value)
+                .map(Box::new)
+                .map(Self::Root),
+            "ahp-automations" => serde_json::from_value::<AutomationState>(value)
+                .map(Box::new)
+                .map(Self::Automations),
+            "ahp-session" => serde_json::from_value::<SessionState>(value)
+                .map(Box::new)
+                .map(Self::Session),
+            "ahp-chat" => serde_json::from_value::<ChatState>(value)
+                .map(Box::new)
+                .map(Self::Chat),
+            "ahp-canvas" => serde_json::from_value::<CanvasState>(value)
+                .map(Box::new)
+                .map(Self::Canvas),
+            "ahp-terminal" => serde_json::from_value::<TerminalState>(value)
+                .map(Box::new)
+                .map(Self::Terminal),
+            "ahp-changeset" => serde_json::from_value::<ChangesetState>(value)
+                .map(Box::new)
+                .map(Self::Changeset),
+            "ahp-resource-watch" => serde_json::from_value::<ResourceWatchState>(value)
+                .map(Box::new)
+                .map(Self::ResourceWatch),
+            "ahp-annotations" => serde_json::from_value::<AnnotationsState>(value)
+                .map(Box::new)
+                .map(Self::Annotations),
+            "ahp-automation-run" => serde_json::from_value::<AutomationRunState>(value)
+                .map(Box::new)
+                .map(Self::AutomationRun),
+            "ahp-tcp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
+            "ahp-otlp" => serde_json::from_value::<EmptyState>(value).map(Self::Empty),
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SnapshotState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde_json::Value::deserialize(deserializer).map(Self::Unknown)
+    }
+}
+
+impl<'de> Deserialize<'de> for Snapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireSnapshot {
+            resource: Uri,
+            state: serde_json::Value,
+            from_seq: i64,
+        }
+
+        let wire = WireSnapshot::deserialize(deserializer)?;
+        let state = SnapshotState::from_resource(&wire.resource, wire.state)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            resource: wire.resource,
+            state,
+            from_seq: wire.from_seq,
+        })
+    }
 }

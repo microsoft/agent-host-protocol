@@ -179,8 +179,11 @@ impl MultiHostStateMirror {
     /// Apply a single action envelope, scoped to `host`. Routing uses
     /// `envelope.channel`: [`ROOT_RESOURCE_URI`] is the root channel,
     /// every other channel is identified by the URI the server
-    /// announces.
+    /// announces. Rejected envelopes leave state unchanged.
     pub fn apply_envelope(&mut self, host: &HostId, envelope: &ActionEnvelope) {
+        if envelope.rejection_reason.is_some() {
+            return;
+        }
         if envelope.channel == ROOT_RESOURCE_URI {
             let root = self
                 .root_states

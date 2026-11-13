@@ -376,6 +376,14 @@ actor AHPConnection {
             if let callback = onAction {
                 await MainActor.run { callback(envelope) }
             }
+        case .actionDecodingFailed(_, let seq, let origin, _, let error):
+            serverSeq = max(serverSeq, seq)
+            if let origin, origin.clientId == clientId {
+                pendingOutboundActions.removeAll { $0.clientSeq <= origin.clientSeq }
+            }
+            #if DEBUG
+            print("[AHPConnection] failed to decode action: \(error)")
+            #endif
         case .sessionAdded(let params):
             if let callback = onNotification {
                 await MainActor.run { callback(.sessionAdded(params)) }

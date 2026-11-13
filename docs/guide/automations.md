@@ -33,6 +33,7 @@ AutomationCapabilities {
   schedules?: {
     minIntervalMinutes?: number
   }
+  oneTime?: {}
   runCancellation?: {}
   runHistoryLimit?: number
   customizations?: {}
@@ -47,7 +48,7 @@ fields describe optional features and restrictions; clients use each
 automation's `operations` to determine which definition actions are currently
 allowed.
 
-`create`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
+`create`, `oneTime`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
 the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
 
@@ -202,8 +203,8 @@ on demand.
 
 ## Triggers
 
-An empty `triggers` list means manual-only. Automatic triggers are either
-portable schedules or host-defined events.
+An empty `triggers` list means manual-only. Automatic triggers are portable
+schedules, one-time triggers, or host-defined events.
 
 Each trigger has an `id` that is unique and stable within its definition. Runs
 created automatically record that id in `AutomationTriggeredRunOrigin`, so
@@ -289,6 +290,25 @@ unavailable, for example while the host's scheduler is stopped:
 
 Omitting `misfirePolicy` is equivalent to `runOnce`. A catch-up run records
 `origin.catchUp: true` and the original `scheduledFor` timestamp.
+
+### One-time triggers
+
+When `AutomationCapabilities.oneTime` is present, a definition may contain a
+trigger that starts one run at a fixed time:
+
+```typescript
+AutomationOneTimeTrigger {
+  id: string
+  kind: 'oneTime'
+  runAt: string // ISO 8601
+  misfirePolicy?: 'skip' | 'runOnce'
+}
+```
+
+The trigger fires at most once for a given `runAt`. Updating `runAt` moves the
+occurrence to the new time; the previous time no longer fires. `misfirePolicy` applies as it does for scheduled triggers
+when `runAt` passes while automatic execution is unavailable. The run records
+`runAt` as `origin.scheduledFor`.
 
 ### Event triggers
 
@@ -454,6 +474,12 @@ different fields compose. Supplied arrays and objects replace their fields in
 full rather than merging recursively. When accepted actions replace the same
 field, the later action in server order wins. The host rejects actions that are
 unauthorized, no longer permitted, or invalid for the current definition.
+
+Runtime-decoder clients preserve unknown members on `message`, `session`,
+`triggers`, and `disableConditions`, including nested objects and shared types
+annotated `@preserveUnknownMembers`. Editors should modify decoded values (or
+copy them with their preserved members), not rebuild replacements from known
+fields alone, so they do not erase fields added by newer protocol versions.
 
 To permanently remove an automation, a client dispatches
 `automation/removed` on `ahp-automations://`:

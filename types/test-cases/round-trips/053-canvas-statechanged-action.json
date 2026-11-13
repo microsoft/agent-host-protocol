@@ -9,7 +9,7 @@
       "instanceId": "preview",
       "extensionId": "project:preview",
       "canvasId": "preview",
-      "url": "https://example.test/replacement"
+      "uri": "https://example.test/replacement"
     }
   },
   "acceptableOutputs": [{
@@ -18,7 +18,7 @@
       "instanceId": "preview",
       "extensionId": "project:preview",
       "canvasId": "preview",
-      "url": "https://example.test/replacement"
+      "uri": "https://example.test/replacement"
     }
   }]
 }

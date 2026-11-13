@@ -6,7 +6,7 @@
     "extensionId": "project:preview",
     "canvasId": "preview",
     "title": "Preview",
-    "url": "https://example.test/live"
+    "uri": "https://example.test/live"
   },
   "actions": [
     {

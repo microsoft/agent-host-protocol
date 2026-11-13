@@ -1,0 +1,24 @@
+{
+  "name": "initialize-host-environment",
+  "group": "A",
+  "description": "InitializeResult carries typed path semantics in an extensible host environment descriptor.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "environment": {
+      "pathStyle": "windows"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "0.9.0",
+      "serverSeq": 0,
+      "snapshots": [],
+      "environment": {
+        "pathStyle": "windows"
+      }
+    }
+  ]
+}

@@ -513,9 +513,9 @@ fn container_children_mut(c: &mut Customization) -> Option<&mut Vec<ChildCustomi
 
 fn effective_enablement(enablement: &[CustomizationEnablement]) -> bool {
     match enablement.first() {
-        Some(CustomizationEnablement::Global { enabled }) => *enabled,
+        Some(CustomizationEnablement::Global { enabled, .. }) => *enabled,
         Some(CustomizationEnablement::Workspace { enabled, .. }) => *enabled,
-        Some(CustomizationEnablement::Session { enabled }) => *enabled,
+        Some(CustomizationEnablement::Session { enabled, .. }) => *enabled,
         Some(CustomizationEnablement::Unknown(_)) => false,
         None => true,
     }
@@ -1032,7 +1032,10 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         StateAction::SessionMcpServerStartRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
-            McpServerState::Starting(McpServerStartingState { blocking: None }),
+            McpServerState::Starting(McpServerStartingState {
+                blocking: None,
+                extra: Default::default(),
+            }),
             None,
         ),
         StateAction::SessionMcpServerBackgroundRequested(a) => {
@@ -1050,7 +1053,9 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         StateAction::SessionMcpServerStopRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
-            McpServerState::Stopped(McpServerStoppedState {}),
+            McpServerState::Stopped(McpServerStoppedState {
+                extra: Default::default(),
+            }),
             None,
         ),
         _ => ReduceOutcome::OutOfScope,
@@ -2334,8 +2339,10 @@ mod tests {
     fn user_message(text: &str) -> Message {
         Message {
             text: text.into(),
+            extra: Default::default(),
             origin: MessageOrigin {
                 kind: MessageKind::User,
+                extra: Default::default(),
             },
             attachments: None,
             model: None,

@@ -1111,7 +1111,7 @@ function generateAnnotationsChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Annotations Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the `ahp-session:/<uuid>/annotations` channel — per-session annotations anchored to file ranges within a session turn. Clients (and the agent host) mutate annotations by dispatching the client-dispatchable `annotations/*` state actions, which the write-ahead reducer applies identically on both peers.\n');
+  lines.push('Reference for the `ahp-annotations:/<uuid>` channel — per-session annotations anchored to file ranges within a session turn. Clients (and the agent host) mutate annotations by dispatching the client-dispatchable `annotations/*` state actions, which the write-ahead reducer applies identically on both peers.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {

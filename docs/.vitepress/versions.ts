@@ -5,7 +5,7 @@
  * matching `v<version>` git tag; `npm run docs:versions` materializes it
  * into `docs/versions/<version>/`.
  */
-export const STABLE_DOC_VERSIONS: readonly string[] = ['1.0.0']
+export const STABLE_DOC_VERSIONS: readonly string[] = ['1.1.0', '1.0.0']
 
 /** Top-level docs sections that are versioned. */
 export const VERSIONED_SECTIONS = ['guide', 'specification', 'reference'] as const

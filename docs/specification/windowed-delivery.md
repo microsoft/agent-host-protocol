@@ -9,9 +9,9 @@ waits for credit before it sends more data. This lets a sender slow down the
 source of the data, such as a terminal process, when the receiver falls behind.
 
 The window is a soft target. A sender can go slightly past it with its last
-message or fragment. Each JSON-RPC data message also has a hard size limit. Large
-messages are sent in fragments, and each fragment counts against the window.
-Fragments also let subscriptions take turns, so that one busy subscription does
+message or frame. Each JSON-RPC data message also has a hard size limit. Large
+messages are sent in frames, and each frame counts against the window.
+Frames also let subscriptions take turns, so that one busy subscription does
 not hold up the whole connection.
 
 A subscription uses windowed delivery only if the client offers it in
@@ -27,7 +27,7 @@ This page uses these terms:
   message that a channel defines, such as `tcp/reset`. Control messages do not
   count against the window.
 - A **data message** is any other notification for the subscription, including
-  `channel/frame` fragments. Examples are `action`, `channel/snapshot`,
+  `channel/frame` notifications. Examples are `action`, `channel/snapshot`,
   `dispatchAction`, and `auth/required`. Data messages
   count against the window.
 
@@ -43,7 +43,7 @@ data that it receives:
 | Limit | Meaning |
 |---|---|
 | `windowBytes` | The target amount of outstanding data. When outstanding data reaches this value, the sender waits for credit. This is a soft target. |
-| `maximumFrameBytes` | The largest JSON-RPC data message, including a `channel/frame` notification, that can be sent. This is a hard limit, and MUST be at least 1024. |
+| `maxFrameBytes` | The largest JSON-RPC data message, including a `channel/frame` notification, that can be sent. This is a hard limit, and MUST be at least 1024. |
 
 All sizes are measured as described in [Measuring Size](#measuring-size).
 
@@ -54,9 +54,9 @@ two sets of limits:
 - `hostReceive` applies to data that the client sends to the server.
 
 The server MAY set each `clientReceive` value lower than the client offered. It
-MUST NOT set any value higher than the client offered. `maximumFrameBytes` MUST
+MUST NOT set any value higher than the client offered. `maxFrameBytes` MUST
 be at least 1024 in both sets of limits. A server MUST decline windowed delivery
-if, within these limits, it cannot send a `channel/frame` fragment that carries
+if, within these limits, it cannot send a `channel/frame` notification that carries
 at least one character, for example because the channel URI is very long.
 
 In this example, the server accepts small limits so that the later examples are
@@ -73,7 +73,7 @@ easy to follow:
     "flowControl": {
       "receive": {
         "windowBytes": 262144,
-        "maximumFrameBytes": 16384
+        "maxFrameBytes": 16384
       }
     }
   }
@@ -87,11 +87,11 @@ easy to follow:
     "flowControl": {
       "clientReceive": {
         "windowBytes": 512,
-        "maximumFrameBytes": 1024
+        "maxFrameBytes": 1024
       },
       "hostReceive": {
         "windowBytes": 512,
-        "maximumFrameBytes": 1024
+        "maxFrameBytes": 1024
       }
     }
   }
@@ -126,11 +126,11 @@ receives the `subscribe` result. Initial data can be larger than the window,
 and the server cannot finish sending it until the client returns credit.
 
 The first data message that the server sends on a windowed subscription MUST
-be a `channel/snapshot` notification. If the snapshot is sent in fragments, this
+be a `channel/snapshot` notification. If the snapshot is sent in frames, this
 applies to the joined message. Every data message after the snapshot is a
 change to that state, or new data for the channel.
 
-The server MUST send the `subscribe` result before any data message or fragment
+The server MUST send the `subscribe` result before any data message or frame
 for the subscription. The client can send data messages, such as
 `dispatchAction`, as soon as it receives the result; it does not need to wait
 for the snapshot.
@@ -170,7 +170,7 @@ example:
 ```
 
 This message is 520 bytes when serialized without whitespace, so it fits within
-`maximumFrameBytes` and is sent as shown. It also counts 520 bytes against the
+`maxFrameBytes` and is sent as shown. It also counts 520 bytes against the
 window.
 
 After processing the snapshot, the client sends credit for it:
@@ -185,7 +185,7 @@ After processing the snapshot, the client sends credit for it:
 
 The snapshot is larger than the 512-byte window. This is allowed because the
 window was empty when the server sent it, and the snapshot fits within
-`maximumFrameBytes`; see [Window and Credit](#window-and-credit). The server
+`maxFrameBytes`; see [Window and Credit](#window-and-credit). The server
 cannot send more data until it receives credit.
 
 A channel whose state has no fields, such as a telemetry channel, also starts
@@ -214,29 +214,29 @@ The message still counts against the window. A receiver MUST NOT treat a data
 message as uncounted because it is not wrapped in `channel/frame`.
 
 Each JSON-RPC data message sent, including a `channel/frame` notification, MUST
-NOT exceed `maximumFrameBytes`. If a data message is larger than
-`maximumFrameBytes`, the sender MUST do one of the following:
+NOT exceed `maxFrameBytes`. If a data message is larger than
+`maxFrameBytes`, the sender MUST do one of the following:
 
 - Split the content into several smaller data messages that are each valid on
   their own. For example, send long terminal output as several `terminal/data`
   actions, in order.
-- Send the message in fragments, as described in [Fragments](#fragments).
+- Send the message in frames, as described in [Frames](#frames).
 
-A data message that fits within `maximumFrameBytes` can be sent whole, even if
+A data message that fits within `maxFrameBytes` can be sent whole, even if
 it is larger than the remaining credit; see [Window and Credit](#window-and-credit).
-A sender can also send it in fragments, so that it does not hold up other
+A sender can also send it in frames, so that it does not hold up other
 subscriptions.
 
-## Fragments
+## Frames
 
-Fragments have two purposes:
+Frames have two purposes:
 
-- They carry a data message that is larger than `maximumFrameBytes`.
+- They carry a data message that is larger than `maxFrameBytes`.
 - They let subscriptions share the connection. A large message sent whole may
-  hold up every other subscription until it has been sent. Sent in fragments, it
+  hold up every other subscription until it has been sent. Sent in frames, it
   takes turns with other subscriptions.
 
-A sender divides a data message into fragments by serializing it to JSON text,
+A sender divides a data message into frames by serializing it to JSON text,
 dividing the text into pieces, and sending each piece in a `channel/frame`
 notification:
 
@@ -244,12 +244,12 @@ notification:
 |---|---|
 | `channel` | The subscription's channel URI |
 | `data` | The next piece of the serialized message |
-| `final` | `true` on the last fragment. Absent or `false` on other fragments. |
+| `final` | `true` on the last frame. Absent or `false` on other frames. |
 
-For example, the 284-byte `action` message above can be sent as two fragments:
+For example, the 284-byte `action` message above can be sent as two frames:
 
 ```jsonc
-// Server to client: first fragment
+// Server to client: first frame
 {
   "jsonrpc": "2.0",
   "method": "channel/frame",
@@ -259,7 +259,7 @@ For example, the 284-byte `action` message above can be sent as two fragments:
   }
 }
 
-// Server to client: last fragment
+// Server to client: last frame
 {
   "jsonrpc": "2.0",
   "method": "channel/frame",
@@ -272,43 +272,43 @@ For example, the 284-byte `action` message above can be sent as two fragments:
 ```
 
 The receiver joins the `data` strings in the order received. When it receives
-the fragment with `final: true`, it parses the joined text as one JSON-RPC
+the frame with `final: true`, it parses the joined text as one JSON-RPC
 notification and processes it in the same way as a message received without
-fragments. The receiver MUST NOT process a message before it has the final
-fragment.
+frames. The receiver MUST NOT process a message before it has the final
+frame.
 
-Each fragment counts against the window when it is sent. If the window becomes
+Each frame counts against the window when it is sent. If the window becomes
 full partway through a message, the sender waits for credit before it sends the
-next fragment. See [Window and Credit](#window-and-credit).
+next frame. See [Window and Credit](#window-and-credit).
 
 Each `data` value is a JSON string that contains JSON text, so it has two levels
-of escaping. In the last fragment, `\\r\\n` decodes to the text `\r\n`. When the
+of escaping. In the last frame, `\\r\\n` decodes to the text `\r\n`. When the
 receiver parses the joined message, `\r\n` decodes to a carriage return and a
 line feed.
 
-The following rules apply to fragments:
+The following rules apply to frames:
 
 1. `data` MUST NOT be empty.
-2. A fragment MUST NOT divide a UTF-16 surrogate pair.
+2. A frame MUST NOT divide a UTF-16 surrogate pair.
 3. The `channel` inside the joined message MUST be the same as the `channel` of
-   the fragments.
-4. For each subscription and direction, only one fragmented message can be in
-   progress. After the first fragment of a message, the sender MUST NOT send
+   the frames.
+4. For each subscription and direction, only one framed message can be in
+   progress. After the first frame of a message, the sender MUST NOT send
    another data message for that subscription and direction until it has sent
-   the final fragment. The sender can send messages for other subscriptions, and
-   control messages, between fragments.
-5. Control messages MUST NOT be sent in fragments. Requests and responses MUST
+   the final frame. The sender can send messages for other subscriptions, and
+   control messages, between frames.
+5. Control messages MUST NOT be sent in frames. Requests and responses MUST
    NOT be sent in `channel/frame`.
-6. Fragments do not have message IDs or offsets. The transport delivers them in
+6. Frames do not have message IDs or offsets. The transport delivers them in
    order.
 
-A sender chooses the size of each fragment, up to `maximumFrameBytes`. Smaller
-fragments let subscriptions take turns more often, but each fragment adds its
+A sender chooses the size of each frame, up to `maxFrameBytes`. Smaller
+frames let subscriptions take turns more often, but each frame adds its
 `channel/frame` envelope to the data sent. When the remaining credit is smaller
-than `maximumFrameBytes`, a sender SHOULD make the next fragment about the size
+than `maxFrameBytes`, a sender SHOULD make the next frame about the size
 of the remaining credit, so that it fills the window without going far past it.
-The fragment does not need to match the remaining credit exactly. When the
-remaining credit is smaller than a `channel/frame` envelope, the fragment goes
+The frame does not need to match the remaining credit exactly. When the
+remaining credit is smaller than a `channel/frame` envelope, the frame goes
 slightly past the window.
 
 ## Measuring Size
@@ -327,19 +327,19 @@ In JavaScript, the size of a string is `text.length * 2`. Implementations in
 other languages MUST count UTF-16 code units, not characters or UTF-8 bytes.
 
 The size of a message is the size of its complete JSON-RPC text, as sent and as
-received. For a fragment, this includes the `channel/frame` envelope and the
+received. For a frame, this includes the `channel/frame` envelope and the
 escape characters that JSON adds to `data`. The same size is used for the
-window, for credit, and for `maximumFrameBytes`.
+window, for credit, and for `maxFrameBytes`.
 
 | Message | Size |
 |---|---:|
 | `channel/snapshot` example | 520 |
 | `action` example, sent whole | 284 |
-| `action` example, first fragment | 360 |
-| `action` example, last fragment | 374 |
+| `action` example, first frame | 360 |
+| `action` example, last frame | 374 |
 
-Sent as two fragments, the `action` uses 734 bytes of the window instead of 284,
-because the fragment envelopes and escape characters count. This is the real
+Sent as two frames, the `action` uses 734 bytes of the window instead of 284,
+because the frame envelopes and escape characters count. This is the real
 amount of data sent, so it is the amount the window counts.
 
 A receiver MUST measure the text it received. It MUST NOT parse a message and
@@ -350,7 +350,7 @@ escape sequences can change.
 
 For each direction of a subscription, the sender keeps two totals:
 
-- **Sent bytes**: the total size of all data messages and fragments that it
+- **Sent bytes**: the total size of all data messages and frames that it
   has sent.
 - **Consumed bytes**: the highest `consumedBytes` value it has received in
   `channel/credit`.
@@ -361,29 +361,29 @@ The difference is the **outstanding** data:
 outstanding = sent bytes - consumed bytes
 ```
 
-The sender MUST NOT send a data message or fragment while outstanding data is
+The sender MUST NOT send a data message or frame while outstanding data is
 equal to or greater than `windowBytes`. It adds the size of each data message
-or fragment to sent bytes when it sends it.
+or frame to sent bytes when it sends it.
 
 The window is a soft target. A sender does not know the exact size of a message
 until it serializes it, and it does not need to try different sizes to fit the
-remaining credit exactly. The last message or fragment that a sender sends
+remaining credit exactly. The last message or frame that a sender sends
 before the window is full can go past the window. For example, if 500 bytes of
 a 512-byte window are outstanding, the sender can still send a 284-byte action
-whole. Because every message and fragment is
-at most `maximumFrameBytes`, outstanding data is always less than
-`windowBytes + maximumFrameBytes`.
+whole. Because every message and frame is
+at most `maxFrameBytes`, outstanding data is always less than
+`windowBytes + maxFrameBytes`.
 
-A sender SHOULD send large messages in fragments, so that it does not go far
+A sender SHOULD send large messages in frames, so that it does not go far
 past the window. For example, with a 64 KiB window and 16 KiB
-`maximumFrameBytes`, a 100 KiB tool-call action is sent as a series of
-fragments of up to 16 KiB. After about 64 KiB, the window is full, and the
-sender waits for credit before it sends the next fragment. While it waits,
+`maxFrameBytes`, a 100 KiB tool-call action is sent as a series of
+frames of up to 16 KiB. After about 64 KiB, the window is full, and the
+sender waits for credit before it sends the next frame. While it waits,
 other subscriptions can still send data.
 
 The receiver tells the sender how much data it has released by sending
 `channel/credit`. The `consumedBytes` value is the total size of all data
-messages and fragments that the receiver has released since the subscription
+messages and frames that the receiver has released since the subscription
 started. It is a total, not an increment.
 
 Continuing the example, the client receives the 284-byte `action` after the
@@ -403,8 +403,8 @@ Continuing the example, the client receives the 284-byte `action` after the
 | `action` | 284 | 804 |
 
 The credit for the action is 284 bytes, not the 14 bytes of terminal text in
-the action. Had the server sent the action as the two fragments shown in
-[Fragments](#fragments), the credit for it would be 734 bytes, and
+the action. Had the server sent the action as the two frames shown in
+[Frames](#frames), the credit for it would be 734 bytes, and
 `consumedBytes` would be 1254.
 
 The receiver decides when to send credit. For example:
@@ -420,20 +420,20 @@ MUST send credit as soon as it is ready to receive more data. If it does not,
 the sender waits indefinitely. A receiver that sends credit as soon as data
 arrives does not slow the sender down.
 
-A receiver can release fragments at any time while it receives a message. It
-MUST NOT wait for all fragments of a message to arrive before releasing any of
+A receiver can release frames at any time while it receives a message. It
+MUST NOT wait for all frames of a message to arrive before releasing any of
 them. The sender stops when the window is full, so a message larger than the
 window would never be completed.
 
 `consumedBytes` can be any value up to sent bytes; it does not need to match
-the end of a message or fragment. A sender ignores a value that is less than or
+the end of a message or frame. A sender ignores a value that is less than or
 equal to the previous value.
 
 This specification does not define what happens when a peer breaks these rules:
 for example, when `consumedBytes` is greater than sent bytes, when a sender
 sends while outstanding data is at or above `windowBytes`, or when a message is
-larger than `maximumFrameBytes`. Going past the window with the last message or
-fragment is not a violation. An implementation that detects a violation can log
+larger than `maxFrameBytes`. Going past the window with the last message or
+frame is not a violation. An implementation that detects a violation can log
 it or close the connection.
 
 The server MUST share the connection fairly among subscriptions, and MUST limit
@@ -455,7 +455,7 @@ roles reversed: the client checks the `hostReceive` limits, and the server sends
 
 | Method | Direction | Purpose |
 |---|---|---|
-| `channel/credit` | Either | Reports the total size of data messages and fragments that the receiver has released |
+| `channel/credit` | Either | Reports the total size of data messages and frames that the receiver has released |
 | `unsubscribe` | Client to server | Ends the subscription |
 
 A channel can define its own control messages. For example, the
@@ -530,7 +530,7 @@ the reason locally.
 
 For each kept subscription:
 
-- Both peers discard partial fragmented messages from the old connection.
+- Both peers discard partially received framed messages from the old connection.
 - All counters start at zero on the new connection. Credit counts only data
   received on the new connection. A client that still holds data from the old
   connection keeps it, but never sends credit for it.
@@ -592,14 +592,14 @@ credit for it. The client also had a windowed subscription to
         {
           "channel": "ahp-terminal:/t1",
           "flowControl": {
-            "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
+            "receive": { "windowBytes": 262144, "maxFrameBytes": 16384 }
           },
           "lastAppliedServerSeq": 6
         },
         {
           "channel": "ahp-terminal:/t2",
           "flowControl": {
-            "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
+            "receive": { "windowBytes": 262144, "maxFrameBytes": 16384 }
           },
           "lastAppliedServerSeq": 0
         }
@@ -623,11 +623,11 @@ credit for it. The client also had a windowed subscription to
           "flowControl": {
             "clientReceive": {
               "windowBytes": 512,
-              "maximumFrameBytes": 1024
+              "maxFrameBytes": 1024
             },
             "hostReceive": {
               "windowBytes": 512,
-              "maximumFrameBytes": 1024
+              "maxFrameBytes": 1024
             }
           },
           "recovery": "replay"

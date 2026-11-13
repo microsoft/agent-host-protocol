@@ -17,6 +17,7 @@ import {
   EnumDeclaration,
   PropertySignature,
   SourceFile,
+  Node,
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
@@ -29,6 +30,9 @@ import {
   isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { readActionOrigins } from './generate-action-origin.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -406,6 +410,7 @@ function generateSwiftStruct(
   swiftName: string,
   props: SwiftProp[],
   nested?: string,
+  preserveUnknownMembers = false,
 ): string {
   const lines: string[] = [];
 
@@ -417,9 +422,9 @@ function generateSwiftStruct(
   const isRecursive = props.some(p => p.type === swiftName || p.type === `${swiftName}?`);
 
   if (isRecursive) {
-    lines.push(`public final class ${swiftName}: Codable, @unchecked Sendable {`);
+    lines.push(`public final class ${swiftName}: Codable, @unchecked Sendable, Equatable {`);
   } else {
-    lines.push(`public struct ${swiftName}: Codable, Sendable {`);
+    lines.push(`public struct ${swiftName}: Codable, Sendable, Equatable {`);
   }
 
   // Properties
@@ -432,6 +437,11 @@ function generateSwiftStruct(
     lines.push(`    public var ${p.name}: ${p.type}`);
   }
 
+  if (preserveUnknownMembers) {
+    lines.push('    /// Unrecognized wire members retained for full-object edits.');
+    lines.push('    public var extra: [String: AnyCodable]');
+  }
+
   // Nested types
   if (nested) {
     lines.push('');
@@ -441,10 +451,10 @@ function generateSwiftStruct(
   }
 
   // CodingKeys if needed
-  const needsKeys = props.some(p => p.name !== p.wireName);
-  if (needsKeys) {
+  const needsKeys = props.some(p => p.name !== p.wireName) || swiftName === 'Snapshot';
+  if (needsKeys || preserveUnknownMembers) {
     lines.push('');
-    lines.push('    enum CodingKeys: String, CodingKey {');
+    lines.push(`    enum CodingKeys: String, CodingKey${preserveUnknownMembers ? ', CaseIterable' : ''} {`);
     for (const p of props) {
       if (p.name !== p.wireName) {
         lines.push(`        case ${p.name} = ${JSON.stringify(p.wireName)}`);
@@ -461,16 +471,52 @@ function generateSwiftStruct(
     const defaultVal = p.optional ? ' = nil' : '';
     return `        ${p.name}: ${p.type}${defaultVal}`;
   });
+  if (preserveUnknownMembers) initParams.push('        extra: [String: AnyCodable] = [:]');
   lines.push('    public init(');
   lines.push(initParams.join(',\n'));
   lines.push('    ) {');
   for (const p of props) {
     lines.push(`        self.${p.name} = ${p.name}`);
   }
+  if (preserveUnknownMembers) lines.push('        self.extra = extra');
   lines.push('    }');
+  if (preserveUnknownMembers) lines.push(generateUnknownMembersCodable(props));
+  if (swiftName === 'Snapshot') {
+    lines.push(`
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.resource = try container.decode(String.self, forKey: .resource)
+        self.state = try SnapshotState.decode(resource: resource, from: container.superDecoder(forKey: .state))
+        self.fromSeq = try container.decode(Int.self, forKey: .fromSeq)
+    }`);
+  }
+
+  // Swift synthesizes equality for value types, but not recursive classes.
+  if (isRecursive) {
+    lines.push('');
+    lines.push(`    public static func == (lhs: ${swiftName}, rhs: ${swiftName}) -> Bool {`);
+    const names = [...props.map(p => p.name), ...(preserveUnknownMembers ? ['extra'] : [])];
+    lines.push(names.map(name => `        lhs.${name} == rhs.${name}`).join(' &&\n'));
+    lines.push('    }');
+  }
 
   lines.push('}');
   return lines.join('\n');
+}
+
+function generateUnknownMembersCodable(props: SwiftProp[]): string {
+  return `
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+${props.map(p => `        self.${p.name} = try container.${p.optional ? 'decodeIfPresent' : 'decode'}(${p.type.replace(/\?$/, '')}.self, forKey: .${p.name})`).join('\n')}
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+${props.map(p => `        try container.${p.optional ? 'encodeIfPresent' : 'encode'}(self.${p.name}, forKey: .${p.name})`).join('\n')}
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\\.rawValue)))
+    }`;
 }
 
 // ─── Discriminated Union Generation ──────────────────────────────────────────
@@ -510,7 +556,7 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
     config.discriminatorEnum,
   );
   const lines: string[] = [];
-  lines.push(`public enum ${config.name}: Codable, Sendable {`);
+  lines.push(`public enum ${config.name}: Codable, Sendable, Equatable {`);
 
   for (const v of config.variants) {
     lines.push(`    case ${v.caseName}(${v.structName})`);
@@ -586,7 +632,7 @@ function generateStructFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = swiftNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  const declaration = generateSwiftStruct(name, props);
+  const declaration = generateSwiftStruct(name, props, undefined, preservesUnknownMembers(iface));
   if (!readStability(iface)) return declaration;
   const doc = getDocumentation(iface).split('\n').map(line => emitSwiftDocLine(line)).join('\n');
   return `${doc}\n${declaration}`;
@@ -601,7 +647,7 @@ function generateFixedChatSourceBranchSwift(
   const hasSelection = name === 'SideChatSource';
   const lines = [
     ...doc.split('\n').map(line => emitSwiftDocLine(line)),
-    `public struct ${name}: Codable, Sendable {`,
+    `public struct ${name}: Codable, Sendable, Equatable {`,
     '    /// Discriminant',
     `    public var kind: ChatSourceKind { .${kindCase} }`,
     '    /// URI of the existing source chat.',
@@ -690,7 +736,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
@@ -760,7 +806,7 @@ const STATE_STRUCTS = [
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
   'AutomationSessionOrigin', 'AutomationSchedule',
-  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger', 'AutomationOneTimeTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
@@ -1006,7 +1052,7 @@ const BACKGROUND_WORK_UNION: UnionConfig = {
 };
 
 function generateToolResultContentUnion(): string {
-  return `public enum ToolResultContent: Codable, Sendable {
+  return `public enum ToolResultContent: Codable, Sendable, Equatable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
     case resource(ToolResultResourceContent)
@@ -1088,7 +1134,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
         }
     }
 
-    private struct MarkdownWrapper: Codable {
+    private struct MarkdownWrapper: Codable, Equatable {
         let markdown: String
     }
 }`;
@@ -1128,7 +1174,7 @@ public enum WorkingDirectoryEntry: Codable, Sendable {
 
 function generateToolInput(): string {
   return `/// Raw tool input represented inline or by content reference.
-public enum ToolInput: Codable, Sendable {
+public enum ToolInput: Codable, Sendable, Equatable {
     case inline(String)
     case contentRef(ContentRef)
 
@@ -1152,8 +1198,13 @@ public enum ToolInput: Codable, Sendable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot.
-public enum SnapshotState: Codable, Sendable {
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `        case "${scheme}": return .${toCamelCase(variant)}(try ${type}(from: decoder))`
+  ).join('\n');
+  return `/// The state payload of a snapshot, selected by its resource's URI scheme.
+/// Standalone decoding preserves any JSON value as unknown; use Snapshot or
+/// decode(resource:from:) for typed decoding, which propagates known-channel errors.
+public enum SnapshotState: Codable, Sendable, Equatable {
     case empty(EmptyState)
     case root(RootState)
     case session(SessionState)
@@ -1169,48 +1220,16 @@ public enum SnapshotState: Codable, Sendable {
     /// re-encodes unchanged.
     case unknown(AnyCodable)
 
-    private struct MemberKey: CodingKey {
-        var stringValue: String
-        var intValue: Int? { nil }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue: Int) { nil }
+    public init(from decoder: Decoder) throws {
+        self = .unknown(try AnyCodable(from: decoder))
     }
 
-    public init(from decoder: Decoder) throws {
-        // An object with no members is an empty state, used by channels whose state has no fields.
-        // EmptyState would decode any object, so check for members explicitly.
-        if let members = try? decoder.container(keyedBy: MemberKey.self), members.allKeys.isEmpty {
-            self = .empty(EmptyState())
-            return
-        }
-        // Try the most distinctive shapes first. SessionState has required
-        // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
-        // \`turns\`; CanvasState has required instance/provider/type identifiers;
-        // the remaining variants follow, with RootState as the
-        // catch-all.
-        if let session = try? SessionState(from: decoder) {
-            self = .session(session)
-        } else if let chat = try? ChatState(from: decoder) {
-            self = .chat(chat)
-        } else if let canvas = try? CanvasState(from: decoder) {
-            self = .canvas(canvas)
-        } else if let terminal = try? TerminalState(from: decoder) {
-            self = .terminal(terminal)
-        } else if let changeset = try? ChangesetState(from: decoder) {
-            self = .changeset(changeset)
-        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
-            self = .resourceWatch(resourceWatch)
-        } else if let annotations = try? AnnotationsState(from: decoder) {
-            self = .annotations(annotations)
-        } else if let automations = try? AutomationState(from: decoder) {
-            self = .automations(automations)
-        } else if let automationRun = try? AutomationRunState(from: decoder) {
-            self = .automationRun(automationRun)
-        } else if let root = try? RootState(from: decoder) {
-            self = .root(root)
-        } else {
-            // A state from a later protocol version: keep it rather than fail.
-            self = .unknown(try AnyCodable(from: decoder))
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    public static func decode(resource: String, from decoder: Decoder) throws -> SnapshotState {
+        let scheme = resource.firstIndex(of: ":").map { resource[..<$0] } ?? ""
+        switch scheme {
+${branches}
+        default: return .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -1235,7 +1254,7 @@ public enum SnapshotState: Codable, Sendable {
 
 
 function generateChatOriginSwift(): string {
-  return `public struct ChatOriginUser: Codable, Sendable {
+  return `public struct ChatOriginUser: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
 
     public init(kind: ChatOriginKind = .user) {
@@ -1243,7 +1262,7 @@ function generateChatOriginSwift(): string {
     }
 }
 
-public struct ChatOriginFork: Codable, Sendable {
+public struct ChatOriginFork: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -1255,7 +1274,7 @@ public struct ChatOriginFork: Codable, Sendable {
     }
 }
 
-public struct ChatOriginTool: Codable, Sendable {
+public struct ChatOriginTool: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var toolCallId: String
@@ -1267,7 +1286,7 @@ public struct ChatOriginTool: Codable, Sendable {
     }
 }
 
-public struct ChatOriginSideChat: Codable, Sendable {
+public struct ChatOriginSideChat: Codable, Sendable, Equatable {
     public var kind: ChatOriginKind
     public var chat: String
     public var turnId: String
@@ -1281,7 +1300,7 @@ public struct ChatOriginSideChat: Codable, Sendable {
     }
 }
 
-public enum ChatOrigin: Codable, Sendable {
+public enum ChatOrigin: Codable, Sendable, Equatable {
     case user(ChatOriginUser)
     case fork(ChatOriginFork)
     case sideChat(ChatOriginSideChat)
@@ -1340,6 +1359,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { caseName: 'schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
     { caseName: 'event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+    { caseName: 'oneTime', structName: 'AutomationOneTimeTrigger', discriminantValue: 'oneTime' },
   ],
   injectDiscriminantOnEncode: true,
 };
@@ -1408,7 +1428,7 @@ function generateStateFile(project: Project): string {
   }
 
   lines.push('// MARK: - Customization Enablement Union\n');
-  lines.push(generateCustomizationEnablementSwift());
+  lines.push(generateCustomizationEnablementSwift(project));
   lines.push('');
 
   lines.push('// MARK: - Tool Input\n');
@@ -1594,7 +1614,7 @@ function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Sess
   const className = `${scope}ToolCallConfirmedAction`;
   const wireType = scope === 'Chat' ? 'chat/toolCallConfirmed' : 'session/toolCallConfirmed';
   return `/// Client approves or denies a pending tool call (merged approved + denied variants).
-public struct ${className}: Codable, Sendable {
+public struct ${className}: Codable, Sendable, Equatable {
     /// Action type discriminant
     public var type: String
     /// Turn identifier
@@ -1707,7 +1727,7 @@ function generateActionsFile(project: Project): string {
   // StateAction discriminated union
   lines.push('// MARK: - StateAction Union\n');
   lines.push('/// Discriminated union of all state actions.');
-  lines.push('public enum StateAction: Codable, Sendable {');
+  lines.push('public enum StateAction: Codable, Sendable, Equatable {');
   for (const v of ACTION_VARIANTS) {
     lines.push(`    case ${v.caseName}(${v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : v.tsInterface === '_merged_chat_' ? 'ChatToolCallConfirmedAction' : v.tsInterface})`);
   }
@@ -1751,19 +1771,47 @@ function generateActionsFile(project: Project): string {
   return lines.join('\n');
 }
 
+function generateActionOriginFile(project: Project): string {
+  const dispatchable = readActionOrigins(project)
+    .filter(action => action.isClientDispatchable)
+    .map(action => {
+      const variant = ACTION_VARIANTS.find(variant => variant.type === action.actionType);
+      if (!variant) throw new Error(`Missing Swift action variant for ${action.name}`);
+      return variant;
+    });
+
+  return `${GENERATED_HEADER}
+/// Set of action types that clients are allowed to dispatch.
+public let clientDispatchableActions: Set<String> = [
+${dispatchable.map(action => `    ${JSON.stringify(action.type)},`).join('\n')}
+]
+
+/// Checks whether an action may be dispatched by a client.
+public func isClientDispatchable(_ action: StateAction) -> Bool {
+    switch action {
+    case ${dispatchable.map(action => `.${action.caseName}`).join(',\n         ')}:
+        return true
+    default:
+        return false
+    }
+}
+`;
+}
+
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'RepositorySource',
-  'CreateTcpConnectionParams',
-  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
+  'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
+  'InitializeParams', 'HostEnvironment', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationCapabilities',
   'RepositoryPreparationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'AutomationOneTimeCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
@@ -1837,6 +1885,55 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
+function generateCommandConformances(project: Project): string {
+  const commandMap = findInterface(project, 'CommandMap');
+  if (!commandMap) throw new Error('Interface CommandMap not found');
+
+  const lines = [`/// A protocol command whose params determine its method and result type.
+public protocol AHPCommand: Encodable, Sendable {
+    associatedtype Result: Decodable, Sendable
+    static var method: String { get }
+}
+
+/// The JSON null result returned by commands with no response payload.
+public struct AHPNullResult: Codable, Sendable, Equatable {
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard container.decodeNil() else {
+            throw DecodingError.typeMismatch(Self.self, DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected a null command result"
+            ))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
+    }
+}
+`];
+
+  for (const property of commandMap.getProperties()) {
+    const command = property.getTypeNodeOrThrow();
+    if (!Node.isTypeLiteral(command)) {
+      throw new Error(`Expected a type literal for CommandMap.${property.getName()}`);
+    }
+    const method = property.getName().replace(/^['"]|['"]$/g, '');
+    const params = mapType(command.getPropertyOrThrow('params').getTypeNodeOrThrow().getText());
+    const resultType = command.getPropertyOrThrow('result').getTypeNodeOrThrow().getText();
+    const result = resultType === 'null' || resultType === 'void' ? 'AHPNullResult' : mapType(resultType);
+    lines.push(`extension ${params}: AHPCommand {
+    public typealias Result = ${result}
+    public static let method = ${JSON.stringify(method)}
+}
+`);
+  }
+  return lines.join('\n');
+}
+
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1895,12 +1992,27 @@ function generateCommandsFile(project: Project): string {
   lines.push(generateChangesetOperationTargetSwift());
   lines.push('');
 
+  lines.push('// MARK: - Typed Commands\n');
+  lines.push(generateCommandConformances(project));
+
   return lines.join('\n');
 }
 
-function generateCustomizationEnablementSwift(): string {
+function generateCustomizationEnablementSwift(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (kind: string, workspace = false): string => {
+    const props = [
+      ...(workspace ? [{ name: 'uri', wireName: 'uri', type: 'URI', optional: false, doc: '' }] : []),
+      { name: 'enabled', wireName: 'enabled', type: 'Bool', optional: false, doc: '' },
+      { name: 'kind', wireName: 'kind', type: 'String', optional: false, doc: '' },
+    ];
+    const name = `CustomizationEnablement${kind[0].toUpperCase() + kind.slice(1)}`;
+    return generateSwiftStruct(name, props, undefined, preserve)
+      .replace('kind: String\n', `kind: String = ${JSON.stringify(kind)}\n`)
+      .replace('kind: String,', `kind: String = ${JSON.stringify(kind)},`);
+  };
   return `/// A single explicit customization enablement decision.
-public enum CustomizationEnablement: Codable, Sendable {
+public enum CustomizationEnablement: Codable, Sendable, Equatable {
     case global(CustomizationEnablementGlobal)
     case workspace(CustomizationEnablementWorkspace)
     case session(CustomizationEnablementSession)
@@ -1932,39 +2044,16 @@ public enum CustomizationEnablement: Codable, Sendable {
     }
 }
 
-public struct CustomizationEnablementGlobal: Codable, Sendable {
-    public var kind: String = "global"
-    public var enabled: Bool
+${variant('global')}
 
-    public init(enabled: Bool) {
-        self.enabled = enabled
-    }
-}
+${variant('workspace', true)}
 
-public struct CustomizationEnablementWorkspace: Codable, Sendable {
-    public var kind: String = "workspace"
-    public var uri: URI
-    public var enabled: Bool
-
-    public init(uri: URI, enabled: Bool) {
-        self.uri = uri
-        self.enabled = enabled
-    }
-}
-
-public struct CustomizationEnablementSession: Codable, Sendable {
-    public var kind: String = "session"
-    public var enabled: Bool
-
-    public init(enabled: Bool) {
-        self.enabled = enabled
-    }
-}`;
+${variant('session')}`;
 }
 
 function generateChangesetOperationTargetSwift(): string {
   return `/// Identifies the file or range a \`ChangesetOperation\` should act on.
-public enum ChangesetOperationTarget: Codable, Sendable {
+public enum ChangesetOperationTarget: Codable, Sendable, Equatable {
     case resource(ChangesetOperationResourceTarget)
     case range(ChangesetOperationRangeTarget)
 
@@ -1993,7 +2082,7 @@ public enum ChangesetOperationTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationResourceTarget: Codable, Sendable {
+public struct ChangesetOperationResourceTarget: Codable, Sendable, Equatable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
@@ -2022,7 +2111,7 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationRangeTarget: Codable, Sendable {
+public struct ChangesetOperationRangeTarget: Codable, Sendable, Equatable {
     public var kind: String { "range" }
     public var resource: String
     public var side: String?
@@ -2210,7 +2299,7 @@ public struct JsonRpcRequest<Params: Codable>: Codable, Sendable where Params: S
 }
 
 /// A JSON-RPC 2.0 error object.
-public struct JsonRpcError: Codable, Sendable {
+public struct JsonRpcError: Codable, Sendable, Equatable {
     public let code: Int
     public let message: String
     public let data: AnyCodable?
@@ -2230,7 +2319,7 @@ public struct JsonRpcSuccessResponse<Result: Codable>: Codable, Sendable where R
 }
 
 /// A JSON-RPC 2.0 error response.
-public struct JsonRpcErrorResponse: Codable, Sendable {
+public struct JsonRpcErrorResponse: Codable, Sendable, Equatable {
     public let jsonrpc: String
     public let id: Int
     public let error: JsonRpcError
@@ -2249,6 +2338,10 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
     }
 }
 
+extension JsonRpcRequest: Equatable where Params: Equatable {}
+extension JsonRpcSuccessResponse: Equatable where Result: Equatable {}
+extension JsonRpcNotification: Equatable where Params: Equatable {}
+
 // MARK: - Server → Client Notification Params
 
 /// Params for the server → client \`action\` notification.
@@ -2262,8 +2355,7 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "initialize", params: params)
     }
 
-    // \`ping\` carries no payload beyond the root channel discriminant, so there is
-    // no dedicated \`PingParams\` type. The helper hardcodes the channel object.
+    // Preserve the dictionary-based helper's public signature for compatibility.
     public static func ping(id: Int) -> JsonRpcRequest<[String: String]> {
         JsonRpcRequest(id: id, method: "ping", params: ["channel": "ahp-root://"])
     }
@@ -2373,7 +2465,7 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
     public let value: Any
 
     public init(_ value: Any) {
-        self.value = value
+        self.value = (value as? AnyCodable)?.value ?? value
     }
 
     public init(from decoder: Decoder) throws {
@@ -2449,12 +2541,22 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
         }
     }
 
+    private static func booleanValue(_ value: Any) -> Bool? {
+        if type(of: value) == Bool.self { return value as? Bool }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+        return number.boolValue
+    }
+
     public static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool {
+        let lhsBool = booleanValue(lhs.value)
+        let rhsBool = booleanValue(rhs.value)
+        if lhsBool != nil || rhsBool != nil {
+            return lhsBool == rhsBool
+        }
         switch (lhs.value, rhs.value) {
         case is (NSNull, NSNull):
             return true
-        case let (lhs as Bool, rhs as Bool):
-            return lhs == rhs
         case let (lhs as Int, rhs as Int):
             return lhs == rhs
         case let (lhs as Double, rhs as Double):
@@ -2463,12 +2565,14 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
             return lhs == rhs
         case let (lhs as [Any], rhs as [Any]):
             guard lhs.count == rhs.count else { return false }
-            return zip(lhs, rhs).allSatisfy { AnyCodable($0) == AnyCodable($1) }
+            return zip(lhs, rhs).allSatisfy {
+                ($0 as? AnyCodable ?? AnyCodable($0)) == ($1 as? AnyCodable ?? AnyCodable($1))
+            }
         case let (lhs as [String: Any], rhs as [String: Any]):
             guard lhs.count == rhs.count else { return false }
             return lhs.allSatisfy { key, val in
                 guard let other = rhs[key] else { return false }
-                return AnyCodable(val) == AnyCodable(other)
+                return (val as? AnyCodable ?? AnyCodable(val)) == (other as? AnyCodable ?? AnyCodable(other))
             }
         default:
             return false
@@ -2536,7 +2640,6 @@ function checkExhaustiveness(project: Project): void {
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
     'SessionToolCallConfirmedAction', // emitted as merged variant
-    'PingParams',                    // empty interface; no Swift type emitted (AHPCommands.ping hardcodes the channel)
     'TerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
     'TerminalContentPart',           // TERMINAL_CONTENT_PART_UNION discriminated union
     'ChatInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
@@ -2681,6 +2784,7 @@ export function generateSwiftPackage(project: Project, outputDir: string): void 
   // Generated files (always overwritten)
   fs.writeFileSync(path.join(generatedDir, 'State.generated.swift'), generateStateFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Actions.generated.swift'), generateActionsFile(project));
+  fs.writeFileSync(path.join(generatedDir, 'ActionOrigin.generated.swift'), generateActionOriginFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Commands.generated.swift'), generateCommandsFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Notifications.generated.swift'), generateNotificationsFile(project));
   fs.writeFileSync(path.join(generatedDir, 'Errors.generated.swift'), generateErrorsFile(project));

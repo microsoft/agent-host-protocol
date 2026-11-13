@@ -29,11 +29,11 @@
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
-        ChangesetOperationTarget, ChatSource, CreateChatParams, CreateSessionParams,
-        CreateTcpConnectionParams, Implementation, InitializeParams, InitializeResult,
-        ListSessionsResult, ReconnectParams, ReconnectResult, ResolveSessionConfigParams,
-        ResourceReadParams, ResourceReadResult, SessionConfigCompletionsParams, SubscribeParams,
-        SubscribeResult,
+        AuthenticateParams, ChangesetOperationTarget, ChatSource, CreateChatParams,
+        CreateSessionParams, CreateTcpConnectionParams, Implementation, InitializeParams,
+        InitializeResult, ListSessionsResult, ReconnectParams, ReconnectResult,
+        ResolveSessionConfigParams, ResourceReadParams, ResourceReadResult,
+        SessionConfigCompletionsParams, SubscribeParams, SubscribeResult,
     },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
@@ -253,6 +253,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "CreateTcpConnectionParams" => round_trip!(CreateTcpConnectionParams),
         "ResourceReadParams" => round_trip!(ResourceReadParams),
         "ResourceReadResult" => round_trip!(ResourceReadResult),
+        "AuthenticateParams" => round_trip!(AuthenticateParams),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

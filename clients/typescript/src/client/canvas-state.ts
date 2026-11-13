@@ -17,5 +17,5 @@ export function isCanvasState(state: Snapshot['state']): state is CanvasState {
   return (state.extensionName === undefined || typeof state.extensionName === 'string')
     && (state.title === undefined || typeof state.title === 'string')
     && (state.status === undefined || typeof state.status === 'string')
-    && (state.url === undefined || typeof state.url === 'string');
+    && (state.uri === undefined || typeof state.uri === 'string');
 }

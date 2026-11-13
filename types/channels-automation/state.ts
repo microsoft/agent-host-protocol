@@ -84,6 +84,7 @@ export const enum AutomationOperation {
  * `30 9 * * 1-5` runs at 09:30 every weekday.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationSchedule {
   /** Five-field AHP cron expression described by {@link AutomationSchedule}. */
@@ -123,12 +124,15 @@ export const enum AutomationTriggerKind {
   Schedule = 'schedule',
   /** A host-defined external event discovered from trigger definitions. */
   Event = 'event',
+  /** A single {@link AutomationOneTimeTrigger.runAt | scheduled time}. */
+  OneTime = 'oneTime',
 }
 
 /**
  * Starts runs from a recurring cron schedule evaluated by the host.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationScheduleTrigger {
   /**
@@ -148,6 +152,33 @@ export interface AutomationScheduleTrigger {
 }
 
 /**
+ * Starts one run at a fixed time evaluated by the host.
+ *
+ * The trigger fires at most once for a given {@link runAt}. Updating
+ * {@link runAt} moves the occurrence to the new time; the previous time no
+ * longer fires.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationOneTimeTrigger {
+  /**
+   * Identifier unique and stable within this automation definition. Recorded in
+   * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+   * run.
+   */
+  id: string;
+  kind: AutomationTriggerKind.OneTime;
+  /** Scheduled run timestamp in ISO 8601 format. */
+  runAt: string;
+  /**
+   * Policy when {@link runAt} passes while automatic execution is unavailable.
+   * Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+   */
+  misfirePolicy?: AutomationMisfirePolicy;
+}
+
+/**
  * Starts runs from events understood by the owning host.
  *
  * Event trigger types, events, and configuration are discovered through
@@ -157,6 +188,7 @@ export interface AutomationScheduleTrigger {
  * discovery.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationEventTrigger {
   /**
@@ -196,7 +228,8 @@ export interface AutomationEventTrigger {
  */
 export type AutomationTrigger =
   | AutomationScheduleTrigger
-  | AutomationEventTrigger;
+  | AutomationEventTrigger
+  | AutomationOneTimeTrigger;
 
 /**
  * Discriminant for an {@link AutomationDisableCondition}.
@@ -215,6 +248,7 @@ export const enum AutomationDisableConditionKind {
  * Stops scheduling after a fixed number of scheduled runs.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationAfterRunsCondition {
   kind: AutomationDisableConditionKind.AfterRuns;
@@ -230,6 +264,7 @@ export interface AutomationAfterRunsCondition {
  * Stops scheduling once a wall-clock date passes.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationAfterDateCondition {
   kind: AutomationDisableConditionKind.AfterDate;
@@ -251,6 +286,7 @@ export type AutomationDisableCondition =
  * Describes one host-defined trigger event.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationTriggerEventDefinition {
   /** Stable event id. */
@@ -291,6 +327,7 @@ export interface AutomationTriggerDefinition {
  * carry credentials, confirmation decisions, or durable permission grants.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationSessionTemplate {
   /** Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider. */
@@ -409,7 +446,7 @@ export interface AutomationEntry {
   resource: URI;
   /** Current durable definition. */
   definition: AutomationDefinition;
-  /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
+  /** Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
   nextRunAt?: string;
   /**
    * Host-owned count of scheduled runs consumed against the current

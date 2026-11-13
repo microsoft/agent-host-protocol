@@ -90,6 +90,17 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 }
 
 /**
+ * Native filesystem path grammar used by a host environment.
+ */
+@Serializable
+enum class PathStyle {
+    @SerialName("posix")
+    POSIX,
+    @SerialName("windows")
+    WINDOWS
+}
+
+/**
  * Encoding of fetched content data.
  */
 @Serializable
@@ -373,6 +384,16 @@ data class CreateTcpConnectionParams(
     val port: Long
 )
 
+/**
+ * Result of the `createTcpConnection` command.
+ *
+ * An empty object on success.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class CreateTcpConnectionResult
+
 @Serializable
 data class InitializeParams(
     /**
@@ -431,6 +452,17 @@ data class InitializeParams(
 )
 
 @Serializable
+data class HostEnvironment(
+    /**
+     * Authoritative native path grammar for resources in this environment.
+     *
+     * Clients parsing or formatting native paths MUST use this field instead of
+     * inferring path semantics from their local environment.
+     */
+    val pathStyle: PathStyle? = null
+)
+
+@Serializable
 data class InitializeResult(
     /**
      * Protocol version selected by the server. MUST be one of the entries in
@@ -465,6 +497,12 @@ data class InitializeResult(
      * channel whose state has no fields ({@link EmptyState}).
      */
     val snapshots: List<Snapshot>,
+    /**
+     * Default execution environment exposed by this host connection.
+     *
+     * Absence means no environment metadata is available.
+     */
+    val environment: HostEnvironment? = null,
     /**
      * Suggested default directory for remote filesystem browsing
      */
@@ -509,8 +547,9 @@ data class InitializeResult(
      */
     val tcpConnections: TcpConnectionsCapability? = null,
     /**
-     * Present when chats in one session may be backed by different agents
-     * (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+     * Present when chats in one session may be backed by different agent
+     * providers (see {@link CreateChatParams.provider} and
+     * {@link ChatState.provider}).
      * Clients MUST NOT send `CreateChatParams.provider` without it.
      *
      * Stability: 1.0 - Early development.
@@ -564,6 +603,10 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
+     * Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+     */
+    val oneTime: AutomationOneTimeCapability? = null,
+    /**
      * Present when clients may request cancellation of `pending` or `running`
      * automation runs.
      */
@@ -599,6 +642,9 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+@Serializable
+class AutomationOneTimeCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.
@@ -985,14 +1031,16 @@ data class CreateChatParams(
      */
     val title: String? = null,
     /**
-     * Agent provider ID for the new chat. Absent means the session's provider.
+     * Agent provider ID for the new chat. Absent means the session's agent
+     * provider.
      *
      * Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-     * `InvalidParams` a provider that is not in the root state's `agents` or
-     * whose agent does not advertise `multipleChats`. Forks and side chats
+     * `InvalidParams` an agent provider that is not in the root state's `agents`
+     * or that does not advertise `multipleChats`. Forks and side chats
      * (`source` present) continue the source chat's history, so they always use
-     * the source chat's agent: absent means that agent, and a different value is
-     * rejected. Agent capability checks for this request use the chat's agent.
+     * the source chat's agent provider: absent means that agent provider, and a
+     * different value is rejected. Agent capability checks for this request use
+     * the chat's agent provider.
      *
      * Stability: 1.0 - Early development.
      */
@@ -1632,7 +1680,14 @@ data class AuthenticateParams(
      * Without a target, resource/scope matching is unchanged; the token may
      * satisfy every matching pending challenge. Older hosts ignore this field.
      */
-    val target: AuthenticateTarget? = null
+    val target: AuthenticateTarget? = null,
+    /**
+     * Optional identifier for the client's selected account, sent alongside the token.
+     * Hosts can compare `accountId` values to detect when the underlying account has changed.
+     * Hosts MUST treat `accountId` as an opaque string.
+     * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+     */
+    val accountId: String? = null
 )
 
 @Serializable

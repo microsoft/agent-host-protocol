@@ -52,6 +52,7 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -560,6 +561,7 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 // ─── Struct Generation ───────────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   omitDiscriminants?: boolean;
   doc?: string;
   includeDiscriminants?: boolean;
@@ -649,6 +651,14 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
     const req = csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
+  if (opts.preserveUnknownMembers) {
+    lines.push('');
+    lines.push('    /// <summary>Unrecognized wire members retained for full-object edits.</summary>');
+    lines.push('    [JsonExtensionData]');
+    // Source-generated metadata binds init-only properties to the constructor,
+    // which System.Text.Json rejects for extension data.
+    lines.push('    public Dictionary<string, JsonElement>? Extra { get; set; }');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -664,7 +674,7 @@ function generateClassFromInterface(
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
+  return generateCsClass(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 function generatePartialClass(project: Project, tsInterfaceName: string): string {
@@ -764,7 +774,7 @@ const STATE_ENUMS = [
   'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
@@ -926,6 +936,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
   { name: 'AutomationEventTrigger' },
+  { name: 'AutomationOneTimeTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -1382,6 +1393,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -1419,6 +1431,9 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 function generateCustomizationEnablementUnionCs(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; set; }\n'
+    : '';
   // Variants are inline object types in `types/`, so there are no named
   // interfaces to read the discriminator from — name the enum explicitly.
   const allowUnknown = discriminatedUnionAllowsUnknown(
@@ -1440,20 +1455,20 @@ public sealed record CustomizationEnablementGlobal
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementWorkspace
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Workspace;
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementSession
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>
 {
@@ -2348,12 +2363,12 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'RepositorySource' },
-  { name: 'CreateTcpConnectionParams' },
-  { name: 'InitializeParams' }, { name: 'InitializeResult' },
+  { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
+  { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
   // record or those fields reference a non-existent type (CS0246).
@@ -2365,6 +2380,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },

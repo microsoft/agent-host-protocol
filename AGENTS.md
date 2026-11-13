@@ -5,7 +5,10 @@ codegen conventions are in `clients/kotlin/AGENTS.md`,
 `clients/swift/AGENTS.md`, `clients/go/AGENTS.md`, and
 `clients/dotnet/AGENTS.md`. Editorial rules
 for protocol types are in
-`.github/instructions/general-instructions.instructions.md`. Release mechanics
+`.github/instructions/general-instructions.instructions.md`, and the
+protocol's vocabulary and naming conventions (identifiers, units, booleans,
+message names, legacy names not to copy) are in
+`.github/instructions/protocol-naming.instructions.md`. Release mechanics
 are in [`RELEASING.md`](RELEASING.md).
 
 ## Adding changelog fragments
