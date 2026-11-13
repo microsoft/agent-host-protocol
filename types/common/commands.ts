@@ -206,7 +206,7 @@ export interface InitializeParams extends BaseParams {
 }
 
 /**
- * Optional capabilities a client declares during `initialize`.
+ * Optional capabilities a client declares during `initialize` or `reconnect`.
  *
  * Each field is a presence flag: an empty object `{}` means "supported",
  * absence means "not supported". Sub-fields on individual capabilities
@@ -215,6 +215,8 @@ export interface InitializeParams extends BaseParams {
  * @category Commands
  */
 export interface ClientCapabilities {
+  /** Selects the connection's automation catalogue format. */
+  automations?: AutomationClientCapabilities;
   /**
    * Client can render
    * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -229,6 +231,14 @@ export interface ClientCapabilities {
    * App-bearing tool calls as ordinary MCP tool calls.
    */
   mcpApps?: Record<string, never>;
+}
+
+/**
+ * @category Commands
+ */
+export interface AutomationClientCapabilities {
+  /** Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view. */
+  oneTime?: AutomationOneTimeCapability;
 }
 
 /**
@@ -390,7 +400,7 @@ export interface AutomationCapabilities {
   create?: AutomationCreateCapability;
   /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
-  /** Enables one-time triggers, durable receipts, and guarded updates. */
+  /** Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}. */
   oneTime?: AutomationOneTimeCapability;
   /** Enables existing-conversation targets for scheduled chats; requires {@link oneTime}. */
   existingConversation?: AutomationExistingConversationCapability;
@@ -528,6 +538,8 @@ export interface ReconnectParams extends BaseParams {
    * @see {@link /specification/windowed-delivery#reconnection | Windowed Delivery: Reconnection}
    */
   windows?: ChannelDeliveryResumeOptions;
+  /** Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId. */
+  capabilities?: ClientCapabilities;
 }
 
 /**

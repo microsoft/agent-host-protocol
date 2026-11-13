@@ -277,12 +277,14 @@ type InitializeResult struct {
 	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
-// Optional capabilities a client declares during `initialize`.
+// Optional capabilities a client declares during `initialize` or `reconnect`.
 //
 // Each field is a presence flag: an empty object `{}` means "supported",
 // absence means "not supported". Sub-fields on individual capabilities
 // are reserved for future per-capability options.
 type ClientCapabilities struct {
+	// Selects the connection's automation catalogue format.
+	Automations *AutomationClientCapabilities `json:"automations,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -295,6 +297,11 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+}
+
+type AutomationClientCapabilities struct {
+	// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
+	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
 }
 
 // Automation features supported by this host authority.
@@ -311,7 +318,7 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
-	// Enables one-time triggers, durable receipts, and guarded updates.
+	// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
 	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
 	// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
 	ExistingConversation *AutomationExistingConversationCapability `json:"existingConversation,omitempty"`
@@ -418,6 +425,8 @@ type ReconnectParams struct {
 	//
 	// Stability: 1.0 - Early development.
 	Windows *ChannelDeliveryResumeOptions `json:"windows,omitempty"`
+	// Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
+	Capabilities *ClientCapabilities `json:"capabilities,omitempty"`
 }
 
 // One windowed subscription that the client wants to keep after reconnection.

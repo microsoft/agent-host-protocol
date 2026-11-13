@@ -16,6 +16,7 @@ export * from './notifications.js';
 export * from './messages.js';
 export * from './errors.js';
 export * from './version/registry.js';
+export * from './channels-automation/compatibility.js';
 
 // `ChatAction` is declared both by hand and in the generated origin module, so
 // disambiguate the `export *`s above.

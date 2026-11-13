@@ -540,6 +540,10 @@ data class InitializeResult(
 @Serializable
 data class ClientCapabilities(
     /**
+     * Selects the connection's automation catalogue format.
+     */
+    val automations: AutomationClientCapabilities? = null,
+    /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
      * it can host the View sandbox, run the `ui/​*` protocol against it,
@@ -556,6 +560,14 @@ data class ClientCapabilities(
 )
 
 @Serializable
+data class AutomationClientCapabilities(
+    /**
+     * Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
+     */
+    val oneTime: AutomationOneTimeCapability? = null
+)
+
+@Serializable
 data class AutomationCapabilities(
     /**
      * Present when clients may dispatch {@link AutomationCreateRequestedAction}.
@@ -566,7 +578,7 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
-     * Enables one-time triggers, durable receipts, and guarded updates.
+     * Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
      */
     val oneTime: AutomationOneTimeCapability? = null,
     /**
@@ -672,7 +684,11 @@ data class ReconnectParams(
      *
      * Stability: 1.0 - Early development.
      */
-    val windows: ChannelDeliveryResumeOptions? = null
+    val windows: ChannelDeliveryResumeOptions? = null,
+    /**
+     * Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
+     */
+    val capabilities: ClientCapabilities? = null
 )
 
 @Serializable

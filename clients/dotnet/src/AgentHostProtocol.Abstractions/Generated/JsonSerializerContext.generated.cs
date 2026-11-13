@@ -37,6 +37,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(AutomationAfterRunsCondition))]
 [JsonSerializable(typeof(AutomationCancelledRunLifecycle))]
 [JsonSerializable(typeof(AutomationCapabilities))]
+[JsonSerializable(typeof(AutomationClientCapabilities))]
 [JsonSerializable(typeof(AutomationCompletedRunLifecycle))]
 [JsonSerializable(typeof(AutomationConversation))]
 [JsonSerializable(typeof(AutomationCreateCapability))]

@@ -122,12 +122,25 @@
     },
     "ClientCapabilities": {
       "type": "object",
-      "description": "Optional capabilities a client declares during `initialize`.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities\nare reserved for future per-capability options.",
+      "description": "Optional capabilities a client declares during `initialize` or `reconnect`.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities\nare reserved for future per-capability options.",
       "properties": {
+        "automations": {
+          "$ref": "#/$defs/AutomationClientCapabilities",
+          "description": "Selects the connection's automation catalogue format."
+        },
         "mcpApps": {
           "type": "object",
           "additionalProperties": {},
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
+        }
+      }
+    },
+    "AutomationClientCapabilities": {
+      "type": "object",
+      "properties": {
+        "oneTime": {
+          "$ref": "#/$defs/AutomationOneTimeCapability",
+          "description": "Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view."
         }
       }
     },
@@ -230,7 +243,7 @@
         },
         "oneTime": {
           "$ref": "#/$defs/AutomationOneTimeCapability",
-          "description": "Enables one-time triggers, durable receipts, and guarded updates."
+          "description": "Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}."
         },
         "existingConversation": {
           "$ref": "#/$defs/AutomationExistingConversationCapability",
@@ -336,6 +349,10 @@
         "windows": {
           "$ref": "#/$defs/ChannelDeliveryResumeOptions",
           "description": "Windowed subscriptions that the client wants to keep. Each channel MUST\nalso be in `subscriptions` and MUST appear only once. These subscriptions\nare not included in the result's `actions` or `snapshots`.\n\nStability: 1.0 - Early development."
+        },
+        "capabilities": {
+          "$ref": "#/$defs/ClientCapabilities",
+          "description": "Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId."
         }
       },
       "required": [

@@ -42,6 +42,24 @@ When `InitializeResult.automations` is present, clients subscribe to
 actions and therefore participate in reconnect replay. If replay is unavailable,
 the host returns a fresh catalogue snapshot.
 
+### One-time catalogue opt-in
+
+A client MUST declare `initialize.capabilities.automations.oneTime: {}` before receiving one-time entries. Host support alone is not acknowledgement: `AutomationTriggerKind` is exhaustive and older decoders reject `oneTime`.
+
+For a connection without this declaration, the host MUST:
+
+- Omit `automations.oneTime` and `automations.existingConversation` from `InitializeResult`.
+- Exclude entries containing a one-time trigger from every catalogue snapshot, including initialize, subscribe, reconnect fallback, and windowed-delivery snapshots.
+- Project a one-time `automation/set` into `automation/removed` for the same resource. This removes a formerly visible entry if its trigger changes to one-time; removing an unseen resource is a no-op.
+- Suppress create/update request echoes containing one-time triggers, including rejected echoes.
+- Reject requests to create or operate on one-time definitions before mutation, without echoing an incompatible payload.
+
+The same projection MUST apply to live actions and replay, before encoding direct notifications or flow-control frames. Preserve the original action envelope's sequencing and correlation metadata; omitted actions do not renumber the stream.
+
+Clients MUST repeat the opt-in in `reconnect.capabilities.automations.oneTime`; it is never inherited from `clientId`. The host MUST retain the previous connection's opt-in. If it differs, or the host cannot establish the previous view, the host MUST reject reconnect with `InvalidParams` before sending catalogue data and require a fresh `initialize`. This renegotiates host capabilities and returns a snapshot for the new view instead of replaying the old one.
+
+Opted-in connections receive the full authorized catalogue. Hosts MUST NOT mutate the shared catalogue to accommodate a legacy reader. The TypeScript helpers `automationCapabilitiesForClient`, `automationStateForClient`, and `automationActionForClient` implement the outgoing projections; `canResumeAutomationCatalogue` checks for a view change. Hosts still enforce incoming request checks and retain connection negotiation state.
+
 ## Commands
 
 Run and run-history commands use `channel: "ahp-automations://"` and carry the

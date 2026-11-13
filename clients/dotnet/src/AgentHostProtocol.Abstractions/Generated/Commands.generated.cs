@@ -569,13 +569,17 @@ public sealed record Implementation
     public string? Title { get; init; }
 }
 
-/// <summary>Optional capabilities a client declares during `initialize`.
+/// <summary>Optional capabilities a client declares during `initialize` or `reconnect`.
 ///
 /// Each field is a presence flag: an empty object `{}` means "supported",
 /// absence means "not supported". Sub-fields on individual capabilities
 /// are reserved for future per-capability options.</summary>
 public sealed record ClientCapabilities
 {
+    /// <summary>Selects the connection's automation catalogue format.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationClientCapabilities? Automations { get; init; }
+
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -589,6 +593,13 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+}
+
+public sealed record AutomationClientCapabilities
+{
+    /// <summary>Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationOneTimeCapability? OneTime { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -610,7 +621,7 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
-    /// <summary>Enables one-time triggers, durable receipts, and guarded updates.</summary>
+    /// <summary>Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationOneTimeCapability? OneTime { get; init; }
 
@@ -718,6 +729,10 @@ public sealed record ReconnectParams
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChannelDeliveryResumeOptions? Windows { get; init; }
+
+    /// <summary>Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ClientCapabilities? Capabilities { get; init; }
 }
 
 /// <summary>One windowed subscription that the client wants to keep after reconnection.

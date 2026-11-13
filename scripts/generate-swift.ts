@@ -1754,7 +1754,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
-  'InitializeParams', 'HostEnvironment', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationCapabilities',
+  'InitializeParams', 'HostEnvironment', 'InitializeResult', 'PingParams', 'ClientCapabilities', 'AutomationClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',

@@ -455,7 +455,7 @@ pub struct InitializeResult {
     pub multiple_chat_providers: Option<MultipleChatProvidersCapability>,
 }
 
-/// Optional capabilities a client declares during `initialize`.
+/// Optional capabilities a client declares during `initialize` or `reconnect`.
 ///
 /// Each field is a presence flag: an empty object `{}` means "supported",
 /// absence means "not supported". Sub-fields on individual capabilities
@@ -463,6 +463,9 @@ pub struct InitializeResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
+    /// Selects the connection's automation catalogue format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automations: Option<AutomationClientCapabilities>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -476,6 +479,14 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationClientCapabilities {
+    /// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub one_time: Option<AutomationOneTimeCapability>,
 }
 
 /// Automation features supported by this host authority.
@@ -496,7 +507,7 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
-    /// Enables one-time triggers, durable receipts, and guarded updates.
+    /// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time: Option<AutomationOneTimeCapability>,
     /// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
@@ -625,6 +636,9 @@ pub struct ReconnectParams {
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub windows: Option<ChannelDeliveryResumeOptions>,
+    /// Current declarations; one-time catalogue opt-in MUST be repeated, not inherited by clientId.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<ClientCapabilities>,
 }
 
 /// One windowed subscription that the client wants to keep after reconnection.

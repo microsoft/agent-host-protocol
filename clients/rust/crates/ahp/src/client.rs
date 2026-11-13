@@ -544,6 +544,7 @@ impl Client {
             last_seen_server_seq,
             subscriptions,
             windows: None,
+            capabilities: None,
         };
         self.request("reconnect", params).await
     }

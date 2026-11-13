@@ -218,7 +218,7 @@ trigger's configuration.
 
 ### One-time triggers and scheduled chats
 
-When `automations.oneTime` is present, a definition can have exactly one trigger of this form, with no other triggers:
+Clients opt in with `initialize.capabilities.automations.oneTime: {}`. A supporting host then advertises `automations.oneTime` on that connection, and a definition can have exactly one trigger of this form, with no other triggers:
 
 ```typescript
 AutomationOneTimeTrigger {
@@ -258,7 +258,7 @@ The host revalidates authorization, chat membership, and availability at executi
 
 Hosts advertising `automations.oneTime` also support `automation/updateRequested.expectedModifiedAt`. When supplied, it must exactly match the current definition's `modifiedAt`; the host checks and persists the mutation atomically, advances that timestamp for every accepted definition update, and rejects a mismatch without changing state. This prevents a stale reschedule or cancellation from overwriting another client's edit. Omission retains the existing ordered-patch behavior. This is not a guard for `automation/removed`.
 
-Clients must not author one-time triggers, scheduled-chat purposes, or guarded updates without `automations.oneTime`, or existing targets without `automations.existingConversation`. The new fields are optional, but the new trigger variant extends an **exhaustive** enum: older clients may reject a catalogue containing `kind: 'oneTime'`. Host feature advertisement alone does not make old decoders forward-compatible; deployments must ensure catalogue readers support the new variant before exposing it. Existing schedule/event definitions and their manual-run behavior remain unchanged.
+Clients must not author one-time triggers, scheduled-chat purposes, or guarded updates without `automations.oneTime`, or existing targets without `automations.existingConversation`. The new trigger extends an **exhaustive** enum, so host support alone is insufficient: each reader must opt in during initialize and repeat the declaration on reconnect. Legacy connections receive a projected catalogue without one-time entries, including live updates and replay. Changing opt-in on reconnect requires a fresh initialize. See [One-time catalogue opt-in](/specification/automation-channel#one-time-catalogue-opt-in) for the required connection boundary. Existing schedule/event definitions and their manual-run behavior remain unchanged.
 
 ### Scheduled triggers
 
