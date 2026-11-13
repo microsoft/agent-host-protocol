@@ -1738,6 +1738,9 @@ public enum AutomationTriggerKind
     /// <summary>A host-defined external event discovered from trigger definitions.</summary>
     [WireValue("event")]
     Event,
+    /// <summary>A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.</summary>
+    [WireValue("oneTime")]
+    OneTime,
 }
 
 /// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
@@ -6879,6 +6882,33 @@ public sealed record AutomationEventTrigger
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
+/// <summary>Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} moves the occurrence to the new time; the previous time no
+/// longer fires.</summary>
+public sealed record AutomationOneTimeTrigger
+{
+    /// <summary>Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.</summary>
+    public required string Id { get; init; }
+
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.OneTime;
+
+    /// <summary>Scheduled run timestamp in ISO 8601 format.</summary>
+    public required string RunAt { get; init; }
+
+    /// <summary>Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationMisfirePolicy? MisfirePolicy { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
 /// <summary>Describes one host-defined trigger event.</summary>
 public sealed record AutomationTriggerEventDefinition
 {
@@ -7119,7 +7149,7 @@ public sealed class AutomationEntry
     /// <summary>Current durable definition.</summary>
     public required AutomationDefinition Definition { get; set; }
 
-    /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
+    /// <summary>Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
 
@@ -7206,12 +7236,13 @@ public sealed record AutomationTriggeredRunOrigin
 {
     public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
-    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.</summary>
+    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.</summary>
     public required string TriggerId { get; init; }
 
     /// <summary>Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.</summary>
+    /// schedule and one-time triggers and normally absent for event triggers.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ScheduledFor { get; init; }
 
@@ -8025,6 +8056,7 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+        ["oneTime"] = typeof(AutomationOneTimeTrigger),
             },
             allowUnknown: false)
     {

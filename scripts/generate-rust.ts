@@ -1016,6 +1016,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger', omitDiscriminants: true },
   { name: 'AutomationEventTrigger', omitDiscriminants: true },
+  { name: 'AutomationOneTimeTrigger', omitDiscriminants: true },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -1302,6 +1303,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -1903,6 +1905,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },

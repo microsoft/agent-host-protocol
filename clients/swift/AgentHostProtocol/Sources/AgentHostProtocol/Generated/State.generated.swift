@@ -1133,6 +1133,8 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case schedule = "schedule"
     /// A host-defined external event discovered from trigger definitions.
     case event = "event"
+    /// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+    case oneTime = "oneTime"
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -7946,6 +7948,60 @@ public struct AutomationEventTrigger: Codable, Sendable, Equatable {
     }
 }
 
+public struct AutomationOneTimeTrigger: Codable, Sendable, Equatable {
+    /// Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.
+    public var id: String
+    public var kind: AutomationTriggerKind
+    /// Scheduled run timestamp in ISO 8601 format.
+    public var runAt: String
+    /// Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+    public var misfirePolicy: AutomationMisfirePolicy?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case runAt
+        case misfirePolicy
+    }
+
+    public init(
+        id: String,
+        kind: AutomationTriggerKind,
+        runAt: String,
+        misfirePolicy: AutomationMisfirePolicy? = nil,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.runAt = runAt
+        self.misfirePolicy = misfirePolicy
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.runAt = try container.decode(String.self, forKey: .runAt)
+        self.misfirePolicy = try container.decodeIfPresent(AutomationMisfirePolicy.self, forKey: .misfirePolicy)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.runAt, forKey: .runAt)
+        try container.encodeIfPresent(self.misfirePolicy, forKey: .misfirePolicy)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
 public struct AutomationTriggerEventDefinition: Codable, Sendable, Equatable {
     /// Stable event id.
     public var id: String
@@ -8303,7 +8359,7 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
     public var resource: String
     /// Current durable definition.
     public var definition: AutomationDefinition
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
     /// Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -8419,11 +8475,12 @@ public struct AutomationManualRunOrigin: Codable, Sendable, Equatable {
 
 public struct AutomationTriggeredRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
-    /// Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.
+    /// Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.
     public var triggerId: String
     /// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.
+    /// schedule and one-time triggers and normally absent for event triggers.
     public var scheduledFor: String?
     /// `true` when this is a catch-up run created by
     /// {@link AutomationMisfirePolicy.RunOnce}.
@@ -9686,6 +9743,7 @@ public enum SessionOrigin: Codable, Sendable, Equatable {
 public enum AutomationTrigger: Codable, Sendable, Equatable {
     case schedule(AutomationScheduleTrigger)
     case event(AutomationEventTrigger)
+    case oneTime(AutomationOneTimeTrigger)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -9699,6 +9757,8 @@ public enum AutomationTrigger: Codable, Sendable, Equatable {
             self = .schedule(try AutomationScheduleTrigger(from: decoder))
         case "event":
             self = .event(try AutomationEventTrigger(from: decoder))
+        case "oneTime":
+            self = .oneTime(try AutomationOneTimeTrigger(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationTrigger discriminant: \(discriminant)")
         }
@@ -9711,6 +9771,9 @@ public enum AutomationTrigger: Codable, Sendable, Equatable {
             try value.encode(to: encoder)
         case .event(var value):
             value.kind = .event
+            try value.encode(to: encoder)
+        case .oneTime(var value):
+            value.kind = .oneTime
             try value.encode(to: encoder)
         }
     }

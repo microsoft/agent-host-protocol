@@ -311,6 +311,8 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
+	// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
 	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
@@ -356,6 +358,10 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+type AutomationOneTimeCapability struct {
 }
 
 // Presence capability for {@link InitializeResult.multipleChatProviders}.

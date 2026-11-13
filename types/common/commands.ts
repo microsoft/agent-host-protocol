@@ -390,6 +390,8 @@ export interface AutomationCapabilities {
   create?: AutomationCreateCapability;
   /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
+  /** Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}. */
+  oneTime?: AutomationOneTimeCapability;
   /**
    * Present when clients may request cancellation of `pending` or `running`
    * automation runs.
@@ -418,6 +420,13 @@ export interface AutomationCapabilities {
  * @category Commands
  */
 export interface AutomationCustomizationsCapability {}
+
+/**
+ * Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+ *
+ * @category Commands
+ */
+export interface AutomationOneTimeCapability {}
 
 /**
  * Presence capability for {@link AutomationCreateRequestedAction |

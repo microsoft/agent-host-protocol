@@ -554,6 +554,8 @@ const (
 	AutomationTriggerKindSchedule AutomationTriggerKind = "schedule"
 	// A host-defined external event discovered from trigger definitions.
 	AutomationTriggerKindEvent AutomationTriggerKind = "event"
+	// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+	AutomationTriggerKindOneTime AutomationTriggerKind = "oneTime"
 )
 
 // Discriminant for an {@link AutomationDisableCondition}.
@@ -4766,6 +4768,36 @@ func (v AutomationEventTrigger) MarshalJSON() ([]byte, error) {
 	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "type", "title", "description", "events", "config")
 }
 
+// Starts one run at a fixed time evaluated by the host.
+//
+// The trigger fires at most once for a given {@link runAt}. Updating
+// {@link runAt} moves the occurrence to the new time; the previous time no
+// longer fires.
+type AutomationOneTimeTrigger struct {
+	// Identifier unique and stable within this automation definition. Recorded in
+	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+	// run.
+	Id   string                `json:"id"`
+	Kind AutomationTriggerKind `json:"kind"`
+	// Scheduled run timestamp in ISO 8601 format.
+	RunAt string `json:"runAt"`
+	// Policy when {@link runAt} passes while automatic execution is unavailable.
+	// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationOneTimeTrigger) UnmarshalJSON(data []byte) error {
+	type wire AutomationOneTimeTrigger
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "runAt", "misfirePolicy")
+}
+
+func (v AutomationOneTimeTrigger) MarshalJSON() ([]byte, error) {
+	type wire AutomationOneTimeTrigger
+	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "runAt", "misfirePolicy")
+}
+
 // Describes one host-defined trigger event.
 type AutomationTriggerEventDefinition struct {
 	// Stable event id.
@@ -4983,7 +5015,7 @@ type AutomationEntry struct {
 	Resource URI `json:"resource"`
 	// Current durable definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+	// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Host-owned count of scheduled runs consumed against the current
 	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -5049,11 +5081,12 @@ type AutomationManualRunOrigin struct {
 // Origin recorded for a run created by one of the automation's triggers.
 type AutomationTriggeredRunOrigin struct {
 	Kind AutomationRunOriginKind `json:"kind"`
-	// Matches the stable {@link AutomationScheduleTrigger.id} or
-	// {@link AutomationEventTrigger.id} in the definition.
+	// Matches the stable {@link AutomationScheduleTrigger.id},
+	// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+	// in the definition.
 	TriggerId string `json:"triggerId"`
 	// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-	// schedule triggers and normally absent for event triggers.
+	// schedule and one-time triggers and normally absent for event triggers.
 	ScheduledFor *string `json:"scheduledFor,omitempty"`
 	// `true` when this is a catch-up run created by
 	// {@link AutomationMisfirePolicy.RunOnce}.
@@ -6737,6 +6770,7 @@ type isAutomationTrigger interface{ isAutomationTrigger() }
 
 func (*AutomationScheduleTrigger) isAutomationTrigger() {}
 func (*AutomationEventTrigger) isAutomationTrigger()    {}
+func (*AutomationOneTimeTrigger) isAutomationTrigger()  {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
 func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
@@ -6756,6 +6790,12 @@ func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "event":
 		var value AutomationEventTrigger
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "oneTime":
+		var value AutomationOneTimeTrigger
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -6787,6 +6827,8 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"schedule\"")
 	case *AutomationEventTrigger:
 		object["kind"] = json.RawMessage("\"event\"")
+	case *AutomationOneTimeTrigger:
+		object["kind"] = json.RawMessage("\"oneTime\"")
 	}
 	return json.Marshal(object)
 }

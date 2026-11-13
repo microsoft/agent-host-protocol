@@ -496,6 +496,9 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub one_time: Option<AutomationOneTimeCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -551,6 +554,11 @@ pub struct AutomationRunCancellationCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
+
+/// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOneTimeCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///

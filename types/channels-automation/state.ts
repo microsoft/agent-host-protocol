@@ -124,6 +124,8 @@ export const enum AutomationTriggerKind {
   Schedule = 'schedule',
   /** A host-defined external event discovered from trigger definitions. */
   Event = 'event',
+  /** A single {@link AutomationOneTimeTrigger.runAt | scheduled time}. */
+  OneTime = 'oneTime',
 }
 
 /**
@@ -145,6 +147,33 @@ export interface AutomationScheduleTrigger {
   /**
    * Policy for missed occurrences. Omission is equivalent to
    * {@link AutomationMisfirePolicy.RunOnce}.
+   */
+  misfirePolicy?: AutomationMisfirePolicy;
+}
+
+/**
+ * Starts one run at a fixed time evaluated by the host.
+ *
+ * The trigger fires at most once for a given {@link runAt}. Updating
+ * {@link runAt} moves the occurrence to the new time; the previous time no
+ * longer fires.
+ *
+ * @category Automation State
+ * @preserveUnknownMembers
+ */
+export interface AutomationOneTimeTrigger {
+  /**
+   * Identifier unique and stable within this automation definition. Recorded in
+   * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+   * run.
+   */
+  id: string;
+  kind: AutomationTriggerKind.OneTime;
+  /** Scheduled run timestamp in ISO 8601 format. */
+  runAt: string;
+  /**
+   * Policy when {@link runAt} passes while automatic execution is unavailable.
+   * Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
    */
   misfirePolicy?: AutomationMisfirePolicy;
 }
@@ -199,7 +228,8 @@ export interface AutomationEventTrigger {
  */
 export type AutomationTrigger =
   | AutomationScheduleTrigger
-  | AutomationEventTrigger;
+  | AutomationEventTrigger
+  | AutomationOneTimeTrigger;
 
 /**
  * Discriminant for an {@link AutomationDisableCondition}.
@@ -416,7 +446,7 @@ export interface AutomationEntry {
   resource: URI;
   /** Current durable definition. */
   definition: AutomationDefinition;
-  /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
+  /** Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
   nextRunAt?: string;
   /**
    * Host-owned count of scheduled runs consumed against the current
