@@ -14,7 +14,9 @@
       },
       "runCancellation": {},
       "runHistoryLimit": 50,
-      "customizations": {}
+      "customizations": {},
+      "oneTime": {},
+      "existingConversation": {}
     }
   },
   "acceptableOutputs": [{
@@ -28,7 +30,9 @@
       },
       "runCancellation": {},
       "runHistoryLimit": 50,
-      "customizations": {}
+      "customizations": {},
+      "oneTime": {},
+      "existingConversation": {}
     }
   }]
 }

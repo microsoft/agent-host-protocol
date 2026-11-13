@@ -566,6 +566,14 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
+     * Present when absolute one-time triggers, durable receipts, and conditional updates are supported.
+     */
+    val oneTime: AutomationOneTimeCapability? = null,
+    /**
+     * Present when one-time scheduled chats can target an existing conversation; requires {@link oneTime}.
+     */
+    val existingConversation: AutomationExistingConversationCapability? = null,
+    /**
      * Present when clients may request cancellation of `pending` or `running`
      * automation runs.
      */
@@ -601,6 +609,12 @@ class AutomationRunCancellationCapability
 
 @Serializable
 class AutomationCustomizationsCapability
+
+@Serializable
+class AutomationOneTimeCapability
+
+@Serializable
+class AutomationExistingConversationCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

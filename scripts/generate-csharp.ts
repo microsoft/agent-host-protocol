@@ -931,9 +931,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
   { name: 'AutomationEventTrigger' },
+  { name: 'AutomationOneTimeTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
+  { name: 'AutomationConversation' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition' },
@@ -1344,6 +1346,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -2326,6 +2329,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationOneTimeCapability' },
+  { name: 'AutomationExistingConversationCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },

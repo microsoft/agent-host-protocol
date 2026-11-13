@@ -1,0 +1,34 @@
+{
+  "name": "scheduled-chat-session-provenance",
+  "group": "A",
+  "description": "A newly created session retains scheduled-chat provenance without its automation catalogue entry.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/new",
+    "provider": "demo",
+    "title": "Scheduled request",
+    "status": 1,
+    "createdAt": "2026-11-14T09:00:00Z",
+    "modifiedAt": "2026-11-14T09:00:00Z",
+    "origin": {
+      "kind": "automation",
+      "purpose": "scheduledChat",
+      "automation": "ahp-automation:/send-later",
+      "run": "ahp-automation-run:/new"
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/new",
+    "provider": "demo",
+    "title": "Scheduled request",
+    "status": 1,
+    "createdAt": "2026-11-14T09:00:00Z",
+    "modifiedAt": "2026-11-14T09:00:00Z",
+    "origin": {
+      "kind": "automation",
+      "purpose": "scheduledChat",
+      "automation": "ahp-automation:/send-later",
+      "run": "ahp-automation-run:/new"
+    }
+  }]
+}

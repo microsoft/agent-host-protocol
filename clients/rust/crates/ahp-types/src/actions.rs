@@ -2277,6 +2277,12 @@ pub struct ResourceWatchChangedAction {
 /// from the dispatching client, persists the definition, then publishes the
 /// authoritative result with {@link AutomationSetAction | `automation/set`}.
 /// Rejections leave the catalogue unchanged.
+///
+/// When {@link AutomationCapabilities.oneTime} is advertised, retries of an
+/// unchanged one-time definition at the same resource MUST return its current
+/// authoritative entry without creating another occurrence, even after its
+/// due time. A conflicting definition MUST be rejected. A removed one-time
+/// resource MUST NOT be reused to recreate a request, including after restart.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCreateRequestedAction {
@@ -2306,6 +2312,14 @@ pub struct AutomationUpdateRequestedAction {
     pub resource: Uri,
     /// Editable {@link AutomationDefinition} fields to replace.
     pub changes: AutomationDefinitionPatch,
+    /// Apply the patch only if this exactly matches
+    /// {@link AutomationEntry.modifiedAt}. Requires
+    /// {@link AutomationCapabilities.oneTime}. The host checks and persists the
+    /// update atomically, rejects a mismatch without changing state, and
+    /// advances `modifiedAt` on each accepted definition update so stale guards
+    /// cannot match a different revision. Omission retains ordered patch semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_modified_at: Option<String>,
 }
 
 /// Add or replace one full automation state in

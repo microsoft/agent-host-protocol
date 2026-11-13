@@ -2488,15 +2488,24 @@ public struct AutomationUpdateRequestedAction: Codable, Sendable, Equatable {
     public var resource: String
     /// Editable {@link AutomationDefinition} fields to replace.
     public var changes: AutomationDefinitionPatch
+    /// Apply the patch only if this exactly matches
+    /// {@link AutomationEntry.modifiedAt}. Requires
+    /// {@link AutomationCapabilities.oneTime}. The host checks and persists the
+    /// update atomically, rejects a mismatch without changing state, and
+    /// advances `modifiedAt` on each accepted definition update so stale guards
+    /// cannot match a different revision. Omission retains ordered patch semantics.
+    public var expectedModifiedAt: String?
 
     public init(
         type: ActionType,
         resource: String,
-        changes: AutomationDefinitionPatch
+        changes: AutomationDefinitionPatch,
+        expectedModifiedAt: String? = nil
     ) {
         self.type = type
         self.resource = resource
         self.changes = changes
+        self.expectedModifiedAt = expectedModifiedAt
     }
 }
 

@@ -1133,6 +1133,8 @@ public enum AutomationTriggerKind: String, Codable, Sendable {
     case schedule = "schedule"
     /// A host-defined external event discovered from trigger definitions.
     case event = "event"
+    /// One run at an absolute UTC instant, including catch-up after unavailability.
+    case oneTime = "oneTime"
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -7759,6 +7761,9 @@ public struct ResourceChange: Codable, Sendable, Equatable {
 
 public struct AutomationSessionOrigin: Codable, Sendable, Equatable {
     public var kind: SessionOriginKind
+    /// Immutable purpose copied from the run, including after its definition is
+    /// removed. Existing conversation targets retain their original provenance.
+    public var purpose: String?
     /// Owning {@link AutomationEntry.resource}.
     public var automation: String
     /// Owning {@link AutomationRunState.resource}.
@@ -7766,10 +7771,12 @@ public struct AutomationSessionOrigin: Codable, Sendable, Equatable {
 
     public init(
         kind: SessionOriginKind,
+        purpose: String? = nil,
         automation: String,
         run: String
     ) {
         self.kind = kind
+        self.purpose = purpose
         self.automation = automation
         self.run = run
     }
@@ -7946,6 +7953,50 @@ public struct AutomationEventTrigger: Codable, Sendable, Equatable {
     }
 }
 
+public struct AutomationOneTimeTrigger: Codable, Sendable, Equatable {
+    /// Identifier unique and stable within this automation definition.
+    public var id: String
+    public var kind: AutomationTriggerKind
+    /// Absolute ISO 8601 UTC timestamp ending in `Z`.
+    public var runAt: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case id
+        case kind
+        case runAt
+    }
+
+    public init(
+        id: String,
+        kind: AutomationTriggerKind,
+        runAt: String,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.id = id
+        self.kind = kind
+        self.runAt = runAt
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(AutomationTriggerKind.self, forKey: .kind)
+        self.runAt = try container.decode(String.self, forKey: .runAt)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .id)
+        try container.encode(self.kind, forKey: .kind)
+        try container.encode(self.runAt, forKey: .runAt)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
 public struct AutomationTriggerEventDefinition: Codable, Sendable, Equatable {
     /// Stable event id.
     public var id: String
@@ -8112,16 +8163,51 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
     }
 }
 
+public struct AutomationConversation: Codable, Sendable, Equatable {
+    /// Exact host-advertised owner session URI.
+    public var session: String
+    /// Exact host-advertised chat URI; it need not be the session's default chat.
+    public var chat: String
+
+    public init(
+        session: String,
+        chat: String
+    ) {
+        self.session = session
+        self.chat = chat
+    }
+}
+
 public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
-    /// Initial message sent to every newly created run session. Its
+    /// A captured user request scheduled for later. Requires
+    /// {@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and
+    /// enabled creation. Disabling it before admission permanently cancels it:
+    /// the host MUST reject subsequent definition updates and manual runs.
+    public var purpose: String?
+    /// Existing conversation receiving a one-time scheduled-chat request.
+    ///
+    /// Requires {@link AutomationCapabilities.existingConversation} and
+    /// `purpose: 'scheduledChat'`. Immutable after creation. The host MUST
+    /// revalidate authorization and that the chat belongs to the advertised
+    /// session. It MUST NOT create a replacement conversation, apply the
+    /// session template or message model/agent, or acquire ownership of the
+    /// existing session. The required {@link session} field is ignored.
+    ///
+    /// Delivery joins the ordinary message queue without steering or cancelling
+    /// another turn. Completion means accepted queue handoff, not turn completion.
+    /// The delivery-only run has no owned sessions: its `sessions` is empty and
+    /// `primarySession` is absent.
+    public var conversation: AutomationConversation?
+    /// Initial message sent to each new run session or existing conversation. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     public var message: Message
-    /// Template used to create fresh sessions for each run.
+    /// Template used to create fresh sessions; ignored when {@link conversation} is set.
     public var session: AutomationSessionTemplate
     /// Whether automatic triggers may create runs. Manual runs remain available
-    /// whenever {@link AutomationOperation.Run} is advertised.
+    /// whenever {@link AutomationOperation.Run} is advertised, except that
+    /// disabling a scheduled chat permanently cancels its unconsumed occurrence.
     public var enabled: Bool
     /// Automatic triggers. An empty list means manual-only.
     public var triggers: [AutomationTrigger]
@@ -8145,6 +8231,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case title
+        case purpose
+        case conversation
         case message
         case session
         case enabled
@@ -8155,6 +8243,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
 
     public init(
         title: String,
+        purpose: String? = nil,
+        conversation: AutomationConversation? = nil,
         message: Message,
         session: AutomationSessionTemplate,
         enabled: Bool,
@@ -8163,6 +8253,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
+        self.purpose = purpose
+        self.conversation = conversation
         self.message = message
         self.session = session
         self.enabled = enabled
@@ -8175,6 +8267,8 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
 public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Replacement {@link AutomationDefinition.title}.
     public var title: String?
+    /// Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints.
+    public var purpose: String?
     /// Replacement {@link AutomationDefinition.message}.
     public var message: Message?
     /// Replacement {@link AutomationDefinition.session}. The host revalidates
@@ -8197,6 +8291,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case title
+        case purpose
         case message
         case session
         case enabled
@@ -8207,6 +8302,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
 
     public init(
         title: String? = nil,
+        purpose: String? = nil,
         message: Message? = nil,
         session: AutomationSessionTemplate? = nil,
         enabled: Bool? = nil,
@@ -8215,6 +8311,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
+        self.purpose = purpose
         self.message = message
         self.session = session
         self.enabled = enabled
@@ -8305,6 +8402,21 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
     public var definition: AutomationDefinition
     /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
+    /// Durable one-time admission receipt. Retained independently of the
+    /// run-history window; consuming the occurrence never depends on retained
+    /// summaries. Absent before admission.
+    public var oneTimeRun: String?
+    /// ISO 8601 timestamp when the one-time run's initial request was accepted
+    /// for dispatch. Retained independently of run history. Admission or session
+    /// allocation alone MUST NOT set this receipt. Absence does not prove
+    /// non-dispatch after interrupted or uncertain execution.
+    public var oneTimeDispatchedAt: String?
+    /// ISO 8601 timestamp positively confirming that a consumed occurrence
+    /// failed before submission was attempted. Only this receipt permits
+    /// explicit recovery as a sendable draft; failure plus absent
+    /// {@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish
+    /// both dispatch receipts for the same occurrence.
+    public var oneTimeDispatchRejectedAt: String?
     /// Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
     /// **current** allowance, not a lifetime total: the host resets it to `0` when
@@ -8350,6 +8462,9 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
         case resource
         case definition
         case nextRunAt
+        case oneTimeRun
+        case oneTimeDispatchedAt
+        case oneTimeDispatchRejectedAt
         case runCount
         case runs
         case runsNextCursor
@@ -8364,6 +8479,9 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
         resource: String,
         definition: AutomationDefinition,
         nextRunAt: String? = nil,
+        oneTimeRun: String? = nil,
+        oneTimeDispatchedAt: String? = nil,
+        oneTimeDispatchRejectedAt: String? = nil,
         runCount: Int? = nil,
         runs: [AutomationRunSummary],
         runsNextCursor: String? = nil,
@@ -8376,6 +8494,9 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
         self.resource = resource
         self.definition = definition
         self.nextRunAt = nextRunAt
+        self.oneTimeRun = oneTimeRun
+        self.oneTimeDispatchedAt = oneTimeDispatchedAt
+        self.oneTimeDispatchRejectedAt = oneTimeDispatchRejectedAt
         self.runCount = runCount
         self.runs = runs
         self.runsNextCursor = runsNextCursor
@@ -8420,13 +8541,14 @@ public struct AutomationManualRunOrigin: Codable, Sendable, Equatable {
 public struct AutomationTriggeredRunOrigin: Codable, Sendable, Equatable {
     public var kind: AutomationRunOriginKind
     /// Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.
+    /// {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.
     public var triggerId: String
     /// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.
+    /// schedule and one-time triggers and normally absent for event triggers.
     public var scheduledFor: String?
     /// `true` when this is a catch-up run created by
-    /// {@link AutomationMisfirePolicy.RunOnce}.
+    /// {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
     public var catchUp: Bool?
     /// Host-defined, non-secret event provenance suitable for display or audit.
     /// This is descriptive context, not an input that clients replay.
@@ -8599,6 +8721,8 @@ public struct AutomationRunSummary: Codable, Sendable, Equatable {
 }
 
 public struct AutomationRunState: Codable, Sendable, Equatable {
+    /// Immutable purpose copied from the admitted definition, independent of catalogue retention.
+    public var purpose: String?
     /// URI of this automation-run channel.
     public var resource: String
     /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
@@ -8617,6 +8741,7 @@ public struct AutomationRunState: Codable, Sendable, Equatable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
+        case purpose
         case resource
         case automation
         case origin
@@ -8627,6 +8752,7 @@ public struct AutomationRunState: Codable, Sendable, Equatable {
     }
 
     public init(
+        purpose: String? = nil,
         resource: String,
         automation: String,
         origin: AutomationRunOrigin,
@@ -8635,6 +8761,7 @@ public struct AutomationRunState: Codable, Sendable, Equatable {
         primarySession: String? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
+        self.purpose = purpose
         self.resource = resource
         self.automation = automation
         self.origin = origin
@@ -9686,6 +9813,7 @@ public enum SessionOrigin: Codable, Sendable, Equatable {
 public enum AutomationTrigger: Codable, Sendable, Equatable {
     case schedule(AutomationScheduleTrigger)
     case event(AutomationEventTrigger)
+    case oneTime(AutomationOneTimeTrigger)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -9699,6 +9827,8 @@ public enum AutomationTrigger: Codable, Sendable, Equatable {
             self = .schedule(try AutomationScheduleTrigger(from: decoder))
         case "event":
             self = .event(try AutomationEventTrigger(from: decoder))
+        case "oneTime":
+            self = .oneTime(try AutomationOneTimeTrigger(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationTrigger discriminant: \(discriminant)")
         }
@@ -9711,6 +9841,9 @@ public enum AutomationTrigger: Codable, Sendable, Equatable {
             try value.encode(to: encoder)
         case .event(var value):
             value.kind = .event
+            try value.encode(to: encoder)
+        case .oneTime(var value):
+            value.kind = .oneTime
             try value.encode(to: encoder)
         }
     }

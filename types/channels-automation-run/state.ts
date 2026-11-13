@@ -11,6 +11,7 @@ import type {
   AutomationEventTrigger,
   AutomationMisfirePolicy,
   AutomationScheduleTrigger,
+  AutomationOneTimeTrigger,
   AutomationEntry,
 } from '../channels-automation/state.js';
 import type { RunAutomationParams } from '../channels-automation/commands.js';
@@ -70,17 +71,18 @@ export interface AutomationTriggeredRunOrigin {
   kind: AutomationRunOriginKind.Trigger;
   /**
    * Matches the stable {@link AutomationScheduleTrigger.id} or
-   * {@link AutomationEventTrigger.id} in the definition.
+   * {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+   * in the definition.
    */
   triggerId: string;
   /**
    * Intended schedule occurrence as an ISO 8601 timestamp. Present for
-   * schedule triggers and normally absent for event triggers.
+   * schedule and one-time triggers and normally absent for event triggers.
    */
   scheduledFor?: string;
   /**
    * `true` when this is a catch-up run created by
-   * {@link AutomationMisfirePolicy.RunOnce}.
+   * {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.
    */
   catchUp?: boolean;
   /**
@@ -230,6 +232,8 @@ export interface AutomationRunSummary {
  * @category Automation Run State
  */
 export interface AutomationRunState {
+  /** Immutable purpose copied from the admitted definition, independent of catalogue retention. */
+  purpose?: 'scheduledChat';
   /** URI of this automation-run channel. */
   resource: URI;
   /** Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}. */

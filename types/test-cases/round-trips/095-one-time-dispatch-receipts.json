@@ -1,0 +1,120 @@
+{
+  "name": "one-time-dispatch-receipts",
+  "group": "A",
+  "description": "Pruned run history preserves distinct dispatched, rejected, and uncertain one-time admissions.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [
+        {
+          "resource": "ahp-automation:/dispatched",
+          "definition": {
+            "title": "Dispatched",
+            "purpose": "scheduledChat",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/sent",
+          "oneTimeDispatchedAt": "2026-11-14T09:00:01Z",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        },
+        {
+          "resource": "ahp-automation:/rejected",
+          "definition": {
+            "title": "Rejected before submission",
+            "purpose": "scheduledChat",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/not-sent",
+          "oneTimeDispatchRejectedAt": "2026-11-14T09:00:01Z",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        },
+        {
+          "resource": "ahp-automation:/uncertain",
+          "definition": {
+            "title": "Uncertain handoff",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/uncertain",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        }
+      ]
+    },
+    "fromSeq": 10
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [
+        {
+          "resource": "ahp-automation:/dispatched",
+          "definition": {
+            "title": "Dispatched",
+            "purpose": "scheduledChat",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/sent",
+          "oneTimeDispatchedAt": "2026-11-14T09:00:01Z",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        },
+        {
+          "resource": "ahp-automation:/rejected",
+          "definition": {
+            "title": "Rejected before submission",
+            "purpose": "scheduledChat",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/not-sent",
+          "oneTimeDispatchRejectedAt": "2026-11-14T09:00:01Z",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        },
+        {
+          "resource": "ahp-automation:/uncertain",
+          "definition": {
+            "title": "Uncertain handoff",
+            "message": { "text": "Go", "origin": { "kind": "automation" } },
+            "session": {},
+            "enabled": false,
+            "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T09:00:00Z" }]
+          },
+          "oneTimeRun": "ahp-automation-run:/uncertain",
+          "runs": [],
+          "operations": ["remove"],
+          "createdAt": "2026-11-13T18:00:00Z",
+          "modifiedAt": "2026-11-14T09:00:00Z"
+        }
+      ]
+    },
+    "fromSeq": 10
+  }]
+}

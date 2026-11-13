@@ -1743,6 +1743,12 @@ type ResourceWatchChangedAction struct {
 // from the dispatching client, persists the definition, then publishes the
 // authoritative result with {@link AutomationSetAction | `automation/set`}.
 // Rejections leave the catalogue unchanged.
+//
+// When {@link AutomationCapabilities.oneTime} is advertised, retries of an
+// unchanged one-time definition at the same resource MUST return its current
+// authoritative entry without creating another occurrence, even after its
+// due time. A conflicting definition MUST be rejected. A removed one-time
+// resource MUST NOT be reused to recreate a request, including after restart.
 type AutomationCreateRequestedAction struct {
 	Type ActionType `json:"type"`
 	// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
@@ -1770,6 +1776,13 @@ type AutomationUpdateRequestedAction struct {
 	Resource URI `json:"resource"`
 	// Editable {@link AutomationDefinition} fields to replace.
 	Changes AutomationDefinitionPatch `json:"changes"`
+	// Apply the patch only if this exactly matches
+	// {@link AutomationEntry.modifiedAt}. Requires
+	// {@link AutomationCapabilities.oneTime}. The host checks and persists the
+	// update atomically, rejects a mismatch without changing state, and
+	// advances `modifiedAt` on each accepted definition update so stale guards
+	// cannot match a different revision. Omission retains ordered patch semantics.
+	ExpectedModifiedAt *string `json:"expectedModifiedAt,omitempty"`
 }
 
 // Add or replace one full automation state in

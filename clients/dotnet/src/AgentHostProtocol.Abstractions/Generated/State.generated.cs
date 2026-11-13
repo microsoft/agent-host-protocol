@@ -1738,6 +1738,9 @@ public enum AutomationTriggerKind
     /// <summary>A host-defined external event discovered from trigger definitions.</summary>
     [WireValue("event")]
     Event,
+    /// <summary>One run at an absolute UTC instant, including catch-up after unavailability.</summary>
+    [WireValue("oneTime")]
+    OneTime,
 }
 
 /// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
@@ -6754,6 +6757,11 @@ public sealed record AutomationSessionOrigin
 {
     public SessionOriginKind Kind { get; init; } = SessionOriginKind.Automation;
 
+    /// <summary>Immutable purpose copied from the run, including after its definition is
+    /// removed. Existing conversation targets retain their original provenance.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Purpose { get; init; }
+
     /// <summary>Owning {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
 
@@ -6879,6 +6887,30 @@ public sealed record AutomationEventTrigger
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
+/// <summary>Admits one run at an absolute instant.
+///
+/// Requires {@link AutomationCapabilities.oneTime}. This MUST be the
+/// definition's only trigger. The host atomically persists
+/// {@link AutomationEntry.oneTimeRun} before dispatch, including for manual
+/// execution before the due time. Missed occurrences catch up once. Failed,
+/// cancelled, or interrupted execution never rearms the occurrence. Once
+/// admitted, definition updates are rejected and repeated manual requests
+/// return the existing run, even with a different request id.</summary>
+public sealed record AutomationOneTimeTrigger
+{
+    /// <summary>Identifier unique and stable within this automation definition.</summary>
+    public required string Id { get; init; }
+
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.OneTime;
+
+    /// <summary>Absolute ISO 8601 UTC timestamp ending in `Z`.</summary>
+    public required string RunAt { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
 /// <summary>Describes one host-defined trigger event.</summary>
 public sealed record AutomationTriggerEventDefinition
 {
@@ -6986,6 +7018,16 @@ public sealed record AutomationSessionTemplate
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
+/// <summary>An exact existing execution target, without session creation or ownership.</summary>
+public sealed record AutomationConversation
+{
+    /// <summary>Exact host-advertised owner session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Exact host-advertised chat URI; it need not be the session's default chat.</summary>
+    public required string Chat { get; init; }
+}
+
 /// <summary>Durable, client-editable definition of an automation.
 ///
 /// A definition combines the initial automation message, the session template
@@ -6997,15 +7039,39 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Initial message sent to every newly created run session. Its
+    /// <summary>A captured user request scheduled for later. Requires
+    /// {@link AutomationCapabilities.oneTime}, exactly one one-time trigger, and
+    /// enabled creation. Disabling it before admission permanently cancels it:
+    /// the host MUST reject subsequent definition updates and manual runs.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Purpose { get; init; }
+
+    /// <summary>Existing conversation receiving a one-time scheduled-chat request.
+    ///
+    /// Requires {@link AutomationCapabilities.existingConversation} and
+    /// `purpose: 'scheduledChat'`. Immutable after creation. The host MUST
+    /// revalidate authorization and that the chat belongs to the advertised
+    /// session. It MUST NOT create a replacement conversation, apply the
+    /// session template or message model/agent, or acquire ownership of the
+    /// existing session. The required {@link session} field is ignored.
+    ///
+    /// Delivery joins the ordinary message queue without steering or cancelling
+    /// another turn. Completion means accepted queue handoff, not turn completion.
+    /// The delivery-only run has no owned sessions: its `sessions` is empty and
+    /// `primarySession` is absent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationConversation? Conversation { get; init; }
+
+    /// <summary>Initial message sent to each new run session or existing conversation. Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.</summary>
     public required Message Message { get; init; }
 
-    /// <summary>Template used to create fresh sessions for each run.</summary>
+    /// <summary>Template used to create fresh sessions; ignored when {@link conversation} is set.</summary>
     public required AutomationSessionTemplate Session { get; init; }
 
     /// <summary>Whether automatic triggers may create runs. Manual runs remain available
-    /// whenever {@link AutomationOperation.Run} is advertised.</summary>
+    /// whenever {@link AutomationOperation.Run} is advertised, except that
+    /// disabling a scheduled chat permanently cancels its unconsumed occurrence.</summary>
     public bool Enabled { get; init; }
 
     /// <summary>Automatic triggers. An empty list means manual-only.</summary>
@@ -7046,6 +7112,10 @@ public sealed record AutomationDefinitionPatch
     /// <summary>Replacement {@link AutomationDefinition.title}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
+
+    /// <summary>Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Purpose { get; init; }
 
     /// <summary>Replacement {@link AutomationDefinition.message}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -7122,6 +7192,27 @@ public sealed class AutomationEntry
     /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
+
+    /// <summary>Durable one-time admission receipt. Retained independently of the
+    /// run-history window; consuming the occurrence never depends on retained
+    /// summaries. Absent before admission.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OneTimeRun { get; set; }
+
+    /// <summary>ISO 8601 timestamp when the one-time run's initial request was accepted
+    /// for dispatch. Retained independently of run history. Admission or session
+    /// allocation alone MUST NOT set this receipt. Absence does not prove
+    /// non-dispatch after interrupted or uncertain execution.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OneTimeDispatchedAt { get; set; }
+
+    /// <summary>ISO 8601 timestamp positively confirming that a consumed occurrence
+    /// failed before submission was attempted. Only this receipt permits
+    /// explicit recovery as a sendable draft; failure plus absent
+    /// {@link oneTimeDispatchedAt} can be uncertain. The host MUST NOT publish
+    /// both dispatch receipts for the same occurrence.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OneTimeDispatchRejectedAt { get; set; }
 
     /// <summary>Host-owned count of scheduled runs consumed against the current
     /// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -7207,16 +7298,17 @@ public sealed record AutomationTriggeredRunOrigin
     public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
     /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.</summary>
+    /// {@link AutomationEventTrigger.id} or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.</summary>
     public required string TriggerId { get; init; }
 
     /// <summary>Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.</summary>
+    /// schedule and one-time triggers and normally absent for event triggers.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ScheduledFor { get; init; }
 
     /// <summary>`true` when this is a catch-up run created by
-    /// {@link AutomationMisfirePolicy.RunOnce}.</summary>
+    /// {@link AutomationMisfirePolicy.RunOnce} or a missed one-time trigger.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? CatchUp { get; init; }
 
@@ -7350,6 +7442,10 @@ public sealed record AutomationRunSummary
 /// lifecycle.</summary>
 public sealed class AutomationRunState
 {
+    /// <summary>Immutable purpose copied from the admitted definition, independent of catalogue retention.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Purpose { get; set; }
+
     /// <summary>URI of this automation-run channel.</summary>
     public required string Resource { get; set; }
 
@@ -8025,6 +8121,7 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+        ["oneTime"] = typeof(AutomationOneTimeTrigger),
             },
             allowUnknown: false)
     {

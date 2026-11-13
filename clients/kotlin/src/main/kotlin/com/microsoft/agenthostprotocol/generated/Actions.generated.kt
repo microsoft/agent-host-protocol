@@ -1628,7 +1628,16 @@ data class AutomationUpdateRequestedAction(
     /**
      * Editable {@link AutomationDefinition} fields to replace.
      */
-    val changes: AutomationDefinitionPatch
+    val changes: AutomationDefinitionPatch,
+    /**
+     * Apply the patch only if this exactly matches
+     * {@link AutomationEntry.modifiedAt}. Requires
+     * {@link AutomationCapabilities.oneTime}. The host checks and persists the
+     * update atomically, rejects a mismatch without changing state, and
+     * advances `modifiedAt` on each accepted definition update so stale guards
+     * cannot match a different revision. Omission retains ordered patch semantics.
+     */
+    val expectedModifiedAt: String? = null
 )
 
 @Serializable

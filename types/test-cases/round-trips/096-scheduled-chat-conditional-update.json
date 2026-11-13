@@ -1,0 +1,24 @@
+{
+  "name": "scheduled-chat-conditional-update",
+  "group": "A",
+  "description": "A guarded reschedule preserves the expected revision, purpose, and replacement one-time trigger.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/send-later",
+    "expectedModifiedAt": "2026-11-13T18:00:00Z",
+    "changes": {
+      "purpose": "scheduledChat",
+      "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T10:00:00Z" }]
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/send-later",
+    "expectedModifiedAt": "2026-11-13T18:00:00Z",
+    "changes": {
+      "purpose": "scheduledChat",
+      "triggers": [{ "id": "once", "kind": "oneTime", "runAt": "2026-11-14T10:00:00Z" }]
+    }
+  }]
+}

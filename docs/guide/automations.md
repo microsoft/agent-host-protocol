@@ -1,7 +1,7 @@
 # Automations
 
 Automations are durable, host-owned definitions that create fresh agent
-sessions manually or in response to recurring schedules and external events.
+sessions manually or in response to recurring schedules, one-time triggers, and external events. Capability-negotiated scheduled chats may instead enqueue a request in an exact existing conversation.
 They let multiple AHP clients share one catalogue, scheduler, execution claim,
 and run history instead of each client maintaining a local copy.
 
@@ -33,6 +33,8 @@ AutomationCapabilities {
   schedules?: {
     minIntervalMinutes?: number
   }
+  oneTime?: {}
+  existingConversation?: {}
   runCancellation?: {}
   runHistoryLimit?: number
   customizations?: {}
@@ -47,7 +49,7 @@ fields describe optional features and restrictions; clients use each
 automation's `operations` to determine which definition actions are currently
 allowed.
 
-`create`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
+`create`, `runCancellation`, `customizations`, `oneTime`, and `existingConversation` are presence capabilities: an empty object means
 the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
 
@@ -106,6 +108,8 @@ An `AutomationDefinition` is the durable, editable part of an automation:
 ```typescript
 AutomationDefinition {
   title: string
+  purpose?: 'scheduledChat'
+  conversation?: { session: URI, chat: URI }
   message: Message
   session: AutomationSessionTemplate
   enabled: boolean
@@ -200,15 +204,61 @@ started manually when its state advertises the `run` operation. This allows a
 user to pause scheduling without losing the definition or its ability to run
 on demand.
 
+Scheduled chats are an exception: they must be created enabled, and disabling one before admission permanently cancels it. The host rejects subsequent definition updates and manual runs, even if a stale client still offers those controls. Disabling an already admitted occurrence does not retract a queued message.
+
 ## Triggers
 
 An empty `triggers` list means manual-only. Automatic triggers are either
-portable schedules or host-defined events.
+portable schedules, one-time instants, or host-defined events.
 
 Each trigger has an `id` that is unique and stable within its definition. Runs
 created automatically record that id in `AutomationTriggeredRunOrigin`, so
 clients can explain why the run exists even if they do not understand the
 trigger's configuration.
+
+### One-time triggers and scheduled chats
+
+When `automations.oneTime` is present, a definition can have exactly one trigger of this form, with no other triggers:
+
+```typescript
+AutomationOneTimeTrigger {
+  id: string
+  kind: 'oneTime'
+  runAt: string // Absolute ISO 8601 UTC timestamp ending in Z.
+}
+```
+
+The host persists `oneTimeRun` atomically before any external side effect. Automatic execution and manual `runAutomation` ("Send Now") compete for that same admission: whichever wins consumes the occurrence, and subsequent manual requests return the recorded run URI, even with a new request id. Failure, cancellation, interruption, or run-history pruning never rearms it. After admission the host rejects definition edits. A missed instant catches up once when the host becomes available; this does not wake a sleeping machine or start a stopped host. Automatically admitted runs record the trigger id and `runAt` as `origin.scheduledFor`; delayed catch-up sets `origin.catchUp`.
+
+Clients retry an uncertain create with the same client-chosen automation resource, never a fresh identity. The host acknowledges an unchanged definition with its current authoritative entry, even after the due time, and rejects conflicting definitions without mutation. A removed one-time resource cannot be reused, including after restart, so retrying a lost acknowledgement cannot recreate cancelled or already sent work. Clients need no private metadata to establish this wire identity.
+
+`purpose: 'scheduledChat'` identifies a captured user request, rather than a reusable automation. It requires the one-time capability, one one-time trigger, and enabled creation. The purpose is copied immutably into `AutomationRunState.purpose` and the origin of a newly created session, so it remains discoverable after the definition is removed.
+
+Hosts accepting these definitions must durably preserve supported message attachments without depending on a connected client. Unsupported content is rejected before accepting the definition or update, never silently dropped.
+
+#### Dispatch receipts and recovery
+
+These host-owned fields survive pruning of `runs` and are synchronized through ordinary `automation/set` actions:
+
+| Field | Meaning |
+| --- | --- |
+| `oneTimeRun` | The occurrence was consumed by this run; admission alone does not prove dispatch. |
+| `oneTimeDispatchedAt` | The initial request was accepted for dispatch, not necessarily completed by the agent. |
+| `oneTimeDispatchRejectedAt` | Positive confirmation that a consumed occurrence failed before submission was attempted. |
+
+The dispatch receipts require an admitted run and are mutually exclusive. Failure without `oneTimeDispatchedAt` is not proof of non-dispatch: a crash can leave an uncertain handoff. Clients may recover a consumed request as a sendable draft only with `oneTimeDispatchRejectedAt`, following explicit user action; they must never automatically retry an uncertain request. Cancelling an admitted run does not undo an accepted queue handoff.
+
+#### Existing conversations
+
+`automations.existingConversation` additionally allows a scheduled-chat definition to carry `conversation: { session, chat }`. It requires `automations.oneTime`. Both URIs are the exact host-advertised identifiers; the chat need not be the default chat and cannot be reconstructed from the session URI. The target is immutable and is not included in `AutomationDefinitionPatch`.
+
+The host revalidates authorization, chat membership, and availability at execution. It must not create a replacement if the target is gone, acquire ownership of the session, change its provenance, or apply the definition's session template or message model/agent. The required `session` template can be `{}` and is not applied to this target; supplied provider/directory context remains part of the saved definition for client presentation. Delivery joins the chat's ordinary message queue without interrupting or steering an active turn. For this delivery-only run, `sessions` is empty, `primarySession` is absent, and `completed` means accepted queue handoff; it does not wait for the existing conversation's turn to finish.
+
+#### Conditional edits and compatibility
+
+Hosts advertising `automations.oneTime` also support `automation/updateRequested.expectedModifiedAt`. When supplied, it must exactly match the current definition's `modifiedAt`; the host checks and persists the mutation atomically, advances that timestamp for every accepted definition update, and rejects a mismatch without changing state. This prevents a stale reschedule or cancellation from overwriting another client's edit. Omission retains the existing ordered-patch behavior. This is not a guard for `automation/removed`.
+
+Clients must not author one-time triggers, scheduled-chat purposes, or guarded updates without `automations.oneTime`, or existing targets without `automations.existingConversation`. The new fields are optional, but the new trigger variant extends an **exhaustive** enum: older clients may reject a catalogue containing `kind: 'oneTime'`. Host feature advertisement alone does not make old decoders forward-compatible; deployments must ensure catalogue readers support the new variant before exposing it. Existing schedule/event definitions and their manual-run behavior remain unchanged.
 
 ### Scheduled triggers
 

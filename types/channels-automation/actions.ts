@@ -32,6 +32,8 @@ import type {
 export interface AutomationDefinitionPatch {
   /** Replacement {@link AutomationDefinition.title}. */
   title?: string;
+  /** Replacement {@link AutomationDefinition.purpose}, subject to its creation and cancellation constraints. */
+  purpose?: 'scheduledChat';
   /** Replacement {@link AutomationDefinition.message}. */
   message?: Message;
   /**
@@ -77,6 +79,12 @@ export interface AutomationDefinitionPatch {
  * authoritative result with {@link AutomationSetAction | `automation/set`}.
  * Rejections leave the catalogue unchanged.
  *
+ * When {@link AutomationCapabilities.oneTime} is advertised, retries of an
+ * unchanged one-time definition at the same resource MUST return its current
+ * authoritative entry without creating another occurrence, even after its
+ * due time. A conflicting definition MUST be rejected. A removed one-time
+ * resource MUST NOT be reused to recreate a request, including after restart.
+ *
  * @category Automation Actions
  * @version 1
  * @clientDispatchable
@@ -114,6 +122,15 @@ export interface AutomationUpdateRequestedAction {
   resource: URI;
   /** Editable {@link AutomationDefinition} fields to replace. */
   changes: AutomationDefinitionPatch;
+  /**
+   * Apply the patch only if this exactly matches
+   * {@link AutomationEntry.modifiedAt}. Requires
+   * {@link AutomationCapabilities.oneTime}. The host checks and persists the
+   * update atomically, rejects a mismatch without changing state, and
+   * advances `modifiedAt` on each accepted definition update so stale guards
+   * cannot match a different revision. Omission retains ordered patch semantics.
+   */
+  expectedModifiedAt?: string;
 }
 
 /**

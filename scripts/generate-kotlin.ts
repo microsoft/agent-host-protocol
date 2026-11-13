@@ -1081,9 +1081,9 @@ const STATE_STRUCTS = [
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
   'AutomationSessionOrigin', 'AutomationSchedule',
-  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger', 'AutomationOneTimeTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
-  'AutomationSessionTemplate', 'AutomationDefinition',
+  'AutomationSessionTemplate', 'AutomationConversation', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationAfterRunsCondition', 'AutomationAfterDateCondition',
   'AutomationEntry', 'AutomationState',
@@ -1390,6 +1390,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { caseName: 'Schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
     { caseName: 'Event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+    { caseName: 'OneTime', structName: 'AutomationOneTimeTrigger', discriminantValue: 'oneTime' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1811,6 +1812,7 @@ const COMMAND_STRUCTS = [
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'AutomationOneTimeCapability', 'AutomationExistingConversationCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
