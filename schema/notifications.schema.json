@@ -5846,6 +5846,32 @@
         "schedule"
       ]
     },
+    "AutomationOneTimeTrigger": {
+      "type": "object",
+      "description": "Starts one run at a fixed time evaluated by the host.\n\nThe trigger fires at most once for a given {@link runAt}. Updating\n{@link runAt} moves the occurrence to the new time; the previous time no\nlonger fires.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a\nrun."
+        },
+        "kind": {
+          "const": "oneTime"
+        },
+        "runAt": {
+          "type": "string",
+          "description": "Scheduled run timestamp in ISO 8601 format."
+        },
+        "misfirePolicy": {
+          "$ref": "#/$defs/AutomationMisfirePolicy",
+          "description": "Policy when {@link runAt} passes while automatic execution is unavailable.\nOmission is equivalent to {@link AutomationMisfirePolicy.RunOnce}."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "runAt"
+      ]
+    },
     "AutomationEventTrigger": {
       "type": "object",
       "description": "Starts runs from events understood by the owning host.\n\nEvent trigger types, events, and configuration are discovered through\n{@link ListAutomationTriggerDefinitionsParams |\nlistAutomationTriggerDefinitions}. The saved trigger includes the matching\nhuman-readable metadata so it remains displayable without repeating\ndiscovery.",
@@ -6162,7 +6188,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+          "description": "Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runCount": {
           "type": "number",
@@ -6258,11 +6284,11 @@
         },
         "triggerId": {
           "type": "string",
-          "description": "Matches the stable {@link AutomationScheduleTrigger.id} or\n{@link AutomationEventTrigger.id} in the definition."
+          "description": "Matches the stable {@link AutomationScheduleTrigger.id},\n{@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}\nin the definition."
         },
         "scheduledFor": {
           "type": "string",
-          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule triggers and normally absent for event triggers."
+          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule and one-time triggers and normally absent for event triggers."
         },
         "catchUp": {
           "type": "boolean",
@@ -7204,6 +7230,9 @@
         },
         {
           "$ref": "#/$defs/AutomationEventTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationOneTimeTrigger"
         }
       ],
       "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."

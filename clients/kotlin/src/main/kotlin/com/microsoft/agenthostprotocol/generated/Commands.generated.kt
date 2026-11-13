@@ -566,6 +566,10 @@ data class AutomationCapabilities(
      */
     val schedules: AutomationScheduleCapabilities? = null,
     /**
+     * Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+     */
+    val oneTime: AutomationOneTimeCapability? = null,
+    /**
      * Present when clients may request cancellation of `pending` or `running`
      * automation runs.
      */
@@ -628,6 +632,9 @@ class AutomationPreviousSessionTargetCapability
 
 @Serializable
 class AutomationChatTargetCapability
+
+@Serializable
+class AutomationOneTimeCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

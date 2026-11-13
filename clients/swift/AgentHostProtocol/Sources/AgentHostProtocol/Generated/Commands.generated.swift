@@ -586,6 +586,8 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public var create: AutomationCreateCapability?
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     public var schedules: AutomationScheduleCapabilities?
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+    public var oneTime: AutomationOneTimeCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     public var runCancellation: AutomationRunCancellationCapability?
@@ -603,6 +605,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
+        oneTime: AutomationOneTimeCapability? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
         customizations: AutomationCustomizationsCapability? = nil,
@@ -610,6 +613,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     ) {
         self.create = create
         self.schedules = schedules
+        self.oneTime = oneTime
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
@@ -682,6 +686,14 @@ public struct AutomationPreviousSessionTargetCapability: Codable, Sendable, Equa
 }
 
 public struct AutomationChatTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
 
     public init(
 

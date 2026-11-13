@@ -12,6 +12,7 @@ import type {
   AutomationMisfirePolicy,
   AutomationPreviousSessionTarget,
   AutomationScheduleTrigger,
+  AutomationOneTimeTrigger,
   AutomationEntry,
 } from '../channels-automation/state.js';
 import type { RunAutomationParams } from '../channels-automation/commands.js';
@@ -70,13 +71,14 @@ export interface AutomationManualRunOrigin {
 export interface AutomationTriggeredRunOrigin {
   kind: AutomationRunOriginKind.Trigger;
   /**
-   * Matches the stable {@link AutomationScheduleTrigger.id} or
-   * {@link AutomationEventTrigger.id} in the definition.
+   * Matches the stable {@link AutomationScheduleTrigger.id},
+   * {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+   * in the definition.
    */
   triggerId: string;
   /**
    * Intended schedule occurrence as an ISO 8601 timestamp. Present for
-   * schedule triggers and normally absent for event triggers.
+   * schedule and one-time triggers and normally absent for event triggers.
    */
   scheduledFor?: string;
   /**

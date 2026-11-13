@@ -1082,7 +1082,7 @@ const STATE_STRUCTS = [
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
   'AutomationSessionOrigin', 'AutomationSchedule',
-  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger', 'AutomationOneTimeTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
@@ -1393,6 +1393,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { caseName: 'Schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
     { caseName: 'Event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+    { caseName: 'OneTime', structName: 'AutomationOneTimeTrigger', discriminantValue: 'oneTime' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1830,6 +1831,7 @@ const COMMAND_STRUCTS = [
   'AutomationTargetsCapabilities',
   'AutomationPreviousSessionTargetCapability',
   'AutomationChatTargetCapability',
+  'AutomationOneTimeCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',

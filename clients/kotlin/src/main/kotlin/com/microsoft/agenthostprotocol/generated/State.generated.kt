@@ -1183,7 +1183,12 @@ enum class AutomationTriggerKind {
      * A host-defined external event discovered from trigger definitions.
      */
     @SerialName("event")
-    EVENT
+    EVENT,
+    /**
+     * A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+     */
+    @SerialName("oneTime")
+    ONE_TIME
 }
 
 /**
@@ -6258,6 +6263,35 @@ internal object AutomationEventTriggerSerializer : UnknownMembersSerializer<Auto
 )
 
 @KeepGeneratedSerializer
+@Serializable(with = AutomationOneTimeTriggerSerializer::class)
+data class AutomationOneTimeTrigger(
+    /**
+     * Identifier unique and stable within this automation definition. Recorded in
+     * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+     * run.
+     */
+    val id: String,
+    val kind: AutomationTriggerKind,
+    /**
+     * Scheduled run timestamp in ISO 8601 format.
+     */
+    val runAt: String,
+    /**
+     * Policy when {@link runAt} passes while automatic execution is unavailable.
+     * Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+     */
+    val misfirePolicy: AutomationMisfirePolicy? = null,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationOneTimeTriggerSerializer : UnknownMembersSerializer<AutomationOneTimeTrigger>(
+    AutomationOneTimeTrigger.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+@KeepGeneratedSerializer
 @Serializable(with = AutomationTriggerEventDefinitionSerializer::class)
 data class AutomationTriggerEventDefinition(
     /**
@@ -6569,7 +6603,7 @@ data class AutomationEntry(
      */
     val definition: AutomationDefinition,
     /**
-     * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+     * Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
     /**
@@ -6653,13 +6687,14 @@ data class AutomationManualRunOrigin(
 data class AutomationTriggeredRunOrigin(
     val kind: AutomationRunOriginKind,
     /**
-     * Matches the stable {@link AutomationScheduleTrigger.id} or
-     * {@link AutomationEventTrigger.id} in the definition.
+     * Matches the stable {@link AutomationScheduleTrigger.id},
+     * {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+     * in the definition.
      */
     val triggerId: String,
     /**
      * Intended schedule occurrence as an ISO 8601 timestamp. Present for
-     * schedule triggers and normally absent for event triggers.
+     * schedule and one-time triggers and normally absent for event triggers.
      */
     val scheduledFor: String? = null,
     /**
@@ -8049,6 +8084,8 @@ sealed interface AutomationTrigger
 value class AutomationTriggerSchedule(val value: AutomationScheduleTrigger) : AutomationTrigger
 @JvmInline
 value class AutomationTriggerEvent(val value: AutomationEventTrigger) : AutomationTrigger
+@JvmInline
+value class AutomationTriggerOneTime(val value: AutomationOneTimeTrigger) : AutomationTrigger
 
 internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
     override val descriptor: SerialDescriptor =
@@ -8065,6 +8102,7 @@ internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
         return when (discriminant) {
             "schedule" -> AutomationTriggerSchedule(input.json.decodeFromJsonElement(AutomationScheduleTrigger.serializer(), element))
             "event" -> AutomationTriggerEvent(input.json.decodeFromJsonElement(AutomationEventTrigger.serializer(), element))
+            "oneTime" -> AutomationTriggerOneTime(input.json.decodeFromJsonElement(AutomationOneTimeTrigger.serializer(), element))
             else -> error("Unknown AutomationTrigger discriminator: $discriminant")
         }
     }
@@ -8075,11 +8113,13 @@ internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
         val element: JsonElement = when (value) {
             is AutomationTriggerSchedule -> output.json.encodeToJsonElement(AutomationScheduleTrigger.serializer(), value.value)
             is AutomationTriggerEvent -> output.json.encodeToJsonElement(AutomationEventTrigger.serializer(), value.value)
+            is AutomationTriggerOneTime -> output.json.encodeToJsonElement(AutomationOneTimeTrigger.serializer(), value.value)
         }
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
             is AutomationTriggerSchedule -> "schedule"
             is AutomationTriggerEvent -> "event"
+            is AutomationTriggerOneTime -> "oneTime"
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

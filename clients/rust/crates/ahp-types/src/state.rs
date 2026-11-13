@@ -1527,6 +1527,9 @@ pub enum AutomationTriggerKind {
     /// A host-defined external event discovered from trigger definitions.
     #[serde(rename = "event")]
     Event,
+    /// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+    #[serde(rename = "oneTime")]
+    OneTime,
 }
 
 /// Discriminant for an {@link AutomationDisableCondition}.
@@ -6191,6 +6194,29 @@ pub struct AutomationEventTrigger {
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
+/// Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} moves the occurrence to the new time; the previous time no
+/// longer fires.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOneTimeTrigger {
+    /// Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.
+    pub id: String,
+    /// Scheduled run timestamp in ISO 8601 format.
+    pub run_at: String,
+    /// Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misfire_policy: Option<AutomationMisfirePolicy>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
 /// Describes one host-defined trigger event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -6508,7 +6534,7 @@ pub struct AutomationEntry {
     pub resource: Uri,
     /// Current durable definition.
     pub definition: AutomationDefinition,
-    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+    /// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
     /// Host-owned count of scheduled runs consumed against the current
@@ -6638,11 +6664,12 @@ pub struct AutomationManualRunOrigin {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationTriggeredRunOrigin {
-    /// Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.
+    /// Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.
     pub trigger_id: String,
     /// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.
+    /// schedule and one-time triggers and normally absent for event triggers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheduled_for: Option<String>,
     /// `true` when this is a catch-up run created by
@@ -7207,6 +7234,8 @@ pub enum AutomationTrigger {
     Schedule(AutomationScheduleTrigger),
     #[serde(rename = "event")]
     Event(AutomationEventTrigger),
+    #[serde(rename = "oneTime")]
+    OneTime(AutomationOneTimeTrigger),
 }
 
 /// Self-disable rule for an automation.

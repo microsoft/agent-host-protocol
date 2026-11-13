@@ -610,6 +610,10 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
+    /// <summary>Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationOneTimeCapability? OneTime { get; init; }
+
     /// <summary>Present when clients may request cancellation of `pending` or `running`
     /// automation runs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -702,6 +706,11 @@ public sealed record AutomationPreviousSessionTargetCapability
 /// The empty object means "supported"; fields are reserved for future
 /// options.</summary>
 public sealed record AutomationChatTargetCapability
+{
+}
+
+/// <summary>Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+public sealed record AutomationOneTimeCapability
 {
 }
 
