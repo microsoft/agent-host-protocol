@@ -6271,6 +6271,9 @@ pub struct AutomationSessionTemplate {
 pub struct AutomationConversation {
     pub session: Uri,
     pub chat: Uri,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Durable, client-editable definition of an automation.
@@ -6284,12 +6287,12 @@ pub struct AutomationConversation {
 pub struct AutomationDefinition {
     /// Human-readable automation name.
     pub title: String,
-    /// Requires one one-time trigger and enabled creation. Disabling before
-    /// admission permanently cancels the request.
+    /// Immutable after creation. Requires one one-time trigger and enabled creation.
+    /// Disabling before admission permanently cancels the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
     /// Immutable scheduled-chat target; requires
-    /// {@link AutomationCapabilities.existingConversation}. Queues without
+    /// {@link AutomationOneTimeCapability.existingConversation}. Queues without
     /// interrupting active turns or applying session/model/agent overrides.
     /// Completes on queue acceptance and owns no sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -6338,8 +6341,6 @@ pub struct AutomationDefinitionPatch {
     /// Replacement {@link AutomationDefinition.title}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub purpose: Option<String>,
     /// Replacement {@link AutomationDefinition.message}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,

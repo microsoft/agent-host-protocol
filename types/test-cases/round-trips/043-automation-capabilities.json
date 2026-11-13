@@ -15,8 +15,7 @@
       "runCancellation": {},
       "runHistoryLimit": 50,
       "customizations": {},
-      "oneTime": {},
-      "existingConversation": {}
+      "oneTime": { "existingConversation": {} }
     }
   },
   "acceptableOutputs": [{
@@ -31,8 +30,7 @@
       "runCancellation": {},
       "runHistoryLimit": 50,
       "customizations": {},
-      "oneTime": {},
-      "existingConversation": {}
+      "oneTime": { "existingConversation": {} }
     }
   }]
 }

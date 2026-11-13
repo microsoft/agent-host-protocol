@@ -564,7 +564,7 @@ data class AutomationClientCapabilities(
     /**
      * Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
      */
-    val oneTime: AutomationOneTimeCapability? = null
+    val oneTime: AutomationOneTimeClientCapability? = null
 )
 
 @Serializable
@@ -581,10 +581,6 @@ data class AutomationCapabilities(
      * Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
      */
     val oneTime: AutomationOneTimeCapability? = null,
-    /**
-     * Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
-     */
-    val existingConversation: AutomationExistingConversationCapability? = null,
     /**
      * Present when clients may request cancellation of `pending` or `running`
      * automation runs.
@@ -623,10 +619,18 @@ class AutomationRunCancellationCapability
 class AutomationCustomizationsCapability
 
 @Serializable
-class AutomationOneTimeCapability
+data class AutomationOneTimeCapability(
+    /**
+     * Enables existing-conversation targets for scheduled chats.
+     */
+    val existingConversation: AutomationExistingConversationCapability? = null
+)
 
 @Serializable
 class AutomationExistingConversationCapability
+
+@Serializable
+class AutomationOneTimeClientCapability
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

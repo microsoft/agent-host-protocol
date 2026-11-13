@@ -48,7 +48,7 @@ A client MUST declare `initialize.capabilities.automations.oneTime: {}` before r
 
 For a connection without this declaration, the host MUST:
 
-- Omit `automations.oneTime` and `automations.existingConversation` from `InitializeResult`.
+- Omit `automations.oneTime`, including its nested `existingConversation` option, from `InitializeResult`.
 - Exclude entries containing a one-time trigger from every catalogue snapshot, including initialize, subscribe, reconnect fallback, and windowed-delivery snapshots.
 - Project a one-time `automation/set` into `automation/removed` for the same resource. This removes a formerly visible entry if its trigger changes to one-time; removing an unseen resource is a no-op.
 - Suppress create/update request echoes containing one-time triggers, including rejected echoes.
@@ -127,7 +127,7 @@ occurrence with at most one run.
 
 Unchanged one-time create retries at the same resource MUST return its current authoritative entry without admitting another occurrence, including after the due time. Conflicting definitions MUST be rejected. Hosts MUST durably prevent reuse of removed one-time resource identities so replay after restart cannot recreate the request.
 
-A `purpose: 'scheduledChat'` definition requires this trigger and enabled creation. Disabling it before admission permanently cancels it: subsequent updates and manual runs MUST be rejected. The purpose is copied into the admitted run and any newly created session's automation origin, independently of catalogue retention.
+A `purpose: 'scheduledChat'` definition requires this trigger and enabled creation. Purpose is immutable after creation and absent from `AutomationDefinitionPatch`; hosts MUST reject updates that add, remove, or change it, including conversion of an existing disabled or recurring definition. Disabling a scheduled chat before admission permanently cancels it: subsequent updates and manual runs MUST be rejected. The purpose is copied into the admitted run and any newly created session's automation origin, independently of catalogue retention.
 
 `oneTimeDispatchedAt` records accepted dispatch, not run completion. `oneTimeDispatchRejectedAt` positively confirms failure before submission was attempted. Both require `oneTimeRun`, survive run-history pruning, and MUST NOT coexist for one occurrence. Missing dispatch confirmation, even with a failed run, MUST NOT be interpreted as safe to resend after an uncertain handoff. Only a positive rejection receipt permits explicit recovery of a consumed request as a sendable draft.
 
@@ -135,7 +135,7 @@ Hosts MUST capture supported message attachments durably at acceptance and rejec
 
 ### Existing-conversation targets
 
-`automations.existingConversation` requires `automations.oneTime` and enables an immutable `AutomationDefinition.conversation: { session, chat }` on scheduled chats. These MUST be exact advertised URIs, including non-default chats. Hosts MUST revalidate authorization and membership and MUST NOT create a replacement target, apply the session template or message model/agent, change session provenance, or acquire session ownership. Delivery MUST join the ordinary queue without steering or cancelling another turn. Completion means accepted queue handoff rather than turn completion; cancelling the delivery run MUST NOT cancel unrelated work in the existing conversation.
+`automations.oneTime.existingConversation` enables an immutable `AutomationDefinition.conversation: { session, chat }` on scheduled chats. These MUST be exact advertised URIs, including non-default chats. Clients MUST preserve unknown target members on decode/re-encode. Hosts MUST revalidate authorization and membership and MUST NOT create a replacement target, apply the session template or message model/agent, change session provenance, or acquire session ownership. Delivery MUST join the ordinary queue without steering or cancelling another turn. Completion means accepted queue handoff rather than turn completion; cancelling the delivery run MUST NOT cancel unrelated work in the existing conversation.
 
 The delivery run MUST have empty `sessions` and no `primarySession`; the existing target is not an owned run session.
 

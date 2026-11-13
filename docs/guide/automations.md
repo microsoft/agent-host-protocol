@@ -33,8 +33,9 @@ AutomationCapabilities {
   schedules?: {
     minIntervalMinutes?: number
   }
-  oneTime?: {}
-  existingConversation?: {}
+  oneTime?: {
+    existingConversation?: {}
+  }
   runCancellation?: {}
   runHistoryLimit?: number
   customizations?: {}
@@ -232,7 +233,7 @@ The host persists `oneTimeRun` atomically before any external side effect. Autom
 
 Clients retry an uncertain create with the same client-chosen automation resource, never a fresh identity. The host acknowledges an unchanged definition with its current authoritative entry, even after the due time, and rejects conflicting definitions without mutation. A removed one-time resource cannot be reused, including after restart, so retrying a lost acknowledgement cannot recreate cancelled or already sent work. Clients need no private metadata to establish this wire identity.
 
-`purpose: 'scheduledChat'` identifies a captured user request, rather than a reusable automation. It requires the one-time capability, one one-time trigger, and enabled creation. The purpose is copied immutably into `AutomationRunState.purpose` and the origin of a newly created session, so it remains discoverable after the definition is removed.
+`purpose: 'scheduledChat'` identifies a captured user request, rather than a reusable automation. It requires the one-time capability, one one-time trigger, and enabled creation. Purpose is immutable and is not part of `AutomationDefinitionPatch`: updates cannot convert an existing automation into or out of a scheduled chat. The purpose is copied immutably into `AutomationRunState.purpose` and the origin of a newly created session, so it remains discoverable after the definition is removed.
 
 Hosts accepting these definitions must durably preserve supported message attachments without depending on a connected client. Unsupported content is rejected before accepting the definition or update, never silently dropped.
 
@@ -250,7 +251,7 @@ The dispatch receipts require an admitted run and are mutually exclusive. Failur
 
 #### Existing conversations
 
-`automations.existingConversation` additionally allows a scheduled-chat definition to carry `conversation: { session, chat }`. It requires `automations.oneTime`. Both URIs are the exact host-advertised identifiers; the chat need not be the default chat and cannot be reconstructed from the session URI. The target is immutable and is not included in `AutomationDefinitionPatch`.
+`automations.oneTime.existingConversation` additionally allows a scheduled-chat definition to carry `conversation: { session, chat }`. Both URIs are the exact host-advertised identifiers; the chat need not be the default chat and cannot be reconstructed from the session URI. The target is immutable and is not included in `AutomationDefinitionPatch`. Clients preserve unknown members of this target when round-tripping a definition.
 
 The host revalidates authorization, chat membership, and availability at execution. It must not create a replacement if the target is gone, acquire ownership of the session, change its provenance, or apply the definition's session template or message model/agent. The required `session` template can be `{}` and is not applied to this target; supplied provider/directory context remains part of the saved definition for client presentation. Delivery joins the chat's ordinary message queue without interrupting or steering an active turn. For this delivery-only run, `sessions` is empty, `primarySession` is absent, and `completed` means accepted queue handoff; it does not wait for the existing conversation's turn to finish.
 
@@ -258,7 +259,7 @@ The host revalidates authorization, chat membership, and availability at executi
 
 Hosts advertising `automations.oneTime` also support `automation/updateRequested.expectedModifiedAt`. When supplied, it must exactly match the current definition's `modifiedAt`; the host checks and persists the mutation atomically, advances that timestamp for every accepted definition update, and rejects a mismatch without changing state. This prevents a stale reschedule or cancellation from overwriting another client's edit. Omission retains the existing ordered-patch behavior. This is not a guard for `automation/removed`.
 
-Clients must not author one-time triggers, scheduled-chat purposes, or guarded updates without `automations.oneTime`, or existing targets without `automations.existingConversation`. The new trigger extends an **exhaustive** enum, so host support alone is insufficient: each reader must opt in during initialize and repeat the declaration on reconnect. Legacy connections receive a projected catalogue without one-time entries, including live updates and replay. Changing opt-in on reconnect requires a fresh initialize. See [One-time catalogue opt-in](/specification/automation-channel#one-time-catalogue-opt-in) for the required connection boundary. Existing schedule/event definitions and their manual-run behavior remain unchanged.
+Clients must not author one-time triggers, scheduled-chat purposes, or guarded updates without `automations.oneTime`, or existing targets without `automations.oneTime.existingConversation`. The new trigger extends an **exhaustive** enum, so host support alone is insufficient: each reader must opt in during initialize and repeat the declaration on reconnect. Legacy connections receive a projected catalogue without one-time entries, including live updates and replay. Changing opt-in on reconnect requires a fresh initialize. See [One-time catalogue opt-in](/specification/automation-channel#one-time-catalogue-opt-in) for the required connection boundary. Existing schedule/event definitions and their manual-run behavior remain unchanged.
 
 ### Scheduled triggers
 

@@ -486,7 +486,7 @@ pub struct ClientCapabilities {
 pub struct AutomationClientCapabilities {
     /// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub one_time: Option<AutomationOneTimeCapability>,
+    pub one_time: Option<AutomationOneTimeClientCapability>,
 }
 
 /// Automation features supported by this host authority.
@@ -510,9 +510,6 @@ pub struct AutomationCapabilities {
     /// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub one_time: Option<AutomationOneTimeCapability>,
-    /// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub existing_conversation: Option<AutomationExistingConversationCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -569,9 +566,17 @@ pub struct AutomationRunCancellationCapability {}
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOneTimeCapability {
+    /// Enables existing-conversation targets for scheduled chats.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub existing_conversation: Option<AutomationExistingConversationCapability>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationOneTimeCapability {}
+pub struct AutomationOneTimeClientCapability {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

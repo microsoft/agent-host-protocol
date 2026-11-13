@@ -372,6 +372,7 @@ export interface AutomationSessionTemplate {
  * Exact host-advertised target, including non-default chats; not owned by the automation.
  *
  * @category Automation State
+ * @preserveUnknownMembers
  */
 export interface AutomationConversation {
   session: URI;
@@ -392,13 +393,13 @@ export interface AutomationDefinition {
   /** Human-readable automation name. */
   title: string;
   /**
-   * Requires one one-time trigger and enabled creation. Disabling before
-   * admission permanently cancels the request.
+   * Immutable after creation. Requires one one-time trigger and enabled creation.
+   * Disabling before admission permanently cancels the request.
    */
   purpose?: 'scheduledChat';
   /**
    * Immutable scheduled-chat target; requires
-   * {@link AutomationCapabilities.existingConversation}. Queues without
+   * {@link AutomationOneTimeCapability.existingConversation}. Queues without
    * interrupting active turns or applying session/model/agent overrides.
    * Completes on queue acceptance and owns no sessions.
    */

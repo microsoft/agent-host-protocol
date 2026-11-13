@@ -6076,11 +6076,11 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Requires one one-time trigger and enabled creation. Disabling before\nadmission permanently cancels the request."
+          "description": "Immutable after creation. Requires one one-time trigger and enabled creation.\nDisabling before admission permanently cancels the request."
         },
         "conversation": {
           "$ref": "#/$defs/AutomationConversation",
-          "description": "Immutable scheduled-chat target; requires\n{@link AutomationCapabilities.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
+          "description": "Immutable scheduled-chat target; requires\n{@link AutomationOneTimeCapability.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
         },
         "message": {
           "$ref": "#/$defs/Message",

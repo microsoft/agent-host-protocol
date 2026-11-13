@@ -7016,6 +7016,10 @@ public sealed record AutomationConversation
     public required string Session { get; init; }
 
     public required string Chat { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Durable, client-editable definition of an automation.
@@ -7029,13 +7033,13 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Requires one one-time trigger and enabled creation. Disabling before
-    /// admission permanently cancels the request.</summary>
+    /// <summary>Immutable after creation. Requires one one-time trigger and enabled creation.
+    /// Disabling before admission permanently cancels the request.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Purpose { get; init; }
 
     /// <summary>Immutable scheduled-chat target; requires
-    /// {@link AutomationCapabilities.existingConversation}. Queues without
+    /// {@link AutomationOneTimeCapability.existingConversation}. Queues without
     /// interrupting active turns or applying session/model/agent overrides.
     /// Completes on queue acceptance and owns no sessions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -7090,9 +7094,6 @@ public sealed record AutomationDefinitionPatch
     /// <summary>Replacement {@link AutomationDefinition.title}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Purpose { get; init; }
 
     /// <summary>Replacement {@link AutomationDefinition.message}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -301,7 +301,7 @@ type ClientCapabilities struct {
 
 type AutomationClientCapabilities struct {
 	// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
-	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
+	OneTime *AutomationOneTimeClientCapability `json:"oneTime,omitempty"`
 }
 
 // Automation features supported by this host authority.
@@ -320,8 +320,6 @@ type AutomationCapabilities struct {
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
 	// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
 	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
-	// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
-	ExistingConversation *AutomationExistingConversationCapability `json:"existingConversation,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
 	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
@@ -370,6 +368,11 @@ type AutomationCustomizationsCapability struct {
 }
 
 type AutomationOneTimeCapability struct {
+	// Enables existing-conversation targets for scheduled chats.
+	ExistingConversation *AutomationExistingConversationCapability `json:"existingConversation,omitempty"`
+}
+
+type AutomationOneTimeClientCapability struct {
 }
 
 type AutomationExistingConversationCapability struct {

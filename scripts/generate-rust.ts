@@ -1907,6 +1907,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
   { name: 'AutomationOneTimeCapability' },
+  { name: 'AutomationOneTimeClientCapability' },
   { name: 'AutomationExistingConversationCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },

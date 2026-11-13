@@ -38,7 +38,7 @@ const oneTime: AutomationEntry = {
 };
 
 test('one connection opting in does not expose one-time entries or capabilities to legacy connections', () => {
-  const capabilities: AutomationCapabilities = { create: {}, schedules: {}, oneTime: {}, existingConversation: {} };
+  const capabilities: AutomationCapabilities = { create: {}, schedules: {}, oneTime: { existingConversation: {} } };
   const state: AutomationState = { entries: [recurring, oneTime], _meta: { revision: 'r1' } };
   const legacyClients: (ClientCapabilities | undefined)[] = [undefined, {}, { automations: {} }];
   for (const client of legacyClients) {

@@ -238,8 +238,11 @@ export interface ClientCapabilities {
  */
 export interface AutomationClientCapabilities {
   /** Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view. */
-  oneTime?: AutomationOneTimeCapability;
+  oneTime?: AutomationOneTimeClientCapability;
 }
+
+/** @category Commands */
+export interface AutomationOneTimeClientCapability {}
 
 /**
  * Native filesystem path grammar used by a host environment.
@@ -402,8 +405,6 @@ export interface AutomationCapabilities {
   schedules?: AutomationScheduleCapabilities;
   /** Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}. */
   oneTime?: AutomationOneTimeCapability;
-  /** Enables existing-conversation targets for scheduled chats; requires {@link oneTime}. */
-  existingConversation?: AutomationExistingConversationCapability;
   /**
    * Present when clients may request cancellation of `pending` or `running`
    * automation runs.
@@ -434,7 +435,10 @@ export interface AutomationCapabilities {
 export interface AutomationCustomizationsCapability {}
 
 /** @category Commands */
-export interface AutomationOneTimeCapability {}
+export interface AutomationOneTimeCapability {
+  /** Enables existing-conversation targets for scheduled chats. */
+  existingConversation?: AutomationExistingConversationCapability;
+}
 
 /** @category Commands */
 export interface AutomationExistingConversationCapability {}

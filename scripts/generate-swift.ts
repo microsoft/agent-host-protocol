@@ -1760,6 +1760,7 @@ const COMMAND_STRUCTS = [
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
   'AutomationOneTimeCapability', 'AutomationExistingConversationCapability',
+  'AutomationOneTimeClientCapability', 'AutomationExistingConversationCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',

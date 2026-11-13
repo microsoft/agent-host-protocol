@@ -5774,11 +5774,11 @@
           "enum": [
             "scheduledChat"
           ],
-          "description": "Requires one one-time trigger and enabled creation. Disabling before\nadmission permanently cancels the request."
+          "description": "Immutable after creation. Requires one one-time trigger and enabled creation.\nDisabling before admission permanently cancels the request."
         },
         "conversation": {
           "$ref": "#/$defs/AutomationConversation",
-          "description": "Immutable scheduled-chat target; requires\n{@link AutomationCapabilities.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
+          "description": "Immutable scheduled-chat target; requires\n{@link AutomationOneTimeCapability.existingConversation}. Queues without\ninterrupting active turns or applying session/model/agent overrides.\nCompletes on queue acceptance and owns no sessions."
         },
         "message": {
           "$ref": "#/$defs/Message",
@@ -6355,10 +6355,14 @@
       "type": "object",
       "properties": {
         "oneTime": {
-          "$ref": "#/$defs/AutomationOneTimeCapability",
+          "$ref": "#/$defs/AutomationOneTimeClientCapability",
           "description": "Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view."
         }
       }
+    },
+    "AutomationOneTimeClientCapability": {
+      "type": "object",
+      "properties": {}
     },
     "HostEnvironment": {
       "type": "object",
@@ -6461,10 +6465,6 @@
           "$ref": "#/$defs/AutomationOneTimeCapability",
           "description": "Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}."
         },
-        "existingConversation": {
-          "$ref": "#/$defs/AutomationExistingConversationCapability",
-          "description": "Enables existing-conversation targets for scheduled chats; requires {@link oneTime}."
-        },
         "runCancellation": {
           "$ref": "#/$defs/AutomationRunCancellationCapability",
           "description": "Present when clients may request cancellation of `pending` or `running`\nautomation runs."
@@ -6486,7 +6486,12 @@
     },
     "AutomationOneTimeCapability": {
       "type": "object",
-      "properties": {}
+      "properties": {
+        "existingConversation": {
+          "$ref": "#/$defs/AutomationExistingConversationCapability",
+          "description": "Enables existing-conversation targets for scheduled chats."
+        }
+      }
     },
     "AutomationExistingConversationCapability": {
       "type": "object",
@@ -11918,12 +11923,6 @@
         "title": {
           "type": "string",
           "description": "Replacement {@link AutomationDefinition.title}."
-        },
-        "purpose": {
-          "type": "string",
-          "enum": [
-            "scheduledChat"
-          ]
         },
         "message": {
           "$ref": "#/$defs/Message",

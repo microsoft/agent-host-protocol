@@ -8164,24 +8164,47 @@ public struct AutomationSessionTemplate: Codable, Sendable, Equatable {
 public struct AutomationConversation: Codable, Sendable, Equatable {
     public var session: String
     public var chat: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case session
+        case chat
+    }
 
     public init(
         session: String,
-        chat: String
+        chat: String,
+        extra: [String: AnyCodable] = [:]
     ) {
         self.session = session
         self.chat = chat
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.session = try container.decode(String.self, forKey: .session)
+        self.chat = try container.decode(String.self, forKey: .chat)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.session, forKey: .session)
+        try container.encode(self.chat, forKey: .chat)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 public struct AutomationDefinition: Codable, Sendable, Equatable {
     /// Human-readable automation name.
     public var title: String
-    /// Requires one one-time trigger and enabled creation. Disabling before
-    /// admission permanently cancels the request.
+    /// Immutable after creation. Requires one one-time trigger and enabled creation.
+    /// Disabling before admission permanently cancels the request.
     public var purpose: String?
     /// Immutable scheduled-chat target; requires
-    /// {@link AutomationCapabilities.existingConversation}. Queues without
+    /// {@link AutomationOneTimeCapability.existingConversation}. Queues without
     /// interrupting active turns or applying session/model/agent overrides.
     /// Completes on queue acceptance and owns no sessions.
     public var conversation: AutomationConversation?
@@ -8251,7 +8274,6 @@ public struct AutomationDefinition: Codable, Sendable, Equatable {
 public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
     /// Replacement {@link AutomationDefinition.title}.
     public var title: String?
-    public var purpose: String?
     /// Replacement {@link AutomationDefinition.message}.
     public var message: Message?
     /// Replacement {@link AutomationDefinition.session}. The host revalidates
@@ -8274,7 +8296,6 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case title
-        case purpose
         case message
         case session
         case enabled
@@ -8285,7 +8306,6 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
 
     public init(
         title: String? = nil,
-        purpose: String? = nil,
         message: Message? = nil,
         session: AutomationSessionTemplate? = nil,
         enabled: Bool? = nil,
@@ -8294,7 +8314,6 @@ public struct AutomationDefinitionPatch: Codable, Sendable, Equatable {
         meta: [String: AnyCodable]? = nil
     ) {
         self.title = title
-        self.purpose = purpose
         self.message = message
         self.session = session
         self.enabled = enabled

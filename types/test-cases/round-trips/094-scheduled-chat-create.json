@@ -1,7 +1,7 @@
 {
   "name": "scheduled-chat-create",
   "group": "A",
-  "description": "A one-time scheduled chat preserves its purpose and exact non-default conversation target.",
+  "description": "A one-time scheduled chat preserves its purpose, exact non-default target, and unknown nested target fields.",
   "type": "StateAction",
   "input": {
     "type": "automation/createRequested",
@@ -9,7 +9,7 @@
     "definition": {
       "title": "Send the follow-up",
       "purpose": "scheduledChat",
-      "conversation": { "session": "ahp-session:/existing", "chat": "ahp-chat:/non-default" },
+      "conversation": { "session": "ahp-session:/existing", "chat": "ahp-chat:/non-default", "futureRouting": { "partition": "example" } },
       "message": { "text": "Follow up", "origin": { "kind": "automation" } },
       "session": { "provider": "demo", "workingDirectories": ["file:///workspace"] },
       "enabled": true,
@@ -22,7 +22,7 @@
     "definition": {
       "title": "Send the follow-up",
       "purpose": "scheduledChat",
-      "conversation": { "session": "ahp-session:/existing", "chat": "ahp-chat:/non-default" },
+      "conversation": { "session": "ahp-session:/existing", "chat": "ahp-chat:/non-default", "futureRouting": { "partition": "example" } },
       "message": { "text": "Follow up", "origin": { "kind": "automation" } },
       "session": { "provider": "demo", "workingDirectories": ["file:///workspace"] },
       "enabled": true,

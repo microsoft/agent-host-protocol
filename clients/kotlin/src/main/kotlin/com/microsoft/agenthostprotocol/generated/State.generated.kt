@@ -6367,10 +6367,19 @@ internal object AutomationSessionTemplateSerializer : UnknownMembersSerializer<A
     { value, extra -> value.copy(extra = extra) },
 )
 
-@Serializable
+@KeepGeneratedSerializer
+@Serializable(with = AutomationConversationSerializer::class)
 data class AutomationConversation(
     val session: String,
-    val chat: String
+    val chat: String,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationConversationSerializer : UnknownMembersSerializer<AutomationConversation>(
+    AutomationConversation.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
 )
 
 @Serializable
@@ -6380,13 +6389,13 @@ data class AutomationDefinition(
      */
     val title: String,
     /**
-     * Requires one one-time trigger and enabled creation. Disabling before
-     * admission permanently cancels the request.
+     * Immutable after creation. Requires one one-time trigger and enabled creation.
+     * Disabling before admission permanently cancels the request.
      */
     val purpose: String? = null,
     /**
      * Immutable scheduled-chat target; requires
-     * {@link AutomationCapabilities.existingConversation}. Queues without
+     * {@link AutomationOneTimeCapability.existingConversation}. Queues without
      * interrupting active turns or applying session/model/agent overrides.
      * Completes on queue acceptance and owns no sessions.
      */
@@ -6439,7 +6448,6 @@ data class AutomationDefinitionPatch(
      * Replacement {@link AutomationDefinition.title}.
      */
     val title: String? = null,
-    val purpose: String? = null,
     /**
      * Replacement {@link AutomationDefinition.message}.
      */

@@ -4896,6 +4896,18 @@ func (v AutomationSessionTemplate) MarshalJSON() ([]byte, error) {
 type AutomationConversation struct {
 	Session URI `json:"session"`
 	Chat    URI `json:"chat"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationConversation) UnmarshalJSON(data []byte) error {
+	type wire AutomationConversation
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "session", "chat")
+}
+
+func (v AutomationConversation) MarshalJSON() ([]byte, error) {
+	type wire AutomationConversation
+	return marshalWithExtra(wire(v), v.Extra, "session", "chat")
 }
 
 // Durable, client-editable definition of an automation.
@@ -4907,11 +4919,11 @@ type AutomationConversation struct {
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Requires one one-time trigger and enabled creation. Disabling before
-	// admission permanently cancels the request.
+	// Immutable after creation. Requires one one-time trigger and enabled creation.
+	// Disabling before admission permanently cancels the request.
 	Purpose *string `json:"purpose,omitempty"`
 	// Immutable scheduled-chat target; requires
-	// {@link AutomationCapabilities.existingConversation}. Queues without
+	// {@link AutomationOneTimeCapability.existingConversation}. Queues without
 	// interrupting active turns or applying session/model/agent overrides.
 	// Completes on queue acceptance and owns no sessions.
 	Conversation *AutomationConversation `json:"conversation,omitempty"`
@@ -4953,8 +4965,7 @@ type AutomationDefinition struct {
 // them, so editing known fields does not erase fields from newer versions.
 type AutomationDefinitionPatch struct {
 	// Replacement {@link AutomationDefinition.title}.
-	Title   *string `json:"title,omitempty"`
-	Purpose *string `json:"purpose,omitempty"`
+	Title *string `json:"title,omitempty"`
 	// Replacement {@link AutomationDefinition.message}.
 	Message *Message `json:"message,omitempty"`
 	// Replacement {@link AutomationDefinition.session}. The host revalidates

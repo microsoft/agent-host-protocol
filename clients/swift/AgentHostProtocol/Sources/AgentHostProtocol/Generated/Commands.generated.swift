@@ -587,10 +587,10 @@ public struct ClientCapabilities: Codable, Sendable, Equatable {
 
 public struct AutomationClientCapabilities: Codable, Sendable, Equatable {
     /// Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.
-    public var oneTime: AutomationOneTimeCapability?
+    public var oneTime: AutomationOneTimeClientCapability?
 
     public init(
-        oneTime: AutomationOneTimeCapability? = nil
+        oneTime: AutomationOneTimeClientCapability? = nil
     ) {
         self.oneTime = oneTime
     }
@@ -603,8 +603,6 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     public var schedules: AutomationScheduleCapabilities?
     /// Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.
     public var oneTime: AutomationOneTimeCapability?
-    /// Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.
-    public var existingConversation: AutomationExistingConversationCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     public var runCancellation: AutomationRunCancellationCapability?
@@ -620,7 +618,6 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
         oneTime: AutomationOneTimeCapability? = nil,
-        existingConversation: AutomationExistingConversationCapability? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
         customizations: AutomationCustomizationsCapability? = nil
@@ -628,7 +625,6 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         self.create = create
         self.schedules = schedules
         self.oneTime = oneTime
-        self.existingConversation = existingConversation
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
@@ -673,6 +669,17 @@ public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
 }
 
 public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
+    /// Enables existing-conversation targets for scheduled chats.
+    public var existingConversation: AutomationExistingConversationCapability?
+
+    public init(
+        existingConversation: AutomationExistingConversationCapability? = nil
+    ) {
+        self.existingConversation = existingConversation
+    }
+}
+
+public struct AutomationExistingConversationCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -680,7 +687,7 @@ public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
     }
 }
 
-public struct AutomationExistingConversationCapability: Codable, Sendable, Equatable {
+public struct AutomationOneTimeClientCapability: Codable, Sendable, Equatable {
 
     public init(
 

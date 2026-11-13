@@ -25,7 +25,6 @@ export function automationCapabilitiesForClient(
   if (client?.automations?.oneTime !== undefined) return capabilities;
   const legacy = { ...capabilities };
   delete legacy.oneTime;
-  delete legacy.existingConversation;
   return legacy;
 }
 

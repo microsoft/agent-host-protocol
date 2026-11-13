@@ -390,7 +390,6 @@ async fn automation_capabilities_are_exposed_and_survive_reconnect() {
         create: None,
         schedules: None,
         one_time: None,
-        existing_conversation: None,
         run_cancellation: None,
         run_history_limit: Some(25),
         customizations: None,

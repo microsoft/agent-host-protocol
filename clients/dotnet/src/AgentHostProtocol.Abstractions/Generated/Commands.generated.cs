@@ -599,7 +599,7 @@ public sealed record AutomationClientCapabilities
 {
     /// <summary>Accepts one-time entries in snapshots, actions, and replay. Absence requires a legacy catalogue view.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationOneTimeCapability? OneTime { get; init; }
+    public AutomationOneTimeClientCapability? OneTime { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -624,10 +624,6 @@ public sealed record AutomationCapabilities
     /// <summary>Enables one-time triggers, receipts, and guarded updates; requires {@link AutomationClientCapabilities.oneTime}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationOneTimeCapability? OneTime { get; init; }
-
-    /// <summary>Enables existing-conversation targets for scheduled chats; requires {@link oneTime}.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AutomationExistingConversationCapability? ExistingConversation { get; init; }
 
     /// <summary>Present when clients may request cancellation of `pending` or `running`
     /// automation runs.</summary>
@@ -687,6 +683,13 @@ public sealed record AutomationCustomizationsCapability
 }
 
 public sealed record AutomationOneTimeCapability
+{
+    /// <summary>Enables existing-conversation targets for scheduled chats.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationExistingConversationCapability? ExistingConversation { get; init; }
+}
+
+public sealed record AutomationOneTimeClientCapability
 {
 }
 

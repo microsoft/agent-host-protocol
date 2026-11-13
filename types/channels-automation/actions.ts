@@ -32,7 +32,6 @@ import type {
 export interface AutomationDefinitionPatch {
   /** Replacement {@link AutomationDefinition.title}. */
   title?: string;
-  purpose?: 'scheduledChat';
   /** Replacement {@link AutomationDefinition.message}. */
   message?: Message;
   /**
