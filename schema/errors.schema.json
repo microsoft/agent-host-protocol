@@ -7196,6 +7196,10 @@
           "type": "string",
           "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
           "minLength": 1
+        },
+        "accountLabel": {
+          "type": "string",
+          "description": "Optional human-readable label for the client's selected account.\nDisplay-only metadata; labels need not be unique or stable.\nHosts MUST NOT use this label to identify accounts, detect account changes,\nor authorize access."
         }
       },
       "required": [

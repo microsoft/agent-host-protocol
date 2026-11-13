@@ -1370,6 +1370,11 @@ type AuthenticateParams struct {
 	// Hosts MUST treat `accountId` as an opaque string.
 	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
 	AccountId *string `json:"accountId,omitempty"`
+	// Optional human-readable label for the client's selected account.
+	// Display-only metadata; labels need not be unique or stable.
+	// Hosts MUST NOT use this label to identify accounts, detect account changes,
+	// or authorize access.
+	AccountLabel *string `json:"accountLabel,omitempty"`
 }
 
 // Result of the `authenticate` command.
