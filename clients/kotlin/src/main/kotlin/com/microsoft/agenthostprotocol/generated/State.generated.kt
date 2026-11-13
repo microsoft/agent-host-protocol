@@ -1148,12 +1148,16 @@ internal object AutomationOperationSerializer : KSerializer<AutomationOperation>
 value class AutomationMisfirePolicy(val rawValue: String) {
     companion object {
         /**
-         * Discard missed occurrences and wait for the next future occurrence.
+         * Discard missed occurrences and wait for the next future occurrence. The
+         * host SHOULD record the discarded occurrences as one
+         * {@link AutomationSkippedRunLifecycle | skipped} run with reason
+         * `misfire`.
          */
         val SKIP: AutomationMisfirePolicy = AutomationMisfirePolicy("skip")
         /**
          * Start at most one catch-up run when execution becomes available, regardless
-         * of how many occurrences were missed.
+         * of how many occurrences were missed. The host MAY record the other missed
+         * occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.
          */
         val RUN_ONCE: AutomationMisfirePolicy = AutomationMisfirePolicy("runOnce")
     }
@@ -1211,7 +1215,7 @@ enum class AutomationDisableConditionKind {
 /**
  * Lifecycle status of one automation run.
  *
- * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+ * `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
  * while any linked session awaits input or client-side work; linked session
  * state is authoritative for those interactions.
  */
@@ -1241,7 +1245,12 @@ enum class AutomationRunStatus {
      * Execution ended because cancellation was accepted.
      */
     @SerialName("cancelled")
-    CANCELLED
+    CANCELLED,
+    /**
+     * A trigger occurrence was recorded but deliberately not executed.
+     */
+    @SerialName("skipped")
+    SKIPPED
 }
 
 /**
@@ -6519,7 +6528,9 @@ data class AutomationEntry(
      * {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
      * reconstructed from {@link runs} (a bounded, prunable window). The host
      * increments it atomically when it admits a scheduled run, including runs
-     * later cancelled or failed.
+     * later cancelled, failed, or skipped. Runs created directly as
+     * {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+     * count.
      *
      * Absent when {@link AutomationDefinition.disableConditions} contains no
      * {@link AutomationAfterRunsCondition}.
@@ -6620,7 +6631,14 @@ data class AutomationPendingRunLifecycle(
     /**
      * Run creation timestamp in ISO 8601 format.
      */
-    val createdAt: String
+    val createdAt: String,
+    /**
+     * Why the run has not started yet, when the host knows. The host updates it
+     * by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+     * to `pending`. A run that cannot proceed and will not retry transitions to
+     * `failed` instead.
+     */
+    val waiting: AutomationRunWaiting? = null
 )
 
 @Serializable
@@ -6693,6 +6711,77 @@ data class AutomationCancelledRunLifecycle(
      * Cancellation completion timestamp in ISO 8601 format.
      */
     val completedAt: String
+)
+
+@Serializable
+data class AutomationSkippedRunLifecycle(
+    val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
+    val createdAt: String,
+    /**
+     * Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence.
+     */
+    val completedAt: String,
+    /**
+     * Machine-readable reason the occurrence was skipped. Common values
+     * include:
+     *
+     * - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+     * - `'overlap'`: dropped by an overlap or concurrency policy
+     * - `'quota'`: dropped because a budget or rate limit was exhausted
+     */
+    val reason: String,
+    /**
+     * Human-readable detail suitable for display.
+     */
+    val message: String? = null,
+    /**
+     * Number of consecutive occurrences of the same trigger and reason that this
+     * record represents, for example every occurrence missed while the host was
+     * offline. The origin identifies the most recent of them. Absent means `1`.
+     *
+     * Hosts SHOULD coalesce consecutive skips this way rather than recording one
+     * run per occurrence, so skipped runs don't push executed runs out of the
+     * bounded {@link AutomationEntry.runs} window.
+     */
+    val occurrenceCount: Long? = null
+)
+
+@KeepGeneratedSerializer
+@Serializable(with = AutomationRunWaitingSerializer::class)
+data class AutomationRunWaiting(
+    /**
+     * Machine-readable reason the run is waiting. Common values include:
+     *
+     * - `'capacity'`: the host has no execution capacity right now
+     * - `'concurrency'`: waiting for earlier runs of the same automation to finish
+     * - `'quota'`: a budget or rate limit was reached
+     * - `'authentication'`: waiting for credentials, such as a connected,
+     * authenticated client
+     * - `'targetBusy'`: the session or chat the run delivers into is busy
+     * - `'retry'`: backing off after a transient failure
+     * - `'unavailable'`: the host is paused, draining, or otherwise not running
+     * automations
+     */
+    val reason: String,
+    /**
+     * Human-readable detail suitable for display.
+     */
+    val message: String? = null,
+    /**
+     * When the host expects to try again, as an ISO 8601 timestamp.
+     */
+    val retryAt: String? = null,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationRunWaitingSerializer : UnknownMembersSerializer<AutomationRunWaiting>(
+    AutomationRunWaiting.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
 )
 
 @Serializable
@@ -8132,6 +8221,8 @@ value class AutomationRunLifecycleCompleted(val value: AutomationCompletedRunLif
 value class AutomationRunLifecycleFailed(val value: AutomationFailedRunLifecycle) : AutomationRunLifecycle
 @JvmInline
 value class AutomationRunLifecycleCancelled(val value: AutomationCancelledRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleSkipped(val value: AutomationSkippedRunLifecycle) : AutomationRunLifecycle
 
 internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLifecycle> {
     override val descriptor: SerialDescriptor =
@@ -8151,6 +8242,7 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
             "completed" -> AutomationRunLifecycleCompleted(input.json.decodeFromJsonElement(AutomationCompletedRunLifecycle.serializer(), element))
             "failed" -> AutomationRunLifecycleFailed(input.json.decodeFromJsonElement(AutomationFailedRunLifecycle.serializer(), element))
             "cancelled" -> AutomationRunLifecycleCancelled(input.json.decodeFromJsonElement(AutomationCancelledRunLifecycle.serializer(), element))
+            "skipped" -> AutomationRunLifecycleSkipped(input.json.decodeFromJsonElement(AutomationSkippedRunLifecycle.serializer(), element))
             else -> error("Unknown AutomationRunLifecycle discriminator: $discriminant")
         }
     }
@@ -8164,6 +8256,7 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
             is AutomationRunLifecycleCompleted -> output.json.encodeToJsonElement(AutomationCompletedRunLifecycle.serializer(), value.value)
             is AutomationRunLifecycleFailed -> output.json.encodeToJsonElement(AutomationFailedRunLifecycle.serializer(), value.value)
             is AutomationRunLifecycleCancelled -> output.json.encodeToJsonElement(AutomationCancelledRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleSkipped -> output.json.encodeToJsonElement(AutomationSkippedRunLifecycle.serializer(), value.value)
         }
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
@@ -8172,6 +8265,7 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
             is AutomationRunLifecycleCompleted -> "completed"
             is AutomationRunLifecycleFailed -> "failed"
             is AutomationRunLifecycleCancelled -> "cancelled"
+            is AutomationRunLifecycleSkipped -> "skipped"
         }
         if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

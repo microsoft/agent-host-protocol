@@ -1482,10 +1482,14 @@ impl<'de> serde::Deserialize<'de> for AutomationOperation {
 /// unavailable.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AutomationMisfirePolicy {
-    /// Discard missed occurrences and wait for the next future occurrence.
+    /// Discard missed occurrences and wait for the next future occurrence. The
+    /// host SHOULD record the discarded occurrences as one
+    /// {@link AutomationSkippedRunLifecycle | skipped} run with reason
+    /// `misfire`.
     Skip,
     /// Start at most one catch-up run when execution becomes available, regardless
-    /// of how many occurrences were missed.
+    /// of how many occurrences were missed. The host MAY record the other missed
+    /// occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.
     RunOnce,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
@@ -1545,7 +1549,7 @@ pub enum AutomationDisableConditionKind {
 
 /// Lifecycle status of one automation run.
 ///
-/// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+/// `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
 /// while any linked session awaits input or client-side work; linked session
 /// state is authoritative for those interactions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1565,6 +1569,9 @@ pub enum AutomationRunStatus {
     /// Execution ended because cancellation was accepted.
     #[serde(rename = "cancelled")]
     Cancelled,
+    /// A trigger occurrence was recorded but deliberately not executed.
+    #[serde(rename = "skipped")]
+    Skipped,
 }
 
 /// Discriminant describing what created an automation run.
@@ -6397,7 +6404,9 @@ pub struct AutomationEntry {
     /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
     /// reconstructed from {@link runs} (a bounded, prunable window). The host
     /// increments it atomically when it admits a scheduled run, including runs
-    /// later cancelled or failed.
+    /// later cancelled, failed, or skipped. Runs created directly as
+    /// {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+    /// count.
     ///
     /// Absent when {@link AutomationDefinition.disableConditions} contains no
     /// {@link AutomationAfterRunsCondition}.
@@ -6541,6 +6550,12 @@ pub struct AutomationTriggeredRunOrigin {
 pub struct AutomationPendingRunLifecycle {
     /// Run creation timestamp in ISO 8601 format.
     pub created_at: String,
+    /// Why the run has not started yet, when the host knows. The host updates it
+    /// by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+    /// to `pending`. A run that cannot proceed and will not retry transitions to
+    /// `failed` instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiting: Option<AutomationRunWaiting>,
 }
 
 /// The run is executing linked sessions or awaiting interaction on them.
@@ -6604,6 +6619,72 @@ pub struct AutomationCancelledRunLifecycle {
     pub started_at: Option<String>,
     /// Cancellation completion timestamp in ISO 8601 format.
     pub completed_at: String,
+}
+
+/// Terminal lifecycle for a trigger occurrence that the host recorded but
+/// deliberately did not execute.
+///
+/// A skipped run never starts and links no sessions. The host either creates
+/// the run directly as `skipped` or transitions a `pending` run to `skipped`,
+/// for example when an overlap policy coalesces it. Its
+/// {@link AutomationTriggeredRunOrigin.scheduledFor} or
+/// {@link AutomationTriggeredRunOrigin.event} identifies the occurrence.
+///
+/// Skipped runs appear in {@link AutomationEntry.runs} alongside executed runs,
+/// so clients can explain a missing result without extra state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSkippedRunLifecycle {
+    /// Run creation timestamp in ISO 8601 format.
+    pub created_at: String,
+    /// Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence.
+    pub completed_at: String,
+    /// Machine-readable reason the occurrence was skipped. Common values
+    /// include:
+    ///
+    /// - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+    /// - `'overlap'`: dropped by an overlap or concurrency policy
+    /// - `'quota'`: dropped because a budget or rate limit was exhausted
+    pub reason: String,
+    /// Human-readable detail suitable for display.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// Number of consecutive occurrences of the same trigger and reason that this
+    /// record represents, for example every occurrence missed while the host was
+    /// offline. The origin identifies the most recent of them. Absent means `1`.
+    ///
+    /// Hosts SHOULD coalesce consecutive skips this way rather than recording one
+    /// run per occurrence, so skipped runs don't push executed runs out of the
+    /// bounded {@link AutomationEntry.runs} window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurrence_count: Option<i64>,
+}
+
+/// Host-reported detail explaining why a pending run is waiting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunWaiting {
+    /// Machine-readable reason the run is waiting. Common values include:
+    ///
+    /// - `'capacity'`: the host has no execution capacity right now
+    /// - `'concurrency'`: waiting for earlier runs of the same automation to finish
+    /// - `'quota'`: a budget or rate limit was reached
+    /// - `'authentication'`: waiting for credentials, such as a connected,
+    ///   authenticated client
+    /// - `'targetBusy'`: the session or chat the run delivers into is busy
+    /// - `'retry'`: backing off after a transient failure
+    /// - `'unavailable'`: the host is paused, draining, or otherwise not running
+    ///   automations
+    pub reason: String,
+    /// Human-readable detail suitable for display.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// When the host expects to try again, as an ISO 8601 timestamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<String>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Lightweight projection of a run retained in its automation's history.
@@ -7123,6 +7204,8 @@ pub enum AutomationRunLifecycle {
     Failed(AutomationFailedRunLifecycle),
     #[serde(rename = "cancelled")]
     Cancelled(AutomationCancelledRunLifecycle),
+    #[serde(rename = "skipped")]
+    Skipped(AutomationSkippedRunLifecycle),
 }
 
 /// The state payload of a snapshot, selected by its resource's URI scheme.

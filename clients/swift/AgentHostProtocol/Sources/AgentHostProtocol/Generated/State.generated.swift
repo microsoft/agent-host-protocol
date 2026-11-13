@@ -1099,10 +1099,14 @@ public enum AutomationOperation: Codable, Sendable, Equatable {
 /// How a host handles schedule occurrences missed while automatic execution was
 /// unavailable.
 public enum AutomationMisfirePolicy: Codable, Sendable, Equatable {
-    /// Discard missed occurrences and wait for the next future occurrence.
+    /// Discard missed occurrences and wait for the next future occurrence. The
+    /// host SHOULD record the discarded occurrences as one
+    /// {@link AutomationSkippedRunLifecycle | skipped} run with reason
+    /// `misfire`.
     case skip
     /// Start at most one catch-up run when execution becomes available, regardless
-    /// of how many occurrences were missed.
+    /// of how many occurrences were missed. The host MAY record the other missed
+    /// occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.
     case runOnce
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
@@ -1147,7 +1151,7 @@ public enum AutomationDisableConditionKind: String, Codable, Sendable {
 
 /// Lifecycle status of one automation run.
 ///
-/// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+/// `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
 /// while any linked session awaits input or client-side work; linked session
 /// state is authoritative for those interactions.
 public enum AutomationRunStatus: String, Codable, Sendable {
@@ -1161,6 +1165,8 @@ public enum AutomationRunStatus: String, Codable, Sendable {
     case failed = "failed"
     /// Execution ended because cancellation was accepted.
     case cancelled = "cancelled"
+    /// A trigger occurrence was recorded but deliberately not executed.
+    case skipped = "skipped"
 }
 
 /// Discriminant describing what created an automation run.
@@ -8368,7 +8374,9 @@ public struct AutomationEntry: Codable, Sendable, Equatable {
     /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
     /// reconstructed from {@link runs} (a bounded, prunable window). The host
     /// increments it atomically when it admits a scheduled run, including runs
-    /// later cancelled or failed.
+    /// later cancelled, failed, or skipped. Runs created directly as
+    /// {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+    /// count.
     ///
     /// Absent when {@link AutomationDefinition.disableConditions} contains no
     /// {@link AutomationAfterRunsCondition}.
@@ -8508,13 +8516,20 @@ public struct AutomationPendingRunLifecycle: Codable, Sendable, Equatable {
     public var status: AutomationRunStatus
     /// Run creation timestamp in ISO 8601 format.
     public var createdAt: String
+    /// Why the run has not started yet, when the host knows. The host updates it
+    /// by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+    /// to `pending`. A run that cannot proceed and will not retry transitions to
+    /// `failed` instead.
+    public var waiting: AutomationRunWaiting?
 
     public init(
         status: AutomationRunStatus,
-        createdAt: String
+        createdAt: String,
+        waiting: AutomationRunWaiting? = nil
     ) {
         self.status = status
         self.createdAt = createdAt
+        self.waiting = waiting
     }
 }
 
@@ -8607,6 +8622,102 @@ public struct AutomationCancelledRunLifecycle: Codable, Sendable, Equatable {
         self.createdAt = createdAt
         self.startedAt = startedAt
         self.completedAt = completedAt
+    }
+}
+
+public struct AutomationSkippedRunLifecycle: Codable, Sendable, Equatable {
+    public var status: AutomationRunStatus
+    /// Run creation timestamp in ISO 8601 format.
+    public var createdAt: String
+    /// Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence.
+    public var completedAt: String
+    /// Machine-readable reason the occurrence was skipped. Common values
+    /// include:
+    ///
+    /// - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+    /// - `'overlap'`: dropped by an overlap or concurrency policy
+    /// - `'quota'`: dropped because a budget or rate limit was exhausted
+    public var reason: String
+    /// Human-readable detail suitable for display.
+    public var message: String?
+    /// Number of consecutive occurrences of the same trigger and reason that this
+    /// record represents, for example every occurrence missed while the host was
+    /// offline. The origin identifies the most recent of them. Absent means `1`.
+    ///
+    /// Hosts SHOULD coalesce consecutive skips this way rather than recording one
+    /// run per occurrence, so skipped runs don't push executed runs out of the
+    /// bounded {@link AutomationEntry.runs} window.
+    public var occurrenceCount: Int?
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        completedAt: String,
+        reason: String,
+        message: String? = nil,
+        occurrenceCount: Int? = nil
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+        self.reason = reason
+        self.message = message
+        self.occurrenceCount = occurrenceCount
+    }
+}
+
+public struct AutomationRunWaiting: Codable, Sendable, Equatable {
+    /// Machine-readable reason the run is waiting. Common values include:
+    ///
+    /// - `'capacity'`: the host has no execution capacity right now
+    /// - `'concurrency'`: waiting for earlier runs of the same automation to finish
+    /// - `'quota'`: a budget or rate limit was reached
+    /// - `'authentication'`: waiting for credentials, such as a connected,
+    /// authenticated client
+    /// - `'targetBusy'`: the session or chat the run delivers into is busy
+    /// - `'retry'`: backing off after a transient failure
+    /// - `'unavailable'`: the host is paused, draining, or otherwise not running
+    /// automations
+    public var reason: String
+    /// Human-readable detail suitable for display.
+    public var message: String?
+    /// When the host expects to try again, as an ISO 8601 timestamp.
+    public var retryAt: String?
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case reason
+        case message
+        case retryAt
+    }
+
+    public init(
+        reason: String,
+        message: String? = nil,
+        retryAt: String? = nil,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.reason = reason
+        self.message = message
+        self.retryAt = retryAt
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.reason = try container.decode(String.self, forKey: .reason)
+        self.message = try container.decodeIfPresent(String.self, forKey: .message)
+        self.retryAt = try container.decodeIfPresent(String.self, forKey: .retryAt)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.reason, forKey: .reason)
+        try container.encodeIfPresent(self.message, forKey: .message)
+        try container.encodeIfPresent(self.retryAt, forKey: .retryAt)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -9851,6 +9962,7 @@ public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
     case completed(AutomationCompletedRunLifecycle)
     case failed(AutomationFailedRunLifecycle)
     case cancelled(AutomationCancelledRunLifecycle)
+    case skipped(AutomationSkippedRunLifecycle)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "status"
@@ -9870,6 +9982,8 @@ public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
             self = .failed(try AutomationFailedRunLifecycle(from: decoder))
         case "cancelled":
             self = .cancelled(try AutomationCancelledRunLifecycle(from: decoder))
+        case "skipped":
+            self = .skipped(try AutomationSkippedRunLifecycle(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationRunLifecycle discriminant: \(discriminant)")
         }
@@ -9891,6 +10005,9 @@ public enum AutomationRunLifecycle: Codable, Sendable, Equatable {
             try value.encode(to: encoder)
         case .cancelled(var value):
             value.status = .cancelled
+            try value.encode(to: encoder)
+        case .skipped(var value):
+            value.status = .skipped
             try value.encode(to: encoder)
         }
     }
