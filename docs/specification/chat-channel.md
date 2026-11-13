@@ -100,7 +100,7 @@ from `values` takes that property's `default`.
 
 The effective schema is `config.schema` when present, otherwise the session's
 schema. Hosts set `config.schema`, the chat's own schema for its `chatMutable`
-properties, only for a chat whose `provider` differs from the session's.
+properties, only for a chat whose agent provider differs from the session's.
 
 Clients change a chat's `chatMutable` properties by dispatching [`chat/configChanged`](/reference/chat#chatconfigchangedaction),
 which merges into `values` or replaces them when `replace` is `true`. Hosts
@@ -108,17 +108,19 @@ reject keys that are not `chatMutable` in the effective schema.
 
 ### Chat providers
 
-Every chat is backed by one agent. `SessionState.provider` is the session's
-agent, and [`ChatSummary.provider`](/reference/chat#chatsummary) names a chat's
-agent when it differs; absence means the session's agent. A chat's agent never
-changes, but `provider` is relative to its session, so `chat/moved` may set or
-clear it.
+Every chat is backed by one agent provider. `SessionState.provider` is the
+session's agent provider, and [`ChatSummary.provider`](/reference/chat#chatsummary)
+names a chat's agent provider when it differs; absence means the session's
+agent provider. A chat's agent provider never changes, but `provider` is
+relative to its session, so `chat/moved` may set or clear it. This is distinct
+from a message's custom [`agent`](/reference/chat#message) selection, which
+picks a custom agent within the chat's agent provider.
 
 Hosts that advertise
 [`multipleChatProviders`](/reference/common#initializeresult) accept a
-`provider` on `createChat`, letting one session mix agents. Forks and side
-chats continue the source chat's history, so they always use the source chat's
-agent.
+`provider` on `createChat`, letting one session mix agent providers. Forks and
+side chats continue the source chat's history, so they always use the source
+chat's agent provider.
 
 ## Relationship to the session channel
 
@@ -141,7 +143,7 @@ agent.
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
 - a `title` containing the client-selected initial display title for the target chat,
-- a `provider` selecting the chat's agent (see [Chat providers](#chat-providers)),
+- a `provider` selecting the chat's agent provider (see [Chat providers](#chat-providers)),
 - an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatSource`](/reference/chat#chatsource), either
   `{ kind: "fork", chat, turnId }` or `{ kind: "sideChat", chat, turnId }`,
@@ -263,10 +265,10 @@ durable session catalogs. The protocol does not require provider equality,
 prohibit active turns universally, or otherwise expose host-specific storage
 and runtime constraints.
 
-A moved chat keeps its agent. After the move the host reports `provider` on the
-chat whenever it differs from the destination session's provider, including
-when the chat had none because it matched its old session. Hosts MAY refuse, as
-an unsupported destination, a move they cannot support.
+A moved chat keeps its agent provider. After the move the host reports
+`provider` on the chat whenever it differs from the destination session's agent
+provider, including when the chat had none because it matched its old session.
+Hosts MAY refuse, as an unsupported destination, a move they cannot support.
 
 A moved chat's `config.values` move with it unchanged. If a move changes whether
 the chat needs its own `config.schema`, the host sets or clears it, or refuses

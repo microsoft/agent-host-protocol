@@ -66,7 +66,7 @@ describe('windowed delivery protocol examples', () => {
     }
     assert.equal(acceptance.result.snapshot, undefined);
     assert.ok(request.params.flowControl);
-    const keys = ['windowBytes', 'maximumFrameBytes'] as const;
+    const keys = ['windowBytes', 'maxFrameBytes'] as const;
     assert.deepEqual(Object.keys(limits).sort(), [...keys].sort());
     assert.deepEqual(Object.keys(flowControl.hostReceive).sort(), [...keys].sort());
     assert.deepEqual(Object.keys(request.params.flowControl.receive).sort(), [...keys].sort());
@@ -74,14 +74,14 @@ describe('windowed delivery protocol examples', () => {
       assert.ok(Number.isSafeInteger(limits[key]) && limits[key] > 0);
       assert.ok(limits[key] <= request.params.flowControl.receive[key]);
     }
-    assert.ok(limits.maximumFrameBytes >= 1024);
-    assert.ok(flowControl.hostReceive.maximumFrameBytes >= 1024);
+    assert.ok(limits.maxFrameBytes >= 1024);
+    assert.ok(flowControl.hostReceive.maxFrameBytes >= 1024);
   });
 
   it('sends the snapshot as the first data message and allows it to exceed the window', () => {
     const bytes = serializedBytes(snapshot);
     assert.equal(bytes, 520);
-    assert.ok(bytes <= limits.maximumFrameBytes);
+    assert.ok(bytes <= limits.maxFrameBytes);
     assert.ok(bytes > limits.windowBytes);
     assert.equal(snapshot.params.snapshot.resource, request.params.channel);
     const firstServerNotification = examples
@@ -94,7 +94,7 @@ describe('windowed delivery protocol examples', () => {
 
   it('charges direct output, then renegotiates limits without counters on reconnect', () => {
     assert.equal(serializedBytes(output), 284);
-    assert.ok(serializedBytes(output) <= limits.maximumFrameBytes);
+    assert.ok(serializedBytes(output) <= limits.maxFrameBytes);
     const boundary = serializedBytes(snapshot) + serializedBytes(output);
     assert.equal(boundary, 804);
     assert.deepEqual(credits.map(message => message.params.consumedBytes), [520, boundary]);
@@ -119,19 +119,19 @@ describe('windowed delivery protocol examples', () => {
     }
     // The server can lower the offered limits but never raise them.
     const offer = reconnect.params.windows.items[0].flowControl.receive;
-    for (const key of ['windowBytes', 'maximumFrameBytes'] as const) {
+    for (const key of ['windowBytes', 'maxFrameBytes'] as const) {
       assert.ok(retained.flowControl.clientReceive[key] <= offer[key]);
     }
     assert.equal(reconnect.params.windows.items[0].lastAppliedServerSeq, output.params.serverSeq);
   });
 
-  it('charges the alternative fragments by their full size, including envelopes', () => {
+  it('charges the alternative frames by their full size, including envelopes', () => {
     assert.equal(frames.length, 2);
     let text = '';
     for (const [index, frame] of frames.entries()) {
       assert.equal(frame.params.channel, output.params.channel);
       assert.ok(frame.params.data.length > 0);
-      assert.ok(serializedBytes(frame) <= limits.maximumFrameBytes);
+      assert.ok(serializedBytes(frame) <= limits.maxFrameBytes);
       assert.equal(frame.params.final === true, index === frames.length - 1);
       text += frame.params.data;
     }
@@ -139,12 +139,12 @@ describe('windowed delivery protocol examples', () => {
     assert.deepEqual(JSON.parse(text), output);
     assert.equal(utf16Bytes(text), 284);
     assert.deepEqual(frames.map(frame => serializedBytes(frame)), [360, 374]);
-    const fragmentedCharge = frames.reduce((sum, frame) => sum + serializedBytes(frame), 0);
-    assert.equal(fragmentedCharge, 734);
-    assert.equal(serializedBytes(snapshot) + fragmentedCharge, 1254);
+    const framedCharge = frames.reduce((sum, frame) => sum + serializedBytes(frame), 0);
+    assert.equal(framedCharge, 734);
+    assert.equal(serializedBytes(snapshot) + framedCharge, 1254);
   });
 
-  it('sends a large atomic tool-call action as fragments that each count against the window', () => {
+  it('sends a large atomic tool-call action as frames that each count against the window', () => {
     const toolCall: AhpServerNotification<'action'> = {
       ...output,
       params: {
@@ -160,7 +160,7 @@ describe('windowed delivery protocol examples', () => {
       },
     };
     const text = JSON.stringify(toolCall);
-    assert.ok(utf16Bytes(text) > limits.maximumFrameBytes);
+    assert.ok(utf16Bytes(text) > limits.maxFrameBytes);
     assert.ok(utf16Bytes(text) > limits.windowBytes * 64);
 
     const channel = toolCall.params.channel;
@@ -173,51 +173,51 @@ describe('windowed delivery protocol examples', () => {
     let consumed = 0;
     let stored = '';
     let index = 0;
-    let fragments = 0;
+    let frames = 0;
     let creditsSent = 0;
     while (index < text.length) {
-      // The receiver stores fragments for reassembly and returns credit once the window is full.
+      // The receiver stores frames for reassembly and returns credit once the window is full.
       if (sent - consumed >= limits.windowBytes) {
         consumed = sent;
         creditsSent++;
       }
-      assert.ok(sent - consumed < limits.windowBytes, 'a fragment must start below the window');
+      assert.ok(sent - consumed < limits.windowBytes, 'a frame must start below the window');
 
-      // Size the fragment to the remaining credit without exceeding the hard frame limit,
-      // adding each character's escaped size instead of serializing again. The fragment
+      // Size the frame to the remaining credit without exceeding the hard frame limit,
+      // adding each character's escaped size instead of serializing again. The frame
       // always carries at least one character: when the envelope alone exceeds the remaining
-      // credit, the fragment goes slightly past the soft window.
+      // credit, the frame goes slightly past the soft window.
       const remainingCredit = limits.windowBytes - (sent - consumed);
       let wire = envelopeBytes;
       let end = index;
       while (end < text.length && (end === index || wire < remainingCredit)) {
         const next = wire + escapedBytes(text[end]);
-        if (next > limits.maximumFrameBytes) break;
+        if (next > limits.maxFrameBytes) break;
         wire = next;
         end++;
       }
-      assert.ok(end > index, 'fragments must not be empty');
+      assert.ok(end > index, 'frames must not be empty');
       const frame: AhpServerNotification<'channel/frame'> = {
         jsonrpc: '2.0',
         method: 'channel/frame',
         params: { channel, data: text.slice(index, end), ...(end === text.length ? { final: true } : {}) },
       };
       const frameBytes = serializedBytes(frame);
-      assert.ok(frameBytes <= limits.maximumFrameBytes);
+      assert.ok(frameBytes <= limits.maxFrameBytes);
       assert.ok(frameBytes <= wire);
       sent += frameBytes;
       charged += frameBytes;
-      assert.ok(sent - consumed < limits.windowBytes + limits.maximumFrameBytes);
+      assert.ok(sent - consumed < limits.windowBytes + limits.maxFrameBytes);
       stored += frame.params.data;
       index = end;
-      fragments++;
+      frames++;
     }
 
     assert.equal(stored, text);
     assert.deepEqual(JSON.parse(stored), toolCall);
     assert.equal(sent, charged);
-    assert.ok(charged > utf16Bytes(text), 'fragment envelopes and escaping count against the window');
-    assert.ok(fragments > 64);
+    assert.ok(charged > utf16Bytes(text), 'frame envelopes and escaping count against the window');
+    assert.ok(frames > 64);
     assert.ok(creditsSent > 0);
   });
 

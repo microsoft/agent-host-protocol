@@ -1,5 +1,5 @@
 {
   "type": "added",
-  "message": "Experimental subscription-negotiated flow-control types using UTF-16 byte accounting, fragmented delivery and consumption credit notifications, and independent `reconnect.windows` metadata.",
+  "message": "Experimental subscription-negotiated flow-control types using UTF-16 byte accounting, framed delivery and consumption credit notifications, and independent `reconnect.windows` metadata.",
   "issues": [492]
 }

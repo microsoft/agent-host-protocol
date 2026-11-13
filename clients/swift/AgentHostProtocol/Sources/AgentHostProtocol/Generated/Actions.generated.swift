@@ -475,8 +475,11 @@ public struct SessionChatUpdatedAction: Codable, Sendable, Equatable {
     public var chat: String
     /// Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`, `provider`) never change and MUST be omitted by
-    /// senders; receivers SHOULD ignore them if present.
+    /// `resource` is an identity field and never changes. `provider` is reported
+    /// relative to the owning session and changes only when the chat moves to
+    /// another session, which republishes the whole summary through
+    /// `session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD
+    /// ignore them if present.
     public var changes: PartialChatSummary
 
     public init(
@@ -1706,6 +1709,15 @@ public struct ChatIsArchivedChangedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Config values set on a chat changed.
+///
+/// Merges `config` into the chat's
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.
+///
+/// Stability: 1.0 - Early development.
 public struct ChatConfigChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Config values to set on the chat
@@ -1724,11 +1736,22 @@ public struct ChatConfigChangedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | agent provider} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.
+///
+/// Stability: 1.0 - Early development.
 public struct ChatMovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The new owning session URI.
     public var session: String
-    /// The chat's provider in the new session; absent clears it.
+    /// The chat's agent provider ID in the new session; absent clears it.
     public var provider: String?
     /// The chat's config schema in the new session; absent clears it.
     public var schema: SessionConfigSchema?

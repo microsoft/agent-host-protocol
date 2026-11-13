@@ -103,7 +103,7 @@ ChangesetFile {
   reviewed?: boolean                       // GitHub-style "Viewed" flag; absent ⇒ not reviewed
   _meta?: Record<string, unknown>
   nonce?: string                           // optional host-issued token for this change
-  isEditing?: boolean                      // optional indication of an ongoing edit
+  status?: ChangesetFileStatus             // optional bitset of host-reported activity (e.g. Editing)
 }
 ```
 
@@ -130,7 +130,15 @@ of the changeset URI:
 
 ### Per-file Editing Activity
 
-A host MAY set `ChangesetFile.isEditing` to `true` to report an ongoing edit to that file. Clients MAY use it to show progress or temporarily disable that file's review actions while other files remain reviewable. `false` or omission clears the editing indication; neither guarantees that the file is safe to modify. Hosts remain responsible for operation validation and write coordination.
+`ChangesetFile.status` is an optional bitset of
+[`ChangesetFileStatus`](/reference/changeset#changesetfilestatus) flags. A host
+MAY set the `Editing` flag (`1`) to report an ongoing edit to that file. Clients
+MAY use it to show progress or temporarily disable that file's review actions
+while other files remain reviewable. Clients test flags with a bitwise check
+and MUST preserve bits they don't recognize. Clearing the flag, or omitting
+`status`, clears the editing indication; neither guarantees that the file is
+safe to modify. Hosts remain responsible for operation validation and write
+coordination.
 
 The field travels through existing snapshots, `changeset/fileSet`, and `changeset/contentChanged`; no new action, command, or capability is needed. Hosts SHOULD keep it set until the file entry reflects the completed edit, then clear it together with the refreshed `edit` and any updated `nonce`, or remove the file if it no longer belongs to the changeset. An older refresh should not clear the indication for a newer ongoing edit.
 

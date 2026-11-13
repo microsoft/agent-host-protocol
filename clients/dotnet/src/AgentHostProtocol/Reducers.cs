@@ -2167,7 +2167,7 @@ public static class Reducers
         state.CanvasId = a.Canvas.CanvasId;
         state.Title = a.Canvas.Title;
         state.Status = a.Canvas.Status;
-        state.Url = a.Canvas.Url;
+        state.Uri = a.Canvas.Uri;
         return ReduceOutcome.Applied;
     }
 

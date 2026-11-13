@@ -333,7 +333,7 @@ By default, the server sends a subscription's messages as soon as they are
 available. A client can instead offer **windowed delivery** when it subscribes.
 With windowed delivery, a sender waits for credit when the amount of data it
 has sent but the receiver has not released reaches the subscription's window.
-Large messages are sent in fragments, and each fragment counts against the
+Large messages are sent in frames, and each frame counts against the
 window. The receiver releases data with `channel/credit` notifications.
 
 Windowed delivery is useful for channels that can produce data faster than a

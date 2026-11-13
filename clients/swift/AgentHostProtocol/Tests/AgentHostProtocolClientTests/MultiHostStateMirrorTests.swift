@@ -42,13 +42,13 @@ final class MultiHostStateMirrorTests: XCTestCase {
         let resource = "ahp-canvas:/preview"
         let initial = CanvasState(
             instanceId: "preview", extensionId: "project:preview", canvasId: "preview",
-            url: "https://example.test/original"
+            uri: "https://example.test/original"
         )
         let snapshot = Snapshot(resource: resource, state: .canvas(initial), fromSeq: 1)
         await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
         await mirror.applySnapshot(host: "beta", snapshot: snapshot)
         var unavailable = initial
-        unavailable.url = nil
+        unavailable.uri = nil
         await mirror.apply(host: "alpha", envelope: ActionEnvelope(
             channel: resource,
             action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: unavailable)),
@@ -62,7 +62,7 @@ final class MultiHostStateMirrorTests: XCTestCase {
         let alphaKey = HostedResourceKey(hostId: "alpha", uri: resource)
         let betaKey = HostedResourceKey(hostId: "beta", uri: resource)
         XCTAssertEqual(
-            [targeted[alphaKey]?.url, targeted[betaKey]?.url, afterReset[alphaKey]?.instanceId, afterReset[betaKey]?.url],
+            [targeted[alphaKey]?.uri, targeted[betaKey]?.uri, afterReset[alphaKey]?.instanceId, afterReset[betaKey]?.uri],
             [nil, "https://example.test/original", nil, "https://example.test/original"]
         )
         XCTAssertTrue(remaining.isEmpty)

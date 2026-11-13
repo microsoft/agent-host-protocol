@@ -453,6 +453,20 @@ const (
 	ChangesetStatusError ChangesetStatus = "error"
 )
 
+// Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+type ChangesetFileStatus uint32
+
+const (
+	// The host reports an ongoing edit to this file.
+	ChangesetFileStatusEditing ChangesetFileStatus = 1
+)
+
+// Has reports whether every flag in other is also set in s.
+func (s ChangesetFileStatus) Has(other ChangesetFileStatus) bool { return s&other == other }
+
+// Or returns s combined with the flags in other.
+func (s ChangesetFileStatus) Or(other ChangesetFileStatus) ChangesetFileStatus { return s | other }
+
 // Execution lifecycle of a {@link ChangesetOperation}.
 //
 // An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -598,26 +612,26 @@ type TcpConnectionsCapability struct {
 // Limits on data that one peer receives on a windowed subscription.
 //
 // All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-// message's complete text, as sent. For a `channel/frame` fragment, this
+// message's complete text, as sent. For a `channel/frame` notification, this
 // includes its envelope and escape characters. The same size is used for the
-// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 // size of a complete data message. Outstanding data is always less than
-// `windowBytes + maximumFrameBytes`.
+// `windowBytes + maxFrameBytes`.
 //
 // Stability: 1.0 - Early development.
 type ChannelReceiveLimits struct {
 	// The target amount of outstanding data. This is a soft target.
-	// The sender MUST NOT send a data message or fragment while outstanding data
-	// is equal to or greater than this value. The last message or fragment sent
+	// The sender MUST NOT send a data message or frame while outstanding data
+	// is equal to or greater than this value. The last message or frame sent
 	// before the window is full can go past it, so a message that fits within
-	// `maximumFrameBytes` can be sent whole even when it is larger than the
+	// `maxFrameBytes` can be sent whole even when it is larger than the
 	// remaining credit.
 	WindowBytes int64 `json:"windowBytes"`
 	// The largest JSON-RPC message that the sender can send for a data message.
 	// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
 	// notification, it includes the envelope and escape characters. A larger data
-	// message MUST be split into smaller messages or sent in fragments.
-	MaximumFrameBytes int64 `json:"maximumFrameBytes"`
+	// message MUST be split into smaller messages or sent in frames.
+	MaxFrameBytes int64 `json:"maxFrameBytes"`
 }
 
 // The limits that the server accepted for a windowed subscription.
@@ -1446,11 +1460,11 @@ type ChatState struct {
 	// compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 	// Agent provider ID backing this chat. Absent means the session's
-	// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-	// differs. The chat's agent never changes, but `provider` is reported
-	// relative to its session, so `chat/moved` may set or clear it. Like
-	// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-	// side chats use the source chat's agent.
+	// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+	// differs. The chat's agent provider never changes, but `provider` is
+	// reported relative to its session, so `chat/moved` may set or clear it.
+	// `session/chatUpdated` does not carry it. Forks and side chats use the
+	// source chat's agent provider.
 	//
 	// Stability: 1.0 - Early development.
 	Provider *string `json:"provider,omitempty"`
@@ -1570,7 +1584,7 @@ type CanvasState struct {
 	//
 	// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
 	// from persisted state after a provider or host restart.
-	Url *URI `json:"url,omitempty"`
+	Uri *URI `json:"uri,omitempty"`
 }
 
 // Lightweight catalog entry for a chat, carried in
@@ -1778,7 +1792,7 @@ type SessionConfigState struct {
 type ChatConfigState struct {
 	// Config schema for this chat's `chatMutable` properties. Absent means the
 	// session's schema. Hosts set it, as the chat's own schema, when the chat's
-	// {@link ChatState.provider | `provider`} differs from the session's; when
+	// {@link ChatState.provider | agent provider} differs from the session's; when
 	// present, clients use it instead of the session's schema.
 	//
 	// Stability: 1.0 - Early development.
@@ -4417,9 +4431,12 @@ type ChangesetFile struct {
 	// echo in {@link ChangesetOperationTarget.nonce}.
 	// Hosts SHOULD update a published nonce whenever contents of the file change.
 	Nonce *string `json:"nonce,omitempty"`
-	// Whether the host reports an ongoing edit to this file.
-	// This is advisory; false or absent does not guarantee that modifying the file is safe.
-	IsEditing *bool `json:"isEditing,omitempty"`
+	// Host-reported activity on this file, as a bitset of
+	// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+	// reported. This is advisory; the absence of
+	// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+	// file is safe.
+	Status *ChangesetFileStatus `json:"status,omitempty"`
 }
 
 // A server-declared invokable verb the client can run against a

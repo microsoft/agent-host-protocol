@@ -172,7 +172,7 @@ fn canvases_are_reduced_and_reset_per_host() {
         canvas_id: "preview".into(),
         title: None,
         status: None,
-        url: Some("https://example.test/original".into()),
+        uri: Some("https://example.test/original".into()),
     };
     let snapshot = Snapshot {
         resource: uri.into(),
@@ -187,7 +187,7 @@ fn canvases_are_reduced_and_reset_per_host() {
             channel: uri.into(),
             action: StateAction::CanvasStateChanged(CanvasStateChangedAction {
                 canvas: CanvasState {
-                    url: None,
+                    uri: None,
                     ..initial.clone()
                 },
             }),
@@ -199,8 +199,8 @@ fn canvases_are_reduced_and_reset_per_host() {
     let alpha_key = HostedResourceKey::new(alpha.clone(), uri);
     let beta_key = HostedResourceKey::new(beta, uri);
     let targeted = (
-        mirror.canvases()[&alpha_key].url.clone(),
-        mirror.canvases()[&beta_key].url.clone(),
+        mirror.canvases()[&alpha_key].uri.clone(),
+        mirror.canvases()[&beta_key].uri.clone(),
     );
     mirror.reset_host(&alpha);
     let reset = (
@@ -210,7 +210,7 @@ fn canvases_are_reduced_and_reset_per_host() {
     mirror.reset();
     assert_eq!(
         (targeted, reset, mirror.canvases().is_empty()),
-        ((None, initial.url), (false, true), true),
+        ((None, initial.uri), (false, true), true),
     );
 }
 

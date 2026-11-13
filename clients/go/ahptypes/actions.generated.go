@@ -225,8 +225,11 @@ type SessionChatUpdatedAction struct {
 	Chat URI `json:"chat"`
 	// Mutable summary fields that changed; omitted fields are unchanged.
 	//
-	// Identity fields (`resource`, `provider`) never change and MUST be omitted by
-	// senders; receivers SHOULD ignore them if present.
+	// `resource` is an identity field and never changes. `provider` is reported
+	// relative to the owning session and changes only when the chat moves to
+	// another session, which republishes the whole summary through
+	// `session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD
+	// ignore them if present.
 	Changes PartialChatSummary `json:"changes"`
 }
 
@@ -883,6 +886,8 @@ type ChatIsArchivedChangedAction struct {
 // `replace` is `true`; keys missing after a replace take their property's
 // `default`. Only properties with `chatMutable: true` in
 // the effective schema may be set.
+//
+// Stability: 1.0 - Early development.
 type ChatConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Config values to set on the chat
@@ -895,16 +900,18 @@ type ChatConfigChangedAction struct {
 //
 // Dispatched by the host on the moved chat's channel after a cross-session
 // `moveChat`. `provider` and `schema` are the chat's
-// {@link ChatState.provider | `provider`} and
+// {@link ChatState.provider | agent provider} and
 // {@link ChatConfigState.schema | `config.schema`} relative to the new
 // session; absent clears them. `ChatState` has no session field, so the
 // reducer does not store `session`; it tells subscribers which session now
 // owns the chat.
+//
+// Stability: 1.0 - Early development.
 type ChatMovedAction struct {
 	Type ActionType `json:"type"`
 	// The new owning session URI.
 	Session URI `json:"session"`
-	// The chat's provider in the new session; absent clears it.
+	// The chat's agent provider ID in the new session; absent clears it.
 	Provider *string `json:"provider,omitempty"`
 	// The chat's config schema in the new session; absent clears it.
 	Schema *SessionConfigSchema `json:"schema,omitempty"`

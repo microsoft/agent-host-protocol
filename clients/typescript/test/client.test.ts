@@ -194,10 +194,10 @@ test('state mirror replaces and clears live canvas sources', () => {
     instanceId: 'preview',
     extensionId: 'project:preview',
     canvasId: 'preview',
-    url: 'https://example.test/old',
+    uri: 'https://example.test/old',
   };
   mirror.applySnapshot({ resource, state: initial, fromSeq: 1 });
-  const replacement: CanvasState = { ...initial, url: 'https://example.test/new' };
+  const replacement: CanvasState = { ...initial, uri: 'https://example.test/new' };
   mirror.apply({
     channel: resource,
     serverSeq: 2,
@@ -234,7 +234,7 @@ test('state mirror rejects a non-canvas snapshot on a canvas channel', () => {
 
 test('state mirror rejects a canvas snapshot with a malformed source field', () => {
   const mirror = new AhpStateMirror();
-  const malformed: Snapshot = JSON.parse('{"resource":"ahp-canvas:/preview","state":{"instanceId":"preview","extensionId":"project:preview","canvasId":"preview","url":42},"fromSeq":1}');
+  const malformed: Snapshot = JSON.parse('{"resource":"ahp-canvas:/preview","state":{"instanceId":"preview","extensionId":"project:preview","canvasId":"preview","uri":42},"fromSeq":1}');
   assert.throws(() => mirror.applySnapshot(malformed), /Invalid canvas snapshot/);
 });
 

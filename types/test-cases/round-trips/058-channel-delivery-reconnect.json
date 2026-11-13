@@ -14,11 +14,11 @@
           "flowControl": {
             "clientReceive": {
               "windowBytes": 262144,
-              "maximumFrameBytes": 16384
+              "maxFrameBytes": 16384
             },
             "hostReceive": {
               "windowBytes": 131072,
-              "maximumFrameBytes": 16384
+              "maxFrameBytes": 16384
             }
           },
           "recovery": "replay"
@@ -38,11 +38,11 @@
             "flowControl": {
               "clientReceive": {
                 "windowBytes": 262144,
-                "maximumFrameBytes": 16384
+                "maxFrameBytes": 16384
               },
               "hostReceive": {
                 "windowBytes": 131072,
-                "maximumFrameBytes": 16384
+                "maxFrameBytes": 16384
               }
             },
             "recovery": "replay"
