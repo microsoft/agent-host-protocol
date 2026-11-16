@@ -1016,6 +1016,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -1086,6 +1087,8 @@ const STATE_STRUCTS = [
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationAfterRunsCondition', 'AutomationAfterDateCondition',
+  'AutomationNewSessionTarget', 'AutomationPreviousSessionTarget',
+  'AutomationChatTarget',
   'AutomationEntry', 'AutomationState',
   'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
@@ -1405,6 +1408,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'NewSession', structName: 'AutomationNewSessionTarget', discriminantValue: 'newSession' },
+    { caseName: 'PreviousSession', structName: 'AutomationPreviousSessionTarget', discriminantValue: 'previousSession' },
+    { caseName: 'Chat', structName: 'AutomationChatTarget', discriminantValue: 'chat' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
 const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
   name: 'AutomationRunOrigin',
   discriminantField: 'kind',
@@ -1522,6 +1536,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TARGET_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1812,6 +1828,9 @@ const COMMAND_STRUCTS = [
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'AutomationTargetsCapabilities',
+  'AutomationPreviousSessionTargetCapability',
+  'AutomationChatTargetCapability',
   'AutomationOneTimeCapability',
   'MultipleChatProvidersCapability',
   'Implementation',
@@ -2513,6 +2532,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationDisableCondition', // AUTOMATION_DISABLE_CONDITION_UNION discriminated union
+    'AutomationTarget',           // AUTOMATION_TARGET_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()

@@ -757,7 +757,7 @@
     },
     "AutomationSessionOrigin": {
       "type": "object",
-      "description": "Provenance recorded on a session created for an automation run.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
+      "description": "Provenance recorded on a session created for an automation run. Runs that\nlater continue the session don't change it.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
       "properties": {
         "kind": {
           "const": "automation"
@@ -5560,6 +5560,52 @@
         "date"
       ]
     },
+    "AutomationNewSessionTarget": {
+      "type": "object",
+      "description": "Each run creates a session from {@link AutomationDefinition.session}.",
+      "properties": {
+        "kind": {
+          "const": "newSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationPreviousSessionTarget": {
+      "type": "object",
+      "description": "Each run continues the session of the automation's previous run, so a\nrecurring automation keeps one conversation.\n\nThe previous run's session is the\n{@link AutomationRunState.primarySession | primary session} of the most\nrecently created earlier run of this automation that has one, even if that\nrun was pruned from {@link AutomationEntry.runs}. The host decides whether\nthat session is still usable. A session that was removed or archived, that\nhas no {@link SessionState.defaultChat | default chat}, or that the\nautomation may no longer drive, is never usable. The host MAY also treat a\nsession as unusable when it can't honor the current template, for example\nafter its agent provider, working directories, or configuration changed.\nWhen there is no usable session, the run creates one from\n{@link AutomationDefinition.session}, as with\n{@link AutomationNewSessionTarget}, and later runs continue that session.\nThe host resolves targets and starts turns in run creation order, so\noverlapping runs share one session instead of each creating one.\n\nWhen a run reuses a session, the host:\n\n- links the session to the run with\n  {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and\n  makes it the run's primary session before delivering the message;\n- adds {@link AutomationDefinition.message} to the session's default chat\n  as a {@link PendingMessageKind.Queued | queued} pending message, so it\n  never steers an active turn and starts a turn once the chat is idle;\n- does not reapply {@link AutomationDefinition.session}, so the session\n  keeps its agent provider, configuration, and working directories. The\n  template's `model` and `agent` still apply to the queued message, as for\n  every run. The host MAY update the session's copies of the automation's\n  customizations to match {@link AutomationEntry.customizations}.\n\nThe run stays `pending` while its message waits and becomes `running` when\na turn starts from it. It ends with the outcome of that turn. If its\nqueued message is withdrawn without a turn starting from it, the run is\n`cancelled`. Cancelling the run removes its queued message or cancels its\nturn, and never affects other turns in the session. If the session becomes\nunusable before a turn starts from the message, the host removes the queued\nmessage, if its chat still exists, and the run fails.\n\n{@link SessionMetadata.origin} keeps naming the run that created the\nsession.",
+      "properties": {
+        "kind": {
+          "const": "previousSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationChatTarget": {
+      "type": "object",
+      "description": "Each run sends its message to one existing chat, such as the conversation\nin which a user asked for a recurring check.\n\nThe host MUST reject a create or update request whose chat doesn't exist or\nthat the automation may not drive. When it accepts one, it sets\n{@link AutomationChatTarget.session | `session`} to the session that\ncurrently owns the chat, replacing any submitted value.\n\nEach run delivers its message the way an\n{@link AutomationPreviousSessionTarget} run does when it reuses a session,\nwith the same run lifecycle: the host links the session to the run, makes it\nthe run's primary session, and adds {@link AutomationDefinition.message} to\nthe chat as a {@link PendingMessageKind.Queued | queued} pending message.\nThe run never creates a session, and the host applies only the template's\n`model` and `agent`, to the queued message. It does not change the\nsession's agent provider, configuration, working directories, or\ncustomizations.\n\nIf the chat no longer exists, or the automation may no longer drive it, the\nrun fails. When that happens after the message was queued, the host first\nremoves the queued message, if the chat still exists.",
+      "properties": {
+        "kind": {
+          "const": "chat"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session that currently owns {@link AutomationChatTarget.chat}. The host\nmaintains it: when the chat moves to another session, the host updates\nthe definition and publishes it with\n{@link AutomationSetAction | `automation/set`}."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat that receives each run's message."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "chat"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -5618,7 +5664,7 @@
     },
     "AutomationSessionTemplate": {
       "type": "object",
-      "description": "Template from which the host creates a fresh session for each automation run.\n\nThe host revalidates every selection when the run starts. Definitions never\ncarry credentials, confirmation decisions, or durable permission grants.",
+      "description": "Template from which the host creates a session for an automation run.\n{@link AutomationDefinition.target} decides whether a run creates one. In a\nsession a run continues, only {@link AutomationSessionTemplate.model |\n`model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the\nrun's message.",
       "properties": {
         "provider": {
           "type": "string",
@@ -5649,13 +5695,13 @@
           "items": {
             "$ref": "#/$defs/ClientPluginCustomization"
           },
-          "description": "Client plugins to make available in every run session, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
+          "description": "Client plugins to make available in every session a run creates, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
         }
       }
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the message each run sends, the session template, the\nrun target, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -5663,11 +5709,11 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Message each run sends (see {@link AutomationDefinition.target}). Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Template used to create fresh sessions for each run."
+          "description": "Template for the sessions runs create. Its model and agent also apply to\na run's turn in a continued session."
         },
         "enabled": {
           "type": "boolean",
@@ -5723,6 +5769,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Opaque implementation-defined metadata. Clients MUST preserve unknown\nentries when updating the definition."
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}."
         }
       },
       "required": [
@@ -5776,7 +5826,7 @@
           "items": {
             "$ref": "#/$defs/PluginCustomization"
           },
-          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery run session receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
+          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery session a run creates receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
         },
         "createdAt": {
           "type": "string",
@@ -5866,7 +5916,7 @@
     },
     "AutomationPendingRunLifecycle": {
       "type": "object",
-      "description": "A durable run exists but has not begun external execution.",
+      "description": "A durable run exists but has not begun external execution. A run that\ncontinues a session also stays pending while that session's chat runs\nanother turn (see {@link AutomationPreviousSessionTarget}).",
       "properties": {
         "status": {
           "const": "pending"
@@ -5883,7 +5933,7 @@
     },
     "AutomationRunningRunLifecycle": {
       "type": "object",
-      "description": "The run is executing linked sessions or awaiting interaction on them.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
+      "description": "The run's work in linked sessions is executing or awaiting interaction.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
       "properties": {
         "status": {
           "const": "running"
@@ -5924,7 +5974,7 @@
         },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
-          "description": "Optional aggregate model usage across all linked sessions."
+          "description": "Optional aggregate model usage of the run's work in its linked sessions."
         }
       },
       "required": [
@@ -6058,7 +6108,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, or delegated attempts."
+          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, delegated attempts, or a session continued from an earlier run."
         },
         "primarySession": {
           "$ref": "#/$defs/URI",
@@ -6621,6 +6671,20 @@
         }
       ],
       "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
+    },
+    "AutomationTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationNewSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationPreviousSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationChatTarget"
+        }
+      ],
+      "description": "Where the runs of an automation send {@link AutomationDefinition.message}.\n\nClients SHOULD NOT author {@link AutomationPreviousSessionTarget} or\n{@link AutomationChatTarget} unless the host advertises\n{@link AutomationTargetsCapabilities.previousSession} or\n{@link AutomationTargetsCapabilities.chat}, respectively."
     },
     "AutomationRunOrigin": {
       "oneOf": [

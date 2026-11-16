@@ -323,6 +323,9 @@ type AutomationCapabilities struct {
 	// Present when {@link AutomationSessionTemplate.customizations} may contain
 	// client plugins for the host to capture.
 	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
+	// Present when definitions may set {@link AutomationDefinition.target}.
+	// Absence means each run creates a session.
+	Targets *AutomationTargetsCapabilities `json:"targets,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -358,6 +361,33 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Run targets supported for {@link AutomationDefinition.target}.
+// {@link AutomationNewSessionTarget} is always supported.
+type AutomationTargetsCapabilities struct {
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+	// target when this is absent.
+	PreviousSession *AutomationPreviousSessionTargetCapability `json:"previousSession,omitempty"`
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+	// this is absent.
+	Chat *AutomationChatTargetCapability `json:"chat,omitempty"`
+}
+
+// Presence capability for {@link AutomationPreviousSessionTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationPreviousSessionTargetCapability struct {
+}
+
+// Presence capability for {@link AutomationChatTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationChatTargetCapability struct {
 }
 
 // Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.

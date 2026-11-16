@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`AutomationDefinition.target` and `AutomationCapabilities.targets`. With `previousSession`, each automation run continues the previous run's session instead of creating one; with `chat`, each run sends its message to one existing chat.",
+  "issues": [572]
+}

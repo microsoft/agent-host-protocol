@@ -34,9 +34,15 @@ stateDiagram-v2
   running --> cancelled
 ```
 
-The run remains `running` while linked sessions await interaction. Their
+The run remains `running` while its work in linked sessions awaits interaction. Their
 `SessionSummary.status` and `SessionState.inputNeeded` fields remain
 authoritative for attention state and response routing.
+
+When a run sends its message to an existing session (a `previousSession` or
+`chat` target), its lifecycle follows its own queued message: the run is
+`pending` while the message waits, `running` once a turn starts from it, and
+ends with that turn's outcome. Withdrawing the queued message cancels the run, and cancelling the run
+never affects other turns in the session.
 
 When `InitializeResult.automations.runCancellation` is present, clients may
 dispatch `automationRun/cancelRequested` for `pending` or `running` runs.
@@ -57,5 +63,5 @@ durable result arrives through `lifecycleChanged`.
 ## Reconciliation
 
 The host persists a run before external side effects and records each session
-URI before sending its first message. Retrying `runAutomation` with the same
+URI before sending the run's message to it. Retrying `runAutomation` with the same
 request ID returns the existing run URI.

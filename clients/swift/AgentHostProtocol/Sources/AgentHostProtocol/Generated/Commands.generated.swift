@@ -598,6 +598,9 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
     /// Present when {@link AutomationSessionTemplate.customizations} may contain
     /// client plugins for the host to capture.
     public var customizations: AutomationCustomizationsCapability?
+    /// Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.
+    public var targets: AutomationTargetsCapabilities?
 
     public init(
         create: AutomationCreateCapability? = nil,
@@ -605,7 +608,8 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         oneTime: AutomationOneTimeCapability? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
-        customizations: AutomationCustomizationsCapability? = nil
+        customizations: AutomationCustomizationsCapability? = nil,
+        targets: AutomationTargetsCapabilities? = nil
     ) {
         self.create = create
         self.schedules = schedules
@@ -613,6 +617,7 @@ public struct AutomationCapabilities: Codable, Sendable, Equatable {
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
+        self.targets = targets
     }
 }
 
@@ -646,6 +651,41 @@ public struct AutomationRunCancellationCapability: Codable, Sendable, Equatable 
 }
 
 public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationTargetsCapabilities: Codable, Sendable, Equatable {
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.
+    public var previousSession: AutomationPreviousSessionTargetCapability?
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.
+    public var chat: AutomationChatTargetCapability?
+
+    public init(
+        previousSession: AutomationPreviousSessionTargetCapability? = nil,
+        chat: AutomationChatTargetCapability? = nil
+    ) {
+        self.previousSession = previousSession
+        self.chat = chat
+    }
+}
+
+public struct AutomationPreviousSessionTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationChatTargetCapability: Codable, Sendable, Equatable {
 
     public init(
 

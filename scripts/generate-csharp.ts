@@ -776,6 +776,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -939,6 +940,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition' },
   { name: 'AutomationAfterDateCondition' },
+  { name: 'AutomationNewSessionTarget' },
+  { name: 'AutomationPreviousSessionTarget' },
+  { name: 'AutomationChatTarget' },
   { name: 'AutomationEntry', mutable: true },
   { name: 'AutomationState', mutable: true },
   { name: 'AutomationManualRunOrigin' },
@@ -1359,6 +1363,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   ],
 };
 
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  doc: 'AutomationTarget is where an automation\'s runs send their message.',
+  variants: [
+    { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
+    { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
+  ],
+};
+
 const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
   name: 'AutomationRunOrigin',
   discriminantField: 'kind',
@@ -1618,7 +1633,7 @@ function generateStateFile(project: Project): string {
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
-    AUTOMATION_DISABLE_CONDITION_UNION,
+    AUTOMATION_DISABLE_CONDITION_UNION, AUTOMATION_TARGET_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(project, u));
@@ -2328,6 +2343,9 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
   { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
@@ -2930,6 +2948,7 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
+    'AutomationTarget',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',

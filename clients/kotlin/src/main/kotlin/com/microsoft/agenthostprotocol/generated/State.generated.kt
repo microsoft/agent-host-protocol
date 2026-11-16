@@ -429,7 +429,7 @@ value class MessageKind(val rawValue: String) {
          */
         val TOOL: MessageKind = MessageKind("tool")
         /**
-         * Emitted automatically when an automation run starts a session.
+         * Sent by an automation run.
          */
         val AUTOMATION: MessageKind = MessageKind("automation")
         /**
@@ -1209,11 +1209,43 @@ enum class AutomationDisableConditionKind {
 }
 
 /**
+ * Discriminant for an {@link AutomationTarget}.
+ */
+@Serializable(with = AutomationTargetKindSerializer::class)
+@JvmInline
+value class AutomationTargetKind(val rawValue: String) {
+    companion object {
+        /**
+         * Each run creates a session.
+         */
+        val NEW_SESSION: AutomationTargetKind = AutomationTargetKind("newSession")
+        /**
+         * Each run continues the session of the automation's previous run.
+         */
+        val PREVIOUS_SESSION: AutomationTargetKind = AutomationTargetKind("previousSession")
+        /**
+         * Each run sends its message to one existing chat.
+         */
+        val CHAT: AutomationTargetKind = AutomationTargetKind("chat")
+    }
+}
+
+internal object AutomationTargetKindSerializer : KSerializer<AutomationTargetKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AutomationTargetKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AutomationTargetKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AutomationTargetKind =
+        AutomationTargetKind(decoder.decodeString())
+}
+
+/**
  * Lifecycle status of one automation run.
  *
  * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
- * while any linked session awaits input or client-side work; linked session
- * state is authoritative for those interactions.
+ * while its work in a linked session awaits input or client-side work; linked
+ * session state is authoritative for those interactions.
  */
 @Serializable
 enum class AutomationRunStatus {
@@ -1223,7 +1255,7 @@ enum class AutomationRunStatus {
     @SerialName("pending")
     PENDING,
     /**
-     * One or more linked sessions are executing or awaiting interaction.
+     * The run's work in linked sessions is executing or awaiting interaction.
      */
     @SerialName("running")
     RUNNING,
@@ -6338,7 +6370,7 @@ data class AutomationSessionTemplate(
      */
     val config: Map<String, JsonElement>? = null,
     /**
-     * Client plugins to make available in every run session, in the same
+     * Client plugins to make available in every session a run creates, in the same
      * published shape as
      * {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
      * Entries are keyed by `id`.
@@ -6380,12 +6412,13 @@ data class AutomationDefinition(
      */
     val title: String,
     /**
-     * Initial message sent to every newly created run session. Its
+     * Message each run sends (see {@link AutomationDefinition.target}). Its
      * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
      */
     val message: Message,
     /**
-     * Template used to create fresh sessions for each run.
+     * Template for the sessions runs create. Its model and agent also apply to
+     * a run's turn in a continued session.
      */
     val session: AutomationSessionTemplate,
     /**
@@ -6418,7 +6451,12 @@ data class AutomationDefinition(
      * entries when updating the definition.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Where each run sends {@link AutomationDefinition.message}. Absence means
+     * {@link AutomationTargetKind.NewSession}.
+     */
+    val target: AutomationTarget? = null
 )
 
 @Serializable
@@ -6458,7 +6496,11 @@ data class AutomationDefinitionPatch(
      * Complete replacement {@link AutomationDefinition._meta}.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Replacement {@link AutomationDefinition.target}.
+     */
+    val target: AutomationTarget? = null
 )
 
 @KeepGeneratedSerializer
@@ -6493,6 +6535,59 @@ data class AutomationAfterDateCondition(
 
 internal object AutomationAfterDateConditionSerializer : UnknownMembersSerializer<AutomationAfterDateCondition>(
     AutomationAfterDateCondition.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+@KeepGeneratedSerializer
+@Serializable(with = AutomationNewSessionTargetSerializer::class)
+data class AutomationNewSessionTarget(
+    val kind: AutomationTargetKind,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationNewSessionTargetSerializer : UnknownMembersSerializer<AutomationNewSessionTarget>(
+    AutomationNewSessionTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+@KeepGeneratedSerializer
+@Serializable(with = AutomationPreviousSessionTargetSerializer::class)
+data class AutomationPreviousSessionTarget(
+    val kind: AutomationTargetKind,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationPreviousSessionTargetSerializer : UnknownMembersSerializer<AutomationPreviousSessionTarget>(
+    AutomationPreviousSessionTarget.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+@KeepGeneratedSerializer
+@Serializable(with = AutomationChatTargetSerializer::class)
+data class AutomationChatTarget(
+    val kind: AutomationTargetKind,
+    /**
+     * Session that currently owns {@link AutomationChatTarget.chat}. The host
+     * maintains it: when the chat moves to another session, the host updates
+     * the definition and publishes it with
+     * {@link AutomationSetAction | `automation/set`}.
+     */
+    val session: String,
+    /**
+     * Chat that receives each run's message.
+     */
+    val chat: String,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object AutomationChatTargetSerializer : UnknownMembersSerializer<AutomationChatTarget>(
+    AutomationChatTarget.generatedSerializer(),
     { it.extra },
     { value, extra -> value.copy(extra = extra) },
 )
@@ -6550,7 +6645,7 @@ data class AutomationEntry(
      * connected. `clientId` is absent because the copy no longer depends on a
      * client.
      *
-     * Every run session receives these plugins in
+     * Every session a run creates receives these plugins in
      * {@link SessionState.customizations}, with the enablement from the
      * matching template entry.
      */
@@ -6652,7 +6747,7 @@ data class AutomationCompletedRunLifecycle(
      */
     val completedAt: String,
     /**
-     * Optional aggregate model usage across all linked sessions.
+     * Optional aggregate model usage of the run's work in its linked sessions.
      */
     val usage: UsageInfo? = null
 )
@@ -6749,7 +6844,7 @@ data class AutomationRunState(
     /**
      * Ordered, unique session URIs belonging to this run, each matching
      * {@link SessionState.resource}. Entries may represent retries, parallel
-     * workers, or delegated attempts.
+     * workers, delegated attempts, or a session continued from an earlier run.
      */
     val sessions: List<String>,
     /**
@@ -8069,6 +8164,67 @@ internal object AutomationDisableConditionSerializer : KSerializer<AutomationDis
         val discriminant = when (value) {
             is AutomationDisableConditionAfterRuns -> "afterRuns"
             is AutomationDisableConditionAfterDate -> "afterDate"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationTargetSerializer::class)
+sealed interface AutomationTarget
+
+@JvmInline
+value class AutomationTargetNewSession(val value: AutomationNewSessionTarget) : AutomationTarget
+@JvmInline
+value class AutomationTargetPreviousSession(val value: AutomationPreviousSessionTarget) : AutomationTarget
+@JvmInline
+value class AutomationTargetChat(val value: AutomationChatTarget) : AutomationTarget
+/**
+ * Forward-compat catch-all for unknown AutomationTarget discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AutomationTargetUnknown(val raw: JsonObject) : AutomationTarget
+
+internal object AutomationTargetSerializer : KSerializer<AutomationTarget> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationTarget")
+
+    override fun deserialize(decoder: Decoder): AutomationTarget {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationTarget can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationTarget")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AutomationTargetUnknown(obj)
+        return when (discriminant) {
+            "newSession" -> AutomationTargetNewSession(input.json.decodeFromJsonElement(AutomationNewSessionTarget.serializer(), element))
+            "previousSession" -> AutomationTargetPreviousSession(input.json.decodeFromJsonElement(AutomationPreviousSessionTarget.serializer(), element))
+            "chat" -> AutomationTargetChat(input.json.decodeFromJsonElement(AutomationChatTarget.serializer(), element))
+            else -> AutomationTargetUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationTarget) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationTarget can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationTargetNewSession -> output.json.encodeToJsonElement(AutomationNewSessionTarget.serializer(), value.value)
+            is AutomationTargetPreviousSession -> output.json.encodeToJsonElement(AutomationPreviousSessionTarget.serializer(), value.value)
+            is AutomationTargetChat -> output.json.encodeToJsonElement(AutomationChatTarget.serializer(), value.value)
+            is AutomationTargetUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationTargetNewSession -> "newSession"
+            is AutomationTargetPreviousSession -> "previousSession"
+            is AutomationTargetChat -> "chat"
+            is AutomationTargetUnknown -> null
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

@@ -858,6 +858,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -1024,6 +1025,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition', omitDiscriminants: true },
   { name: 'AutomationAfterDateCondition', omitDiscriminants: true },
+  { name: 'AutomationNewSessionTarget', omitDiscriminants: true },
+  { name: 'AutomationPreviousSessionTarget', omitDiscriminants: true },
+  { name: 'AutomationChatTarget', omitDiscriminants: true },
   { name: 'AutomationEntry' },
   { name: 'AutomationState' },
   { name: 'AutomationManualRunOrigin', omitDiscriminants: true },
@@ -1317,6 +1321,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   ],
 };
 
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  doc: 'Where an automation\'s runs send their message.',
+  variants: [
+    { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
+    { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
+  ],
+};
+
 const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
   name: 'AutomationRunOrigin',
   discriminantField: 'kind',
@@ -1586,6 +1601,8 @@ where D: serde::Deserializer<'de>,
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TARGET_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1905,6 +1922,9 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
   { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
@@ -2537,6 +2557,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin',
     'AutomationTrigger',
     'AutomationDisableCondition',
+    'AutomationTarget',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',

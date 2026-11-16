@@ -438,7 +438,7 @@ pub enum MessageKind {
     /// Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.
     Tool,
-    /// Emitted automatically when an automation run starts a session.
+    /// Sent by an automation run.
     Automation,
     /// A system-generated notification rather than a direct user message.
     SystemNotification,
@@ -1543,17 +1543,59 @@ pub enum AutomationDisableConditionKind {
     AfterDate,
 }
 
+/// Discriminant for an {@link AutomationTarget}.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AutomationTargetKind {
+    /// Each run creates a session.
+    NewSession,
+    /// Each run continues the session of the automation's previous run.
+    PreviousSession,
+    /// Each run sends its message to one existing chat.
+    Chat,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AutomationTargetKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::NewSession => serializer.serialize_str("newSession"),
+            Self::PreviousSession => serializer.serialize_str("previousSession"),
+            Self::Chat => serializer.serialize_str("chat"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AutomationTargetKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "newSession" => Self::NewSession,
+            "previousSession" => Self::PreviousSession,
+            "chat" => Self::Chat,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-/// while any linked session awaits input or client-side work; linked session
-/// state is authoritative for those interactions.
+/// while its work in a linked session awaits input or client-side work; linked
+/// session state is authoritative for those interactions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AutomationRunStatus {
     /// The durable run record exists but execution has not started.
     #[serde(rename = "pending")]
     Pending,
-    /// One or more linked sessions are executing or awaiting interaction.
+    /// The run's work in linked sessions is executing or awaiting interaction.
     #[serde(rename = "running")]
     Running,
     /// Execution finished successfully.
@@ -6047,7 +6089,8 @@ pub struct ResourceChange {
     pub r#type: ResourceChangeType,
 }
 
-/// Provenance recorded on a session created for an automation run.
+/// Provenance recorded on a session created for an automation run. Runs that
+/// later continue the session don't change it.
 ///
 /// The links let clients navigate from an ordinary session to the task-level
 /// run and its durable definition. The session channel remains authoritative
@@ -6213,10 +6256,11 @@ pub struct AutomationTriggerDefinition {
     pub config_schema: Option<ConfigSchema>,
 }
 
-/// Template from which the host creates a fresh session for each automation run.
-///
-/// The host revalidates every selection when the run starts. Definitions never
-/// carry credentials, confirmation decisions, or durable permission grants.
+/// Template from which the host creates a session for an automation run.
+/// {@link AutomationDefinition.target} decides whether a run creates one. In a
+/// session a run continues, only {@link AutomationSessionTemplate.model |
+/// `model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the
+/// run's message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionTemplate {
@@ -6241,7 +6285,7 @@ pub struct AutomationSessionTemplate {
     /// {@link ResolveSessionConfigResult.values}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
-    /// Client plugins to make available in every run session, in the same
+    /// Client plugins to make available in every session a run creates, in the same
     /// published shape as
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
     /// Entries are keyed by `id`.
@@ -6273,8 +6317,8 @@ pub struct AutomationSessionTemplate {
 
 /// Durable, client-editable definition of an automation.
 ///
-/// A definition combines the initial automation message, the session template
-/// used for each run, and zero or more automatic triggers. Run history,
+/// A definition combines the message each run sends, the session template, the
+/// run target, and zero or more automatic triggers. Run history,
 /// timestamps, and currently allowed operations live on
 /// {@link AutomationEntry} rather than in the definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -6282,10 +6326,11 @@ pub struct AutomationSessionTemplate {
 pub struct AutomationDefinition {
     /// Human-readable automation name.
     pub title: String,
-    /// Initial message sent to every newly created run session. Its
+    /// Message each run sends (see {@link AutomationDefinition.target}). Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     pub message: Message,
-    /// Template used to create fresh sessions for each run.
+    /// Template for the sessions runs create. Its model and agent also apply to
+    /// a run's turn in a continued session.
     pub session: AutomationSessionTemplate,
     /// Whether automatic triggers may create runs. Manual runs remain available
     /// whenever {@link AutomationOperation.Run} is advertised.
@@ -6311,6 +6356,10 @@ pub struct AutomationDefinition {
     /// entries when updating the definition.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Where each run sends {@link AutomationDefinition.message}. Absence means
+    /// {@link AutomationTargetKind.NewSession}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<AutomationTarget>,
 }
 
 /// Partial replacement of editable {@link AutomationDefinition} fields.
@@ -6351,6 +6400,9 @@ pub struct AutomationDefinitionPatch {
     /// Complete replacement {@link AutomationDefinition._meta}.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Replacement {@link AutomationDefinition.target}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<AutomationTarget>,
 }
 
 /// Stops scheduling after a fixed number of scheduled runs.
@@ -6370,6 +6422,101 @@ pub struct AutomationAfterRunsCondition {
 pub struct AutomationAfterDateCondition {
     /// ISO 8601 timestamp after which scheduling stops.
     pub date: String,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Each run creates a session from {@link AutomationDefinition.session}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationNewSessionTarget {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Each run continues the session of the automation's previous run, so a
+/// recurring automation keeps one conversation.
+///
+/// The previous run's session is the
+/// {@link AutomationRunState.primarySession | primary session} of the most
+/// recently created earlier run of this automation that has one, even if that
+/// run was pruned from {@link AutomationEntry.runs}. The host decides whether
+/// that session is still usable. A session that was removed or archived, that
+/// has no {@link SessionState.defaultChat | default chat}, or that the
+/// automation may no longer drive, is never usable. The host MAY also treat a
+/// session as unusable when it can't honor the current template, for example
+/// after its agent provider, working directories, or configuration changed.
+/// When there is no usable session, the run creates one from
+/// {@link AutomationDefinition.session}, as with
+/// {@link AutomationNewSessionTarget}, and later runs continue that session.
+/// The host resolves targets and starts turns in run creation order, so
+/// overlapping runs share one session instead of each creating one.
+///
+/// When a run reuses a session, the host:
+///
+/// - links the session to the run with
+///   {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and
+///   makes it the run's primary session before delivering the message;
+/// - adds {@link AutomationDefinition.message} to the session's default chat
+///   as a {@link PendingMessageKind.Queued | queued} pending message, so it
+///   never steers an active turn and starts a turn once the chat is idle;
+/// - does not reapply {@link AutomationDefinition.session}, so the session
+///   keeps its agent provider, configuration, and working directories. The
+///   template's `model` and `agent` still apply to the queued message, as for
+///   every run. The host MAY update the session's copies of the automation's
+///   customizations to match {@link AutomationEntry.customizations}.
+///
+/// The run stays `pending` while its message waits and becomes `running` when
+/// a turn starts from it. It ends with the outcome of that turn. If its
+/// queued message is withdrawn without a turn starting from it, the run is
+/// `cancelled`. Cancelling the run removes its queued message or cancels its
+/// turn, and never affects other turns in the session. If the session becomes
+/// unusable before a turn starts from the message, the host removes the queued
+/// message, if its chat still exists, and the run fails.
+///
+/// {@link SessionMetadata.origin} keeps naming the run that created the
+/// session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationPreviousSessionTarget {
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Each run sends its message to one existing chat, such as the conversation
+/// in which a user asked for a recurring check.
+///
+/// The host MUST reject a create or update request whose chat doesn't exist or
+/// that the automation may not drive. When it accepts one, it sets
+/// {@link AutomationChatTarget.session | `session`} to the session that
+/// currently owns the chat, replacing any submitted value.
+///
+/// Each run delivers its message the way an
+/// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+/// with the same run lifecycle: the host links the session to the run, makes it
+/// the run's primary session, and adds {@link AutomationDefinition.message} to
+/// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+/// The run never creates a session, and the host applies only the template's
+/// `model` and `agent`, to the queued message. It does not change the
+/// session's agent provider, configuration, working directories, or
+/// customizations.
+///
+/// If the chat no longer exists, or the automation may no longer drive it, the
+/// run fails. When that happens after the message was queued, the host first
+/// removes the queued message, if the chat still exists.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationChatTarget {
+    /// Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.
+    pub session: Uri,
+    /// Chat that receives each run's message.
+    pub chat: Uri,
     /// Unrecognized wire members retained for full-object edits.
     #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]
     pub extra: serde_json::Map<String, serde_json::Value>,
@@ -6422,7 +6569,7 @@ pub struct AutomationEntry {
     /// connected. `clientId` is absent because the copy no longer depends on a
     /// client.
     ///
-    /// Every run session receives these plugins in
+    /// Every session a run creates receives these plugins in
     /// {@link SessionState.customizations}, with the enablement from the
     /// matching template entry.
     #[serde(
@@ -6535,7 +6682,9 @@ pub struct AutomationTriggeredRunOrigin {
     pub event: Option<JsonObject>,
 }
 
-/// A durable run exists but has not begun external execution.
+/// A durable run exists but has not begun external execution. A run that
+/// continues a session also stays pending while that session's chat runs
+/// another turn (see {@link AutomationPreviousSessionTarget}).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationPendingRunLifecycle {
@@ -6543,7 +6692,7 @@ pub struct AutomationPendingRunLifecycle {
     pub created_at: String,
 }
 
-/// The run is executing linked sessions or awaiting interaction on them.
+/// The run's work in linked sessions is executing or awaiting interaction.
 ///
 /// Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
 /// remain authoritative for whether user attention or client-side work is
@@ -6567,7 +6716,7 @@ pub struct AutomationCompletedRunLifecycle {
     pub started_at: String,
     /// Completion timestamp in ISO 8601 format.
     pub completed_at: String,
-    /// Optional aggregate model usage across all linked sessions.
+    /// Optional aggregate model usage of the run's work in its linked sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<UsageInfo>,
 }
@@ -6650,7 +6799,7 @@ pub struct AutomationRunState {
     pub lifecycle: AutomationRunLifecycle,
     /// Ordered, unique session URIs belonging to this run, each matching
     /// {@link SessionState.resource}. Entries may represent retries, parallel
-    /// workers, or delegated attempts.
+    /// workers, delegated attempts, or a session continued from an earlier run.
     pub sessions: Vec<Uri>,
     /// Member of {@link AutomationRunState.sessions} that the host recommends opening first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -7097,6 +7246,22 @@ pub enum AutomationDisableCondition {
     AfterRuns(AutomationAfterRunsCondition),
     #[serde(rename = "afterDate")]
     AfterDate(AutomationAfterDateCondition),
+}
+
+/// Where an automation's runs send their message.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AutomationTarget {
+    #[serde(rename = "newSession")]
+    NewSession(AutomationNewSessionTarget),
+    #[serde(rename = "previousSession")]
+    PreviousSession(AutomationPreviousSessionTarget),
+    #[serde(rename = "chat")]
+    Chat(AutomationChatTarget),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
 }
 
 /// Provenance describing how an automation run was created.
