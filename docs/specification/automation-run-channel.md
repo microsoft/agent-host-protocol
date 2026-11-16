@@ -29,10 +29,19 @@ stateDiagram-v2
   pending --> running
   pending --> failed
   pending --> cancelled
+  pending --> skipped
+  [*] --> skipped
   running --> completed
   running --> failed
   running --> cancelled
 ```
+
+A `pending` lifecycle may carry `waiting`, the host's reason the run hasn't
+started. The host updates it with a `pending` → `pending`
+`lifecycleChanged`. A `skipped` lifecycle records a trigger occurrence the
+host deliberately didn't execute, such as a misfire or overlap. It never
+starts, links no sessions, and may stand for several coalesced occurrences
+through `occurrenceCount`.
 
 The run remains `running` while linked sessions await interaction. Their
 `SessionSummary.status` and `SessionState.inputNeeded` fields remain

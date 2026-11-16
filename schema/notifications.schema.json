@@ -6142,7 +6142,7 @@
         },
         "runCount": {
           "type": "number",
-          "description": "Host-owned count of scheduled runs consumed against the current\n{@link AutomationAfterRunsCondition} allowance. Authoritative usage for the\n**current** allowance, not a lifetime total: the host resets it to `0` when\na disabled→enabled transition starts a fresh allowance or a\n{@link AutomationAfterRunsCondition} is added when none was present. It is NOT\nreconstructed from {@link runs} (a bounded, prunable window). The host\nincrements it atomically when it admits a scheduled run, including runs\nlater cancelled or failed.\n\nAbsent when {@link AutomationDefinition.disableConditions} contains no\n{@link AutomationAfterRunsCondition}."
+          "description": "Host-owned count of scheduled runs consumed against the current\n{@link AutomationAfterRunsCondition} allowance. Authoritative usage for the\n**current** allowance, not a lifetime total: the host resets it to `0` when\na disabled→enabled transition starts a fresh allowance or a\n{@link AutomationAfterRunsCondition} is added when none was present. It is NOT\nreconstructed from {@link runs} (a bounded, prunable window). The host\nincrements it atomically when it admits a scheduled run, including runs\nlater cancelled, failed, or skipped. Runs created directly as\n{@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not\ncount.\n\nAbsent when {@link AutomationDefinition.disableConditions} contains no\n{@link AutomationAfterRunsCondition}."
         },
         "runs": {
           "type": "array",
@@ -6265,11 +6265,36 @@
         "createdAt": {
           "type": "string",
           "description": "Run creation timestamp in ISO 8601 format."
+        },
+        "waiting": {
+          "$ref": "#/$defs/AutomationRunWaiting",
+          "description": "Why the run has not started yet, when the host knows. The host updates it\nby dispatching {@link AutomationRunLifecycleChangedAction} from `pending`\nto `pending`. A run that cannot proceed and will not retry transitions to\n`failed` instead."
         }
       },
       "required": [
         "status",
         "createdAt"
+      ]
+    },
+    "AutomationRunWaiting": {
+      "type": "object",
+      "description": "Host-reported detail explaining why a pending run is waiting.",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Machine-readable reason the run is waiting. Common values include:\n\n- `'capacity'`: the host has no execution capacity right now\n- `'concurrency'`: waiting for earlier runs of the same automation to finish\n- `'quota'`: a budget or rate limit was reached\n- `'authentication'`: waiting for credentials, such as a connected,\n  authenticated client\n- `'targetBusy'`: the session or chat the run delivers into is busy\n- `'retry'`: backing off after a transient failure\n- `'unavailable'`: the host is paused, draining, or otherwise not running\n  automations"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable detail suitable for display."
+        },
+        "retryAt": {
+          "type": "string",
+          "description": "When the host expects to try again, as an ISO 8601 timestamp."
+        }
+      },
+      "required": [
+        "reason"
       ]
     },
     "AutomationRunningRunLifecycle": {
@@ -6380,6 +6405,42 @@
         "status",
         "createdAt",
         "completedAt"
+      ]
+    },
+    "AutomationSkippedRunLifecycle": {
+      "type": "object",
+      "description": "Terminal lifecycle for a trigger occurrence that the host recorded but\ndeliberately did not execute.\n\nA skipped run never starts and links no sessions. The host either creates\nthe run directly as `skipped` or transitions a `pending` run to `skipped`,\nfor example when an overlap policy coalesces it. Its\n{@link AutomationTriggeredRunOrigin.scheduledFor} or\n{@link AutomationTriggeredRunOrigin.event} identifies the occurrence.\n\nSkipped runs appear in {@link AutomationEntry.runs} alongside executed runs,\nso clients can explain a missing result without extra state.",
+      "properties": {
+        "status": {
+          "const": "skipped"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Run creation timestamp in ISO 8601 format."
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Machine-readable reason the occurrence was skipped. Common values\ninclude:\n\n- `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}\n- `'overlap'`: dropped by an overlap or concurrency policy\n- `'quota'`: dropped because a budget or rate limit was exhausted"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable detail suitable for display."
+        },
+        "occurrenceCount": {
+          "type": "integer",
+          "description": "Number of consecutive occurrences of the same trigger and reason that this\nrecord represents, for example every occurrence missed while the host was\noffline. The origin identifies the most recent of them. Absent means `1`.\n\nHosts SHOULD coalesce consecutive skips this way rather than recording one\nrun per occurrence, so skipped runs don't push executed runs out of the\nbounded {@link AutomationEntry.runs} window.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "completedAt",
+        "reason"
       ]
     },
     "AutomationRunSummary": {
@@ -7234,6 +7295,9 @@
         },
         {
           "$ref": "#/$defs/AutomationCancelledRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationSkippedRunLifecycle"
         }
       ],
       "description": "Discriminated lifecycle of an automation run."

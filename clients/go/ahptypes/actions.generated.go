@@ -1841,8 +1841,8 @@ type AutomationRunPrimarySessionChangedAction struct {
 // revalidates that the run is non-terminal. The authoritative outcome arrives
 // later through
 // {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
-// `cancelled`, or the run may complete or fail before cancellation takes
-// effect.
+// `cancelled`, or the run may complete, fail, or be skipped before
+// cancellation takes effect.
 type AutomationRunCancelRequestedAction struct {
 	Type ActionType `json:"type"`
 }

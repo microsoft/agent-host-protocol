@@ -16,11 +16,12 @@ import type {
 } from '../channels-automation/state.js';
 import type { RunAutomationParams } from '../channels-automation/commands.js';
 import type { SessionState } from '../channels-session/state.js';
+import type { AutomationRunLifecycleChangedAction } from './actions.js';
 
 /**
  * Lifecycle status of one automation run.
  *
- * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+ * `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
  * while any linked session awaits input or client-side work; linked session
  * state is authoritative for those interactions.
  *
@@ -38,6 +39,8 @@ export const enum AutomationRunStatus {
   Failed = 'failed',
   /** Execution ended because cancellation was accepted. */
   Cancelled = 'cancelled',
+  /** A trigger occurrence was recorded but deliberately not executed. */
+  Skipped = 'skipped',
 }
 
 /**
@@ -110,6 +113,40 @@ export interface AutomationPendingRunLifecycle {
   status: AutomationRunStatus.Pending;
   /** Run creation timestamp in ISO 8601 format. */
   createdAt: string;
+  /**
+   * Why the run has not started yet, when the host knows. The host updates it
+   * by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+   * to `pending`. A run that cannot proceed and will not retry transitions to
+   * `failed` instead.
+   */
+  waiting?: AutomationRunWaiting;
+}
+
+/**
+ * Host-reported detail explaining why a pending run is waiting.
+ *
+ * @category Automation Run State
+ * @preserveUnknownMembers
+ */
+export interface AutomationRunWaiting {
+  /**
+   * Machine-readable reason the run is waiting. Common values include:
+   *
+   * - `'capacity'`: the host has no execution capacity right now
+   * - `'concurrency'`: waiting for earlier runs of the same automation to finish
+   * - `'quota'`: a budget or rate limit was reached
+   * - `'authentication'`: waiting for credentials, such as a connected,
+   *   authenticated client
+   * - `'targetBusy'`: the session or chat the run delivers into is busy
+   * - `'retry'`: backing off after a transient failure
+   * - `'unavailable'`: the host is paused, draining, or otherwise not running
+   *   automations
+   */
+  reason: string;
+  /** Human-readable detail suitable for display. */
+  message?: string;
+  /** When the host expects to try again, as an ISO 8601 timestamp. */
+  retryAt?: string;
 }
 
 /**
@@ -185,6 +222,53 @@ export interface AutomationCancelledRunLifecycle {
 }
 
 /**
+ * Terminal lifecycle for a trigger occurrence that the host recorded but
+ * deliberately did not execute.
+ *
+ * A skipped run never starts and links no sessions. The host either creates
+ * the run directly as `skipped` or transitions a `pending` run to `skipped`,
+ * for example when an overlap policy coalesces it. Its
+ * {@link AutomationTriggeredRunOrigin.scheduledFor} or
+ * {@link AutomationTriggeredRunOrigin.event} identifies the occurrence.
+ *
+ * Skipped runs appear in {@link AutomationEntry.runs} alongside executed runs,
+ * so clients can explain a missing result without extra state.
+ *
+ * @category Automation Run State
+ */
+export interface AutomationSkippedRunLifecycle {
+  status: AutomationRunStatus.Skipped;
+  /** Run creation timestamp in ISO 8601 format. */
+  createdAt: string;
+  /** Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence. */
+  completedAt: string;
+  /**
+   * Machine-readable reason the occurrence was skipped. Common values
+   * include:
+   *
+   * - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+   * - `'overlap'`: dropped by an overlap or concurrency policy
+   * - `'quota'`: dropped because a budget or rate limit was exhausted
+   */
+  reason: string;
+  /** Human-readable detail suitable for display. */
+  message?: string;
+  /**
+   * Number of consecutive occurrences of the same trigger and reason that this
+   * record represents, for example every occurrence missed while the host was
+   * offline. The origin identifies the most recent of them. Absent means `1`.
+   *
+   * Hosts SHOULD coalesce consecutive skips this way rather than recording one
+   * run per occurrence, so skipped runs don't push executed runs out of the
+   * bounded {@link AutomationEntry.runs} window.
+   *
+   * @integer
+   * @minimum 1
+   */
+  occurrenceCount?: number;
+}
+
+/**
  * Discriminated lifecycle of an automation run.
  *
  * @category Automation Run State
@@ -194,7 +278,8 @@ export type AutomationRunLifecycle =
   | AutomationRunningRunLifecycle
   | AutomationCompletedRunLifecycle
   | AutomationFailedRunLifecycle
-  | AutomationCancelledRunLifecycle;
+  | AutomationCancelledRunLifecycle
+  | AutomationSkippedRunLifecycle;
 
 /**
  * Lightweight projection of a run retained in its automation's history.

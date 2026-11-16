@@ -1690,11 +1690,15 @@ public readonly struct AutomationMisfirePolicy : IEquatable<AutomationMisfirePol
     /// <summary>The raw wire value.</summary>
     public string Value => _value ?? string.Empty;
 
-    /// <summary>Discard missed occurrences and wait for the next future occurrence.</summary>
+    /// <summary>Discard missed occurrences and wait for the next future occurrence. The
+    /// host SHOULD record the discarded occurrences as one
+    /// {@link AutomationSkippedRunLifecycle | skipped} run with reason
+    /// `misfire`.</summary>
     public static readonly AutomationMisfirePolicy Skip = new AutomationMisfirePolicy("skip");
 
     /// <summary>Start at most one catch-up run when execution becomes available, regardless
-    /// of how many occurrences were missed.</summary>
+    /// of how many occurrences were missed. The host MAY record the other missed
+    /// occurrences as a {@link AutomationSkippedRunLifecycle | skipped} run.</summary>
     public static readonly AutomationMisfirePolicy RunOnce = new AutomationMisfirePolicy("runOnce");
 
     /// <inheritdoc />
@@ -1757,7 +1761,7 @@ public enum AutomationDisableConditionKind
 
 /// <summary>Lifecycle status of one automation run.
 ///
-/// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+/// `completed`, `failed`, `cancelled`, and `skipped` are terminal. A run remains `running`
 /// while any linked session awaits input or client-side work; linked session
 /// state is authoritative for those interactions.</summary>
 [JsonConverter(typeof(WireEnumConverter<AutomationRunStatus>))]
@@ -1778,6 +1782,9 @@ public enum AutomationRunStatus
     /// <summary>Execution ended because cancellation was accepted.</summary>
     [WireValue("cancelled")]
     Cancelled,
+    /// <summary>A trigger occurrence was recorded but deliberately not executed.</summary>
+    [WireValue("skipped")]
+    Skipped,
 }
 
 /// <summary>Discriminant describing what created an automation run.</summary>
@@ -7160,7 +7167,9 @@ public sealed class AutomationEntry
     /// {@link AutomationAfterRunsCondition} is added when none was present. It is NOT
     /// reconstructed from {@link runs} (a bounded, prunable window). The host
     /// increments it atomically when it admits a scheduled run, including runs
-    /// later cancelled or failed.
+    /// later cancelled, failed, or skipped. Runs created directly as
+    /// {@link AutomationSkippedRunLifecycle | skipped} are not admitted and do not
+    /// count.
     ///
     /// Absent when {@link AutomationDefinition.disableConditions} contains no
     /// {@link AutomationAfterRunsCondition}.</summary>
@@ -7264,6 +7273,13 @@ public sealed record AutomationPendingRunLifecycle
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
+
+    /// <summary>Why the run has not started yet, when the host knows. The host updates it
+    /// by dispatching {@link AutomationRunLifecycleChangedAction} from `pending`
+    /// to `pending`. A run that cannot proceed and will not retry transitions to
+    /// `failed` instead.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationRunWaiting? Waiting { get; init; }
 }
 
 /// <summary>The run is executing linked sessions or awaiting interaction on them.
@@ -7340,6 +7356,79 @@ public sealed record AutomationCancelledRunLifecycle
 
     /// <summary>Cancellation completion timestamp in ISO 8601 format.</summary>
     public required string CompletedAt { get; init; }
+}
+
+/// <summary>Terminal lifecycle for a trigger occurrence that the host recorded but
+/// deliberately did not execute.
+///
+/// A skipped run never starts and links no sessions. The host either creates
+/// the run directly as `skipped` or transitions a `pending` run to `skipped`,
+/// for example when an overlap policy coalesces it. Its
+/// {@link AutomationTriggeredRunOrigin.scheduledFor} or
+/// {@link AutomationTriggeredRunOrigin.event} identifies the occurrence.
+///
+/// Skipped runs appear in {@link AutomationEntry.runs} alongside executed runs,
+/// so clients can explain a missing result without extra state.</summary>
+public sealed record AutomationSkippedRunLifecycle
+{
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Skipped;
+
+    /// <summary>Run creation timestamp in ISO 8601 format.</summary>
+    public required string CreatedAt { get; init; }
+
+    /// <summary>Timestamp, in ISO 8601 format, at which the host decided to skip the occurrence.</summary>
+    public required string CompletedAt { get; init; }
+
+    /// <summary>Machine-readable reason the occurrence was skipped. Common values
+    /// include:
+    ///
+    /// - `'misfire'`: dropped by the trigger's {@link AutomationMisfirePolicy}
+    /// - `'overlap'`: dropped by an overlap or concurrency policy
+    /// - `'quota'`: dropped because a budget or rate limit was exhausted</summary>
+    public required string Reason { get; init; }
+
+    /// <summary>Human-readable detail suitable for display.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+
+    /// <summary>Number of consecutive occurrences of the same trigger and reason that this
+    /// record represents, for example every occurrence missed while the host was
+    /// offline. The origin identifies the most recent of them. Absent means `1`.
+    ///
+    /// Hosts SHOULD coalesce consecutive skips this way rather than recording one
+    /// run per occurrence, so skipped runs don't push executed runs out of the
+    /// bounded {@link AutomationEntry.runs} window.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? OccurrenceCount { get; init; }
+}
+
+/// <summary>Host-reported detail explaining why a pending run is waiting.</summary>
+public sealed record AutomationRunWaiting
+{
+    /// <summary>Machine-readable reason the run is waiting. Common values include:
+    ///
+    /// - `'capacity'`: the host has no execution capacity right now
+    /// - `'concurrency'`: waiting for earlier runs of the same automation to finish
+    /// - `'quota'`: a budget or rate limit was reached
+    /// - `'authentication'`: waiting for credentials, such as a connected,
+    ///   authenticated client
+    /// - `'targetBusy'`: the session or chat the run delivers into is busy
+    /// - `'retry'`: backing off after a transient failure
+    /// - `'unavailable'`: the host is paused, draining, or otherwise not running
+    ///   automations</summary>
+    public required string Reason { get; init; }
+
+    /// <summary>Human-readable detail suitable for display.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+
+    /// <summary>When the host expects to try again, as an ISO 8601 timestamp.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RetryAt { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Lightweight projection of a run retained in its automation's history.
@@ -8141,6 +8230,7 @@ internal sealed class AutomationRunLifecycleConverter : UnionConverter<Automatio
         ["completed"] = typeof(AutomationCompletedRunLifecycle),
         ["failed"] = typeof(AutomationFailedRunLifecycle),
         ["cancelled"] = typeof(AutomationCancelledRunLifecycle),
+        ["skipped"] = typeof(AutomationSkippedRunLifecycle),
             },
             allowUnknown: false)
     {

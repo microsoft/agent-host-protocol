@@ -291,6 +291,11 @@ unavailable, for example while the host's scheduler is stopped:
 Omitting `misfirePolicy` is equivalent to `runOnce`. A catch-up run records
 `origin.catchUp: true` and the original `scheduledFor` timestamp.
 
+Under `skip`, the host should record the discarded occurrences as one
+[skipped run](#skipped-runs) with reason `misfire`, so clients can explain a
+missing result. Under `runOnce`, the host may do the same for the occurrences
+that the catch-up run didn't cover.
+
 ### One-time triggers
 
 When `AutomationCapabilities.oneTime` is present, a definition may contain a
@@ -405,7 +410,9 @@ For an `afterRuns` condition the host owns usage through the authoritative
 `AutomationEntry.runCount`. It is the count for the **current
 allowance**, not a lifetime total, and it is not reconstructed from the bounded
 `runs` window. The host increments it atomically when it admits a scheduled run,
-so a slot is spent even if that run is later cancelled or fails before startup.
+so a slot is spent even if that run is later cancelled, fails before startup, or
+is skipped. Runs created directly as `skipped` are not admitted and don't
+consume the allowance.
 Catch-up runs are scheduled runs and consume the allowance; manual runs do not.
 Clients display remaining allowance as `max - runCount` and never
 keep their own count.
@@ -533,14 +540,52 @@ stateDiagram-v2
   pending --> running
   pending --> failed
   pending --> cancelled
+  pending --> skipped
+  [*] --> skipped
   running --> completed
   running --> failed
   running --> cancelled
 ```
 
-`completed`, `failed`, and `cancelled` are terminal. `failed.startedAt` and
+`completed`, `failed`, `cancelled`, and `skipped` are terminal. `failed.startedAt` and
 `cancelled.startedAt` are optional because validation, workspace preparation,
 or cancellation may finish before execution begins.
+
+#### Waiting runs
+
+A `pending` run may carry `waiting`, which explains why it hasn't started:
+
+```typescript
+AutomationRunWaiting {
+  reason: string // e.g. 'capacity', 'concurrency', 'quota', 'authentication',
+                 // 'targetBusy', 'retry', 'unavailable'
+  message?: string
+  retryAt?: string // ISO 8601
+}
+```
+
+`reason` is an open string. Clients recognize the documented values and fall
+back to `message` or a generic waiting indicator for anything else, so hosts
+can report causes specific to them.
+
+The host updates `waiting` by dispatching `automationRun/lifecycleChanged` from
+`pending` to `pending`. Because `AutomationRunSummary.lifecycle` mirrors the
+run, run history shows the reason without subscribing to each run. A run that
+can't proceed and won't retry transitions to `failed` with an `ErrorInfo`
+instead.
+
+#### Skipped runs
+
+A `skipped` run records a trigger occurrence that the host deliberately didn't
+execute. It never starts and links no sessions. Its `origin` identifies the
+occurrence, and its lifecycle carries a string `reason` (recognized values are
+`misfire`, `overlap`, and `quota`; hosts may add others), an optional `message`, and an optional `occurrenceCount`.
+
+Hosts should coalesce consecutive skips of the same trigger and reason into one
+record, with `occurrenceCount` giving the total and `origin` identifying the
+most recent occurrence. This keeps skipped runs from pushing executed runs out
+of the bounded `runs` window. Skipped runs appear in run history and
+`fetchAutomationRuns` like any other run.
 
 The run remains `running` while a linked session awaits user input,
 confirmation, authentication, or client-side tool execution. Linked
@@ -576,7 +621,8 @@ The client dispatches `automationRun/cancelRequested`. This action is
 side-effect-only and does not optimistically change lifecycle. The host
 revalidates that the run is still non-terminal, then later emits
 `automationRun/lifecycleChanged` with the authoritative result. The run may
-become `cancelled`, or it may complete or fail before cancellation takes effect.
+become `cancelled`, or it may complete, fail, or be skipped before cancellation
+takes effect.
 
 ## Run history and retention
 

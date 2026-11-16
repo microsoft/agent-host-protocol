@@ -2765,8 +2765,8 @@ public sealed record AutomationRunPrimarySessionChangedAction
 /// revalidates that the run is non-terminal. The authoritative outcome arrives
 /// later through
 /// {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
-/// `cancelled`, or the run may complete or fail before cancellation takes
-/// effect.</summary>
+/// `cancelled`, or the run may complete, fail, or be skipped before
+/// cancellation takes effect.</summary>
 public sealed record AutomationRunCancelRequestedAction
 {
     public ActionType Type { get; init; } = ActionType.AutomationRunCancelRequested;
