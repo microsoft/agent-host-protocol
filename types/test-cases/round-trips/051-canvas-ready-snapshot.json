@@ -12,7 +12,7 @@
       "canvasId": "preview",
       "title": "Preview",
       "status": "Ready",
-      "url": "https://example.test/preview"
+      "uri": "https://example.test/preview"
     },
     "fromSeq": 5
   },
@@ -25,7 +25,7 @@
       "canvasId": "preview",
       "title": "Preview",
       "status": "Ready",
-      "url": "https://example.test/preview"
+      "uri": "https://example.test/preview"
     },
     "fromSeq": 5
   }]

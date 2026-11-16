@@ -1,0 +1,16 @@
+{
+  "name": "automation-reset-target-patch",
+  "group": "A",
+  "description": "A patch that resets target to newSession round-trips, keeping unknown members of the variant.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/german",
+    "changes": { "target": { "kind": "newSession", "future": true } }
+  },
+  "acceptableOutputs": [{
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/german",
+    "changes": { "target": { "kind": "newSession", "future": true } }
+  }]
+}

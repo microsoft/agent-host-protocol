@@ -211,7 +211,7 @@ const (
 	// Produced by a tool rather than the user — for example, a tool that spawns a
 	// worker chat whose first message carries a seed prompt.
 	MessageKindTool MessageKind = "tool"
-	// Emitted automatically when an automation run starts a session.
+	// Sent by an automation run.
 	MessageKindAutomation MessageKind = "automation"
 	// A system-generated notification rather than a direct user message.
 	MessageKindSystemNotification MessageKind = "systemNotification"
@@ -463,6 +463,20 @@ const (
 	ChangesetStatusError ChangesetStatus = "error"
 )
 
+// Bitset flags describing host-reported activity on a {@link ChangesetFile}.
+type ChangesetFileStatus uint32
+
+const (
+	// The host reports an ongoing edit to this file.
+	ChangesetFileStatusEditing ChangesetFileStatus = 1
+)
+
+// Has reports whether every flag in other is also set in s.
+func (s ChangesetFileStatus) Has(other ChangesetFileStatus) bool { return s&other == other }
+
+// Or returns s combined with the flags in other.
+func (s ChangesetFileStatus) Or(other ChangesetFileStatus) ChangesetFileStatus { return s | other }
+
 // Execution lifecycle of a {@link ChangesetOperation}.
 //
 // An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -550,6 +564,8 @@ const (
 	AutomationTriggerKindSchedule AutomationTriggerKind = "schedule"
 	// A host-defined external event discovered from trigger definitions.
 	AutomationTriggerKindEvent AutomationTriggerKind = "event"
+	// A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.
+	AutomationTriggerKindOneTime AutomationTriggerKind = "oneTime"
 )
 
 // Discriminant for an {@link AutomationDisableCondition}.
@@ -562,17 +578,29 @@ const (
 	AutomationDisableConditionKindAfterDate AutomationDisableConditionKind = "afterDate"
 )
 
+// Discriminant for an {@link AutomationTarget}.
+type AutomationTargetKind string
+
+const (
+	// Each run creates a session.
+	AutomationTargetKindNewSession AutomationTargetKind = "newSession"
+	// Each run continues the session of the automation's previous run.
+	AutomationTargetKindPreviousSession AutomationTargetKind = "previousSession"
+	// Each run sends its message to one existing chat.
+	AutomationTargetKindChat AutomationTargetKind = "chat"
+)
+
 // Lifecycle status of one automation run.
 //
 // `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-// while any linked session awaits input or client-side work; linked session
-// state is authoritative for those interactions.
+// while its work in a linked session awaits input or client-side work; linked
+// session state is authoritative for those interactions.
 type AutomationRunStatus string
 
 const (
 	// The durable run record exists but execution has not started.
 	AutomationRunStatusPending AutomationRunStatus = "pending"
-	// One or more linked sessions are executing or awaiting interaction.
+	// The run's work in linked sessions is executing or awaiting interaction.
 	AutomationRunStatusRunning AutomationRunStatus = "running"
 	// Execution finished successfully.
 	AutomationRunStatusCompleted AutomationRunStatus = "completed"
@@ -608,26 +636,26 @@ type TcpConnectionsCapability struct {
 // Limits on data that one peer receives on a windowed subscription.
 //
 // All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-// message's complete text, as sent. For a `channel/frame` fragment, this
+// message's complete text, as sent. For a `channel/frame` notification, this
 // includes its envelope and escape characters. The same size is used for the
-// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 // size of a complete data message. Outstanding data is always less than
-// `windowBytes + maximumFrameBytes`.
+// `windowBytes + maxFrameBytes`.
 //
 // Stability: 1.0 - Early development.
 type ChannelReceiveLimits struct {
 	// The target amount of outstanding data. This is a soft target.
-	// The sender MUST NOT send a data message or fragment while outstanding data
-	// is equal to or greater than this value. The last message or fragment sent
+	// The sender MUST NOT send a data message or frame while outstanding data
+	// is equal to or greater than this value. The last message or frame sent
 	// before the window is full can go past it, so a message that fits within
-	// `maximumFrameBytes` can be sent whole even when it is larger than the
+	// `maxFrameBytes` can be sent whole even when it is larger than the
 	// remaining credit.
 	WindowBytes int64 `json:"windowBytes"`
 	// The largest JSON-RPC message that the sender can send for a data message.
 	// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
 	// notification, it includes the envelope and escape characters. A larger data
-	// message MUST be split into smaller messages or sent in fragments.
-	MaximumFrameBytes int64 `json:"maximumFrameBytes"`
+	// message MUST be split into smaller messages or sent in frames.
+	MaxFrameBytes int64 `json:"maxFrameBytes"`
 }
 
 // The limits that the server accepted for a windowed subscription.
@@ -687,6 +715,18 @@ type Icon struct {
 	//
 	// If not provided, the client should assume the icon can be used with any theme.
 	Theme *string `json:"theme,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *Icon) UnmarshalJSON(data []byte) error {
+	type wire Icon
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "src", "contentType", "sizes", "theme")
+}
+
+func (v Icon) MarshalJSON() ([]byte, error) {
+	type wire Icon
+	return marshalWithExtra(wire(v), v.Extra, "src", "contentType", "sizes", "theme")
 }
 
 // Describes a protected resource's authentication requirements using
@@ -726,6 +766,18 @@ type ProtectedResourceMetadata struct {
 	//
 	// Clients SHOULD treat an absent field the same as `true`.
 	Required *bool `json:"required,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ProtectedResourceMetadata) UnmarshalJSON(data []byte) error {
+	type wire ProtectedResourceMetadata
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "resource", "resource_name", "authorization_servers", "jwks_uri", "scopes_supported", "bearer_methods_supported", "resource_signing_alg_values_supported", "resource_documentation", "resource_policy_uri", "resource_tos_uri", "required")
+}
+
+func (v ProtectedResourceMetadata) MarshalJSON() ([]byte, error) {
+	type wire ProtectedResourceMetadata
+	return marshalWithExtra(wire(v), v.Extra, "resource", "resource_name", "authorization_servers", "jwks_uri", "scopes_supported", "bearer_methods_supported", "resource_signing_alg_values_supported", "resource_documentation", "resource_policy_uri", "resource_tos_uri", "required")
 }
 
 // Global state shared with every client subscribed to `ahp-root://`.
@@ -932,6 +984,18 @@ type ModelSelection struct {
 	// pickers produce strings, but some (e.g. a numeric context-size picker)
 	// produce numbers or booleans, which are carried through as-is.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSelection) UnmarshalJSON(data []byte) error {
+	type wire ModelSelection
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "config")
+}
+
+func (v ModelSelection) MarshalJSON() ([]byte, error) {
+	type wire ModelSelection
+	return marshalWithExtra(wire(v), v.Extra, "id", "config")
 }
 
 // A selected custom agent for a session.
@@ -945,6 +1009,18 @@ type ModelSelection struct {
 type AgentSelection struct {
 	// Stable agent URI (matches an {@link AgentCustomization.uri}).
 	Uri URI `json:"uri"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AgentSelection) UnmarshalJSON(data []byte) error {
+	type wire AgentSelection
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "uri")
+}
+
+func (v AgentSelection) MarshalJSON() ([]byte, error) {
+	type wire AgentSelection
+	return marshalWithExtra(wire(v), v.Extra, "uri")
 }
 
 // A JSON Schema-compatible property descriptor with display extensions.
@@ -1032,7 +1108,7 @@ type SessionState struct {
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
-	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
@@ -1312,7 +1388,7 @@ type SessionSummary struct {
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
-	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// (`ahp-annotations:/<uuid>`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
@@ -1429,11 +1505,11 @@ type ChatState struct {
 	// compatibility.
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 	// Agent provider ID backing this chat. Absent means the session's
-	// {@link SessionMetadata.provider | `provider`}; hosts set it when it
-	// differs. The chat's agent never changes, but `provider` is reported
-	// relative to its session, so `chat/moved` may set or clear it. Like
-	// `resource`, it is omitted from `session/chatUpdated` changes. Forks and
-	// side chats use the source chat's agent.
+	// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+	// differs. The chat's agent provider never changes, but `provider` is
+	// reported relative to its session, so `chat/moved` may set or clear it.
+	// `session/chatUpdated` does not carry it. Forks and side chats use the
+	// source chat's agent provider.
 	//
 	// Stability: 1.0 - Early development.
 	Provider *string `json:"provider,omitempty"`
@@ -1641,7 +1717,7 @@ type CanvasState struct {
 	//
 	// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
 	// from persisted state after a provider or host restart.
-	Url *URI `json:"url,omitempty"`
+	Uri *URI `json:"uri,omitempty"`
 }
 
 // Lightweight catalog entry for a chat, carried in
@@ -1849,7 +1925,7 @@ type SessionConfigState struct {
 type ChatConfigState struct {
 	// Config schema for this chat's `chatMutable` properties. Absent means the
 	// session's schema. Hosts set it, as the chat's own schema, when the chat's
-	// {@link ChatState.provider | `provider`} differs from the session's; when
+	// {@link ChatState.provider | agent provider} differs from the session's; when
 	// present, clients use it instead of the session's schema.
 	//
 	// Stability: 1.0 - Early development.
@@ -1932,6 +2008,18 @@ type Message struct {
 	// agent hosts MAY use it to carry context that does not fit any other
 	// field. Mirrors the MCP `_meta` convention.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *Message) UnmarshalJSON(data []byte) error {
+	type wire Message
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "text", "origin", "attachments", "model", "agent", "_meta")
+}
+
+func (v Message) MarshalJSON() ([]byte, error) {
+	type wire Message
+	return marshalWithExtra(wire(v), v.Extra, "text", "origin", "attachments", "model", "agent", "_meta")
 }
 
 // Identifies the origin of a {@link Message} — who produced it. For the message
@@ -1940,6 +2028,18 @@ type Message struct {
 type MessageOrigin struct {
 	// The kind of actor that produced the message.
 	Kind MessageKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *MessageOrigin) UnmarshalJSON(data []byte) error {
+	type wire MessageOrigin
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v MessageOrigin) MarshalJSON() ([]byte, error) {
+	type wire MessageOrigin
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // A choice in a select-style question.
@@ -2115,6 +2215,18 @@ type TextPosition struct {
 	Line int64 `json:"line"`
 	// Zero-based character offset within the line.
 	Character int64 `json:"character"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *TextPosition) UnmarshalJSON(data []byte) error {
+	type wire TextPosition
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "line", "character")
+}
+
+func (v TextPosition) MarshalJSON() ([]byte, error) {
+	type wire TextPosition
+	return marshalWithExtra(wire(v), v.Extra, "line", "character")
 }
 
 // A range within a textual document.
@@ -2123,6 +2235,18 @@ type TextRange struct {
 	Start TextPosition `json:"start"`
 	// End position of the range.
 	End TextPosition `json:"end"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *TextRange) UnmarshalJSON(data []byte) error {
+	type wire TextRange
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "start", "end")
+}
+
+func (v TextRange) MarshalJSON() ([]byte, error) {
+	type wire TextRange
+	return marshalWithExtra(wire(v), v.Extra, "start", "end")
 }
 
 // A selection within a textual resource.
@@ -2133,6 +2257,18 @@ type TextRange struct {
 type TextSelection struct {
 	// The range covered by the selection.
 	Range TextRange `json:"range"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *TextSelection) UnmarshalJSON(data []byte) error {
+	type wire TextSelection
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "range")
+}
+
+func (v TextSelection) MarshalJSON() ([]byte, error) {
+	type wire TextSelection
+	return marshalWithExtra(wire(v), v.Extra, "range")
 }
 
 // A simple, opaque attachment whose model representation is described by
@@ -2171,6 +2307,18 @@ type SimpleMessageAttachment struct {
 	// property MAY be omitted when the attachment originated from a
 	// `completions` response.
 	ModelRepresentation *string `json:"modelRepresentation,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *SimpleMessageAttachment) UnmarshalJSON(data []byte) error {
+	type wire SimpleMessageAttachment
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "label", "range", "displayKind", "_meta", "type", "modelRepresentation")
+}
+
+func (v SimpleMessageAttachment) MarshalJSON() ([]byte, error) {
+	type wire SimpleMessageAttachment
+	return marshalWithExtra(wire(v), v.Extra, "label", "range", "displayKind", "_meta", "type", "modelRepresentation")
 }
 
 // An attachment whose data is embedded inline as a base64 string.
@@ -2212,6 +2360,18 @@ type MessageEmbeddedResourceAttachment struct {
 	//
 	// Only meaningful for textual resources.
 	Selection *TextSelection `json:"selection,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *MessageEmbeddedResourceAttachment) UnmarshalJSON(data []byte) error {
+	type wire MessageEmbeddedResourceAttachment
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "label", "range", "displayKind", "_meta", "type", "data", "contentType", "selection")
+}
+
+func (v MessageEmbeddedResourceAttachment) MarshalJSON() ([]byte, error) {
+	type wire MessageEmbeddedResourceAttachment
+	return marshalWithExtra(wire(v), v.Extra, "label", "range", "displayKind", "_meta", "type", "data", "contentType", "selection")
 }
 
 // An attachment that references a resource by URI. The content is not
@@ -2255,6 +2415,18 @@ type MessageResourceAttachment struct {
 	//
 	// Only meaningful for textual resources.
 	Selection *TextSelection `json:"selection,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *MessageResourceAttachment) UnmarshalJSON(data []byte) error {
+	type wire MessageResourceAttachment
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "label", "range", "displayKind", "_meta", "uri", "sizeHint", "contentType", "nonce", "type", "selection")
+}
+
+func (v MessageResourceAttachment) MarshalJSON() ([]byte, error) {
+	type wire MessageResourceAttachment
+	return marshalWithExtra(wire(v), v.Extra, "label", "range", "displayKind", "_meta", "uri", "sizeHint", "contentType", "nonce", "type", "selection")
 }
 
 // An attachment that references annotations on a session's annotations
@@ -2290,12 +2462,24 @@ type MessageAnnotationsAttachment struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Discriminant
 	Type MessageAttachmentKind `json:"type"`
-	// The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+	// The annotations channel URI (`ahp-annotations:/<uuid>`).
 	// Matches {@link AnnotationsSummary.resource}.
 	Resource URI `json:"resource"`
 	// Specific {@link Annotation.id | annotation ids} to reference. When
 	// omitted, the attachment references all annotations on the channel.
 	AnnotationIds []string `json:"annotationIds,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *MessageAnnotationsAttachment) UnmarshalJSON(data []byte) error {
+	type wire MessageAnnotationsAttachment
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "label", "range", "displayKind", "_meta", "type", "resource", "annotationIds")
+}
+
+func (v MessageAnnotationsAttachment) MarshalJSON() ([]byte, error) {
+	type wire MessageAnnotationsAttachment
+	return marshalWithExtra(wire(v), v.Extra, "label", "range", "displayKind", "_meta", "type", "resource", "annotationIds")
 }
 
 // An attachment that references a chat transcript through a fixed completed
@@ -2350,6 +2534,18 @@ type MessageChatAttachment struct {
 	// Last completed turn included in the referenced transcript. When omitted,
 	// the host pins the latest completed turn when accepting the message.
 	EndTurn *string `json:"endTurn,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *MessageChatAttachment) UnmarshalJSON(data []byte) error {
+	type wire MessageChatAttachment
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "label", "range", "displayKind", "_meta", "type", "resource", "endTurn")
+}
+
+func (v MessageChatAttachment) MarshalJSON() ([]byte, error) {
+	type wire MessageChatAttachment
+	return marshalWithExtra(wire(v), v.Extra, "label", "range", "displayKind", "_meta", "type", "resource", "endTurn")
 }
 
 type MarkdownResponsePart struct {
@@ -2371,6 +2567,18 @@ type ContentRef struct {
 	ContentType *string `json:"contentType,omitempty"`
 	// Content nonce
 	Nonce *string `json:"nonce,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ContentRef) UnmarshalJSON(data []byte) error {
+	type wire ContentRef
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "uri", "sizeHint", "contentType", "nonce")
+}
+
+func (v ContentRef) MarshalJSON() ([]byte, error) {
+	type wire ContentRef
+	return marshalWithExtra(wire(v), v.Extra, "uri", "sizeHint", "contentType", "nonce")
 }
 
 // A content part that's a reference to large content stored outside the state tree.
@@ -2978,11 +3186,35 @@ type ToolResultSubagentContent struct {
 // Container is being loaded by the host.
 type CustomizationLoadingState struct {
 	Kind CustomizationLoadStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationLoadingState) UnmarshalJSON(data []byte) error {
+	type wire CustomizationLoadingState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v CustomizationLoadingState) MarshalJSON() ([]byte, error) {
+	type wire CustomizationLoadingState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // Container loaded successfully.
 type CustomizationLoadedState struct {
 	Kind CustomizationLoadStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationLoadedState) UnmarshalJSON(data []byte) error {
+	type wire CustomizationLoadedState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v CustomizationLoadedState) MarshalJSON() ([]byte, error) {
+	type wire CustomizationLoadedState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // Container partially loaded but has warnings.
@@ -2990,6 +3222,18 @@ type CustomizationDegradedState struct {
 	Kind CustomizationLoadStatus `json:"kind"`
 	// Human-readable description of the warning.
 	Message string `json:"message"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationDegradedState) UnmarshalJSON(data []byte) error {
+	type wire CustomizationDegradedState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "message")
+}
+
+func (v CustomizationDegradedState) MarshalJSON() ([]byte, error) {
+	type wire CustomizationDegradedState
+	return marshalWithExtra(wire(v), v.Extra, "kind", "message")
 }
 
 // Container failed to load.
@@ -2997,6 +3241,18 @@ type CustomizationErrorState struct {
 	Kind CustomizationLoadStatus `json:"kind"`
 	// Human-readable error message.
 	Message string `json:"message"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationErrorState) UnmarshalJSON(data []byte) error {
+	type wire CustomizationErrorState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "message")
+}
+
+func (v CustomizationErrorState) MarshalJSON() ([]byte, error) {
+	type wire CustomizationErrorState
+	return marshalWithExtra(wire(v), v.Extra, "kind", "message")
 }
 
 // An [Open Plugins](https://open-plugins.com/) plugin.
@@ -3050,6 +3306,18 @@ type PluginCustomization struct {
 	// has no version concept. Provenance / display only: the host neither
 	// parses nor enforces it.
 	Version *string `json:"version,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *PluginCustomization) UnmarshalJSON(data []byte) error {
+	type wire PluginCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "clientId", "load", "children", "type", "enablement", "version")
+}
+
+func (v PluginCustomization) MarshalJSON() ([]byte, error) {
+	type wire PluginCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "clientId", "load", "children", "type", "enablement", "version")
 }
 
 // A {@link PluginCustomization} as published by a client. Extends the
@@ -3122,6 +3390,18 @@ type ClientPluginCustomization struct {
 	// carries the client's global decision for each one; the host applies it
 	// under the child's durable key.
 	ChildEnablement map[string][]CustomizationEnablement `json:"childEnablement,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ClientPluginCustomization) UnmarshalJSON(data []byte) error {
+	type wire ClientPluginCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "clientId", "load", "children", "type", "enablement", "version", "nonce", "childEnablement")
+}
+
+func (v ClientPluginCustomization) MarshalJSON() ([]byte, error) {
+	type wire ClientPluginCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "clientId", "load", "children", "type", "enablement", "version", "nonce", "childEnablement")
 }
 
 // A directory the host watches for this session.
@@ -3253,6 +3533,18 @@ type AgentCustomization struct {
 	// in a picker); it remains available for the agent to auto-delegate
 	// to. Absent or `false` means the user may select it.
 	DisableUserInvocation *bool `json:"disableUserInvocation,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AgentCustomization) UnmarshalJSON(data []byte) error {
+	type wire AgentCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "model", "tools", "disableModelInvocation", "disableUserInvocation")
+}
+
+func (v AgentCustomization) MarshalJSON() ([]byte, error) {
+	type wire AgentCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "model", "tools", "disableModelInvocation", "disableUserInvocation")
 }
 
 // A skill contributed by a plugin, directory, or MCP server.
@@ -3315,6 +3607,18 @@ type SkillCustomization struct {
 	// as a slash command); it remains available for the agent to
 	// auto-invoke. Absent or `false` means the user may invoke it.
 	DisableUserInvocation *bool `json:"disableUserInvocation,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *SkillCustomization) UnmarshalJSON(data []byte) error {
+	type wire SkillCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "disableModelInvocation", "disableUserInvocation")
+}
+
+func (v SkillCustomization) MarshalJSON() ([]byte, error) {
+	type wire SkillCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "disableModelInvocation", "disableUserInvocation")
 }
 
 // A prompt contributed by a plugin or directory.
@@ -3363,6 +3667,18 @@ type PromptCustomization struct {
 	Type    CustomizationType `json:"type"`
 	// Short description of what the prompt does.
 	Description *string `json:"description,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *PromptCustomization) UnmarshalJSON(data []byte) error {
+	type wire PromptCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description")
+}
+
+func (v PromptCustomization) MarshalJSON() ([]byte, error) {
+	type wire PromptCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description")
 }
 
 // A rule contributed by a plugin or directory.
@@ -3426,6 +3742,18 @@ type RuleCustomization struct {
 	// Glob patterns the rule applies to. When present, the rule is only
 	// active for matching files.
 	Globs []string `json:"globs,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *RuleCustomization) UnmarshalJSON(data []byte) error {
+	type wire RuleCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "alwaysApply", "globs")
+}
+
+func (v RuleCustomization) MarshalJSON() ([]byte, error) {
+	type wire RuleCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type", "description", "alwaysApply", "globs")
 }
 
 // A hook manifest contributed by a plugin or directory.
@@ -3472,6 +3800,18 @@ type HookCustomization struct {
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
 	Enabled *bool             `json:"enabled,omitempty"`
 	Type    CustomizationType `json:"type"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *HookCustomization) UnmarshalJSON(data []byte) error {
+	type wire HookCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type")
+}
+
+func (v HookCustomization) MarshalJSON() ([]byte, error) {
+	type wire HookCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "enabled", "type")
 }
 
 // An MCP server contributed by a plugin or directory.
@@ -3559,6 +3899,18 @@ type McpServerCustomization struct {
 	// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
 	// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).
 	Children []SkillCustomization `json:"children,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerCustomization) UnmarshalJSON(data []byte) error {
+	type wire McpServerCustomization
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "uri", "name", "icons", "range", "_meta", "type", "enablement", "state", "channel", "mcpApp", "children")
+}
+
+func (v McpServerCustomization) MarshalJSON() ([]byte, error) {
+	type wire McpServerCustomization
+	return marshalWithExtra(wire(v), v.Extra, "id", "uri", "name", "icons", "range", "_meta", "type", "enablement", "state", "channel", "mcpApp", "children")
 }
 
 // Information from the agent host needed to render MCP Apps served
@@ -3570,6 +3922,18 @@ type McpServerCustomizationApps struct {
 	// client feeds these straight through into the `hostCapabilities` of
 	// the `ui/initialize` response delivered to the View.
 	Capabilities AhpMcpUiHostCapabilities `json:"capabilities"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerCustomizationApps) UnmarshalJSON(data []byte) error {
+	type wire McpServerCustomizationApps
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "capabilities")
+}
+
+func (v McpServerCustomizationApps) MarshalJSON() ([]byte, error) {
+	type wire McpServerCustomizationApps
+	return marshalWithExtra(wire(v), v.Extra, "capabilities")
 }
 
 // The subset of MCP App
@@ -3615,6 +3979,18 @@ type AhpMcpUiHostCapabilities struct {
 	Logging map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AhpMcpUiHostCapabilities) UnmarshalJSON(data []byte) error {
+	type wire AhpMcpUiHostCapabilities
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "serverTools", "serverResources", "logging", "sampling")
+}
+
+func (v AhpMcpUiHostCapabilities) MarshalJSON() ([]byte, error) {
+	type wire AhpMcpUiHostCapabilities
+	return marshalWithExtra(wire(v), v.Extra, "serverTools", "serverResources", "logging", "sampling")
 }
 
 // Server is registered with the host but has not yet started.
@@ -3629,11 +4005,35 @@ type McpServerStartingState struct {
 	// through an appropriate affordance to ask the host to background the
 	// startup.
 	Blocking *bool `json:"blocking,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerStartingState) UnmarshalJSON(data []byte) error {
+	type wire McpServerStartingState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "blocking")
+}
+
+func (v McpServerStartingState) MarshalJSON() ([]byte, error) {
+	type wire McpServerStartingState
+	return marshalWithExtra(wire(v), v.Extra, "kind", "blocking")
 }
 
 // Server is running and serving requests.
 type McpServerReadyState struct {
 	Kind McpServerStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerReadyState) UnmarshalJSON(data []byte) error {
+	type wire McpServerReadyState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v McpServerReadyState) MarshalJSON() ([]byte, error) {
+	type wire McpServerReadyState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // Server is reachable but cannot serve requests until the client
@@ -3677,6 +4077,18 @@ type McpServerAuthRequiredState struct {
 	// Human-readable hint, typically from the OAuth `error_description`.
 	Description *string         `json:"description,omitempty"`
 	Kind        McpServerStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerAuthRequiredState) UnmarshalJSON(data []byte) error {
+	type wire McpServerAuthRequiredState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "reason", "oauthClient", "resource", "requiredScopes", "description", "kind")
+}
+
+func (v McpServerAuthRequiredState) MarshalJSON() ([]byte, error) {
+	type wire McpServerAuthRequiredState
+	return marshalWithExtra(wire(v), v.Extra, "reason", "oauthClient", "resource", "requiredScopes", "description", "kind")
 }
 
 // Server failed to start, crashed, or otherwise transitioned to a
@@ -3686,12 +4098,36 @@ type McpServerErrorState struct {
 	Kind McpServerStatus `json:"kind"`
 	// Error details.
 	Error ErrorInfo `json:"error"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerErrorState) UnmarshalJSON(data []byte) error {
+	type wire McpServerErrorState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "error")
+}
+
+func (v McpServerErrorState) MarshalJSON() ([]byte, error) {
+	type wire McpServerErrorState
+	return marshalWithExtra(wire(v), v.Extra, "kind", "error")
 }
 
 // Server has been shut down. The host MAY remove the server from the
 // session entirely shortly after this state.
 type McpServerStoppedState struct {
 	Kind McpServerStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpServerStoppedState) UnmarshalJSON(data []byte) error {
+	type wire McpServerStoppedState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v McpServerStoppedState) MarshalJSON() ([]byte, error) {
+	type wire McpServerStoppedState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
 }
 
 // A pre-registered OAuth client that clients use instead of dynamic client
@@ -3702,6 +4138,18 @@ type McpOAuthClient struct {
 	// OAuth client secret for a confidential client. Absence means the client is
 	// public and uses a secretless flow such as authorization code with PKCE.
 	ClientSecret *string `json:"clientSecret,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpOAuthClient) UnmarshalJSON(data []byte) error {
+	type wire McpOAuthClient
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "clientId", "clientSecret")
+}
+
+func (v McpOAuthClient) MarshalJSON() ([]byte, error) {
+	type wire McpOAuthClient
+	return marshalWithExtra(wire(v), v.Extra, "clientId", "clientSecret")
 }
 
 // Reusable MCP authentication challenge — the RFC 9728 discovery info a
@@ -3740,6 +4188,18 @@ type McpAuthRequirement struct {
 	RequiredScopes []string `json:"requiredScopes,omitempty"`
 	// Human-readable hint, typically from the OAuth `error_description`.
 	Description *string `json:"description,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *McpAuthRequirement) UnmarshalJSON(data []byte) error {
+	type wire McpAuthRequirement
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "reason", "oauthClient", "resource", "requiredScopes", "description")
+}
+
+func (v McpAuthRequirement) MarshalJSON() ([]byte, error) {
+	type wire McpAuthRequirement
+	return marshalWithExtra(wire(v), v.Extra, "reason", "oauthClient", "resource", "requiredScopes", "description")
 }
 
 type ToolCallClientContributor struct {
@@ -3941,6 +4401,18 @@ type ErrorInfo struct {
 	// Clients MAY look for well-known optional keys here to provide enhanced UI
 	// (e.g. a structured chat fetch error for richer, localized messaging).
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ErrorInfo) UnmarshalJSON(data []byte) error {
+	type wire ErrorInfo
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "errorType", "message", "stack", "_meta")
+}
+
+func (v ErrorInfo) MarshalJSON() ([]byte, error) {
+	type wire ErrorInfo
+	return marshalWithExtra(wire(v), v.Extra, "errorType", "message", "stack", "_meta")
 }
 
 // A point-in-time snapshot of a subscribed resource's state, returned by
@@ -4092,9 +4564,12 @@ type ChangesetFile struct {
 	// echo in {@link ChangesetOperationTarget.nonce}.
 	// Hosts SHOULD update a published nonce whenever contents of the file change.
 	Nonce *string `json:"nonce,omitempty"`
-	// Whether the host reports an ongoing edit to this file.
-	// This is advisory; false or absent does not guarantee that modifying the file is safe.
-	IsEditing *bool `json:"isEditing,omitempty"`
+	// Host-reported activity on this file, as a bitset of
+	// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+	// reported. This is advisory; the absence of
+	// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+	// file is safe.
+	Status *ChangesetFileStatus `json:"status,omitempty"`
 }
 
 // A server-declared invokable verb the client can run against a
@@ -4143,9 +4618,8 @@ type ChangesetOperation struct {
 // entry counts without subscribing to the channel itself.
 type AnnotationsSummary struct {
 	// The subscribable annotations channel URI for the owning session
-	// (typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even
-	// though it is derivable from the session URI so badge UI does not need
-	// to know the derivation rule.
+	// (`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).
+	// Clients should use this value rather than derive it from the session URI.
 	Resource URI `json:"resource"`
 	// Total number of {@link Annotation} entries in the channel.
 	AnnotationCount int64 `json:"annotationCount"`
@@ -4154,7 +4628,7 @@ type AnnotationsSummary struct {
 }
 
 // Full state for a session's annotations channel, returned when a client
-// subscribes to an `ahp-session:/<uuid>/annotations` URI.
+// subscribes to an `ahp-annotations:/<uuid>` URI.
 type AnnotationsState struct {
 	// Annotations in this channel, keyed by {@link Annotation.id}.
 	Annotations []Annotation `json:"annotations"`
@@ -4302,7 +4776,8 @@ type ResourceChange struct {
 	Type ResourceChangeType `json:"type"`
 }
 
-// Provenance recorded on a session created for an automation run.
+// Provenance recorded on a session created for an automation run. Runs that
+// later continue the session don't change it.
 //
 // The links let clients navigate from an ordinary session to the task-level
 // run and its durable definition. The session channel remains authoritative
@@ -4344,6 +4819,18 @@ type AutomationSchedule struct {
 	// IANA Time Zone Database identifier used to interpret the expression, for
 	// example `"UTC"` or `"Europe/Berlin"`.
 	TimeZone string `json:"timeZone"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationSchedule) UnmarshalJSON(data []byte) error {
+	type wire AutomationSchedule
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "expression", "timeZone")
+}
+
+func (v AutomationSchedule) MarshalJSON() ([]byte, error) {
+	type wire AutomationSchedule
+	return marshalWithExtra(wire(v), v.Extra, "expression", "timeZone")
 }
 
 // Starts runs from a recurring cron schedule evaluated by the host.
@@ -4358,6 +4845,18 @@ type AutomationScheduleTrigger struct {
 	// Policy for missed occurrences. Omission is equivalent to
 	// {@link AutomationMisfirePolicy.RunOnce}.
 	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationScheduleTrigger) UnmarshalJSON(data []byte) error {
+	type wire AutomationScheduleTrigger
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "schedule", "misfirePolicy")
+}
+
+func (v AutomationScheduleTrigger) MarshalJSON() ([]byte, error) {
+	type wire AutomationScheduleTrigger
+	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "schedule", "misfirePolicy")
 }
 
 // Starts runs from events understood by the owning host.
@@ -4387,6 +4886,48 @@ type AutomationEventTrigger struct {
 	// Values described by {@link AutomationTriggerDefinition.configSchema}.
 	// Clients MUST preserve unknown entries when editing other fields.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationEventTrigger) UnmarshalJSON(data []byte) error {
+	type wire AutomationEventTrigger
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "type", "title", "description", "events", "config")
+}
+
+func (v AutomationEventTrigger) MarshalJSON() ([]byte, error) {
+	type wire AutomationEventTrigger
+	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "type", "title", "description", "events", "config")
+}
+
+// Starts one run at a fixed time evaluated by the host.
+//
+// The trigger fires at most once for a given {@link runAt}. Updating
+// {@link runAt} moves the occurrence to the new time; the previous time no
+// longer fires.
+type AutomationOneTimeTrigger struct {
+	// Identifier unique and stable within this automation definition. Recorded in
+	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+	// run.
+	Id   string                `json:"id"`
+	Kind AutomationTriggerKind `json:"kind"`
+	// Scheduled run timestamp in ISO 8601 format.
+	RunAt string `json:"runAt"`
+	// Policy when {@link runAt} passes while automatic execution is unavailable.
+	// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.
+	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationOneTimeTrigger) UnmarshalJSON(data []byte) error {
+	type wire AutomationOneTimeTrigger
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "kind", "runAt", "misfirePolicy")
+}
+
+func (v AutomationOneTimeTrigger) MarshalJSON() ([]byte, error) {
+	type wire AutomationOneTimeTrigger
+	return marshalWithExtra(wire(v), v.Extra, "id", "kind", "runAt", "misfirePolicy")
 }
 
 // Describes one host-defined trigger event.
@@ -4397,6 +4938,18 @@ type AutomationTriggerEventDefinition struct {
 	Title string `json:"title"`
 	// Optional longer explanation of when this event fires.
 	Description *string `json:"description,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationTriggerEventDefinition) UnmarshalJSON(data []byte) error {
+	type wire AutomationTriggerEventDefinition
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "title", "description")
+}
+
+func (v AutomationTriggerEventDefinition) MarshalJSON() ([]byte, error) {
+	type wire AutomationTriggerEventDefinition
+	return marshalWithExtra(wire(v), v.Extra, "id", "title", "description")
 }
 
 // Describes one host-defined event trigger type available for a prospective
@@ -4418,10 +4971,11 @@ type AutomationTriggerDefinition struct {
 	ConfigSchema *ConfigSchema `json:"configSchema,omitempty"`
 }
 
-// Template from which the host creates a fresh session for each automation run.
-//
-// The host revalidates every selection when the run starts. Definitions never
-// carry credentials, confirmation decisions, or durable permission grants.
+// Template from which the host creates a session for an automation run.
+// {@link AutomationDefinition.target} decides whether a run creates one. In a
+// session a run continues, only {@link AutomationSessionTemplate.model |
+// `model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the
+// run's message.
 type AutomationSessionTemplate struct {
 	// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
 	Provider *string `json:"provider,omitempty"`
@@ -4439,7 +4993,7 @@ type AutomationSessionTemplate struct {
 	// {@link CreateSessionParams.config}, normally obtained from
 	// {@link ResolveSessionConfigResult.values}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
-	// Client plugins to make available in every run session, in the same
+	// Client plugins to make available in every session a run creates, in the same
 	// published shape as
 	// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
 	// Entries are keyed by `id`.
@@ -4463,21 +5017,34 @@ type AutomationSessionTemplate struct {
 	// Clients MUST NOT set this field unless the host advertises
 	// {@link AutomationCapabilities.customizations}.
 	Customizations []ClientPluginCustomization `json:"customizations,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationSessionTemplate) UnmarshalJSON(data []byte) error {
+	type wire AutomationSessionTemplate
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "provider", "model", "agent", "workingDirectories", "config", "customizations")
+}
+
+func (v AutomationSessionTemplate) MarshalJSON() ([]byte, error) {
+	type wire AutomationSessionTemplate
+	return marshalWithExtra(wire(v), v.Extra, "provider", "model", "agent", "workingDirectories", "config", "customizations")
 }
 
 // Durable, client-editable definition of an automation.
 //
-// A definition combines the initial automation message, the session template
-// used for each run, and zero or more automatic triggers. Run history,
+// A definition combines the message each run sends, the session template, the
+// run target, and zero or more automatic triggers. Run history,
 // timestamps, and currently allowed operations live on
 // {@link AutomationEntry} rather than in the definition.
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Initial message sent to every newly created run session. Its
+	// Message each run sends (see {@link AutomationDefinition.target}). Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
 	Message Message `json:"message"`
-	// Template used to create fresh sessions for each run.
+	// Template for the sessions runs create. Its model and agent also apply to
+	// a run's turn in a continued session.
 	Session AutomationSessionTemplate `json:"session"`
 	// Whether automatic triggers may create runs. Manual runs remain available
 	// whenever {@link AutomationOperation.Run} is advertised.
@@ -4501,12 +5068,18 @@ type AutomationDefinition struct {
 	// Opaque implementation-defined metadata. Clients MUST preserve unknown
 	// entries when updating the definition.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Where each run sends {@link AutomationDefinition.message}. Absence means
+	// {@link AutomationTargetKind.NewSession}.
+	Target *AutomationTarget `json:"target,omitempty"`
 }
 
 // Partial replacement of editable {@link AutomationDefinition} fields.
 //
 // Omitted fields are unchanged. Supplied arrays and objects replace their
-// corresponding values in full; they are not merged recursively.
+// corresponding values in full; they are not merged recursively. Runtime
+// decoders MUST preserve unrecognized members on these replacement objects
+// and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
+// them, so editing known fields does not erase fields from newer versions.
 type AutomationDefinitionPatch struct {
 	// Replacement {@link AutomationDefinition.title}.
 	Title *string `json:"title,omitempty"`
@@ -4529,6 +5102,8 @@ type AutomationDefinitionPatch struct {
 	DisableConditions *[]AutomationDisableCondition `json:"disableConditions,omitempty"`
 	// Complete replacement {@link AutomationDefinition._meta}.
 	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Replacement {@link AutomationDefinition.target}.
+	Target *AutomationTarget `json:"target,omitempty"`
 }
 
 // Stops scheduling after a fixed number of scheduled runs.
@@ -4536,6 +5111,18 @@ type AutomationAfterRunsCondition struct {
 	Kind AutomationDisableConditionKind `json:"kind"`
 	// Positive-integer cap on scheduled runs.
 	Max int64 `json:"max"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationAfterRunsCondition) UnmarshalJSON(data []byte) error {
+	type wire AutomationAfterRunsCondition
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "max")
+}
+
+func (v AutomationAfterRunsCondition) MarshalJSON() ([]byte, error) {
+	type wire AutomationAfterRunsCondition
+	return marshalWithExtra(wire(v), v.Extra, "kind", "max")
 }
 
 // Stops scheduling once a wall-clock date passes.
@@ -4543,6 +5130,137 @@ type AutomationAfterDateCondition struct {
 	Kind AutomationDisableConditionKind `json:"kind"`
 	// ISO 8601 timestamp after which scheduling stops.
 	Date string `json:"date"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationAfterDateCondition) UnmarshalJSON(data []byte) error {
+	type wire AutomationAfterDateCondition
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "date")
+}
+
+func (v AutomationAfterDateCondition) MarshalJSON() ([]byte, error) {
+	type wire AutomationAfterDateCondition
+	return marshalWithExtra(wire(v), v.Extra, "kind", "date")
+}
+
+// Each run creates a session from {@link AutomationDefinition.session}.
+type AutomationNewSessionTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationNewSessionTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationNewSessionTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v AutomationNewSessionTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationNewSessionTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// Each run continues the session of the automation's previous run, so a
+// recurring automation keeps one conversation.
+//
+// The previous run's session is the
+// {@link AutomationRunState.primarySession | primary session} of the most
+// recently created earlier run of this automation that has one, even if that
+// run was pruned from {@link AutomationEntry.runs}. The host decides whether
+// that session is still usable. A session that was removed or archived, that
+// has no {@link SessionState.defaultChat | default chat}, or that the
+// automation may no longer drive, is never usable. The host MAY also treat a
+// session as unusable when it can't honor the current template, for example
+// after its agent provider, working directories, or configuration changed.
+// When there is no usable session, the run creates one from
+// {@link AutomationDefinition.session}, as with
+// {@link AutomationNewSessionTarget}, and later runs continue that session.
+// The host resolves targets and starts turns in run creation order, so
+// overlapping runs share one session instead of each creating one.
+//
+// When a run reuses a session, the host:
+//
+//   - links the session to the run with
+//     {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and
+//     makes it the run's primary session before delivering the message;
+//   - adds {@link AutomationDefinition.message} to the session's default chat
+//     as a {@link PendingMessageKind.Queued | queued} pending message, so it
+//     never steers an active turn and starts a turn once the chat is idle;
+//   - does not reapply {@link AutomationDefinition.session}, so the session
+//     keeps its agent provider, configuration, and working directories. The
+//     template's `model` and `agent` still apply to the queued message, as for
+//     every run. The host MAY update the session's copies of the automation's
+//     customizations to match {@link AutomationEntry.customizations}.
+//
+// The run stays `pending` while its message waits and becomes `running` when
+// a turn starts from it. It ends with the outcome of that turn. If its
+// queued message is withdrawn without a turn starting from it, the run is
+// `cancelled`. Cancelling the run removes its queued message or cancels its
+// turn, and never affects other turns in the session. If the session becomes
+// unusable before a turn starts from the message, the host removes the queued
+// message, if its chat still exists, and the run fails.
+//
+// {@link SessionMetadata.origin} keeps naming the run that created the
+// session.
+type AutomationPreviousSessionTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationPreviousSessionTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationPreviousSessionTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v AutomationPreviousSessionTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationPreviousSessionTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// Each run sends its message to one existing chat, such as the conversation
+// in which a user asked for a recurring check.
+//
+// The host MUST reject a create or update request whose chat doesn't exist or
+// that the automation may not drive. When it accepts one, it sets
+// {@link AutomationChatTarget.session | `session`} to the session that
+// currently owns the chat, replacing any submitted value.
+//
+// Each run delivers its message the way an
+// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+// with the same run lifecycle: the host links the session to the run, makes it
+// the run's primary session, and adds {@link AutomationDefinition.message} to
+// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+// The run never creates a session, and the host applies only the template's
+// `model` and `agent`, to the queued message. It does not change the
+// session's agent provider, configuration, working directories, or
+// customizations.
+//
+// If the chat no longer exists, or the automation may no longer drive it, the
+// run fails. When that happens after the message was queued, the host first
+// removes the queued message, if the chat still exists.
+type AutomationChatTarget struct {
+	Kind AutomationTargetKind `json:"kind"`
+	// Session that currently owns {@link AutomationChatTarget.chat}. The host
+	// maintains it: when the chat moves to another session, the host updates
+	// the definition and publishes it with
+	// {@link AutomationSetAction | `automation/set`}.
+	Session URI `json:"session"`
+	// Chat that receives each run's message.
+	Chat URI `json:"chat"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *AutomationChatTarget) UnmarshalJSON(data []byte) error {
+	type wire AutomationChatTarget
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "session", "chat")
+}
+
+func (v AutomationChatTarget) MarshalJSON() ([]byte, error) {
+	type wire AutomationChatTarget
+	return marshalWithExtra(wire(v), v.Extra, "kind", "session", "chat")
 }
 
 // Authoritative state of one automation in {@link AutomationState.entries}.
@@ -4555,7 +5273,7 @@ type AutomationEntry struct {
 	Resource URI `json:"resource"`
 	// Current durable definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
+	// Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Host-owned count of scheduled runs consumed against the current
 	// {@link AutomationAfterRunsCondition} allowance. Authoritative usage for the
@@ -4587,7 +5305,7 @@ type AutomationEntry struct {
 	// connected. `clientId` is absent because the copy no longer depends on a
 	// client.
 	//
-	// Every run session receives these plugins in
+	// Every session a run creates receives these plugins in
 	// {@link SessionState.customizations}, with the enablement from the
 	// matching template entry.
 	Customizations []PluginCustomization `json:"customizations,omitempty"`
@@ -4621,11 +5339,12 @@ type AutomationManualRunOrigin struct {
 // Origin recorded for a run created by one of the automation's triggers.
 type AutomationTriggeredRunOrigin struct {
 	Kind AutomationRunOriginKind `json:"kind"`
-	// Matches the stable {@link AutomationScheduleTrigger.id} or
-	// {@link AutomationEventTrigger.id} in the definition.
+	// Matches the stable {@link AutomationScheduleTrigger.id},
+	// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+	// in the definition.
 	TriggerId string `json:"triggerId"`
 	// Intended schedule occurrence as an ISO 8601 timestamp. Present for
-	// schedule triggers and normally absent for event triggers.
+	// schedule and one-time triggers and normally absent for event triggers.
 	ScheduledFor *string `json:"scheduledFor,omitempty"`
 	// `true` when this is a catch-up run created by
 	// {@link AutomationMisfirePolicy.RunOnce}.
@@ -4635,14 +5354,16 @@ type AutomationTriggeredRunOrigin struct {
 	Event map[string]json.RawMessage `json:"event,omitempty"`
 }
 
-// A durable run exists but has not begun external execution.
+// A durable run exists but has not begun external execution. A run that
+// continues a session also stays pending while that session's chat runs
+// another turn (see {@link AutomationPreviousSessionTarget}).
 type AutomationPendingRunLifecycle struct {
 	Status AutomationRunStatus `json:"status"`
 	// Run creation timestamp in ISO 8601 format.
 	CreatedAt string `json:"createdAt"`
 }
 
-// The run is executing linked sessions or awaiting interaction on them.
+// The run's work in linked sessions is executing or awaiting interaction.
 //
 // Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
 // remain authoritative for whether user attention or client-side work is
@@ -4664,7 +5385,7 @@ type AutomationCompletedRunLifecycle struct {
 	StartedAt string `json:"startedAt"`
 	// Completion timestamp in ISO 8601 format.
 	CompletedAt string `json:"completedAt"`
-	// Optional aggregate model usage across all linked sessions.
+	// Optional aggregate model usage of the run's work in its linked sessions.
 	Usage *UsageInfo `json:"usage,omitempty"`
 }
 
@@ -4736,7 +5457,7 @@ type AutomationRunState struct {
 	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
 	// Ordered, unique session URIs belonging to this run, each matching
 	// {@link SessionState.resource}. Entries may represent retries, parallel
-	// workers, or delegated attempts.
+	// workers, delegated attempts, or a session continued from an earlier run.
 	Sessions []URI `json:"sessions"`
 	// Member of {@link AutomationRunState.sessions} that the host recommends opening first.
 	PrimarySession *URI `json:"primarySession,omitempty"`
@@ -4756,6 +5477,18 @@ type isCustomizationEnablement interface{ isCustomizationEnablement() }
 type CustomizationEnablementGlobal struct {
 	Kind    string `json:"kind"`
 	Enabled bool   `json:"enabled"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationEnablementGlobal) UnmarshalJSON(data []byte) error {
+	type wire CustomizationEnablementGlobal
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "enabled")
+}
+
+func (v CustomizationEnablementGlobal) MarshalJSON() ([]byte, error) {
+	type wire CustomizationEnablementGlobal
+	return marshalWithExtra(wire(v), v.Extra, "kind", "enabled")
 }
 
 func (*CustomizationEnablementGlobal) isCustomizationEnablement() {}
@@ -4764,6 +5497,18 @@ type CustomizationEnablementWorkspace struct {
 	Kind    string `json:"kind"`
 	URI     URI    `json:"uri"`
 	Enabled bool   `json:"enabled"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationEnablementWorkspace) UnmarshalJSON(data []byte) error {
+	type wire CustomizationEnablementWorkspace
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "uri", "enabled")
+}
+
+func (v CustomizationEnablementWorkspace) MarshalJSON() ([]byte, error) {
+	type wire CustomizationEnablementWorkspace
+	return marshalWithExtra(wire(v), v.Extra, "kind", "uri", "enabled")
 }
 
 func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
@@ -4771,6 +5516,18 @@ func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
 type CustomizationEnablementSession struct {
 	Kind    string `json:"kind"`
 	Enabled bool   `json:"enabled"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *CustomizationEnablementSession) UnmarshalJSON(data []byte) error {
+	type wire CustomizationEnablementSession
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "enabled")
+}
+
+func (v CustomizationEnablementSession) MarshalJSON() ([]byte, error) {
+	type wire CustomizationEnablementSession
+	return marshalWithExtra(wire(v), v.Extra, "kind", "enabled")
 }
 
 func (*CustomizationEnablementSession) isCustomizationEnablement() {}
@@ -6347,6 +7104,7 @@ type isAutomationTrigger interface{ isAutomationTrigger() }
 
 func (*AutomationScheduleTrigger) isAutomationTrigger() {}
 func (*AutomationEventTrigger) isAutomationTrigger()    {}
+func (*AutomationOneTimeTrigger) isAutomationTrigger()  {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
 func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
@@ -6366,6 +7124,12 @@ func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "event":
 		var value AutomationEventTrigger
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "oneTime":
+		var value AutomationOneTimeTrigger
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -6397,6 +7161,8 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"schedule\"")
 	case *AutomationEventTrigger:
 		object["kind"] = json.RawMessage("\"event\"")
+	case *AutomationOneTimeTrigger:
+		object["kind"] = json.RawMessage("\"oneTime\"")
 	}
 	return json.Marshal(object)
 }
@@ -6462,6 +7228,92 @@ func (u AutomationDisableCondition) MarshalJSON() ([]byte, error) {
 		object["kind"] = json.RawMessage("\"afterRuns\"")
 	case *AutomationAfterDateCondition:
 		object["kind"] = json.RawMessage("\"afterDate\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationTarget is where an automation's runs send their message.
+type AutomationTarget struct {
+	Value isAutomationTarget
+}
+
+// isAutomationTarget is the marker interface implemented by every
+// concrete variant of AutomationTarget.
+type isAutomationTarget interface{ isAutomationTarget() }
+
+func (*AutomationNewSessionTarget) isAutomationTarget()      {}
+func (*AutomationPreviousSessionTarget) isAutomationTarget() {}
+func (*AutomationChatTarget) isAutomationTarget()            {}
+
+// AutomationTargetUnknown carries an unrecognized AutomationTarget variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AutomationTargetUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AutomationTargetUnknown) isAutomationTarget() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationTarget) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "newSession":
+		var value AutomationNewSessionTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "previousSession":
+		var value AutomationPreviousSessionTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat":
+		var value AutomationChatTarget
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AutomationTargetUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationTarget) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AutomationTargetUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return data, nil
+	}
+	switch u.Value.(type) {
+	case *AutomationNewSessionTarget:
+		object["kind"] = json.RawMessage("\"newSession\"")
+	case *AutomationPreviousSessionTarget:
+		object["kind"] = json.RawMessage("\"previousSession\"")
+	case *AutomationChatTarget:
+		object["kind"] = json.RawMessage("\"chat\"")
 	}
 	return json.Marshal(object)
 }

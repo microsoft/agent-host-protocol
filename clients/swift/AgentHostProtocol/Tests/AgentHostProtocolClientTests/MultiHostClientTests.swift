@@ -88,6 +88,23 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    func testHostClientHandleTypedRequestReturnsListSessions() async throws {
+        let summary = makeSummary("ahp-session:/s1", "Listed session", modifiedAt: 1_000)
+        let config = HostConfig(
+            id: "local",
+            label: "Local",
+            transportFactory: makeFakeHostFactory(state: FakeHostState(sessions: [summary]))
+        )
+        let (multi, _) = try await MultiHostClient.single(config)
+        defer { Task { await multi.shutdown() } }
+        await waitForHostState(multi, id: "local") { $0.isConnected }
+
+        let handleValue = await multi.client(for: "local")
+        let handle = try XCTUnwrap(handleValue)
+        let result = try await handle.request(ListSessionsParams(channel: RootResourceURI))
+        XCTAssertEqual(result.items, [summary])
+    }
+
     // MARK: - host_client_handle_invalidates_after_reconnect
 
     func testHostClientHandleInvalidatesAfterReconnect() async throws {
@@ -112,7 +129,7 @@ final class MultiHostClientTests: XCTestCase {
         }
 
         do {
-            try await handle.checkAlive()
+            _ = try await handle.request(ListSessionsParams(channel: RootResourceURI))
             XCTFail("expected HostError.hostReconnected")
         } catch let error as HostError {
             switch error {

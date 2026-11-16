@@ -8,7 +8,7 @@
     "flowControl": {
       "receive": {
         "windowBytes": 262144,
-        "maximumFrameBytes": 16384
+        "maxFrameBytes": 16384
       }
     }
   },
@@ -18,7 +18,7 @@
       "flowControl": {
         "receive": {
           "windowBytes": 262144,
-          "maximumFrameBytes": 16384
+          "maxFrameBytes": 16384
         }
       }
     }

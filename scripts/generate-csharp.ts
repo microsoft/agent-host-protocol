@@ -52,6 +52,7 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const NAMESPACE = 'Microsoft.AgentHostProtocol';
 
@@ -559,6 +560,7 @@ function generateEnum(enumDecl: EnumDeclaration): string {
 // ─── Struct Generation ───────────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   omitDiscriminants?: boolean;
   doc?: string;
   includeDiscriminants?: boolean;
@@ -648,6 +650,14 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
     const req = csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
+  if (opts.preserveUnknownMembers) {
+    lines.push('');
+    lines.push('    /// <summary>Unrecognized wire members retained for full-object edits.</summary>');
+    lines.push('    [JsonExtensionData]');
+    // Source-generated metadata binds init-only properties to the constructor,
+    // which System.Text.Json rejects for extension data.
+    lines.push('    public Dictionary<string, JsonElement>? Extra { get; set; }');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -663,7 +673,7 @@ function generateClassFromInterface(
   const name = csNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateCsClass(name, props, { doc: ifaceDoc, ...opts });
+  return generateCsClass(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 function generatePartialClass(project: Project, tsInterfaceName: string): string {
@@ -764,9 +774,10 @@ const STATE_ENUMS = [
   'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -931,6 +942,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
   { name: 'AutomationEventTrigger' },
+  { name: 'AutomationOneTimeTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -938,6 +950,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition' },
   { name: 'AutomationAfterDateCondition' },
+  { name: 'AutomationNewSessionTarget' },
+  { name: 'AutomationPreviousSessionTarget' },
+  { name: 'AutomationChatTarget' },
   { name: 'AutomationEntry', mutable: true },
   { name: 'AutomationState', mutable: true },
   { name: 'AutomationManualRunOrigin' },
@@ -1357,6 +1372,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -1367,6 +1383,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   variants: [
     { variantName: 'AfterRuns', innerType: 'AutomationAfterRunsCondition', wireValue: 'afterRuns' },
     { variantName: 'AfterDate', innerType: 'AutomationAfterDateCondition', wireValue: 'afterDate' },
+  ],
+};
+
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  doc: 'AutomationTarget is where an automation\'s runs send their message.',
+  variants: [
+    { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
+    { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
   ],
 };
 
@@ -1394,6 +1421,9 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 function generateCustomizationEnablementUnionCs(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; set; }\n'
+    : '';
   // Variants are inline object types in `types/`, so there are no named
   // interfaces to read the discriminator from — name the enum explicitly.
   const allowUnknown = discriminatedUnionAllowsUnknown(
@@ -1415,20 +1445,20 @@ public sealed record CustomizationEnablementGlobal
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementWorkspace
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Workspace;
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
-}
+${extra}}
 
 public sealed record CustomizationEnablementSession
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
-}
+${extra}}
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>
 {
@@ -1634,7 +1664,7 @@ function generateStateFile(project: Project): string {
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION, CANVAS_REGISTRY_STATE_UNION,
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
-    AUTOMATION_DISABLE_CONDITION_UNION,
+    AUTOMATION_DISABLE_CONDITION_UNION, AUTOMATION_TARGET_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(project, u));
@@ -2337,7 +2367,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
-  { name: 'CreateTcpConnectionParams' },
+  { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
@@ -2349,6 +2379,10 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
+  { name: 'AutomationOneTimeCapability' },
   { name: 'MultipleChatProvidersCapability' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
@@ -2951,6 +2985,7 @@ function checkExhaustiveness(project: Project): void {
     'CanvasRegistryState', 'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
+    'AutomationTarget',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',

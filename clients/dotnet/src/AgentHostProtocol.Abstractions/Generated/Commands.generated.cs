@@ -363,6 +363,15 @@ public sealed record CreateTcpConnectionParams
     public long Port { get; init; }
 }
 
+/// <summary>Result of the `createTcpConnection` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateTcpConnectionResult
+{
+}
+
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
 public sealed record InitializeParams
@@ -521,8 +530,9 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TcpConnectionsCapability? TcpConnections { get; init; }
 
-    /// <summary>Present when chats in one session may be backed by different agents
-    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// <summary>Present when chats in one session may be backed by different agent
+    /// providers (see {@link CreateChatParams.provider} and
+    /// {@link ChatState.provider}).
     /// Clients MUST NOT send `CreateChatParams.provider` without it.
     ///
     /// Stability: 1.0 - Early development.</summary>
@@ -600,6 +610,10 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationScheduleCapabilities? Schedules { get; init; }
 
+    /// <summary>Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationOneTimeCapability? OneTime { get; init; }
+
     /// <summary>Present when clients may request cancellation of `pending` or `running`
     /// automation runs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -615,6 +629,11 @@ public sealed record AutomationCapabilities
     /// client plugins for the host to capture.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCustomizationsCapability? Customizations { get; init; }
+
+    /// <summary>Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTargetsCapabilities? Targets { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationCreateRequestedAction |
@@ -654,6 +673,44 @@ public sealed record AutomationRunCancellationCapability
 /// The empty object means "supported"; fields are reserved for future
 /// capture options and limits.</summary>
 public sealed record AutomationCustomizationsCapability
+{
+}
+
+/// <summary>Run targets supported for {@link AutomationDefinition.target}.
+/// {@link AutomationNewSessionTarget} is always supported.</summary>
+public sealed record AutomationTargetsCapabilities
+{
+    /// <summary>Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationPreviousSessionTargetCapability? PreviousSession { get; init; }
+
+    /// <summary>Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationChatTargetCapability? Chat { get; init; }
+}
+
+/// <summary>Presence capability for {@link AutomationPreviousSessionTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.</summary>
+public sealed record AutomationPreviousSessionTargetCapability
+{
+}
+
+/// <summary>Presence capability for {@link AutomationChatTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.</summary>
+public sealed record AutomationChatTargetCapability
+{
+}
+
+/// <summary>Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.</summary>
+public sealed record AutomationOneTimeCapability
 {
 }
 
@@ -1066,14 +1123,16 @@ public sealed record CreateChatParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; init; }
 
-    /// <summary>Agent provider ID for the new chat. Absent means the session's provider.
+    /// <summary>Agent provider ID for the new chat. Absent means the session's agent
+    /// provider.
     ///
     /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-    /// `InvalidParams` a provider that is not in the root state's `agents` or
-    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// `InvalidParams` an agent provider that is not in the root state's `agents`
+    /// or that does not advertise `multipleChats`. Forks and side chats
     /// (`source` present) continue the source chat's history, so they always use
-    /// the source chat's agent: absent means that agent, and a different value is
-    /// rejected. Agent capability checks for this request use the chat's agent.
+    /// the source chat's agent provider: absent means that agent provider, and a
+    /// different value is rejected. Agent capability checks for this request use
+    /// the chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1142,12 +1201,12 @@ public sealed record ChatMoveToNewSessionDestination
 /// Rejection leaves ownership, catalog order, chat state, and root summaries
 /// unchanged.
 ///
-/// A moved chat keeps its agent. After the move the host reports
+/// A moved chat keeps its agent provider. After the move the host reports
 /// {@link ChatState.provider | `provider`} on the chat whenever it differs from
-/// the destination session's provider, including when the chat had none
+/// the destination session's agent provider, including when the chat had none
 /// because it matched its old session. Hosts MAY refuse, as an unsupported
 /// destination, a move they cannot support, such as one that changes whether
-/// the chat's agent matches its session's.
+/// the chat's agent provider matches its session's.
 ///
 /// A moved chat's `config.values` move with it unchanged. If a move changes
 /// whether the chat needs its own `config.schema`, the host sets or clears it,

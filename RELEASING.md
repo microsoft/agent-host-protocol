@@ -13,6 +13,27 @@ with its own release cadence. Each client release advertises which protocol
 versions it supports via a generated `SUPPORTED_PROTOCOL_VERSIONS` constant
 and a checked-in `clients/<lang>/release-metadata.json`.
 
+For a coordinated release, use **one PR with two commits**:
+
+1. Prepare and validate the release manifests, changelogs, and generated files
+   at `X.Y.Z`. Record this release commit's SHA; all seven tags point here.
+2. Advance `PROTOCOL_VERSION` to the next development version and promote
+   `X.Y.Z` in `STABLE_DOC_VERSIONS` **in the same commit and PR**. Keep the
+   released compatibility baselines unchanged unless intentionally revising
+   the compatibility policy.
+
+Create the bare `vX.Y.Z` tag locally at the first commit before validating the
+second commit with `npm test` and `npm run docs:build`. After all required CI
+checks and collaborator approvals pass, push each release tag separately,
+verify the remote tags point at the release SHA, then merge the PR with a merge
+commit. **Do not enable auto-merge before pushing the tags.** Tag pushes start
+publishing before the PR merges; this ordering ensures the tag needed by the
+documentation build already exists when the merge triggers deployment.
+
+See [Updating published documentation](#updating-published-documentation) and
+the [release skill](skills/release-ahp/SKILL.md) for the full coordinated flow.
+Do not defer documentation promotion to another PR.
+
 ## Changelog fragments
 
 Normal feature/fix PRs do **not** edit `CHANGELOG.md` files directly. They add
@@ -76,6 +97,10 @@ want to validate fragment JSON without consuming it.
 > triggered manually from the ADO UI as a hotfix escape hatch.
 
 ## Per-client release flow
+
+These recipes describe individual artifact releases. For coordinated releases,
+use the two-commit PR and pre-merge tag order above instead of each recipe's
+merge-then-tag order.
 
 ### Rust (`rust/vX.Y.Z`)
 
@@ -212,9 +237,27 @@ trigger started the run.
 
 ## Updating published documentation
 
-After pushing the release's `vX.Y.Z` tag, prepend `X.Y.Z` to
-`STABLE_DOC_VERSIONS` in `docs/.vitepress/versions.ts` and merge that change
-to `main` so the new release becomes the default documentation version.
+In the **same commit that bumps the next development version**, prepend the
+released `X.Y.Z` to `STABLE_DOC_VERSIONS` in `docs/.vitepress/versions.ts`,
+preserving older entries. For example, releasing `1.1.0` and starting `1.2.0`
+sets `PROTOCOL_VERSION = '1.2.0'` and
+`STABLE_DOC_VERSIONS = ['1.1.0', '1.0.0']` in the same PR.
+
+The homepage's specification label and the default docs version both use the
+first stable entry; the draft label follows `PROTOCOL_VERSION` separately.
+Pushing release tags alone does not promote the website.
+
+The docs builder materializes stable pages from bare `vX.Y.Z` tags. Create the
+new tag locally at the release commit for `npm run docs:build`, then push it
+with the other release tags after CI and review approval but **before merging**
+the combined PR. Never tag the development-bump commit or merge while the
+required remote tag is missing.
+
+After merge, confirm `Deploy Documentation` succeeds and check the live
+homepage label, default docs, and version selector: `X.Y.Z` must be the default,
+older releases must remain available, and only the next development version
+must be labelled `(draft)`. The release is not complete until this deployment
+is verified; a passing local build is not sufficient.
 
 ## What CI guards against
 

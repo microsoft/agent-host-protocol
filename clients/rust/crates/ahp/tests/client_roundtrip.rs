@@ -85,7 +85,14 @@ async fn request_response_and_action_fanout() {
         let sub_result = serde_json::json!({
             "snapshot": {
                 "resource": "ahp-session:/s1",
-                "state": { "agents": [] },
+                "state": {
+                    "provider": "demo",
+                    "title": "Session",
+                    "status": 1,
+                    "lifecycle": "ready",
+                    "activeClients": [],
+                    "chats": []
+                },
                 "fromSeq": 0
             }
         });

@@ -7,24 +7,24 @@
   "$defs": {
     "ChannelReceiveLimits": {
       "type": "object",
-      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` fragment, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maximumFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maximumFrameBytes`.\n\nStability: 1.0 - Early development.",
+      "description": "Limits on data that one peer receives on a windowed subscription.\n\nAll sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC\nmessage's complete text, as sent. For a `channel/frame` notification, this\nincludes its envelope and escape characters. The same size is used for the\nwindow, credit, and `maxFrameBytes`. There is no negotiated limit on the\nsize of a complete data message. Outstanding data is always less than\n`windowBytes + maxFrameBytes`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "windowBytes": {
           "type": "integer",
-          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or fragment while outstanding data\nis equal to or greater than this value. The last message or fragment sent\nbefore the window is full can go past it, so a message that fits within\n`maximumFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
+          "description": "The target amount of outstanding data. This is a soft target.\nThe sender MUST NOT send a data message or frame while outstanding data\nis equal to or greater than this value. The last message or frame sent\nbefore the window is full can go past it, so a message that fits within\n`maxFrameBytes` can be sent whole even when it is larger than the\nremaining credit.",
           "minimum": 1,
           "maximum": 9007199254740991
         },
-        "maximumFrameBytes": {
+        "maxFrameBytes": {
           "type": "integer",
-          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in fragments.",
+          "description": "The largest JSON-RPC message that the sender can send for a data message.\nThis is a hard limit, and MUST be at least 1024. For a `channel/frame`\nnotification, it includes the envelope and escape characters. A larger data\nmessage MUST be split into smaller messages or sent in frames.",
           "minimum": 1024,
           "maximum": 9007199254740991
         }
       },
       "required": [
         "windowBytes",
-        "maximumFrameBytes"
+        "maxFrameBytes"
       ]
     },
     "ChannelFlowControl": {
@@ -769,7 +769,7 @@
     },
     "AutomationSessionOrigin": {
       "type": "object",
-      "description": "Provenance recorded on a session created for an automation run.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
+      "description": "Provenance recorded on a session created for an automation run. Runs that\nlater continue the session don't change it.\n\nThe links let clients navigate from an ordinary session to the task-level\nrun and its durable definition. The session channel remains authoritative\nfor this session's transcript, tools, confirmations, and changes.",
       "properties": {
         "kind": {
           "const": "automation"
@@ -826,7 +826,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         }
       },
       "required": [
@@ -872,7 +872,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "lifecycle": {
           "$ref": "#/$defs/SessionLifecycle",
@@ -1180,7 +1180,7 @@
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
-          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-annotations:/<uuid>`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -2570,7 +2570,7 @@
         },
         "provider": {
           "type": "string",
-          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | `provider`}; hosts set it when it\ndiffers. The chat's agent never changes, but `provider` is reported\nrelative to its session, so `chat/moved` may set or clear it. Like\n`resource`, it is omitted from `session/chatUpdated` changes. Forks and\nside chats use the source chat's agent.\n\nStability: 1.0 - Early development."
+          "description": "Agent provider ID backing this chat. Absent means the session's\n{@link SessionMetadata.provider | agent provider}; hosts set it when it\ndiffers. The chat's agent provider never changes, but `provider` is\nreported relative to its session, so `chat/moved` may set or clear it.\n`session/chatUpdated` does not carry it. Forks and side chats use the\nsource chat's agent provider.\n\nStability: 1.0 - Early development."
         },
         "workingDirectories": {
           "type": "array",
@@ -2840,7 +2840,7 @@
       "properties": {
         "schema": {
           "$ref": "#/$defs/SessionConfigSchema",
-          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | `provider`} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
+          "description": "Config schema for this chat's `chatMutable` properties. Absent means the\nsession's schema. Hosts set it, as the chat's own schema, when the chat's\n{@link ChatState.provider | agent provider} differs from the session's; when\npresent, clients use it instead of the session's schema.\n\nStability: 1.0 - Early development."
         },
         "values": {
           "type": "object",
@@ -3631,7 +3631,7 @@
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).\nMatches {@link AnnotationsSummary.resource}."
+          "description": "The annotations channel URI (`ahp-annotations:/<uuid>`).\nMatches {@link AnnotationsSummary.resource}."
         },
         "annotationIds": {
           "type": "array",
@@ -3778,8 +3778,9 @@
           "description": "Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown."
         },
         "duration": {
-          "type": "number",
-          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock."
+          "type": "integer",
+          "description": "Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.",
+          "minimum": 0
         }
       },
       "required": [
@@ -4886,7 +4887,7 @@
           "type": "string",
           "description": "Provider-supplied status text, when available."
         },
-        "url": {
+        "uri": {
           "$ref": "#/$defs/URI",
           "description": "Absolute URI of the canvas's live content, typically an HTTP(S) URL;\nabsent when the live source is unavailable. Hosts MUST clear this field\nwhen the provider becomes unavailable.\n\nA client that can't load this URI directly, for example because it is a\nloopback address in the host's environment or uses a scheme that the\nclient doesn't load, reads it with `resourceRead`. The client resolves the\nrelative references in its content and reads them the same way. Hosts\nSHOULD serve reads of this URI, and of other URLs on its origin when it is\nan HTTP(S) URL, to clients that can subscribe to the canvas. The provider\nchooses the URI, so the host decides which sources it is willing to read.\n\nSource URIs MUST be redacted from diagnostic logs and MUST NOT be reused\nfrom persisted state after a provider or host restart."
         }
@@ -5300,9 +5301,9 @@
           "type": "string",
           "description": "Optional host-issued token for this reviewable change, which clients MAY\necho in {@link ChangesetOperationTarget.nonce}.\nHosts SHOULD update a published nonce whenever contents of the file change."
         },
-        "isEditing": {
-          "type": "boolean",
-          "description": "Whether the host reports an ongoing edit to this file.\nThis is advisory; false or absent does not guarantee that modifying the file is safe."
+        "status": {
+          "$ref": "#/$defs/ChangesetFileStatus",
+          "description": "Host-reported activity on this file, as a bitset of\n{@link ChangesetFileStatus} flags. Absent or `0` means no activity is\nreported. This is advisory; the absence of\n{@link ChangesetFileStatus.Editing} does not guarantee that modifying the\nfile is safe."
         }
       },
       "required": [
@@ -5367,7 +5368,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribable annotations channel URI for the owning session\n(typically `ahp-session:/<uuid>/annotations`). Surfaced explicitly even\nthough it is derivable from the session URI so badge UI does not need\nto know the derivation rule."
+          "description": "The subscribable annotations channel URI for the owning session\n(`ahp-annotations:/<uuid>`, where `<uuid>` is the owning session's id).\nClients should use this value rather than derive it from the session URI."
         },
         "annotationCount": {
           "type": "number",
@@ -5386,7 +5387,7 @@
     },
     "AnnotationsState": {
       "type": "object",
-      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-session:/<uuid>/annotations` URI.",
+      "description": "Full state for a session's annotations channel, returned when a client\nsubscribes to an `ahp-annotations:/<uuid>` URI.",
       "properties": {
         "annotations": {
           "type": "array",
@@ -5617,6 +5618,32 @@
         "schedule"
       ]
     },
+    "AutomationOneTimeTrigger": {
+      "type": "object",
+      "description": "Starts one run at a fixed time evaluated by the host.\n\nThe trigger fires at most once for a given {@link runAt}. Updating\n{@link runAt} moves the occurrence to the new time; the previous time no\nlonger fires.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a\nrun."
+        },
+        "kind": {
+          "const": "oneTime"
+        },
+        "runAt": {
+          "type": "string",
+          "description": "Scheduled run timestamp in ISO 8601 format."
+        },
+        "misfirePolicy": {
+          "$ref": "#/$defs/AutomationMisfirePolicy",
+          "description": "Policy when {@link runAt} passes while automatic execution is unavailable.\nOmission is equivalent to {@link AutomationMisfirePolicy.RunOnce}."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "runAt"
+      ]
+    },
     "AutomationEventTrigger": {
       "type": "object",
       "description": "Starts runs from events understood by the owning host.\n\nEvent trigger types, events, and configuration are discovered through\n{@link ListAutomationTriggerDefinitionsParams |\nlistAutomationTriggerDefinitions}. The saved trigger includes the matching\nhuman-readable metadata so it remains displayable without repeating\ndiscovery.",
@@ -5696,6 +5723,52 @@
         "date"
       ]
     },
+    "AutomationNewSessionTarget": {
+      "type": "object",
+      "description": "Each run creates a session from {@link AutomationDefinition.session}.",
+      "properties": {
+        "kind": {
+          "const": "newSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationPreviousSessionTarget": {
+      "type": "object",
+      "description": "Each run continues the session of the automation's previous run, so a\nrecurring automation keeps one conversation.\n\nThe previous run's session is the\n{@link AutomationRunState.primarySession | primary session} of the most\nrecently created earlier run of this automation that has one, even if that\nrun was pruned from {@link AutomationEntry.runs}. The host decides whether\nthat session is still usable. A session that was removed or archived, that\nhas no {@link SessionState.defaultChat | default chat}, or that the\nautomation may no longer drive, is never usable. The host MAY also treat a\nsession as unusable when it can't honor the current template, for example\nafter its agent provider, working directories, or configuration changed.\nWhen there is no usable session, the run creates one from\n{@link AutomationDefinition.session}, as with\n{@link AutomationNewSessionTarget}, and later runs continue that session.\nThe host resolves targets and starts turns in run creation order, so\noverlapping runs share one session instead of each creating one.\n\nWhen a run reuses a session, the host:\n\n- links the session to the run with\n  {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and\n  makes it the run's primary session before delivering the message;\n- adds {@link AutomationDefinition.message} to the session's default chat\n  as a {@link PendingMessageKind.Queued | queued} pending message, so it\n  never steers an active turn and starts a turn once the chat is idle;\n- does not reapply {@link AutomationDefinition.session}, so the session\n  keeps its agent provider, configuration, and working directories. The\n  template's `model` and `agent` still apply to the queued message, as for\n  every run. The host MAY update the session's copies of the automation's\n  customizations to match {@link AutomationEntry.customizations}.\n\nThe run stays `pending` while its message waits and becomes `running` when\na turn starts from it. It ends with the outcome of that turn. If its\nqueued message is withdrawn without a turn starting from it, the run is\n`cancelled`. Cancelling the run removes its queued message or cancels its\nturn, and never affects other turns in the session. If the session becomes\nunusable before a turn starts from the message, the host removes the queued\nmessage, if its chat still exists, and the run fails.\n\n{@link SessionMetadata.origin} keeps naming the run that created the\nsession.",
+      "properties": {
+        "kind": {
+          "const": "previousSession"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationChatTarget": {
+      "type": "object",
+      "description": "Each run sends its message to one existing chat, such as the conversation\nin which a user asked for a recurring check.\n\nThe host MUST reject a create or update request whose chat doesn't exist or\nthat the automation may not drive. When it accepts one, it sets\n{@link AutomationChatTarget.session | `session`} to the session that\ncurrently owns the chat, replacing any submitted value.\n\nEach run delivers its message the way an\n{@link AutomationPreviousSessionTarget} run does when it reuses a session,\nwith the same run lifecycle: the host links the session to the run, makes it\nthe run's primary session, and adds {@link AutomationDefinition.message} to\nthe chat as a {@link PendingMessageKind.Queued | queued} pending message.\nThe run never creates a session, and the host applies only the template's\n`model` and `agent`, to the queued message. It does not change the\nsession's agent provider, configuration, working directories, or\ncustomizations.\n\nIf the chat no longer exists, or the automation may no longer drive it, the\nrun fails. When that happens after the message was queued, the host first\nremoves the queued message, if the chat still exists.",
+      "properties": {
+        "kind": {
+          "const": "chat"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session that currently owns {@link AutomationChatTarget.chat}. The host\nmaintains it: when the chat moves to another session, the host updates\nthe definition and publishes it with\n{@link AutomationSetAction | `automation/set`}."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat that receives each run's message."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "chat"
+      ]
+    },
     "AutomationTriggerEventDefinition": {
       "type": "object",
       "description": "Describes one host-defined trigger event.",
@@ -5754,7 +5827,7 @@
     },
     "AutomationSessionTemplate": {
       "type": "object",
-      "description": "Template from which the host creates a fresh session for each automation run.\n\nThe host revalidates every selection when the run starts. Definitions never\ncarry credentials, confirmation decisions, or durable permission grants.",
+      "description": "Template from which the host creates a session for an automation run.\n{@link AutomationDefinition.target} decides whether a run creates one. In a\nsession a run continues, only {@link AutomationSessionTemplate.model |\n`model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the\nrun's message.",
       "properties": {
         "provider": {
           "type": "string",
@@ -5785,13 +5858,13 @@
           "items": {
             "$ref": "#/$defs/ClientPluginCustomization"
           },
-          "description": "Client plugins to make available in every run session, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
+          "description": "Client plugins to make available in every session a run creates, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
         }
       }
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the message each run sends, the session template, the\nrun target, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -5799,11 +5872,11 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
+          "description": "Message each run sends (see {@link AutomationDefinition.target}). Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Template used to create fresh sessions for each run."
+          "description": "Template for the sessions runs create. Its model and agent also apply to\na run's turn in a continued session."
         },
         "enabled": {
           "type": "boolean",
@@ -5859,6 +5932,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Opaque implementation-defined metadata. Clients MUST preserve unknown\nentries when updating the definition."
+        },
+        "target": {
+          "$ref": "#/$defs/AutomationTarget",
+          "description": "Where each run sends {@link AutomationDefinition.message}. Absence means\n{@link AutomationTargetKind.NewSession}."
         }
       },
       "required": [
@@ -5883,7 +5960,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
+          "description": "Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runCount": {
           "type": "number",
@@ -5912,7 +5989,7 @@
           "items": {
             "$ref": "#/$defs/PluginCustomization"
           },
-          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery run session receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
+          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery session a run creates receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
         },
         "createdAt": {
           "type": "string",
@@ -5979,11 +6056,11 @@
         },
         "triggerId": {
           "type": "string",
-          "description": "Matches the stable {@link AutomationScheduleTrigger.id} or\n{@link AutomationEventTrigger.id} in the definition."
+          "description": "Matches the stable {@link AutomationScheduleTrigger.id},\n{@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}\nin the definition."
         },
         "scheduledFor": {
           "type": "string",
-          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule triggers and normally absent for event triggers."
+          "description": "Intended schedule occurrence as an ISO 8601 timestamp. Present for\nschedule and one-time triggers and normally absent for event triggers."
         },
         "catchUp": {
           "type": "boolean",
@@ -6002,7 +6079,7 @@
     },
     "AutomationPendingRunLifecycle": {
       "type": "object",
-      "description": "A durable run exists but has not begun external execution.",
+      "description": "A durable run exists but has not begun external execution. A run that\ncontinues a session also stays pending while that session's chat runs\nanother turn (see {@link AutomationPreviousSessionTarget}).",
       "properties": {
         "status": {
           "const": "pending"
@@ -6019,7 +6096,7 @@
     },
     "AutomationRunningRunLifecycle": {
       "type": "object",
-      "description": "The run is executing linked sessions or awaiting interaction on them.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
+      "description": "The run's work in linked sessions is executing or awaiting interaction.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
       "properties": {
         "status": {
           "const": "running"
@@ -6060,7 +6137,7 @@
         },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
-          "description": "Optional aggregate model usage across all linked sessions."
+          "description": "Optional aggregate model usage of the run's work in its linked sessions."
         }
       },
       "required": [
@@ -6194,7 +6271,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, or delegated attempts."
+          "description": "Ordered, unique session URIs belonging to this run, each matching\n{@link SessionState.resource}. Entries may represent retries, parallel\nworkers, delegated attempts, or a session continued from an earlier run."
         },
         "primarySession": {
           "$ref": "#/$defs/URI",
@@ -6757,6 +6834,9 @@
         },
         {
           "$ref": "#/$defs/AutomationEventTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationOneTimeTrigger"
         }
       ],
       "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
@@ -6771,6 +6851,20 @@
         }
       ],
       "description": "One self-disable rule in {@link AutomationDefinition.disableConditions}.\nThe host disables scheduling once any rule is met (logical OR)."
+    },
+    "AutomationTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationNewSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationPreviousSessionTarget"
+        },
+        {
+          "$ref": "#/$defs/AutomationChatTarget"
+        }
+      ],
+      "description": "Where the runs of an automation send {@link AutomationDefinition.message}.\n\nClients SHOULD NOT author {@link AutomationPreviousSessionTarget} or\n{@link AutomationChatTarget} unless the host advertises\n{@link AutomationTargetsCapabilities.previousSession} or\n{@link AutomationTargetsCapabilities.chat}, respectively."
     },
     "AutomationRunOrigin": {
       "oneOf": [
@@ -6937,6 +7031,12 @@
       ],
       "type": "string",
       "description": "Computation lifecycle of a {@link ChangesetState}."
+    },
+    "ChangesetFileStatus": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Bitset flags describing host-reported activity on a {@link ChangesetFile}.\n\nKnown flags:\n\n- `Editing` (1): The host reports an ongoing edit to this file."
     },
     "ChangesetOperationScope": {
       "enum": [

@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Adds `chat/moved`, dispatched on a chat's channel after a cross-session move with its new session, `provider` and `config.schema`."
-}

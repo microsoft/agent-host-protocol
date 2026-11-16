@@ -291,7 +291,7 @@ describe('generated JSON schemas', () => {
         }
       });
 
-      it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
+      it('enforces delivery counter, limit, and nonempty-frame bounds', () => {
         if (file !== 'notifications.schema.json') return;
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;

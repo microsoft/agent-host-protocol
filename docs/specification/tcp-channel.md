@@ -46,7 +46,8 @@ The client chooses a URI for the new channel and sends `createTcpConnection`:
 | `port` | The destination port, from 1 to 65535 |
 
 The host checks that the client is allowed to connect to the destination, then
-opens the connection. On success, the result is `null`. On failure, the host
+opens the connection. On success, the result is an empty object (`{}`) that
+later versions may extend. On failure, the host
 returns one of these errors:
 
 | Error | Cause |
@@ -79,7 +80,7 @@ The client subscribes to the channel with windowed delivery:
   "params": {
     "channel": "ahp-tcp:/t1",
     "flowControl": {
-      "receive": { "windowBytes": 262144, "maximumFrameBytes": 16384 }
+      "receive": { "windowBytes": 262144, "maxFrameBytes": 16384 }
     }
   }
 }
@@ -90,8 +91,8 @@ The client subscribes to the channel with windowed delivery:
   "id": 13,
   "result": {
     "flowControl": {
-      "clientReceive": { "windowBytes": 262144, "maximumFrameBytes": 16384 },
-      "hostReceive": { "windowBytes": 131072, "maximumFrameBytes": 16384 }
+      "clientReceive": { "windowBytes": 262144, "maxFrameBytes": 16384 },
+      "hostReceive": { "windowBytes": 131072, "maxFrameBytes": 16384 }
     }
   }
 }
@@ -148,9 +149,9 @@ reorder bytes.
 
 The window counts the size of each notification as sent, like any other data
 message, not the number of bytes in `data`. The message above is 180 bytes. To
-keep each message within `maximumFrameBytes`, a sender SHOULD send large
+keep each message within `maxFrameBytes`, a sender SHOULD send large
 amounts of data as several `tcp/data` notifications, rather than one
-notification in fragments.
+notification in frames.
 
 `tcp/eof` ends the sender's direction after the data that it has already sent.
 The other direction can continue. The sender MUST NOT send `tcp/data` after

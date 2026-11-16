@@ -55,10 +55,10 @@ import {
 } from '../src/client/hosts/index.js';
 
 import { PROTOCOL_VERSION } from '../src/types/version/registry.js';
-import { SessionStatus } from '../src/types/channels-session/state.js';
+import { SessionLifecycle, SessionStatus } from '../src/types/channels-session/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
 import { CanvasRegistryStatus, type CanvasesState } from '../src/types/channels-canvases/state.js';
-import { ActionType } from '../src/types/common/actions.js';
+import { ActionType, type ActionEnvelope } from '../src/types/common/actions.js';
 
 const ROOT = 'ahp-root://' as const;
 
@@ -370,6 +370,34 @@ test('MultiHostStateMirror routes collection actions to one host and clears coll
     afterHostReset: { removed: undefined, retained: initial },
     remaining: 0,
   });
+});
+
+test('MultiHostStateMirror ignores rejected action envelopes', () => {
+  const mirror = new MultiHostStateMirror();
+  const resource = 'ahp-session:/s1';
+  mirror.applySnapshot('host-a', {
+    resource,
+    state: {
+      provider: 'test', title: 'Old', status: SessionStatus.Idle,
+      lifecycle: SessionLifecycle.Ready, activeClients: [], chats: [],
+    },
+    fromSeq: 0,
+  });
+  const initial = mirror.getSession('host-a', resource);
+  const envelope: ActionEnvelope = {
+    channel: resource,
+    action: { type: ActionType.SessionTitleChanged, title: 'New' },
+    serverSeq: 1,
+    origin: { clientId: 'test', clientSeq: 1 },
+  };
+
+  for (const rejectionReason of ['not allowed', '']) {
+    mirror.applyEnvelope('host-a', { ...envelope, rejectionReason });
+    assert.equal(mirror.getSession('host-a', resource), initial);
+  }
+
+  mirror.applyEnvelope('host-a', { ...envelope, serverSeq: 2 });
+  assert.equal(mirror.getSession('host-a', resource)?.title, 'New');
 });
 
 test('MultiHostStateMirror isolates canvas updates and clears canvas state on reset', () => {

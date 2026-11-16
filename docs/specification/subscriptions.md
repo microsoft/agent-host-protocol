@@ -23,7 +23,9 @@ All channels use the same `subscribe` and `unsubscribe` messages.
 |---|---|---|
 | `ahp-root://` | `RootState` | Agents, terminals, and host configuration. This channel always exists. |
 | `ahp-automations://` | `AutomationState` | All automations visible to the client. This channel exists when `InitializeResult.automations` is present. |
+| `ahp-automation-run:/<id>` | `AutomationRunState` | One automation run: lifecycle, provenance, and linked sessions. |
 | `ahp-session:/<uuid>` | `SessionState` | Session metadata and the session's list of chats. |
+| `ahp-annotations:/<uuid>` | `AnnotationsState` | One session's inline file annotations. Use `AnnotationsSummary.resource`; `<uuid>` is the owning session's id. |
 | `ahp-chat:/<cid>` | `ChatState` | One chat: turns, streamed responses, tool calls, pending messages, input requests, and changesets. See [Chat Channel](/specification/chat-channel). |
 | `ahp-canvases:/<id>` | `CanvasesState` | Experimental. One chat-owned collection advertised by `ChatState.canvasesUri`; registry load state and keyed live membership. Subscribing is observation only. See [Canvases Collection](/reference/canvases). |
 | `ahp-canvas:/<id>` | `CanvasState` | Experimental. One canvas. Its opaque URI is listed in its collection's `canvases`; legacy `ChatState.canvases` projects the same membership. See [Canvas Channel](/reference/canvas). |
@@ -333,7 +335,7 @@ By default, the server sends a subscription's messages as soon as they are
 available. A client can instead offer **windowed delivery** when it subscribes.
 With windowed delivery, a sender waits for credit when the amount of data it
 has sent but the receiver has not released reaches the subscription's window.
-Large messages are sent in fragments, and each fragment counts against the
+Large messages are sent in frames, and each frame counts against the
 window. The receiver releases data with `channel/credit` notifications.
 
 Windowed delivery is useful for channels that can produce data faster than a

@@ -20,7 +20,7 @@ public struct JsonRpcRequest<Params: Codable>: Codable, Sendable where Params: S
 }
 
 /// A JSON-RPC 2.0 error object.
-public struct JsonRpcError: Codable, Sendable {
+public struct JsonRpcError: Codable, Sendable, Equatable {
     public let code: Int
     public let message: String
     public let data: AnyCodable?
@@ -40,7 +40,7 @@ public struct JsonRpcSuccessResponse<Result: Codable>: Codable, Sendable where R
 }
 
 /// A JSON-RPC 2.0 error response.
-public struct JsonRpcErrorResponse: Codable, Sendable {
+public struct JsonRpcErrorResponse: Codable, Sendable, Equatable {
     public let jsonrpc: String
     public let id: Int
     public let error: JsonRpcError
@@ -59,6 +59,10 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
     }
 }
 
+extension JsonRpcRequest: Equatable where Params: Equatable {}
+extension JsonRpcSuccessResponse: Equatable where Result: Equatable {}
+extension JsonRpcNotification: Equatable where Params: Equatable {}
+
 // MARK: - Server → Client Notification Params
 
 /// Params for the server → client `action` notification.
@@ -72,8 +76,7 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "initialize", params: params)
     }
 
-    // `ping` carries no payload beyond the root channel discriminant, so there is
-    // no dedicated `PingParams` type. The helper hardcodes the channel object.
+    // Preserve the dictionary-based helper's public signature for compatibility.
     public static func ping(id: Int) -> JsonRpcRequest<[String: String]> {
         JsonRpcRequest(id: id, method: "ping", params: ["channel": "ahp-root://"])
     }

@@ -28,7 +28,7 @@ When WebSocket is used:
 [Windowed delivery](/specification/windowed-delivery) does not change this
 requirement. A data message that is too large for one JSON-RPC message can be
 sent in several `channel/frame` notifications. Each `channel/frame` is a
-complete JSON-RPC message, and the receiver joins the fragments after the
+complete JSON-RPC message, and the receiver joins their contents after the
 transport has delivered them.
 
 ## Keep-Alive

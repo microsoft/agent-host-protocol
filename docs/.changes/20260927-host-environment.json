@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional typed `InitializeResult.environment.pathStyle` metadata for authoritative host path semantics."
-}

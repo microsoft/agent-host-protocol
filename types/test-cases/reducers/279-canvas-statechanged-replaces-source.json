@@ -7,7 +7,7 @@
     "canvasId": "preview",
     "title": "Preview",
     "status": "Ready",
-    "url": "https://example.test/old"
+    "uri": "https://example.test/old"
   },
   "actions": [
     {
@@ -18,7 +18,7 @@
         "canvasId": "preview",
         "title": "Preview",
         "status": "Ready",
-        "url": "https://example.test/new"
+        "uri": "https://example.test/new"
       }
     }
   ],
@@ -28,6 +28,6 @@
     "canvasId": "preview",
     "title": "Preview",
     "status": "Ready",
-    "url": "https://example.test/new"
+    "uri": "https://example.test/new"
   }
 }

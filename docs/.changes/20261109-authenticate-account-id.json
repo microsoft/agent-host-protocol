@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `authenticate.accountId` carries an opaque client-local account-selection hint without changing token validation or legacy authentication."
-}

@@ -87,6 +87,19 @@ final class ReducersTests: XCTestCase {
 
     // MARK: - Dispatch Validation
 
+    func testPreviouslyMissingClientDispatchableActions() {
+        XCTAssertTrue(isClientDispatchable(.rootConfigChanged(
+            RootConfigChangedAction(type: .rootConfigChanged, config: [:])
+        )))
+        XCTAssertTrue(isClientDispatchable(.terminalInput(
+            TerminalInputAction(type: .terminalInput, data: "hello")
+        )))
+        XCTAssertTrue(isClientDispatchable(.chatToolCallConfirmed(
+            ChatToolCallConfirmedAction(turnId: T, toolCallId: "tool-1", approved: true)
+        )))
+        XCTAssertFalse(isClientDispatchable(.unknown(AnyCodable(["type": "root/configChanged"]))))
+    }
+
     func testClientDispatchableReturnsTrue() {
         let actions: [StateAction] = [
             .chatTurnStarted(ChatTurnStartedAction(

@@ -5,7 +5,7 @@ package com.microsoft.agenthostprotocol.generated
 /**
  * Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
  */
-public const val PROTOCOL_VERSION: String = "1.1.0"
+public const val PROTOCOL_VERSION: String = "1.2.0"
 
 /**
  * Every protocol version this library is willing to negotiate, ordered

@@ -199,7 +199,7 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
-  provider?: string        // chat's agent; absent = session's provider
+  provider?: string        // chat's agent provider; absent = session's agent provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
   config?: ChatConfigState        // chat's chatMutable values (+ optional schema)
@@ -221,13 +221,13 @@ working directories: the chat's subset when present, otherwise the full
 session set.
 
 `config.values` holds the chat's own values for its `chatMutable` settings;
-`config.schema` is present only when the chat's agent differs from the
+`config.schema` is present only when the chat's agent provider differs from the
 session's. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
 
-`provider` names the chat's agent when it differs from the session's. Hosts
-advertising `multipleChatProviders` let one session mix agents. See
-[Chat providers](/specification/chat-channel#chat-providers).
+`provider` names the chat's agent provider when it differs from the session's.
+Hosts advertising `multipleChatProviders` let one session mix agent providers.
+See [Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

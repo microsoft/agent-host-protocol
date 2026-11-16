@@ -1,10 +1,10 @@
 {
-  "description": "changeset/filesReviewChanged changes the Viewed flag without changing editing activity or the nonce",
+  "description": "changeset/filesReviewChanged changes the Viewed flag without changing file status or the nonce",
   "reducer": "changeset",
   "initial": {
     "status": "ready",
     "files": [
-      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true }
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "status": 1 }
     ]
   },
   "actions": [
@@ -13,7 +13,7 @@
   "expected": {
     "status": "ready",
     "files": [
-      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true, "reviewed": true }
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "status": 1, "reviewed": true }
     ]
   }
 }

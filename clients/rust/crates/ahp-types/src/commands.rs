@@ -295,6 +295,15 @@ pub struct CreateTcpConnectionParams {
     pub port: i64,
 }
 
+/// Result of the `createTcpConnection` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTcpConnectionResult {}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -436,8 +445,9 @@ pub struct InitializeResult {
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tcp_connections: Option<TcpConnectionsCapability>,
-    /// Present when chats in one session may be backed by different agents
-    /// (see {@link CreateChatParams.provider} and {@link ChatState.provider}).
+    /// Present when chats in one session may be backed by different agent
+    /// providers (see {@link CreateChatParams.provider} and
+    /// {@link ChatState.provider}).
     /// Clients MUST NOT send `CreateChatParams.provider` without it.
     ///
     /// Stability: 1.0 - Early development.
@@ -486,6 +496,9 @@ pub struct AutomationCapabilities {
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub one_time: Option<AutomationOneTimeCapability>,
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -499,6 +512,10 @@ pub struct AutomationCapabilities {
     /// client plugins for the host to capture.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<AutomationCustomizationsCapability>,
+    /// Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub targets: Option<AutomationTargetsCapabilities>,
 }
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
@@ -541,6 +558,44 @@ pub struct AutomationRunCancellationCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCustomizationsCapability {}
+
+/// Run targets supported for {@link AutomationDefinition.target}.
+/// {@link AutomationNewSessionTarget} is always supported.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTargetsCapabilities {
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_session: Option<AutomationPreviousSessionTargetCapability>,
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat: Option<AutomationChatTargetCapability>,
+}
+
+/// Presence capability for {@link AutomationPreviousSessionTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationPreviousSessionTargetCapability {}
+
+/// Presence capability for {@link AutomationChatTarget}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationChatTargetCapability {}
+
+/// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationOneTimeCapability {}
 
 /// Presence capability for {@link InitializeResult.multipleChatProviders}.
 ///
@@ -980,14 +1035,16 @@ pub struct CreateChatParams {
     /// Client-selected initial display title for the new chat.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Agent provider ID for the new chat. Absent means the session's provider.
+    /// Agent provider ID for the new chat. Absent means the session's agent
+    /// provider.
     ///
     /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
-    /// `InvalidParams` a provider that is not in the root state's `agents` or
-    /// whose agent does not advertise `multipleChats`. Forks and side chats
+    /// `InvalidParams` an agent provider that is not in the root state's `agents`
+    /// or that does not advertise `multipleChats`. Forks and side chats
     /// (`source` present) continue the source chat's history, so they always use
-    /// the source chat's agent: absent means that agent, and a different value is
-    /// rejected. Agent capability checks for this request use the chat's agent.
+    /// the source chat's agent provider: absent means that agent provider, and a
+    /// different value is rejected. Agent capability checks for this request use
+    /// the chat's agent provider.
     ///
     /// Stability: 1.0 - Early development.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1050,12 +1107,12 @@ pub struct ChatMoveToNewSessionDestination {}
 /// Rejection leaves ownership, catalog order, chat state, and root summaries
 /// unchanged.
 ///
-/// A moved chat keeps its agent. After the move the host reports
+/// A moved chat keeps its agent provider. After the move the host reports
 /// {@link ChatState.provider | `provider`} on the chat whenever it differs from
-/// the destination session's provider, including when the chat had none
+/// the destination session's agent provider, including when the chat had none
 /// because it matched its old session. Hosts MAY refuse, as an unsupported
 /// destination, a move they cannot support, such as one that changes whether
-/// the chat's agent matches its session's.
+/// the chat's agent provider matches its session's.
 ///
 /// A moved chat's `config.values` move with it unchanged. If a move changes
 /// whether the chat needs its own `config.schema`, the host sets or clears it,

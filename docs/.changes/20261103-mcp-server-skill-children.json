@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `McpServerCustomization.children` for MCP-served skills (SEP-2640), toggleable by id with `session/customizationToggled`."
-}

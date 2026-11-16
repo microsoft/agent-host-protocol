@@ -601,10 +601,12 @@ impl HostRuntime {
         }
         // Best-effort root state mirror update; for non-root actions this
         // is a no-op (the reducer reports OutOfScope).
-        if matches!(
-            apply_action_to_root(&mut state.root_state, &envelope.action),
-            ReduceOutcome::OutOfScope
-        ) {
+        if envelope.rejection_reason.is_none()
+            && matches!(
+                apply_action_to_root(&mut state.root_state, &envelope.action),
+                ReduceOutcome::OutOfScope
+            )
+        {
             // Not a root action; leave root state untouched. Per-session
             // and per-terminal state mirrors are intentionally not
             // duplicated here — consumers that need them can subscribe

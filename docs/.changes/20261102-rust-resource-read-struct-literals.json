@@ -1,7 +1,0 @@
-{
-  "type": "changed",
-  "message": "Direct Rust struct literals for `ResourceReadParams` must now include `position: None` and `length: None`, and those for `ResourceReadResult` must include `size: None`.",
-  "targets": [
-    "rust"
-  ]
-}

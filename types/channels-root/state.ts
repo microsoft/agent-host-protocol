@@ -270,6 +270,7 @@ export interface SessionModelInfo {
  * {@link SessionModelInfo.configSchema}.
  *
  * @category Root State
+ * @preserveUnknownMembers
  */
 export interface ModelSelection {
   /** Model identifier */
