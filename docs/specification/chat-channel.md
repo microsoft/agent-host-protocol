@@ -66,6 +66,8 @@ The host can publish timing with the initial `chat/responsePart` or update it th
 
 Clients MAY periodically sync their local input state into the draft by dispatching [`chat/draftChanged`](/reference/chat#actions). Eager syncing is not required — clients SHOULD debounce and MAY sync only at convenient points (for example, on blur). When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Dispatch `chat/draftChanged` with no `draft` to clear it once the message is sent.
 
+The unsent first message of a session that has not started yet lives in the `draft` of a [draft session](./session-channel#draft-sessions)'s default chat. Because the draft session is shared state, another client can pick the message up and continue it.
+
 ### Per-chat working directory
 
 `ChatState.workingDirectories` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat inherits the session's full [`workingDirectories`](/reference/session#sessionsummary) set; when present it MUST be a subset of that set. Hosts MAY set a per-chat subset to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back.
@@ -330,7 +332,7 @@ the host already materialized when it accepted the containing message.
 
 ### Active chat
 
-Once a chat exists and its session is `lifecycle: 'ready'`, the chat accepts turns. The wire shape mirrors the legacy single-chat session shape:
+Once a chat exists and its session is `lifecycle: 'ready'`, the chat accepts turns. The one exception is the default chat of a [draft session](./session-channel#draft-sessions): starting a turn there submits the draft, and the turn begins once the session is ready. The wire shape mirrors the legacy single-chat session shape:
 
 - The client dispatches `chat/turnStarted` to begin a turn.
 - The server streams `chat/delta`, `chat/responsePart`, `chat/toolCallStart`, `chat/toolCallReady`, and related actions.

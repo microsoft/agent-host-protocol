@@ -1,0 +1,25 @@
+{
+  "description": "session/draftSubmitted moves a draft to creating and clears IsDraft",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 129,
+    "lifecycle": "draft",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/draftSubmitted"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": []
+  }
+}

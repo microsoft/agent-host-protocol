@@ -190,6 +190,16 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
         creationError: action.error,
       };
 
+    case ActionType.SessionDraftSubmitted:
+      if (state.lifecycle !== SessionLifecycle.Draft) {
+        return state;
+      }
+      return {
+        ...state,
+        lifecycle: SessionLifecycle.Creating,
+        status: withStatusFlag(state.status, SessionStatus.IsDraft, false),
+      };
+
     case ActionType.SessionChatAdded: {
       const list = state.chats;
       const idx = list.findIndex(c => c.resource === action.summary.resource);
@@ -287,6 +297,15 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
         config: {
           ...state.config,
           values: action.replace ? { ...action.config } : { ...state.config.values, ...action.config },
+        },
+      };
+
+    case ActionType.SessionConfigSchemaChanged:
+      return {
+        ...state,
+        config: {
+          schema: action.schema,
+          values: action.values ? { ...action.values } : { ...state.config?.values },
         },
       };
 

@@ -1,0 +1,101 @@
+{
+  "description": "session/configSchemaChanged replaces the schema and values",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 129,
+    "lifecycle": "draft",
+    "activeClients": [],
+    "chats": [],
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          }
+        }
+      },
+      "values": {
+        "target": "folder"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/configChanged",
+      "config": {
+        "target": "worktree"
+      }
+    },
+    {
+      "type": "session/configSchemaChanged",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enumDynamic": true
+          }
+        },
+        "required": [
+          "baseBranch"
+        ]
+      },
+      "values": {
+        "target": "worktree",
+        "baseBranch": "main"
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 129,
+    "lifecycle": "draft",
+    "activeClients": [],
+    "chats": [],
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enumDynamic": true
+          }
+        },
+        "required": [
+          "baseBranch"
+        ]
+      },
+      "values": {
+        "target": "worktree",
+        "baseBranch": "main"
+      }
+    }
+  }
+}

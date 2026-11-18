@@ -18,6 +18,7 @@ import type {
 import type {
   SessionReadyAction,
   SessionCreationFailedAction,
+  SessionDraftSubmittedAction,
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
@@ -45,6 +46,7 @@ import type {
   SessionActivityChangedAction,
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
+  SessionConfigSchemaChangedAction,
   SessionMetaChangedAction,
 } from '../channels-session/actions.js';
 
@@ -157,6 +159,7 @@ export const enum ActionType {
   RootActiveSessionsChanged = 'root/activeSessionsChanged',
   SessionReady = 'session/ready',
   SessionCreationFailed = 'session/creationFailed',
+  SessionDraftSubmitted = 'session/draftSubmitted',
   SessionChatAdded = 'session/chatAdded',
   SessionChatRemoved = 'session/chatRemoved',
   SessionChatUpdated = 'session/chatUpdated',
@@ -224,6 +227,7 @@ export const enum ActionType {
   SessionActivityChanged = 'session/activityChanged',
   SessionChangesetsChanged = 'session/changesetsChanged',
   SessionConfigChanged = 'session/configChanged',
+  SessionConfigSchemaChanged = 'session/configSchemaChanged',
   SessionMetaChanged = 'session/metaChanged',
   ChangesetStatusChanged = 'changeset/statusChanged',
   ChangesetFileSet = 'changeset/fileSet',
@@ -303,6 +307,7 @@ export type StateAction =
   | RootConfigChangedAction
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionDraftSubmittedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
@@ -330,6 +335,7 @@ export type StateAction =
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
+  | SessionConfigSchemaChangedAction
   | SessionMetaChangedAction
   | ChatTurnStartedAction
   | ChatDeltaAction

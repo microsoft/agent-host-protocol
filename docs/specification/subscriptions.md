@@ -49,7 +49,8 @@ route any message using only its `method` and `params.channel`.
 
 | Messages | Value of `params.channel` |
 |---|---|
-| `initialize`, `ping`, `reconnect`, `authenticate`, `listSessions`, `resolveSessionConfig`, `sessionConfigCompletions`, `listAutomationTriggerDefinitions` | `ahp-root://` |
+| `initialize`, `ping`, `reconnect`, `authenticate`, `listSessions`, `resolveSessionConfig`, `listAutomationTriggerDefinitions` | `ahp-root://` |
+| `sessionConfigCompletions` | `ahp-root://`, or the URI of the session whose config is being edited, such as a [draft](/specification/session-channel#draft-sessions) |
 | `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | `ahp-root://`. Either peer can send these requests. |
 | `runAutomation`, `fetchAutomationRuns` | `ahp-automations://` |
 | `createSession`, `disposeSession`, `createChat` | The session URI. For `createSession`, this is the URI of the new session. |

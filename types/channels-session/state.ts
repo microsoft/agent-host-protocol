@@ -33,10 +33,23 @@ import type {
 /**
  * Session initialization state.
  *
+ * A session created with {@link CreateSessionParams.draft} starts in `draft`,
+ * moves to `creating` when it is submitted, and then to `ready` or `failed`.
+ * Other sessions start in `creating`.
+ *
  * @category Session State
  * @nonexhaustive
  */
 export const enum SessionLifecycle {
+  /**
+   * The session has been described but not submitted. The host has not
+   * prepared any working directories, worktrees, or repositories for it, and
+   * its inputs remain editable. See
+   * {@link /specification/session-channel#draft-sessions | Draft sessions}.
+   *
+   * @stability 1.0
+   */
+  Draft = 'draft',
   Creating = 'creating',
   Ready = 'ready',
   Failed = 'failed',
@@ -66,6 +79,14 @@ export const enum SessionStatus {
   IsRead = 1 << 5,
   /** The session has been archived by the client. */
   IsArchived = 1 << 6,
+  /**
+   * The session is a draft that has not been submitted. Set exactly while
+   * {@link SessionState.lifecycle} is {@link SessionLifecycle.Draft}, so that
+   * catalogue consumers can tell drafts apart without subscribing.
+   *
+   * @stability 1.0
+   */
+  IsDraft = 1 << 7,
 }
 
 /**
@@ -628,7 +649,12 @@ export interface SessionConfigPropertySchema extends ConfigPropertySchema {
    * seed/recent values for initial display.
    */
   enumDynamic?: boolean;
-  /** When `true`, the user may change this property after session creation */
+  /**
+   * When `true`, the user may change this property after the session is
+   * created. While a session is a {@link SessionLifecycle.Draft | draft},
+   * every property may change regardless of this flag; it applies once the
+   * draft is submitted.
+   */
   sessionMutable?: boolean;
   /**
    * When `true`, the property may be changed per chat with

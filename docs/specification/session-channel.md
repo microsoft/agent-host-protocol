@@ -31,9 +31,114 @@ Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot
 8. Server broadcasts root/sessionAdded to clients subscribed to ahp-root://
 ```
 
+A session created with `draft: true` starts in `lifecycle: 'draft'` instead and
+enters step 4 only when it is submitted; see [Draft sessions](#draft-sessions).
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft: createSession(draft: true)
+  [*] --> creating: createSession
+  draft --> creating: session/draftSubmitted
+  creating --> ready: session/ready
+  creating --> failed: session/creationFailed
+```
+
 ### Creation
 
 [`createSession`](/reference/session#createsession) is a JSON-RPC request. The client picks the URI; the server allocates session state and begins backend initialisation. If the URI is already in use the server returns `SessionAlreadyExists` (`-32003`).
+
+### Draft sessions
+
+<StabilityIndex level="1.0" />
+
+Draft sessions require the host to advertise
+[`InitializeResult.draftSessions`](/reference/common#initializeresult).
+
+A draft session describes a session the user intends to start, before anything
+is prepared for it. It gives the in-progress composer a real session to work
+against, so completions, customizations, models, and config pickers behave as
+they will after the session starts, and it is shared state, so a draft started
+on one device can be continued on another.
+
+#### Creating a draft
+
+A client creates a draft by sending `createSession` with `draft: true`. Clients
+MUST NOT do so unless the host advertises `draftSessions`. The host:
+
+- creates the session in `lifecycle: 'draft'` with
+  [`SessionStatus.IsDraft`](/reference/session#sessionstatus) set;
+- sets [`defaultChat`](/reference/session#sessionstate) to a chat that holds the
+  user's unsent message in its [`draft`](./chat-channel#drafts);
+- resolves [`config`](/reference/session#sessionstate) (schema and defaults) from
+  the requested agent provider, working directories, and config values; and
+- populates customizations, server tools, and other state that can be derived
+  from the requested working directories without side effects.
+
+The host MUST NOT perform any preparation with side effects while the session is
+a draft: no clones, no worktrees or branches, and no writes to the working
+directories. It MAY warm up the agent provider's runtime.
+
+#### Editing a draft
+
+All of a draft's inputs remain editable:
+
+| Input | How to change it |
+|---|---|
+| Config values | `session/configChanged`. Every schema property is mutable while drafting; `sessionMutable` applies after submission. |
+| Working directories | `session/workingDirectorySet`, `session/workingDirectoryRemoved`, and `session/workingDirectoryReplaced`. Primary-slot restrictions do not apply, and the only directory may be replaced even without `multipleWorkingDirectories`. |
+| Unsent message | `chat/draftChanged` on the default chat. |
+| Title | `session/titleChanged`. |
+
+The agent provider cannot change. To switch provider, create a new draft and
+carry the message over.
+
+The host keeps the draft's config resolved. When an accepted change alters the
+schema or its defaults (for example, choosing an isolated checkout adds a
+base-branch property), the host dispatches
+[`session/configSchemaChanged`](/reference/session#sessionconfigschemachangedaction)
+with the new schema and resolved values. This replaces the client-driven
+[`resolveSessionConfig`](/reference/root#resolvesessionconfig) loop. For
+properties marked `enumDynamic`, clients send
+[`sessionConfigCompletions`](/reference/root#sessionconfigcompletions) with the
+draft's session URI as `channel`; the host reads the provider, directories, and
+values from the draft. [`completions`](/reference/session#completions) targets
+the default chat as usual.
+
+Clients MUST NOT create additional chats on a draft, and the host MUST reject
+`createChat` and `moveChat` targeting one.
+
+#### Submitting a draft
+
+A client submits a draft by starting a turn: it dispatches `chat/turnStarted` on
+the draft's default chat. There is no separate submit action for clients.
+
+The host first validates the draft, for example that every required config
+property has a value. If the draft is invalid, the host rejects the
+`chat/turnStarted`; the client rolls back its optimistic turn and the session
+stays a draft. Otherwise the host dispatches
+[`session/draftSubmitted`](/reference/session#sessiondraftsubmittedaction) on the
+session channel, which moves the session to `creating` and clears `IsDraft`,
+then echoes the turn. The host prepares the session from its final inputs
+(creating any isolated checkout the config selects, which it publishes by
+replacing the working directory) and dispatches `session/ready` or
+`session/creationFailed`, as for any other creation. The turn waits while the
+session is `creating` and begins once it is `ready`. If creation fails, the host
+ends the turn with an error.
+
+#### Visibility and cleanup
+
+Drafts appear in the session catalogue with `IsDraft` set, so other devices can
+list and resume them. Hosts MUST NOT include drafts in
+[`listSessions`](/reference/root#listsessions) results or `root/sessionAdded`
+notifications for clients that did not declare
+[`ClientCapabilities.draftSessions`](/reference/common#clientcapabilities). Such
+clients first see the session when it is submitted. Hosts MAY also defer
+announcing a draft to other clients until it has content, such as a non-empty
+message draft or a changed input.
+
+Clients SHOULD dispose drafts the user abandons, such as a composer closed
+without typing, with [`disposeSession`](#disposal). Hosts MAY dispose drafts that
+have no content after an idle period of their choosing.
 
 ### Active session
 

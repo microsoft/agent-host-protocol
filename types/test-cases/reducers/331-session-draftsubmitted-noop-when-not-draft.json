@@ -1,0 +1,25 @@
+{
+  "description": "session/draftSubmitted is a no-op for a session that is not a draft",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/draftSubmitted"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": []
+  }
+}
