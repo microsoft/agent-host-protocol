@@ -126,20 +126,15 @@ type _ExpectedServerCommands =
 
 // ─── Assertions ──────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckCommandMapKeys = _Exact<keyof CommandMap, _ExpectedCommands>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckClientNotificationMapKeys = _Exact<keyof ClientNotificationMap, _ExpectedClientNotifications>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckServerNotificationMapKeys = _Exact<keyof ServerNotificationMap, _ExpectedServerNotifications>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckServerCommandMapKeys = _Exact<keyof ServerCommandMap, _ExpectedServerCommands>;
+// Exported only so `noUnusedLocals` keeps checking them; the package entry
+// doesn't re-export this file.
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckClientNotificationsHaveChannel = _AllNotificationParamsHaveChannel<ClientNotificationMap> extends true ? true : never;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckServerNotificationsHaveChannel = _AllNotificationParamsHaveChannel<ServerNotificationMap> extends true ? true : never;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckCommandsHaveChannel = _AllParamsHaveChannel<CommandMap> extends true ? true : never;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckServerCommandsHaveChannel = _AllParamsHaveChannel<ServerCommandMap> extends true ? true : never;
+export type _CheckCommandMapKeys = _Exact<keyof CommandMap, _ExpectedCommands>;
+export type _CheckClientNotificationMapKeys = _Exact<keyof ClientNotificationMap, _ExpectedClientNotifications>;
+export type _CheckServerNotificationMapKeys = _Exact<keyof ServerNotificationMap, _ExpectedServerNotifications>;
+export type _CheckServerCommandMapKeys = _Exact<keyof ServerCommandMap, _ExpectedServerCommands>;
+
+export type _CheckClientNotificationsHaveChannel = _AllNotificationParamsHaveChannel<ClientNotificationMap> extends true ? true : never;
+export type _CheckServerNotificationsHaveChannel = _AllNotificationParamsHaveChannel<ServerNotificationMap> extends true ? true : never;
+export type _CheckCommandsHaveChannel = _AllParamsHaveChannel<CommandMap> extends true ? true : never;
+export type _CheckServerCommandsHaveChannel = _AllParamsHaveChannel<ServerCommandMap> extends true ? true : never;
