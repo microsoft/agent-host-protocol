@@ -12,7 +12,6 @@ import type {
   AutomationDefinition,
   AutomationDisableCondition,
   AutomationEntry,
-  AutomationNewSessionTarget,
   AutomationOperation,
   AutomationSessionTemplate,
   AutomationState,
