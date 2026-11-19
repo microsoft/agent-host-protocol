@@ -74,6 +74,11 @@ export interface ListSessionsResult extends PaginatedResult {
  * returns a property schema describing what additional metadata is needed,
  * contextual to the current selections.
  *
+ * When the host advertises {@link InitializeResult.draftSessions}, clients
+ * SHOULD instead create a {@link SessionLifecycle.Draft | draft session} and
+ * edit it: the host keeps the draft's {@link SessionState.config} resolved and
+ * publishes schema changes with `session/configSchemaChanged`.
+ *
  * The client calls this command whenever the user changes a significant input
  * (e.g. picks a working directory, toggles a property). Each response returns
  * the full current property set (not a delta). The returned `values` contain
@@ -190,12 +195,22 @@ export interface SessionConfigValueItem {
  * ```
  */
 export interface SessionConfigCompletionsParams extends BaseParams {
-  channel: 'ahp-root://';
-  /** Agent provider ID */
+  /**
+   * `ahp-root://`, or the URI of a session whose config is being edited
+   * (typically a {@link SessionLifecycle.Draft | draft}). For a session URI,
+   * the host takes the agent provider, working directories, and config values
+   * from that session's state and ignores `provider`, `workingDirectory`, and
+   * `config`. A session URI requires {@link InitializeResult.draftSessions}.
+   */
+  channel: URI;
+  /** Agent provider ID. Ignored when `channel` is a session URI. */
   provider?: string;
-  /** Working directory for the session */
+  /** Working directory for the session. Ignored when `channel` is a session URI. */
   workingDirectory?: URI;
-  /** Current user-filled configuration values (provides context for the query) */
+  /**
+   * Current user-filled configuration values (provides context for the
+   * query). Ignored when `channel` is a session URI.
+   */
   config?: Record<string, unknown>;
   /** Property id from the schema to query values for */
   property: string;

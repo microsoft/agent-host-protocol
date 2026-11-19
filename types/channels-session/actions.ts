@@ -13,6 +13,7 @@ import type {
   Customization,
   CustomizationEnablement,
   McpServerState,
+  SessionConfigSchema,
 } from './state.js';
 import type { URI } from '../common/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -40,6 +41,26 @@ export interface SessionCreationFailedAction {
   type: ActionType.SessionCreationFailed;
   /** Error details */
   error: ErrorInfo;
+}
+
+/**
+ * A draft session was submitted. The reducer moves
+ * {@link SessionState.lifecycle} from {@link SessionLifecycle.Draft} to
+ * {@link SessionLifecycle.Creating} and clears {@link SessionStatus.IsDraft};
+ * it is a no-op for a session that is not a draft.
+ *
+ * The host dispatches this when it accepts a `chat/turnStarted` on a draft
+ * session's default chat, before echoing the turn (see
+ * {@link /specification/session-channel#submitting-a-draft | Submitting a draft}).
+ * It then prepares the session as for any creation and dispatches
+ * `session/ready` or `session/creationFailed`.
+ *
+ * @category Session Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface SessionDraftSubmittedAction {
+  type: ActionType.SessionDraftSubmitted;
 }
 
 /**
@@ -313,7 +334,9 @@ export interface SessionWorkingDirectorySetAction {
  * the set unchanged. When the agent advertises
  * {@link MultipleWorkingDirectoriesCapability.primaryReplacement}, clients MUST
  * NOT use this generic membership action to remove index `0`; the host MUST
- * reject such a removal, leaving the protected slot intact.
+ * reject such a removal, leaving the protected slot intact. These primary-slot
+ * rules do not apply while the session is a
+ * {@link SessionLifecycle.Draft | draft}.
  *
  * @category Session Actions
  * @version 1
@@ -343,6 +366,10 @@ export interface SessionWorkingDirectoryRemovedAction {
  * {@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients
  * MUST NOT target an immutable primary. The host MUST validate and apply its
  * backend side effect before broadcasting an accepted action, or reject it.
+ *
+ * While the session is a {@link SessionLifecycle.Draft | draft}, nothing has
+ * been prepared, so neither capability is required and any entry, including
+ * the only one, may be replaced.
  *
  * @category Session Actions
  * @version 1
@@ -608,7 +635,9 @@ export interface SessionMcpServerStopRequestedAction {
  * Client changed a mutable config value mid-session.
  *
  * Only properties with `sessionMutable: true` in the config schema may be
- * changed. The server validates and broadcasts the action; the reducer merges
+ * changed, except while the session is a
+ * {@link SessionLifecycle.Draft | draft}, when any property in the schema may
+ * change. The server validates and broadcasts the action; the reducer merges
  * the new values into `state.config.values`.
  *
  * @category Session Actions
@@ -621,6 +650,36 @@ export interface SessionConfigChangedAction {
   config: Record<string, unknown>;
   /** When `true`, replaces all config values instead of merging */
   replace?: boolean;
+}
+
+/**
+ * The host re-resolved the session's config schema.
+ *
+ * Replaces {@link SessionConfigState.schema}, creating
+ * {@link SessionState.config} when absent. When `values` is present it also
+ * replaces {@link SessionConfigState.values}; otherwise the existing values are
+ * kept (or are empty when `config` was absent).
+ *
+ * The schema of a draft session depends on its inputs: for example, choosing
+ * an isolated checkout can add a base-branch property. Hosts SHOULD dispatch
+ * this after any accepted change to a draft's config values or working
+ * directories that alters the schema or its defaults, which replaces the
+ * client-driven `resolveSessionConfig` loop. Hosts MAY also dispatch it for a
+ * ready session whose schema changes.
+ *
+ * @category Session Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface SessionConfigSchemaChangedAction {
+  type: ActionType.SessionConfigSchemaChanged;
+  /** The new config schema. */
+  schema: SessionConfigSchema;
+  /**
+   * The resolved config values, with host defaults applied and values for
+   * removed properties dropped. Omit to keep the current values.
+   */
+  values?: Record<string, unknown>;
 }
 
 /**

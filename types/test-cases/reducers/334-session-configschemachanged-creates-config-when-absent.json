@@ -1,0 +1,54 @@
+{
+  "description": "session/configSchemaChanged creates config with empty values when absent",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 129,
+    "lifecycle": "draft",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/configSchemaChanged",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 129,
+    "lifecycle": "draft",
+    "activeClients": [],
+    "chats": [],
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          }
+        }
+      },
+      "values": {}
+    }
+  }
+}

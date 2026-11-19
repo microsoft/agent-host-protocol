@@ -9,6 +9,7 @@ import type {
   RootConfigChangedAction,
   SessionReadyAction,
   SessionCreationFailedAction,
+  SessionDraftSubmittedAction,
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
@@ -36,6 +37,7 @@ import type {
   SessionActivityChangedAction,
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
+  SessionConfigSchemaChangedAction,
   SessionMetaChangedAction,
   ChatTurnStartedAction,
   ChatDeltaAction,
@@ -141,6 +143,7 @@ export type ServerRootAction =
 export type SessionAction =
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionDraftSubmittedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
@@ -168,6 +171,7 @@ export type SessionAction =
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
+  | SessionConfigSchemaChangedAction
   | SessionMetaChangedAction
 ;
 
@@ -192,6 +196,7 @@ export type ClientSessionAction =
 export type ServerSessionAction =
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionDraftSubmittedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
@@ -206,6 +211,7 @@ export type ServerSessionAction =
   | SessionMcpServerStateChangedAction
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
+  | SessionConfigSchemaChangedAction
   | SessionMetaChangedAction
 ;
 
@@ -469,6 +475,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.RootConfigChanged]: true,
   [ActionType.SessionReady]: false,
   [ActionType.SessionCreationFailed]: false,
+  [ActionType.SessionDraftSubmitted]: false,
   [ActionType.SessionChatAdded]: false,
   [ActionType.SessionChatRemoved]: false,
   [ActionType.SessionChatUpdated]: false,
@@ -496,6 +503,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionActivityChanged]: false,
   [ActionType.SessionChangesetsChanged]: false,
   [ActionType.SessionConfigChanged]: true,
+  [ActionType.SessionConfigSchemaChanged]: false,
   [ActionType.SessionMetaChanged]: false,
   [ActionType.ChatTurnStarted]: true,
   [ActionType.ChatDelta]: false,

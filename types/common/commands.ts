@@ -233,6 +233,16 @@ export interface ClientCapabilities {
    * App-bearing tool calls as ordinary MCP tool calls.
    */
   mcpApps?: Record<string, never>;
+  /**
+   * Client understands {@link SessionLifecycle.Draft | draft sessions}.
+   *
+   * Hosts MUST NOT list or announce draft sessions to clients that omit this
+   * capability; such clients first see a draft when it is submitted.
+   *
+   * @stability 1.0
+   * @see {@link /specification/session-channel#draft-sessions | Draft sessions}
+   */
+  draftSessions?: Record<string, never>;
 }
 
 /**
@@ -366,7 +376,23 @@ export interface InitializeResult {
    * @see {@link /specification/chat-channel#chat-providers | Chat Channel: Chat providers}
    */
   multipleChatProviders?: MultipleChatProvidersCapability;
+  /**
+   * Present when the host supports
+   * {@link SessionLifecycle.Draft | draft sessions} through
+   * {@link CreateSessionParams.draft}.
+   * @stability 1.0
+   * @see {@link /specification/session-channel#draft-sessions | Draft sessions}
+   */
+  draftSessions?: DraftSessionsCapability;
 }
+
+/**
+ * Presence capability for {@link InitializeResult.draftSessions}.
+ *
+ * @category Commands
+ * @stability 1.0
+ */
+export interface DraftSessionsCapability {}
 
 /**
  * Presence capability for {@link InitializeResult.multipleChatProviders}.

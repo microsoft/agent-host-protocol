@@ -75,6 +75,20 @@ export interface CreateSessionParams extends BaseParams {
    */
   config?: Record<string, unknown>;
   /**
+   * Create the session as a {@link SessionLifecycle.Draft | draft}.
+   *
+   * The host resolves the session's config schema and defaults from
+   * `provider`, `workingDirectories`, and `config`, and sets up the default
+   * chat, but MUST NOT prepare anything with side effects (clones, worktrees,
+   * branches, writes to working directories) until the draft is submitted.
+   * Clients MUST NOT set this unless the host advertises
+   * {@link InitializeResult.draftSessions}.
+   *
+   * @stability 1.0
+   * @see {@link /specification/session-channel#draft-sessions | Draft sessions}
+   */
+  draft?: boolean;
+  /**
    * Eagerly claim an active client role for the new session.
    *
    * When provided, the server initializes the session with this client as an
