@@ -1,5 +1,0 @@
-{
-  "type": "security",
-  "message": "Updated the Swift AHPApp sample's `swift-nio-ssh` dependency to 0.14.1 to fix CVE-2026-43798.",
-  "targets": ["swift"]
-}
