@@ -6,11 +6,11 @@
   "input": {
     "resource": "ahp-chat:/c1",
     "fromSeq": 10,
-    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyNavigation": true }
+    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyBrowsing": {} }
   },
   "acceptableOutputs": [{
     "resource": "ahp-chat:/c1",
     "fromSeq": 10,
-    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyNavigation": true }
+    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyBrowsing": {} }
   }]
 }

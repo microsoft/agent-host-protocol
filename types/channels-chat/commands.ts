@@ -276,7 +276,7 @@ export interface ChatTurnIndexEntry {
 
 /**
  * Lists every visible non-system prompt in retained turns, oldest first, across pages.
- * Requires `ChatState.historyNavigation`. Does not load turns into state.
+ * Requires `ChatState.historyBrowsing`. Does not load turns into state.
  *
  * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
  * @category Commands
@@ -322,7 +322,7 @@ export const enum ChatTurnReadDirection {
 /**
  * Reads a byte-bounded window of completed turns directly, without changing
  * any subscription or fetching intervening pages. Requires
- * `ChatState.historyNavigation`. A missing anchor is `NotFound` (-32008).
+ * `ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).
  *
  * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
  * @category Commands
@@ -354,73 +354,4 @@ export interface ReadChatTurnsResult {
   hasBefore: boolean;
   /** Whether retained completed turns follow this window. */
   hasAfter: boolean;
-}
-
-/**
- * The searchable side of a completed turn.
- * @exhaustive
- */
-export const enum ChatTurnMatchKind {
-  Request = 'request',
-  Response = 'response',
-}
-
-/** A match locator, not a snippet, text offset, or response-part identifier. */
-export interface ChatTurnMatch {
-  turnId: string;
-  kind: ChatTurnMatchKind;
-  /**
-   * Zero-based index of this nonempty match in forward text order on this
-   * side of the turn, for the same query and flags.
-   * @integer
-   * @minimum 0
-   */
-  occurrence: number;
-}
-
-/**
- * Searches visible request and response text in retained completed turns.
- * Returns match locators newest first, independently of the subscription.
- * Requires `ChatState.historyNavigation`.
- *
- * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
- * @category Commands
- * @method searchChatTurns
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface SearchChatTurnsParams extends BaseParams, PaginatedParams {
-  /** Chat URI. */
-  channel: URI;
-  /**
-   * Nonempty literal text, or a pattern when `isRegex` is true.
-   * @minLength 1
-   */
-  query: string;
-  /** Case-sensitive matching; defaults to false. */
-  matchCase?: boolean;
-  /** Require whole-word matches; defaults to false. */
-  wholeWord?: boolean;
-  /** Treat the query as a regular expression; defaults to false. */
-  isRegex?: boolean;
-  /** Opaque cursor for the same chat, query and effective flags; omit to start at the newest turn. */
-  cursor?: string;
-  /**
-   * Maximum matches in the page; defaults to 100. The host may return fewer.
-   * @integer
-   * @minimum 1
-   */
-  limit?: number;
-}
-
-/** One page of match locators, which may end within a turn or side. */
-export interface SearchChatTurnsResult extends PaginatedResult {
-  /** Match locators in reverse transcript order. */
-  items: ChatTurnMatch[];
-  /**
-   * Resume after the last result or scanned position. A bounded scan may
-   * return no matches with an advancing cursor; only absence means done.
-   */
-  nextCursor?: string;
 }

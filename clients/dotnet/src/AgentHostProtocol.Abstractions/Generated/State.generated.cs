@@ -2173,6 +2173,11 @@ public sealed record MultipleChatsCapability
     public bool? SideChat { get; init; }
 }
 
+/// <summary>Presence advertises `listChatTurns` and `readChatTurns` for this chat.</summary>
+public sealed record ChatHistoryBrowsingCapability
+{
+}
+
 /// <summary>Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.</summary>
 public sealed record MultipleWorkingDirectoriesCapability
 {
@@ -2643,11 +2648,9 @@ public sealed class ChatState
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
 
-    /// <summary>When true, the host supports `listChatTurns`, `readChatTurns`, and
-    /// `searchChatTurns` over this chat's retained history, independently of
-    /// the subscription window. Absent or false means unsupported.</summary>
+    /// <summary>Browse retained history independently of the subscription window. Absent when unsupported.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? HistoryNavigation { get; set; }
+    public ChatHistoryBrowsingCapability? HistoryBrowsing { get; set; }
 
     /// <summary>Cursor for loading older completed turns into this chat state.
     ///

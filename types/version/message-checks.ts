@@ -62,7 +62,6 @@ type _ExpectedCommands =
   | 'disposeChat'
   | 'listChatTurns'
   | 'readChatTurns'
-  | 'searchChatTurns'
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'

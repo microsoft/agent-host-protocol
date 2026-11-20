@@ -52,9 +52,9 @@ older turn).
 
 ### Read-only history navigation
 
-When `ChatState.historyNavigation` is `true`, the host supports **all three** commands below on that chat URI. Absent or `false` means unsupported. A client discovers this from the snapshot, including after reconnect; it MUST NOT infer support from the protocol version or `turnsNextCursor`.
+When `ChatState.historyBrowsing` is present (for example, `"historyBrowsing": {}`), the host supports both `listChatTurns` and `readChatTurns` on that chat URI. Absence means unsupported. A client discovers support from the snapshot, including after reconnect; it MUST NOT infer support from the protocol version or `turnsNextCursor`.
 
-These are reads of the host's retained, completed transcript, including turns outside the subscription window. “Completed” means a `Turn` with any terminal state, not just `complete`. Drafts, pending messages and `activeTurn` are not history. Apply the same access checks and visibility rules as for reading the chat. Each result is private to the caller. The commands MUST NOT create or expand a subscription, fetch the gap, dispatch `chat/turnsLoaded`, change `turnsNextCursor`, or mark the chat read. Queries, selected matches, sidebar position and viewport are client-local, not replayable chat state.
+These are reads of the host's retained, completed transcript, including turns outside the subscription window. “Completed” means a `Turn` with any terminal state, not just `complete`. Drafts, pending messages and `activeTurn` are not history. Apply the same access checks and visibility rules as for reading the chat. Each result is private to the caller. The commands MUST NOT create or expand a subscription, fetch the gap, dispatch `chat/turnsLoaded`, change `turnsNextCursor`, or mark the chat read. The reader's position is client-local, not replayable chat state.
 
 #### List the prompt index
 
@@ -76,24 +76,13 @@ These are reads of the host's retained, completed transcript, including turns ou
 
 Hosts MUST bound both the turn count and the serialized response size. Target at most 4 MiB of UTF-8 encoded JSON per result; a smaller budget is permitted. If the required turn (the anchor for `around`, the nearest adjacent turn for `before`/`after`) alone exceeds this target, the host may return it alone **only** within a finite, transport-safe hard byte limit. If it cannot fit, return `InternalError` (`-32603`) with an explanatory message. Do not truncate a turn, skip an oversized immediate neighbor, or return an empty page that cannot advance.
 
-#### Search visible text
-
-`searchChatTurns` returns `{ turnId, kind, occurrence }` locators, not snippets or offsets. Search only text that can be revealed to the caller:
-
-- `request`: the full visible initiating `Message.text`, not its index preview. Exclude hidden requests and system notifications.
-- `response`: visible text of `markdown` response parts in stream order. Match their displayed text (for example, a link's label, not its destination or Markdown delimiters), separately per part. Matches do not cross parts. Do not search reasoning, tool names, calls, arguments or output, attachments, content references, other response-part kinds, metadata, or raw provider transcripts.
-
-Omitted `matchCase`, `wholeWord` and `isRegex` each mean `false`: the default query is literal, case-insensitive, and may match inside words. A regex uses ECMAScript Unicode matching, case-insensitive unless `matchCase` is true. Whole-word mode applies ECMAScript word boundaries at word ends. Match left to right without overlap, ignoring zero-width matches. A host SHOULD bound regex execution; reject an invalid or over-budget pattern rather than report a partial scan as exhaustive.
-
-Number nonempty matches **from zero in forward text order**, restarting for each side of each turn and continuing across the visible Markdown parts of the response. Return turns **newest first**; within a turn return response before request and occurrences in descending order. For example, searching `map` in a request `map` and a response `map then map` yields `response:1`, `response:0`, `request:0`. A page may end between these matches. To reveal a match outside the subscription, read `around` its turn ID and locate the same forward occurrence on that side. The client need not load the intervening transcript.
-
 #### Continuation and errors
 
-For list and search, omit `cursor` for the first page; the default `limit` is 100 **entries or matches**. For all three commands `limit` must be a positive integer; hosts may cap it and return fewer. Echo `nextCursor` unchanged for the following page. Its absence means the traversal is complete. A bounded search may return no matches yet with an advancing `nextCursor`; this is not a final “no matches.”
+For `listChatTurns`, omit `cursor` for the first page; the default `limit` is 100 entries. Echo `nextCursor` unchanged for the following page. Its absence means the traversal is complete. For both commands `limit` must be a positive integer; hosts may cap it and return fewer.
 
-Cursors are opaque and scoped to the connection, method, chat, and (for search) the query and effective flags. They are not `turnsNextCursor` values. Following a chain MUST enumerate the first page's ordered history without duplicates or omissions, even when a page ends within a turn. New completions do not join a traversal already in progress. A retry of the same cursor resumes from the same boundary or fails explicitly. If a change to retained history or cursor expiry prevents a consistent continuation, return `Conflict` (`-32011`); the client discards that traversal and restarts without a cursor. Discard cursors on reconnect.
+Cursors are opaque and scoped to the connection, method, and chat. They are not `turnsNextCursor` values. Following a chain MUST enumerate the first page's ordered index without duplicates or omissions. New completions do not join a traversal already in progress. A retry of the same cursor resumes from the same boundary or fails explicitly. If a change to retained history or cursor expiry prevents a consistent continuation, return `Conflict` (`-32011`); the client discards that traversal and restarts without a cursor. Discard cursors on reconnect.
 
-Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, invalid direction or limit, empty query, or an invalid or over-budget regex. An unavailable command, including for a chat that does not advertise `historyNavigation`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index or a successful search. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
+Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, or an invalid direction or limit. An unavailable command, including for a chat that does not advertise `historyBrowsing`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
 
 ### Reasoning timing
 
@@ -436,7 +425,6 @@ This section lists wire methods that are interpreted in the context of a chat UR
 | `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
 | `listChatTurns` | request | Page the retained prompt index without loading turns into state. |
 | `readChatTurns` | request | Read a bounded window around, before, or after a retained turn. |
-| `searchChatTurns` | request | Find occurrences in visible retained request and response text. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 
 `createChat` is dispatched against the owning session URI (`params.channel = "ahp-session:/<sid>"`).

@@ -68,7 +68,7 @@ import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/c
 import type { CreateTcpConnectionParams } from '../src/types/channels-tcp/commands.js';
 import type {
   ChatSource, CreateChatParams, ListChatTurnsParams, ListChatTurnsResult, ReadChatTurnsParams,
-  ReadChatTurnsResult, SearchChatTurnsParams, SearchChatTurnsResult,
+  ReadChatTurnsResult,
 } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
@@ -257,8 +257,6 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'ListChatTurnsResult': void (parsed as ListChatTurnsResult); break;
     case 'ReadChatTurnsParams': void (parsed as ReadChatTurnsParams); break;
     case 'ReadChatTurnsResult': void (parsed as ReadChatTurnsResult); break;
-    case 'SearchChatTurnsParams': void (parsed as SearchChatTurnsParams); break;
-    case 'SearchChatTurnsResult': void (parsed as SearchChatTurnsResult); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;
     case 'SubscribeParams':     void (parsed as SubscribeParams); break;

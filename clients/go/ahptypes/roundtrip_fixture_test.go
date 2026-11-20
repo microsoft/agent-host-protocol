@@ -278,14 +278,6 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v ReadChatTurnsResult
 		dec(&v)
 		return enc(&v)
-	case "SearchChatTurnsParams":
-		var v SearchChatTurnsParams
-		dec(&v)
-		return enc(&v)
-	case "SearchChatTurnsResult":
-		var v SearchChatTurnsResult
-		dec(&v)
-		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)

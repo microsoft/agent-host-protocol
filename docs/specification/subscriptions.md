@@ -53,7 +53,7 @@ route any message using only its `method` and `params.channel`.
 | `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | `ahp-root://`. Either peer can send these requests. |
 | `runAutomation`, `fetchAutomationRuns` | `ahp-automations://` |
 | `createSession`, `disposeSession`, `createChat` | The session URI. For `createSession`, this is the URI of the new session. |
-| `fetchTurns`, `listChatTurns`, `readChatTurns`, `searchChatTurns`, `completions`, `disposeChat` | The chat URI |
+| `fetchTurns`, `listChatTurns`, `readChatTurns`, `completions`, `disposeChat` | The chat URI |
 | `moveChat` | The URI of the chat to move |
 | `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
 | `createTcpConnection` | The URI of the new TCP channel |

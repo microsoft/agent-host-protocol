@@ -1641,6 +1641,14 @@ public struct MultipleChatsCapability: Codable, Sendable, Equatable {
     }
 }
 
+public struct ChatHistoryBrowsingCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
 public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable {
     /// The agent's **first** working directory (index `0` of
     /// {@link CreateSessionParams.workingDirectories}) is an immutable primary:
@@ -2040,10 +2048,8 @@ public struct ChatState: Codable, Sendable, Equatable {
     public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
-    /// When true, the host supports `listChatTurns`, `readChatTurns`, and
-    /// `searchChatTurns` over this chat's retained history, independently of
-    /// the subscription window. Absent or false means unsupported.
-    public var historyNavigation: Bool?
+    /// Browse retained history independently of the subscription window. Absent when unsupported.
+    public var historyBrowsing: ChatHistoryBrowsingCapability?
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
@@ -2094,7 +2100,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         case canvases
         case config
         case turns
-        case historyNavigation
+        case historyBrowsing
         case turnsNextCursor
         case activeTurn
         case steeringMessage
@@ -2120,7 +2126,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
         turns: [Turn],
-        historyNavigation: Bool? = nil,
+        historyBrowsing: ChatHistoryBrowsingCapability? = nil,
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
@@ -2144,7 +2150,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         self.canvases = canvases
         self.config = config
         self.turns = turns
-        self.historyNavigation = historyNavigation
+        self.historyBrowsing = historyBrowsing
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
         self.steeringMessage = steeringMessage

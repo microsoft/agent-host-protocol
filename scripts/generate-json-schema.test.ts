@@ -625,7 +625,6 @@ describe('generated JSON schemas', () => {
         for (const [name, params] of [
           ['ListChatTurnsParams', { channel }],
           ['ReadChatTurnsParams', { channel, turnId }],
-          ['SearchChatTurnsParams', { channel, query: 'x' }],
         ] as const) {
           assert.ok(accepts(name, params), 'all modifiers are optional');
           assert.ok(!accepts(name, { ...params, limit: 0 }));
@@ -635,15 +634,14 @@ describe('generated JSON schemas', () => {
         assert.ok(!accepts('ReadChatTurnsParams', { channel, turnId, direction: 'latest' }));
         assert.ok(!accepts('ReadChatTurnsResult', { turns: [], hasBefore: false }));
         assert.ok(!accepts('ReadChatTurnsResult', { turns: [{ turnId }], hasBefore: false, hasAfter: true }));
-        assert.ok(!accepts('SearchChatTurnsParams', { channel, query: '' }));
-        assert.ok(!accepts('SearchChatTurnsResult', { items: [{ turnId, kind: 'reasoning', occurrence: 0 }] }));
-        assert.ok(!accepts('SearchChatTurnsResult', { items: [{ turnId, kind: 'response', occurrence: -1 }] }));
         const page = (preview: string) => ({ items: [{ turnId, preview }] });
         assert.ok(accepts('ListChatTurnsResult', page('🌱'.repeat(80))));
         assert.ok(!accepts('ListChatTurnsResult', page('🌱'.repeat(81))));
 
-        assert.equal((defs.ChatState.properties as Record<string, { type?: string }>).historyNavigation.type, 'boolean');
-        assert.ok(!(defs.ChatState.required as string[]).includes('historyNavigation'));
+        const browsing = (defs.ChatState.properties as Record<string, JsonNode>).historyBrowsing;
+        assert.ok(schemaAccepts(schema, browsing, {}));
+        assert.ok(!schemaAccepts(schema, browsing, true));
+        assert.ok(!(defs.ChatState.required as string[]).includes('historyBrowsing'));
       });
 
       it('constrains stable chat move destinations and results', () => {

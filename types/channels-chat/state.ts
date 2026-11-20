@@ -31,6 +31,9 @@ import type {
 
 // ─── Chat State ──────────────────────────────────────────────────────────────
 
+/** Presence advertises `listChatTurns` and `readChatTurns` for this chat. */
+export interface ChatHistoryBrowsingCapability {}
+
 /**
  * Full state for a single chat, loaded when a client subscribes to the chat's
  * URI.
@@ -145,12 +148,8 @@ export interface ChatState {
   // ── Conversation contents ──────────────────────────────────────────
   /** Completed turns */
   turns: Turn[];
-  /**
-   * When true, the host supports `listChatTurns`, `readChatTurns`, and
-   * `searchChatTurns` over this chat's retained history, independently of
-   * the subscription window. Absent or false means unsupported.
-   */
-  historyNavigation?: boolean;
+  /** Browse retained history independently of the subscription window. Absent when unsupported. */
+  historyBrowsing?: ChatHistoryBrowsingCapability;
   /**
    * Cursor for loading older completed turns into this chat state.
    *
