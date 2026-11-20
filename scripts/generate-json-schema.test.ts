@@ -649,6 +649,26 @@ describe('generated JSON schemas', () => {
         assert.ok(!(defs.ChatState.required as string[]).includes('historyBrowsing'));
       });
 
+      it('keeps chat history search optional and its match locators addressable', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, JsonNode>;
+        const cap = defs.ChatHistoryBrowsingCapability;
+        assert.ok(schemaAccepts(schema, cap, {}));
+        assert.ok(schemaAccepts(schema, cap, { search: {} }));
+        assert.ok(!schemaAccepts(schema, cap, { search: true }));
+
+        const params = { channel: 'ahp-chat:/c1', query: 'map' };
+        assert.ok(schemaAccepts(schema, defs.SearchChatTurnsParams, params));
+        for (const invalid of [{ query: '' }, { limit: 0 }, { limit: 1.5 }]) {
+          assert.ok(!schemaAccepts(schema, defs.SearchChatTurnsParams, { ...params, ...invalid }));
+        }
+        for (const invalid of [{ kind: 'reasoning', occurrence: 0 }, { kind: 'response', occurrence: -1 }]) {
+          assert.ok(!schemaAccepts(schema, defs.SearchChatTurnsResult, { items: [{ turnId: 't1', ...invalid }] }));
+        }
+      });
+
       it('constrains stable chat move destinations and results', () => {
         if (file !== 'commands.schema.json') {
           return;

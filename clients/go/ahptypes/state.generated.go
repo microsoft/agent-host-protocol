@@ -878,6 +878,12 @@ type MultipleChatsCapability struct {
 
 // Presence advertises `listChatTurns` and `readChatTurns` for this chat.
 type ChatHistoryBrowsingCapability struct {
+	// Presence advertises host-side search; omit for browsing-only chats.
+	Search *ChatHistorySearchCapability `json:"search,omitempty"`
+}
+
+// Presence advertises `searchChatTurns`. Open a result with `readChatTurns`.
+type ChatHistorySearchCapability struct {
 }
 
 // Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.

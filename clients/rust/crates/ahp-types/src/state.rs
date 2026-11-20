@@ -1968,9 +1968,18 @@ pub struct MultipleChatsCapability {
 }
 
 /// Presence advertises `listChatTurns` and `readChatTurns` for this chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryBrowsingCapability {
+    /// Presence advertises host-side search; omit for browsing-only chats.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<ChatHistorySearchCapability>,
+}
+
+/// Presence advertises `searchChatTurns`. Open a result with `readChatTurns`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChatHistoryBrowsingCapability {}
+pub struct ChatHistorySearchCapability {}
 
 /// Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

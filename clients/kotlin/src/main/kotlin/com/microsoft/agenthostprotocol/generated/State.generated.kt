@@ -1645,7 +1645,15 @@ data class MultipleChatsCapability(
 )
 
 @Serializable
-class ChatHistoryBrowsingCapability
+data class ChatHistoryBrowsingCapability(
+    /**
+     * Presence advertises host-side search; omit for browsing-only chats.
+     */
+    val search: ChatHistorySearchCapability? = null
+)
+
+@Serializable
+class ChatHistorySearchCapability
 
 @Serializable
 data class MultipleWorkingDirectoriesCapability(

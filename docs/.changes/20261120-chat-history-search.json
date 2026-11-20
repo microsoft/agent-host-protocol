@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Chats with `historyBrowsing.search` support `searchChatTurns` to find occurrences in visible retained request and response text. Open a match with `readChatTurns` without loading the intervening history."
+}

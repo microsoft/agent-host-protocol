@@ -1,0 +1,8 @@
+{
+  "name": "search-chat-turns-result",
+  "group": "A",
+  "description": "Repeated matches are located per side in forward text, but delivered in reverse; a final page omits nextCursor.",
+  "type": "SearchChatTurnsResult",
+  "input": { "items": [{ "turnId": "t1", "kind": "response", "occurrence": 1 }, { "turnId": "t1", "kind": "response", "occurrence": 0 }, { "turnId": "t1", "kind": "request", "occurrence": 0 }] },
+  "acceptableOutputs": [{ "items": [{ "turnId": "t1", "kind": "response", "occurrence": 1 }, { "turnId": "t1", "kind": "response", "occurrence": 0 }, { "turnId": "t1", "kind": "request", "occurrence": 0 }] }]
+}

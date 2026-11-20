@@ -363,3 +363,72 @@ export interface ReadChatTurnsResult extends PaginatedResult {
   /** Read immediately after the last returned turn; absent at the end. */
   nextCursor?: string;
 }
+
+/**
+ * The searchable side of a completed turn.
+ * @exhaustive
+ */
+export const enum ChatTurnMatchKind {
+  Request = 'request',
+  Response = 'response',
+}
+
+/** A match locator, not a snippet, text offset, or response-part identifier. */
+export interface ChatTurnMatch {
+  turnId: string;
+  kind: ChatTurnMatchKind;
+  /**
+   * Zero-based index of this nonempty match in forward text order on this
+   * side of the turn, for the same query and flags.
+   * @integer
+   * @minimum 0
+   */
+  occurrence: number;
+}
+
+/**
+ * Searches visible request and response text in retained completed turns.
+ * Returns match locators newest first, independently of the subscription.
+ * Requires `ChatState.historyBrowsing.search`.
+ *
+ * @see {@link /specification/chat-channel#search-visible-text | Search visible text}
+ * @category Commands
+ * @method searchChatTurns
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface SearchChatTurnsParams extends BaseParams, PaginatedParams {
+  /** Chat URI. */
+  channel: URI;
+  /**
+   * Nonempty literal text, or a pattern when `isRegex` is true.
+   * @minLength 1
+   */
+  query: string;
+  /** Case-sensitive matching; defaults to false. */
+  matchCase?: boolean;
+  /** Require whole-word matches; defaults to false. */
+  wholeWord?: boolean;
+  /** Treat the query as a regular expression; defaults to false. */
+  isRegex?: boolean;
+  /** Opaque cursor for the same chat, query and effective flags; omit to start at the newest turn. */
+  cursor?: string;
+  /**
+   * Maximum matches in the page; defaults to 100. The host may return fewer.
+   * @integer
+   * @minimum 1
+   */
+  limit?: number;
+}
+
+/** One page of match locators, which may end within a turn or side. */
+export interface SearchChatTurnsResult extends PaginatedResult {
+  /** Match locators in reverse transcript order. */
+  items: ChatTurnMatch[];
+  /**
+   * Resume after the last result or scanned position. A bounded scan may
+   * return no matches with an advancing cursor; only absence means done.
+   */
+  nextCursor?: string;
+}

@@ -1818,6 +1818,93 @@
         "turns"
       ]
     },
+    "ChatTurnMatch": {
+      "type": "object",
+      "description": "A match locator, not a snippet, text offset, or response-part identifier.",
+      "properties": {
+        "turnId": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatTurnMatchKind"
+        },
+        "occurrence": {
+          "type": "integer",
+          "description": "Zero-based index of this nonempty match in forward text order on this\nside of the turn, for the same query and flags.",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "turnId",
+        "kind",
+        "occurrence"
+      ]
+    },
+    "SearchChatTurnsParams": {
+      "type": "object",
+      "description": "Searches visible request and response text in retained completed turns.\nReturns match locators newest first, independently of the subscription.\nRequires `ChatState.historyBrowsing.search`.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum matches in the page; defaults to 100. The host may return fewer.",
+          "minimum": 1
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor for the same chat, query and effective flags; omit to start at the newest turn."
+        },
+        "query": {
+          "type": "string",
+          "description": "Nonempty literal text, or a pattern when `isRegex` is true.",
+          "minLength": 1
+        },
+        "matchCase": {
+          "type": "boolean",
+          "description": "Case-sensitive matching; defaults to false."
+        },
+        "wholeWord": {
+          "type": "boolean",
+          "description": "Require whole-word matches; defaults to false."
+        },
+        "isRegex": {
+          "type": "boolean",
+          "description": "Treat the query as a regular expression; defaults to false."
+        }
+      },
+      "required": [
+        "channel",
+        "query"
+      ]
+    },
+    "SearchChatTurnsResult": {
+      "type": "object",
+      "description": "One page of match locators, which may end within a turn or side.",
+      "properties": {
+        "nextCursor": {
+          "type": "string",
+          "description": "Resume after the last result or scanned position. A bounded scan may\nreturn no matches with an advancing cursor; only absence means done."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatTurnMatch"
+          },
+          "description": "Match locators in reverse transcript order."
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
     "CreateTerminalParams": {
       "type": "object",
       "description": "Creates a new terminal on the server.\n\nAfter creation, the client should subscribe to the terminal URI to receive\nstate updates. The server dispatches `root/terminalsChanged` to update the\nroot terminal list.",
@@ -4792,6 +4879,16 @@
     "ChatHistoryBrowsingCapability": {
       "type": "object",
       "description": "Presence advertises `listChatTurns` and `readChatTurns` for this chat.",
+      "properties": {
+        "search": {
+          "$ref": "#/$defs/ChatHistorySearchCapability",
+          "description": "Presence advertises host-side search; omit for browsing-only chats."
+        }
+      }
+    },
+    "ChatHistorySearchCapability": {
+      "type": "object",
+      "description": "Presence advertises `searchChatTurns`. Open a result with `readChatTurns`.",
       "properties": {}
     },
     "ChatState": {
@@ -11396,6 +11493,14 @@
         }
       ],
       "description": "An attachment associated with a {@link Message}."
+    },
+    "ChatTurnMatchKind": {
+      "enum": [
+        "request",
+        "response"
+      ],
+      "type": "string",
+      "description": "The searchable side of a completed turn."
     },
     "TerminalClaim": {
       "oneOf": [

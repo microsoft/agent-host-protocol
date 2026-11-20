@@ -2910,6 +2910,16 @@
     "ChatHistoryBrowsingCapability": {
       "type": "object",
       "description": "Presence advertises `listChatTurns` and `readChatTurns` for this chat.",
+      "properties": {
+        "search": {
+          "$ref": "#/$defs/ChatHistorySearchCapability",
+          "description": "Presence advertises host-side search; omit for browsing-only chats."
+        }
+      }
+    },
+    "ChatHistorySearchCapability": {
+      "type": "object",
+      "description": "Presence advertises `searchChatTurns`. Open a result with `readChatTurns`.",
       "properties": {}
     },
     "ChatState": {

@@ -141,6 +141,10 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "readChatTurns", params: params)
     }
 
+    public static func searchChatTurns(id: Int, params: SearchChatTurnsParams) -> JsonRpcRequest<SearchChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "searchChatTurns", params: params)
+    }
+
     public static func authenticate(id: Int, params: AuthenticateParams) -> JsonRpcRequest<AuthenticateParams> {
         JsonRpcRequest(id: id, method: "authenticate", params: params)
     }

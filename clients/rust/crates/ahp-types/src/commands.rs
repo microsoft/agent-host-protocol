@@ -109,6 +109,15 @@ impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
     }
 }
 
+/// The searchable side of a completed turn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChatTurnMatchKind {
+    #[serde(rename = "request")]
+    Request,
+    #[serde(rename = "response")]
+    Response,
+}
+
 /// Native filesystem path grammar used by a host environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PathStyle {
@@ -1785,6 +1794,66 @@ pub struct ReadChatTurnsResult {
     /// Read immediately before the first returned turn; absent at the start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_cursor: Option<String>,
+}
+
+/// A match locator, not a snippet, text offset, or response-part identifier.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTurnMatch {
+    pub turn_id: String,
+    pub kind: ChatTurnMatchKind,
+    /// Zero-based index of this nonempty match in forward text order on this
+    /// side of the turn, for the same query and flags.
+    pub occurrence: i64,
+}
+
+/// Searches visible request and response text in retained completed turns.
+/// Returns match locators newest first, independently of the subscription.
+/// Requires `ChatState.historyBrowsing.search`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchChatTurnsParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Nonempty literal text, or a pattern when `isRegex` is true.
+    pub query: String,
+    /// Case-sensitive matching; defaults to false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_case: Option<bool>,
+    /// Require whole-word matches; defaults to false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whole_word: Option<bool>,
+    /// Treat the query as a regular expression; defaults to false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_regex: Option<bool>,
+}
+
+/// One page of match locators, which may end within a turn or side.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchChatTurnsResult {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    /// Match locators in reverse transcript order.
+    pub items: Vec<ChatTurnMatch>,
 }
 
 /// Stop receiving updates for a channel.

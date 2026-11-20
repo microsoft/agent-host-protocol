@@ -32,7 +32,13 @@ import type {
 // ─── Chat State ──────────────────────────────────────────────────────────────
 
 /** Presence advertises `listChatTurns` and `readChatTurns` for this chat. */
-export interface ChatHistoryBrowsingCapability {}
+export interface ChatHistoryBrowsingCapability {
+  /** Presence advertises host-side search; omit for browsing-only chats. */
+  search?: ChatHistorySearchCapability;
+}
+
+/** Presence advertises `searchChatTurns`. Open a result with `readChatTurns`. */
+export interface ChatHistorySearchCapability {}
 
 /**
  * Full state for a single chat, loaded when a client subscribes to the chat's
