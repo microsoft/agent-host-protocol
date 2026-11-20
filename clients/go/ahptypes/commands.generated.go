@@ -43,18 +43,6 @@ const (
 	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
 )
 
-// Which contiguous window of completed turns to read, relative to an anchor.
-type ChatTurnReadDirection string
-
-const (
-	// Include the anchor and nearby turns.
-	ChatTurnReadDirectionAround ChatTurnReadDirection = "around"
-	// Immediately preceding turns, excluding the anchor.
-	ChatTurnReadDirectionBefore ChatTurnReadDirection = "before"
-	// Immediately following turns, excluding the anchor.
-	ChatTurnReadDirectionAfter ChatTurnReadDirection = "after"
-)
-
 // Native filesystem path grammar used by a host environment.
 type PathStyle string
 
@@ -1360,31 +1348,33 @@ type ListChatTurnsResult struct {
 	Items []ChatTurnIndexEntry `json:"items"`
 }
 
-// Reads a byte-bounded window of completed turns directly, without changing
-// any subscription or fetching intervening pages. Requires
-// `ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).
+// Reads a byte-bounded page of completed turns without changing a subscription.
+// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
+// Requires `ChatState.historyBrowsing`.
 type ReadChatTurnsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Identifier of the retained completed turn anchoring the window.
-	TurnId string `json:"turnId"`
-	// Defaults to `around`.
-	Direction *ChatTurnReadDirection `json:"direction,omitempty"`
-	// Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+	// Stable ID of the first turn to return. Omit when continuing by cursor.
+	FromTurnId *string `json:"fromTurnId,omitempty"`
+	// Echo either cursor from a previous read page. Omit when opening by ID.
+	Cursor *string `json:"cursor,omitempty"`
+	// Maximum number of whole turns on this page; defaults to 10.
 	Limit *int64 `json:"limit,omitempty"`
 }
 
-// A contiguous slice of the transcript, not a chat snapshot or a state update.
+// A contiguous page of the transcript, not a chat snapshot or a state update.
 type ReadChatTurnsResult struct {
-	// Whole turns in chronological order for all three directions.
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// Consecutive whole turns, oldest first, including on a previous-page read.
 	Turns []Turn `json:"turns"`
-	// Whether retained completed turns precede this window.
-	HasBefore bool `json:"hasBefore"`
-	// Whether retained completed turns follow this window.
-	HasAfter bool `json:"hasAfter"`
+	// Read immediately before the first returned turn; absent at the start.
+	PreviousCursor *string `json:"previousCursor,omitempty"`
 }
 
 // Stop receiving updates for a channel.

@@ -90,28 +90,6 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 }
 
 /**
- * Which contiguous window of completed turns to read, relative to an anchor.
- */
-@Serializable
-enum class ChatTurnReadDirection {
-    /**
-     * Include the anchor and nearby turns.
-     */
-    @SerialName("around")
-    AROUND,
-    /**
-     * Immediately preceding turns, excluding the anchor.
-     */
-    @SerialName("before")
-    BEFORE,
-    /**
-     * Immediately following turns, excluding the anchor.
-     */
-    @SerialName("after")
-    AFTER
-}
-
-/**
  * Native filesystem path grammar used by a host environment.
  */
 @Serializable
@@ -1657,15 +1635,15 @@ data class ReadChatTurnsParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Identifier of the retained completed turn anchoring the window.
+     * Stable ID of the first turn to return. Omit when continuing by cursor.
      */
-    val turnId: String,
+    val fromTurnId: String? = null,
     /**
-     * Defaults to `around`.
+     * Echo either cursor from a previous read page. Omit when opening by ID.
      */
-    val direction: ChatTurnReadDirection? = null,
+    val cursor: String? = null,
     /**
-     * Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+     * Maximum number of whole turns on this page; defaults to 10.
      */
     val limit: Long? = null
 )
@@ -1673,17 +1651,19 @@ data class ReadChatTurnsParams(
 @Serializable
 data class ReadChatTurnsResult(
     /**
-     * Whole turns in chronological order for all three directions.
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * Consecutive whole turns, oldest first, including on a previous-page read.
      */
     val turns: List<Turn>,
     /**
-     * Whether retained completed turns precede this window.
+     * Read immediately before the first returned turn; absent at the start.
      */
-    val hasBefore: Boolean,
-    /**
-     * Whether retained completed turns follow this window.
-     */
-    val hasAfter: Boolean
+    val previousCursor: String? = null
 )
 
 @Serializable

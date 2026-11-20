@@ -20,7 +20,7 @@ import {
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
@@ -271,7 +271,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = sf.getInterface(name);
+    const iface = findWireFields(sf, name);
     if (iface) return iface;
   }
   return undefined;
@@ -1913,7 +1913,7 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },

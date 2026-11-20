@@ -199,7 +199,6 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ChatTurnCancelledAction))]
 [JsonSerializable(typeof(ChatTurnCompleteAction))]
 [JsonSerializable(typeof(ChatTurnIndexEntry))]
-[JsonSerializable(typeof(ChatTurnReadDirection))]
 [JsonSerializable(typeof(ChatTurnResumeAction))]
 [JsonSerializable(typeof(ChatTurnsLoadedAction))]
 [JsonSerializable(typeof(ChatTurnStartedAction))]

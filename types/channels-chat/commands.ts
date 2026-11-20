@@ -307,22 +307,9 @@ export interface ListChatTurnsResult extends PaginatedResult {
 }
 
 /**
- * Which contiguous window of completed turns to read, relative to an anchor.
- * @exhaustive
- */
-export const enum ChatTurnReadDirection {
-  /** Include the anchor and nearby turns. */
-  Around = 'around',
-  /** Immediately preceding turns, excluding the anchor. */
-  Before = 'before',
-  /** Immediately following turns, excluding the anchor. */
-  After = 'after',
-}
-
-/**
- * Reads a byte-bounded window of completed turns directly, without changing
- * any subscription or fetching intervening pages. Requires
- * `ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).
+ * Reads a byte-bounded page of completed turns without changing a subscription.
+ * Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
+ * Requires `ChatState.historyBrowsing`.
  *
  * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
  * @category Commands
@@ -331,27 +318,48 @@ export const enum ChatTurnReadDirection {
  * @messageType Request
  * @version 1
  */
-export interface ReadChatTurnsParams extends BaseParams {
+interface ReadChatTurnsPageParams extends BaseParams {
   /** Chat URI. */
   channel: URI;
-  /** Identifier of the retained completed turn anchoring the window. */
-  turnId: string;
-  /** Defaults to `around`. */
-  direction?: ChatTurnReadDirection;
+  /** Stable ID of the first turn to return. Omit when continuing by cursor. */
+  fromTurnId?: string;
+  /** Echo either cursor from a previous read page. Omit when opening by ID. */
+  cursor?: string;
   /**
-   * Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+   * Maximum number of whole turns on this page; defaults to 10.
    * @integer
    * @minimum 1
    */
   limit?: number;
 }
 
-/** A contiguous slice of the transcript, not a chat snapshot or a state update. */
-export interface ReadChatTurnsResult {
-  /** Whole turns in chronological order for all three directions. */
+/** Open a page starting at a retained completed turn, inclusive. */
+interface ReadChatTurnsFromTurnParams extends ReadChatTurnsPageParams {
+  fromTurnId: string;
+  cursor?: never;
+}
+
+/** Continue immediately before or after a returned page. The cursor carries the direction. */
+interface ReadChatTurnsFromCursorParams extends ReadChatTurnsPageParams {
+  fromTurnId?: never;
+  cursor: string;
+}
+
+/**
+ * Select exactly one starting position: a turn ID or a continuation cursor.
+ * @wireFields ReadChatTurnsPageParams
+ */
+export type ReadChatTurnsParams = ReadChatTurnsFromTurnParams | ReadChatTurnsFromCursorParams;
+
+/** A contiguous page of the transcript, not a chat snapshot or a state update. */
+export interface ReadChatTurnsResult extends PaginatedResult {
+  /**
+   * Consecutive whole turns, oldest first, including on a previous-page read.
+   * @minItems 1
+   */
   turns: Turn[];
-  /** Whether retained completed turns precede this window. */
-  hasBefore: boolean;
-  /** Whether retained completed turns follow this window. */
-  hasAfter: boolean;
+  /** Read immediately before the first returned turn; absent at the start. */
+  previousCursor?: string;
+  /** Read immediately after the last returned turn; absent at the end. */
+  nextCursor?: string;
 }
