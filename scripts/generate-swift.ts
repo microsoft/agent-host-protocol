@@ -21,7 +21,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
 import { getDocumentation, readStability } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
@@ -243,7 +243,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = sf.getInterface(name);
+    const iface = findWireFields(sf, name);
     if (iface) return iface;
   }
   return undefined;
@@ -750,6 +750,7 @@ const STATE_STRUCTS = [
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
+  'ChatHistoryBrowsingCapability',
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
@@ -1800,6 +1801,8 @@ const COMMAND_STRUCTS = [
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'ChatTurnIndexEntry', 'ListChatTurnsParams', 'ListChatTurnsResult',
+  'ReadChatTurnsParams', 'ReadChatTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2377,6 +2380,14 @@ public enum AHPCommands {
 
     public static func fetchTurns(id: Int, params: FetchTurnsParams) -> JsonRpcRequest<FetchTurnsParams> {
         JsonRpcRequest(id: id, method: "fetchTurns", params: params)
+    }
+
+    public static func listChatTurns(id: Int, params: ListChatTurnsParams) -> JsonRpcRequest<ListChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "listChatTurns", params: params)
+    }
+
+    public static func readChatTurns(id: Int, params: ReadChatTurnsParams) -> JsonRpcRequest<ReadChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "readChatTurns", params: params)
     }
 
     public static func authenticate(id: Int, params: AuthenticateParams) -> JsonRpcRequest<AuthenticateParams> {

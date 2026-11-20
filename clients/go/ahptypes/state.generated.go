@@ -876,6 +876,10 @@ type MultipleChatsCapability struct {
 	SideChat *bool `json:"sideChat,omitempty"`
 }
 
+// Presence advertises `listChatTurns` and `readChatTurns` for this chat.
+type ChatHistoryBrowsingCapability struct {
+}
+
 // Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
 type MultipleWorkingDirectoriesCapability struct {
 	// The agent's **first** working directory (index `0` of
@@ -1522,6 +1526,8 @@ type ChatState struct {
 	Config *ChatConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
+	// Browse retained history independently of the subscription window. Absent when unsupported.
+	HistoryBrowsing *ChatHistoryBrowsingCapability `json:"historyBrowsing,omitempty"`
 	// Cursor for loading older completed turns into this chat state.
 	//
 	// Presence means `turns` is a tail window and more historical turns are

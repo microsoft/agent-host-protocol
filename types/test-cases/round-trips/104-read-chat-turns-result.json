@@ -1,0 +1,16 @@
+{
+  "name": "read-chat-turns-result",
+  "group": "A",
+  "description": "A page in the middle includes the selected whole turn and one continuation for each side.",
+  "type": "ReadChatTurnsResult",
+  "input": {
+    "turns": [{ "id": "t1", "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }],
+    "previousCursor": "older",
+    "nextCursor": "newer"
+  },
+  "acceptableOutputs": [{
+    "turns": [{ "id": "t1", "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }],
+    "previousCursor": "older",
+    "nextCursor": "newer"
+  }]
+}

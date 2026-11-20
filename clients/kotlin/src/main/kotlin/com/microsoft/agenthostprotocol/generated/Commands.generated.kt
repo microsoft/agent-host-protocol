@@ -1565,6 +1565,108 @@ data class FetchTurnsParams(
 class FetchTurnsResult
 
 @Serializable
+data class ChatTurnIndexEntry(
+    /**
+     * Stable identifier of the completed turn in this chat.
+     */
+    val turnId: String,
+    /**
+     * First nonempty trimmed prompt line, or empty string. If truncated, the
+     * 80 Unicode scalar values include the trailing ellipsis.
+     */
+    val preview: String,
+    /**
+     * The turn's ISO 8601 start time, if known.
+     */
+    val startedAt: String? = null
+)
+
+@Serializable
+data class ListChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null
+)
+
+@Serializable
+data class ListChatTurnsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * One entry per eligible prompt in transcript order.
+     */
+    val items: List<ChatTurnIndexEntry>
+)
+
+@Serializable
+data class ReadChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Stable ID of the first turn to return. Omit when continuing by cursor.
+     */
+    val fromTurnId: String? = null,
+    /**
+     * Echo either cursor from a previous read page. Omit when opening by ID.
+     */
+    val cursor: String? = null,
+    /**
+     * Maximum number of whole turns on this page; defaults to 10.
+     */
+    val limit: Long? = null
+)
+
+@Serializable
+data class ReadChatTurnsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * Consecutive whole turns, oldest first, including on a previous-page read.
+     */
+    val turns: List<Turn>,
+    /**
+     * Read immediately before the first returned turn; absent at the start.
+     */
+    val previousCursor: String? = null
+)
+
+@Serializable
 data class UnsubscribeParams(
     /**
      * Channel URI to unsubscribe from

@@ -1,0 +1,16 @@
+{
+  "name": "chat-history-navigation-snapshot",
+  "group": "A",
+  "description": "A joining client discovers navigation even when the subscription has loaded no completed turns.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 10,
+    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyBrowsing": {} }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 10,
+    "state": { "resource": "ahp-chat:/c1", "title": "Design", "status": 1, "modifiedAt": "2026-11-18T12:00:00Z", "turns": [], "turnsNextCursor": "older", "historyBrowsing": {} }
+  }]
+}

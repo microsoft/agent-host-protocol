@@ -1,0 +1,8 @@
+{
+  "name": "read-chat-turns-params",
+  "group": "A",
+  "description": "Open a page starting at the selected turn without backfilling the subscription.",
+  "type": "ReadChatTurnsParams",
+  "input": { "channel": "ahp-chat:/c1", "fromTurnId": "t1", "limit": 1 },
+  "acceptableOutputs": [{ "channel": "ahp-chat:/c1", "fromTurnId": "t1", "limit": 1 }]
+}

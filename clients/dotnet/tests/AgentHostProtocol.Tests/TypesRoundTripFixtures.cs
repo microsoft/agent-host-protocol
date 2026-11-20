@@ -166,6 +166,14 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<InitializeResult>(inputJson));
             case "CreateChatParams":
                 return Wrap(Ser.Deserialize<CreateChatParams>(inputJson));
+            case "ListChatTurnsParams":
+                return Wrap(Ser.Deserialize<ListChatTurnsParams>(inputJson));
+            case "ListChatTurnsResult":
+                return Wrap(Ser.Deserialize<ListChatTurnsResult>(inputJson));
+            case "ReadChatTurnsParams":
+                return Wrap(Ser.Deserialize<ReadChatTurnsParams>(inputJson));
+            case "ReadChatTurnsResult":
+                return Wrap(Ser.Deserialize<ReadChatTurnsResult>(inputJson));
             case "Snapshot":
                 return Wrap(Ser.Deserialize<Snapshot>(inputJson));
             case "SubscribeParams":

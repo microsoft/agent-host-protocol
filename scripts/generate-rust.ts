@@ -20,7 +20,7 @@ import {
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
@@ -271,7 +271,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = sf.getInterface(name);
+    const iface = findWireFields(sf, name);
     if (iface) return iface;
   }
   return undefined;
@@ -878,6 +878,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AgentInfo' },
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
+  { name: 'ChatHistoryBrowsingCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
@@ -1953,6 +1954,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
+  { name: 'ChatTurnIndexEntry' }, { name: 'ListChatTurnsParams' }, { name: 'ListChatTurnsResult' },
+  { name: 'ReadChatTurnsParams' }, { name: 'ReadChatTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget', omitDiscriminants: true },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },

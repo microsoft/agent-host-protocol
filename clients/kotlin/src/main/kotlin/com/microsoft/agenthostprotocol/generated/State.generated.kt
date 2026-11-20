@@ -1645,6 +1645,9 @@ data class MultipleChatsCapability(
 )
 
 @Serializable
+class ChatHistoryBrowsingCapability
+
+@Serializable
 data class MultipleWorkingDirectoriesCapability(
     /**
      * The agent's **first** working directory (index `0` of
@@ -1983,6 +1986,10 @@ data class ChatState(
      * Completed turns
      */
     val turns: List<Turn>,
+    /**
+     * Browse retained history independently of the subscription window. Absent when unsupported.
+     */
+    val historyBrowsing: ChatHistoryBrowsingCapability? = null,
     /**
      * Cursor for loading older completed turns into this chat state.
      *

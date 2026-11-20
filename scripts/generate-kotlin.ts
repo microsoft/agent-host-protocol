@@ -33,7 +33,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
 import { getDocumentation, readStability } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
@@ -273,7 +273,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = sf.getInterface(name);
+    const iface = findWireFields(sf, name);
     if (iface) return iface;
   }
   return undefined;
@@ -1027,6 +1027,7 @@ const STATE_STRUCTS = [
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
+  'ChatHistoryBrowsingCapability',
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
@@ -1853,6 +1854,8 @@ const COMMAND_STRUCTS = [
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'ChatTurnIndexEntry', 'ListChatTurnsParams', 'ListChatTurnsResult',
+  'ReadChatTurnsParams', 'ReadChatTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2386,6 +2389,12 @@ object AhpCommands {
 
     fun fetchTurns(id: Long, params: FetchTurnsParams): JsonRpcRequest<FetchTurnsParams> =
         JsonRpcRequest(id = id, method = "fetchTurns", params = params)
+
+    fun listChatTurns(id: Long, params: ListChatTurnsParams): JsonRpcRequest<ListChatTurnsParams> =
+        JsonRpcRequest(id = id, method = "listChatTurns", params = params)
+
+    fun readChatTurns(id: Long, params: ReadChatTurnsParams): JsonRpcRequest<ReadChatTurnsParams> =
+        JsonRpcRequest(id = id, method = "readChatTurns", params = params)
 
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)

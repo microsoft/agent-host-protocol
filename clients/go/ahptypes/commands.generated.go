@@ -1287,7 +1287,7 @@ type CreateResourceWatchResult struct {
 // channel's `turns` state, ahead of the already-loaded window, and update or
 // clear `turnsNextCursor`.
 //
-// Before applying any operation that references a turn outside the currently
+// Before applying any state-changing operation that references a turn outside the currently
 // loaded window, the host MUST eagerly load enough older turns into state for
 // that operation to reduce against valid state.
 type FetchTurnsParams struct {
@@ -1306,6 +1306,75 @@ type FetchTurnsParams struct {
 
 // Result of the `fetchTurns` command.
 type FetchTurnsResult struct {
+}
+
+// A prompt in the retained history, identified by its turn rather than its position.
+type ChatTurnIndexEntry struct {
+	// Stable identifier of the completed turn in this chat.
+	TurnId string `json:"turnId"`
+	// First nonempty trimmed prompt line, or empty string. If truncated, the
+	// 80 Unicode scalar values include the trailing ellipsis.
+	Preview string `json:"preview"`
+	// The turn's ISO 8601 start time, if known.
+	StartedAt *string `json:"startedAt,omitempty"`
+}
+
+// Lists every visible non-system prompt in retained turns, oldest first, across pages.
+// Requires `ChatState.historyBrowsing`. Does not load turns into state.
+type ListChatTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Maximum number of entries to return in this page. The server SHOULD respect
+	// this bound but MAY return fewer entries and MAY impose its own upper cap.
+	// Omit to let the server choose the page size.
+	Limit *int64 `json:"limit,omitempty"`
+	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+	// as opaque — do not parse, modify, or persist them across connections. An
+	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// One chronological page of the prompt index.
+type ListChatTurnsResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// One entry per eligible prompt in transcript order.
+	Items []ChatTurnIndexEntry `json:"items"`
+}
+
+// Reads a byte-bounded page of completed turns without changing a subscription.
+// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
+// Requires `ChatState.historyBrowsing`.
+type ReadChatTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Stable ID of the first turn to return. Omit when continuing by cursor.
+	FromTurnId *string `json:"fromTurnId,omitempty"`
+	// Echo either cursor from a previous read page. Omit when opening by ID.
+	Cursor *string `json:"cursor,omitempty"`
+	// Maximum number of whole turns on this page; defaults to 10.
+	Limit *int64 `json:"limit,omitempty"`
+}
+
+// A contiguous page of the transcript, not a chat snapshot or a state update.
+type ReadChatTurnsResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// Consecutive whole turns, oldest first, including on a previous-page read.
+	Turns []Turn `json:"turns"`
+	// Read immediately before the first returned turn; absent at the start.
+	PreviousCursor *string `json:"previousCursor,omitempty"`
 }
 
 // Stop receiving updates for a channel.

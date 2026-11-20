@@ -216,7 +216,7 @@ describe('command params/result naming conventions', () => {
 
     it(`${method}: ${paramsName} is exported from commands.ts`, () => {
       assert.ok(
-        new RegExp(`export\\s+interface\\s+${paramsName}\\b`).test(commandsSrc),
+        new RegExp(`export\\s+(?:interface|type)\\s+${paramsName}\\b`).test(commandsSrc),
         `Expected ${paramsName} to be exported from commands.ts`,
       );
     });

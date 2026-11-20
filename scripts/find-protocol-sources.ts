@@ -8,6 +8,16 @@
 import { Project, SourceFile } from 'ts-morph';
 import path from 'path';
 
+/** Flat fields for native records and reference tables; schema generation keeps the TS union. */
+export function findWireFields(sf: SourceFile, name: string) {
+  const iface = sf.getInterface(name);
+  if (iface) return iface;
+  const tag = sf.getTypeAlias(name)?.getJsDocs().flatMap(doc => doc.getTags())
+    .find(tag => tag.getTagName() === 'wireFields');
+  if (tag) return sf.getInterfaceOrThrow(tag.getCommentText()?.trim() ?? '');
+  return undefined;
+}
+
 /**
  * Folders containing canonical declarations. Iteration order is
  * `common, channels-root, channels-session, channels-terminal,

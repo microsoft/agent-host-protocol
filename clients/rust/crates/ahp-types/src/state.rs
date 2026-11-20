@@ -1967,6 +1967,11 @@ pub struct MultipleChatsCapability {
     pub side_chat: Option<bool>,
 }
 
+/// Presence advertises `listChatTurns` and `readChatTurns` for this chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryBrowsingCapability {}
+
 /// Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -2274,6 +2279,9 @@ pub struct ChatState {
     pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
+    /// Browse retained history independently of the subscription window. Absent when unsupported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history_browsing: Option<ChatHistoryBrowsingCapability>,
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are

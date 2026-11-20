@@ -60,6 +60,8 @@ type _ExpectedCommands =
   | 'createTcpConnection'
   | 'moveChat'
   | 'disposeChat'
+  | 'listChatTurns'
+  | 'readChatTurns'
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'
