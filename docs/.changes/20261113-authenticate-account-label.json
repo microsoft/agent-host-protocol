@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `AuthenticateParams.accountLabel` for display-only account labels alongside authentication tokens."
+}
