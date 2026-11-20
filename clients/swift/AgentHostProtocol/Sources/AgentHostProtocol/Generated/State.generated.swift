@@ -1567,6 +1567,9 @@ public struct AgentInfo: Codable, Sendable, Equatable {
     /// to gate features (multi-chat, fork) instead of switching on the provider
     /// id.
     public var capabilities: AgentCapabilities?
+    /// Sources this agent offers models from. Clients use them to label and
+    /// group {@link models}. A source may have no models.
+    public var modelSources: [ModelSourceInfo]?
 
     public init(
         provider: String,
@@ -1575,7 +1578,8 @@ public struct AgentInfo: Codable, Sendable, Equatable {
         models: [SessionModelInfo],
         protectedResources: [ProtectedResourceMetadata]? = nil,
         customizations: [Customization]? = nil,
-        capabilities: AgentCapabilities? = nil
+        capabilities: AgentCapabilities? = nil,
+        modelSources: [ModelSourceInfo]? = nil
     ) {
         self.provider = provider
         self.displayName = displayName
@@ -1584,6 +1588,7 @@ public struct AgentInfo: Codable, Sendable, Equatable {
         self.protectedResources = protectedResources
         self.customizations = customizations
         self.capabilities = capabilities
+        self.modelSources = modelSources
     }
 }
 
@@ -1679,8 +1684,25 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable
     }
 }
 
+public struct ModelSourceInfo: Codable, Sendable, Equatable {
+    /// Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+    public var id: String
+    /// Human-readable name
+    public var displayName: String
+
+    public init(
+        id: String,
+        displayName: String
+    ) {
+        self.id = id
+        self.displayName = displayName
+    }
+}
+
 public struct SessionModelInfo: Codable, Sendable, Equatable {
-    /// Model identifier
+    /// Model identifier, unique within the agent's {@link AgentInfo.models}.
+    /// When several model sources serve the same upstream model, the host gives
+    /// each entry its own ID.
     public var id: String
     /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     public var provider: String
@@ -1713,6 +1735,9 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
     /// SHOULD fall back to a generic presentation for values they do not
     /// recognize.
     public var vendor: String?
+    /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+    /// in the agent's {@link AgentInfo.modelSources}.
+    public var modelSourceId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1726,6 +1751,7 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
         case configSchema
         case meta = "_meta"
         case vendor
+        case modelSourceId
     }
 
     public init(
@@ -1739,7 +1765,8 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
         policyState: PolicyState? = nil,
         configSchema: ConfigSchema? = nil,
         meta: [String: AnyCodable]? = nil,
-        vendor: String? = nil
+        vendor: String? = nil,
+        modelSourceId: String? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -1752,6 +1779,7 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
         self.configSchema = configSchema
         self.meta = meta
         self.vendor = vendor
+        self.modelSourceId = modelSourceId
     }
 }
 

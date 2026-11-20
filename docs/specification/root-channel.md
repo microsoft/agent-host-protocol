@@ -32,6 +32,33 @@ RootState {
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
+### Model sources
+
+An agent provider can offer models from more than one source, such as different services or subscriptions. It lists those sources in [`AgentInfo.modelSources`](/reference/root#agentinfo), and each model names its source in [`SessionModelInfo.modelSourceId`](/reference/root#sessionmodelinfo). Clients use sources to label and group models, for example in a model picker.
+
+- Source IDs MUST be unique within the agent's `modelSources`.
+- A model's `modelSourceId` MUST match an entry in the same agent's `modelSources`.
+- Model IDs MUST be unique within the agent's `models`. When two sources serve the same upstream model, the host gives each entry its own ID and maps that ID to the upstream model.
+- A source can have no models.
+
+A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, which also determines the source.
+
+```json
+{
+  "provider": "example",
+  "displayName": "Example agent",
+  "description": "An agent with two model sources",
+  "modelSources": [
+    { "id": "source-a", "displayName": "Service A" },
+    { "id": "source-b", "displayName": "Service B" }
+  ],
+  "models": [
+    { "id": "shared-model-a", "provider": "example", "name": "Shared model", "modelSourceId": "source-a" },
+    { "id": "shared-model-b", "provider": "example", "name": "Shared model", "modelSourceId": "source-b" }
+  ]
+}
+```
+
 ### Paginating the catalogue
 
 A large catalogue can be fetched incrementally. [`listSessions`](/reference/root#listsessions) accepts an optional `limit` (the maximum number of entries the client wants in the page — the server SHOULD respect it, but MAY return fewer and MAY impose its own upper cap) and an optional opaque `cursor`. The result carries the page in `items` plus an optional `nextCursor`:

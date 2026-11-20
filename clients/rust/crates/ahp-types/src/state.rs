@@ -1913,6 +1913,10 @@ pub struct AgentInfo {
     /// id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<AgentCapabilities>,
+    /// Sources this agent offers models from. Clients use them to label and
+    /// group {@link models}. A source may have no models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_sources: Option<Vec<ModelSourceInfo>>,
 }
 
 /// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -2002,10 +2006,23 @@ pub struct MultipleWorkingDirectoriesCapability {
     pub primary_replacement: Option<bool>,
 }
 
+/// A source that an agent provider offers models from, such as a service or
+/// subscription.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSourceInfo {
+    /// Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+    pub id: String,
+    /// Human-readable name
+    pub display_name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionModelInfo {
-    /// Model identifier
+    /// Model identifier, unique within the agent's {@link AgentInfo.models}.
+    /// When several model sources serve the same upstream model, the host gives
+    /// each entry its own ID.
     pub id: String,
     /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     pub provider: String,
@@ -2046,6 +2063,10 @@ pub struct SessionModelInfo {
     /// recognize.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vendor: Option<String>,
+    /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+    /// in the agent's {@link AgentInfo.modelSources}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_source_id: Option<String>,
 }
 
 /// A model selection: the chosen model ID together with any model-specific

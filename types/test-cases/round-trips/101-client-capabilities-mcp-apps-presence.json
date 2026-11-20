@@ -1,0 +1,28 @@
+{
+  "name": "client-capabilities-mcp-apps-presence",
+  "group": "A",
+  "description": "An empty-object client capability flag keeps its presence through decode and re-encode.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://",
+    "protocolVersions": [
+      "1.1.0"
+    ],
+    "clientId": "mcp-apps-client",
+    "capabilities": {
+      "mcpApps": {}
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "protocolVersions": [
+        "1.1.0"
+      ],
+      "clientId": "mcp-apps-client",
+      "capabilities": {
+        "mcpApps": {}
+      }
+    }
+  ]
+}

@@ -94,6 +94,13 @@ export interface AgentInfo {
    * id.
    */
   capabilities?: AgentCapabilities;
+  /**
+   * Sources this agent offers models from. Clients use them to label and
+   * group {@link models}. A source may have no models.
+   *
+   * @see {@link /specification/root-channel#model-sources | Model sources}
+   */
+  modelSources?: ModelSourceInfo[];
 }
 
 /**
@@ -196,10 +203,27 @@ export interface MultipleWorkingDirectoriesCapability {
 }
 
 /**
+ * A source that an agent provider offers models from, such as a service or
+ * subscription.
+ *
+ * @category Root State
+ */
+export interface ModelSourceInfo {
+  /** Model source identifier, unique within the agent's {@link AgentInfo.modelSources}. */
+  id: string;
+  /** Human-readable name */
+  displayName: string;
+}
+
+/**
  * @category Root State
  */
 export interface SessionModelInfo {
-  /** Model identifier */
+  /**
+   * Model identifier, unique within the agent's {@link AgentInfo.models}.
+   * When several model sources serve the same upstream model, the host gives
+   * each entry its own ID.
+   */
   id: string;
   /** Agent provider that owns this model. Matches {@link AgentInfo.provider}. */
   provider: string;
@@ -238,6 +262,11 @@ export interface SessionModelInfo {
    * recognize.
    */
   vendor?: string;
+  /**
+   * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+   * in the agent's {@link AgentInfo.modelSources}.
+   */
+  modelSourceId?: string;
 }
 
 /**
