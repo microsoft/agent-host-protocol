@@ -798,7 +798,7 @@ type RootConfigState struct {
 }
 
 type AgentInfo struct {
-	// Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
+	// Agent provider ID (e.g. `'copilot'`)
 	Provider string `json:"provider"`
 	// Human-readable name
 	DisplayName string `json:"displayName"`
@@ -830,12 +830,9 @@ type AgentInfo struct {
 	// to gate features (multi-chat, fork) instead of switching on the provider
 	// id.
 	Capabilities *AgentCapabilities `json:"capabilities,omitempty"`
-	// Model sources exposed by this agent harness, including sources with
-	// no currently available models. Together with {@link models}, this is one
-	// atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
-	// this agent; every model's `modelSourceId` MUST reference an entry here.
-	// Absence preserves legacy discovery without inventing source identity.
-	ModelSources *[]ModelSourceInfo `json:"modelSources,omitempty"`
+	// Sources this agent offers models from. Clients use them to label and
+	// group {@link models}. A source may have no models.
+	ModelSources []ModelSourceInfo `json:"modelSources,omitempty"`
 }
 
 // Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -860,11 +857,6 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
-	// The agent preserves and enforces exact source-qualified model selections.
-	// Clients MUST also declare `ClientCapabilities.modelSourceSelection`
-	// before sending a `ModelSelection.modelSourceId`. Protocol version
-	// negotiation alone does not establish support.
-	ModelSourceSelection *map[string]json.RawMessage `json:"modelSourceSelection,omitempty"`
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -918,21 +910,21 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
-// An independently selectable source of model access exposed by one agent
-// harness. IDs are opaque and stable within that host and harness, not global
-// identities, authorization proof, account or billing identities, or inherently
-// telemetry-safe values. Selection does not establish per-call usage provenance.
+// A source that an agent provider offers models from, such as a service or
+// subscription.
 type ModelSourceInfo struct {
-	// Opaque source identifier. MUST NOT be derived from the display name.
+	// Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
 	Id string `json:"id"`
-	// Human-readable label; not an identifier and not necessarily unique.
+	// Human-readable name
 	DisplayName string `json:"displayName"`
 }
 
 type SessionModelInfo struct {
-	// Raw model identifier; different model sources may expose the same ID.
+	// Model identifier, unique within the agent's {@link AgentInfo.models}.
+	// When several model sources serve the same upstream model, the host gives
+	// each entry its own ID.
 	Id string `json:"id"`
-	// Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
+	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
 	Provider string `json:"provider"`
 	// Human-readable model name
 	Name string `json:"name"`
@@ -963,42 +955,33 @@ type SessionModelInfo struct {
 	// SHOULD fall back to a generic presentation for values they do not
 	// recognize.
 	Vendor *string `json:"vendor,omitempty"`
-	// Source of this model within the owning agent's {@link AgentInfo.modelSources}.
-	// The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
-	// If a raw ID appears more than once, every such row MUST be qualified.
-	// Absence is legacy, unqualified identity; it does not name a default source.
+	// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+	// in the agent's {@link AgentInfo.modelSources}.
 	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 
-// A model selection: the raw model ID, an optional exact model source, and
-// configuration values whose keys correspond to {@link SessionModelInfo.configSchema}.
-// A qualified selection is never a preference: hosts MUST preserve the pair
-// or explicitly fail, never strip the qualifier or fall back to another source.
-// This selection is not per-call usage provenance.
+// A model selection: the chosen model ID together with any model-specific
+// configuration values whose keys correspond to the model's
+// {@link SessionModelInfo.configSchema}.
 type ModelSelection struct {
-	// Raw model identifier, unchanged by source qualification or UI keys.
+	// Model identifier
 	Id string `json:"id"`
 	// Model-specific configuration values. Values are JSON primitives: most
 	// pickers produce strings, but some (e.g. a numeric context-size picker)
 	// produce numbers or booleans, which are carried through as-is.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
-	// Exact model source ID in the owning agent's advertised catalog.
-	// Requires both client and agent `modelSourceSelection` capabilities.
-	// MUST survive messages, drafts, queued work, persistence and replay.
-	// Absence retains genuinely unqualified legacy selection behavior.
-	ModelSourceId *string `json:"modelSourceId,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
 	Extra map[string]json.RawMessage `json:"-"`
 }
 
 func (v *ModelSelection) UnmarshalJSON(data []byte) error {
 	type wire ModelSelection
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "config", "modelSourceId")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "config")
 }
 
 func (v ModelSelection) MarshalJSON() ([]byte, error) {
 	type wire ModelSelection
-	return marshalWithExtra(wire(v), v.Extra, "id", "config", "modelSourceId")
+	return marshalWithExtra(wire(v), v.Extra, "id", "config")
 }
 
 // A selected custom agent for a session.
@@ -1903,16 +1886,13 @@ type Message struct {
 	Origin MessageOrigin `json:"origin"`
 	// File/selection attachments
 	Attachments []MessageAttachment `json:"attachments,omitempty"`
-	// The model selection associated with this message.
+	// The model this message was, or will be, sent with.
 	//
-	// For historic user/agent messages this retains the host-accepted selection,
-	// so a client editing or resending the message can preserve it. For a
+	// For historic user/agent messages this records the model actually used, so
+	// a client editing or resending the message can retain that selection. For a
 	// {@link ChatState.draft | draft} it carries the model the user picked for
 	// the message they are composing. Absent means the agent host's default
-	// model applies. A source qualifier MUST be preserved exactly, including
-	// through pending messages and restored history; it is not per-call usage
-	// provenance. Accepting a message does not prove a deferred model switch
-	// has activated.
+	// model applies.
 	Model *ModelSelection `json:"model,omitempty"`
 	// The custom agent this message was, or will be, sent with.
 	//
@@ -4895,21 +4875,11 @@ type AutomationTriggerDefinition struct {
 // `model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the
 // run's message.
 type AutomationSessionTemplate struct {
-	// Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
-	// the host's default only for genuinely unqualified saved definitions.
-	//
-	// If this template's `model` or {@link AutomationDefinition.message}'s
-	// `model` has a `modelSourceId`, the host MUST persist an explicit provider
-	// when accepting a create or update. An omitted owner MUST be resolved and
-	// stored at acceptance or the action rejected. Updates retaining a qualified
-	// selection MUST preserve its saved owner when omitted, or reject; they MUST
-	// NOT resolve it again from a changed host default.
+	// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
 	Provider *string `json:"provider,omitempty"`
-	// Optional model selection revalidated when a run starts against the owning
-	// agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
-	// both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
-	// A missing or unavailable saved owner or pair fails the run rather than
-	// resolving against the current default or falling back to another source or harness.
+	// Optional model selection resolved when a run starts. Its
+	// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
+	// by the selected provider.
 	Model *ModelSelection `json:"model,omitempty"`
 	// Optional custom agent selection identified by {@link AgentSelection.uri}.
 	Agent *AgentSelection `json:"agent,omitempty"`
@@ -4970,9 +4940,6 @@ type AutomationDefinition struct {
 	Title string `json:"title"`
 	// Message each run sends (see {@link AutomationDefinition.target}). Its
 	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
-	// A qualified `model` requires an explicit persisted
-	// {@link AutomationSessionTemplate.provider | `session.provider`}, even
-	// when the session template's own `model` is absent.
 	Message Message `json:"message"`
 	// Template for the sessions runs create. Its model and agent also apply to
 	// a run's turn in a continued session.
@@ -5011,10 +4978,6 @@ type AutomationDefinition struct {
 // decoders MUST preserve unrecognized members on these replacement objects
 // and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
 // them, so editing known fields does not erase fields from newer versions.
-// The host MUST validate the resulting definition's qualified model ownership
-// under {@link AutomationSessionTemplate.provider}. Replacing `session` while
-// omitting its provider MUST NOT erase or rebind the owner of a retained
-// qualified selection.
 type AutomationDefinitionPatch struct {
 	// Replacement {@link AutomationDefinition.title}.
 	Title *string `json:"title,omitempty"`

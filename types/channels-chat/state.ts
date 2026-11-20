@@ -878,16 +878,13 @@ export interface Message {
   /** File/selection attachments */
   attachments?: MessageAttachment[];
   /**
-   * The model selection associated with this message.
+   * The model this message was, or will be, sent with.
    *
-   * For historic user/agent messages this retains the host-accepted selection,
-   * so a client editing or resending the message can preserve it. For a
+   * For historic user/agent messages this records the model actually used, so
+   * a client editing or resending the message can retain that selection. For a
    * {@link ChatState.draft | draft} it carries the model the user picked for
    * the message they are composing. Absent means the agent host's default
-   * model applies. A source qualifier MUST be preserved exactly, including
-   * through pending messages and restored history; it is not per-call usage
-   * provenance. Accepting a message does not prove a deferred model switch
-   * has activated.
+   * model applies.
    */
   model?: ModelSelection;
   /**

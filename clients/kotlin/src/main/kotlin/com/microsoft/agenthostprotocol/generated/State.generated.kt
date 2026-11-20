@@ -1549,7 +1549,7 @@ data class RootConfigState(
 @Serializable
 data class AgentInfo(
     /**
-     * Agent harness ID (e.g. `'copilot'`), not a model source or account ID.
+     * Agent provider ID (e.g. `'copilot'`)
      */
     val provider: String,
     /**
@@ -1595,11 +1595,8 @@ data class AgentInfo(
      */
     val capabilities: AgentCapabilities? = null,
     /**
-     * Model sources exposed by this agent harness, including sources with
-     * no currently available models. Together with {@link models}, this is one
-     * atomic catalog, replaced by `root/agentsChanged`. IDs MUST be unique within
-     * this agent; every model's `modelSourceId` MUST reference an entry here.
-     * Absence preserves legacy discovery without inventing source identity.
+     * Sources this agent offers models from. Clients use them to label and
+     * group {@link models}. A source may have no models.
      */
     val modelSources: List<ModelSourceInfo>? = null
 )
@@ -1625,14 +1622,7 @@ data class AgentCapabilities(
      * set and MUST NOT set more than one entry in
      * {@link CreateSessionParams.workingDirectories}.
      */
-    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null,
-    /**
-     * The agent preserves and enforces exact source-qualified model selections.
-     * Clients MUST also declare `ClientCapabilities.modelSourceSelection`
-     * before sending a `ModelSelection.modelSourceId`. Protocol version
-     * negotiation alone does not establish support.
-     */
-    val modelSourceSelection: Map<String, JsonElement>? = null
+    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null
 )
 
 @Serializable
@@ -1697,11 +1687,11 @@ data class MultipleWorkingDirectoriesCapability(
 @Serializable
 data class ModelSourceInfo(
     /**
-     * Opaque source identifier. MUST NOT be derived from the display name.
+     * Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
      */
     val id: String,
     /**
-     * Human-readable label; not an identifier and not necessarily unique.
+     * Human-readable name
      */
     val displayName: String
 )
@@ -1709,11 +1699,13 @@ data class ModelSourceInfo(
 @Serializable
 data class SessionModelInfo(
     /**
-     * Raw model identifier; different model sources may expose the same ID.
+     * Model identifier, unique within the agent's {@link AgentInfo.models}.
+     * When several model sources serve the same upstream model, the host gives
+     * each entry its own ID.
      */
     val id: String,
     /**
-     * Owning agent harness. Matches {@link AgentInfo.provider}, not a model source.
+     * Agent provider that owns this model. Matches {@link AgentInfo.provider}.
      */
     val provider: String,
     /**
@@ -1765,10 +1757,8 @@ data class SessionModelInfo(
      */
     val vendor: String? = null,
     /**
-     * Source of this model within the owning agent's {@link AgentInfo.modelSources}.
-     * The pair `(modelSourceId, id)` MUST be unique within that agent's catalog.
-     * If a raw ID appears more than once, every such row MUST be qualified.
-     * Absence is legacy, unqualified identity; it does not name a default source.
+     * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+     * in the agent's {@link AgentInfo.modelSources}.
      */
     val modelSourceId: String? = null
 )
@@ -1777,7 +1767,7 @@ data class SessionModelInfo(
 @Serializable(with = ModelSelectionSerializer::class)
 data class ModelSelection(
     /**
-     * Raw model identifier, unchanged by source qualification or UI keys.
+     * Model identifier
      */
     val id: String,
     /**
@@ -1786,13 +1776,6 @@ data class ModelSelection(
      * produce numbers or booleans, which are carried through as-is.
      */
     val config: Map<String, JsonElement>? = null,
-    /**
-     * Exact model source ID in the owning agent's advertised catalog.
-     * Requires both client and agent `modelSourceSelection` capabilities.
-     * MUST survive messages, drafts, queued work, persistence and replay.
-     * Absence retains genuinely unqualified legacy selection behavior.
-     */
-    val modelSourceId: String? = null,
     @Transient
     val extra: Map<String, JsonElement> = emptyMap()
 )
@@ -2822,16 +2805,13 @@ data class Message(
      */
     val attachments: List<MessageAttachment>? = null,
     /**
-     * The model selection associated with this message.
+     * The model this message was, or will be, sent with.
      *
-     * For historic user/agent messages this retains the host-accepted selection,
-     * so a client editing or resending the message can preserve it. For a
+     * For historic user/agent messages this records the model actually used, so
+     * a client editing or resending the message can retain that selection. For a
      * {@link ChatState.draft | draft} it carries the model the user picked for
      * the message they are composing. Absent means the agent host's default
-     * model applies. A source qualifier MUST be preserved exactly, including
-     * through pending messages and restored history; it is not per-call usage
-     * provenance. Accepting a message does not prove a deferred model switch
-     * has activated.
+     * model applies.
      */
     val model: ModelSelection? = null,
     /**
@@ -6388,23 +6368,13 @@ data class AutomationTriggerDefinition(
 @Serializable(with = AutomationSessionTemplateSerializer::class)
 data class AutomationSessionTemplate(
     /**
-     * Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
-     * the host's default only for genuinely unqualified saved definitions.
-     *
-     * If this template's `model` or {@link AutomationDefinition.message}'s
-     * `model` has a `modelSourceId`, the host MUST persist an explicit provider
-     * when accepting a create or update. An omitted owner MUST be resolved and
-     * stored at acceptance or the action rejected. Updates retaining a qualified
-     * selection MUST preserve its saved owner when omitted, or reject; they MUST
-     * NOT resolve it again from a changed host default.
+     * Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
      */
     val provider: String? = null,
     /**
-     * Optional model selection revalidated when a run starts against the owning
-     * agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
-     * both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
-     * A missing or unavailable saved owner or pair fails the run rather than
-     * resolving against the current default or falling back to another source or harness.
+     * Optional model selection resolved when a run starts. Its
+     * {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
+     * by the selected provider.
      */
     val model: ModelSelection? = null,
     /**
@@ -6468,9 +6438,6 @@ data class AutomationDefinition(
     /**
      * Message each run sends (see {@link AutomationDefinition.target}). Its
      * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
-     * A qualified `model` requires an explicit persisted
-     * {@link AutomationSessionTemplate.provider | `session.provider`}, even
-     * when the session template's own `model` is absent.
      */
     val message: Message,
     /**

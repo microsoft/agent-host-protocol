@@ -76,11 +76,6 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
 | .NET SDK 10 (.NET client) | `mcr.microsoft.com/dotnet/sdk:10.0` | Supports `.slnx`; the test host rolls forward from .NET 8. |
 
-An already available Docker engine can run the same images; do not provision a
-second VM solely to change container CLIs. Check engine readiness and disk/memory
-headroom first. Keep verification containers and writable copies task-owned,
-and never prune unrelated images, volumes, or build caches.
-
 The full Swift client and tests import Apple-only `Network` and `CryptoKit`.
 Run them on macOS with a full Xcode/XCTest toolchain: Command Line Tools alone
 may lack XCTest, and a Linux Swift image is not a substitute for the full suite.

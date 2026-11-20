@@ -75,25 +75,16 @@ fails on drift.
 
 ### Empty-object capability flags
 
-Optional `Record<string, never>` capability flags use pointer-to-map fields:
-`nil` omits the flag, while a non-nil pointer to an empty map encodes the
-required `{}` opt-in. For example:
+Optional `Record<string, never>` capability flags use pointer-to-map fields. `nil` omits the flag, and a non-nil pointer to an empty map encodes the `{}` opt-in:
 
 ```go
 supported := map[string]json.RawMessage{}
 capabilities := ahptypes.ClientCapabilities{
-    ModelSourceSelection: &supported,
+    McpApps: &supported,
 }
 ```
 
-This also corrects existing `McpApps`, `ChangesetCapabilities.Review`, and
-`AhpMcpUiHostCapabilities.Logging` flags that previously lost empty objects
-through `omitempty`. When upgrading, change map-valued initializers for these
-fields to pointers and rebuild consumers. `AgentInfo.ModelSources` similarly
-uses a pointer to a slice to preserve an explicitly empty catalog.
-These wire-preservation fixes do not automatically opt a client into features.
-Ordinary optional maps and slices retain their existing omission behavior for
-nil or empty values; required collections still serialize, including when empty.
+This applies to `ClientCapabilities.McpApps`, `ChangesetCapabilities.Review`, and `AhpMcpUiHostCapabilities.Logging`, which previously lost empty objects through `omitempty`. When upgrading, change map-valued initializers for these fields to pointers. Other optional maps and slices still omit nil or empty values.
 
 ## Releasing
 

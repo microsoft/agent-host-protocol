@@ -366,7 +366,6 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
         && tsName === 'disableConditions')
       || (tsName === 'backgroundWork' && iface.getName() === 'ChatState')
-      || (tsName === 'modelSources' && iface.getName() === 'AgentInfo')
       || /^Record<string,\s*never>(?:\s*\|\s*undefined)?$/.test(tsType);
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;

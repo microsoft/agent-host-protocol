@@ -27,10 +27,6 @@ import type {
  * decoders MUST preserve unrecognized members on these replacement objects
  * and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
  * them, so editing known fields does not erase fields from newer versions.
- * The host MUST validate the resulting definition's qualified model ownership
- * under {@link AutomationSessionTemplate.provider}. Replacing `session` while
- * omitting its provider MUST NOT erase or rebind the owner of a retained
- * qualified selection.
  *
  * @category Automation Actions
  */

@@ -1,0 +1,128 @@
+{
+  "name": "model-source-catalog",
+  "group": "A",
+  "description": "An agent labels and groups its models by model source, including a source with no models. Two sources serving the same upstream model get distinct model IDs. Another agent has no model sources.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [
+      {
+        "resource": "ahp-root://",
+        "fromSeq": 1,
+        "state": {
+          "agents": [
+            {
+              "provider": "example",
+              "displayName": "Example",
+              "description": "Groups models by source",
+              "modelSources": [
+                {
+                  "id": "source-a",
+                  "displayName": "Service A"
+                },
+                {
+                  "id": "source-b",
+                  "displayName": "Service B"
+                },
+                {
+                  "id": "source-c",
+                  "displayName": "Service C"
+                }
+              ],
+              "models": [
+                {
+                  "id": "shared-model-a",
+                  "provider": "example",
+                  "name": "Shared model",
+                  "vendor": "Example vendor",
+                  "modelSourceId": "source-a"
+                },
+                {
+                  "id": "shared-model-b",
+                  "provider": "example",
+                  "name": "Shared model",
+                  "modelSourceId": "source-b"
+                }
+              ]
+            },
+            {
+              "provider": "plain",
+              "displayName": "Plain",
+              "description": "No model sources",
+              "models": [
+                {
+                  "id": "shared-model",
+                  "provider": "plain",
+                  "name": "Shared model"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 1,
+      "snapshots": [
+        {
+          "resource": "ahp-root://",
+          "fromSeq": 1,
+          "state": {
+            "agents": [
+              {
+                "provider": "example",
+                "displayName": "Example",
+                "description": "Groups models by source",
+                "modelSources": [
+                  {
+                    "id": "source-a",
+                    "displayName": "Service A"
+                  },
+                  {
+                    "id": "source-b",
+                    "displayName": "Service B"
+                  },
+                  {
+                    "id": "source-c",
+                    "displayName": "Service C"
+                  }
+                ],
+                "models": [
+                  {
+                    "id": "shared-model-a",
+                    "provider": "example",
+                    "name": "Shared model",
+                    "vendor": "Example vendor",
+                    "modelSourceId": "source-a"
+                  },
+                  {
+                    "id": "shared-model-b",
+                    "provider": "example",
+                    "name": "Shared model",
+                    "modelSourceId": "source-b"
+                  }
+                ]
+              },
+              {
+                "provider": "plain",
+                "displayName": "Plain",
+                "description": "No model sources",
+                "models": [
+                  {
+                    "id": "shared-model",
+                    "provider": "plain",
+                    "name": "Shared model"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

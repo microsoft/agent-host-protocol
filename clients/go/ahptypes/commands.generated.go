@@ -295,12 +295,6 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
-	// Client understands source-qualified model catalogs and preserves exact
-	// `ModelSelection.modelSourceId` values across every selection-bearing path.
-	// Hosts MUST NOT expose ambiguous-by-bare-ID catalogs without this capability.
-	// Clients MUST also check `AgentCapabilities.modelSourceSelection` before
-	// sending a qualified selection; negotiating a protocol version is insufficient.
-	ModelSourceSelection *map[string]json.RawMessage `json:"modelSourceSelection,omitempty"`
 }
 
 // Automation features supported by this host authority.

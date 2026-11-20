@@ -464,24 +464,12 @@ export interface AutomationTriggerDefinition {
  * @preserveUnknownMembers
  */
 export interface AutomationSessionTemplate {
-  /**
-   * Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
-   * the host's default only for genuinely unqualified saved definitions.
-   *
-   * If this template's `model` or {@link AutomationDefinition.message}'s
-   * `model` has a `modelSourceId`, the host MUST persist an explicit provider
-   * when accepting a create or update. An omitted owner MUST be resolved and
-   * stored at acceptance or the action rejected. Updates retaining a qualified
-   * selection MUST preserve its saved owner when omitted, or reject; they MUST
-   * NOT resolve it again from a changed host default.
-   */
+  /** Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider. */
   provider?: string;
   /**
-   * Optional model selection revalidated when a run starts against the owning
-   * agent's {@link SessionModelInfo} catalog. A qualified selection MUST retain
-   * both its persisted {@link provider} and exact `(modelSourceId, id)` pair.
-   * A missing or unavailable saved owner or pair fails the run rather than
-   * resolving against the current default or falling back to another source or harness.
+   * Optional model selection resolved when a run starts. Its
+   * {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
+   * by the selected provider.
    */
   model?: ModelSelection;
   /** Optional custom agent selection identified by {@link AgentSelection.uri}. */
@@ -542,9 +530,6 @@ export interface AutomationDefinition {
   /**
    * Message each run sends (see {@link AutomationDefinition.target}). Its
    * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
-   * A qualified `model` requires an explicit persisted
-   * {@link AutomationSessionTemplate.provider | `session.provider`}, even
-   * when the session template's own `model` is absent.
    */
   message: Message;
   /**
