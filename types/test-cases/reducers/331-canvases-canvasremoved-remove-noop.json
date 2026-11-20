@@ -1,0 +1,12 @@
+{
+  "description": "Canvas collection remove is key-only and ignores absent resources",
+  "reducer": "canvases",
+  "initial": { "registry": { "status": "ready", "extensions": [] }, "canvases": [{ "resource": "ahp-canvas:/first" }, { "resource": "ahp-canvas:/second" }] },
+  "actions": [
+    { "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/unknown" },
+    { "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/first" },
+    { "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/first" },
+    { "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/second" }
+  ],
+  "expected": { "registry": { "status": "ready", "extensions": [] }, "canvases": [] }
+}

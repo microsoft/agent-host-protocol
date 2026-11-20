@@ -69,6 +69,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-session': 'session',
   'channels-chat': 'chat',
   'channels-canvas': 'canvas',
+  'channels-canvases': 'canvases',
   'channels-terminal': 'terminal',
   'channels-changeset': 'changeset',
   'channels-annotations': 'annotations',
@@ -602,6 +603,10 @@ function renderActionInterfaceBlock(iface: InterfaceDeclaration): string {
   }
   const heading = `### \`${labelBase}${variantSuffix}\``;
   lines.push(heading + '\n');
+  const stability = readStability(iface);
+  if (stability) {
+    lines.push(`<StabilityIndex level="${stability.level}" />\n`);
+  }
   const isClientDispatchable = hasJsDocTag(iface, 'clientDispatchable');
   const desc = getJsDocDescription(iface);
   const prefix = isClientDispatchable ? '**Client-dispatchable.** ' : '';
@@ -1017,11 +1022,12 @@ function generateCanvasChannelPage(project: Project): string {
   currentPage = 'canvas';
   const stateSf = findChannelSourceFile(project, 'channels-canvas', 'state.ts');
   const actionsSf = findChannelSourceFile(project, 'channels-canvas', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-canvas', 'commands.ts');
 
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Canvas Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and content URI. A client that cannot load the content URI directly reads it with `resourceRead`. A missing URI means the source is unavailable. Source URIs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
+  lines.push('Reference for the experimental `ahp-canvas:` instance channel. The owning `ahp-canvases:` collection advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and content URI. Legacy chat references project the same membership. A client that cannot load the content URI directly reads it with `resourceRead`. A missing URI means the source is unavailable. Source URIs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {
@@ -1031,6 +1037,31 @@ function generateCanvasChannelPage(project: Project): string {
   if (actionsSf) {
     lines.push('## Actions\n');
     lines.push('Replace `CanvasState` through server-authoritative actions scoped to the canvas URI via `ActionEnvelope.channel`.\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  return lines.join('\n');
+}
+
+function generateCanvasesChannelPage(project: Project): string {
+  currentPage = 'canvases';
+  const stateSf = findChannelSourceFile(project, 'channels-canvases', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-canvases', 'actions.ts');
+  const lines: string[] = [GENERATED_HEADER, '# Canvases Collection Channel\n'];
+  lines.push(stabilityIndex(stateSf));
+  lines.push('Reference for the experimental `ahp-canvases:` collection advertised by `ChatState.canvasesUri`. Subscriptions observe registry load state and live membership without materializing cold backing. Registry requests explicitly ensure materialization; opening and disposal target instances owned by this collection. See [Canvas collections](/specification/chat-channel#canvas-collections).\n');
+  lines.push(schemaLink('state.schema.json'));
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
     lines.push(schemaLink('actions.schema.json'));
     lines.push(emitActionsSection([actionsSf]));
   }
@@ -1478,6 +1509,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'session.md', generator: generateSessionChannelPage },
     { filename: 'chat.md', generator: generateChatChannelPage },
     { filename: 'canvas.md', generator: generateCanvasChannelPage },
+    { filename: 'canvases.md', generator: generateCanvasesChannelPage },
     { filename: 'terminal.md', generator: generateTerminalChannelPage },
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },

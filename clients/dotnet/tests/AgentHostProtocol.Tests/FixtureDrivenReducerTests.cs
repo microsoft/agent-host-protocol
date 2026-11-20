@@ -81,6 +81,9 @@ public sealed class FixtureDrivenReducerTests
                 case "canvas":
                     RunFixture<CanvasState>(initial, expected, actions, Reducers.ApplyToCanvas);
                     break;
+                case "canvases":
+                    RunFixture<CanvasesState>(initial, expected, actions, Reducers.ApplyToCanvases);
+                    break;
                 case "automation":
                     RunFixture<AutomationState>(
                         initial,

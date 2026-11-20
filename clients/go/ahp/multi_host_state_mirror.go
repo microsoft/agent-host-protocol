@@ -25,30 +25,32 @@ type HostedResourceKey struct {
 // [ApplyActionToRoot] / [ApplyActionToSession] / [ApplyActionToChat] /
 // [ApplyActionToTerminal] reducer and re-storing the result.
 type MultiHostStateMirror struct {
-	mu            sync.RWMutex
-	roots         map[string]ahptypes.RootState
-	session       map[HostedResourceKey]ahptypes.SessionState
-	chat          map[HostedResourceKey]ahptypes.ChatState
-	canvas        map[HostedResourceKey]ahptypes.CanvasState
-	term          map[HostedResourceKey]ahptypes.TerminalState
-	changes       map[HostedResourceKey]ahptypes.ChangesetState
-	automationCat map[string]ahptypes.AutomationState
-	automation    map[HostedResourceKey]ahptypes.AutomationEntry
-	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
+	mu                sync.RWMutex
+	roots             map[string]ahptypes.RootState
+	session           map[HostedResourceKey]ahptypes.SessionState
+	chat              map[HostedResourceKey]ahptypes.ChatState
+	canvas            map[HostedResourceKey]ahptypes.CanvasState
+	canvasCollections map[HostedResourceKey]ahptypes.CanvasesState
+	term              map[HostedResourceKey]ahptypes.TerminalState
+	changes           map[HostedResourceKey]ahptypes.ChangesetState
+	automationCat     map[string]ahptypes.AutomationState
+	automation        map[HostedResourceKey]ahptypes.AutomationEntry
+	automationRun     map[HostedResourceKey]ahptypes.AutomationRunState
 }
 
 // NewMultiHostStateMirror returns an empty mirror.
 func NewMultiHostStateMirror() *MultiHostStateMirror {
 	return &MultiHostStateMirror{
-		roots:         make(map[string]ahptypes.RootState),
-		session:       make(map[HostedResourceKey]ahptypes.SessionState),
-		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
-		canvas:        make(map[HostedResourceKey]ahptypes.CanvasState),
-		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
-		changes:       make(map[HostedResourceKey]ahptypes.ChangesetState),
-		automationCat: make(map[string]ahptypes.AutomationState),
-		automation:    make(map[HostedResourceKey]ahptypes.AutomationEntry),
-		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
+		roots:             make(map[string]ahptypes.RootState),
+		session:           make(map[HostedResourceKey]ahptypes.SessionState),
+		chat:              make(map[HostedResourceKey]ahptypes.ChatState),
+		canvas:            make(map[HostedResourceKey]ahptypes.CanvasState),
+		canvasCollections: make(map[HostedResourceKey]ahptypes.CanvasesState),
+		term:              make(map[HostedResourceKey]ahptypes.TerminalState),
+		changes:           make(map[HostedResourceKey]ahptypes.ChangesetState),
+		automationCat:     make(map[string]ahptypes.AutomationState),
+		automation:        make(map[HostedResourceKey]ahptypes.AutomationEntry),
+		automationRun:     make(map[HostedResourceKey]ahptypes.AutomationRunState),
 	}
 }
 
@@ -112,6 +114,21 @@ func (m *MultiHostStateMirror) Canvas(hostID string, uri ahptypes.URI) (ahptypes
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	v, ok := m.canvas[HostedResourceKey{hostID, uri}]
+	return v, ok
+}
+
+// PutCanvasCollection stores collection state under (hostID, uri).
+func (m *MultiHostStateMirror) PutCanvasCollection(hostID string, uri ahptypes.URI, state ahptypes.CanvasesState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.canvasCollections[HostedResourceKey{hostID, uri}] = state
+}
+
+// CanvasCollection returns collection state at (hostID, uri), or (zero, false).
+func (m *MultiHostStateMirror) CanvasCollection(hostID string, uri ahptypes.URI) (ahptypes.CanvasesState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.canvasCollections[HostedResourceKey{hostID, uri}]
 	return v, ok
 }
 
@@ -216,6 +233,11 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 			delete(m.canvas, k)
 		}
 	}
+	for k := range m.canvasCollections {
+		if k.HostID == hostID {
+			delete(m.canvasCollections, k)
+		}
+	}
 	for k := range m.term {
 		if k.HostID == hostID {
 			delete(m.term, k)
@@ -255,6 +277,7 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	delete(m.session, k)
 	delete(m.chat, k)
 	delete(m.canvas, k)
+	delete(m.canvasCollections, k)
 	delete(m.term, k)
 	delete(m.changes, k)
 	delete(m.automation, k)

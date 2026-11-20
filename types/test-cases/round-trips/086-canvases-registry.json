@@ -1,0 +1,88 @@
+{
+  "name": "canvases-registry",
+  "group": "A",
+  "description": "A collection snapshot preserves ready registry declarations and full input schemas separately from live references.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-canvases:/peer",
+    "state": {
+      "canvases": [{ "resource": "ahp-canvas:/live" }],
+      "registry": {
+        "status": "ready",
+        "extensions": [
+          {
+            "id": "opaque-provider-id",
+            "label": "Diagram Tools",
+            "canvases": [
+              {
+                "id": "diagram",
+                "label": "Diagram",
+                "description": "Visualize a diagram."
+              },
+              {
+                "id": "form",
+                "label": "Form",
+                "description": "Collect structured input.",
+                "inputSchema": {
+                  "type": "object",
+                  "properties": {
+                    "issue": { "type": "string", "description": "Issue number or URL." },
+                    "options": {
+                      "type": "object",
+                      "properties": { "verbose": { "type": "boolean", "default": false } }
+                    }
+                  },
+                  "required": ["issue"],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fromSeq": 3
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-canvases:/peer",
+      "state": {
+        "canvases": [{ "resource": "ahp-canvas:/live" }],
+        "registry": {
+          "status": "ready",
+          "extensions": [
+            {
+              "id": "opaque-provider-id",
+              "label": "Diagram Tools",
+              "canvases": [
+                {
+                  "id": "diagram",
+                  "label": "Diagram",
+                  "description": "Visualize a diagram."
+                },
+                {
+                  "id": "form",
+                  "label": "Form",
+                  "description": "Collect structured input.",
+                  "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                      "issue": { "type": "string", "description": "Issue number or URL." },
+                      "options": {
+                        "type": "object",
+                        "properties": { "verbose": { "type": "boolean", "default": false } }
+                      }
+                    },
+                    "required": ["issue"],
+                    "additionalProperties": false
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "fromSeq": 3
+    }
+  ]
+}

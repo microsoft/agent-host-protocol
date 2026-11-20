@@ -1,0 +1,8 @@
+{
+  "name": "canvases-loading",
+  "group": "A",
+  "description": "A loading registry snapshot round-trips as a known collection.",
+  "type": "Snapshot",
+  "input": { "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "loading" }, "canvases": [] }, "fromSeq": 1 },
+  "acceptableOutputs": [{ "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "loading" }, "canvases": [] }, "fromSeq": 1 }]
+}

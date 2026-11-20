@@ -1,0 +1,7 @@
+{
+  "description": "Canvas collection ignores unknown future actions",
+  "reducer": "canvases",
+  "initial": { "registry": { "status": "uninitialized" }, "canvases": [] },
+  "actions": [{ "type": "canvases/futureAction" }],
+  "expected": { "registry": { "status": "uninitialized" }, "canvases": [] }
+}

@@ -1,0 +1,58 @@
+{
+  "description": "canvases/registryChanged replaces load state with the full normalized registry and input schema",
+  "reducer": "canvases",
+  "initial": {
+    "registry": { "status": "loading" },
+    "canvases": [{ "resource": "ahp-canvas:/existing" }]
+  },
+  "actions": [
+    {
+      "type": "canvases/registryChanged",
+      "registry": {
+        "status": "ready",
+        "extensions": [
+          {
+            "id": "opaque-provider-id",
+            "label": "Project Canvases",
+            "canvases": [
+              {
+                "id": "diagram",
+                "label": "Diagram",
+                "description": "Visualize a diagram.",
+                "inputSchema": {
+                  "type": "object",
+                  "properties": { "layout": { "enum": ["compact", "expanded"], "default": "compact" } },
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "canvases": [{ "resource": "ahp-canvas:/existing" }],
+    "registry": {
+      "status": "ready",
+      "extensions": [
+        {
+          "id": "opaque-provider-id",
+          "label": "Project Canvases",
+          "canvases": [
+            {
+              "id": "diagram",
+              "label": "Diagram",
+              "description": "Visualize a diagram.",
+              "inputSchema": {
+                "type": "object",
+                "properties": { "layout": { "enum": ["compact", "expanded"], "default": "compact" } },
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

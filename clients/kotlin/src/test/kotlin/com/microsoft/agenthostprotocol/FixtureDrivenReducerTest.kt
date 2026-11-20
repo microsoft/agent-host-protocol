@@ -2,6 +2,7 @@ package com.microsoft.agenthostprotocol
 
 import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.CanvasState
+import com.microsoft.agenthostprotocol.generated.CanvasesState
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.AnnotationsState
 import com.microsoft.agenthostprotocol.generated.AutomationState
@@ -151,6 +152,14 @@ class FixtureDrivenReducerTest {
                     for (action in actions) s = chatReducer(s, action)
                     s
                 },
+            )
+
+            "canvases" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = CanvasesState.serializer(),
+                run = { state -> actions.fold(state, ::canvasesReducer) },
             )
 
             "canvas" -> compareFixture(

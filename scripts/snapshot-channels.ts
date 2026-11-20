@@ -10,6 +10,7 @@ export const SNAPSHOT_CHANNELS = [
   { scheme: 'ahp-session', variant: 'Session', type: 'SessionState' },
   { scheme: 'ahp-chat', variant: 'Chat', type: 'ChatState' },
   { scheme: 'ahp-canvas', variant: 'Canvas', type: 'CanvasState' },
+  { scheme: 'ahp-canvases', variant: 'Canvases', type: 'CanvasesState' },
   { scheme: 'ahp-terminal', variant: 'Terminal', type: 'TerminalState' },
   { scheme: 'ahp-changeset', variant: 'Changeset', type: 'ChangesetState' },
   { scheme: 'ahp-resource-watch', variant: 'ResourceWatch', type: 'ResourceWatchState' },

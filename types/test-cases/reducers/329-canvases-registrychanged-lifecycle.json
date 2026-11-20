@@ -1,0 +1,14 @@
+{
+  "description": "Registry retry lifecycle distinguishes error, loading, ready-empty and uninitialized without changing membership",
+  "reducer": "canvases",
+  "initial": { "registry": { "status": "ready", "extensions": [] }, "canvases": [{ "resource": "ahp-canvas:/live" }] },
+  "actions": [
+    { "type": "canvases/registryChanged", "registry": { "status": "error", "error": { "errorType": "loadFailed", "message": "Unavailable" } } },
+    { "type": "canvases/registryRequested" },
+    { "type": "canvases/registryChanged", "registry": { "status": "loading" } },
+    { "type": "canvases/registryRequested" },
+    { "type": "canvases/registryChanged", "registry": { "status": "ready", "extensions": [] } },
+    { "type": "canvases/registryChanged", "registry": { "status": "uninitialized" } }
+  ],
+  "expected": { "registry": { "status": "uninitialized" }, "canvases": [{ "resource": "ahp-canvas:/live" }] }
+}

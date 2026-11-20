@@ -1,0 +1,8 @@
+{
+  "name": "chat-canvases-uri-cleared",
+  "group": "A",
+  "description": "Absence in the pointer replacement action clears the collection pointer.",
+  "type": "StateAction",
+  "input": { "type": "chat/canvasesUriChanged" },
+  "acceptableOutputs": [{ "type": "chat/canvasesUriChanged" }]
+}

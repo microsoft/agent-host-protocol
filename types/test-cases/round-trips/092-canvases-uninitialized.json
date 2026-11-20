@@ -1,0 +1,8 @@
+{
+  "name": "canvases-uninitialized",
+  "group": "A",
+  "description": "An uninitialized registry is not a loaded empty registry and can coexist with unsolicited instances.",
+  "type": "Snapshot",
+  "input": { "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "uninitialized" }, "canvases": [{ "resource": "ahp-canvas:/unsolicited" }] }, "fromSeq": 0 },
+  "acceptableOutputs": [{ "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "uninitialized" }, "canvases": [{ "resource": "ahp-canvas:/unsolicited" }] }, "fromSeq": 0 }]
+}

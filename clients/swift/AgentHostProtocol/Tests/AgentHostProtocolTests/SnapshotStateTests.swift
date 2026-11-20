@@ -4,8 +4,12 @@ import AgentHostProtocol
 
 final class SnapshotStateTests: XCTestCase {
     func testMalformedKnownChannelStateFailsToDecode() {
-        let json = #"{"resource":"ahp-session:/s1","state":{"lifecycle":"ready"},"fromSeq":1}"#
-        XCTAssertThrowsError(try JSONDecoder().decode(Snapshot.self, from: Data(json.utf8)))
+        for json in [
+            #"{"resource":"ahp-session:/s1","state":{"lifecycle":"ready"},"fromSeq":1}"#,
+            #"{"resource":"ahp-canvases:/c1","state":{"registry":{"status":"uninitialized"}},"fromSeq":1}"#,
+        ] {
+            XCTAssertThrowsError(try JSONDecoder().decode(Snapshot.self, from: Data(json.utf8)))
+        }
     }
 
     func testUnknownAndStandaloneStatesRoundTrip() throws {

@@ -125,6 +125,7 @@ export default withMermaid(defineConfigWithTheme<DocThemeConfig>({
             { text: 'Session Channel', link: '/reference/session' },
             { text: 'Chat Channel', link: '/reference/chat' },
             { text: 'Canvas Channel', link: '/reference/canvas' },
+            { text: 'Canvases Collection', link: '/reference/canvases' },
             { text: 'Terminal Channel', link: '/reference/terminal' },
             { text: 'TCP Channel', link: '/reference/tcp' },
             { text: 'Changeset Channel', link: '/reference/changeset' },

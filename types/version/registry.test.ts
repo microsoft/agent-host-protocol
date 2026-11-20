@@ -13,6 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import type { StateAction } from '../actions.js';
 
 import {
   ACTION_INTRODUCED_IN,
@@ -111,4 +112,18 @@ test('chat/configChanged is available starting in protocol 1.1.0', () => {
   assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatConfigChanged], '1.1.0');
   assert.equal(isActionKnownToVersion(action, '1.0.0'), false);
   assert.equal(isActionKnownToVersion(action, '1.1.0'), true);
+});
+
+test('Canvas collection actions are available starting in protocol 1.1.0', () => {
+  for (const type of [
+    ActionType.ChatCanvasesUriChanged,
+    ActionType.CanvasesRegistryRequested,
+    ActionType.CanvasesRegistryChanged,
+    ActionType.CanvasesCanvasSet,
+    ActionType.CanvasesCanvasRemoved,
+  ]) {
+    assert.equal(ACTION_INTRODUCED_IN[type], '1.1.0');
+    assert.equal(isActionKnownToVersion({ type } as StateAction, '1.0.0'), false);
+    assert.equal(isActionKnownToVersion({ type } as StateAction, '1.1.0'), true);
+  }
 });

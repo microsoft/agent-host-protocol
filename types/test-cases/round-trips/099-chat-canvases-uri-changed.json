@@ -1,0 +1,8 @@
+{
+  "name": "chat-canvases-uri-changed",
+  "group": "A",
+  "description": "A server action replaces the advertised collection pointer.",
+  "type": "StateAction",
+  "input": { "type": "chat/canvasesUriChanged", "canvasesUri": "ahp-canvases:/opaque" },
+  "acceptableOutputs": [{ "type": "chat/canvasesUriChanged", "canvasesUri": "ahp-canvases:/opaque" }]
+}

@@ -1,0 +1,7 @@
+{
+  "description": "chat/canvasesUriChanged clears only the collection pointer",
+  "reducer": "chat",
+  "initial": { "resource": "ahp-chat:/peer", "title": "Peer", "status": 1, "modifiedAt": "2026-10-14T10:00:00.000Z", "turns": [], "canvasesUri": "ahp-canvases:/old", "canvases": [{ "resource": "ahp-canvas:/existing" }] },
+  "actions": [{ "type": "chat/canvasesUriChanged" }],
+  "expected": { "resource": "ahp-chat:/peer", "title": "Peer", "status": 1, "modifiedAt": "2026-10-14T10:00:00.000Z", "turns": [], "canvases": [{ "resource": "ahp-canvas:/existing" }] }
+}

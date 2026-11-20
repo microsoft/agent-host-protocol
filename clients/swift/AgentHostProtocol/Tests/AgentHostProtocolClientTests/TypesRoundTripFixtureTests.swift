@@ -218,6 +218,10 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ResourceReadParams.self, from: inputData))
         case "ResourceReadResult":
             return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
+        case "OpenCanvasParams":
+            return try reencode(dec.decode(OpenCanvasParams.self, from: inputData))
+        case "DisposeCanvasParams":
+            return try reencode(dec.decode(DisposeCanvasParams.self, from: inputData))
         case "AuthenticateParams":
             return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
         default:

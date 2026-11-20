@@ -1270,6 +1270,63 @@ public struct MoveChatResult: Codable, Sendable, Equatable {
     }
 }
 
+public struct OpenCanvasParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Advertised `ahp-canvases:` collection that owns the canvas instance.
+    public var canvases: String
+    /// Stable identifier of the extension that declares the canvas.
+    public var extensionId: String
+    /// Provider-local canvas type identifier.
+    public var canvasId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case canvases
+        case extensionId
+        case canvasId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        canvases: String,
+        extensionId: String,
+        canvasId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.canvases = canvases
+        self.extensionId = extensionId
+        self.canvasId = canvasId
+    }
+}
+
+public struct DisposeCanvasParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
 public struct ListSessionsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
@@ -2943,6 +3000,16 @@ extension MoveChatParams: AHPCommand {
 extension DisposeChatParams: AHPCommand {
     public typealias Result = AHPNullResult
     public static let method = "disposeChat"
+}
+
+extension OpenCanvasParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "openCanvas"
+}
+
+extension DisposeCanvasParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeCanvas"
 }
 
 extension CreateTerminalParams: AHPCommand {

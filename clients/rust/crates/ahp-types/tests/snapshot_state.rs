@@ -3,12 +3,16 @@ use serde_json::json;
 
 #[test]
 fn malformed_known_channel_state_fails_to_decode() {
-    let raw = json!({
-        "resource": "ahp-session:/s1",
-        "state": {"lifecycle": "ready"},
-        "fromSeq": 1,
-    });
-    assert!(serde_json::from_value::<Snapshot>(raw).is_err());
+    for (resource, state) in [
+        ("ahp-session:/s1", json!({"lifecycle": "ready"})),
+        (
+            "ahp-canvases:/c1",
+            json!({"registry": {"status": "uninitialized"}}),
+        ),
+    ] {
+        let raw = json!({"resource": resource, "state": state, "fromSeq": 1});
+        assert!(serde_json::from_value::<Snapshot>(raw).is_err());
+    }
 }
 
 #[test]

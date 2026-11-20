@@ -1,0 +1,10 @@
+{
+  "description": "Canvas collection set appends missing resources and replaces matching resources without duplicates or reordering",
+  "reducer": "canvases",
+  "initial": { "registry": { "status": "uninitialized" }, "canvases": [{ "resource": "ahp-canvas:/first" }] },
+  "actions": [
+    { "type": "canvases/canvasSet", "canvas": { "resource": "ahp-canvas:/second" } },
+    { "type": "canvases/canvasSet", "canvas": { "resource": "ahp-canvas:/first" } }
+  ],
+  "expected": { "registry": { "status": "uninitialized" }, "canvases": [{ "resource": "ahp-canvas:/first" }, { "resource": "ahp-canvas:/second" }] }
+}

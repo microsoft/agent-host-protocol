@@ -247,6 +247,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.canvases = a.canvases
         return next
 
+    case .chatCanvasesUriChanged(let a):
+        var next = state
+        next.canvasesUri = a.canvasesUri
+        return next
+
     case .chatWorkingDirectorySet(let a):
         if (state.workingDirectories ?? []).contains(a.directory) { return state }
         var next = state
@@ -1283,6 +1288,29 @@ private func updateResponsePart(
     activeTurn.responseParts = parts
     var next = state
     next.activeTurn = activeTurn
+    return next
+}
+
+/// Pure reducer for registry and keyed canvas collection membership.
+public func canvasesReducer(state: CanvasesState, action: StateAction) -> CanvasesState {
+    var next = state
+    switch action {
+    case .canvasesRegistryRequested:
+        return state
+    case .canvasesRegistryChanged(let a):
+        next.registry = a.registry
+    case .canvasesCanvasSet(let a):
+        if let idx = next.canvases.firstIndex(where: { $0.resource == a.canvas.resource }) {
+            next.canvases[idx] = a.canvas
+        } else {
+            next.canvases.append(a.canvas)
+        }
+    case .canvasesCanvasRemoved(let a):
+        guard let idx = next.canvases.firstIndex(where: { $0.resource == a.resource }) else { return state }
+        next.canvases.remove(at: idx)
+    default:
+        return state
+    }
     return next
 }
 

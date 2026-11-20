@@ -27,6 +27,7 @@ export {
   sessionReducer,
   chatReducer,
   canvasReducer,
+  canvasesReducer,
   terminalReducer,
   changesetReducer,
   annotationsReducer,

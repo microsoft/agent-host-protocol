@@ -1,0 +1,8 @@
+{
+  "name": "canvases-canvas-set",
+  "group": "A",
+  "description": "Collection upserts carry the full reference object.",
+  "type": "StateAction",
+  "input": { "type": "canvases/canvasSet", "canvas": { "resource": "ahp-canvas:/live" } },
+  "acceptableOutputs": [{ "type": "canvases/canvasSet", "canvas": { "resource": "ahp-canvas:/live" } }]
+}

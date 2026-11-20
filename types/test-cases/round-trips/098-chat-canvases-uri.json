@@ -1,0 +1,8 @@
+{
+  "name": "chat-canvases-uri",
+  "group": "A",
+  "description": "Chat snapshots advertise a collection URI while preserving legacy membership.",
+  "type": "Snapshot",
+  "input": { "resource": "ahp-chat:/peer", "state": { "resource": "ahp-chat:/peer", "title": "Peer", "status": 1, "modifiedAt": "2026-10-14T10:00:00.000Z", "turns": [], "canvasesUri": "ahp-canvases:/opaque", "canvases": [{ "resource": "ahp-canvas:/live" }] }, "fromSeq": 0 },
+  "acceptableOutputs": [{ "resource": "ahp-chat:/peer", "state": { "resource": "ahp-chat:/peer", "title": "Peer", "status": 1, "modifiedAt": "2026-10-14T10:00:00.000Z", "turns": [], "canvasesUri": "ahp-canvases:/opaque", "canvases": [{ "resource": "ahp-canvas:/live" }] }, "fromSeq": 0 }]
+}

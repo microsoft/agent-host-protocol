@@ -1,0 +1,8 @@
+{
+  "name": "canvases-error",
+  "group": "A",
+  "description": "A registry error is typed and independent of live collection membership.",
+  "type": "Snapshot",
+  "input": { "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "error", "error": { "errorType": "loadFailed", "message": "Unavailable" } }, "canvases": [] }, "fromSeq": 2 },
+  "acceptableOutputs": [{ "resource": "ahp-canvases:/peer", "state": { "registry": { "status": "error", "error": { "errorType": "loadFailed", "message": "Unavailable" } }, "canvases": [] }, "fromSeq": 2 }]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "canvases-canvas-removed",
+  "group": "A",
+  "description": "Collection removal carries only the resource key.",
+  "type": "StateAction",
+  "input": { "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/live" },
+  "acceptableOutputs": [{ "type": "canvases/canvasRemoved", "resource": "ahp-canvas:/live" }]
+}

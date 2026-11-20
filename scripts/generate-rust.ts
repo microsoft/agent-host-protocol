@@ -169,8 +169,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | CanvasesState | AutomationState | AutomationRunState | EmptyState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -841,6 +841,7 @@ function generateStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'CanvasRegistryStatus',
   'ChannelRecoveryKind',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
@@ -855,7 +856,7 @@ const STATE_ENUMS = [
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'CanvasExtensionSource',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
@@ -877,6 +878,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'RootConfigState' },
   { name: 'AgentInfo' },
   { name: 'AgentCapabilities' },
+  { name: 'CanvasesCapability' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'SessionModelInfo' },
@@ -886,6 +888,14 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'ConfigSchema' },
   { name: 'PendingMessage' },
   { name: 'ChatState' },
+  { name: 'CanvasExtension' },
+  { name: 'CanvasType' },
+  { name: 'CanvasRegistry' },
+  { name: 'CanvasesState' },
+  { name: 'CanvasRegistryUninitializedState', omitDiscriminants: true },
+  { name: 'CanvasRegistryLoadingState', omitDiscriminants: true },
+  { name: 'CanvasRegistryReadyState', omitDiscriminants: true },
+  { name: 'CanvasRegistryErrorState', omitDiscriminants: true },
   { name: 'CanvasReference' },
   { name: 'CanvasState' },
   { name: 'ChatSummary' },
@@ -1206,6 +1216,19 @@ const CHILD_CUSTOMIZATION_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_REGISTRY_STATE_UNION: UnionConfig = {
+  name: 'CanvasRegistryState',
+  discriminantField: 'status',
+  doc: 'Authoritative Canvas registry materialization state.',
+  variants: [
+    { variantName: 'Uninitialized', innerType: 'CanvasRegistryUninitializedState', wireValue: 'uninitialized' },
+    { variantName: 'Loading', innerType: 'CanvasRegistryLoadingState', wireValue: 'loading' },
+    { variantName: 'Ready', innerType: 'CanvasRegistryReadyState', wireValue: 'ready' },
+    { variantName: 'Error', innerType: 'CanvasRegistryErrorState', wireValue: 'error' },
+  ],
+  unknown: true,
+};
+
 const CUSTOMIZATION_LOAD_STATE_UNION: UnionConfig = {
   name: 'CustomizationLoadState',
   discriminantField: 'kind',
@@ -1420,6 +1443,7 @@ pub enum SnapshotState {
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Canvas(Box<CanvasState>),
+    Canvases(Box<CanvasesState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
@@ -1584,6 +1608,7 @@ where D: serde::Deserializer<'de>,
   lines.push(generateDiscriminatedUnion(project, CHILD_CUSTOMIZATION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CUSTOMIZATION_LOAD_STATE_UNION));
+  lines.push(generateDiscriminatedUnion(project, CANVAS_REGISTRY_STATE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
   lines.push('');
@@ -1656,6 +1681,11 @@ const ACTION_VARIANTS: {
   { type: 'chat/movableChanged', variantName: 'ChatMovableChanged', tsInterface: 'ChatMovableChangedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/canvasesChanged', variantName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
+  { type: 'chat/canvasesUriChanged', variantName: 'ChatCanvasesUriChanged', tsInterface: 'ChatCanvasesUriChangedAction' },
+  { type: 'canvases/registryRequested', variantName: 'CanvasesRegistryRequested', tsInterface: 'CanvasesRegistryRequestedAction' },
+  { type: 'canvases/registryChanged', variantName: 'CanvasesRegistryChanged', tsInterface: 'CanvasesRegistryChangedAction' },
+  { type: 'canvases/canvasSet', variantName: 'CanvasesCanvasSet', tsInterface: 'CanvasesCanvasSetAction' },
+  { type: 'canvases/canvasRemoved', variantName: 'CanvasesCanvasRemoved', tsInterface: 'CanvasesCanvasRemovedAction' },
   { type: 'canvas/stateChanged', variantName: 'CanvasStateChanged', tsInterface: 'CanvasStateChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1809,7 +1839,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasRegistryState, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -1940,6 +1970,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination', omitDiscriminants: true }, { name: 'ChatMoveToNewSessionDestination', omitDiscriminants: true },
   { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
+  { name: 'OpenCanvasParams' }, { name: 'DisposeCanvasParams' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -2545,6 +2576,7 @@ function checkExhaustiveness(project: Project): void {
     'Customization',                // CUSTOMIZATION_UNION discriminated union
     'ChildCustomization',           // CHILD_CUSTOMIZATION_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; Rust consumers reuse CustomizationType
+    'CanvasRegistryState',
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union

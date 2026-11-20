@@ -1054,6 +1054,9 @@ public static class Reducers
             case ChatCanvasesChangedAction a:
                 state.Canvases = CopyList(a.Canvases);
                 return ReduceOutcome.Applied;
+            case ChatCanvasesUriChangedAction a:
+                state.CanvasesUri = a.CanvasesUri;
+                return ReduceOutcome.Applied;
             case ChatWorkingDirectorySetAction a:
                 {
                     // Membership keyed by the directory URI, over this chat's subset of
@@ -2171,6 +2174,41 @@ public static class Reducers
         return ReduceOutcome.Applied;
     }
 
+    /// <summary>Applies registry and keyed canvas collection membership mutations.</summary>
+    public static ReduceOutcome ApplyToCanvases(CanvasesState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+        switch (action.Value)
+        {
+            case CanvasesRegistryRequestedAction:
+                return ReduceOutcome.NoOp;
+            case CanvasesRegistryChangedAction a:
+                state.Registry = a.Registry;
+                return ReduceOutcome.Applied;
+            case CanvasesCanvasSetAction a:
+                {
+                    var next = new List<CanvasReference>(state.Canvases);
+                    var idx = next.FindIndex(canvas => canvas.Resource == a.Canvas.Resource);
+                    if (idx < 0) next.Add(a.Canvas);
+                    else next[idx] = a.Canvas;
+                    state.Canvases = next;
+                    return ReduceOutcome.Applied;
+                }
+            case CanvasesCanvasRemovedAction a:
+                {
+                    var idx = state.Canvases.FindIndex(canvas => canvas.Resource == a.Resource);
+                    if (idx < 0) return ReduceOutcome.NoOp;
+                    var next = new List<CanvasReference>(state.Canvases);
+                    next.RemoveAt(idx);
+                    state.Canvases = next;
+                    return ReduceOutcome.Applied;
+                }
+            default:
+                return ReduceOutcome.OutOfScope;
+        }
+    }
+
     // ─── Terminal Reducer ──────────────────────────────────────────────────
 
     /// <summary>
@@ -2640,6 +2678,7 @@ public static class Reducers
         "chat/isReadChanged",
         "chat/isArchivedChanged",
         "chat/configChanged",
+        "canvases/registryRequested",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

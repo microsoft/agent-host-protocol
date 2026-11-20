@@ -1,0 +1,22 @@
+{
+  "name": "canvases-registry-changed-action",
+  "group": "A",
+  "description": "canvases/registryChanged carries a ready, loaded-empty registry replacement.",
+  "type": "StateAction",
+  "input": {
+    "type": "canvases/registryChanged",
+    "registry": {
+      "status": "ready",
+      "extensions": []
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "canvases/registryChanged",
+      "registry": {
+        "status": "ready",
+        "extensions": []
+      }
+    }
+  ]
+}

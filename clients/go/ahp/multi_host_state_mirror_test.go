@@ -29,6 +29,26 @@ func TestMultiHostStateMirrorCanvasLifecycle(t *testing.T) {
 	}
 }
 
+func TestMultiHostStateMirrorCanvasCollectionLifecycle(t *testing.T) {
+	mirror := NewMultiHostStateMirror()
+	uri := ahptypes.URI("ahp-canvases:/opaque")
+	state := ahptypes.CanvasesState{
+		Registry: ahptypes.CanvasRegistryState{Value: &ahptypes.CanvasRegistryUninitializedState{}},
+		Canvases: []ahptypes.CanvasReference{},
+	}
+	mirror.PutCanvasCollection("host-a", uri, state)
+	mirror.PutCanvasCollection("host-b", uri, state)
+	mirror.DropResource("host-a", uri)
+	_, removed := mirror.CanvasCollection("host-a", uri)
+	mirror.PutCanvasCollection("host-a", uri, state)
+	mirror.DropHost("host-a")
+	_, dropped := mirror.CanvasCollection("host-a", uri)
+	retained, found := mirror.CanvasCollection("host-b", uri)
+	if !reflect.DeepEqual([]bool{removed, dropped, found, reflect.DeepEqual(retained, state)}, []bool{false, false, true, true}) {
+		t.Fatal("canvas collection was not isolated or removed with its resource and host")
+	}
+}
+
 func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	mirror := NewMultiHostStateMirror()
 	automationURI := ahptypes.URI("ahp-automation:/nightly")
