@@ -1766,7 +1766,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'ChatTurnMatchKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
@@ -1800,6 +1800,9 @@ const COMMAND_STRUCTS = [
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'ChatTurnIndexEntry', 'ListChatTurnsParams', 'ListChatTurnsResult',
+  'ReadChatTurnsParams', 'ReadChatTurnsResult',
+  'ChatTurnMatch', 'SearchChatTurnsParams', 'SearchChatTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2377,6 +2380,18 @@ public enum AHPCommands {
 
     public static func fetchTurns(id: Int, params: FetchTurnsParams) -> JsonRpcRequest<FetchTurnsParams> {
         JsonRpcRequest(id: id, method: "fetchTurns", params: params)
+    }
+
+    public static func listChatTurns(id: Int, params: ListChatTurnsParams) -> JsonRpcRequest<ListChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "listChatTurns", params: params)
+    }
+
+    public static func readChatTurns(id: Int, params: ReadChatTurnsParams) -> JsonRpcRequest<ReadChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "readChatTurns", params: params)
+    }
+
+    public static func searchChatTurns(id: Int, params: SearchChatTurnsParams) -> JsonRpcRequest<SearchChatTurnsParams> {
+        JsonRpcRequest(id: id, method: "searchChatTurns", params: params)
     }
 
     public static func authenticate(id: Int, params: AuthenticateParams) -> JsonRpcRequest<AuthenticateParams> {

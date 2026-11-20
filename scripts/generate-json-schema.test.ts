@@ -153,7 +153,8 @@ function schemaAccepts(
   switch (schema.type) {
     case 'string':
       return typeof value === 'string' &&
-        (typeof schema.minLength !== 'number' || [...value].length >= schema.minLength);
+        (typeof schema.minLength !== 'number' || [...value].length >= schema.minLength) &&
+        (typeof schema.maxLength !== 'number' || [...value].length <= schema.maxLength);
     case 'number':
     case 'integer':
       return typeof value === 'number' &&
@@ -608,6 +609,41 @@ describe('generated JSON schemas', () => {
           }),
           false,
         );
+      });
+
+      it('keeps chat history reads optional and their pages bounded and addressable', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const channel = 'ahp-chat:/c1';
+        const turnId = 'anchor';
+        const accepts = (name: string, value: unknown) => {
+          assert.ok(defs[name], `${name} must be a named wire type`);
+          return schemaAccepts(schema, defs[name] as JsonNode, value);
+        };
+        for (const [name, params] of [
+          ['ListChatTurnsParams', { channel }],
+          ['ReadChatTurnsParams', { channel, turnId }],
+          ['SearchChatTurnsParams', { channel, query: 'x' }],
+        ] as const) {
+          assert.ok(accepts(name, params), 'all modifiers are optional');
+          assert.ok(!accepts(name, { ...params, limit: 0 }));
+          assert.ok(!accepts(name, { ...params, limit: 1.5 }));
+        }
+        assert.ok(!accepts('ReadChatTurnsParams', { channel }));
+        assert.ok(!accepts('ReadChatTurnsParams', { channel, turnId, direction: 'latest' }));
+        assert.ok(!accepts('ReadChatTurnsResult', { turns: [], hasBefore: false }));
+        assert.ok(!accepts('ReadChatTurnsResult', { turns: [{ turnId }], hasBefore: false, hasAfter: true }));
+        assert.ok(!accepts('SearchChatTurnsParams', { channel, query: '' }));
+        assert.ok(!accepts('SearchChatTurnsResult', { items: [{ turnId, kind: 'reasoning', occurrence: 0 }] }));
+        assert.ok(!accepts('SearchChatTurnsResult', { items: [{ turnId, kind: 'response', occurrence: -1 }] }));
+        const page = (preview: string) => ({ items: [{ turnId, preview }] });
+        assert.ok(accepts('ListChatTurnsResult', page('🌱'.repeat(80))));
+        assert.ok(!accepts('ListChatTurnsResult', page('🌱'.repeat(81))));
+
+        assert.equal((defs.ChatState.properties as Record<string, { type?: string }>).historyNavigation.type, 'boolean');
+        assert.ok(!(defs.ChatState.required as string[]).includes('historyNavigation'));
       });
 
       it('constrains stable chat move destinations and results', () => {

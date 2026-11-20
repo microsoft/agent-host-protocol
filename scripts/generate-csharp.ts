@@ -2328,7 +2328,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'ChatTurnMatchKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
@@ -2380,6 +2380,9 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
+  { name: 'ChatTurnIndexEntry' }, { name: 'ListChatTurnsParams' }, { name: 'ListChatTurnsResult' },
+  { name: 'ReadChatTurnsParams' }, { name: 'ReadChatTurnsResult' },
+  { name: 'ChatTurnMatch' }, { name: 'SearchChatTurnsParams' }, { name: 'SearchChatTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },

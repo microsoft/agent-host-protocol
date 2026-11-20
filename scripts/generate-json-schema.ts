@@ -40,6 +40,7 @@ interface JsonSchema {
   minimum?: number;
   maximum?: number;
   minLength?: number;
+  maxLength?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -431,14 +432,16 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
         propSchema[constraint] = value;
       }
     }
-    const minLength = getNumericPropertyTag(prop, 'minLength');
-    if (minLength !== undefined) {
-      if (propSchema.type !== 'string' || !Number.isInteger(minLength) || minLength < 0) {
-        throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @minLength on ${typeText}`,
-        );
+    for (const constraint of ['minLength', 'maxLength'] as const) {
+      const length = getNumericPropertyTag(prop, constraint);
+      if (length !== undefined) {
+        if (propSchema.type !== 'string' || !Number.isInteger(length) || length < 0) {
+          throw new Error(
+            `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @${constraint} on ${typeText}`,
+          );
+        }
+        propSchema[constraint] = length;
       }
-      propSchema.minLength = minLength;
     }
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {

@@ -1818,7 +1818,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'ChatTurnMatchKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
   'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
@@ -1853,6 +1853,9 @@ const COMMAND_STRUCTS = [
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
+  'ChatTurnIndexEntry', 'ListChatTurnsParams', 'ListChatTurnsResult',
+  'ReadChatTurnsParams', 'ReadChatTurnsResult',
+  'ChatTurnMatch', 'SearchChatTurnsParams', 'SearchChatTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2386,6 +2389,15 @@ object AhpCommands {
 
     fun fetchTurns(id: Long, params: FetchTurnsParams): JsonRpcRequest<FetchTurnsParams> =
         JsonRpcRequest(id = id, method = "fetchTurns", params = params)
+
+    fun listChatTurns(id: Long, params: ListChatTurnsParams): JsonRpcRequest<ListChatTurnsParams> =
+        JsonRpcRequest(id = id, method = "listChatTurns", params = params)
+
+    fun readChatTurns(id: Long, params: ReadChatTurnsParams): JsonRpcRequest<ReadChatTurnsParams> =
+        JsonRpcRequest(id = id, method = "readChatTurns", params = params)
+
+    fun searchChatTurns(id: Long, params: SearchChatTurnsParams): JsonRpcRequest<SearchChatTurnsParams> =
+        JsonRpcRequest(id = id, method = "searchChatTurns", params = params)
 
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)

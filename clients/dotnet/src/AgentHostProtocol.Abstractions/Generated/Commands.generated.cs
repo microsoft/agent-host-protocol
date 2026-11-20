@@ -125,6 +125,31 @@ internal sealed class ChatMoveDestinationKindConverter : JsonConverter<ChatMoveD
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Which contiguous window of completed turns to read, relative to an anchor.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChatTurnReadDirection>))]
+public enum ChatTurnReadDirection
+{
+    /// <summary>Include the anchor and nearby turns.</summary>
+    [WireValue("around")]
+    Around,
+    /// <summary>Immediately preceding turns, excluding the anchor.</summary>
+    [WireValue("before")]
+    Before,
+    /// <summary>Immediately following turns, excluding the anchor.</summary>
+    [WireValue("after")]
+    After,
+}
+
+/// <summary>The searchable side of a completed turn.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChatTurnMatchKind>))]
+public enum ChatTurnMatchKind
+{
+    [WireValue("request")]
+    Request,
+    [WireValue("response")]
+    Response,
+}
+
 /// <summary>Native filesystem path grammar used by a host environment.</summary>
 [JsonConverter(typeof(WireEnumConverter<PathStyle>))]
 public enum PathStyle
@@ -1804,7 +1829,7 @@ public sealed record CreateResourceWatchResult
 /// channel's `turns` state, ahead of the already-loaded window, and update or
 /// clear `turnsNextCursor`.
 ///
-/// Before applying any operation that references a turn outside the currently
+/// Before applying any state-changing operation that references a turn outside the currently
 /// loaded window, the host MUST eagerly load enough older turns into state for
 /// that operation to reduce against valid state.</summary>
 public sealed record FetchTurnsParams
@@ -1830,6 +1855,155 @@ public sealed record FetchTurnsParams
 /// <summary>Result of the `fetchTurns` command.</summary>
 public sealed record FetchTurnsResult
 {
+}
+
+/// <summary>A prompt in the retained history, identified by its turn rather than its position.</summary>
+public sealed record ChatTurnIndexEntry
+{
+    /// <summary>Stable identifier of the completed turn in this chat.</summary>
+    public required string TurnId { get; init; }
+
+    /// <summary>First nonempty trimmed prompt line, or empty string. If truncated, the
+    /// 80 Unicode scalar values include the trailing ellipsis.</summary>
+    public required string Preview { get; init; }
+
+    /// <summary>The turn's ISO 8601 start time, if known.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+}
+
+/// <summary>Lists every visible non-system prompt in retained turns, oldest first, across pages.
+/// Requires `ChatState.historyNavigation`. Does not load turns into state.</summary>
+public sealed record ListChatTurnsParams
+{
+    /// <summary>Chat URI.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Maximum entries in the page; defaults to 100. The host may return fewer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Limit { get; init; }
+
+    /// <summary>Opaque index cursor for this chat; omit to start at the oldest eligible prompt.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Cursor { get; init; }
+}
+
+/// <summary>One chronological page of the prompt index.</summary>
+public sealed record ListChatTurnsResult
+{
+    /// <summary>Continue this index after the last entry; absent at the end of the index.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NextCursor { get; init; }
+
+    /// <summary>One entry per eligible prompt in transcript order.</summary>
+    public required List<ChatTurnIndexEntry> Items { get; init; }
+}
+
+/// <summary>Reads a byte-bounded window of completed turns directly, without changing
+/// any subscription or fetching intervening pages. Requires
+/// `ChatState.historyNavigation`. A missing anchor is `NotFound` (-32008).</summary>
+public sealed record ReadChatTurnsParams
+{
+    /// <summary>Chat URI.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Identifier of the retained completed turn anchoring the window.</summary>
+    public required string TurnId { get; init; }
+
+    /// <summary>Defaults to `around`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChatTurnReadDirection? Direction { get; init; }
+
+    /// <summary>Maximum number of whole turns, including the anchor for `around`; defaults to 10.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Limit { get; init; }
+}
+
+/// <summary>A contiguous slice of the transcript, not a chat snapshot or a state update.</summary>
+public sealed record ReadChatTurnsResult
+{
+    /// <summary>Whole turns in chronological order for all three directions.</summary>
+    public required List<Turn> Turns { get; init; }
+
+    /// <summary>Whether retained completed turns precede this window.</summary>
+    public bool HasBefore { get; init; }
+
+    /// <summary>Whether retained completed turns follow this window.</summary>
+    public bool HasAfter { get; init; }
+}
+
+/// <summary>A match locator, not a snippet, text offset, or response-part identifier.</summary>
+public sealed record ChatTurnMatch
+{
+    public required string TurnId { get; init; }
+
+    public ChatTurnMatchKind Kind { get; init; }
+
+    /// <summary>Zero-based index of this nonempty match in forward text order on this
+    /// side of the turn, for the same query and flags.</summary>
+    public long Occurrence { get; init; }
+}
+
+/// <summary>Searches visible request and response text in retained completed turns.
+/// Returns match locators newest first, independently of the subscription.
+/// Requires `ChatState.historyNavigation`.</summary>
+public sealed record SearchChatTurnsParams
+{
+    /// <summary>Chat URI.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Maximum matches in the page; defaults to 100. The host may return fewer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Limit { get; init; }
+
+    /// <summary>Opaque cursor for the same chat, query and effective flags; omit to start at the newest turn.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Cursor { get; init; }
+
+    /// <summary>Nonempty literal text, or a pattern when `isRegex` is true.</summary>
+    public required string Query { get; init; }
+
+    /// <summary>Case-sensitive matching; defaults to false.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MatchCase { get; init; }
+
+    /// <summary>Require whole-word matches; defaults to false.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? WholeWord { get; init; }
+
+    /// <summary>Treat the query as a regular expression; defaults to false.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsRegex { get; init; }
+}
+
+/// <summary>One page of match locators, which may end within a turn or side.</summary>
+public sealed record SearchChatTurnsResult
+{
+    /// <summary>Resume after the last result or scanned position. A bounded scan may
+    /// return no matches with an advancing cursor; only absence means done.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NextCursor { get; init; }
+
+    /// <summary>Match locators in reverse transcript order.</summary>
+    public required List<ChatTurnMatch> Items { get; init; }
 }
 
 /// <summary>Stop receiving updates for a channel.</summary>

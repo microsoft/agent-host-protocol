@@ -2274,6 +2274,11 @@ pub struct ChatState {
     pub config: Option<ChatConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
+    /// When true, the host supports `listChatTurns`, `readChatTurns`, and
+    /// `searchChatTurns` over this chat's retained history, independently of
+    /// the subscription window. Absent or false means unsupported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history_navigation: Option<bool>,
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are

@@ -1522,6 +1522,10 @@ type ChatState struct {
 	Config *ChatConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
+	// When true, the host supports `listChatTurns`, `readChatTurns`, and
+	// `searchChatTurns` over this chat's retained history, independently of
+	// the subscription window. Absent or false means unsupported.
+	HistoryNavigation *bool `json:"historyNavigation,omitempty"`
 	// Cursor for loading older completed turns into this chat state.
 	//
 	// Presence means `turns` is a tail window and more historical turns are

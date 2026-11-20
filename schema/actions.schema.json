@@ -1580,7 +1580,7 @@
     },
     "ChatTurnsLoadedAction": {
       "type": "object",
-      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
+      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany state-changing operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
       "properties": {
         "type": {
           "const": "chat/turnsLoaded"
@@ -5318,6 +5318,10 @@
             "$ref": "#/$defs/Turn"
           },
           "description": "Completed turns"
+        },
+        "historyNavigation": {
+          "type": "boolean",
+          "description": "When true, the host supports `listChatTurns`, `readChatTurns`, and\n`searchChatTurns` over this chat's retained history, independently of\nthe subscription window. Absent or false means unsupported."
         },
         "turnsNextCursor": {
           "type": "string",

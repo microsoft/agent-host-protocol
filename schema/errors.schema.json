@@ -2688,6 +2688,10 @@
           },
           "description": "Completed turns"
         },
+        "historyNavigation": {
+          "type": "boolean",
+          "description": "When true, the host supports `listChatTurns`, `readChatTurns`, and\n`searchChatTurns` over this chat's retained history, independently of\nthe subscription window. Absent or false means unsupported."
+        },
         "turnsNextCursor": {
           "type": "string",
           "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns."
@@ -7564,7 +7568,7 @@
     },
     "FetchTurnsParams": {
       "type": "object",
-      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.",
+      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any state-changing operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -7847,6 +7851,221 @@
       },
       "required": [
         "channel"
+      ]
+    },
+    "ChatTurnIndexEntry": {
+      "type": "object",
+      "description": "A prompt in the retained history, identified by its turn rather than its position.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Stable identifier of the completed turn in this chat."
+        },
+        "preview": {
+          "type": "string",
+          "description": "First nonempty trimmed prompt line, or empty string. If truncated, the\n80 Unicode scalar values include the trailing ellipsis.",
+          "maxLength": 80
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "The turn's ISO 8601 start time, if known."
+        }
+      },
+      "required": [
+        "turnId",
+        "preview"
+      ]
+    },
+    "ListChatTurnsParams": {
+      "type": "object",
+      "description": "Lists every visible non-system prompt in retained turns, oldest first, across pages.\nRequires `ChatState.historyNavigation`. Does not load turns into state.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum entries in the page; defaults to 100. The host may return fewer.",
+          "minimum": 1
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque index cursor for this chat; omit to start at the oldest eligible prompt."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "ListChatTurnsResult": {
+      "type": "object",
+      "description": "One chronological page of the prompt index.",
+      "properties": {
+        "nextCursor": {
+          "type": "string",
+          "description": "Continue this index after the last entry; absent at the end of the index."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatTurnIndexEntry"
+          },
+          "description": "One entry per eligible prompt in transcript order."
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "ReadChatTurnsParams": {
+      "type": "object",
+      "description": "Reads a byte-bounded window of completed turns directly, without changing\nany subscription or fetching intervening pages. Requires\n`ChatState.historyNavigation`. A missing anchor is `NotFound` (-32008).",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Identifier of the retained completed turn anchoring the window."
+        },
+        "direction": {
+          "$ref": "#/$defs/ChatTurnReadDirection",
+          "description": "Defaults to `around`."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of whole turns, including the anchor for `around`; defaults to 10.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "channel",
+        "turnId"
+      ]
+    },
+    "ReadChatTurnsResult": {
+      "type": "object",
+      "description": "A contiguous slice of the transcript, not a chat snapshot or a state update.",
+      "properties": {
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "description": "Whole turns in chronological order for all three directions."
+        },
+        "hasBefore": {
+          "type": "boolean",
+          "description": "Whether retained completed turns precede this window."
+        },
+        "hasAfter": {
+          "type": "boolean",
+          "description": "Whether retained completed turns follow this window."
+        }
+      },
+      "required": [
+        "turns",
+        "hasBefore",
+        "hasAfter"
+      ]
+    },
+    "ChatTurnMatch": {
+      "type": "object",
+      "description": "A match locator, not a snippet, text offset, or response-part identifier.",
+      "properties": {
+        "turnId": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatTurnMatchKind"
+        },
+        "occurrence": {
+          "type": "integer",
+          "description": "Zero-based index of this nonempty match in forward text order on this\nside of the turn, for the same query and flags.",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "turnId",
+        "kind",
+        "occurrence"
+      ]
+    },
+    "SearchChatTurnsParams": {
+      "type": "object",
+      "description": "Searches visible request and response text in retained completed turns.\nReturns match locators newest first, independently of the subscription.\nRequires `ChatState.historyNavigation`.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum matches in the page; defaults to 100. The host may return fewer.",
+          "minimum": 1
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor for the same chat, query and effective flags; omit to start at the newest turn."
+        },
+        "query": {
+          "type": "string",
+          "description": "Nonempty literal text, or a pattern when `isRegex` is true.",
+          "minLength": 1
+        },
+        "matchCase": {
+          "type": "boolean",
+          "description": "Case-sensitive matching; defaults to false."
+        },
+        "wholeWord": {
+          "type": "boolean",
+          "description": "Require whole-word matches; defaults to false."
+        },
+        "isRegex": {
+          "type": "boolean",
+          "description": "Treat the query as a regular expression; defaults to false."
+        }
+      },
+      "required": [
+        "channel",
+        "query"
+      ]
+    },
+    "SearchChatTurnsResult": {
+      "type": "object",
+      "description": "One page of match locators, which may end within a turn or side.",
+      "properties": {
+        "nextCursor": {
+          "type": "string",
+          "description": "Resume after the last result or scanned position. A bounded scan may\nreturn no matches with an advancing cursor; only absence means done."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatTurnMatch"
+          },
+          "description": "Match locators in reverse transcript order."
+        }
+      },
+      "required": [
+        "items"
       ]
     },
     "CreateTerminalParams": {
@@ -9394,6 +9613,23 @@
         }
       ],
       "description": "Identifies the destination of an atomic chat move."
+    },
+    "ChatTurnReadDirection": {
+      "enum": [
+        "around",
+        "before",
+        "after"
+      ],
+      "type": "string",
+      "description": "Which contiguous window of completed turns to read, relative to an anchor."
+    },
+    "ChatTurnMatchKind": {
+      "enum": [
+        "request",
+        "response"
+      ],
+      "type": "string",
+      "description": "The searchable side of a completed turn."
     },
     "ChangesetOperationTarget": {
       "oneOf": [
@@ -11146,7 +11382,7 @@
     },
     "ChatTurnsLoadedAction": {
       "type": "object",
-      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
+      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany state-changing operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
       "properties": {
         "type": {
           "const": "chat/turnsLoaded"

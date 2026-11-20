@@ -1,0 +1,16 @@
+{
+  "name": "read-chat-turns-result",
+  "group": "A",
+  "description": "An exclusive window at the start of the transcript contains the whole preceding turn.",
+  "type": "ReadChatTurnsResult",
+  "input": {
+    "turns": [{ "id": "t1", "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }],
+    "hasBefore": false,
+    "hasAfter": true
+  },
+  "acceptableOutputs": [{
+    "turns": [{ "id": "t1", "message": { "origin": { "kind": "user" }, "text": "Sketch the design" }, "responseParts": [{ "kind": "markdown", "id": "part-1", "content": "Design A or design B?" }], "state": "complete" }],
+    "hasBefore": false,
+    "hasAfter": true
+  }]
+}

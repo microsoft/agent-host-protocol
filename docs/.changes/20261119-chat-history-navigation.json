@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `ChatState.historyNavigation` advertises `listChatTurns`, `readChatTurns`, and `searchChatTurns` for browsing retained history without loading the intervening transcript into a subscription."
+}

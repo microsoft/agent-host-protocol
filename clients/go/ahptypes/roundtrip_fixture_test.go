@@ -262,6 +262,30 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v CreateChatParams
 		dec(&v)
 		return enc(&v)
+	case "ListChatTurnsParams":
+		var v ListChatTurnsParams
+		dec(&v)
+		return enc(&v)
+	case "ListChatTurnsResult":
+		var v ListChatTurnsResult
+		dec(&v)
+		return enc(&v)
+	case "ReadChatTurnsParams":
+		var v ReadChatTurnsParams
+		dec(&v)
+		return enc(&v)
+	case "ReadChatTurnsResult":
+		var v ReadChatTurnsResult
+		dec(&v)
+		return enc(&v)
+	case "SearchChatTurnsParams":
+		var v SearchChatTurnsParams
+		dec(&v)
+		return enc(&v)
+	case "SearchChatTurnsResult":
+		var v SearchChatTurnsResult
+		dec(&v)
+		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)

@@ -68,6 +68,22 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Which contiguous window of completed turns to read, relative to an anchor.
+public enum ChatTurnReadDirection: String, Codable, Sendable {
+    /// Include the anchor and nearby turns.
+    case around = "around"
+    /// Immediately preceding turns, excluding the anchor.
+    case before = "before"
+    /// Immediately following turns, excluding the anchor.
+    case after = "after"
+}
+
+/// The searchable side of a completed turn.
+public enum ChatTurnMatchKind: String, Codable, Sendable {
+    case request = "request"
+    case response = "response"
+}
+
 /// Native filesystem path grammar used by a host environment.
 public enum PathStyle: String, Codable, Sendable {
     case posix = "posix"
@@ -1906,6 +1922,225 @@ public struct FetchTurnsResult: Codable, Sendable, Equatable {
     }
 }
 
+public struct ChatTurnIndexEntry: Codable, Sendable, Equatable {
+    /// Stable identifier of the completed turn in this chat.
+    public var turnId: String
+    /// First nonempty trimmed prompt line, or empty string. If truncated, the
+    /// 80 Unicode scalar values include the trailing ellipsis.
+    public var preview: String
+    /// The turn's ISO 8601 start time, if known.
+    public var startedAt: String?
+
+    public init(
+        turnId: String,
+        preview: String,
+        startedAt: String? = nil
+    ) {
+        self.turnId = turnId
+        self.preview = preview
+        self.startedAt = startedAt
+    }
+}
+
+public struct ListChatTurnsParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    public var limit: Int?
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    public var cursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case limit
+        case cursor
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        limit: Int? = nil,
+        cursor: String? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.limit = limit
+        self.cursor = cursor
+    }
+}
+
+public struct ListChatTurnsResult: Codable, Sendable, Equatable {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    public var nextCursor: String?
+    /// One entry per eligible prompt in transcript order.
+    public var items: [ChatTurnIndexEntry]
+
+    public init(
+        nextCursor: String? = nil,
+        items: [ChatTurnIndexEntry]
+    ) {
+        self.nextCursor = nextCursor
+        self.items = items
+    }
+}
+
+public struct ReadChatTurnsParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Identifier of the retained completed turn anchoring the window.
+    public var turnId: String
+    /// Defaults to `around`.
+    public var direction: ChatTurnReadDirection?
+    /// Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+    public var limit: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case turnId
+        case direction
+        case limit
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        turnId: String,
+        direction: ChatTurnReadDirection? = nil,
+        limit: Int? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.turnId = turnId
+        self.direction = direction
+        self.limit = limit
+    }
+}
+
+public struct ReadChatTurnsResult: Codable, Sendable, Equatable {
+    /// Whole turns in chronological order for all three directions.
+    public var turns: [Turn]
+    /// Whether retained completed turns precede this window.
+    public var hasBefore: Bool
+    /// Whether retained completed turns follow this window.
+    public var hasAfter: Bool
+
+    public init(
+        turns: [Turn],
+        hasBefore: Bool,
+        hasAfter: Bool
+    ) {
+        self.turns = turns
+        self.hasBefore = hasBefore
+        self.hasAfter = hasAfter
+    }
+}
+
+public struct ChatTurnMatch: Codable, Sendable, Equatable {
+    public var turnId: String
+    public var kind: ChatTurnMatchKind
+    /// Zero-based index of this nonempty match in forward text order on this
+    /// side of the turn, for the same query and flags.
+    public var occurrence: Int
+
+    public init(
+        turnId: String,
+        kind: ChatTurnMatchKind,
+        occurrence: Int
+    ) {
+        self.turnId = turnId
+        self.kind = kind
+        self.occurrence = occurrence
+    }
+}
+
+public struct SearchChatTurnsParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    public var limit: Int?
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    public var cursor: String?
+    /// Nonempty literal text, or a pattern when `isRegex` is true.
+    public var query: String
+    /// Case-sensitive matching; defaults to false.
+    public var matchCase: Bool?
+    /// Require whole-word matches; defaults to false.
+    public var wholeWord: Bool?
+    /// Treat the query as a regular expression; defaults to false.
+    public var isRegex: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case limit
+        case cursor
+        case query
+        case matchCase
+        case wholeWord
+        case isRegex
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        limit: Int? = nil,
+        cursor: String? = nil,
+        query: String,
+        matchCase: Bool? = nil,
+        wholeWord: Bool? = nil,
+        isRegex: Bool? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.limit = limit
+        self.cursor = cursor
+        self.query = query
+        self.matchCase = matchCase
+        self.wholeWord = wholeWord
+        self.isRegex = isRegex
+    }
+}
+
+public struct SearchChatTurnsResult: Codable, Sendable, Equatable {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    public var nextCursor: String?
+    /// Match locators in reverse transcript order.
+    public var items: [ChatTurnMatch]
+
+    public init(
+        nextCursor: String? = nil,
+        items: [ChatTurnMatch]
+    ) {
+        self.nextCursor = nextCursor
+        self.items = items
+    }
+}
+
 public struct UnsubscribeParams: Codable, Sendable, Equatable {
     /// Channel URI to unsubscribe from
     public var channel: String
@@ -2943,6 +3178,21 @@ extension MoveChatParams: AHPCommand {
 extension DisposeChatParams: AHPCommand {
     public typealias Result = AHPNullResult
     public static let method = "disposeChat"
+}
+
+extension ListChatTurnsParams: AHPCommand {
+    public typealias Result = ListChatTurnsResult
+    public static let method = "listChatTurns"
+}
+
+extension ReadChatTurnsParams: AHPCommand {
+    public typealias Result = ReadChatTurnsResult
+    public static let method = "readChatTurns"
+}
+
+extension SearchChatTurnsParams: AHPCommand {
+    public typealias Result = SearchChatTurnsResult
+    public static let method = "searchChatTurns"
 }
 
 extension CreateTerminalParams: AHPCommand {

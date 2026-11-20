@@ -43,6 +43,26 @@ const (
 	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
 )
 
+// Which contiguous window of completed turns to read, relative to an anchor.
+type ChatTurnReadDirection string
+
+const (
+	// Include the anchor and nearby turns.
+	ChatTurnReadDirectionAround ChatTurnReadDirection = "around"
+	// Immediately preceding turns, excluding the anchor.
+	ChatTurnReadDirectionBefore ChatTurnReadDirection = "before"
+	// Immediately following turns, excluding the anchor.
+	ChatTurnReadDirectionAfter ChatTurnReadDirection = "after"
+)
+
+// The searchable side of a completed turn.
+type ChatTurnMatchKind string
+
+const (
+	ChatTurnMatchKindRequest  ChatTurnMatchKind = "request"
+	ChatTurnMatchKindResponse ChatTurnMatchKind = "response"
+)
+
 // Native filesystem path grammar used by a host environment.
 type PathStyle string
 
@@ -1287,7 +1307,7 @@ type CreateResourceWatchResult struct {
 // channel's `turns` state, ahead of the already-loaded window, and update or
 // clear `turnsNextCursor`.
 //
-// Before applying any operation that references a turn outside the currently
+// Before applying any state-changing operation that references a turn outside the currently
 // loaded window, the host MUST eagerly load enough older turns into state for
 // that operation to reduce against valid state.
 type FetchTurnsParams struct {
@@ -1306,6 +1326,120 @@ type FetchTurnsParams struct {
 
 // Result of the `fetchTurns` command.
 type FetchTurnsResult struct {
+}
+
+// A prompt in the retained history, identified by its turn rather than its position.
+type ChatTurnIndexEntry struct {
+	// Stable identifier of the completed turn in this chat.
+	TurnId string `json:"turnId"`
+	// First nonempty trimmed prompt line, or empty string. If truncated, the
+	// 80 Unicode scalar values include the trailing ellipsis.
+	Preview string `json:"preview"`
+	// The turn's ISO 8601 start time, if known.
+	StartedAt *string `json:"startedAt,omitempty"`
+}
+
+// Lists every visible non-system prompt in retained turns, oldest first, across pages.
+// Requires `ChatState.historyNavigation`. Does not load turns into state.
+type ListChatTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Maximum number of entries to return in this page. The server SHOULD respect
+	// this bound but MAY return fewer entries and MAY impose its own upper cap.
+	// Omit to let the server choose the page size.
+	Limit *int64 `json:"limit,omitempty"`
+	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+	// as opaque — do not parse, modify, or persist them across connections. An
+	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// One chronological page of the prompt index.
+type ListChatTurnsResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// One entry per eligible prompt in transcript order.
+	Items []ChatTurnIndexEntry `json:"items"`
+}
+
+// Reads a byte-bounded window of completed turns directly, without changing
+// any subscription or fetching intervening pages. Requires
+// `ChatState.historyNavigation`. A missing anchor is `NotFound` (-32008).
+type ReadChatTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Identifier of the retained completed turn anchoring the window.
+	TurnId string `json:"turnId"`
+	// Defaults to `around`.
+	Direction *ChatTurnReadDirection `json:"direction,omitempty"`
+	// Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+	Limit *int64 `json:"limit,omitempty"`
+}
+
+// A contiguous slice of the transcript, not a chat snapshot or a state update.
+type ReadChatTurnsResult struct {
+	// Whole turns in chronological order for all three directions.
+	Turns []Turn `json:"turns"`
+	// Whether retained completed turns precede this window.
+	HasBefore bool `json:"hasBefore"`
+	// Whether retained completed turns follow this window.
+	HasAfter bool `json:"hasAfter"`
+}
+
+// A match locator, not a snippet, text offset, or response-part identifier.
+type ChatTurnMatch struct {
+	TurnId string            `json:"turnId"`
+	Kind   ChatTurnMatchKind `json:"kind"`
+	// Zero-based index of this nonempty match in forward text order on this
+	// side of the turn, for the same query and flags.
+	Occurrence int64 `json:"occurrence"`
+}
+
+// Searches visible request and response text in retained completed turns.
+// Returns match locators newest first, independently of the subscription.
+// Requires `ChatState.historyNavigation`.
+type SearchChatTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Maximum number of entries to return in this page. The server SHOULD respect
+	// this bound but MAY return fewer entries and MAY impose its own upper cap.
+	// Omit to let the server choose the page size.
+	Limit *int64 `json:"limit,omitempty"`
+	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+	// as opaque — do not parse, modify, or persist them across connections. An
+	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+	Cursor *string `json:"cursor,omitempty"`
+	// Nonempty literal text, or a pattern when `isRegex` is true.
+	Query string `json:"query"`
+	// Case-sensitive matching; defaults to false.
+	MatchCase *bool `json:"matchCase,omitempty"`
+	// Require whole-word matches; defaults to false.
+	WholeWord *bool `json:"wholeWord,omitempty"`
+	// Treat the query as a regular expression; defaults to false.
+	IsRegex *bool `json:"isRegex,omitempty"`
+}
+
+// One page of match locators, which may end within a turn or side.
+type SearchChatTurnsResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// Match locators in reverse transcript order.
+	Items []ChatTurnMatch `json:"items"`
 }
 
 // Stop receiving updates for a channel.

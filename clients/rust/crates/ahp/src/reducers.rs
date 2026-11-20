@@ -2388,6 +2388,7 @@ mod tests {
             canvases: None,
             config: None,
             turns: Vec::new(),
+            history_navigation: None,
             turns_next_cursor: None,
             active_turn: None,
             steering_message: None,

@@ -2040,6 +2040,10 @@ public struct ChatState: Codable, Sendable, Equatable {
     public var config: ChatConfigState?
     /// Completed turns
     public var turns: [Turn]
+    /// When true, the host supports `listChatTurns`, `readChatTurns`, and
+    /// `searchChatTurns` over this chat's retained history, independently of
+    /// the subscription window. Absent or false means unsupported.
+    public var historyNavigation: Bool?
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
@@ -2090,6 +2094,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         case canvases
         case config
         case turns
+        case historyNavigation
         case turnsNextCursor
         case activeTurn
         case steeringMessage
@@ -2115,6 +2120,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
         turns: [Turn],
+        historyNavigation: Bool? = nil,
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
@@ -2138,6 +2144,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         self.canvases = canvases
         self.config = config
         self.turns = turns
+        self.historyNavigation = historyNavigation
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
         self.steeringMessage = steeringMessage

@@ -90,6 +90,39 @@ internal object ChatMoveDestinationKindSerializer : KSerializer<ChatMoveDestinat
 }
 
 /**
+ * Which contiguous window of completed turns to read, relative to an anchor.
+ */
+@Serializable
+enum class ChatTurnReadDirection {
+    /**
+     * Include the anchor and nearby turns.
+     */
+    @SerialName("around")
+    AROUND,
+    /**
+     * Immediately preceding turns, excluding the anchor.
+     */
+    @SerialName("before")
+    BEFORE,
+    /**
+     * Immediately following turns, excluding the anchor.
+     */
+    @SerialName("after")
+    AFTER
+}
+
+/**
+ * The searchable side of a completed turn.
+ */
+@Serializable
+enum class ChatTurnMatchKind {
+    @SerialName("request")
+    REQUEST,
+    @SerialName("response")
+    RESPONSE
+}
+
+/**
  * Native filesystem path grammar used by a host environment.
  */
 @Serializable
@@ -1563,6 +1596,174 @@ data class FetchTurnsParams(
 
 @Serializable
 class FetchTurnsResult
+
+@Serializable
+data class ChatTurnIndexEntry(
+    /**
+     * Stable identifier of the completed turn in this chat.
+     */
+    val turnId: String,
+    /**
+     * First nonempty trimmed prompt line, or empty string. If truncated, the
+     * 80 Unicode scalar values include the trailing ellipsis.
+     */
+    val preview: String,
+    /**
+     * The turn's ISO 8601 start time, if known.
+     */
+    val startedAt: String? = null
+)
+
+@Serializable
+data class ListChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null
+)
+
+@Serializable
+data class ListChatTurnsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * One entry per eligible prompt in transcript order.
+     */
+    val items: List<ChatTurnIndexEntry>
+)
+
+@Serializable
+data class ReadChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Identifier of the retained completed turn anchoring the window.
+     */
+    val turnId: String,
+    /**
+     * Defaults to `around`.
+     */
+    val direction: ChatTurnReadDirection? = null,
+    /**
+     * Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+     */
+    val limit: Long? = null
+)
+
+@Serializable
+data class ReadChatTurnsResult(
+    /**
+     * Whole turns in chronological order for all three directions.
+     */
+    val turns: List<Turn>,
+    /**
+     * Whether retained completed turns precede this window.
+     */
+    val hasBefore: Boolean,
+    /**
+     * Whether retained completed turns follow this window.
+     */
+    val hasAfter: Boolean
+)
+
+@Serializable
+data class ChatTurnMatch(
+    val turnId: String,
+    val kind: ChatTurnMatchKind,
+    /**
+     * Zero-based index of this nonempty match in forward text order on this
+     * side of the turn, for the same query and flags.
+     */
+    val occurrence: Long
+)
+
+@Serializable
+data class SearchChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null,
+    /**
+     * Nonempty literal text, or a pattern when `isRegex` is true.
+     */
+    val query: String,
+    /**
+     * Case-sensitive matching; defaults to false.
+     */
+    val matchCase: Boolean? = null,
+    /**
+     * Require whole-word matches; defaults to false.
+     */
+    val wholeWord: Boolean? = null,
+    /**
+     * Treat the query as a regular expression; defaults to false.
+     */
+    val isRegex: Boolean? = null
+)
+
+@Serializable
+data class SearchChatTurnsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * Match locators in reverse transcript order.
+     */
+    val items: List<ChatTurnMatch>
+)
 
 @Serializable
 data class UnsubscribeParams(
