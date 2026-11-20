@@ -20,6 +20,7 @@ If #543 lands differently, the selection sections here change with it.
 - A **model source** is #543's term for an independently selectable source of model access. It is described by `ModelSourceInfo`, referenced by `SessionModelInfo.modelSourceId`, and advertised per agent in root state.
 - A **model source customization** is the new child customization: a model source that a plugin contributes to one session.
 - A **model source definition** is the content inside the plugin that declares it: the endpoint, the wire format, and any curated model list, in a format the host's agent understands.
+- The **contributing client** is the client whose plugin declared the source. The plugin container's `clientId` names it.
 - An **agent provider** is the existing `provider` field (`AgentInfo.provider`, `SessionModelInfo.provider`). This proposal doesn't change it, and it doesn't use "provider" for anything new.
 
 #619 and the first draft of this proposal called the new customization a "model provider". #543 had already renamed its own provisional model provider concept to "model source" to keep "provider" for the agent provider, so this proposal follows it.
@@ -113,6 +114,17 @@ export interface ModelSourceCustomization extends CustomizationBase {
   enablement?: CustomizationEnablement[];
   /** Current lifecycle state of the source. */
   state: ModelSourceState;
+  /**
+   * Who may select this source's models, as the host applies it. Absent
+   * means only the contributing client. See §4.5.
+   */
+  sharing?: ModelSourceSharingPolicy;
+  /**
+   * What happens when the contributing client leaves, as the host applies
+   * it. Absent means the source is withdrawn once turns already running on
+   * it finish. See §4.5.
+   */
+  retention?: ModelSourceRetentionPolicy;
 }
 ```
 
@@ -308,7 +320,7 @@ Selection doesn't change. A client picks a source's model the way it picks any m
 { "id": "model-source-1:example-model" }
 ```
 
-Model IDs are opaque; the example only shows that the host, not the endpoint, chooses them. The selection travels on every path a selection already uses: `Message.model` on turns, drafts, and pending messages. The host resolves the ID against the chat's session. A source's model is selectable only while the source exists, is enabled, is `ready`, and lists it. Otherwise the host rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions.
+Model IDs are opaque; the example only shows that the host, not the endpoint, chooses them. The selection travels on every path a selection already uses: `Message.model` on turns, drafts, and pending messages. The host resolves the ID against the chat's session. A source's model is selectable only while the source exists, is enabled, is `ready`, and lists it, and only by a client its sharing policy allows (see [§4.5](#_4-5-several-clients-and-clients-that-leave)). Otherwise the host rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions.
 
 Because session-scoped sources are new to #543, this proposal adds four rules:
 
@@ -320,9 +332,92 @@ Because session-scoped sources are new to #543, this proposal adds four rules:
 
   A host can meet this by minting IDs it never reuses within a session, rather than deriving them from the endpoint's model name alone.
 - **Stable model IDs.** The host SHOULD keep a source's model IDs stable for as long as the source exists, including across credential rotation, so drafts and pending messages keep resolving.
-- **Session only.** A source's model can be selected only in the session that contains the source. The source exists only while its client is active, so an automation template can't name one. A host validating an automation's selection against the agent's catalog rejects it, which is the intended outcome.
+- **Session only.** A source's model can be selected only in the session that contains the source. The source lasts at most as long as the session, so an automation template can't name one. A host validating an automation's selection against the agent's catalog rejects it, which is the intended outcome.
 
-### 4.5 No capabilities
+### 4.5 Several clients, and clients that leave
+
+Several clients can be active in one session. Each publishes its own plugins and supplies its own keys, and each message picks its model by `id`, so two clients can use different sources in the same chat. Two choices about each source belong to the client that contributed it:
+
+- **Sharing** decides who may select the source's models. By default only the contributing client may, so another client's turns never spend the user's key. A user who wants to continue on another device can share the source with the session.
+- **Retention** decides what happens when the contributing client leaves. By default the host withdraws the source, but turns already running on it finish first. A user who wants work to keep going after the client goes away can keep the source for the rest of the session.
+
+```ts
+// types/channels-session/state.ts
+
+/**
+ * Who may select a model source's models.
+ *
+ * @category Model Source State
+ * @nonexhaustive
+ */
+export const enum ModelSourceSharingPolicy {
+  /** Only the contributing client. */
+  ContributingClient = 'contributingClient',
+  /** Any client active in the session. */
+  Session = 'session',
+}
+
+/**
+ * How long a model source lasts once its contributing client leaves.
+ *
+ * @category Model Source State
+ * @nonexhaustive
+ */
+export const enum ModelSourceRetentionPolicy {
+  /** Withdrawn when the contributing client leaves, once running turns finish. */
+  ContributingClient = 'contributingClient',
+  /** Kept, with its credential in memory, until the session ends or the host restarts. */
+  Session = 'session',
+}
+
+/**
+ * The contributing client's choices for one model source in its plugin.
+ *
+ * @category Model Source State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceOptions {
+  /** Who may select the source's models. Absent means `contributingClient`. */
+  sharing?: ModelSourceSharingPolicy;
+  /** What happens when this client leaves. Absent means `contributingClient`. */
+  retention?: ModelSourceRetentionPolicy;
+  /**
+   * With `session` retention, the longest time to keep the source after
+   * this client leaves, in milliseconds. Absent means until the session
+   * ends.
+   *
+   * @integer
+   * @minimum 1
+   */
+  maxRetention?: number;
+}
+
+export interface ClientPluginCustomization extends PluginCustomization {
+  // …existing…
+  /**
+   * Choices for the model sources this plugin contributes, keyed by the
+   * source's name as it appears in the definition, the same way
+   * `childEnablement` is keyed.
+   */
+  childModelSources?: Record<string, ModelSourceOptions>;
+}
+```
+
+The client asks; the host decides. The host:
+
+- applies a policy no broader than the client asked for. It MAY narrow it, for example by refusing `session` retention or applying a shorter time limit, and publishes the result in `ModelSourceCustomization.sharing` and `retention`. It treats an unknown requested value as `contributingClient`.
+- rejects a selection of a `contributingClient`-shared source's model by any other client, through the failure paths in [§4.4](#_4-4-models-and-selection).
+
+Clients:
+
+- SHOULD offer only the models they're allowed to select. A client is the contributor when the source's container has its `clientId`.
+- SHOULD label each source in a picker with the contributing client's `displayName` from `SessionState.activeClients`, for example "OpenRouter (Laptop)". Two clients' sources can share a name, and the label keeps them apart.
+- SHOULD show when a retained source's contributing client has left.
+
+[§6](#_6-lifecycle) describes what happens when the contributing client leaves.
+
+### 4.6 No capabilities
 
 Following #543's direction after review, this proposal adds no capability flags. Support is discoverable from state:
 
@@ -330,7 +425,7 @@ Following #543's direction after review, this proposal adds no capability flags.
 - A client that doesn't understand the child keeps it as an unknown variant and ignores it. Its models live inside the child's state, so they never reach that client's picker.
 - Only the contributing client answers `authRequired`, and it understands the child because it published the definition.
 
-### 4.6 Change table
+### 4.7 Change table
 
 What a follow-up implementation would touch:
 
@@ -341,6 +436,8 @@ What a follow-up implementation would touch:
 | `ChildCustomizationType`, `ChildCustomization` | `channels-session/state.ts` | widened |
 | `ModelSourceStatus`, four `ModelSource*State` variants, `ModelSourceState` | `channels-session/state.ts` | added (lifecycle union) |
 | `ModelSourceAuthRequirement` | `channels-session/state.ts` | added |
+| `ModelSourceSharingPolicy`, `ModelSourceRetentionPolicy`, `ModelSourceOptions` | `channels-session/state.ts` | added |
+| `ClientPluginCustomization.childModelSources` | `channels-session/state.ts` | added |
 | `AuthenticateTargetKind.ModelSource`, `ModelSourceAuthenticateTarget` | `common/commands.ts` | added |
 | `AuthenticateTarget` | `common/commands.ts` | widened |
 | `AuthenticateParams.target` and `resource` docs | `common/commands.ts` | generalized beyond MCP servers |
@@ -376,17 +473,18 @@ sequenceDiagram
     C->>H: chat/turnStarted (message.model: { id })
     A->>E: inference (credential attached)
 
-    Note over C,H: Later, the client leaves or drops the plugin
+    Note over C,H: Later, the contributing client leaves (default retention)
+    Note over H: new work on the source stops, running turns finish
     H->>A: withdraw source, drop credential
-    Note over H: session/activeClientRemoved, then the plugin and its children are removed
+    Note over H: the plugin and its children are removed
 ```
 
 1. The client publishes a plugin containing a model source definition through `session/activeClientSet`. The plugin may be virtual.
 2. The host expands it into a `ModelSourceCustomization` child in `starting`. Its agent reads and validates the definition.
 3. If a credential is needed, the host sets `state: authRequired`. The contributing client calls `authenticate` with a `modelSource` target.
 4. The agent lists models, and the host sets `state: ready` with `models`.
-5. Any client in the session can select one of those models by `id`.
-6. When the contributing client leaves the session or removes the plugin, the host withdraws the source and its models and drops the credential (see [Lifecycle](#_6-lifecycle)).
+5. The contributing client, and any other client the source is shared with, can select one of those models by `id`.
+6. When the contributing client leaves, turns already running on the source finish. The host then withdraws the source and drops the credential, unless the client asked to keep it for the session. If the client removes the plugin instead, the host withdraws the source right away. See [Lifecycle](#_6-lifecycle).
 
 ---
 
@@ -396,12 +494,26 @@ sequenceDiagram
 
 The host withdraws a source when:
 
-- the contributing client is removed from `SessionState.activeClients`, under the existing rules (it unsubscribes, it disconnects past the host's grace period, or it reconnects without resubscribing);
+- the contributing client leaves, which means it is removed from `SessionState.activeClients` under the existing rules (it unsubscribes, it disconnects past the host's grace period, or it reconnects without resubscribing). For this case, the source's retention policy decides when withdrawal happens (see [When the contributing client leaves](#when-the-contributing-client-leaves));
 - the client re-publishes its active-client entry without the plugin;
 - the plugin's content changes so it no longer declares the source;
 - the session is disposed.
 
 On withdrawal, the host removes the child, drops the credential, and the source's models leave the session's selectable catalog.
+
+### When the contributing client leaves
+
+A client going away doesn't cut off work already running on its sources.
+
+- **`contributingClient` retention (the default).** The host stops new work on the source as soon as the client leaves: a new turn or a queued message that names one of its models fails. Turns already running on the source SHOULD finish, and the host withdraws the source once they have. The host MAY bound how long it waits. Any client can still cancel such a turn with the existing cancellation actions.
+- **`session` retention.** The source stays usable, under its sharing policy. The host keeps the plugin container in `SessionState.customizations` with its `clientId` still set, but removes every child except the retained model sources. Queued messages keep running, and clients the source is shared with can start new turns on it. The host withdraws the source when the first of these happens:
+  - the session is disposed;
+  - the host restarts;
+  - `maxRetention`, or the host's own limit, runs out;
+  - any client disables the source with `session/customizationToggled`, which is how another client stops a retained source early;
+  - the contributing client returns with an entry that no longer includes the source.
+
+While the contributing client is away, nobody can supply a new credential. If a retained source's credential expires or is rejected, the source stays in `authRequired`, and work that needs it fails. Other clients SHOULD NOT prompt for the key. When the contributing client returns and publishes the plugin again, the retained source rejoins its entry. It keeps its `id`, its model IDs, and its credential.
 
 ### Selections after withdrawal
 
@@ -409,7 +521,7 @@ A selection that names a withdrawn model fails. The host MUST NOT run the work o
 
 - Drafts and history keep the `id`. Because the `id` stays reserved (see [§4.4](#_4-4-models-and-selection)), it can't later resolve to a different source. Clients show such a selection as unavailable and let the user choose again.
 - A queued or steering message that names a withdrawn model fails when the host would consume it, through the existing chat lifecycle.
-- An active turn fails through the existing turn lifecycle the next time it needs the withdrawn source.
+- An active turn fails through the existing turn lifecycle the next time it needs the withdrawn source. This happens when a source is withdrawn while a turn is still using it, for example when the client removes the plugin. A client that simply leaves lets running turns finish first.
 
 ### Disabling
 
@@ -425,7 +537,7 @@ A selection that names a withdrawn model fails. The host MUST NOT run the work o
 ### Reconnect and restart
 
 - Source status lives in session state, so a reconnecting client reads `authRequired` from its snapshot and answers it. Nothing depends on a replayed notification.
-- After a host restart, credentials are gone, because they were never persisted. A restored source returns in `authRequired`, or is absent until its client publishes the plugin again. Its model IDs stay reserved either way, so the host keeps those reservations with the session's other durable state. They identify a source and model, not a secret.
+- After a host restart, credentials are gone, because they were never persisted. Retention ends too. A restored source returns in `authRequired`, or is absent until its client publishes the plugin again. Its model IDs stay reserved either way, so the host keeps those reservations with the session's other durable state. They identify a source and model, not a secret.
 
 ---
 
@@ -435,11 +547,11 @@ A selection that names a withdrawn model fails. The host MUST NOT run the work o
 2. **Memory only.** The host holds it only in memory. It is never persisted and never placed in environment variables, command lines, logs, or telemetry. It is redacted from tool output and error messages.
 3. **Scoped to `(session, customizationId)`.** It is never shared with sibling sources, MCP servers, other sessions, or the agent's own protected resources.
 4. **Attached only to that source's requests**, as its definition specifies. It is never sent to another origin, including on redirect, and never exposed to the model, tools, terminals, or hooks.
-5. **Supplied by the contributing client.** Other clients may render the source's status but SHOULD NOT prompt for its credential.
+5. **Supplied by the contributing client.** Other clients may render the source's status but SHOULD NOT prompt for its credential, including while a retained source's contributing client is away.
 6. **Re-requested through state.** The host asks again by setting `state: authRequired`. State survives reconnects; `auth/required` notifications are not replayed.
 7. **`expiresIn` for short-lived tokens.** A credential delivered without `expiresIn` stays valid until the endpoint rejects it or the client revokes it.
 8. **Checked by the client.** Before sending a secret, the contributing client SHOULD check that `resource.resource` matches the endpoint in its own definition.
-9. **Dropped** when the source is withdrawn, when the session is disposed, and when the host restarts.
+9. **Dropped** when the source is withdrawn, when the session is disposed, and when the host restarts. With `session` retention, the key stays in memory after the contributing client leaves, until retention ends. It is still never persisted.
 
 ---
 
@@ -449,7 +561,7 @@ A selection that names a withdrawn model fails. The host MUST NOT run the work o
 - Client-sent model catalogs. Models always come from the host.
 - Using a source's models from automations, or from any session other than the one containing the source.
 - Usage, billing, or per-call provenance.
-- Keys the host holds itself. That is host-owned authentication ([#404](https://github.com/microsoft/agent-host-protocol/pull/404)).
+- Keys the host holds itself, and sources that outlive a host restart. That is host-owned authentication ([#404](https://github.com/microsoft/agent-host-protocol/pull/404)); see the open questions.
 
 Hosts apply policy appropriate to the source. A model source the user configured in their own client is user configuration, while one from a third-party plugin may warrant stricter rules.
 
@@ -461,8 +573,10 @@ Hosts apply policy appropriate to the source. A model source the user configured
 - **Session-scoped sources in #543.** #543 scopes `modelSourceId` to `AgentInfo.modelSources` and model ID uniqueness to one agent's catalog. This proposal needs both to extend to the session's model source customizations, with the rules in [§4.4](#_4-4-models-and-selection). #543's chat transfer rules should also decide what happens when a chat whose draft or pending message names a source's model moves to another session.
 - **`authenticate` beyond Bearer tokens.** `authenticate` is specified with RFC 6750 Bearer semantics. The `modelSource` target needs wording for opaque secrets that the agent applies per the definition. It also needs a rule for endpoints that aren't `https` URLs, which RFC 9728 `resource` values must be.
 - **Host-owned authentication and account identity.** How does this interact with [#404](https://github.com/microsoft/agent-host-protocol/pull/404) and [#459](https://github.com/microsoft/agent-host-protocol/pull/459)?
-  - If a host holds its own keys (#404), its account consumers may need a model source variant.
+  - `session` retention keeps a source alive while the host runs, but not across a host restart, and it can't serve automations. Those cases need the host to own both the definition and the key. #404 doesn't cover that yet: its flows are OAuth only, its account consumers are agents and MCP servers, and it treats a key pushed with `authenticate` as the client's. It would need three additions: a flow where the client hands a user-supplied secret over once, a model source consumer, and model source definitions the host owns.
   - An API key has no authority-qualified account (#459). An Entra ID token does, so it's open whether `auth/revoked` should reach a source credential delivered with an `account`.
+- **Taking over a source.** When a retained source's contributing client is away, or a source was just withdrawn, should another client that publishes the same definition and key be able to take it over? The reserved-ID rule already lets the same source come back with the same model IDs. Extending that to a different client would keep drafts and queued work resolving.
+- **Duplicate sources.** The same user with two windows or devices, each configured for the same service, gets two sources with the same models, and the host holds two copies of the key. Labels keep them apart. Should a host be able to merge identical sources with several contributors? That's only safe when the host knows both keys belong to the same account, and API keys usually don't say.
 - **Host-owned plugins.** Should plugins from `AgentInfo.customizations`, rather than client-contributed ones, be able to surface model sources the same way? The type allows it. But the "contributing client supplies the credential" rule has no contributor to point at, so these sources would need either any client that understands them or host-owned authentication.
 - **A client capability.** Without one, the host can't tell whether a client understands a definition inside a plugin it publishes. A client that synthesizes the plugin does. One that forwards a third-party plugin from disk might not, which would leave a child in `authRequired` that nobody answers. Is that worth a `ClientCapabilities` flag?
 - **Declining client sources.** A host may refuse client-contributed sources by policy. This proposal surfaces that as `error` with an explanatory `ErrorInfo`, so the user sees why. Is a dedicated error type or status worth adding?
@@ -475,6 +589,7 @@ Hosts apply policy appropriate to the source. A model source the user configured
 
 - **Additive.** `CustomizationType` and `AuthenticateTargetKind` are `@nonexhaustive`, and generated clients preserve unknown `ChildCustomization` and `AuthenticateTarget` variants as raw values. All new fields are optional.
 - **Ignorable.** A host whose agent can't read model source definitions doesn't surface them, and clients keep using the agent's models. A client that doesn't understand `ModelSourceCustomization` ignores it, and never sees its models.
+- **Safe defaults.** A host that ignores `childModelSources` applies the defaults, which are the narrowest choices: only the contributing client may use a source, and the source goes away when that client leaves.
 - **No protocol version bump.** Older peers ignore what they don't understand, per the [compatibility guarantee](/specification/versioning#compatibility-guarantee). New declarations would carry `@stability 1.0` inside the otherwise stable session channel.
 - **Depends on #543.** It reuses `ModelSourceInfo`'s roles and `SessionModelInfo.modelSourceId`, so this lands after #543, or together with it.
 
@@ -504,7 +619,7 @@ Applying the [doctrine's design tests](/guide/doctrine#design-tests):
 
 - **Can a minimal client ignore this and still render a coherent session?** Yes. The new child is an unknown variant to such a client, a source's models never enter its picker, and turns use the agent's models.
 - **Is the durable, user-visible result represented in state?** Yes. Source status, the authentication requirement, and the model catalog all live in `SessionState.customizations`. The credential is deliberately not state, because it is a secret.
-- **Does the host remain the authority?** Yes. The host mints IDs, decides status, lists models, validates every selection, and decides policy. Clients send a plugin and a secret, never a catalog.
+- **Does the host remain the authority?** Yes. The host mints IDs, decides status, lists models, validates every selection, and decides policy, including how far to honor a client's sharing and retention choices. Clients send a plugin and a secret, never a catalog.
 - **Does this expose an agent implementation detail?** No. The definition format, wire protocol, discovery, model ID mapping, and how a key is attached stay behind the host. AHP sees a name, a status, and models.
 - **Does it fit an existing channel?** Yes. The source lives in session customizations, and the credential uses root `authenticate`. No new channel.
 - **Can clients discover support through capabilities or optional state?** Yes, through optional state. A model source child appears only when the host's agent supports it, and its models appear only once it's ready.
