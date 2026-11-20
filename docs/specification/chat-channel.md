@@ -84,6 +84,23 @@ Cursors are opaque and scoped to the connection, method, and chat. They are not 
 
 Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, or an invalid direction or limit. An unavailable command, including for a chat that does not advertise `historyBrowsing`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
 
+#### Search visible text
+
+A host that supports `searchChatTurns` advertises `"historyBrowsing": { "search": {} }` in the chat snapshot. A browsing-only host omits `search`; clients MUST NOT infer search support from the ability to list or read turns. Search uses the same visibility, access checks, and read-only guarantees as browsing. Queries and selected matches are private to the caller, not shared chat state.
+
+`searchChatTurns` returns `{ turnId, kind, occurrence }` locators, not snippets or offsets. Search only text that can be revealed to the caller:
+
+- `request`: the full visible initiating `Message.text`, not its index preview. Exclude hidden requests and system notifications.
+- `response`: visible text of `markdown` response parts in stream order. Match their displayed text (for example, a link's label, not its destination or Markdown delimiters), separately per part. Matches do not cross parts. Do not search reasoning, tool names, calls, arguments or output, attachments, content references, other response-part kinds, metadata, or raw provider transcripts.
+
+Omitted `matchCase`, `wholeWord` and `isRegex` each mean `false`: the default query is literal, case-insensitive, and may match inside words. A regex uses ECMAScript Unicode matching, case-insensitive unless `matchCase` is true. Whole-word mode applies ECMAScript word boundaries at word ends. Match left to right without overlap, ignoring zero-width matches. A host SHOULD bound regex execution; reject an invalid or over-budget pattern rather than report a partial scan as exhaustive.
+
+Number nonempty matches **from zero in forward text order**, restarting for each side of each turn and continuing across the visible Markdown parts of the response. Return turns **newest first**; within a turn return response before request and occurrences in descending order. For example, searching `map` in a request `map` and a response `map then map` yields `response:1`, `response:0`, `request:0`. A page may end between these matches. To reveal a match outside the subscription, read `around` its turn ID and locate the same forward occurrence on that side. The client need not load the intervening transcript.
+
+Omit `cursor` to start at the newest turn. The default `limit` is 100 matches; it must be a positive integer and the host may return fewer. Search follows the [continuation and error rules](#continuation-and-errors) for the prompt index, but binds each cursor to the query and effective flags as well as the connection, method and chat. A cursor can resume within one side of a turn. An empty `items` page with an advancing `nextCursor` is not a final “no matches”; only an absent cursor ends the traversal.
+
+An unavailable search command returns `MethodNotFound` (`-32601`), including on a browsing-only chat; it does not return an empty result. An empty query or invalid or over-budget regex returns `InvalidParams` (`-32602`).
+
 ### Reasoning timing
 
 [`ReasoningResponsePart`](/reference/chat#reasoningresponsepart) may include a producer-recorded `startedAt` timestamp and a final `duration` in non-negative integer milliseconds. Timing is optional: an absent duration means unfinished or unknown, not zero. Clients MUST treat a supplied duration as producer-owned data rather than measuring replay, subtracting their local clock from `startedAt`, or substituting a minimum display value into stored state.
@@ -425,6 +442,7 @@ This section lists wire methods that are interpreted in the context of a chat UR
 | `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
 | `listChatTurns` | request | Page the retained prompt index without loading turns into state. |
 | `readChatTurns` | request | Read a bounded window around, before, or after a retained turn. |
+| `searchChatTurns` | request | Find occurrences in visible retained request and response text. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 
 `createChat` is dispatched against the owning session URI (`params.channel = "ahp-session:/<sid>"`).

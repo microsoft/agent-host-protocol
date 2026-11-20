@@ -112,6 +112,17 @@ enum class ChatTurnReadDirection {
 }
 
 /**
+ * The searchable side of a completed turn.
+ */
+@Serializable
+enum class ChatTurnMatchKind {
+    @SerialName("request")
+    REQUEST,
+    @SerialName("response")
+    RESPONSE
+}
+
+/**
  * Native filesystem path grammar used by a host environment.
  */
 @Serializable
@@ -1684,6 +1695,74 @@ data class ReadChatTurnsResult(
      * Whether retained completed turns follow this window.
      */
     val hasAfter: Boolean
+)
+
+@Serializable
+data class ChatTurnMatch(
+    val turnId: String,
+    val kind: ChatTurnMatchKind,
+    /**
+     * Zero-based index of this nonempty match in forward text order on this
+     * side of the turn, for the same query and flags.
+     */
+    val occurrence: Long
+)
+
+@Serializable
+data class SearchChatTurnsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null,
+    /**
+     * Nonempty literal text, or a pattern when `isRegex` is true.
+     */
+    val query: String,
+    /**
+     * Case-sensitive matching; defaults to false.
+     */
+    val matchCase: Boolean? = null,
+    /**
+     * Require whole-word matches; defaults to false.
+     */
+    val wholeWord: Boolean? = null,
+    /**
+     * Treat the query as a regular expression; defaults to false.
+     */
+    val isRegex: Boolean? = null
+)
+
+@Serializable
+data class SearchChatTurnsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * Match locators in reverse transcript order.
+     */
+    val items: List<ChatTurnMatch>
 )
 
 @Serializable

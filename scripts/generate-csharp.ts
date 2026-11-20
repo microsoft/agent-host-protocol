@@ -794,6 +794,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'ChatHistoryBrowsingCapability' },
+  { name: 'ChatHistorySearchCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
@@ -2329,7 +2330,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ChatTurnReadDirection', 'ChatTurnMatchKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
@@ -2383,6 +2384,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'ChatTurnIndexEntry' }, { name: 'ListChatTurnsParams' }, { name: 'ListChatTurnsResult' },
   { name: 'ReadChatTurnsParams' }, { name: 'ReadChatTurnsResult' },
+  { name: 'ChatTurnMatch' }, { name: 'SearchChatTurnsParams' }, { name: 'SearchChatTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },

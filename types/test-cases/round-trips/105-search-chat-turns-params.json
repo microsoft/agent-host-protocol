@@ -1,0 +1,8 @@
+{
+  "name": "search-chat-turns-params",
+  "group": "A",
+  "description": "A search page retains its query and all search modifiers.",
+  "type": "SearchChatTurnsParams",
+  "input": { "channel": "ahp-chat:/c1", "query": "des[i]gn", "matchCase": false, "wholeWord": true, "isRegex": true, "cursor": "matches", "limit": 3 },
+  "acceptableOutputs": [{ "channel": "ahp-chat:/c1", "query": "des[i]gn", "matchCase": false, "wholeWord": true, "isRegex": true, "cursor": "matches", "limit": 3 }]
+}

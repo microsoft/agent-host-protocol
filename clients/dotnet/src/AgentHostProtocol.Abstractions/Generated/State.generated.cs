@@ -2176,6 +2176,14 @@ public sealed record MultipleChatsCapability
 /// <summary>Presence advertises `listChatTurns` and `readChatTurns` for this chat.</summary>
 public sealed record ChatHistoryBrowsingCapability
 {
+    /// <summary>Presence advertises host-side search; omit for browsing-only chats.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChatHistorySearchCapability? Search { get; init; }
+}
+
+/// <summary>Presence advertises `searchChatTurns`. Open a result with `readChatTurns`.</summary>
+public sealed record ChatHistorySearchCapability
+{
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.</summary>

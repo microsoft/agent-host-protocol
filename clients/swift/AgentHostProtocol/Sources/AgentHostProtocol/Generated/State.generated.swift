@@ -1642,6 +1642,17 @@ public struct MultipleChatsCapability: Codable, Sendable, Equatable {
 }
 
 public struct ChatHistoryBrowsingCapability: Codable, Sendable, Equatable {
+    /// Presence advertises host-side search; omit for browsing-only chats.
+    public var search: ChatHistorySearchCapability?
+
+    public init(
+        search: ChatHistorySearchCapability? = nil
+    ) {
+        self.search = search
+    }
+}
+
+public struct ChatHistorySearchCapability: Codable, Sendable, Equatable {
 
     public init(
 

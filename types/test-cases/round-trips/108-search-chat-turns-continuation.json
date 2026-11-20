@@ -1,0 +1,8 @@
+{
+  "name": "search-chat-turns-continuation",
+  "group": "A",
+  "description": "A scan budget can run out before a match: an empty page with a continuation is not the final result.",
+  "type": "SearchChatTurnsResult",
+  "input": { "items": [], "nextCursor": "scanned-to-t45" },
+  "acceptableOutputs": [{ "items": [], "nextCursor": "scanned-to-t45" }]
+}
