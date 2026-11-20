@@ -16,7 +16,7 @@
         "canvasId": "preview",
         "title": "Preview",
         "status": "Ready",
-        "url": "https://example.test/live"
+        "uri": "https://example.test/live"
       }
     }
   ],
@@ -27,6 +27,6 @@
     "canvasId": "preview",
     "title": "Preview",
     "status": "Ready",
-    "url": "https://example.test/live"
+    "uri": "https://example.test/live"
   }
 }

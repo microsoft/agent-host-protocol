@@ -1,0 +1,90 @@
+{
+  "description": "session/customizationToggled disables a skill served by an MCP server inside a plugin",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin",
+        "uri": "https://plugins.example/plugin",
+        "name": "Plugin",
+        "children": [
+          {
+            "type": "skill",
+            "id": "plugin-skill",
+            "uri": "https://plugins.example/plugin#skills/review",
+            "name": "review"
+          },
+          {
+            "type": "mcpServer",
+            "id": "server",
+            "uri": "https://plugins.example/plugin#mcp",
+            "name": "Server",
+            "state": { "kind": "ready" },
+            "children": [
+              {
+                "type": "skill",
+                "id": "mcp-skill",
+                "uri": "mcp://server/skills/lint",
+                "name": "lint"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "id": "mcp-skill",
+      "enablement": [{ "kind": "session", "enabled": false }]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin",
+        "uri": "https://plugins.example/plugin",
+        "name": "Plugin",
+        "children": [
+          {
+            "type": "skill",
+            "id": "plugin-skill",
+            "uri": "https://plugins.example/plugin#skills/review",
+            "name": "review"
+          },
+          {
+            "type": "mcpServer",
+            "id": "server",
+            "uri": "https://plugins.example/plugin#mcp",
+            "name": "Server",
+            "state": { "kind": "ready" },
+            "children": [
+              {
+                "type": "skill",
+                "id": "mcp-skill",
+                "uri": "mcp://server/skills/lint",
+                "name": "lint",
+                "enabled": false
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

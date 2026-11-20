@@ -81,6 +81,7 @@
             "pastTenseMessage": "Done",
             "content": null,
             "structuredContent": null,
+            "resultMetadata": null,
             "error": null
           }
         }

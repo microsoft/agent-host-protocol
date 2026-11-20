@@ -3,7 +3,7 @@
 Customizations extend agent sessions with additional capabilities — agents, skills, prompts, rules, hooks, and MCP servers. AHP organises them as a discriminated union with a fixed set of types and a shallow tree:
 
 - **Top-level entries are typically containers**: a `PluginCustomization` (an [Open Plugins](https://open-plugins.com/) package) or a `DirectoryCustomization` (a directory the host watches on disk). The host MAY also surface a bare `McpServerCustomization` at the top level (for example, a globally-configured MCP server that isn't bundled in a plugin).
-- **Other children live inside a container**: `AgentCustomization`, `SkillCustomization`, `PromptCustomization`, `RuleCustomization`, `HookCustomization`, `McpServerCustomization`. MCP servers can therefore appear in either position.
+- **Other children live inside a container**: `AgentCustomization`, `SkillCustomization`, `PromptCustomization`, `RuleCustomization`, `HookCustomization`, `McpServerCustomization`. MCP servers can therefore appear in either position, and may serve skills in their own `children` array (MCP skills extension, SEP-2640).
 
 The agent host is authoritative on the effective tree and its enablement. Clients publish plugins, the host expands them into children, and the host owns disk-backed directories and bare top-level MCP servers.
 
@@ -108,7 +108,7 @@ stateDiagram-v2
 
 ## Children
 
-Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`). The five leaf children carry an optional `enabled` flag (absent means enabled), while `McpServerCustomization` carries explicit scoped `enablement` decisions. Children are leaf nodes — no further nesting — and their parent is implied by which container holds them in its `children` array. A child's `enabled` is independent of its container's. Children have no `clientId`: client provenance lives on the container since clients can only contribute containers, not individual children.
+Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`). The five leaf children carry an optional `enabled` flag (absent means enabled), while `McpServerCustomization` carries explicit scoped `enablement` decisions and may have `SkillCustomization[]` children. Other children are leaf nodes, and their parent is implied by which entry holds them in its `children` array. A child's `enabled` is independent of its parent's: an MCP-served skill is effectively enabled only when its server is effectively enabled and `(skill.enabled ?? true)`. MCP server `children` is absent when skills have not been discovered or are unsupported, and empty when the server was queried and serves none. Children have no `clientId`: client provenance lives on the container since clients can only contribute containers, not individual children.
 
 Each child type carries optional metadata sourced from its [Open Plugins](https://open-plugins.com/plugin-builders/specification.md) component definition (typically the file's YAML frontmatter):
 
@@ -118,7 +118,7 @@ SkillCustomization        { type: 'skill';       description?, disableModelInvoc
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too
 HookCustomization         { type: 'hook';        event?, matcher? }
-McpServerCustomization    { type: 'mcpServer';   enablement?, state, channel?, mcpApp? }   // see /guide/mcp
+McpServerCustomization    { type: 'mcpServer';   enablement?, state, channel?, mcpApp?, children?: SkillCustomization[] }   // see /guide/mcp
 ```
 
 Agents and skills carry a symmetric invocation matrix. `disableModelInvocation` removes the entry from the agent's automatic choices — a custom agent it won't auto-delegate to, or a skill it won't auto-invoke — while leaving it available for the user to pick. `disableUserInvocation` does the reverse: the entry stays available for the agent to invoke but is hidden from user-facing pickers and slash-commands. Both are absent/`false` by default (invocable by either party), and they are independent, so an entry can be agent-only, user-only, both, or neither.
@@ -181,7 +181,8 @@ The action replaces the entry's array wholesale rather than merging a single
 scope. A caller changing one scope must include every decision it intends to
 preserve. The reducer matches `id` against every top-level customization first
 — plugins, directories, and bare top-level MCP servers — then against the
-children inside every container. For plugins and MCP servers it replaces the
+children inside every container, including skills served by top-level or
+container-child MCP servers. For plugins and MCP servers it replaces the
 matched entry's `enablement`; for directories and leaf children it updates the
 plain `enabled` value from the first decision. An empty array clears explicit
 provenance from plugins and MCP servers and restores the default enabled value

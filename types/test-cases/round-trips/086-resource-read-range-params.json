@@ -1,0 +1,20 @@
+{
+  "name": "resource-read-range-params",
+  "group": "A",
+  "description": "resourceRead asks for a byte range with optional position and length.",
+  "type": "ResourceReadParams",
+  "input": {
+    "channel": "ahp-root://",
+    "uri": "file:///workspace/logo.png",
+    "position": 0,
+    "length": 16
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "uri": "file:///workspace/logo.png",
+      "position": 0,
+      "length": 16
+    }
+  ]
+}

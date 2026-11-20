@@ -1,0 +1,96 @@
+{
+  "description": "non-user turn input preserves authorship and payloads in active turns and completed history without fabricated responses",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/non-user",
+    "title": "Non-user input",
+    "status": 1,
+    "modifiedAt": "2026-10-29T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "agent-turn",
+      "startedAt": "2026-10-29T00:00:00.000Z",
+      "message": {
+        "text": "The worker finished its analysis.",
+        "origin": { "kind": "agent" },
+        "attachments": [
+          { "type": "simple", "label": "Worker result", "modelRepresentation": "The analysis passed.", "_meta": { "resultId": "result-1" } }
+        ],
+        "model": { "id": "model-1" },
+        "agent": { "uri": "ahp-agent:/reviewer" },
+        "_meta": { "sourceChat": "ahp-chat:/worker" }
+      }
+    },
+    { "type": "chat/turnComplete", "turnId": "agent-turn", "duration": 1000 },
+    {
+      "type": "chat/turnStarted",
+      "turnId": "notification-turn",
+      "startedAt": "2026-10-29T00:00:01.000Z",
+      "message": {
+        "text": "The worker conversation is now idle.",
+        "origin": { "kind": "systemNotification" }
+      }
+    },
+    { "type": "chat/turnComplete", "turnId": "notification-turn", "duration": 0 },
+    {
+      "type": "chat/turnStarted",
+      "turnId": "tool-turn",
+      "startedAt": "2026-10-29T00:00:02.000Z",
+      "message": {
+        "text": "Background work completed.",
+        "origin": { "kind": "tool" }
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/non-user",
+    "title": "Non-user input",
+    "status": 8,
+    "modifiedAt": "2026-10-29T00:00:02.000Z",
+    "turns": [
+      {
+        "id": "agent-turn",
+        "startedAt": "2026-10-29T00:00:00.000Z",
+        "duration": 1000,
+        "message": {
+          "text": "The worker finished its analysis.",
+          "origin": { "kind": "agent" },
+          "attachments": [
+            { "type": "simple", "label": "Worker result", "modelRepresentation": "The analysis passed.", "_meta": { "resultId": "result-1" } }
+          ],
+          "model": { "id": "model-1" },
+          "agent": { "uri": "ahp-agent:/reviewer" },
+          "_meta": { "sourceChat": "ahp-chat:/worker" }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "notification-turn",
+        "startedAt": "2026-10-29T00:00:01.000Z",
+        "duration": 0,
+        "message": {
+          "text": "The worker conversation is now idle.",
+          "origin": { "kind": "systemNotification" }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "activeTurn": {
+      "id": "tool-turn",
+      "startedAt": "2026-10-29T00:00:02.000Z",
+      "message": {
+        "text": "Background work completed.",
+        "origin": { "kind": "tool" }
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}

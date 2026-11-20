@@ -826,7 +826,7 @@ export class HostRuntime {
     if (envelope.serverSeq > this.shared.serverSeq) {
       this.shared.serverSeq = envelope.serverSeq;
     }
-    if (envelope.channel === ROOT_RESOURCE_URI) {
+    if (envelope.channel === ROOT_RESOURCE_URI && envelope.rejectionReason === undefined) {
       this.shared.rootState = rootReducer(this.shared.rootState, envelope.action as RootAction);
     }
     // Non-root channels: leave the rooted root-state mirror untouched

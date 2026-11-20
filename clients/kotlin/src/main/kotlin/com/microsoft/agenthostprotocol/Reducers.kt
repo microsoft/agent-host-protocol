@@ -323,6 +323,37 @@ private fun withChildCustomizationEnablement(c: ChildCustomization, enablement: 
     }
 }
 
+private fun toggleMcpServerSkill(server: McpServerCustomization, id: String, enablement: List<CustomizationEnablement>): McpServerCustomization? {
+    val skills = server.children ?: return null
+    val index = skills.indexOfFirst { it.id == id }
+    if (index < 0) return null
+    val updated = skills.toMutableList()
+    updated[index] = skills[index].copy(enabled = effectiveEnablement(enablement))
+    return server.copy(children = updated)
+}
+
+private fun toggleContainerChild(container: Customization, id: String, enablement: List<CustomizationEnablement>): Customization? {
+    if (container is CustomizationMcpServer) {
+        return toggleMcpServerSkill(container.value, id, enablement)?.let { CustomizationMcpServer(it) }
+    }
+    val children = customizationChildren(container) ?: return null
+    val childIndex = children.indexOfFirst { childCustomizationId(it) == id }
+    val updated = children.toMutableList()
+    if (childIndex >= 0) {
+        updated[childIndex] = withChildCustomizationEnablement(children[childIndex], enablement)
+        return withCustomizationChildren(container, updated)
+    }
+    for (i in children.indices) {
+        val child = children[i]
+        if (child is ChildCustomizationMcpServer) {
+            val toggled = toggleMcpServerSkill(child.value, id, enablement) ?: continue
+            updated[i] = ChildCustomizationMcpServer(toggled)
+            return withCustomizationChildren(container, updated)
+        }
+    }
+    return null
+}
+
 private fun childCustomizationId(c: ChildCustomization): String? = when (c) {
     is ChildCustomizationAgent -> c.value.id
     is ChildCustomizationSkill -> c.value.id
@@ -762,13 +793,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 state.copy(customizations = updated)
             } else run {
                 for (i in list.indices) {
-                    val children = customizationChildren(list[i]) ?: continue
-                    val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
-                    if (childIdx < 0) continue
-                    val newChildren = children.toMutableList()
-                    newChildren[childIdx] = withChildCustomizationEnablement(newChildren[childIdx], a.enablement)
+                    val toggled = toggleContainerChild(list[i], a.id, a.enablement) ?: continue
                     val updated = list.toMutableList()
-                    updated[i] = withCustomizationChildren(list[i], newChildren)
+                    updated[i] = toggled
                     return@run state.copy(customizations = updated)
                 }
                 state
@@ -1296,6 +1323,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.PENDING_RESULT_CONFIRMATION,
                             confirmed = confirmed,
@@ -1317,6 +1345,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
                             structuredContent = result.structuredContent,
+                            resultMetadata = result.resultMetadata,
                             error = result.error,
                             status = ToolCallStatus.COMPLETED,
                             confirmed = confirmed,
@@ -1349,6 +1378,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 pastTenseMessage = tc.value.pastTenseMessage,
                                 content = tc.value.content,
                                 structuredContent = tc.value.structuredContent,
+                                resultMetadata = tc.value.resultMetadata,
                                 error = tc.value.error,
                                 status = ToolCallStatus.COMPLETED,
                                 confirmed = tc.value.confirmed,
@@ -1465,7 +1495,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartReasoning) {
-                ResponsePartReasoning(part.value.copy(content = part.value.content + a.content))
+                ResponsePartReasoning(part.value.copy(
+                    content = part.value.content + a.content,
+                    startedAt = a.startedAt ?: part.value.startedAt,
+                    duration = a.duration ?: part.value.duration,
+                ))
             } else {
                 part
             }
@@ -1634,7 +1668,20 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val a = action.value
         val current = state.config
         val newValues = if (a.replace == true || current == null) a.config else current.values + a.config
-        state.copy(config = ChatConfigState(values = newValues))
+        state.copy(config = current?.copy(values = newValues) ?: ChatConfigState(values = newValues))
+    }
+
+    is StateActionChatMoved -> {
+        val a = action.value
+        val current = state.config
+        state.copy(
+            provider = a.provider,
+            config = when {
+                current != null -> current.copy(schema = a.schema)
+                a.schema != null -> ChatConfigState(schema = a.schema, values = emptyMap())
+                else -> null
+            },
+        )
     }
 
     else -> state

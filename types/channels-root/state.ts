@@ -287,6 +287,7 @@ export interface SessionModelInfo {
  * This selection is not per-call usage provenance.
  *
  * @category Root State
+ * @preserveUnknownMembers
  */
 export interface ModelSelection {
   /** Raw model identifier, unchanged by source qualification or UI keys. */

@@ -4,6 +4,7 @@ applyTo: 'types/**/*.ts'
 ---
 
 - Treat [AHP Doctrine](../../docs/guide/doctrine.md) as the design compass for protocol changes. Before adding or changing protocol types, check the doctrine's principles and design tests: durable user-visible results should be represented in state, the host should remain authoritative, minimal clients should keep a coherent experience, and agent implementation details should stay behind the host boundary.
+- Name things using the [protocol naming dictionary](./protocol-naming.instructions.md): reuse its established terms, identifier and unit conventions, and message-naming patterns, and don't copy the legacy names it lists.
 - Always prefer dispatching state actions (that can cause side effects) rather than making imperative RPC calls. For example, rather than a `sendMessage` command, we have a `session/turnStarted` message.
 - If a state is invalid, it should be inexpressible. For example, don't do something like
 
@@ -41,6 +42,10 @@ applyTo: 'types/**/*.ts'
   values (clients preserve unknown raw values), and `@exhaustive` only when an
   unknown value is invalid and clients must reject it. The generators validate
   this contract and use it for both raw enums and discriminated unions.
+- Numeric flag enums MUST carry `@bitset` in their main JSDoc block. Members
+  must be unsigned 32-bit integers; combinations and unknown bits remain valid
+  wire values. Generators use this tag, not description prose, to identify
+  bitsets and include each named flag's value and documentation in JSON Schema.
 - For actions or commands that could be implemented by returning an array `T[]` directly, still prefer to wrap it in `{ items: T[] }` for forward compatibility. This allows adding additional fields later without breaking the shape.
 - Naming discriminants for discriminated unions:
   - Lifecycle / state-machine unions: name the union `Foo*State` and its discriminant enum `Foo*Status`. Variant interfaces are `Foo*State` (e.g. `ToolCallState` + `ToolCallStatus` + `ToolCallStreamingState`; `McpServerState` + `McpServerStatus` + `McpServerStartingState`; `CustomizationLoadState` + `CustomizationLoadStatus`).
@@ -54,6 +59,8 @@ applyTo: 'types/**/*.ts'
   - **Partial update** (`Foo*Updated`): the action carries the **key plus the optional fields that changed**; the reducer merges them onto the existing entry and is a **no-op returning `state`** when no entry matches. Ignore the key inside any `changes` payload so it can't be reassigned.
   - Prefer a key-only **remove** action over an upsert that accepts a nullable/sentinel "unset" value (e.g. do not model removal as `Changed` with `entry: null`).
   - Reducer mechanics are uniform: `const idx = list.findIndex(x => x.<key> === action.<key>)`, branch on `idx < 0`, copy immutably (`list.slice()` / `[...list]`), then write or `splice`, and return `{ ...state, <collection>: next }`. Every branch (insert, replace, remove, no-op) needs a fixture in `types/test-cases/reducers/` to keep `types/reducers.ts` at 100% branch coverage.
+- Keep `@preserveUnknownMembers` on automation patch replacement types, shared
+  types, and union variants; annotate new nested fixed-schema objects too.
 - Never update the protocol version unless you were instructed to do so.
 
 ## Finalizing changes
@@ -67,9 +74,7 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | Toolchain | Image | Notes |
 | --- | --- | --- |
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
-| .NET 10 SDK | `mcr.microsoft.com/dotnet/sdk:10.0.402-noble` | Match the full solution build/test gates in CI; include the .NET 8 runtime and Node.js below. Native AOT smoke tests also need `clang` and `zlib1g-dev`. |
-| .NET 8 test runtime | `mcr.microsoft.com/dotnet/runtime:8.0.32-noble` | Supply alongside the .NET 10 SDK so `net8.0` tests run on their intended runtime. |
-| Node.js for .NET interop tests | `docker.io/library/node:24-bookworm-slim` | The full .NET suite launches the repository-local TypeScript host; restore root npm dependencies in the container. |
+| .NET SDK 10 (.NET client) | `mcr.microsoft.com/dotnet/sdk:10.0` | Supports `.slnx`; the test host rolls forward from .NET 8. |
 
 An already available Docker engine can run the same images; do not provision a
 second VM solely to change container CLIs. Check engine readiness and disk/memory

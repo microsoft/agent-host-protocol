@@ -11,6 +11,11 @@ This package contains the Swift libraries for the Agent Host Protocol (AHP). The
   - State mirror helpers: `AHPStateMirror` (single-host) and `MultiHostStateMirror` (multi-host, keyed by `(hostId, uri)`).
   - `ClientIdStore` implementations: `InMemoryClientIdStore` (default) and `FileClientIdStore` (filesystem-backed, atomic writes).
 
+Generated protocol models support `Equatable`, including state/action unions and
+snapshots. Generic JSON-RPC wrappers are equatable when their payloads are.
+`clientDispatchableActions` and `isClientDispatchable(_:)` are generated from the
+canonical `@clientDispatchable` annotations.
+
 The client product is intentionally a protocol/client layer, not a full app store. App-specific policy such as server selection, authentication, reconnect UX, durable session caches, and optimistic outbound action replay should live in the app. `MultiHostClient` owns per-host supervisor policy, backoff, fan-in, and aggregated host views; it does not replace an app's product state model.
 
 ## Installation
@@ -55,6 +60,11 @@ Task {
         switch event.event {
         case .action(let envelope):
             await mirror.apply(envelope)
+        case .actionDecodingFailed(let channel, _, _, _, _):
+            let (result, _) = try await client.subscribe(channel)
+            if let snapshot = result.snapshot {
+                await mirror.applySnapshot(snapshot)
+            }
         case .sessionAdded, .sessionRemoved, .sessionSummaryChanged, .authRequired:
             // Protocol notifications are ephemeral and are not replayed on
             // reconnect. Apps commonly refresh listSessions() after reconnect.
@@ -77,6 +87,23 @@ for snapshot in initialized.snapshots {
 ```
 
 `AHPStateMirror` is a convenience for simple consumers. Larger apps can keep their own state store and route snapshots/actions through the generated reducers directly.
+
+## Typed Commands
+
+Every command params type conforms to the generated `AHPCommand` protocol,
+which binds its wire method to its result type. Use `request(_:)` without a
+method string or result annotation:
+
+```swift
+let sessions = try await client.request(ListSessionsParams(channel: RootResourceURI))
+print(sessions.items)
+
+try await client.request(CreateSessionParams(channel: "ahp-session:/my-session", provider: "my-agent"))
+```
+
+Commands with JSON `null` results return `AHPNullResult`. For host-specific
+extensions, `request(method:params:)` and `requestRaw(method:paramsData:)`
+remain available.
 
 ## Multi-Host Client
 

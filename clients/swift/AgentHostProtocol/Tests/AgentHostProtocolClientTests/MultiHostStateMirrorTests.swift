@@ -6,18 +6,49 @@ import AgentHostProtocol
 
 final class MultiHostStateMirrorTests: XCTestCase {
 
+    func testRejectedActionEnvelopesLeaveStateUnchanged() async {
+        let mirror = MultiHostStateMirror()
+        let resource = "ahp-session:/s1"
+        let initial = SessionState(
+            provider: "test", title: "Old", status: .idle,
+            lifecycle: .ready, activeClients: [], chats: []
+        )
+        let snapshot = Snapshot(resource: resource, state: .session(initial), fromSeq: 0)
+        await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
+        var envelope = ActionEnvelope(
+            channel: resource,
+            action: .sessionTitleChanged(SessionTitleChangedAction(
+                type: .sessionTitleChanged, title: "New"
+            )),
+            serverSeq: 1
+        )
+
+        for reason in ["not allowed", ""] {
+            envelope.rejectionReason = reason
+            await mirror.apply(host: "alpha", envelope: envelope)
+            let sessions = await mirror.sessions
+            XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: resource)]?.title, "Old")
+        }
+
+        envelope.rejectionReason = nil
+        envelope.serverSeq = 2
+        await mirror.apply(host: "alpha", envelope: envelope)
+        let sessions = await mirror.sessions
+        XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: resource)]?.title, "New")
+    }
+
     func testCanvasUpdatesAndResetAreIsolatedPerHost() async {
         let mirror = MultiHostStateMirror()
         let resource = "ahp-canvas:/preview"
         let initial = CanvasState(
             instanceId: "preview", extensionId: "project:preview", canvasId: "preview",
-            url: "https://example.test/original"
+            uri: "https://example.test/original"
         )
         let snapshot = Snapshot(resource: resource, state: .canvas(initial), fromSeq: 1)
         await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
         await mirror.applySnapshot(host: "beta", snapshot: snapshot)
         var unavailable = initial
-        unavailable.url = nil
+        unavailable.uri = nil
         await mirror.apply(host: "alpha", envelope: ActionEnvelope(
             channel: resource,
             action: .canvasStateChanged(CanvasStateChangedAction(type: .canvasStateChanged, canvas: unavailable)),
@@ -31,7 +62,7 @@ final class MultiHostStateMirrorTests: XCTestCase {
         let alphaKey = HostedResourceKey(hostId: "alpha", uri: resource)
         let betaKey = HostedResourceKey(hostId: "beta", uri: resource)
         XCTAssertEqual(
-            [targeted[alphaKey]?.url, targeted[betaKey]?.url, afterReset[alphaKey]?.instanceId, afterReset[betaKey]?.url],
+            [targeted[alphaKey]?.uri, targeted[betaKey]?.uri, afterReset[alphaKey]?.instanceId, afterReset[betaKey]?.uri],
             [nil, "https://example.test/original", nil, "https://example.test/original"]
         )
         XCTAssertTrue(remaining.isEmpty)

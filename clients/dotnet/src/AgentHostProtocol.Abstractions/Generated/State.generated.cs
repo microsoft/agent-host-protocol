@@ -501,7 +501,7 @@ public readonly struct MessageKind : IEquatable<MessageKind>
     /// worker chat whose first message carries a seed prompt.</summary>
     public static readonly MessageKind Tool = new MessageKind("tool");
 
-    /// <summary>Emitted automatically when an automation run starts a session.</summary>
+    /// <summary>Sent by an automation run.</summary>
     public static readonly MessageKind Automation = new MessageKind("automation");
 
     /// <summary>A system-generated notification rather than a direct user message.</summary>
@@ -1062,8 +1062,8 @@ internal sealed class ToolResultContentTypeConverter : JsonConverter<ToolResultC
 /// ({@link CustomizationType.Plugin | `Plugin`} or
 /// {@link CustomizationType.Directory | `Directory`}) or
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
-/// directly by the host. The remaining types appear only as children of
-/// a container.</summary>
+/// directly by the host. The remaining types appear as children of a
+/// container; skills may also be served by an MCP server.</summary>
 [JsonConverter(typeof(CustomizationTypeConverter))]
 public readonly struct CustomizationType : IEquatable<CustomizationType>
 {
@@ -1470,6 +1470,14 @@ internal sealed class ChangesetStatusConverter : JsonConverter<ChangesetStatus>
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Bitset flags describing host-reported activity on a {@link ChangesetFile}.</summary>
+[Flags]
+public enum ChangesetFileStatus : uint
+{
+    /// <summary>The host reports an ongoing edit to this file.</summary>
+    Editing = 1,
+}
+
 /// <summary>Execution lifecycle of a {@link ChangesetOperation}.
 ///
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
@@ -1730,6 +1738,9 @@ public enum AutomationTriggerKind
     /// <summary>A host-defined external event discovered from trigger definitions.</summary>
     [WireValue("event")]
     Event,
+    /// <summary>A single {@link AutomationOneTimeTrigger.runAt | scheduled time}.</summary>
+    [WireValue("oneTime")]
+    OneTime,
 }
 
 /// <summary>Discriminant for an {@link AutomationDisableCondition}.</summary>
@@ -1744,18 +1755,74 @@ public enum AutomationDisableConditionKind
     AfterDate,
 }
 
+/// <summary>Discriminant for an {@link AutomationTarget}.</summary>
+[JsonConverter(typeof(AutomationTargetKindConverter))]
+public readonly struct AutomationTargetKind : IEquatable<AutomationTargetKind>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AutomationTargetKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Each run creates a session.</summary>
+    public static readonly AutomationTargetKind NewSession = new AutomationTargetKind("newSession");
+
+    /// <summary>Each run continues the session of the automation's previous run.</summary>
+    public static readonly AutomationTargetKind PreviousSession = new AutomationTargetKind("previousSession");
+
+    /// <summary>Each run sends its message to one existing chat.</summary>
+    public static readonly AutomationTargetKind Chat = new AutomationTargetKind("chat");
+
+    /// <inheritdoc />
+    public bool Equals(AutomationTargetKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AutomationTargetKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AutomationTargetKind left, AutomationTargetKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AutomationTargetKind left, AutomationTargetKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AutomationTargetKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AutomationTargetKindConverter : JsonConverter<AutomationTargetKind>
+{
+    /// <inheritdoc />
+    public override AutomationTargetKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AutomationTargetKind(reader.GetString() ?? throw new JsonException("AutomationTargetKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AutomationTargetKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Lifecycle status of one automation run.
 ///
 /// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
-/// while any linked session awaits input or client-side work; linked session
-/// state is authoritative for those interactions.</summary>
+/// while its work in a linked session awaits input or client-side work; linked
+/// session state is authoritative for those interactions.</summary>
 [JsonConverter(typeof(WireEnumConverter<AutomationRunStatus>))]
 public enum AutomationRunStatus
 {
     /// <summary>The durable run record exists but execution has not started.</summary>
     [WireValue("pending")]
     Pending,
-    /// <summary>One or more linked sessions are executing or awaiting interaction.</summary>
+    /// <summary>The run's work in linked sessions is executing or awaiting interaction.</summary>
     [WireValue("running")]
     Running,
     /// <summary>Execution finished successfully.</summary>
@@ -1798,28 +1865,28 @@ public sealed record TcpConnectionsCapability
 /// <summary>Limits on data that one peer receives on a windowed subscription.
 ///
 /// All sizes are UTF-16 bytes: two bytes for each UTF-16 code unit of a JSON-RPC
-/// message's complete text, as sent. For a `channel/frame` fragment, this
+/// message's complete text, as sent. For a `channel/frame` notification, this
 /// includes its envelope and escape characters. The same size is used for the
-/// window, credit, and `maximumFrameBytes`. There is no negotiated limit on the
+/// window, credit, and `maxFrameBytes`. There is no negotiated limit on the
 /// size of a complete data message. Outstanding data is always less than
-/// `windowBytes + maximumFrameBytes`.
+/// `windowBytes + maxFrameBytes`.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ChannelReceiveLimits
 {
     /// <summary>The target amount of outstanding data. This is a soft target.
-    /// The sender MUST NOT send a data message or fragment while outstanding data
-    /// is equal to or greater than this value. The last message or fragment sent
+    /// The sender MUST NOT send a data message or frame while outstanding data
+    /// is equal to or greater than this value. The last message or frame sent
     /// before the window is full can go past it, so a message that fits within
-    /// `maximumFrameBytes` can be sent whole even when it is larger than the
+    /// `maxFrameBytes` can be sent whole even when it is larger than the
     /// remaining credit.</summary>
     public long WindowBytes { get; init; }
 
     /// <summary>The largest JSON-RPC message that the sender can send for a data message.
     /// This is a hard limit, and MUST be at least 1024. For a `channel/frame`
     /// notification, it includes the envelope and escape characters. A larger data
-    /// message MUST be split into smaller messages or sent in fragments.</summary>
-    public long MaximumFrameBytes { get; init; }
+    /// message MUST be split into smaller messages or sent in frames.</summary>
+    public long MaxFrameBytes { get; init; }
 }
 
 /// <summary>The limits that the server accepted for a windowed subscription.
@@ -1891,6 +1958,10 @@ public sealed record Icon
     /// If not provided, the client should assume the icon can be used with any theme.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes a protected resource's authentication requirements using
@@ -1960,6 +2031,10 @@ public sealed record ProtectedResourceMetadata
     /// Clients SHOULD treat an absent field the same as `true`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Global state shared with every client subscribed to `ahp-root://`.</summary>
@@ -2246,6 +2321,10 @@ public sealed record ModelSelection
     /// Absence retains genuinely unqualified legacy selection behavior.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModelSourceId { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selected custom agent for a session.
@@ -2260,6 +2339,10 @@ public sealed record AgentSelection
 {
     /// <summary>Stable agent URI (matches an {@link AgentCustomization.uri}).</summary>
     public required string Uri { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A JSON Schema-compatible property descriptor with display extensions.
@@ -2409,6 +2492,12 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; set; }
 
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; set; }
+
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2536,6 +2625,17 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; set; }
 
+    /// <summary>Agent provider ID backing this chat. Absent means the session's
+    /// {@link SessionMetadata.provider | agent provider}; hosts set it when it
+    /// differs. The chat's agent provider never changes, but `provider` is
+    /// reported relative to its session, so `chat/moved` may set or clear it.
+    /// `session/chatUpdated` does not carry it. Forks and side chats use the
+    /// source chat's agent provider.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; set; }
+
     /// <summary>The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
     /// chat's agent has tool access to. Every entry MUST be present in the owning
@@ -2580,9 +2680,7 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<CanvasReference>? Canvases { get; set; }
 
-    /// <summary>Configuration values set on this chat, applied over the owning session's
-    /// {@link SessionState.config | `SessionState.config`}. See
-    /// {@link ChatConfigState}.</summary>
+    /// <summary>This chat's configuration. See {@link ChatConfigState}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
@@ -2674,13 +2772,22 @@ public sealed class CanvasState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Status { get; set; }
 
-    /// <summary>Current absolute HTTP(S) source URL; absent when the live source is unavailable.
-    /// Hosts MUST clear this field when the provider becomes unavailable.
+    /// <summary>Absolute URI of the canvas's live content, typically an HTTP(S) URL;
+    /// absent when the live source is unavailable. Hosts MUST clear this field
+    /// when the provider becomes unavailable.
     ///
-    /// Source URLs MUST be redacted from diagnostic logs and MUST NOT be reused
+    /// A client that can't load this URI directly, for example because it is a
+    /// loopback address in the host's environment or uses a scheme that the
+    /// client doesn't load, reads it with `resourceRead`. The client resolves the
+    /// relative references in its content and reads them the same way. Hosts
+    /// SHOULD serve reads of this URI, and of other URLs on its origin when it is
+    /// an HTTP(S) URL, to clients that can subscribe to the canvas. The provider
+    /// chooses the URI, so the host decides which sources it is willing to read.
+    ///
+    /// Source URIs MUST be redacted from diagnostic logs and MUST NOT be reused
     /// from persisted state after a provider or host restart.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Url { get; set; }
+    public string? Uri { get; set; }
 }
 
 /// <summary>A choice in a select-style question.</summary>
@@ -2989,7 +3096,7 @@ public sealed class SessionState
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3044,7 +3151,8 @@ public sealed class SessionState
     /// - Top-level {@link McpServerCustomization} entries the host
     ///   surfaces directly (for example a globally-configured MCP server
     ///   that isn't bundled in a plugin or directory). MCP servers may
-    ///   also appear as children of a container.
+    ///   also appear as children of a container, and may serve skills in
+    ///   their own {@link McpServerCustomization.children | `children`} array.
     ///
     /// Client-published plugins arrive via
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}
@@ -3327,7 +3435,7 @@ public sealed class SessionSummary
     public List<string>? WorkingDirectories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
-    /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
+    /// (`ahp-annotations:/&lt;uuid&gt;`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3386,6 +3494,12 @@ public sealed record SessionChatSummary
     /// backward compatibility.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
+
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
 
     /// <summary>Current chat status, matching {@link ChatSummary.status}.
     ///
@@ -3508,8 +3622,8 @@ public sealed record SessionConfigPropertySchema
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SessionMutable { get; init; }
 
-    /// <summary>When `true`, the property may be set per chat with `chat/configChanged`.
-    /// The chat's value overrides the session's value for that chat only.</summary>
+    /// <summary>When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? ChatMutable { get; init; }
 }
@@ -3541,16 +3655,30 @@ public sealed class SessionConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>Configuration values set on a chat: an overlay on the owning session's
-/// {@link SessionState.config | `SessionState.config`}.
+/// <summary>A chat's configuration. `values` holds the chat's `chatMutable` properties
+/// of the effective schema. For a chat without its own `schema`, other
+/// properties are session-wide and come from the session's config; a chat with
+/// its own `schema` does not use the session's config. It does not inherit
+/// from the session: a chat's `values` change only through
+/// `chat/configChanged` on the chat.
 ///
-/// It carries only the chat's own values; the session's config schema
-/// applies. The effective config of a chat is the session's values with
-/// these values applied over them. Only properties with `chatMutable: true`
-/// in the session's config schema can be set on a chat.</summary>
+/// Only `chatMutable` properties can be changed with `chat/configChanged`;
+/// hosts reject other keys. Hosts set the initial `values` when they create
+/// the chat. When the session has a config, hosts set `config` on every chat.</summary>
 public sealed class ChatConfigState
 {
-    /// <summary>Config values set on this chat, keyed by property id</summary>
+    /// <summary>Config schema for this chat's `chatMutable` properties. Absent means the
+    /// session's schema. Hosts set it, as the chat's own schema, when the chat's
+    /// {@link ChatState.provider | agent provider} differs from the session's; when
+    /// present, clients use it instead of the session's schema.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; set; }
+
+    /// <summary>The chat's values for the `chatMutable` properties of the effective
+    /// schema, keyed by property id. A missing key takes that property's
+    /// `default`.</summary>
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
@@ -3634,6 +3762,10 @@ public sealed record MessageOrigin
 {
     /// <summary>The kind of actor that produced the message.</summary>
     public MessageKind Kind { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A message that initiates or steers a turn. Messages can originate from the
@@ -3685,6 +3817,10 @@ public sealed class Message
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A zero-based position within a textual document.</summary>
@@ -3695,6 +3831,10 @@ public sealed record TextPosition
 
     /// <summary>Zero-based character offset within the line.</summary>
     public long Character { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A range within a textual document.</summary>
@@ -3705,6 +3845,10 @@ public sealed record TextRange
 
     /// <summary>End position of the range.</summary>
     public required TextPosition End { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A selection within a textual resource.
@@ -3716,6 +3860,10 @@ public sealed record TextSelection
 {
     /// <summary>The range covered by the selection.</summary>
     public required TextRange Range { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A simple, opaque attachment whose model representation is described by
@@ -3765,6 +3913,10 @@ public sealed record SimpleMessageAttachment
     /// `completions` response.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModelRepresentation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment whose data is embedded inline as a base64 string.
@@ -3819,6 +3971,10 @@ public sealed record MessageEmbeddedResourceAttachment
     /// Only meaningful for textual resources.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TextSelection? Selection { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a resource by URI. The content is not
@@ -3880,6 +4036,10 @@ public sealed record MessageResourceAttachment
     /// Only meaningful for textual resources.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TextSelection? Selection { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references annotations on a session's annotations
@@ -3925,7 +4085,7 @@ public sealed record MessageAnnotationsAttachment
     /// <summary>Discriminant</summary>
     public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Annotations;
 
-    /// <summary>The annotations channel URI (typically `ahp-session:/&lt;uuid&gt;/annotations`).
+    /// <summary>The annotations channel URI (`ahp-annotations:/&lt;uuid&gt;`).
     /// Matches {@link AnnotationsSummary.resource}.</summary>
     public required string Resource { get; init; }
 
@@ -3933,6 +4093,10 @@ public sealed record MessageAnnotationsAttachment
     /// omitted, the attachment references all annotations on the channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? AnnotationIds { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An attachment that references a chat transcript through a fixed completed
@@ -3999,6 +4163,10 @@ public sealed record MessageChatAttachment
     /// the host pins the latest completed turn when accepting the message.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? EndTurn { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed class MarkdownResponsePart
@@ -4030,6 +4198,10 @@ public sealed record ContentRef
     /// <summary>Content nonce</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A content part that's a reference to large content stored outside the state tree.</summary>
@@ -4079,6 +4251,14 @@ public sealed class ReasoningResponsePart
 
     /// <summary>Accumulated reasoning text</summary>
     public required string Content { get; set; }
+
+    /// <summary>Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
 }
 
 /// <summary>A system notification surfaced as part of the response stream.
@@ -4174,6 +4354,12 @@ public sealed record ToolCallResult
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
+
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
 
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4532,6 +4718,12 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
 
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
+
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Error { get; init; }
@@ -4604,6 +4796,12 @@ public sealed record ToolCallCompletedState
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? StructuredContent { get; init; }
+
+    /// <summary>Optional result metadata.
+    ///
+    /// This mirrors the `_meta` field of MCP `CallToolResult`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ResultMetadata { get; init; }
 
     /// <summary>Error details if the tool failed</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4893,12 +5091,20 @@ public sealed record ToolResultSubagentContent
 public sealed record CustomizationLoadingState
 {
     public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loading;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container loaded successfully.</summary>
 public sealed record CustomizationLoadedState
 {
     public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loaded;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container partially loaded but has warnings.</summary>
@@ -4908,6 +5114,10 @@ public sealed record CustomizationDegradedState
 
     /// <summary>Human-readable description of the warning.</summary>
     public required string Message { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Container failed to load.</summary>
@@ -4917,6 +5127,10 @@ public sealed record CustomizationErrorState
 
     /// <summary>Human-readable error message.</summary>
     public required string Message { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An [Open Plugins](https://open-plugins.com/) plugin.</summary>
@@ -4991,6 +5205,10 @@ public sealed class PluginCustomization
     /// parses nor enforces it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Version { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A {@link PluginCustomization} as published by a client. Extends the
@@ -5088,6 +5306,10 @@ public sealed record ClientPluginCustomization
     /// under the child's durable key.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, List<CustomizationEnablement>>? ChildEnablement { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A directory the host watches for this session.
@@ -5220,7 +5442,8 @@ public sealed record AgentCustomization
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.</summary>
@@ -5261,9 +5484,13 @@ public sealed record AgentCustomization
     /// to. Absent or `false` means the user may select it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? DisableUserInvocation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>A skill contributed by a plugin or directory.
+/// <summary>A skill contributed by a plugin, directory, or MCP server.
 ///
 /// Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
 /// — the `skills/` directory layout (one subdirectory per skill, each with
@@ -5316,7 +5543,8 @@ public sealed record SkillCustomization
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.</summary>
@@ -5341,6 +5569,10 @@ public sealed record SkillCustomization
     /// auto-invoke. Absent or `false` means the user may invoke it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? DisableUserInvocation { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A prompt contributed by a plugin or directory.</summary>
@@ -5391,7 +5623,8 @@ public sealed record PromptCustomization
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.</summary>
@@ -5403,6 +5636,10 @@ public sealed record PromptCustomization
     /// <summary>Short description of what the prompt does.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A rule contributed by a plugin or directory.
@@ -5461,7 +5698,8 @@ public sealed record RuleCustomization
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.</summary>
@@ -5484,6 +5722,10 @@ public sealed record RuleCustomization
     /// active for matching files.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Globs { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A hook manifest contributed by a plugin or directory.</summary>
@@ -5534,7 +5776,8 @@ public sealed record HookCustomization
     /// enabled state of a plugin child is the plugin's derived enabled value and
     /// `(child.enabled ?? true)`, so a disabled plugin disables every child
     /// regardless of each child's own flag. A directory child instead uses the
-    /// directory's `enabled` value and its own flag.
+    /// directory's `enabled` value and its own flag. An MCP-served skill uses the
+    /// server's effective enabled value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.</summary>
@@ -5542,6 +5785,10 @@ public sealed record HookCustomization
     public bool? Enabled { get; init; }
 
     public CustomizationType Type { get; init; } = CustomizationType.Hook;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>An MCP server contributed by a plugin or directory.
@@ -5636,6 +5883,23 @@ public sealed class McpServerCustomization
     /// which support apps.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public McpServerCustomizationApps? McpApp { get; set; }
+
+    /// <summary>Skills served by this MCP server, for example through the MCP skills
+    /// extension (SEP-2640).
+    ///
+    /// Absent means the host has not discovered skills for this server, or
+    /// does not support MCP-served skills. An empty array means the server
+    /// was queried and serves none.
+    ///
+    /// A skill's effective enabled state is the server's effective enabled
+    /// value and `(skill.enabled ?? true)`. A skill is turned on or off by id
+    /// with [`session/customizationToggled`](/reference/session#sessioncustomizationtoggledaction).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SkillCustomization>? Children { get; set; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Information from the agent host needed to render MCP Apps served
@@ -5648,6 +5912,10 @@ public sealed record McpServerCustomizationApps
     /// client feeds these straight through into the `hostCapabilities` of
     /// the `ui/initialize` response delivered to the View.</summary>
     public required AhpMcpUiHostCapabilities Capabilities { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>The subset of MCP App
@@ -5701,6 +5969,10 @@ public sealed record AhpMcpUiHostCapabilities
     /// <summary>Producer serves `sampling/createMessage` via `mcpMethodCall`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Sampling { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is registered with the host but has not yet started.</summary>
@@ -5718,12 +5990,20 @@ public sealed record McpServerStartingState
     /// startup.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Blocking { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is running and serving requests.</summary>
 public sealed record McpServerReadyState
 {
     public McpServerStatus Kind { get; init; } = McpServerStatus.Ready;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A pre-registered OAuth client that clients use instead of dynamic client
@@ -5737,6 +6017,10 @@ public sealed record McpOAuthClient
     /// public and uses a secretless flow such as authorization code with PKCE.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ClientSecret { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Reusable MCP authentication challenge — the RFC 9728 discovery info a
@@ -5783,6 +6067,10 @@ public sealed record McpAuthRequirement
     /// <summary>Human-readable hint, typically from the OAuth `error_description`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server is reachable but cannot serve requests until the client
@@ -5835,6 +6123,10 @@ public sealed record McpServerAuthRequiredState
     public string? Description { get; init; }
 
     public McpServerStatus Kind { get; init; } = McpServerStatus.AuthRequired;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server failed to start, crashed, or otherwise transitioned to a
@@ -5846,6 +6138,10 @@ public sealed record McpServerErrorState
 
     /// <summary>Error details.</summary>
     public required ErrorInfo Error { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Server has been shut down. The host MAY remove the server from the
@@ -5853,6 +6149,10 @@ public sealed record McpServerErrorState
 public sealed record McpServerStoppedState
 {
     public McpServerStatus Kind { get; init; } = McpServerStatus.Stopped;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record ToolCallClientContributor
@@ -6102,6 +6402,10 @@ public sealed record ErrorInfo
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>A point-in-time snapshot of a subscribed resource's state, returned by
@@ -6282,10 +6586,13 @@ public sealed record ChangesetFile
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
-    /// <summary>Whether the host reports an ongoing edit to this file.
-    /// This is advisory; false or absent does not guarantee that modifying the file is safe.</summary>
+    /// <summary>Host-reported activity on this file, as a bitset of
+    /// {@link ChangesetFileStatus} flags. Absent or `0` means no activity is
+    /// reported. This is advisory; the absence of
+    /// {@link ChangesetFileStatus.Editing} does not guarantee that modifying the
+    /// file is safe.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsEditing { get; init; }
+    public ChangesetFileStatus? Status { get; init; }
 }
 
 /// <summary>A server-declared invokable verb the client can run against a
@@ -6443,9 +6750,8 @@ public sealed record ResourceChange
 public sealed record AnnotationsSummary
 {
     /// <summary>The subscribable annotations channel URI for the owning session
-    /// (typically `ahp-session:/&lt;uuid&gt;/annotations`). Surfaced explicitly even
-    /// though it is derivable from the session URI so badge UI does not need
-    /// to know the derivation rule.</summary>
+    /// (`ahp-annotations:/&lt;uuid&gt;`, where `&lt;uuid&gt;` is the owning session's id).
+    /// Clients should use this value rather than derive it from the session URI.</summary>
     public required string Resource { get; init; }
 
     /// <summary>Total number of {@link Annotation} entries in the channel.</summary>
@@ -6456,7 +6762,7 @@ public sealed record AnnotationsSummary
 }
 
 /// <summary>Full state for a session's annotations channel, returned when a client
-/// subscribes to an `ahp-session:/&lt;uuid&gt;/annotations` URI.</summary>
+/// subscribes to an `ahp-annotations:/&lt;uuid&gt;` URI.</summary>
 public sealed record AnnotationsState
 {
     /// <summary>Annotations in this channel, keyed by {@link Annotation.id}.</summary>
@@ -6545,7 +6851,8 @@ public sealed record AnnotationEntry
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Provenance recorded on a session created for an automation run.
+/// <summary>Provenance recorded on a session created for an automation run. Runs that
+/// later continue the session don't change it.
 ///
 /// The links let clients navigate from an ordinary session to the task-level
 /// run and its durable definition. The session channel remains authoritative
@@ -6608,6 +6915,10 @@ public sealed record AutomationSchedule
     /// <summary>IANA Time Zone Database identifier used to interpret the expression, for
     /// example `"UTC"` or `"Europe/Berlin"`.</summary>
     public required string TimeZone { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from a recurring cron schedule evaluated by the host.</summary>
@@ -6627,6 +6938,10 @@ public sealed record AutomationScheduleTrigger
     /// {@link AutomationMisfirePolicy.RunOnce}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationMisfirePolicy? MisfirePolicy { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Starts runs from events understood by the owning host.
@@ -6665,6 +6980,37 @@ public sealed record AutomationEventTrigger
     /// Clients MUST preserve unknown entries when editing other fields.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Starts one run at a fixed time evaluated by the host.
+///
+/// The trigger fires at most once for a given {@link runAt}. Updating
+/// {@link runAt} moves the occurrence to the new time; the previous time no
+/// longer fires.</summary>
+public sealed record AutomationOneTimeTrigger
+{
+    /// <summary>Identifier unique and stable within this automation definition. Recorded in
+    /// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+    /// run.</summary>
+    public required string Id { get; init; }
+
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.OneTime;
+
+    /// <summary>Scheduled run timestamp in ISO 8601 format.</summary>
+    public required string RunAt { get; init; }
+
+    /// <summary>Policy when {@link runAt} passes while automatic execution is unavailable.
+    /// Omission is equivalent to {@link AutomationMisfirePolicy.RunOnce}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationMisfirePolicy? MisfirePolicy { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined trigger event.</summary>
@@ -6679,6 +7025,10 @@ public sealed record AutomationTriggerEventDefinition
     /// <summary>Optional longer explanation of when this event fires.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Describes one host-defined event trigger type available for a prospective
@@ -6707,10 +7057,11 @@ public sealed record AutomationTriggerDefinition
     public ConfigSchema? ConfigSchema { get; init; }
 }
 
-/// <summary>Template from which the host creates a fresh session for each automation run.
-///
-/// The host revalidates every selection when the run starts. Definitions never
-/// carry credentials, confirmation decisions, or durable permission grants.</summary>
+/// <summary>Template from which the host creates a session for an automation run.
+/// {@link AutomationDefinition.target} decides whether a run creates one. In a
+/// session a run continues, only {@link AutomationSessionTemplate.model |
+/// `model`} and {@link AutomationSessionTemplate.agent | `agent`} apply, to the
+/// run's message.</summary>
 public sealed record AutomationSessionTemplate
 {
     /// <summary>Owning agent harness ID matching {@link AgentInfo.provider}. Omission uses
@@ -6749,7 +7100,7 @@ public sealed record AutomationSessionTemplate
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
 
-    /// <summary>Client plugins to make available in every run session, in the same
+    /// <summary>Client plugins to make available in every session a run creates, in the same
     /// published shape as
     /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
     /// Entries are keyed by `id`.
@@ -6774,12 +7125,16 @@ public sealed record AutomationSessionTemplate
     /// {@link AutomationCapabilities.customizations}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ClientPluginCustomization>? Customizations { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Durable, client-editable definition of an automation.
 ///
-/// A definition combines the initial automation message, the session template
-/// used for each run, and zero or more automatic triggers. Run history,
+/// A definition combines the message each run sends, the session template, the
+/// run target, and zero or more automatic triggers. Run history,
 /// timestamps, and currently allowed operations live on
 /// {@link AutomationEntry} rather than in the definition.</summary>
 public sealed record AutomationDefinition
@@ -6787,14 +7142,15 @@ public sealed record AutomationDefinition
     /// <summary>Human-readable automation name.</summary>
     public required string Title { get; init; }
 
-    /// <summary>Initial message sent to every newly created run session. Its
+    /// <summary>Message each run sends (see {@link AutomationDefinition.target}). Its
     /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     /// A qualified `model` requires an explicit persisted
     /// {@link AutomationSessionTemplate.provider | `session.provider`}, even
     /// when the session template's own `model` is absent.</summary>
     public required Message Message { get; init; }
 
-    /// <summary>Template used to create fresh sessions for each run.</summary>
+    /// <summary>Template for the sessions runs create. Its model and agent also apply to
+    /// a run's turn in a continued session.</summary>
     public required AutomationSessionTemplate Session { get; init; }
 
     /// <summary>Whether automatic triggers may create runs. Manual runs remain available
@@ -6825,12 +7181,20 @@ public sealed record AutomationDefinition
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Where each run sends {@link AutomationDefinition.message}. Absence means
+    /// {@link AutomationTargetKind.NewSession}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTarget? Target { get; init; }
 }
 
 /// <summary>Partial replacement of editable {@link AutomationDefinition} fields.
 ///
 /// Omitted fields are unchanged. Supplied arrays and objects replace their
-/// corresponding values in full; they are not merged recursively.
+/// corresponding values in full; they are not merged recursively. Runtime
+/// decoders MUST preserve unrecognized members on these replacement objects
+/// and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
+/// them, so editing known fields does not erase fields from newer versions.
 /// The host MUST validate the resulting definition's qualified model ownership
 /// under {@link AutomationSessionTemplate.provider}. Replacing `session` while
 /// omitting its provider MUST NOT erase or rebind the owner of a retained
@@ -6872,6 +7236,10 @@ public sealed record AutomationDefinitionPatch
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Replacement {@link AutomationDefinition.target}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationTarget? Target { get; init; }
 }
 
 /// <summary>Stops scheduling after a fixed number of scheduled runs.</summary>
@@ -6881,6 +7249,10 @@ public sealed record AutomationAfterRunsCondition
 
     /// <summary>Positive-integer cap on scheduled runs.</summary>
     public long Max { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Stops scheduling once a wall-clock date passes.</summary>
@@ -6890,6 +7262,110 @@ public sealed record AutomationAfterDateCondition
 
     /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
     public required string Date { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Each run creates a session from {@link AutomationDefinition.session}.</summary>
+public sealed record AutomationNewSessionTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.NewSession;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Each run continues the session of the automation's previous run, so a
+/// recurring automation keeps one conversation.
+///
+/// The previous run's session is the
+/// {@link AutomationRunState.primarySession | primary session} of the most
+/// recently created earlier run of this automation that has one, even if that
+/// run was pruned from {@link AutomationEntry.runs}. The host decides whether
+/// that session is still usable. A session that was removed or archived, that
+/// has no {@link SessionState.defaultChat | default chat}, or that the
+/// automation may no longer drive, is never usable. The host MAY also treat a
+/// session as unusable when it can't honor the current template, for example
+/// after its agent provider, working directories, or configuration changed.
+/// When there is no usable session, the run creates one from
+/// {@link AutomationDefinition.session}, as with
+/// {@link AutomationNewSessionTarget}, and later runs continue that session.
+/// The host resolves targets and starts turns in run creation order, so
+/// overlapping runs share one session instead of each creating one.
+///
+/// When a run reuses a session, the host:
+///
+/// - links the session to the run with
+///   {@link AutomationRunSessionSetAction | `automationRun/sessionSet`} and
+///   makes it the run's primary session before delivering the message;
+/// - adds {@link AutomationDefinition.message} to the session's default chat
+///   as a {@link PendingMessageKind.Queued | queued} pending message, so it
+///   never steers an active turn and starts a turn once the chat is idle;
+/// - does not reapply {@link AutomationDefinition.session}, so the session
+///   keeps its agent provider, configuration, and working directories. The
+///   template's `model` and `agent` still apply to the queued message, as for
+///   every run. The host MAY update the session's copies of the automation's
+///   customizations to match {@link AutomationEntry.customizations}.
+///
+/// The run stays `pending` while its message waits and becomes `running` when
+/// a turn starts from it. It ends with the outcome of that turn. If its
+/// queued message is withdrawn without a turn starting from it, the run is
+/// `cancelled`. Cancelling the run removes its queued message or cancels its
+/// turn, and never affects other turns in the session. If the session becomes
+/// unusable before a turn starts from the message, the host removes the queued
+/// message, if its chat still exists, and the run fails.
+///
+/// {@link SessionMetadata.origin} keeps naming the run that created the
+/// session.</summary>
+public sealed record AutomationPreviousSessionTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.PreviousSession;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>Each run sends its message to one existing chat, such as the conversation
+/// in which a user asked for a recurring check.
+///
+/// The host MUST reject a create or update request whose chat doesn't exist or
+/// that the automation may not drive. When it accepts one, it sets
+/// {@link AutomationChatTarget.session | `session`} to the session that
+/// currently owns the chat, replacing any submitted value.
+///
+/// Each run delivers its message the way an
+/// {@link AutomationPreviousSessionTarget} run does when it reuses a session,
+/// with the same run lifecycle: the host links the session to the run, makes it
+/// the run's primary session, and adds {@link AutomationDefinition.message} to
+/// the chat as a {@link PendingMessageKind.Queued | queued} pending message.
+/// The run never creates a session, and the host applies only the template's
+/// `model` and `agent`, to the queued message. It does not change the
+/// session's agent provider, configuration, working directories, or
+/// customizations.
+///
+/// If the chat no longer exists, or the automation may no longer drive it, the
+/// run fails. When that happens after the message was queued, the host first
+/// removes the queued message, if the chat still exists.</summary>
+public sealed record AutomationChatTarget
+{
+    public AutomationTargetKind Kind { get; init; } = AutomationTargetKind.Chat;
+
+    /// <summary>Session that currently owns {@link AutomationChatTarget.chat}. The host
+    /// maintains it: when the chat moves to another session, the host updates
+    /// the definition and publishes it with
+    /// {@link AutomationSetAction | `automation/set`}.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Chat that receives each run's message.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
@@ -6905,7 +7381,7 @@ public sealed class AutomationEntry
     /// <summary>Current durable definition.</summary>
     public required AutomationDefinition Definition { get; set; }
 
-    /// <summary>Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
+    /// <summary>Earliest schedule or one-time occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextRunAt { get; set; }
 
@@ -6945,7 +7421,7 @@ public sealed class AutomationEntry
     /// connected. `clientId` is absent because the copy no longer depends on a
     /// client.
     ///
-    /// Every run session receives these plugins in
+    /// Every session a run creates receives these plugins in
     /// {@link SessionState.customizations}, with the enablement from the
     /// matching template entry.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -6992,12 +7468,13 @@ public sealed record AutomationTriggeredRunOrigin
 {
     public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
-    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
-    /// {@link AutomationEventTrigger.id} in the definition.</summary>
+    /// <summary>Matches the stable {@link AutomationScheduleTrigger.id},
+    /// {@link AutomationEventTrigger.id}, or {@link AutomationOneTimeTrigger.id}
+    /// in the definition.</summary>
     public required string TriggerId { get; init; }
 
     /// <summary>Intended schedule occurrence as an ISO 8601 timestamp. Present for
-    /// schedule triggers and normally absent for event triggers.</summary>
+    /// schedule and one-time triggers and normally absent for event triggers.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ScheduledFor { get; init; }
 
@@ -7012,7 +7489,9 @@ public sealed record AutomationTriggeredRunOrigin
     public Dictionary<string, JsonElement>? Event { get; init; }
 }
 
-/// <summary>A durable run exists but has not begun external execution.</summary>
+/// <summary>A durable run exists but has not begun external execution. A run that
+/// continues a session also stays pending while that session's chat runs
+/// another turn (see {@link AutomationPreviousSessionTarget}).</summary>
 public sealed record AutomationPendingRunLifecycle
 {
     public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Pending;
@@ -7021,7 +7500,7 @@ public sealed record AutomationPendingRunLifecycle
     public required string CreatedAt { get; init; }
 }
 
-/// <summary>The run is executing linked sessions or awaiting interaction on them.
+/// <summary>The run's work in linked sessions is executing or awaiting interaction.
 ///
 /// Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
 /// remain authoritative for whether user attention or client-side work is
@@ -7051,7 +7530,7 @@ public sealed record AutomationCompletedRunLifecycle
     /// <summary>Completion timestamp in ISO 8601 format.</summary>
     public required string CompletedAt { get; init; }
 
-    /// <summary>Optional aggregate model usage across all linked sessions.</summary>
+    /// <summary>Optional aggregate model usage of the run's work in its linked sessions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UsageInfo? Usage { get; init; }
 }
@@ -7150,7 +7629,7 @@ public sealed class AutomationRunState
 
     /// <summary>Ordered, unique session URIs belonging to this run, each matching
     /// {@link SessionState.resource}. Entries may represent retries, parallel
-    /// workers, or delegated attempts.</summary>
+    /// workers, delegated attempts, or a session continued from an earlier run.</summary>
     public required List<string> Sessions { get; set; }
 
     /// <summary>Member of {@link AutomationRunState.sessions} that the host recommends opening first.</summary>
@@ -7177,6 +7656,8 @@ public sealed record CustomizationEnablementGlobal
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Global;
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementWorkspace
@@ -7184,12 +7665,16 @@ public sealed record CustomizationEnablementWorkspace
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Workspace;
     public required string Uri { get; init; }
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 public sealed record CustomizationEnablementSession
 {
     public CustomizationEnablementKind Kind { get; init; } = CustomizationEnablementKind.Session;
     public bool Enabled { get; init; }
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 internal sealed class CustomizationEnablementConverter : UnionConverter<CustomizationEnablement>
@@ -7805,6 +8290,7 @@ internal sealed class AutomationTriggerConverter : UnionConverter<AutomationTrig
             {
         ["schedule"] = typeof(AutomationScheduleTrigger),
         ["event"] = typeof(AutomationEventTrigger),
+        ["oneTime"] = typeof(AutomationOneTimeTrigger),
             },
             allowUnknown: false)
     {
@@ -7834,6 +8320,34 @@ internal sealed class AutomationDisableConditionConverter : UnionConverter<Autom
         ["afterDate"] = typeof(AutomationAfterDateCondition),
             },
             allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>AutomationTarget is where an automation's runs send their message.</summary>
+[JsonConverter(typeof(AutomationTargetConverter))]
+public sealed class AutomationTarget : AhpUnion
+{
+    /// <summary>Creates an empty AutomationTarget (no active variant).</summary>
+    public AutomationTarget() { }
+
+    /// <summary>Creates a AutomationTarget wrapping the given variant value.</summary>
+    public AutomationTarget(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AutomationTarget discriminated union.</summary>
+internal sealed class AutomationTargetConverter : UnionConverter<AutomationTarget>
+{
+    public AutomationTargetConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["newSession"] = typeof(AutomationNewSessionTarget),
+        ["previousSession"] = typeof(AutomationPreviousSessionTarget),
+        ["chat"] = typeof(AutomationChatTarget),
+            },
+            allowUnknown: true)
     {
     }
 }

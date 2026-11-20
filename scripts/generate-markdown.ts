@@ -1021,7 +1021,7 @@ function generateCanvasChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Canvas Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and HTTP(S) source URL. A missing URL means the source is unavailable. Source URLs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
+  lines.push('Reference for the experimental `ahp-canvas:` channel. Chat state advertises minimal canvas resource references; clients subscribe to each resource for its live presentation metadata and content URI. A client that cannot load the content URI directly reads it with `resourceRead`. A missing URI means the source is unavailable. Source URIs must be redacted from diagnostic logs and must not be reused from persisted state after provider or host restart.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {
@@ -1106,7 +1106,7 @@ function generateAnnotationsChannelPage(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Annotations Channel\n');
   lines.push(stabilityIndex(stateSf));
-  lines.push('Reference for the `ahp-session:/<uuid>/annotations` channel — per-session annotations anchored to file ranges within a session turn. Clients (and the agent host) mutate annotations by dispatching the client-dispatchable `annotations/*` state actions, which the write-ahead reducer applies identically on both peers.\n');
+  lines.push('Reference for the `ahp-annotations:/<uuid>` channel — per-session annotations anchored to file ranges within a session turn. Clients (and the agent host) mutate annotations by dispatching the client-dispatchable `annotations/*` state actions, which the write-ahead reducer applies identically on both peers.\n');
   lines.push(schemaLink('state.schema.json'));
 
   if (stateSf) {

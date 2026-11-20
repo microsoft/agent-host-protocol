@@ -499,6 +499,27 @@ public static class Reducers
         }
     }
 
+    private static bool ToggleMcpServerSkill(
+        McpServerCustomization server,
+        string id,
+        List<CustomizationEnablement> enablement)
+    {
+        List<SkillCustomization>? skills = server.Children;
+        if (skills is null)
+        {
+            return false;
+        }
+
+        int index = skills.FindIndex(skill => skill.Id == id);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        skills[index] = skills[index] with { Enabled = EffectiveEnabled(enablement) };
+        return true;
+    }
+
     private static bool ApplyToggle(
         List<Customization> list,
         string id,
@@ -530,6 +551,15 @@ public static class Reducers
         // Otherwise descend into container children and toggle the matched child.
         foreach (Customization c in list)
         {
+            if (c.Value is McpServerCustomization server)
+            {
+                if (ToggleMcpServerSkill(server, id, enablement))
+                {
+                    return true;
+                }
+                continue;
+            }
+
             List<ChildCustomization>? children = ContainerChildren(c);
             if (children is null)
             {
@@ -541,6 +571,15 @@ public static class Reducers
                 if (TryChildCustomizationId(children[i], out string childGot) && childGot == id)
                 {
                     children[i] = WithChildEnablement(children[i], enablement);
+                    return true;
+                }
+            }
+
+            foreach (ChildCustomization child in children)
+            {
+                if (child.Value is McpServerCustomization nestedServer &&
+                    ToggleMcpServerSkill(nestedServer, id, enablement))
+                {
                     return true;
                 }
             }
@@ -1112,6 +1151,8 @@ public static class Reducers
                     if (p.Value is ReasoningResponsePart r)
                     {
                         r.Content += a.Content;
+                        r.StartedAt = a.StartedAt ?? r.StartedAt;
+                        r.Duration = a.Duration ?? r.Duration;
                     }
                 });
             case ChatTruncatedAction a:
@@ -1143,6 +1184,17 @@ public static class Reducers
                 Dictionary<string, JsonElement> chatValues = MergeConfig(state.Config?.Values, a.Config, a.Replace);
                 state.Config ??= new ChatConfigState { Values = chatValues };
                 state.Config.Values = chatValues;
+                return ReduceOutcome.Applied;
+            case ChatMovedAction a:
+                state.Provider = a.Provider;
+                if (state.Config is not null)
+                {
+                    state.Config.Schema = a.Schema;
+                }
+                else if (a.Schema is not null)
+                {
+                    state.Config = new ChatConfigState { Schema = a.Schema, Values = new Dictionary<string, JsonElement>() };
+                }
                 return ReduceOutcome.Applied;
         }
 
@@ -1458,6 +1510,7 @@ public static class Reducers
                     PastTenseMessage = a.Result.PastTenseMessage,
                     Content = CopyList(a.Result.Content)!,
                     StructuredContent = a.Result.StructuredContent,
+                    ResultMetadata = a.Result.ResultMetadata,
                     Error = a.Result.Error,
                     Confirmed = confirmed,
                     SelectedOption = selectedOption,
@@ -1479,6 +1532,7 @@ public static class Reducers
                 PastTenseMessage = a.Result.PastTenseMessage,
                 Content = CopyList(a.Result.Content) ?? CopyList(preAuthContent),
                 StructuredContent = a.Result.StructuredContent,
+                ResultMetadata = a.Result.ResultMetadata,
                 Error = a.Result.Error,
                 Confirmed = confirmed,
                 SelectedOption = selectedOption,
@@ -1590,6 +1644,7 @@ public static class Reducers
                     PastTenseMessage = s.PastTenseMessage,
                     Content = s.Content,
                     StructuredContent = s.StructuredContent,
+                    ResultMetadata = s.ResultMetadata,
                     Error = s.Error,
                     Confirmed = s.Confirmed,
                     SelectedOption = s.SelectedOption,
@@ -2112,7 +2167,7 @@ public static class Reducers
         state.CanvasId = a.Canvas.CanvasId;
         state.Title = a.Canvas.Title;
         state.Status = a.Canvas.Status;
-        state.Url = a.Canvas.Url;
+        state.Uri = a.Canvas.Uri;
         return ReduceOutcome.Applied;
     }
 

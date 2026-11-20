@@ -1,0 +1,40 @@
+{
+  "name": "chat-moved-action",
+  "group": "A",
+  "description": "A chat/moved action preserves the new session, provider and config schema.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/moved",
+    "session": "ahp-session:/s2",
+    "provider": "other-agent",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "autoApprove": {
+          "type": "boolean",
+          "title": "Auto-approve tools",
+          "default": false,
+          "chatMutable": true
+        }
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/moved",
+      "session": "ahp-session:/s2",
+      "provider": "other-agent",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto-approve tools",
+            "default": false,
+            "chatMutable": true
+          }
+        }
+      }
+    }
+  ]
+}

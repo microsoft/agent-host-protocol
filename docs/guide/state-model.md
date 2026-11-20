@@ -147,6 +147,13 @@ The `status` bitset encodes both the session's activity state and metadata flags
 
 Bits 0–4 encode mutually-exclusive **activity** status (exactly one is set at a time). Bits 5+ encode orthogonal **metadata** flags that may be combined with any activity status via bitwise OR.
 
+On the wire, `status` is an unsigned 32-bit integer (`0` through `4294967295`).
+The JSON Schema accepts this range rather than enumerating individual flags, so
+combined flags and unknown bits from newer protocol versions remain valid.
+Producers must still follow the activity and metadata rules above.
+The canonical enum is annotated `@bitset`; schema descriptions list each named
+flag's numeric value and meaning.
+
 Read state is scoped to the addressed channel. `chat/isReadChanged` changes any
 known chat, including a default chat, without changing its owning session or
 sibling chats. `session/isReadChanged` changes only the session's independent
@@ -192,9 +199,10 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
+  provider?: string        // chat's agent provider; absent = session's agent provider
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
-  config?: ChatConfigState        // config values set on this chat (overlay)
+  config?: ChatConfigState        // chat's chatMutable values (+ optional schema)
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -212,12 +220,14 @@ changeset channel contract. Hosts scope a chat's catalogue to its effective
 working directories: the chat's subset when present, otherwise the full
 session set.
 
-`config` is an overlay on `SessionState.config`: it carries only the values set
-on this chat, and the session's config schema applies. A chat's effective
-config is the session's values with the chat's values applied over them. Only
-properties marked `chatMutable: true` in the session's schema can be set per
-chat, with `chat/configChanged`. See
+`config.values` holds the chat's own values for its `chatMutable` settings;
+`config.schema` is present only when the chat's agent provider differs from the
+session's. See
 [Per-chat configuration](/specification/chat-channel#per-chat-configuration).
+
+`provider` names the chat's agent provider when it differs from the session's.
+Hosts advertising `multipleChatProviders` let one session mix agent providers.
+See [Chat providers](/specification/chat-channel#chat-providers).
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

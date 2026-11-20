@@ -12,6 +12,7 @@ import type {
   AgentSelection,
   ChangesSummary,
   McpAuthRequirement,
+  SessionConfigSchema,
   SessionStatus,
 } from '../channels-session/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -83,6 +84,16 @@ export interface ChatState {
    */
   interactivity?: ChatInteractivity;
   /**
+   * Agent provider ID backing this chat. Absent means the session's
+   * {@link SessionMetadata.provider | agent provider}; hosts set it when it
+   * differs. The chat's agent provider never changes, but `provider` is
+   * reported relative to its session, so `chat/moved` may set or clear it.
+   * `session/chatUpdated` does not carry it. Forks and side chats use the
+   * source chat's agent provider.
+   * @stability 1.0
+   */
+  provider?: string;
+  /**
    * The subset of the session's
    * {@link SessionState.workingDirectories | `workingDirectories`} that this
    * chat's agent has tool access to. Every entry MUST be present in the owning
@@ -127,9 +138,7 @@ export interface ChatState {
    */
   canvases?: CanvasReference[];
   /**
-   * Configuration values set on this chat, applied over the owning session's
-   * {@link SessionState.config | `SessionState.config`}. See
-   * {@link ChatConfigState}.
+   * This chat's configuration. See {@link ChatConfigState}.
    */
   config?: ChatConfigState;
 
@@ -223,6 +232,11 @@ export interface ChatSummary {
    * compatibility.
    */
   interactivity?: ChatInteractivity;
+  /**
+   * Agent provider ID backing this chat. See {@link ChatState.provider}.
+   * @stability 1.0
+   */
+  provider?: string;
   /**
    * The subset of the session's working directories this chat uses.
    * See {@link ChatState.workingDirectories} for the full semantics.
@@ -417,18 +431,33 @@ export const enum ChatInteractivity {
 // ─── Chat Config Types ───────────────────────────────────────────────────────
 
 /**
- * Configuration values set on a chat: an overlay on the owning session's
- * {@link SessionState.config | `SessionState.config`}.
+ * A chat's configuration. `values` holds the chat's `chatMutable` properties
+ * of the effective schema. For a chat without its own `schema`, other
+ * properties are session-wide and come from the session's config; a chat with
+ * its own `schema` does not use the session's config. It does not inherit
+ * from the session: a chat's `values` change only through
+ * `chat/configChanged` on the chat.
  *
- * It carries only the chat's own values; the session's config schema
- * applies. The effective config of a chat is the session's values with
- * these values applied over them. Only properties with `chatMutable: true`
- * in the session's config schema can be set on a chat.
+ * Only `chatMutable` properties can be changed with `chat/configChanged`;
+ * hosts reject other keys. Hosts set the initial `values` when they create
+ * the chat. When the session has a config, hosts set `config` on every chat.
  *
  * @category Chat Config Types
  */
 export interface ChatConfigState {
-  /** Config values set on this chat, keyed by property id */
+  /**
+   * Config schema for this chat's `chatMutable` properties. Absent means the
+   * session's schema. Hosts set it, as the chat's own schema, when the chat's
+   * {@link ChatState.provider | agent provider} differs from the session's; when
+   * present, clients use it instead of the session's schema.
+   * @stability 1.0
+   */
+  schema?: SessionConfigSchema;
+  /**
+   * The chat's values for the `chatMutable` properties of the effective
+   * schema, keyed by property id. A missing key takes that property's
+   * `default`.
+   */
   values: Record<string, unknown>;
 }
 
@@ -809,7 +838,7 @@ export enum MessageKind {
    * worker chat whose first message carries a seed prompt.
    */
   Tool = 'tool',
-  /** Emitted automatically when an automation run starts a session. */
+  /** Sent by an automation run. */
   Automation = 'automation',
   /** A system-generated notification rather than a direct user message. */
   SystemNotification = 'systemNotification',
@@ -821,6 +850,7 @@ export enum MessageKind {
  * turn; for steering or queued messages it is just the origin of that message.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageOrigin {
   /** The kind of actor that produced the message. */
@@ -838,6 +868,7 @@ export interface MessageOrigin {
  * in the text.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface Message {
   /** Message text */
@@ -881,6 +912,7 @@ export interface Message {
  * Common fields shared by all {@link MessageAttachment} variants.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageAttachmentBase {
   /**
@@ -925,6 +957,7 @@ export interface MessageAttachmentBase {
  * the producer.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface SimpleMessageAttachment extends MessageAttachmentBase {
   /** Discriminant */
@@ -948,6 +981,7 @@ export interface SimpleMessageAttachment extends MessageAttachmentBase {
  * delivered with the user message itself rather than fetched separately.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageEmbeddedResourceAttachment extends MessageAttachmentBase {
   /** Discriminant */
@@ -969,6 +1003,7 @@ export interface MessageEmbeddedResourceAttachment extends MessageAttachmentBase
  * delivered inline; consumers can fetch it via `resourceRead` when needed.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageResourceAttachment extends MessageAttachmentBase, ContentRef {
   /** Discriminant */
@@ -990,12 +1025,13 @@ export interface MessageResourceAttachment extends MessageAttachmentBase, Conten
  * {@link Annotation.id | annotation ids}.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageAnnotationsAttachment extends MessageAttachmentBase {
   /** Discriminant */
   type: MessageAttachmentKind.Annotations;
   /**
-   * The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).
+   * The annotations channel URI (`ahp-annotations:/<uuid>`).
    * Matches {@link AnnotationsSummary.resource}.
    */
   resource: URI;
@@ -1029,6 +1065,7 @@ export interface MessageAnnotationsAttachment extends MessageAttachmentBase {
  * referenced chat is later pruned, and treat opening `resource` as best-effort.
  *
  * @category Turn Types
+ * @preserveUnknownMembers
  */
 export interface MessageChatAttachment extends MessageAttachmentBase {
   /** Discriminant */
@@ -1122,6 +1159,14 @@ export interface ReasoningResponsePart {
   id: string;
   /** Accumulated reasoning text */
   content: string;
+  /** Producer-recorded ISO 8601 start of this reasoning interval; absent when unknown. */
+  startedAt?: string;
+  /**
+   * Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; absent while unfinished or unknown. Clients MUST NOT derive it from their own clock.
+   * @integer
+   * @minimum 0
+   */
+  duration?: number;
 }
 
 /**
@@ -1468,6 +1513,12 @@ export interface ToolCallResult {
    * This mirrors the `structuredContent` field of MCP `CallToolResult`.
    */
   structuredContent?: Record<string, unknown>;
+  /**
+   * Optional result metadata.
+   *
+   * This mirrors the `_meta` field of MCP `CallToolResult`.
+   */
+  resultMetadata?: Record<string, unknown>;
   /** Error details if the tool failed */
   error?: { message: string; code?: string };
 }

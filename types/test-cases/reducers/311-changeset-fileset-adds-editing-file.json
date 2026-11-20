@@ -10,14 +10,14 @@
   "actions": [
     {
       "type": "changeset/fileSet",
-      "file": { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true }
+      "file": { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "status": 1 }
     }
   ],
   "expected": {
     "status": "ready",
     "files": [
       { "id": "file:///b.txt", "edit": {}, "nonce": "b-1", "reviewed": true },
-      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "isEditing": true }
+      { "id": "file:///a.txt", "edit": {}, "nonce": "a-1", "status": 1 }
     ]
   }
 }

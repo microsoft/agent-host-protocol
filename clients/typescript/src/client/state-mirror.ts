@@ -155,7 +155,7 @@ export class AhpStateMirror {
 
   /**
    * Apply a server-pushed {@link ActionEnvelope}, routing through the
-   * matching reducer. Unknown channels are ignored.
+   * matching reducer. Rejected envelopes and unknown channels are ignored.
    *
    * The channel-based routing here discriminates which reducer applies;
    * the action is cast to the appropriate per-channel subset (the
@@ -164,6 +164,7 @@ export class AhpStateMirror {
    * TypeScript cannot infer that narrowing from the channel string alone.
    */
   apply(envelope: ActionEnvelope): void {
+    if (envelope.rejectionReason !== undefined) return;
     const { channel, action } = envelope;
     if (channel === ROOT_URI) {
       this.rootState = rootReducer(this.rootState, action as RootAction);

@@ -43,6 +43,14 @@ const (
 	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
 )
 
+// Native filesystem path grammar used by a host environment.
+type PathStyle string
+
+const (
+	PathStylePosix   PathStyle = "posix"
+	PathStyleWindows PathStyle = "windows"
+)
+
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -132,6 +140,14 @@ type CreateTcpConnectionParams struct {
 	Port int64 `json:"port"`
 }
 
+// Result of the `createTcpConnection` command.
+//
+// An empty object on success.
+//
+// Stability: 1.0 - Early development.
+type CreateTcpConnectionResult struct {
+}
+
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
 type InitializeParams struct {
@@ -173,6 +189,23 @@ type InitializeParams struct {
 	Capabilities *ClientCapabilities `json:"capabilities,omitempty"`
 }
 
+// Describes the connection's default host-side execution environment.
+//
+// The descriptor applies to {@link InitializeResult.defaultDirectory},
+// session working directories, and `file:` resources handled by the server
+// through the `resource*` commands, unless more specific environment metadata
+// is available. It does not apply to resources provided by the client.
+//
+// A host that exposes mixed environments MUST only populate fields that have a
+// single connection-wide default.
+type HostEnvironment struct {
+	// Authoritative native path grammar for resources in this environment.
+	//
+	// Clients parsing or formatting native paths MUST use this field instead of
+	// inferring path semantics from their local environment.
+	PathStyle *PathStyle `json:"pathStyle,omitempty"`
+}
+
 // Result of the `initialize` command.
 //
 // `protocolVersion` is the version the server has selected from the client's
@@ -204,6 +237,10 @@ type InitializeResult struct {
 	// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
 	// channel whose state has no fields ({@link EmptyState}).
 	Snapshots []Snapshot `json:"snapshots"`
+	// Default execution environment exposed by this host connection.
+	//
+	// Absence means no environment metadata is available.
+	Environment *HostEnvironment `json:"environment,omitempty"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -231,6 +268,13 @@ type InitializeResult struct {
 	//
 	// Stability: 1.0 - Early development.
 	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
+	// Present when chats in one session may be backed by different agent
+	// providers (see {@link CreateChatParams.provider} and
+	// {@link ChatState.provider}).
+	// Clients MUST NOT send `CreateChatParams.provider` without it.
+	//
+	// Stability: 1.0 - Early development.
+	MultipleChatProviders *MultipleChatProvidersCapability `json:"multipleChatProviders,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -273,6 +317,8 @@ type AutomationCapabilities struct {
 	Create *AutomationCreateCapability `json:"create,omitempty"`
 	// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
 	Schedules *AutomationScheduleCapabilities `json:"schedules,omitempty"`
+	// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+	OneTime *AutomationOneTimeCapability `json:"oneTime,omitempty"`
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
 	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
@@ -283,6 +329,9 @@ type AutomationCapabilities struct {
 	// Present when {@link AutomationSessionTemplate.customizations} may contain
 	// client plugins for the host to capture.
 	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
+	// Present when definitions may set {@link AutomationDefinition.target}.
+	// Absence means each run creates a session.
+	Targets *AutomationTargetsCapabilities `json:"targets,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -318,6 +367,43 @@ type AutomationRunCancellationCapability struct {
 // The empty object means "supported"; fields are reserved for future
 // capture options and limits.
 type AutomationCustomizationsCapability struct {
+}
+
+// Run targets supported for {@link AutomationDefinition.target}.
+// {@link AutomationNewSessionTarget} is always supported.
+type AutomationTargetsCapabilities struct {
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+	// target when this is absent.
+	PreviousSession *AutomationPreviousSessionTargetCapability `json:"previousSession,omitempty"`
+	// Present when {@link AutomationDefinition.target} may be an
+	// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+	// this is absent.
+	Chat *AutomationChatTargetCapability `json:"chat,omitempty"`
+}
+
+// Presence capability for {@link AutomationPreviousSessionTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationPreviousSessionTargetCapability struct {
+}
+
+// Presence capability for {@link AutomationChatTarget}.
+//
+// The empty object means "supported"; fields are reserved for future
+// options.
+type AutomationChatTargetCapability struct {
+}
+
+// Presence capability for {@link AutomationOneTimeTrigger | one-time triggers}.
+type AutomationOneTimeCapability struct {
+}
+
+// Presence capability for {@link InitializeResult.multipleChatProviders}.
+//
+// Stability: 1.0 - Early development.
+type MultipleChatProvidersCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -658,6 +744,19 @@ type CreateChatParams struct {
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Client-selected initial display title for the new chat.
 	Title *string `json:"title,omitempty"`
+	// Agent provider ID for the new chat. Absent means the session's agent
+	// provider.
+	//
+	// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+	// `InvalidParams` an agent provider that is not in the root state's `agents`
+	// or that does not advertise `multipleChats`. Forks and side chats
+	// (`source` present) continue the source chat's history, so they always use
+	// the source chat's agent provider: absent means that agent provider, and a
+	// different value is rejected. Agent capability checks for this request use
+	// the chat's agent provider.
+	//
+	// Stability: 1.0 - Early development.
+	Provider *string `json:"provider,omitempty"`
 }
 
 // Disposes a chat and cleans up server-side resources.
@@ -712,6 +811,19 @@ type ChatMoveToNewSessionDestination struct {
 // optional anchor MUST resolve; and the source MUST NOT anchor itself.
 // Rejection leaves ownership, catalog order, chat state, and root summaries
 // unchanged.
+//
+// A moved chat keeps its agent provider. After the move the host reports
+// {@link ChatState.provider | `provider`} on the chat whenever it differs from
+// the destination session's agent provider, including when the chat had none
+// because it matched its old session. Hosts MAY refuse, as an unsupported
+// destination, a move they cannot support, such as one that changes whether
+// the chat's agent provider matches its session's.
+//
+// A moved chat's `config.values` move with it unchanged. If a move changes
+// whether the chat needs its own `config.schema`, the host sets or clears it,
+// or refuses the move as an unsupported destination. After a cross-session
+// move the host dispatches `chat/moved` on the chat's channel with its new
+// session, `provider` and `config.schema`.
 //
 // On success every moved chat keeps its URI, state, and immutable
 // `ChatOrigin`. The host commits ownership and catalog order before publishing
@@ -787,16 +899,41 @@ type ListSessionsResult struct {
 // client-published URI (e.g. `virtual://my-client/...` plugins); clients
 // use it to read host-side files. The receiver enforces access via the
 // same permission/`resourceRequest` flow regardless of which peer initiated.
+//
+// A peer SHOULD serve reads of the URIs that it publishes as content, such as
+// content references and canvas sources. This includes HTTP(S) URLs that the
+// other peer might not be able to reach, such as a development server on the
+// host's loopback interface.
+//
+// A sender MAY read part of a resource by including
+// {@link ResourceReadParams.position | `position`} and/or
+// {@link ResourceReadParams.length | `length`}.
+//
+//   - A receiver that honors the range SHOULD return only the requested bytes
+//     and MUST include {@link ResourceReadResult.size | `size`}, the total size
+//     of the resource in bytes.
+//   - A receiver that does not honor the range ignores `position` and `length`
+//     and returns the whole resource without `size`. A sender MUST treat a
+//     result without `size` as the whole resource.
+//   - A ranged result MUST NOT split a UTF-8 sequence, if returned with `utf-8` encoding.
+//   - A `position` at or past the end of the resource returns empty `data`.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Content URI from a `ContentRef`
+	// Content URI to read, such as one from a `ContentRef`
 	Uri string `json:"uri"`
 	// Preferred encoding for the returned data (default: server-chosen)
 	Encoding *ContentEncoding `json:"encoding,omitempty"`
+	// Byte offset to start reading at. Defaults to `0`. A receiver that does
+	// not honor byte ranges ignores it and returns the whole resource.
+	Position *int64 `json:"position,omitempty"`
+	// Maximum number of bytes to return from {@link position}. Defaults to the
+	// rest of the resource. A receiver that does not honor byte ranges ignores
+	// it and returns the whole resource.
+	Length *int64 `json:"length,omitempty"`
 }
 
 // Result of the `resourceRead` command.
@@ -805,8 +942,7 @@ type ResourceReadParams struct {
 // server cannot provide the requested encoding, it MUST fall back to either
 // `base64` or `utf-8`.
 //
-// The result contains the whole resource. Windowed delivery does not limit its
-// size, because it is a response and not part of a subscription.
+// Unless {@link size} is present, the result contains the whole resource.
 type ResourceReadResult struct {
 	// Content encoded as a string
 	Data string `json:"data"`
@@ -814,6 +950,11 @@ type ResourceReadResult struct {
 	Encoding ContentEncoding `json:"encoding"`
 	// Content type (e.g. `"image/png"`, `"text/plain"`)
 	ContentType *string `json:"contentType,omitempty"`
+	// Total size of the resource in bytes. Present if and only if the receiver
+	// honored the byte range in {@link ResourceReadParams.position} and
+	// {@link ResourceReadParams.length}; when absent, `data` is the whole
+	// resource.
+	Size *int64 `json:"size,omitempty"`
 }
 
 // Writes content to a file on the server's filesystem.
@@ -1266,6 +1407,11 @@ type AuthenticateParams struct {
 	// Without a target, resource/scope matching is unchanged; the token may
 	// satisfy every matching pending challenge. Older hosts ignore this field.
 	Target *AuthenticateTarget `json:"target,omitempty"`
+	// Optional identifier for the client's selected account, sent alongside the token.
+	// Hosts can compare `accountId` values to detect when the underlying account has changed.
+	// Hosts MUST treat `accountId` as an opaque string.
+	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+	AccountId *string `json:"accountId,omitempty"`
 }
 
 // Result of the `authenticate` command.

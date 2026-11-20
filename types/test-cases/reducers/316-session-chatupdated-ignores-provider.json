@@ -1,0 +1,46 @@
+{
+  "description": "session/chatUpdated ignores the provider identity field",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Other agent",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "provider": "other-agent"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatUpdated",
+      "chat": "ahp-chat:/c2",
+      "changes": {
+        "title": "Renamed",
+        "provider": "copilot"
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/c2",
+        "title": "Renamed",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "provider": "other-agent"
+      }
+    ]
+  }
+}

@@ -24,9 +24,12 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { SNAPSHOT_CHANNELS } from './snapshot-channels.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 
 const GENERATED_BANNER = '// Generated from types/*.ts — do not edit.\n//\n// Regenerate with: npm run generate:rust\n\n#![allow(missing_docs)]\n';
@@ -567,10 +570,13 @@ function generateRustEnum(enumDecl: EnumDeclaration): string {
 // ─── Rust Struct Generation ──────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
   /** Omit Serialize derive when a hand-written implementation is emitted. */
   omitSerialize?: boolean;
+  /** Omit Deserialize derive when a hand-written implementation is emitted. */
+  omitDeserialize?: boolean;
   /** Force `Default` derive (synthesizes Default impl when all fields optional). */
   deriveDefault?: boolean;
   /** Docstring for the struct itself. */
@@ -591,7 +597,7 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
   if (!opts.omitSerialize) {
     derives.push('Serialize');
   }
-  derives.push('Deserialize');
+  if (!opts.omitDeserialize) derives.push('Deserialize');
   if (wantsDefault) derives.push('Default');
   lines.push(`#[derive(${derives.join(', ')})]`);
   lines.push('#[serde(rename_all = "camelCase")]');
@@ -611,9 +617,10 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
       attrs.push('serialize_with = "serialize_running_tool_call"');
       attrs.push('deserialize_with = "deserialize_running_tool_call"');
     }
-    if (rustName === 'AutomationEntry' && p.rustName === 'customizations') {
-      attrs.push('serialize_with = "serialize_plugin_customizations"');
-      attrs.push('deserialize_with = "deserialize_plugin_customizations"');
+    const taggedList = TAGGED_CUSTOMIZATION_LISTS.find(list => list.owner === rustName && list.field === p.rustName);
+    if (taggedList) {
+      attrs.push(`serialize_with = "serialize_${taggedList.fnSuffix}"`);
+      attrs.push(`deserialize_with = "deserialize_${taggedList.fnSuffix}"`);
     }
     if (attrs.length > 0) {
       lines.push(`    #[serde(${attrs.join(', ')})]`);
@@ -627,6 +634,13 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
     lines.push(`    pub ${p.rustName}: ${rustType},`);
   }
 
+  if (opts.preserveUnknownMembers) {
+    lines.push('    /// Unrecognized wire members retained for full-object edits.');
+    const omitted = props.filter(p => opts.omitDiscriminants && p.isLiteralDiscriminant);
+    const attrs = ['flatten', ...omitted.map(p => `deserialize_with = "deserialize_extra_without_${p.wireName}"`)];
+    lines.push(`    #[serde(${attrs.join(', ')})]`);
+    lines.push('    pub extra: serde_json::Map<String, serde_json::Value>,');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -660,13 +674,31 @@ where
 }
 
 /**
- * `PluginCustomization` omits its `type` discriminant because the
- * `Customization` enum supplies it. Standalone plugin lists outside that enum
- * (currently `AutomationEntry.customizations`) must restore it on the wire.
+ * Customization variants omit their `type` discriminant because the
+ * `Customization` and `ChildCustomization` enums supply it. Standalone lists of
+ * one variant outside those enums must restore it on the wire.
  */
-function generatePluginCustomizationsSerdeHelpers(): string {
-  return `fn serialize_plugin_customizations<S>(
-    value: &Option<Vec<PluginCustomization>>,
+interface ITaggedCustomizationList {
+  /** Rust struct that owns the field. */
+  readonly owner: string;
+  /** Rust field name. */
+  readonly field: string;
+  /** Rust element type. */
+  readonly rustType: string;
+  /** Wire value of the `type` discriminant. */
+  readonly tag: string;
+  /** Suffix of the generated `serialize_`/`deserialize_` helper names. */
+  readonly fnSuffix: string;
+}
+
+const TAGGED_CUSTOMIZATION_LISTS: readonly ITaggedCustomizationList[] = [
+  { owner: 'AutomationEntry', field: 'customizations', rustType: 'PluginCustomization', tag: 'plugin', fnSuffix: 'plugin_customizations' },
+  { owner: 'McpServerCustomization', field: 'children', rustType: 'SkillCustomization', tag: 'skill', fnSuffix: 'mcp_server_skills' },
+];
+
+function generateTaggedCustomizationsSerdeHelpers({ rustType, tag, fnSuffix }: ITaggedCustomizationList): string {
+  return `fn serialize_${fnSuffix}<S>(
+    value: &Option<Vec<${rustType}>>,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -679,17 +711,17 @@ where
     for item in items {
         let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
         let serde_json::Value::Object(object) = &mut raw else {
-            return Err(serde::ser::Error::custom("plugin customization must serialize to an object"));
+            return Err(serde::ser::Error::custom("${tag} customization must serialize to an object"));
         };
-        object.insert("type".to_owned(), serde_json::Value::String("plugin".to_owned()));
+        object.insert("type".to_owned(), serde_json::Value::String("${tag}".to_owned()));
         out.push(raw);
     }
     serde::Serialize::serialize(&out, serializer)
 }
 
-fn deserialize_plugin_customizations<'de, D>(
+fn deserialize_${fnSuffix}<'de, D>(
     deserializer: D,
-) -> Result<Option<Vec<PluginCustomization>>, D::Error>
+) -> Result<Option<Vec<${rustType}>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -699,8 +731,8 @@ where
     items
         .into_iter()
         .map(|raw| {
-            if raw.get("type").and_then(serde_json::Value::as_str) != Some("plugin") {
-                return Err(serde::de::Error::custom("expected plugin customization type"));
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("${tag}") {
+                return Err(serde::de::Error::custom("expected ${tag} customization type"));
             }
             serde_json::from_value(raw).map_err(serde::de::Error::custom)
         })
@@ -803,7 +835,7 @@ function generateStructFromInterface(
   const name = rustNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateRustStruct(name, props, { doc: ifaceDoc, ...opts });
+  return generateRustStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
@@ -822,28 +854,13 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
-
-/**
- * Detects *bitset* enums (flag combinations are valid wire values) via the
- * same JSDoc convention the Kotlin and Swift generators use: a numeric enum
- * whose leading JSDoc description starts with the word "Bitset". These are
- * emitted as `u32` newtypes via {@link generateRustBitset} instead of closed
- * `#[repr(u32)]` enums, so combined flags and forward-compat bits round-trip on
- * the wire. Marking an enum a bitset is therefore a property of its `types/`
- * declaration, not a name list maintained here (currently only `SessionStatus`
- * carries the marker).
- */
-function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
-  const desc = enumDecl.getJsDocs()[0]?.getDescription().trim();
-  const isNumeric = enumDecl.getMembers().every(m => typeof m.getValue() === 'number');
-  return isNumeric && desc !== undefined && /^bitset\b/i.test(desc);
-}
 
 /**
  * State structs to emit. The order matters only for human-readability — Rust
@@ -1001,6 +1018,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger', omitDiscriminants: true },
   { name: 'AutomationEventTrigger', omitDiscriminants: true },
+  { name: 'AutomationOneTimeTrigger', omitDiscriminants: true },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -1008,6 +1026,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition', omitDiscriminants: true },
   { name: 'AutomationAfterDateCondition', omitDiscriminants: true },
+  { name: 'AutomationNewSessionTarget', omitDiscriminants: true },
+  { name: 'AutomationPreviousSessionTarget', omitDiscriminants: true },
+  { name: 'AutomationChatTarget', omitDiscriminants: true },
   { name: 'AutomationEntry' },
   { name: 'AutomationState' },
   { name: 'AutomationManualRunOrigin', omitDiscriminants: true },
@@ -1287,6 +1308,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
 };
 
@@ -1297,6 +1319,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   variants: [
     { variantName: 'AfterRuns', innerType: 'AutomationAfterRunsCondition', wireValue: 'afterRuns' },
     { variantName: 'AfterDate', innerType: 'AutomationAfterDateCondition', wireValue: 'afterDate' },
+  ],
+};
+
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  doc: 'Where an automation\'s runs send their message.',
+  variants: [
+    { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
+    { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
   ],
 };
 
@@ -1374,19 +1407,14 @@ ${unknownVariant}}`;
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot.
+  const branches = SNAPSHOT_CHANNELS.map(({ scheme, variant, type }) =>
+    `            "${scheme}" => serde_json::from_value::<${type}>(value)${variant === 'Empty' ? '' : '.map(Box::new)'}.map(Self::${variant}),`
+  ).join('\n');
+  return `/// The state payload of a snapshot, selected by its resource's URI scheme.
 ///
-/// Deserialized by trying the empty state first (an object with no members,
-/// used by channels whose state has no fields), then session (has required \`lifecycle\`), then
-/// chat (has required \`turns\`), then canvas (has required instance/provider/type
-/// identifiers), then terminal (has required \`content\`),
-/// then changeset (has required \`status\` and \`files\`), then resource-watch
-/// (has required \`root\` and \`recursive\`), then annotations (has required
-/// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root (has required \`agents\`). A state that matches
-/// none of these, such as the state of a channel added in a later protocol
-/// version, decodes as \`Unknown\` and keeps its raw JSON.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Standalone deserialization preserves any JSON value as Unknown. Use Snapshot
+/// or from_resource for typed decoding, which propagates known-channel errors.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Empty(EmptyState),
@@ -1403,6 +1431,50 @@ pub enum SnapshotState {
     /// A state that this version does not recognize, kept as raw JSON so it
     /// re-encodes unchanged.
     Unknown(serde_json::Value),
+}
+
+impl SnapshotState {
+    /// Decodes a known channel strictly, or preserves any JSON value for an unknown scheme.
+    pub fn from_resource(resource: &str, value: serde_json::Value) -> Result<Self, serde_json::Error> {
+        let scheme = resource.split_once(':').map(|(scheme, _)| scheme).unwrap_or("");
+        match scheme {
+${branches}
+            _ => Ok(Self::Unknown(value)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SnapshotState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde_json::Value::deserialize(deserializer).map(Self::Unknown)
+    }
+}
+
+impl<'de> Deserialize<'de> for Snapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireSnapshot {
+            resource: Uri,
+            state: serde_json::Value,
+            from_seq: i64,
+        }
+
+        let wire = WireSnapshot::deserialize(deserializer)?;
+        let state = SnapshotState::from_resource(&wire.resource, wire.state)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            resource: wire.resource,
+            state,
+            from_seq: wire.from_seq,
+        })
+    }
 }`;
 }
 
@@ -1431,14 +1503,31 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  const omittedDiscriminants = new Set(STATE_STRUCTS.flatMap(entry => {
+    const iface = findInterface(project, entry.name);
+    return iface && entry.omitDiscriminants && preservesUnknownMembers(iface)
+      ? extractProps(iface, project).filter(p => p.isLiteralDiscriminant).map(p => p.wireName)
+      : [];
+  }));
+  for (const key of omittedDiscriminants) {
+    lines.push(`fn deserialize_extra_without_${key}<'de, D>(deserializer: D) -> Result<serde_json::Map<String, serde_json::Value>, D::Error>
+where D: serde::Deserializer<'de>,
+{
+    let mut extra = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+    extra.remove(${JSON.stringify(key)});
+    Ok(extra)
+}`);
+    lines.push('');
+  }
+
   lines.push('// ─── Structs ──────────────────────────────────────────────────────────\n');
   for (const entry of STATE_STRUCTS) {
     try {
       const struct = generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
+        omitDeserialize: entry.name === 'Snapshot',
       });
-      // EmptyState must match only `{}`, so the untagged SnapshotState does not
-      // decode an unknown state shape as empty.
+      // EmptyState must match only `{}`, including when decoded directly.
       lines.push(entry.name === 'EmptyState'
         ? struct.replace('pub struct EmptyState', '#[serde(deny_unknown_fields)]\npub struct EmptyState')
         : struct);
@@ -1446,9 +1535,9 @@ function generateStateFile(project: Project): string {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
       }
-      if (entry.name === 'AutomationEntry') {
+      for (const list of TAGGED_CUSTOMIZATION_LISTS.filter(list => list.owner === entry.name)) {
         lines.push('');
-        lines.push(generatePluginCustomizationsSerdeHelpers());
+        lines.push(generateTaggedCustomizationsSerdeHelpers(list));
       }
       if (entry.name === 'SubscribeParams') {
         lines.push('');
@@ -1513,6 +1602,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TARGET_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1591,6 +1682,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
   { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', variantName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1718,7 +1810,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -1821,16 +1913,21 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
-  { name: 'CreateTcpConnectionParams' },
-  { name: 'InitializeParams' }, { name: 'InitializeResult' },
+  { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
+  { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
+  { name: 'AutomationOneTimeCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
@@ -1970,6 +2067,9 @@ function generateCommandsFile(project: Project): string {
 }
 
 function generateCustomizationEnablementRust(project: Project): string {
+  const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
+    ? '        #[serde(flatten)]\n        extra: serde_json::Map<String, serde_json::Value>,\n'
+    : '';
   const kind = findEnum(project, 'CustomizationEnablementKind');
   if (!kind) throw new Error('CustomizationEnablementKind enum not found');
   const unknownVariant = getEnumCompatibility(kind) === 'nonexhaustive'
@@ -1984,16 +2084,16 @@ pub enum CustomizationEnablement {
     #[serde(rename = "global")]
     Global {
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "workspace")]
     Workspace {
         uri: Uri,
         enabled: bool,
-    },
+${extra}    },
     #[serde(rename = "session")]
     Session {
         enabled: bool,
-    },
+${extra}    },
 ${unknownVariant}}`;
 }
 
@@ -2458,6 +2558,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin',
     'AutomationTrigger',
     'AutomationDisableCondition',
+    'AutomationTarget',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',

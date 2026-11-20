@@ -1,0 +1,120 @@
+{
+  "name": "automation-one-time-trigger-snapshot",
+  "group": "A",
+  "description": "A catalogue snapshot preserves a one-time trigger and a run that records its scheduled time.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automations://",
+    "state": {
+      "entries": [
+        {
+          "resource": "ahp-automation:/later",
+          "definition": {
+            "title": "Send later",
+            "message": {
+              "text": "Summarize the review",
+              "origin": {
+                "kind": "automation"
+              }
+            },
+            "session": {
+              "provider": "copilot"
+            },
+            "enabled": true,
+            "triggers": [
+              {
+                "id": "once",
+                "kind": "oneTime",
+                "runAt": "2026-11-14T10:00:00Z",
+                "misfirePolicy": "skip"
+              }
+            ]
+          },
+          "nextRunAt": "2026-11-14T10:00:00Z",
+          "runs": [
+            {
+              "resource": "ahp-automation-run:/r1",
+              "automation": "ahp-automation:/later",
+              "origin": {
+                "kind": "trigger",
+                "triggerId": "once",
+                "scheduledFor": "2026-11-13T10:00:00Z"
+              },
+              "lifecycle": {
+                "status": "pending",
+                "createdAt": "2026-11-13T10:00:00Z"
+              },
+              "sessionCount": 0
+            }
+          ],
+          "operations": [
+            "update",
+            "remove",
+            "run"
+          ],
+          "createdAt": "2026-11-13T09:00:00Z",
+          "modifiedAt": "2026-11-13T10:05:00Z"
+        }
+      ]
+    },
+    "fromSeq": 4
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-automations://",
+      "state": {
+        "entries": [
+          {
+            "resource": "ahp-automation:/later",
+            "definition": {
+              "title": "Send later",
+              "message": {
+                "text": "Summarize the review",
+                "origin": {
+                  "kind": "automation"
+                }
+              },
+              "session": {
+                "provider": "copilot"
+              },
+              "enabled": true,
+              "triggers": [
+                {
+                  "id": "once",
+                  "kind": "oneTime",
+                  "runAt": "2026-11-14T10:00:00Z",
+                  "misfirePolicy": "skip"
+                }
+              ]
+            },
+            "nextRunAt": "2026-11-14T10:00:00Z",
+            "runs": [
+              {
+                "resource": "ahp-automation-run:/r1",
+                "automation": "ahp-automation:/later",
+                "origin": {
+                  "kind": "trigger",
+                  "triggerId": "once",
+                  "scheduledFor": "2026-11-13T10:00:00Z"
+                },
+                "lifecycle": {
+                  "status": "pending",
+                  "createdAt": "2026-11-13T10:00:00Z"
+                },
+                "sessionCount": 0
+              }
+            ],
+            "operations": [
+              "update",
+              "remove",
+              "run"
+            ],
+            "createdAt": "2026-11-13T09:00:00Z",
+            "modifiedAt": "2026-11-13T10:05:00Z"
+          }
+        ]
+      },
+      "fromSeq": 4
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "resource-read-ranged-result",
+  "group": "A",
+  "description": "A receiver that honored the byte range returns the requested bytes and the total size of the resource. Here 16 bytes of a 52341-byte resource, as base64.",
+  "type": "ResourceReadResult",
+  "input": {
+    "data": "iVBORw0KGgoAAAANSUhEUg==",
+    "encoding": "base64",
+    "contentType": "image/png",
+    "size": 52341
+  },
+  "acceptableOutputs": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUg==",
+      "encoding": "base64",
+      "contentType": "image/png",
+      "size": 52341
+    }
+  ]
+}

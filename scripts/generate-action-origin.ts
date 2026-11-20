@@ -78,7 +78,7 @@ function resolveActionType(
   return { actionType: value, enumRef: text };
 }
 
-export function generateActionOrigin(project: Project, outDir: string): void {
+export function readActionOrigins(project: Project): ActionInfo[] {
   // After the channel-organized refactor, the `ActionType` enum and
   // `StateAction` union live in `types/common/actions.ts`, while the
   // individual action interfaces live in `types/channels-*/actions.ts`.
@@ -201,6 +201,12 @@ export function generateActionOrigin(project: Project, outDir: string): void {
       isClientDispatchable,
     });
   }
+
+  return actions;
+}
+
+export function generateActionOrigin(project: Project, outDir: string): void {
+  const actions = readActionOrigins(project);
 
   // Generate output
   const rootActions = actions.filter(a => a.scope === 'root');

@@ -26,7 +26,7 @@ public sealed class MultiHostStateMirrorTests
             InstanceId = "preview",
             ExtensionId = "project:preview",
             CanvasId = "preview",
-            Url = "https://example.test/original",
+            Uri = "https://example.test/original",
         };
         mirror.PutCanvas("host-a", uri, State());
         mirror.PutCanvas("host-b", uri, State());
@@ -42,7 +42,7 @@ public sealed class MultiHostStateMirrorTests
             },
         }));
         var (retained, _) = mirror.Canvas("host-b", uri);
-        var targeted = new[] { target!.Url, retained!.Url };
+        var targeted = new[] { target!.Uri, retained!.Uri };
         mirror.DropResource("host-a", uri);
         var (_, resourceFound) = mirror.Canvas("host-a", uri);
         mirror.PutCanvas("host-a", uri, State());

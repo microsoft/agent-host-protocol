@@ -22,7 +22,7 @@
  *     plus a marker interface, with custom MarshalJSON / UnmarshalJSON
  *     methods. Unknown discriminator values surface as a
  *     `*<Name>Unknown` variant carrying the raw JSON.
- *   - Bitset enums (JSDoc starts with "Bitset") are emitted as a typed
+ *   - Bitset enums (`@bitset`) are emitted as a typed
  *     `uint32` with named flag constants plus `Has` / `Or` helpers, so
  *     unknown future bits round-trip losslessly.
  *   - The generator runs `gofmt -w` after writing to keep style stable
@@ -43,7 +43,8 @@ import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
-import { discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
+import { discriminatedUnionAllowsUnknown, isBitsetEnum } from './enum-compatibility.js';
 
 const GENERATED_BANNER =
   '// Generated from types/*.ts — do not edit.\n' +
@@ -425,13 +426,13 @@ function generateStringEnum(enumDecl: EnumDeclaration): string {
 }
 
 /**
- * Bitset enum (numeric values, JSDoc tag "Bitset" or numeric values):
+ * Numeric enum, with flag helpers when annotated `@bitset`:
  *   type SessionStatus uint32
  *   const ( SessionStatusIdle SessionStatus = 1 ... )
  *   func (s SessionStatus) Has(other SessionStatus) bool
  *   func (s SessionStatus) Or(other SessionStatus) SessionStatus
  */
-function generateBitsetEnum(enumDecl: EnumDeclaration): string {
+function generateNumericEnum(enumDecl: EnumDeclaration): string {
   const name = enumDecl.getName();
   const lines: string[] = [];
   const desc = getDocumentation(enumDecl);
@@ -446,25 +447,28 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
     lines.push(`\t${name}${memberName} ${name} = ${mem.getValue()}`);
   }
   lines.push(')');
-  lines.push('');
-  lines.push(`// Has reports whether every flag in other is also set in s.`);
-  lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
-  lines.push('');
-  lines.push(`// Or returns s combined with the flags in other.`);
-  lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  if (isBitsetEnum(enumDecl)) {
+    lines.push('');
+    lines.push(`// Has reports whether every flag in other is also set in s.`);
+    lines.push(`func (s ${name}) Has(other ${name}) bool { return s&other == other }`);
+    lines.push('');
+    lines.push(`// Or returns s combined with the flags in other.`);
+    lines.push(`func (s ${name}) Or(other ${name}) ${name} { return s | other }`);
+  }
   return lines.join('\n');
 }
 
-/** Choose between string-enum and bitset-enum emission. */
+/** Choose between string-enum and numeric-enum emission. */
 function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
-  return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
+  return isNumeric ? generateNumericEnum(enumDecl) : generateStringEnum(enumDecl);
 }
 
 // ─── Struct Generation ───────────────────────────────────────────────────────
 
 interface StructOpts {
+  preserveUnknownMembers?: boolean;
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
   /** Docstring for the struct itself. */
@@ -506,8 +510,29 @@ function generateGoStruct(goName: string, props: GoProp[], opts: StructOpts = {}
     const tag = `\`json:"${tagParts.join(',')}"\``;
     lines.push(`\t${p.goName} ${goType} ${tag}`);
   }
+  if (opts.preserveUnknownMembers) {
+    lines.push('\t// Extra contains unrecognized wire members retained for full-object edits.');
+    lines.push('\tExtra map[string]json.RawMessage `json:"-"`');
+  }
   lines.push('}');
+  if (opts.preserveUnknownMembers) {
+    lines.push(generateUnknownMembersMethods(goName, props.map(p => p.wireName)));
+  }
   return lines.join('\n');
+}
+
+function generateUnknownMembersMethods(name: string, knownKeys: string[]): string {
+  const keys = knownKeys.map(key => JSON.stringify(key)).join(', ');
+  return `
+func (v *${name}) UnmarshalJSON(data []byte) error {
+    type wire ${name}
+    return unmarshalWithExtra(data, (*wire)(v), &v.Extra, ${keys})
+}
+
+func (v ${name}) MarshalJSON() ([]byte, error) {
+    type wire ${name}
+    return marshalWithExtra(wire(v), v.Extra, ${keys})
+}`;
 }
 
 function generateStructFromInterface(
@@ -521,7 +546,7 @@ function generateStructFromInterface(
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
   const props = extractProps(iface, project);
   const ifaceDoc = getDocumentation(iface);
-  return generateGoStruct(name, props, { doc: ifaceDoc, ...opts });
+  return generateGoStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
 
 function generateFixedDiscriminantMethods(
@@ -734,10 +759,11 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -892,6 +918,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
   { name: 'AutomationEventTrigger' },
+  { name: 'AutomationOneTimeTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
@@ -899,6 +926,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationAfterRunsCondition' },
   { name: 'AutomationAfterDateCondition' },
+  { name: 'AutomationNewSessionTarget' },
+  { name: 'AutomationPreviousSessionTarget' },
+  { name: 'AutomationChatTarget' },
   { name: 'AutomationEntry' },
   { name: 'AutomationState' },
   { name: 'AutomationManualRunOrigin' },
@@ -1174,6 +1204,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
     { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+    { variantName: 'OneTime', innerType: 'AutomationOneTimeTrigger', wireValue: 'oneTime' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1185,6 +1216,18 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   variants: [
     { variantName: 'AfterRuns', innerType: 'AutomationAfterRunsCondition', wireValue: 'afterRuns' },
     { variantName: 'AfterDate', innerType: 'AutomationAfterDateCondition', wireValue: 'afterDate' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  doc: 'AutomationTarget is where an automation\'s runs send their message.',
+  variants: [
+    { variantName: 'NewSession', innerType: 'AutomationNewSessionTarget', wireValue: 'newSession' },
+    { variantName: 'PreviousSession', innerType: 'AutomationPreviousSessionTarget', wireValue: 'previousSession' },
+    { variantName: 'Chat', innerType: 'AutomationChatTarget', wireValue: 'chat' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1520,7 +1563,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// ─── Customization Enablement Union ───────────────────────────────────────');
   lines.push('');
-  lines.push(generateCustomizationEnablementGo());
+  lines.push(generateCustomizationEnablementGo(project));
   lines.push('');
 
   lines.push(generateToolInput());
@@ -1569,6 +1612,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TARGET_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1632,6 +1677,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/isReadChanged', variantName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', variantName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
   { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', variantName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1797,16 +1843,21 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
-  { name: 'CreateTcpConnectionParams' },
-  { name: 'InitializeParams' }, { name: 'InitializeResult' },
+  { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
+  { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
   { name: 'AutomationCustomizationsCapability' },
+  { name: 'AutomationTargetsCapabilities' },
+  { name: 'AutomationPreviousSessionTargetCapability' },
+  { name: 'AutomationChatTargetCapability' },
+  { name: 'AutomationOneTimeCapability' },
+  { name: 'MultipleChatProvidersCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ChannelDeliveryResumeParams' }, { name: 'ChannelDeliveryResumeOptions' },
@@ -1887,7 +1938,13 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-function generateCustomizationEnablementGo(): string {
+function generateCustomizationEnablementGo(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (name: string, workspace = false): string => generateGoStruct(name, [
+    { goName: 'Kind', wireName: 'kind', goType: 'string', optional: false, doc: '', isLiteralDiscriminant: false },
+    ...(workspace ? [{ goName: 'URI', wireName: 'uri', goType: 'URI', optional: false, doc: '', isLiteralDiscriminant: false }] : []),
+    { goName: 'Enabled', wireName: 'enabled', goType: 'bool', optional: false, doc: '', isLiteralDiscriminant: false },
+  ], { preserveUnknownMembers: preserve });
   return `// CustomizationEnablement is a single explicit customization enablement decision.
 type CustomizationEnablement struct {
 \tValue isCustomizationEnablement
@@ -1895,25 +1952,15 @@ type CustomizationEnablement struct {
 
 type isCustomizationEnablement interface{ isCustomizationEnablement() }
 
-type CustomizationEnablementGlobal struct {
-\tKind    string \`json:"kind"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementGlobal')}
 
 func (*CustomizationEnablementGlobal) isCustomizationEnablement() {}
 
-type CustomizationEnablementWorkspace struct {
-\tKind    string \`json:"kind"\`
-\tURI     URI    \`json:"uri"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementWorkspace', true)}
 
 func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
 
-type CustomizationEnablementSession struct {
-\tKind    string \`json:"kind"\`
-\tEnabled bool   \`json:"enabled"\`
-}
+${variant('CustomizationEnablementSession')}
 
 func (*CustomizationEnablementSession) isCustomizationEnablement() {}
 
@@ -2537,6 +2584,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin',
     'AutomationTrigger',
     'AutomationDisableCondition',
+    'AutomationTarget',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',

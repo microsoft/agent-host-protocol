@@ -1,0 +1,32 @@
+{
+  "name": "automation-chat-target-patch",
+  "group": "A",
+  "description": "A patch that sets a chat target round-trips its session and chat URIs, keeping unknown members of the variant.",
+  "type": "StateAction",
+  "input": {
+    "type": "automation/updateRequested",
+    "resource": "ahp-automation:/deploy-check",
+    "changes": {
+      "target": {
+        "kind": "chat",
+        "session": "ahp-session:/s1",
+        "chat": "ahp-chat:/c1",
+        "future": true
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "automation/updateRequested",
+      "resource": "ahp-automation:/deploy-check",
+      "changes": {
+        "target": {
+          "kind": "chat",
+          "session": "ahp-session:/s1",
+          "chat": "ahp-chat:/c1",
+          "future": true
+        }
+      }
+    }
+  ]
+}

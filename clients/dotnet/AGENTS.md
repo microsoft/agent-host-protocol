@@ -41,7 +41,7 @@ commit; CI fails on any diff between the committed sources and a fresh run.
   per-type converter. A value added by a newer protocol version therefore
   round-trips verbatim instead of failing the whole message, as
   [`versioning.md`](../../docs/specification/versioning.md) requires (this
-  mirrors Kotlin's `value class` and Rust's `Unknown(String)`). Bitset enums →
+  mirrors Kotlin's `value class` and Rust's `Unknown(String)`). Bitset enums (`@bitset`) →
   `[Flags] enum : uint`, serialized as their numeric value so unknown future
   bits round-trip.
 - Discriminated unions → a sealed wrapper deriving from `AhpUnion` (carrying

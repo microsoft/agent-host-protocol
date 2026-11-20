@@ -1,0 +1,24 @@
+{
+  "name": "automation-one-time-capability",
+  "group": "A",
+  "description": "The one-time trigger capability preserves its empty presence marker.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.1.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "automations": {
+      "oneTime": {}
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.1.0",
+      "serverSeq": 1,
+      "snapshots": [],
+      "automations": {
+        "oneTime": {}
+      }
+    }
+  ]
+}

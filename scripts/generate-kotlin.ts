@@ -18,8 +18,8 @@
  *     `@JsonClassDiscriminator`, because that mode forbids the discriminator
  *     field from existing on the variant data class — but our TS variant
  *     interfaces include it (e.g. `MarkdownResponsePart.kind = 'markdown'`).
- *   - Bitset enums (JSDoc starts with "Bitset") → `@JvmInline value class`
- *     wrapping `Int`, with companion-object flag constants and bitwise ops,
+ *   - Bitset enums (`@bitset`) → `@JvmInline value class`
+ *     wrapping `UInt`, with companion-object flag constants and bitwise ops,
  *     so unknown future bits decode/encode losslessly.
  *   - Recursive structs → plain data classes (Kotlin classes are heap-
  *     allocated by default, so self-reference Just Works).
@@ -39,8 +39,10 @@ import { readProtocolVersions } from './read-protocol-versions.js';
 import {
   discriminatedUnionAllowsUnknown,
   getEnumCompatibility,
+  isBitsetEnum,
 } from './enum-compatibility.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
+import { aliasPreservesUnknownMembers, preservesUnknownMembers } from './read-preserve-unknown-members.js';
 
 const GENERATED_HEADER =
   '// Generated from types/*.ts — do not edit\n\n' +
@@ -358,9 +360,9 @@ function generateKotlinEnum(enumDecl: EnumDeclaration): string {
   const isNumeric = values.every(v => typeof v === 'number');
   const isNonexhaustive = getEnumCompatibility(enumDecl) === 'nonexhaustive';
 
-  // Bitset enums (JSDoc convention "Bitset of …") → `value class` so OR'd
+  // Bitset enums (`@bitset`) → `value class` so OR'd
   // combinations with unknown bits decode/encode losslessly.
-  const isBitset = isNumeric && desc !== undefined && /^bitset\b/i.test(desc);
+  const isBitset = isBitsetEnum(enumDecl);
 
   if (desc) {
     lines.push(...emitKDoc(desc));
@@ -498,6 +500,19 @@ function generateKotlinDataClass(
 
   lines.push(')');
   return lines.join('\n');
+}
+
+function generatePreservingKotlinDataClass(name: string, props: KotlinProp[]): string {
+  const declaration = generateKotlinDataClass(name, props)
+    .replace('@Serializable', `@KeepGeneratedSerializer\n@Serializable(with = ${name}Serializer::class)`)
+    .replace(/\n\)$/, ',\n    @Transient\n    val extra: Map<String, JsonElement> = emptyMap()\n)');
+  return `${declaration}
+
+internal object ${name}Serializer : UnknownMembersSerializer<${name}>(
+    ${name}.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)`;
 }
 
 // ─── Discriminated Union Generation ──────────────────────────────────────────
@@ -654,7 +669,9 @@ function generateDataClassFromInterface(
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = ktNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
-  const declaration = generateKotlinDataClass(name, props);
+  const declaration = preservesUnknownMembers(iface)
+    ? generatePreservingKotlinDataClass(name, props)
+    : generateKotlinDataClass(name, props);
   if (!readStability(iface)) return declaration;
   return `${emitKDoc(getDocumentation(iface)).join('\n')}\n${declaration}`;
 }
@@ -995,10 +1012,11 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
+  'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
@@ -1064,11 +1082,13 @@ const STATE_STRUCTS = [
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
   'AutomationSessionOrigin', 'AutomationSchedule',
-  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger', 'AutomationOneTimeTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationAfterRunsCondition', 'AutomationAfterDateCondition',
+  'AutomationNewSessionTarget', 'AutomationPreviousSessionTarget',
+  'AutomationChatTarget',
   'AutomationEntry', 'AutomationState',
   'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
@@ -1373,6 +1393,7 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   variants: [
     { caseName: 'Schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
     { caseName: 'Event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+    { caseName: 'OneTime', structName: 'AutomationOneTimeTrigger', discriminantValue: 'oneTime' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1383,6 +1404,17 @@ const AUTOMATION_DISABLE_CONDITION_UNION: UnionConfig = {
   variants: [
     { caseName: 'AfterRuns', structName: 'AutomationAfterRunsCondition', discriminantValue: 'afterRuns' },
     { caseName: 'AfterDate', structName: 'AutomationAfterDateCondition', discriminantValue: 'afterDate' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const AUTOMATION_TARGET_UNION: UnionConfig = {
+  name: 'AutomationTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'NewSession', structName: 'AutomationNewSessionTarget', discriminantValue: 'newSession' },
+    { caseName: 'PreviousSession', structName: 'AutomationPreviousSessionTarget', discriminantValue: 'previousSession' },
+    { caseName: 'Chat', structName: 'AutomationChatTarget', discriminantValue: 'chat' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1411,7 +1443,12 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 function generateStateFile(project: Project): string {
-  const lines: string[] = [GENERATED_HEADER];
+  const lines: string[] = [
+    GENERATED_HEADER.replace('package ', '@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\npackage '),
+    'import kotlinx.serialization.KeepGeneratedSerializer',
+    'import kotlinx.serialization.Transient',
+    'import com.microsoft.agenthostprotocol.UnknownMembersSerializer\n',
+  ];
 
   lines.push('// ─── Type Aliases ───────────────────────────────────────────────────────────');
   lines.push('');
@@ -1447,7 +1484,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// ─── Customization Enablement Union ─────────────────────────────────────');
   lines.push('');
-  lines.push(generateCustomizationEnablementKotlin());
+  lines.push(generateCustomizationEnablementKotlin(project));
   lines.push('');
 
   lines.push('// ─── Tool Input ──────────────────────────────────────────────────────────────');
@@ -1499,6 +1536,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_DISABLE_CONDITION_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TARGET_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
@@ -1571,6 +1610,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/isReadChanged', caseName: 'ChatIsReadChanged', tsInterface: 'ChatIsReadChangedAction' },
   { type: 'chat/isArchivedChanged', caseName: 'ChatIsArchivedChanged', tsInterface: 'ChatIsArchivedChangedAction' },
   { type: 'chat/configChanged', caseName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
+  { type: 'chat/moved', caseName: 'ChatMoved', tsInterface: 'ChatMovedAction' },
   { type: 'chat/inputRequested', caseName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', caseName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', caseName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1778,16 +1818,21 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'PathStyle', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthenticateTargetKind'];
 
 const COMMAND_STRUCTS = [
-  'CreateTcpConnectionParams',
-  'InitializeParams', 'InitializeResult',
+  'CreateTcpConnectionParams', 'CreateTcpConnectionResult',
+  'InitializeParams', 'HostEnvironment', 'InitializeResult',
   'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
   'AutomationCustomizationsCapability',
+  'AutomationTargetsCapabilities',
+  'AutomationPreviousSessionTargetCapability',
+  'AutomationChatTargetCapability',
+  'AutomationOneTimeCapability',
+  'MultipleChatProvidersCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'ChannelDeliveryResumeParams', 'ChannelDeliveryResumeOptions',
@@ -1860,7 +1905,18 @@ const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
   ],
 };
 
-function generateCustomizationEnablementKotlin(): string {
+function generateCustomizationEnablementKotlin(project: Project): string {
+  const preserve = aliasPreservesUnknownMembers(project, 'CustomizationEnablement');
+  const variant = (kind: string, workspace = false): string => {
+    const props = [
+      ...(workspace ? [{ name: 'uri', wireName: 'uri', type: 'URI', optional: false, doc: '' }] : []),
+      { name: 'enabled', wireName: 'enabled', type: 'Boolean', optional: false, doc: '' },
+      { name: 'kind', wireName: 'kind', type: 'String', optional: false, doc: '' },
+    ];
+    const name = `CustomizationEnablement${kind[0].toUpperCase() + kind.slice(1)}`;
+    return (preserve ? generatePreservingKotlinDataClass(name, props) : generateKotlinDataClass(name, props))
+      .replaceAll('val kind: String', `val kind: String = ${JSON.stringify(kind)}`);
+  };
   return `/**
  * A single explicit customization enablement decision.
  */
@@ -1871,24 +1927,11 @@ sealed interface CustomizationEnablement {
     @JvmInline value class Session(val value: CustomizationEnablementSession) : CustomizationEnablement
 }
 
-@Serializable
-data class CustomizationEnablementGlobal(
-    val enabled: Boolean,
-    val kind: String = "global",
-)
+${variant('global')}
 
-@Serializable
-data class CustomizationEnablementWorkspace(
-    val uri: URI,
-    val enabled: Boolean,
-    val kind: String = "workspace",
-)
+${variant('workspace', true)}
 
-@Serializable
-data class CustomizationEnablementSession(
-    val enabled: Boolean,
-    val kind: String = "session",
-)
+${variant('session')}
 
 internal object CustomizationEnablementSerializer : KSerializer<CustomizationEnablement> {
     override val descriptor: SerialDescriptor =
@@ -2489,6 +2532,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationDisableCondition', // AUTOMATION_DISABLE_CONDITION_UNION discriminated union
+    'AutomationTarget',           // AUTOMATION_TARGET_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()

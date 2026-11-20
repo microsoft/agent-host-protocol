@@ -12,11 +12,15 @@
 
 import { describe, it, before } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
-import { typeAdmitsUndefined } from './generate-json-schema.js';
+import { generateJsonSchemas, typeAdmitsUndefined } from './generate-json-schema.js';
+import { ActionType } from '../types/common/actions.js';
+import { SessionLifecycle, SessionStatus } from '../types/channels-session/state.js';
+import { sessionReducer } from '../types/channels-session/reducer.js';
 import type { RootState } from '../types/channels-root/state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,7 +47,7 @@ function collectRefTargets(node: JsonNode, acc: Set<string>): void {
   if (node && typeof node === 'object') {
     const ref = (node as Record<string, unknown>).$ref;
     if (typeof ref === 'string') {
-      const m = ref.match(/^#\/\$defs\/(.+)$/);
+      const m = ref.match(/^#\/\$defs\/(.*)$/);
       if (m) acc.add(m[1]);
     }
     const not = (node as Record<string, unknown>).not;
@@ -117,6 +121,10 @@ function schemaAccepts(
     return value === schema.const;
   }
 
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return false;
+  }
+
   if (schema.contains && Array.isArray(value)) {
     const matches = value.filter(item => schemaAccepts(root, schema.contains as JsonNode, item)).length;
     const minimum = typeof schema.minContains === 'number' ? schema.minContains : 1;
@@ -164,6 +172,42 @@ function schemaAccepts(
 
   return true;
 }
+
+describe('@bitset JSON Schema generation', () => {
+  it('uses the tag to accept combinations and documents every named value', () => {
+    const project = new Project({ useInMemoryFileSystem: true });
+    project.createSourceFile('/types/common/state.ts', `
+      /** Status flags. @nonexhaustive @bitset */
+      export enum Tagged {
+        /** The first flag. */
+        First = 1,
+        /** Both flags together. */
+        Combined = 1 | 2,
+      }
+      /** Bitset is just prose here. @nonexhaustive */
+      export enum Untagged { First = 1, Second = 2 }
+      export interface Example { tagged: Tagged; untagged: Untagged }
+    `);
+    const outDir = mkdtempSync(resolve(tmpdir(), 'ahp-bitset-schema-'));
+    try {
+      generateJsonSchemas(project, outDir);
+      const schema = JSON.parse(readFileSync(resolve(outDir, 'state.schema.json'), 'utf-8'));
+      assert.deepEqual(schema.$defs.Tagged, {
+        type: 'integer',
+        minimum: 0,
+        maximum: 0xffff_ffff,
+        description: 'Status flags.\n\nKnown flags:\n\n- `First` (1): The first flag.\n- `Combined` (3): Both flags together.',
+      });
+      assert.deepEqual(schema.$defs.Untagged, {
+        enum: [1, 2],
+        type: 'number',
+        description: 'Bitset is just prose here.',
+      });
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('generated JSON schemas', () => {
   for (const file of SCHEMA_FILES) {
@@ -267,7 +311,65 @@ describe('generated JSON schemas', () => {
         });
       }
 
-      it('enforces delivery counter, limit, and nonempty-fragment bounds', () => {
+      it('validates StateAction payloads without unresolved references', () => {
+        if (file !== 'actions.schema.json' && file !== 'commands.schema.json') return;
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const action = { type: 'root/activeSessionsChanged', activeSessions: 0 };
+
+        assert.equal(schemaAccepts(schema, defs.StateAction, action), true);
+        for (const invalid of [
+          { type: action.type },
+          { ...action, activeSessions: '0' },
+          { ...action, type: 'root/unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, defs.StateAction, invalid), false, JSON.stringify(invalid));
+        }
+      });
+
+      it('accepts all activity, read, and archived SessionStatus combinations', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const activity of [SessionStatus.Idle, SessionStatus.Error, SessionStatus.InProgress, SessionStatus.InputNeeded]) {
+          for (const flags of [0, SessionStatus.IsRead, SessionStatus.IsArchived, SessionStatus.IsRead | SessionStatus.IsArchived]) {
+            const status = activity | flags;
+            assert.equal(schemaAccepts(schema, defs.SessionStatus, status), true, `status ${status}`);
+          }
+        }
+      });
+
+      it('validates a session snapshot after marking it read', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const session = sessionReducer({
+          provider: 'copilot',
+          title: 'Test Session',
+          status: SessionStatus.Idle,
+          lifecycle: SessionLifecycle.Ready,
+          activeClients: [],
+          chats: [],
+        }, { type: ActionType.SessionIsReadChanged, isRead: true });
+
+        assert.equal(schemaAccepts(schema, defs.SessionState, session), true);
+        assert.equal(schemaAccepts(schema, defs.SessionSummary, {
+          ...session,
+          resource: 'ahp-session:/test',
+          createdAt: '2026-11-09T00:00:00Z',
+          modifiedAt: '2026-11-09T00:00:00Z',
+        }), true);
+      });
+
+      it('accepts forward-compatible uint32 status bits and rejects non-uint32 values', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const fixture = JSON.parse(readFileSync(resolve(
+          root, 'types/test-cases/round-trips/005-session-status-unknown-bits-preserved.json',
+        ), 'utf-8'));
+        for (const value of [0, fixture.input, 0xffff_ffff]) {
+          assert.equal(schemaAccepts(schema, defs.SessionStatus, value), true, `status ${value}`);
+        }
+        for (const value of [-1, 1.5, 0x1_0000_0000, '33', null]) {
+          assert.equal(schemaAccepts(schema, defs.SessionStatus, value), false, `status ${value}`);
+        }
+      });
+
+      it('enforces delivery counter, limit, and nonempty-frame bounds', () => {
         if (file !== 'notifications.schema.json') return;
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const limits = defs.ChannelReceiveLimits.properties as Record<string, Record<string, unknown>>;
@@ -317,6 +419,36 @@ describe('generated JSON schemas', () => {
         }
       });
 
+      it('accepts resourceRead byte ranges and rejects invalid ranges', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const params = defs.ResourceReadParams;
+        const result = defs.ResourceReadResult;
+        const base = { channel: 'ahp-root://', uri: 'file:///workspace/logo.png' };
+        assert.equal((params.required as string[]).some(name => name === 'position' || name === 'length'), false);
+        assert.equal((result.required as string[]).includes('size'), false);
+        for (const value of [base, { ...base, position: 0 }, { ...base, length: 0 }, { ...base, position: 16, length: 16 }]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const value of [
+          { ...base, position: -1 },
+          { ...base, position: 1.5 },
+          { ...base, length: -1 },
+          { ...base, length: 2.5 },
+        ]) {
+          assert.equal(schemaAccepts(schema, params as JsonNode, value), false, JSON.stringify(value));
+        }
+        const whole = { data: 'aGVsbG8=', encoding: 'base64' };
+        for (const value of [whole, { ...whole, size: 52341 }, { data: '', encoding: 'base64', size: 0 }, { data: 'Aé😀', encoding: 'utf-8', size: 1024 }]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, value), true, JSON.stringify(value));
+        }
+        for (const size of [-1, 1.5]) {
+          assert.equal(schemaAccepts(schema, result as JsonNode, { ...whole, size }), false, `size ${size}`);
+        }
+      });
+
       it('preserves automation schedule restrictions', () => {
         if (file !== 'commands.schema.json') {
           return;
@@ -342,6 +474,19 @@ describe('generated JSON schemas', () => {
         assert.equal(required.includes('expiresIn'), false);
         assert.match(expiresIn.description as string, /remaining lifetime, in seconds/);
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
+      });
+
+      it('accepts an optional account-selection hint without requiring it for authentication', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const base = { channel: 'ahp-root://', resource: 'https://api.example.com', token: 'test-token' };
+        const values = [base, ...['selection-1', '', 42, null, {}, []].map(accountId => ({ ...base, accountId }))];
+        assert.deepEqual(values.map(value => schemaAccepts(schema, authenticate as JsonNode, value)), [
+          true, true, false, false, false, false, false,
+        ]);
       });
 
       it('accepts optional, empty, single-kind, and combined automation disable conditions', () => {
@@ -416,6 +561,35 @@ describe('generated JSON schemas', () => {
           ]) {
             assert.equal(schemaAccepts(schema, properties.disableConditions, value), false, `${type}: ${JSON.stringify(value)}`);
           }
+        }
+      });
+
+      it('optionally describes host path semantics in an extensible environment descriptor', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const initializeResult = defs.InitializeResult;
+        const properties = initializeResult.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.environment.$ref, '#/$defs/HostEnvironment');
+
+        const environment = defs.HostEnvironment;
+        assert.equal(environment.required, undefined);
+
+        const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
+        assert.equal(schemaAccepts(schema, initializeResult, base), true);
+        for (const value of [
+          {},
+          { pathStyle: 'posix' },
+          { pathStyle: 'windows' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), true);
+        }
+        for (const value of [
+          null,
+          { pathStyle: 'unknown' },
+        ]) {
+          assert.equal(schemaAccepts(schema, initializeResult, { ...base, environment: value }), false);
         }
       });
 

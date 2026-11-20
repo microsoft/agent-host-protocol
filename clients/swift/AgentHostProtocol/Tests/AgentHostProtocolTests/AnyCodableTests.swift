@@ -20,6 +20,30 @@ final class AnyCodableTests: XCTestCase {
         return String(bytes: reEncoded, encoding: .utf8)!
     }
 
+    func testNestedAnyCodableEqualitySurvivesRoundTrip() throws {
+        let value = AnyCodable([
+            "k": AnyCodable(1),
+            "items": AnyCodable([AnyCodable(true), AnyCodable("value")]),
+        ])
+        let decoded = try JSONDecoder().decode(AnyCodable.self, from: JSONEncoder().encode(value))
+
+        XCTAssertEqual(value, value)
+        XCTAssertEqual(AnyCodable(value), value)
+        XCTAssertEqual(value, decoded)
+        XCTAssertEqual(decoded, value)
+    }
+
+    func testNSNumberEqualityDistinguishesBooleansFromNumbers() {
+        for (number, boolean) in [(NSNumber(value: 0), false), (NSNumber(value: 1), true)] {
+            XCTAssertNotEqual(AnyCodable(number), AnyCodable(boolean))
+            XCTAssertNotEqual(AnyCodable(boolean), AnyCodable(number))
+            XCTAssertNotEqual(AnyCodable(number), AnyCodable(NSNumber(value: boolean)))
+            XCTAssertNotEqual(AnyCodable(number.intValue), AnyCodable(NSNumber(value: boolean)))
+            XCTAssertEqual(AnyCodable(number), AnyCodable(number.intValue))
+            XCTAssertEqual(AnyCodable(NSNumber(value: boolean)), AnyCodable(boolean))
+        }
+    }
+
     func testNSNumberIntDoesNotEncodeAsBool() throws {
         struct Payload: Codable { let serverSeq: Int }
         let json = try roundTripJSON(value: Payload(serverSeq: 1))

@@ -61,6 +61,7 @@ import type {
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
 import type {
   Implementation, InitializeParams, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
+  ResourceReadParams, ResourceReadResult, AuthenticateParams,
 } from '../src/types/common/commands.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
@@ -262,6 +263,9 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'TcpEofParams':        void (parsed as TcpEofParams); break;
     case 'TcpResetParams':      void (parsed as TcpResetParams); break;
     case 'CreateTcpConnectionParams': void (parsed as CreateTcpConnectionParams); break;
+    case 'ResourceReadParams':  void (parsed as ResourceReadParams); break;
+    case 'ResourceReadResult':  void (parsed as ResourceReadResult); break;
+    case 'AuthenticateParams':  void (parsed as AuthenticateParams); break;
     default:
       throw new Error(
         `${file}: unknown wire type "${type}". Add a decode entry to bindToType.`,

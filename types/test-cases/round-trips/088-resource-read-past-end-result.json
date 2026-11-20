@@ -1,0 +1,18 @@
+{
+  "name": "resource-read-past-end-result",
+  "group": "A",
+  "description": "A ranged read whose position is at or past the end returns empty data and still carries size.",
+  "type": "ResourceReadResult",
+  "input": {
+    "data": "",
+    "encoding": "base64",
+    "size": 52341
+  },
+  "acceptableOutputs": [
+    {
+      "data": "",
+      "encoding": "base64",
+      "size": 52341
+    }
+  ]
+}

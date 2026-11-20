@@ -1040,7 +1040,7 @@ public sealed class MultiHostClient : IMultiHostClient
             {
                 var evt = new SubscriptionEventAction(env);
                 ApplyEventToHostState(entry, evt);
-                if (env.Channel == ProtocolVersion.RootResourceUri)
+                if (env.RejectionReason is null && env.Channel == ProtocolVersion.RootResourceUri)
                     entry.ApplyRootAction(env.Action);
                 entry.AdvanceServerSeq(env.ServerSeq);
                 var hostEv = new HostSubscriptionEvent(entry.Id, env.Channel, evt);
@@ -1160,6 +1160,7 @@ public sealed class MultiHostClient : IMultiHostClient
                 // (mirrors the ordering in Swift HostRuntime.handleEvent).
                 var summaryTouched = ApplyEventToHostState(entry, ev.Event);
                 var rootTouched = ev.Event is SubscriptionEventAction rootAction
+                    && rootAction.Envelope.RejectionReason is null
                     && rootAction.Envelope.Channel == ProtocolVersion.RootResourceUri
                     && entry.ApplyRootAction(rootAction.Envelope.Action);
                 if (ev.Event is SubscriptionEventAction action)

@@ -109,6 +109,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |
 | `chat/configChanged` | **Yes** | Config values set on a chat (`chatMutable` properties) changed |
+| `chat/moved` | No | The chat moved to another session; carries its new session, `provider` and `config.schema` |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
 ### Server & Active-Client Tools (session channel)
@@ -174,7 +175,7 @@ See the [Terminals guide](/guide/terminals) for usage flows.
 
 ## Annotations Actions
 
-Annotations actions travel on a session's annotations channel (`ahp-session:/<uuid>/annotations`). Every annotations action is client-dispatchable — clients create, re-anchor, resolve, and delete annotations and their entries by dispatching these directly (assigning the `Annotation.id` / `AnnotationEntry.id` themselves and applying them optimistically), and the agent host MAY also originate them.
+Annotations actions travel on a session's annotations channel (`ahp-annotations:/<uuid>`). Every annotations action is client-dispatchable — clients create, re-anchor, resolve, and delete annotations and their entries by dispatching these directly (assigning the `Annotation.id` / `AnnotationEntry.id` themselves and applying them optimistically), and the agent host MAY also originate them.
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
@@ -218,7 +219,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/isReadChanged` | Marks the session as read or unread |
 | `chat/isReadChanged` | Marks any known chat, including the default chat, as read or unread without changing its owning session or sibling chats; refreshes the compact `SessionChatSummary.status` projection |
 | `session/isArchivedChanged` | Archives or unarchives the session |
-| `chat/configChanged` | Sets `chatMutable` config values for this chat, overriding the session's values for this chat only |
+| `chat/configChanged` | Sets `chatMutable` config values for this chat only |
 
 ## Reducers
 

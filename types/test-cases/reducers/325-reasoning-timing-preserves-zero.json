@@ -1,0 +1,36 @@
+{
+  "description": "reasoning timing updates accept zero duration and replace supplied fields only",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": { "text": "Hello", "origin": { "kind": "user" } },
+      "responseParts": [{ "kind": "reasoning", "id": "r-1", "content": "Thinking", "startedAt": "1970-01-01T00:00:01.000Z", "duration": 500 }],
+      "usage": null
+    },
+    "resource": "custom-host://opaque/session/chat",
+    "title": "Test Chat",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    { "type": "chat/reasoning", "turnId": "turn-1", "partId": "r-1", "content": "", "startedAt": "1970-01-01T00:00:01.500Z", "duration": 0 },
+    { "type": "chat/reasoning", "turnId": "turn-1", "partId": "r-1", "content": "" }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": { "text": "Hello", "origin": { "kind": "user" } },
+      "responseParts": [{ "kind": "reasoning", "id": "r-1", "content": "Thinking", "startedAt": "1970-01-01T00:00:01.500Z", "duration": 0 }],
+      "usage": null
+    },
+    "resource": "custom-host://opaque/session/chat",
+    "title": "Test Chat",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

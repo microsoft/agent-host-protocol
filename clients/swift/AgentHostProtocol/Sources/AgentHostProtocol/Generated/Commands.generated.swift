@@ -68,6 +68,12 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Native filesystem path grammar used by a host environment.
+public enum PathStyle: String, Codable, Sendable {
+    case posix = "posix"
+    case windows = "windows"
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -183,7 +189,7 @@ public enum AuthenticateTargetKind: Codable, Sendable, Equatable {
 // MARK: - Command Types
 
 /// Copies source history through a completed turn into the new chat.
-public struct ForkChatSource: Codable, Sendable {
+public struct ForkChatSource: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ChatSourceKind { .fork }
     /// URI of the existing source chat.
@@ -227,7 +233,7 @@ public struct ForkChatSource: Codable, Sendable {
 
 /// Supplies source context to a new side chat without copying it into the side
 /// chat's visible history.
-public struct SideChatSource: Codable, Sendable {
+public struct SideChatSource: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ChatSourceKind { .sideChat }
     /// URI of the existing source chat.
@@ -296,7 +302,7 @@ public struct SideChatSource: Codable, Sendable {
 /// cannot open the connection, it returns `TcpConnectionOpenFailed`.
 ///
 /// Stability: 1.0 - Early development.
-public struct CreateTcpConnectionParams: Codable, Sendable {
+public struct CreateTcpConnectionParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -327,7 +333,20 @@ public struct CreateTcpConnectionParams: Codable, Sendable {
     }
 }
 
-public struct InitializeParams: Codable, Sendable {
+/// Result of the `createTcpConnection` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateTcpConnectionResult: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct InitializeParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -397,7 +416,21 @@ public struct InitializeParams: Codable, Sendable {
     }
 }
 
-public struct InitializeResult: Codable, Sendable {
+public struct HostEnvironment: Codable, Sendable, Equatable {
+    /// Authoritative native path grammar for resources in this environment.
+    ///
+    /// Clients parsing or formatting native paths MUST use this field instead of
+    /// inferring path semantics from their local environment.
+    public var pathStyle: PathStyle?
+
+    public init(
+        pathStyle: PathStyle? = nil
+    ) {
+        self.pathStyle = pathStyle
+    }
+}
+
+public struct InitializeResult: Codable, Sendable, Equatable {
     /// Protocol version selected by the server. MUST be one of the entries in
     /// `InitializeParams.protocolVersions`. Formatted as a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -420,6 +453,10 @@ public struct InitializeResult: Codable, Sendable {
     /// Snapshots for each `initialSubscriptions` URI. The server MAY leave out a
     /// channel whose state has no fields ({@link EmptyState}).
     public var snapshots: [Snapshot]
+    /// Default execution environment exposed by this host connection.
+    ///
+    /// Absence means no environment metadata is available.
+    public var environment: HostEnvironment?
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -447,6 +484,13 @@ public struct InitializeResult: Codable, Sendable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
+    /// Present when chats in one session may be backed by different agent
+    /// providers (see {@link CreateChatParams.provider} and
+    /// {@link ChatState.provider}).
+    /// Clients MUST NOT send `CreateChatParams.provider` without it.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var multipleChatProviders: MultipleChatProvidersCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -454,12 +498,14 @@ public struct InitializeResult: Codable, Sendable {
         case serverInfo
         case meta = "_meta"
         case snapshots
+        case environment
         case defaultDirectory
         case completionTriggerCharacters
         case terminalCommandPrefix
         case telemetry
         case automations
         case tcpConnections
+        case multipleChatProviders
     }
 
     public init(
@@ -468,28 +514,53 @@ public struct InitializeResult: Codable, Sendable {
         serverInfo: Implementation? = nil,
         meta: [String: AnyCodable]? = nil,
         snapshots: [Snapshot],
+        environment: HostEnvironment? = nil,
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil,
-        tcpConnections: TcpConnectionsCapability? = nil
+        tcpConnections: TcpConnectionsCapability? = nil,
+        multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
         self.serverInfo = serverInfo
         self.meta = meta
         self.snapshots = snapshots
+        self.environment = environment
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
         self.tcpConnections = tcpConnections
+        self.multipleChatProviders = multipleChatProviders
     }
 }
 
-public struct ClientCapabilities: Codable, Sendable {
+public struct PingParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
+public struct ClientCapabilities: Codable, Sendable, Equatable {
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -518,11 +589,13 @@ public struct ClientCapabilities: Codable, Sendable {
     }
 }
 
-public struct AutomationCapabilities: Codable, Sendable {
+public struct AutomationCapabilities: Codable, Sendable, Equatable {
     /// Present when clients may dispatch {@link AutomationCreateRequestedAction}.
     public var create: AutomationCreateCapability?
     /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     public var schedules: AutomationScheduleCapabilities?
+    /// Present when definitions may contain {@link AutomationOneTimeTrigger | one-time triggers}.
+    public var oneTime: AutomationOneTimeCapability?
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     public var runCancellation: AutomationRunCancellationCapability?
@@ -533,23 +606,30 @@ public struct AutomationCapabilities: Codable, Sendable {
     /// Present when {@link AutomationSessionTemplate.customizations} may contain
     /// client plugins for the host to capture.
     public var customizations: AutomationCustomizationsCapability?
+    /// Present when definitions may set {@link AutomationDefinition.target}.
+    /// Absence means each run creates a session.
+    public var targets: AutomationTargetsCapabilities?
 
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
+        oneTime: AutomationOneTimeCapability? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
         runHistoryLimit: Int? = nil,
-        customizations: AutomationCustomizationsCapability? = nil
+        customizations: AutomationCustomizationsCapability? = nil,
+        targets: AutomationTargetsCapabilities? = nil
     ) {
         self.create = create
         self.schedules = schedules
+        self.oneTime = oneTime
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
         self.customizations = customizations
+        self.targets = targets
     }
 }
 
-public struct AutomationCreateCapability: Codable, Sendable {
+public struct AutomationCreateCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -557,7 +637,7 @@ public struct AutomationCreateCapability: Codable, Sendable {
     }
 }
 
-public struct AutomationScheduleCapabilities: Codable, Sendable {
+public struct AutomationScheduleCapabilities: Codable, Sendable, Equatable {
     /// Smallest permitted interval between consecutive occurrences produced by
     /// {@link AutomationSchedule.expression}. Omission means no restriction beyond
     /// the cron format's one-minute resolution.
@@ -570,7 +650,7 @@ public struct AutomationScheduleCapabilities: Codable, Sendable {
     }
 }
 
-public struct AutomationRunCancellationCapability: Codable, Sendable {
+public struct AutomationRunCancellationCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -578,7 +658,7 @@ public struct AutomationRunCancellationCapability: Codable, Sendable {
     }
 }
 
-public struct AutomationCustomizationsCapability: Codable, Sendable {
+public struct AutomationCustomizationsCapability: Codable, Sendable, Equatable {
 
     public init(
 
@@ -586,7 +666,61 @@ public struct AutomationCustomizationsCapability: Codable, Sendable {
     }
 }
 
-public struct Implementation: Codable, Sendable {
+public struct AutomationTargetsCapabilities: Codable, Sendable, Equatable {
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationPreviousSessionTarget}. Clients SHOULD NOT author that
+    /// target when this is absent.
+    public var previousSession: AutomationPreviousSessionTargetCapability?
+    /// Present when {@link AutomationDefinition.target} may be an
+    /// {@link AutomationChatTarget}. Clients SHOULD NOT author that target when
+    /// this is absent.
+    public var chat: AutomationChatTargetCapability?
+
+    public init(
+        previousSession: AutomationPreviousSessionTargetCapability? = nil,
+        chat: AutomationChatTargetCapability? = nil
+    ) {
+        self.previousSession = previousSession
+        self.chat = chat
+    }
+}
+
+public struct AutomationPreviousSessionTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationChatTargetCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationOneTimeCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+/// Presence capability for {@link InitializeResult.multipleChatProviders}.
+///
+/// Stability: 1.0 - Early development.
+public struct MultipleChatProvidersCapability: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct Implementation: Codable, Sendable, Equatable {
     /// Implementation name, e.g. a product or package identifier.
     public var name: String
     /// Implementation version. A [SemVer](https://semver.org) string is
@@ -606,7 +740,7 @@ public struct Implementation: Codable, Sendable {
     }
 }
 
-public struct ReconnectParams: Codable, Sendable {
+public struct ReconnectParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -651,7 +785,7 @@ public struct ReconnectParams: Codable, Sendable {
     }
 }
 
-public struct ReconnectReplayResult: Codable, Sendable {
+public struct ReconnectReplayResult: Codable, Sendable, Equatable {
     /// Discriminant
     public var type: ReconnectResultType
     /// Missed action envelopes since `lastSeenServerSeq`
@@ -681,7 +815,7 @@ public struct ReconnectReplayResult: Codable, Sendable {
     }
 }
 
-public struct ReconnectSnapshotResult: Codable, Sendable {
+public struct ReconnectSnapshotResult: Codable, Sendable, Equatable {
     /// Discriminant
     public var type: ReconnectResultType
     /// Fresh snapshots for each resumed ordinary subscription. Windowed
@@ -711,7 +845,7 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
 /// One windowed subscription that the client wants to keep after reconnection.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelDeliveryResumeParams: Codable, Sendable {
+public struct ChannelDeliveryResumeParams: Codable, Sendable, Equatable {
     /// The URI of the windowed subscription.
     public var channel: String
     /// The client's offer of limits for the new connection, as in `subscribe`.
@@ -736,7 +870,7 @@ public struct ChannelDeliveryResumeParams: Codable, Sendable {
 /// Windowed subscriptions that the client wants to keep after reconnection.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelDeliveryResumeOptions: Codable, Sendable {
+public struct ChannelDeliveryResumeOptions: Codable, Sendable, Equatable {
     public var items: [ChannelDeliveryResumeParams]
 
     public init(
@@ -754,7 +888,7 @@ public struct ChannelDeliveryResumeOptions: Codable, Sendable {
 /// decide what is sent again.
 ///
 /// Stability: 1.0 - Early development.
-public struct ChannelDeliveryResumeResult: Codable, Sendable {
+public struct ChannelDeliveryResumeResult: Codable, Sendable, Equatable {
     public var items: [ResumedChannelSubscription]
 
     public init(
@@ -767,7 +901,7 @@ public struct ChannelDeliveryResumeResult: Codable, Sendable {
 /// A client's offer of windowed delivery.
 ///
 /// Stability: 1.0 - Early development.
-public struct SubscriptionFlowControlOptions: Codable, Sendable {
+public struct SubscriptionFlowControlOptions: Codable, Sendable, Equatable {
     /// The largest limits that the client accepts for data that it receives. The
     /// server MAY accept lower values, and MUST NOT accept higher values.
     public var receive: ChannelReceiveLimits
@@ -779,7 +913,7 @@ public struct SubscriptionFlowControlOptions: Codable, Sendable {
     }
 }
 
-public struct SubscribeParams: Codable, Sendable {
+public struct SubscribeParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -821,7 +955,7 @@ public struct SubscribeParams: Codable, Sendable {
     }
 }
 
-public struct SubscribeView: Codable, Sendable {
+public struct SubscribeView: Codable, Sendable, Equatable {
     /// Advisory number of most-recent completed turns to expose in a chat
     /// snapshot.
     ///
@@ -839,7 +973,7 @@ public struct SubscribeView: Codable, Sendable {
     }
 }
 
-public struct SubscriptionDeliveryOptions: Codable, Sendable {
+public struct SubscriptionDeliveryOptions: Codable, Sendable, Equatable {
     /// The longest time, in milliseconds, that the server should hold updates for
     /// this subscription in order to combine them. The server MUST NOT combine
     /// updates unless the combined update produces the same state and the client
@@ -854,7 +988,7 @@ public struct SubscriptionDeliveryOptions: Codable, Sendable {
     }
 }
 
-public struct SubscribeResult: Codable, Sendable {
+public struct SubscribeResult: Codable, Sendable, Equatable {
     /// Snapshot of the subscribed channel's state. Present with ordinary delivery,
     /// except that the server MAY omit it for a channel whose state has no fields
     /// ({@link EmptyState}). With windowed delivery, the snapshot is sent in a
@@ -877,7 +1011,7 @@ public struct SubscribeResult: Codable, Sendable {
     }
 }
 
-public struct CreateSessionParams: Codable, Sendable {
+public struct CreateSessionParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -950,7 +1084,7 @@ public struct CreateSessionParams: Codable, Sendable {
     }
 }
 
-public struct DisposeSessionParams: Codable, Sendable {
+public struct DisposeSessionParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -971,7 +1105,7 @@ public struct DisposeSessionParams: Codable, Sendable {
     }
 }
 
-public struct CreateChatParams: Codable, Sendable {
+public struct CreateChatParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1007,6 +1141,19 @@ public struct CreateChatParams: Codable, Sendable {
     public var workingDirectories: [String]?
     /// Client-selected initial display title for the new chat.
     public var title: String?
+    /// Agent provider ID for the new chat. Absent means the session's agent
+    /// provider.
+    ///
+    /// Requires {@link InitializeResult.multipleChatProviders}. Hosts reject with
+    /// `InvalidParams` an agent provider that is not in the root state's `agents`
+    /// or that does not advertise `multipleChats`. Forks and side chats
+    /// (`source` present) continue the source chat's history, so they always use
+    /// the source chat's agent provider: absent means that agent provider, and a
+    /// different value is rejected. Agent capability checks for this request use
+    /// the chat's agent provider.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var provider: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1016,6 +1163,7 @@ public struct CreateChatParams: Codable, Sendable {
         case source
         case workingDirectories
         case title
+        case provider
     }
 
     public init(
@@ -1025,7 +1173,8 @@ public struct CreateChatParams: Codable, Sendable {
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
         workingDirectories: [String]? = nil,
-        title: String? = nil
+        title: String? = nil,
+        provider: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1034,10 +1183,11 @@ public struct CreateChatParams: Codable, Sendable {
         self.source = source
         self.workingDirectories = workingDirectories
         self.title = title
+        self.provider = provider
     }
 }
 
-public struct DisposeChatParams: Codable, Sendable {
+public struct DisposeChatParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1058,7 +1208,7 @@ public struct DisposeChatParams: Codable, Sendable {
     }
 }
 
-public struct ChatMoveToSessionDestination: Codable, Sendable {
+public struct ChatMoveToSessionDestination: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ChatMoveDestinationKind
     /// Destination session URI.
@@ -1080,7 +1230,7 @@ public struct ChatMoveToSessionDestination: Codable, Sendable {
     }
 }
 
-public struct ChatMoveToNewSessionDestination: Codable, Sendable {
+public struct ChatMoveToNewSessionDestination: Codable, Sendable, Equatable {
     /// Discriminant
     public var kind: ChatMoveDestinationKind
 
@@ -1091,7 +1241,7 @@ public struct ChatMoveToNewSessionDestination: Codable, Sendable {
     }
 }
 
-public struct MoveChatParams: Codable, Sendable {
+public struct MoveChatParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1117,7 +1267,7 @@ public struct MoveChatParams: Codable, Sendable {
     }
 }
 
-public struct MoveChatResult: Codable, Sendable {
+public struct MoveChatResult: Codable, Sendable, Equatable {
     /// Authoritative owning session URI after the move.
     public var session: String
 
@@ -1128,7 +1278,7 @@ public struct MoveChatResult: Codable, Sendable {
     }
 }
 
-public struct ListSessionsParams: Codable, Sendable {
+public struct ListSessionsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1164,7 +1314,7 @@ public struct ListSessionsParams: Codable, Sendable {
     }
 }
 
-public struct ListSessionsResult: Codable, Sendable {
+public struct ListSessionsResult: Codable, Sendable, Equatable {
     /// Opaque cursor for the next page. Present when more entries exist beyond the
     /// returned page; absent signals the end of the collection. Pass it back as
     /// {@link PaginatedParams.cursor} to fetch the following page.
@@ -1182,57 +1332,77 @@ public struct ListSessionsResult: Codable, Sendable {
     }
 }
 
-public struct ResourceReadParams: Codable, Sendable {
+public struct ResourceReadParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Content URI from a `ContentRef`
+    /// Content URI to read, such as one from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
+    /// Byte offset to start reading at. Defaults to `0`. A receiver that does
+    /// not honor byte ranges ignores it and returns the whole resource.
+    public var position: Int?
+    /// Maximum number of bytes to return from {@link position}. Defaults to the
+    /// rest of the resource. A receiver that does not honor byte ranges ignores
+    /// it and returns the whole resource.
+    public var length: Int?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
         case uri
         case encoding
+        case position
+        case length
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
         uri: String,
-        encoding: ContentEncoding? = nil
+        encoding: ContentEncoding? = nil,
+        position: Int? = nil,
+        length: Int? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.uri = uri
         self.encoding = encoding
+        self.position = position
+        self.length = length
     }
 }
 
-public struct ResourceReadResult: Codable, Sendable {
+public struct ResourceReadResult: Codable, Sendable, Equatable {
     /// Content encoded as a string
     public var data: String
     /// How `data` is encoded
     public var encoding: ContentEncoding
     /// Content type (e.g. `"image/png"`, `"text/plain"`)
     public var contentType: String?
+    /// Total size of the resource in bytes. Present if and only if the receiver
+    /// honored the byte range in {@link ResourceReadParams.position} and
+    /// {@link ResourceReadParams.length}; when absent, `data` is the whole
+    /// resource.
+    public var size: Int?
 
     public init(
         data: String,
         encoding: ContentEncoding,
-        contentType: String? = nil
+        contentType: String? = nil,
+        size: Int? = nil
     ) {
         self.data = data
         self.encoding = encoding
         self.contentType = contentType
+        self.size = size
     }
 }
 
-public struct ResourceWriteParams: Codable, Sendable {
+public struct ResourceWriteParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1304,7 +1474,7 @@ public struct ResourceWriteParams: Codable, Sendable {
     }
 }
 
-public struct ResourceWriteResult: Codable, Sendable {
+public struct ResourceWriteResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1312,7 +1482,7 @@ public struct ResourceWriteResult: Codable, Sendable {
     }
 }
 
-public struct ResourceListParams: Codable, Sendable {
+public struct ResourceListParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1338,7 +1508,7 @@ public struct ResourceListParams: Codable, Sendable {
     }
 }
 
-public struct ResourceListResult: Codable, Sendable {
+public struct ResourceListResult: Codable, Sendable, Equatable {
     /// Entries directly contained in the requested directory
     public var entries: [DirectoryEntry]
 
@@ -1349,7 +1519,7 @@ public struct ResourceListResult: Codable, Sendable {
     }
 }
 
-public struct DirectoryEntry: Codable, Sendable {
+public struct DirectoryEntry: Codable, Sendable, Equatable {
     /// Base name of the entry
     public var name: String
     /// Whether the entry is a file or directory
@@ -1364,7 +1534,7 @@ public struct DirectoryEntry: Codable, Sendable {
     }
 }
 
-public struct ResourceCopyParams: Codable, Sendable {
+public struct ResourceCopyParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1401,7 +1571,7 @@ public struct ResourceCopyParams: Codable, Sendable {
     }
 }
 
-public struct ResourceCopyResult: Codable, Sendable {
+public struct ResourceCopyResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1409,7 +1579,7 @@ public struct ResourceCopyResult: Codable, Sendable {
     }
 }
 
-public struct ResourceDeleteParams: Codable, Sendable {
+public struct ResourceDeleteParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1441,7 +1611,7 @@ public struct ResourceDeleteParams: Codable, Sendable {
     }
 }
 
-public struct ResourceDeleteResult: Codable, Sendable {
+public struct ResourceDeleteResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1449,7 +1619,7 @@ public struct ResourceDeleteResult: Codable, Sendable {
     }
 }
 
-public struct ResourceMoveParams: Codable, Sendable {
+public struct ResourceMoveParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1486,7 +1656,7 @@ public struct ResourceMoveParams: Codable, Sendable {
     }
 }
 
-public struct ResourceMoveResult: Codable, Sendable {
+public struct ResourceMoveResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1494,7 +1664,7 @@ public struct ResourceMoveResult: Codable, Sendable {
     }
 }
 
-public struct ResourceResolveParams: Codable, Sendable {
+public struct ResourceResolveParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1528,7 +1698,7 @@ public struct ResourceResolveParams: Codable, Sendable {
     }
 }
 
-public struct ResourceResolveResult: Codable, Sendable {
+public struct ResourceResolveResult: Codable, Sendable, Equatable {
     /// Canonical URI after symlink resolution. Equal to the requested URI when
     /// `followSymlinks` is `false` or the URI does not traverse a symlink.
     public var uri: String
@@ -1567,7 +1737,7 @@ public struct ResourceResolveResult: Codable, Sendable {
     }
 }
 
-public struct ResourceMkdirParams: Codable, Sendable {
+public struct ResourceMkdirParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1593,7 +1763,7 @@ public struct ResourceMkdirParams: Codable, Sendable {
     }
 }
 
-public struct ResourceMkdirResult: Codable, Sendable {
+public struct ResourceMkdirResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1601,7 +1771,7 @@ public struct ResourceMkdirResult: Codable, Sendable {
     }
 }
 
-public struct ResourceRequestParams: Codable, Sendable {
+public struct ResourceRequestParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1639,7 +1809,7 @@ public struct ResourceRequestParams: Codable, Sendable {
     }
 }
 
-public struct ResourceRequestResult: Codable, Sendable {
+public struct ResourceRequestResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1647,7 +1817,7 @@ public struct ResourceRequestResult: Codable, Sendable {
     }
 }
 
-public struct CreateResourceWatchParams: Codable, Sendable {
+public struct CreateResourceWatchParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1693,7 +1863,7 @@ public struct CreateResourceWatchParams: Codable, Sendable {
     }
 }
 
-public struct CreateResourceWatchResult: Codable, Sendable {
+public struct CreateResourceWatchResult: Codable, Sendable, Equatable {
     /// Receiver-assigned watch channel URI (`ahp-resource-watch:/<id>`). The
     /// caller subscribes to this URI to start receiving change events and
     /// unsubscribes to release the watcher.
@@ -1706,7 +1876,7 @@ public struct CreateResourceWatchResult: Codable, Sendable {
     }
 }
 
-public struct FetchTurnsParams: Codable, Sendable {
+public struct FetchTurnsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1736,7 +1906,7 @@ public struct FetchTurnsParams: Codable, Sendable {
     }
 }
 
-public struct FetchTurnsResult: Codable, Sendable {
+public struct FetchTurnsResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1744,7 +1914,7 @@ public struct FetchTurnsResult: Codable, Sendable {
     }
 }
 
-public struct UnsubscribeParams: Codable, Sendable {
+public struct UnsubscribeParams: Codable, Sendable, Equatable {
     /// Channel URI to unsubscribe from
     public var channel: String
 
@@ -1755,7 +1925,7 @@ public struct UnsubscribeParams: Codable, Sendable {
     }
 }
 
-public struct DispatchActionParams: Codable, Sendable {
+public struct DispatchActionParams: Codable, Sendable, Equatable {
     /// Channel URI this action targets
     public var channel: String
     /// Client sequence number
@@ -1774,7 +1944,7 @@ public struct DispatchActionParams: Codable, Sendable {
     }
 }
 
-public struct McpServerAuthenticateTarget: Codable, Sendable {
+public struct McpServerAuthenticateTarget: Codable, Sendable, Equatable {
     public var kind: AuthenticateTargetKind
     /// Session URI whose `SessionState.customizations` contains the MCP server.
     public var session: String
@@ -1794,7 +1964,7 @@ public struct McpServerAuthenticateTarget: Codable, Sendable {
     }
 }
 
-public struct AuthenticateParams: Codable, Sendable {
+public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1841,6 +2011,11 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Without a target, resource/scope matching is unchanged; the token may
     /// satisfy every matching pending challenge. Older hosts ignore this field.
     public var target: AuthenticateTarget?
+    /// Optional identifier for the client's selected account, sent alongside the token.
+    /// Hosts can compare `accountId` values to detect when the underlying account has changed.
+    /// Hosts MUST treat `accountId` as an opaque string.
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    public var accountId: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1850,6 +2025,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case expiresIn
         case scopes
         case target
+        case accountId
     }
 
     public init(
@@ -1859,7 +2035,8 @@ public struct AuthenticateParams: Codable, Sendable {
         token: String,
         expiresIn: Int? = nil,
         scopes: [String]? = nil,
-        target: AuthenticateTarget? = nil
+        target: AuthenticateTarget? = nil,
+        accountId: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1868,10 +2045,11 @@ public struct AuthenticateParams: Codable, Sendable {
         self.expiresIn = expiresIn
         self.scopes = scopes
         self.target = target
+        self.accountId = accountId
     }
 }
 
-public struct AuthenticateResult: Codable, Sendable {
+public struct AuthenticateResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -1879,7 +2057,7 @@ public struct AuthenticateResult: Codable, Sendable {
     }
 }
 
-public struct CreateTerminalParams: Codable, Sendable {
+public struct CreateTerminalParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1925,7 +2103,7 @@ public struct CreateTerminalParams: Codable, Sendable {
     }
 }
 
-public struct DisposeTerminalParams: Codable, Sendable {
+public struct DisposeTerminalParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1946,7 +2124,7 @@ public struct DisposeTerminalParams: Codable, Sendable {
     }
 }
 
-public struct ResolveSessionConfigParams: Codable, Sendable {
+public struct ResolveSessionConfigParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -1982,7 +2160,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     }
 }
 
-public struct ResolveSessionConfigResult: Codable, Sendable {
+public struct ResolveSessionConfigResult: Codable, Sendable, Equatable {
     /// JSON Schema describing available configuration properties given the current context
     public var schema: SessionConfigSchema
     /// Current configuration values (echoed back with server-resolved defaults applied)
@@ -1997,7 +2175,7 @@ public struct ResolveSessionConfigResult: Codable, Sendable {
     }
 }
 
-public struct SessionConfigPropertySchema: Codable, Sendable {
+public struct SessionConfigPropertySchema: Codable, Sendable, Equatable {
     /// JSON Schema: property type
     public var type: String
     /// JSON Schema: human-readable label for the property
@@ -2033,8 +2211,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
-    /// When `true`, the property may be set per chat with `chat/configChanged`.
-    /// The chat's value overrides the session's value for that chat only.
+    /// When `true`, the property may be changed per chat with
+    /// `chat/configChanged`, affecting only that chat.
     public var chatMutable: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -2096,7 +2274,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     }
 }
 
-public struct SessionConfigSchema: Codable, Sendable {
+public struct SessionConfigSchema: Codable, Sendable, Equatable {
     /// JSON Schema: always `'object'`
     public var type: String
     /// JSON Schema: property descriptors keyed by property id
@@ -2115,7 +2293,7 @@ public struct SessionConfigSchema: Codable, Sendable {
     }
 }
 
-public struct SessionConfigCompletionsParams: Codable, Sendable {
+public struct SessionConfigCompletionsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2161,7 +2339,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     }
 }
 
-public struct SessionConfigCompletionsResult: Codable, Sendable {
+public struct SessionConfigCompletionsResult: Codable, Sendable, Equatable {
     /// Matching value items
     public var items: [SessionConfigValueItem]
 
@@ -2172,7 +2350,7 @@ public struct SessionConfigCompletionsResult: Codable, Sendable {
     }
 }
 
-public struct SessionConfigValueItem: Codable, Sendable {
+public struct SessionConfigValueItem: Codable, Sendable, Equatable {
     /// The value to store in config
     public var value: String
     /// Human-readable display label
@@ -2191,7 +2369,7 @@ public struct SessionConfigValueItem: Codable, Sendable {
     }
 }
 
-public struct CompletionsParams: Codable, Sendable {
+public struct CompletionsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2229,7 +2407,7 @@ public struct CompletionsParams: Codable, Sendable {
     }
 }
 
-public struct CompletionItem: Codable, Sendable {
+public struct CompletionItem: Codable, Sendable, Equatable {
     /// The text inserted into the input when this item is accepted.
     public var insertText: String
     /// If defined, the start of the range in the input's `text` that is replaced
@@ -2263,7 +2441,7 @@ public struct CompletionItem: Codable, Sendable {
     }
 }
 
-public struct CompletionsResult: Codable, Sendable {
+public struct CompletionsResult: Codable, Sendable, Equatable {
     /// The completion items, in the order the server suggests displaying them.
     public var items: [CompletionItem]
 
@@ -2274,7 +2452,7 @@ public struct CompletionsResult: Codable, Sendable {
     }
 }
 
-public struct InvokeChangesetOperationParams: Codable, Sendable {
+public struct InvokeChangesetOperationParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2306,7 +2484,7 @@ public struct InvokeChangesetOperationParams: Codable, Sendable {
     }
 }
 
-public struct InvokeChangesetOperationResult: Codable, Sendable {
+public struct InvokeChangesetOperationResult: Codable, Sendable, Equatable {
     /// Optional human-readable message describing the result.
     public var message: StringOrMarkdown?
     /// Optional follow-up: a URI to open (e.g. a PR), a content ref, etc.
@@ -2321,7 +2499,7 @@ public struct InvokeChangesetOperationResult: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationFollowUp: Codable, Sendable {
+public struct ChangesetOperationFollowUp: Codable, Sendable, Equatable {
     public var content: ContentRef
     /// When `true`, open in an external handler rather than inline.
     public var external: Bool?
@@ -2335,7 +2513,7 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
     }
 }
 
-public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
+public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2371,7 +2549,7 @@ public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
     }
 }
 
-public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
+public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable, Equatable {
     /// Available event trigger definitions.
     public var items: [AutomationTriggerDefinition]
 
@@ -2382,7 +2560,7 @@ public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
     }
 }
 
-public struct RunAutomationParams: Codable, Sendable {
+public struct RunAutomationParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2415,7 +2593,7 @@ public struct RunAutomationParams: Codable, Sendable {
     }
 }
 
-public struct RunAutomationResult: Codable, Sendable {
+public struct RunAutomationResult: Codable, Sendable, Equatable {
     /// Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}.
     public var resource: String
 
@@ -2426,7 +2604,7 @@ public struct RunAutomationResult: Codable, Sendable {
     }
 }
 
-public struct FetchAutomationRunsParams: Codable, Sendable {
+public struct FetchAutomationRunsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
@@ -2458,7 +2636,7 @@ public struct FetchAutomationRunsParams: Codable, Sendable {
     }
 }
 
-public struct FetchAutomationRunsResult: Codable, Sendable {
+public struct FetchAutomationRunsResult: Codable, Sendable, Equatable {
 
     public init(
 
@@ -2468,7 +2646,7 @@ public struct FetchAutomationRunsResult: Codable, Sendable {
 
 // MARK: - Command Unions
 
-public enum ChatSource: Codable, Sendable {
+public enum ChatSource: Codable, Sendable, Equatable {
     case fork(ForkChatSource)
     case sideChat(SideChatSource)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -2504,7 +2682,7 @@ public enum ChatSource: Codable, Sendable {
     }
 }
 
-public enum ChatMoveDestination: Codable, Sendable {
+public enum ChatMoveDestination: Codable, Sendable, Equatable {
     case session(ChatMoveToSessionDestination)
     case newSession(ChatMoveToNewSessionDestination)
     /// Unknown or future discriminant; the raw payload is preserved
@@ -2542,7 +2720,7 @@ public enum ChatMoveDestination: Codable, Sendable {
 
 // MARK: - AuthenticateTarget Union
 
-public enum AuthenticateTarget: Codable, Sendable {
+public enum AuthenticateTarget: Codable, Sendable, Equatable {
     case mcpServer(McpServerAuthenticateTarget)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
@@ -2578,7 +2756,7 @@ public enum AuthenticateTarget: Codable, Sendable {
 
 // MARK: - ReconnectResult Union
 
-public enum ReconnectResult: Codable, Sendable {
+public enum ReconnectResult: Codable, Sendable, Equatable {
     case replay(ReconnectReplayResult)
     case snapshot(ReconnectSnapshotResult)
 
@@ -2610,7 +2788,7 @@ public enum ReconnectResult: Codable, Sendable {
 // MARK: - Changeset Operation Unions
 
 /// Identifies the file or range a `ChangesetOperation` should act on.
-public enum ChangesetOperationTarget: Codable, Sendable {
+public enum ChangesetOperationTarget: Codable, Sendable, Equatable {
     case resource(ChangesetOperationResourceTarget)
     case range(ChangesetOperationRangeTarget)
 
@@ -2639,7 +2817,7 @@ public enum ChangesetOperationTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationResourceTarget: Codable, Sendable {
+public struct ChangesetOperationResourceTarget: Codable, Sendable, Equatable {
     public var kind: String { "resource" }
     public var resource: String
     public var side: String?
@@ -2668,7 +2846,7 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
     }
 }
 
-public struct ChangesetOperationRangeTarget: Codable, Sendable {
+public struct ChangesetOperationRangeTarget: Codable, Sendable, Equatable {
     public var kind: String { "range" }
     public var resource: String
     public var side: String?
@@ -2695,4 +2873,192 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
         try container.encode(range, forKey: .range)
         try container.encodeIfPresent(nonce, forKey: .nonce)
     }
+}
+
+// MARK: - Typed Commands
+
+/// A protocol command whose params determine its method and result type.
+public protocol AHPCommand: Encodable, Sendable {
+    associatedtype Result: Decodable, Sendable
+    static var method: String { get }
+}
+
+/// The JSON null result returned by commands with no response payload.
+public struct AHPNullResult: Codable, Sendable, Equatable {
+    public init() {}
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard container.decodeNil() else {
+            throw DecodingError.typeMismatch(Self.self, DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected a null command result"
+            ))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encodeNil()
+    }
+}
+
+extension InitializeParams: AHPCommand {
+    public typealias Result = InitializeResult
+    public static let method = "initialize"
+}
+
+extension PingParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "ping"
+}
+
+extension ReconnectParams: AHPCommand {
+    public typealias Result = ReconnectResult
+    public static let method = "reconnect"
+}
+
+extension SubscribeParams: AHPCommand {
+    public typealias Result = SubscribeResult
+    public static let method = "subscribe"
+}
+
+extension CreateSessionParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createSession"
+}
+
+extension DisposeSessionParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeSession"
+}
+
+extension CreateChatParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createChat"
+}
+
+extension CreateTcpConnectionParams: AHPCommand {
+    public typealias Result = CreateTcpConnectionResult
+    public static let method = "createTcpConnection"
+}
+
+extension MoveChatParams: AHPCommand {
+    public typealias Result = MoveChatResult
+    public static let method = "moveChat"
+}
+
+extension DisposeChatParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeChat"
+}
+
+extension CreateTerminalParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "createTerminal"
+}
+
+extension DisposeTerminalParams: AHPCommand {
+    public typealias Result = AHPNullResult
+    public static let method = "disposeTerminal"
+}
+
+extension CreateResourceWatchParams: AHPCommand {
+    public typealias Result = CreateResourceWatchResult
+    public static let method = "createResourceWatch"
+}
+
+extension ListSessionsParams: AHPCommand {
+    public typealias Result = ListSessionsResult
+    public static let method = "listSessions"
+}
+
+extension ResourceReadParams: AHPCommand {
+    public typealias Result = ResourceReadResult
+    public static let method = "resourceRead"
+}
+
+extension ResourceWriteParams: AHPCommand {
+    public typealias Result = ResourceWriteResult
+    public static let method = "resourceWrite"
+}
+
+extension ResourceListParams: AHPCommand {
+    public typealias Result = ResourceListResult
+    public static let method = "resourceList"
+}
+
+extension ResourceCopyParams: AHPCommand {
+    public typealias Result = ResourceCopyResult
+    public static let method = "resourceCopy"
+}
+
+extension ResourceDeleteParams: AHPCommand {
+    public typealias Result = ResourceDeleteResult
+    public static let method = "resourceDelete"
+}
+
+extension ResourceMoveParams: AHPCommand {
+    public typealias Result = ResourceMoveResult
+    public static let method = "resourceMove"
+}
+
+extension ResourceResolveParams: AHPCommand {
+    public typealias Result = ResourceResolveResult
+    public static let method = "resourceResolve"
+}
+
+extension ResourceMkdirParams: AHPCommand {
+    public typealias Result = ResourceMkdirResult
+    public static let method = "resourceMkdir"
+}
+
+extension ResourceRequestParams: AHPCommand {
+    public typealias Result = ResourceRequestResult
+    public static let method = "resourceRequest"
+}
+
+extension FetchTurnsParams: AHPCommand {
+    public typealias Result = FetchTurnsResult
+    public static let method = "fetchTurns"
+}
+
+extension AuthenticateParams: AHPCommand {
+    public typealias Result = AuthenticateResult
+    public static let method = "authenticate"
+}
+
+extension ResolveSessionConfigParams: AHPCommand {
+    public typealias Result = ResolveSessionConfigResult
+    public static let method = "resolveSessionConfig"
+}
+
+extension SessionConfigCompletionsParams: AHPCommand {
+    public typealias Result = SessionConfigCompletionsResult
+    public static let method = "sessionConfigCompletions"
+}
+
+extension CompletionsParams: AHPCommand {
+    public typealias Result = CompletionsResult
+    public static let method = "completions"
+}
+
+extension InvokeChangesetOperationParams: AHPCommand {
+    public typealias Result = InvokeChangesetOperationResult
+    public static let method = "invokeChangesetOperation"
+}
+
+extension ListAutomationTriggerDefinitionsParams: AHPCommand {
+    public typealias Result = ListAutomationTriggerDefinitionsResult
+    public static let method = "listAutomationTriggerDefinitions"
+}
+
+extension RunAutomationParams: AHPCommand {
+    public typealias Result = RunAutomationResult
+    public static let method = "runAutomation"
+}
+
+extension FetchAutomationRunsParams: AHPCommand {
+    public typealias Result = FetchAutomationRunsResult
+    public static let method = "fetchAutomationRuns"
 }

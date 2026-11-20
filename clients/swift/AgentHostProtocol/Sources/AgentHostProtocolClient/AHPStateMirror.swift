@@ -3,7 +3,8 @@
 // Wraps the existing pure reducers (`rootReducer`, `sessionReducer`) so a
 // consumer can keep an in-memory mirror by just routing every inbound
 // `ActionEnvelope` (and any seed `Snapshot`) through `apply` /
-// `applySnapshot`. Multi-host runtimes can compose a mirror per host.
+// `applySnapshot`. Rejected envelopes leave state unchanged. Multi-host
+// runtimes can compose a mirror per host.
 
 import Foundation
 import AgentHostProtocol
@@ -26,12 +27,14 @@ public actor AHPStateMirror {
     public init() {}
 
     /// Apply a single action envelope, routing by `envelope.channel`.
+    /// Rejected envelopes leave state unchanged.
     ///
     /// - Root state lives at `RootResourceURI`; all other channels are
     ///   identified by the URI the server announces. If we have no state for
     ///   the channel yet, the reducer can't initialise one — only
     ///   `applySnapshot` can do that, so the action is dropped.
     public func apply(_ envelope: ActionEnvelope) {
+        guard envelope.rejectionReason == nil else { return }
         let channel = envelope.channel
         let action = envelope.action
         if channel == RootResourceURI {

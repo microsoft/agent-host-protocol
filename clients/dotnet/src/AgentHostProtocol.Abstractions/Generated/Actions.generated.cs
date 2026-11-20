@@ -129,6 +129,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatConfigChanged = new ActionType("chat/configChanged");
 
+    public static readonly ActionType ChatMoved = new ActionType("chat/moved");
+
     public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
 
     public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
@@ -897,8 +899,9 @@ public sealed record SessionCustomizationsChangedAction
 ///
 /// Matches `id` against every top-level customization first — a plugin or
 /// directory container, or a bare top-level MCP server — then against the
-/// children inside each container (a skill, agent, or other entry). Plugins
-/// and MCP servers retain the matched entry's explicit decisions; other
+/// children inside each container (a skill, agent, or other entry), including
+/// skills served by top-level or container-child MCP servers. Plugins and
+/// MCP servers retain the matched entry's explicit decisions; other
 /// entries update their `enabled` flag. Disabling a plugin still disables all
 /// of its children — the effective state of a plugin child is the plugin's
 /// derived enabled value and `(child.enabled ?? true)` — so toggling a child
@@ -1180,8 +1183,11 @@ public sealed record SessionChatUpdatedAction
 
     /// <summary>Mutable summary fields that changed; omitted fields are unchanged.
     ///
-    /// Identity fields (`resource`) never change and MUST be omitted by
-    /// senders; receivers SHOULD ignore them if present.</summary>
+    /// `resource` is an identity field and never changes. `provider` is reported
+    /// relative to the owning session and changes only when the chat moves to
+    /// another session, which republishes the whole summary through
+    /// `session/chatAdded`. Senders MUST omit both fields here; receivers SHOULD
+    /// ignore them if present.</summary>
     public required PartialChatSummary Changes { get; init; }
 }
 
@@ -1210,9 +1216,7 @@ public sealed record SessionDefaultChatChangedAction
     public string? DefaultChat { get; init; }
 }
 
-/// <summary>A new message has been sent to the agent, and a new turn starts.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// <summary>A new message has been sent to the agent, and a new turn starts.</summary>
 public sealed record ChatTurnStartedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnStarted;
@@ -1916,7 +1920,8 @@ public sealed record ChatUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.
 ///
 /// The server MUST first emit a `chat/responsePart` to create the target
-/// reasoning part, then use this action to append text to it.</summary>
+/// reasoning part, then use this action to append text or record its timing.
+/// An empty `content` updates only the supplied timing fields.</summary>
 public sealed record ChatReasoningAction
 {
     public ActionType Type { get; init; } = ActionType.ChatReasoning;
@@ -1929,6 +1934,14 @@ public sealed record ChatReasoningAction
 
     /// <summary>Reasoning text chunk</summary>
     public required string Content { get; init; }
+
+    /// <summary>Producer-recorded ISO 8601 start of the reasoning interval; omitted to preserve the existing value.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Final elapsed reasoning time in non-negative integer milliseconds, measured by the producer's clock; omitted to preserve the existing value. Zero is a recorded duration, not unknown.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
     ///
@@ -1986,9 +1999,7 @@ public sealed record ChatTurnsLoadedAction
 /// message and kind in place.
 ///
 /// If the chat is idle when a queued message is set, the server SHOULD
-/// immediately consume it and start a new turn.
-///
-/// A client is only allowed to send {@link MessageKind.User} messages.</summary>
+/// immediately consume it and start a new turn.</summary>
 public sealed record ChatPendingMessageSetAction
 {
     public ActionType Type { get; init; } = ActionType.ChatPendingMessageSet;
@@ -2092,10 +2103,12 @@ public sealed record ChatIsArchivedChangedAction
 /// <summary>Config values set on a chat changed.
 ///
 /// Merges `config` into the chat's
-/// {@link ChatConfigState | `ChatState.config`} overlay, or replaces the
-/// overlay when `replace` is `true`. Only properties with `chatMutable: true`
-/// in the session's config schema may be set. To reset a property to the
-/// session's value, replace the overlay with one that omits the property.</summary>
+/// {@link ChatConfigState | `ChatState.config`} values, or replaces them when
+/// `replace` is `true`; keys missing after a replace take their property's
+/// `default`. Only properties with `chatMutable: true` in
+/// the effective schema may be set.
+///
+/// Stability: 1.0 - Early development.</summary>
 public sealed record ChatConfigChangedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatConfigChanged;
@@ -2106,6 +2119,33 @@ public sealed record ChatConfigChangedAction
     /// <summary>When `true`, replaces the chat's config values instead of merging</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Replace { get; init; }
+}
+
+/// <summary>The chat moved to another session.
+///
+/// Dispatched by the host on the moved chat's channel after a cross-session
+/// `moveChat`. `provider` and `schema` are the chat's
+/// {@link ChatState.provider | agent provider} and
+/// {@link ChatConfigState.schema | `config.schema`} relative to the new
+/// session; absent clears them. `ChatState` has no session field, so the
+/// reducer does not store `session`; it tells subscribers which session now
+/// owns the chat.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatMovedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatMoved;
+
+    /// <summary>The new owning session URI.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>The chat's agent provider ID in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
+    /// <summary>The chat's config schema in the new session; absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionConfigSchema? Schema { get; init; }
 }
 
 /// <summary>A session requested input from the user.
@@ -2782,6 +2822,12 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInteractivity? Interactivity { get; init; }
 
+    /// <summary>Agent provider ID backing this chat. See {@link ChatState.provider}.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Provider { get; init; }
+
     /// <summary>The subset of the session's working directories this chat uses.
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2897,6 +2943,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/isReadChanged"] = typeof(ChatIsReadChangedAction),
         ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
         ["chat/configChanged"] = typeof(ChatConfigChangedAction),
+        ["chat/moved"] = typeof(ChatMovedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

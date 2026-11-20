@@ -15,6 +15,7 @@ import type {
   AutomationOperation,
   AutomationSessionTemplate,
   AutomationState,
+  AutomationTarget,
   AutomationTrigger,
 } from './state.js';
 
@@ -22,7 +23,10 @@ import type {
  * Partial replacement of editable {@link AutomationDefinition} fields.
  *
  * Omitted fields are unchanged. Supplied arrays and objects replace their
- * corresponding values in full; they are not merged recursively.
+ * corresponding values in full; they are not merged recursively. Runtime
+ * decoders MUST preserve unrecognized members on these replacement objects
+ * and their nested objects (annotated `@preserveUnknownMembers`) and re-encode
+ * them, so editing known fields does not erase fields from newer versions.
  * The host MUST validate the resulting definition's qualified model ownership
  * under {@link AutomationSessionTemplate.provider}. Replacing `session` while
  * omitting its provider MUST NOT erase or rebind the owner of a retained
@@ -60,6 +64,8 @@ export interface AutomationDefinitionPatch {
   disableConditions?: AutomationDisableCondition[];
   /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
+  /** Replacement {@link AutomationDefinition.target}. */
+  target?: AutomationTarget;
 }
 
 /**

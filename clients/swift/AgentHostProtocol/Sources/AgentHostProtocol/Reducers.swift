@@ -450,6 +450,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     pastTenseMessage: a.result.pastTenseMessage,
                     content: content,
                     structuredContent: a.result.structuredContent,
+                    resultMetadata: a.result.resultMetadata,
                     error: a.result.error,
                     confirmed: confirmed,
                     selectedOption: selectedOption,
@@ -469,6 +470,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 pastTenseMessage: a.result.pastTenseMessage,
                 content: content,
                 structuredContent: a.result.structuredContent,
+                resultMetadata: a.result.resultMetadata,
                 error: a.result.error,
                 confirmed: confirmed,
                 selectedOption: selectedOption,
@@ -495,6 +497,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     pastTenseMessage: prc.pastTenseMessage,
                     content: prc.content,
                     structuredContent: prc.structuredContent,
+                    resultMetadata: prc.resultMetadata,
                     error: prc.error,
                     confirmed: prc.confirmed,
                     selectedOption: prc.selectedOption,
@@ -583,6 +586,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return updateResponsePart(state: state, turnId: a.turnId, partId: a.partId) { part in
             guard case .reasoning(var r) = part else { return part }
             r.content += a.content
+            r.startedAt = a.startedAt ?? r.startedAt
+            r.duration = a.duration ?? r.duration
             return .reasoning(r)
         }
 
@@ -732,6 +737,17 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
         var next = state
         next.config = config
+        return next
+
+    case .chatMoved(let a):
+        var next = state
+        next.provider = a.provider
+        if var config = next.config {
+            config.schema = a.schema
+            next.config = config
+        } else if let schema = a.schema {
+            next.config = ChatConfigState(schema: schema, values: [:])
+        }
         return next
 
     default:
@@ -994,59 +1010,6 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 
     default:
         return state
-    }
-}
-
-// MARK: - Client Dispatchable
-
-/// Set of action types that clients are allowed to dispatch.
-public let clientDispatchableActions: Set<String> = [
-    "chat/turnStarted",
-    "chat/turnResume",
-    "chat/toolCallConfirmed",
-    "chat/toolCallComplete",
-    "chat/toolCallResultConfirmed",
-    "chat/turnCancelled",
-    "session/activeClientSet",
-    "session/activeClientRemoved",
-    "chat/pendingMessageSet",
-    "chat/pendingMessageRemoved",
-    "chat/queuedMessagesReordered",
-    "chat/isReadChanged",
-    "chat/isArchivedChanged",
-    "chat/configChanged",
-    "chat/inputAnswerChanged",
-    "chat/inputCompleted",
-    "session/customizationToggled",
-    "session/mcpServerStartRequested",
-    "session/mcpServerStopRequested",
-    "session/mcpServerBackgroundRequested",
-    "session/isReadChanged",
-    "session/isArchivedChanged",
-    "automationRun/cancelRequested",
-]
-
-/// Checks whether an action may be dispatched by a client.
-public func isClientDispatchable(_ action: StateAction) -> Bool {
-    switch action {
-    case .chatTurnStarted, .chatTurnResume,
-         .chatToolCallConfirmed, .chatToolCallComplete,
-         .chatToolCallResultConfirmed, .chatTurnCancelled,
-         .sessionActiveClientSet,
-         .sessionActiveClientRemoved,
-         .chatPendingMessageSet,
-         .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
-         .chatIsReadChanged, .chatIsArchivedChanged, .chatConfigChanged,
-         .chatInputAnswerChanged, .chatInputCompleted,
-         .sessionCustomizationToggled,
-         .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,
-         .sessionMcpServerBackgroundRequested,
-         .sessionIsReadChanged,
-         .sessionIsArchivedChanged,
-         .automationRunCancelRequested:
-        return true
-    default:
-        return false
     }
 }
 
