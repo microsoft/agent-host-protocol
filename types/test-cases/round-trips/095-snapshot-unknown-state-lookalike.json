@@ -1,0 +1,38 @@
+{
+  "name": "snapshot-unknown-state-lookalike",
+  "group": "A",
+  "description": "An extension snapshot preserves unknown state unchanged even when its keys resemble known channel states.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "x-ext:/a",
+    "state": {
+      "content": "extension content",
+      "lifecycle": {
+        "extension": true
+      },
+      "entries": [
+        {
+          "custom": 1
+        }
+      ]
+    },
+    "fromSeq": 9
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "x-ext:/a",
+      "state": {
+        "content": "extension content",
+        "lifecycle": {
+          "extension": true
+        },
+        "entries": [
+          {
+            "custom": 1
+          }
+        ]
+      },
+      "fromSeq": 9
+    }
+  ]
+}
