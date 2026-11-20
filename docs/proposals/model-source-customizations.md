@@ -155,9 +155,10 @@ export interface ModelSourceReadyState {
   /**
    * Models this source offers in this session, as listed or discovered by
    * the host's agent. Every entry's `modelSourceId` MUST equal this
-   * customization's `id`, and every `id` MUST be unique among the models
-   * the session offers. An empty array means the source is ready but
-   * offers no models.
+   * customization's `id`. Every `id` MUST be unique among the models the
+   * session offers, and MUST NOT be an ID the session reserved for a
+   * different source or upstream model. An empty array means the source
+   * is ready but offers no models.
    */
   models: SessionModelInfo[];
 }
@@ -296,7 +297,7 @@ Models come from the host. When a source is `ready`, the host publishes its mode
 
 Each published model follows #543's catalog rules, with these specifics:
 
-- `id` MUST be unique among the session's models: the agent's `AgentInfo.models` and every ready model source customization in the session. The host mints it and maps it to the endpoint's own model identifier, so two sources can serve the same upstream model without colliding.
+- `id` MUST be unique among the session's models: the agent's `AgentInfo.models` and every ready model source customization in the session. The host mints it and maps it to the endpoint's own model identifier, so two sources can serve the same upstream model without colliding. Once published, the `id` stays reserved for that source and upstream model (see **Reserved model IDs** below).
 - `modelSourceId` MUST be the customization's `id`.
 - `provider` stays the session's agent provider. It never names the model source.
 - `vendor` MAY name the service that serves the model, for example `OpenRouter`.
@@ -309,9 +310,15 @@ Selection doesn't change. A client picks a source's model the way it picks any m
 
 Model IDs are opaque; the example only shows that the host, not the endpoint, chooses them. The selection travels on every path a selection already uses: `Message.model` on turns, drafts, and pending messages. The host resolves the ID against the chat's session. A source's model is selectable only while the source exists, is enabled, is `ready`, and lists it. Otherwise the host rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions.
 
-Because session-scoped sources are new to #543, this proposal adds three rules:
+Because session-scoped sources are new to #543, this proposal adds four rules:
 
 - **Disjoint source IDs.** The host MUST NOT mint a model source customization `id` equal to any `id` in the session agent's `AgentInfo.modelSources`, so a `modelSourceId` always names one group.
+- **Reserved model IDs.** Uniqueness within the current catalog isn't enough, because drafts, pending messages, and history keep a selection after its source goes away. Once the host publishes a model `id` for a source, that `id` is bound to that source and its upstream model for the rest of the session. The binding holds while the source is disabled or in `authRequired`, after it is withdrawn, and across a host restart that restores the session. The host:
+  - MUST NOT resolve the `id` to anything else: not another source, not another upstream model, and not one of the agent's own models;
+  - MAY publish the `id` again only when the same source, as its agent identifies it from the definition, comes back offering the same upstream model, for example after the contributing client reconnects;
+  - otherwise fails a selection that names the `id`, as [§6](#_6-lifecycle) describes.
+
+  A host can meet this by minting IDs it never reuses within a session, rather than deriving them from the endpoint's model name alone.
 - **Stable model IDs.** The host SHOULD keep a source's model IDs stable for as long as the source exists, including across credential rotation, so drafts and pending messages keep resolving.
 - **Session only.** A source's model can be selected only in the session that contains the source. The source exists only while its client is active, so an automation template can't name one. A host validating an automation's selection against the agent's catalog rejects it, which is the intended outcome.
 
@@ -400,7 +407,7 @@ On withdrawal, the host removes the child, drops the credential, and the source'
 
 A selection that names a withdrawn model fails. The host MUST NOT run the work on a different model. The user picked a specific service with their own key, and quietly sending the prompt somewhere else would change where their data goes and who pays for it.
 
-- Drafts and history keep the `id`. Clients show such a selection as unavailable and let the user choose again.
+- Drafts and history keep the `id`. Because the `id` stays reserved (see [§4.4](#_4-4-models-and-selection)), it can't later resolve to a different source. Clients show such a selection as unavailable and let the user choose again.
 - A queued or steering message that names a withdrawn model fails when the host would consume it, through the existing chat lifecycle.
 - An active turn fails through the existing turn lifecycle the next time it needs the withdrawn source.
 
@@ -418,7 +425,7 @@ A selection that names a withdrawn model fails. The host MUST NOT run the work o
 ### Reconnect and restart
 
 - Source status lives in session state, so a reconnecting client reads `authRequired` from its snapshot and answers it. Nothing depends on a replayed notification.
-- After a host restart, credentials are gone, because they were never persisted. A restored source returns in `authRequired`, or is absent until its client publishes the plugin again.
+- After a host restart, credentials are gone, because they were never persisted. A restored source returns in `authRequired`, or is absent until its client publishes the plugin again. Its model IDs stay reserved either way, so the host keeps those reservations with the session's other durable state. They identify a source and model, not a secret.
 
 ---
 
