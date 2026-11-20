@@ -62,27 +62,23 @@ These are reads of the host's retained, completed transcript, including turns ou
 
 `preview` is the first nonempty trimmed line of visible request text, or `""` if none exists. When the line exceeds 80 Unicode scalar values, use its first 79 followed by `…`. Do not include attachment bodies, metadata, or response text. Copy `Turn.startedAt` when present; do not synthesize a timestamp.
 
-#### Read a window
+#### Open a turn and page by cursor
 
-`readChatTurns` takes a stable `turnId`. The default `direction` is `around` and the default `limit` is 10 **total turns**, not 10 on each side. The result is a contiguous slice of whole `Turn` objects in **chronological order**:
+To open a turn, send `readChatTurns` with the chat `channel` and `fromTurnId`. The first returned turn MUST be that retained completed turn, followed by its immediate successors. Do not fill the page with earlier turns near the end of history. If the ID is unknown, pruned, or still active, return `NotFound` (`-32008`), not a nearby substitute.
 
-| Direction | Selection |
-|---|---|
-| `around` | Include the anchor exactly once, with nearby turns on either side as space permits. With `limit: 1`, return just the anchor. |
-| `before` | Take immediately preceding turns, excluding the anchor. |
-| `after` | Take immediately following turns, excluding the anchor. |
+Every successful page contains one or more consecutive whole turns, oldest first. Return a `previousCursor` if and only if earlier turns exist, and a `nextCursor` if and only if later turns exist, relative to this page in the same traversal. To scroll, echo either token as `cursor` instead of `fromTurnId`. A previous page ends immediately before the current page; a next page starts immediately after it. Neither repeats the boundary turn, even when the page size changes.
 
-`hasBefore` and `hasAfter` describe whether retained turns exist outside the **returned window**, not just whether the requested count was met. An empty `before` at the oldest anchor returns `false, true`; an empty `after` at the newest returns `true, false` (the anchor exists on the other side). To extend a nonempty window, use `before` its first ID or `after` its last ID. Each read uses the current retained history; if an anchor is missing, pruned, or active rather than completed, return `NotFound` (`-32008`), not an empty success or a nearby substitute.
+For example, `{ "channel": "ahp-chat:/c1", "fromTurnId": "t45", "limit": 5 }` can return turns 45–49. With the same limit and enough space, sending the page's `previousCursor` returns 40–44 in that order; sending its `nextCursor` returns 50–54. The live subscription at turn 100 is unchanged.
 
-Hosts MUST bound both the turn count and the serialized response size. Target at most 4 MiB of UTF-8 encoded JSON per result; a smaller budget is permitted. If the required turn (the anchor for `around`, the nearest adjacent turn for `before`/`after`) alone exceeds this target, the host may return it alone **only** within a finite, transport-safe hard byte limit. If it cannot fit, return `InternalError` (`-32603`) with an explanatory message. Do not truncate a turn, skip an oversized immediate neighbor, or return an empty page that cannot advance.
+The default `limit` is 10 turns per request. Hosts MUST also bound the serialized response size. Target at most 4 MiB of UTF-8 encoded JSON per result; a smaller budget is permitted. If the required turn (the requested ID on opening, or the immediate neighbor on continuation) alone exceeds this target, the host may return it alone **only** within a finite, transport-safe hard byte limit. If it cannot fit, return `InternalError` (`-32603`) with an explanatory message. Never truncate or skip it to make a smaller page.
 
 #### Continuation and errors
 
 For `listChatTurns`, omit `cursor` for the first page; the default `limit` is 100 entries. Echo `nextCursor` unchanged for the following page. Its absence means the traversal is complete. For both commands `limit` must be a positive integer; hosts may cap it and return fewer.
 
-Cursors are opaque and scoped to the connection, method, and chat. They are not `turnsNextCursor` values. Following a chain MUST enumerate the first page's ordered index without duplicates or omissions. New completions do not join a traversal already in progress. A retry of the same cursor resumes from the same boundary or fails explicitly. If a change to retained history or cursor expiry prevents a consistent continuation, return `Conflict` (`-32011`); the client discards that traversal and restarts without a cursor. Discard cursors on reconnect.
+Cursors are opaque and scoped to the connection, method, and chat. They are not `turnsNextCursor` values. Following cursors in one direction MUST enumerate that side of the first page's ordered history without duplicates or omissions. New completions do not join a traversal already in progress. A retry of the same cursor resumes from the same boundary or fails explicitly. If a change to retained history or cursor expiry prevents a consistent continuation, return `Conflict` (`-32011`); the client discards that traversal. Restart a list without a cursor; restart a read with a retained `fromTurnId`. Discard cursors on reconnect.
 
-Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, or an invalid direction or limit. An unavailable command, including for a chat that does not advertise `historyBrowsing`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
+Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, an invalid limit, or a read with both or neither of `fromTurnId` and `cursor`. An unavailable command, including for a chat that does not advertise `historyBrowsing`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
 
 #### Search visible text
 
@@ -95,7 +91,7 @@ A host that supports `searchChatTurns` advertises `"historyBrowsing": { "search"
 
 Omitted `matchCase`, `wholeWord` and `isRegex` each mean `false`: the default query is literal, case-insensitive, and may match inside words. A regex uses ECMAScript Unicode matching, case-insensitive unless `matchCase` is true. Whole-word mode applies ECMAScript word boundaries at word ends. Match left to right without overlap, ignoring zero-width matches. A host SHOULD bound regex execution; reject an invalid or over-budget pattern rather than report a partial scan as exhaustive.
 
-Number nonempty matches **from zero in forward text order**, restarting for each side of each turn and continuing across the visible Markdown parts of the response. Return turns **newest first**; within a turn return response before request and occurrences in descending order. For example, searching `map` in a request `map` and a response `map then map` yields `response:1`, `response:0`, `request:0`. A page may end between these matches. To reveal a match outside the subscription, read `around` its turn ID and locate the same forward occurrence on that side. The client need not load the intervening transcript.
+Number nonempty matches **from zero in forward text order**, restarting for each side of each turn and continuing across the visible Markdown parts of the response. Return turns **newest first**; within a turn return response before request and occurrences in descending order. For example, searching `map` in a request `map` and a response `map then map` yields `response:1`, `response:0`, `request:0`. A page may end between these matches. To reveal a match outside the subscription, pass its `turnId` as `fromTurnId` to `readChatTurns` and locate the occurrence on the first returned turn. Use that page's read cursors to scroll, not the search cursor. The client need not load the intervening transcript.
 
 Omit `cursor` to start at the newest turn. The default `limit` is 100 matches; it must be a positive integer and the host may return fewer. Search follows the [continuation and error rules](#continuation-and-errors) for the prompt index, but binds each cursor to the query and effective flags as well as the connection, method and chat. A cursor can resume within one side of a turn. An empty `items` page with an advancing `nextCursor` is not a final “no matches”; only an absent cursor ends the traversal.
 
@@ -441,7 +437,7 @@ This section lists wire methods that are interpreted in the context of a chat UR
 |---|---|---|
 | `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
 | `listChatTurns` | request | Page the retained prompt index without loading turns into state. |
-| `readChatTurns` | request | Read a bounded window around, before, or after a retained turn. |
+| `readChatTurns` | request | Open a retained turn by ID or read the adjacent page by cursor. |
 | `searchChatTurns` | request | Find occurrences in visible retained request and response text. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 

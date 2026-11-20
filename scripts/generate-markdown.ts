@@ -28,7 +28,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
 import { getDescription, getDocumentation, readStability } from './read-stability.js';
 
 const GENERATED_HEADER = '<!-- Generated from types/*.ts — do not edit -->\n\n';
@@ -491,7 +491,7 @@ function findChannelSourceFile(project: Project, dirName: string, baseName: stri
 function getInterfaceMaybe(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
     if (!isCanonicalSourceFile(sf)) continue;
-    const iface = sf.getInterface(name);
+    const iface = findWireFields(sf, name);
     if (iface) return iface;
   }
   return undefined;
@@ -661,6 +661,12 @@ function emitCommandsSection(project: Project, sourceFiles: SourceFile[]): strin
   const lines: string[] = [];
   for (const sf of sourceFiles) {
     for (const stmt of sf.getStatements()) {
+      if (Node.isTypeAliasDeclaration(stmt) && stmt.isExported()) {
+        const entry = methodByParams.get(stmt.getName());
+        const fields = entry && findWireFields(sf, entry.paramsType);
+        if (entry && fields) lines.push(emitCommandBlock(project, entry, fields));
+        continue;
+      }
       if (!Node.isInterfaceDeclaration(stmt) || !stmt.isExported()) continue;
       const name = stmt.getName();
       const entry = methodByParams.get(name);

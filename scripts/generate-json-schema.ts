@@ -32,6 +32,7 @@ interface JsonSchema {
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   items?: JsonSchema;
+  minItems?: number;
   contains?: JsonSchema;
   minContains?: number;
   maxContains?: number;
@@ -411,7 +412,8 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const name = prop.getName();
     const typeText = getPropertyType(prop);
     const desc = getPropertyDescription(prop);
-    const propSchema = typeTextToSchema(typeText, project);
+    // An optional never field forbids the key on this branch of an exclusive union.
+    const propSchema: JsonSchema = typeText === 'never' ? { not: {} } : typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
     if (hasPropertyTag(prop, 'integer')) {
       if (propSchema.type !== 'number') {
@@ -442,6 +444,13 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
         }
         propSchema[constraint] = length;
       }
+    }
+    const minItems = getNumericPropertyTag(prop, 'minItems');
+    if (minItems !== undefined) {
+      if (propSchema.type !== 'array' || !Number.isInteger(minItems) || minItems < 0) {
+        throw new Error(`${iface.getName()}.${name} uses invalid @minItems on ${typeText}`);
+      }
+      propSchema.minItems = minItems;
     }
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {

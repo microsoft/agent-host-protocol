@@ -1702,9 +1702,9 @@
         "items"
       ]
     },
-    "ReadChatTurnsParams": {
+    "ReadChatTurnsPageParams": {
       "type": "object",
-      "description": "Reads a byte-bounded window of completed turns directly, without changing\nany subscription or fetching intervening pages. Requires\n`ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).",
+      "description": "Reads a byte-bounded page of completed turns without changing a subscription.\nSupply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).\nRequires `ChatState.historyBrowsing`.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1715,49 +1715,107 @@
           "additionalProperties": {},
           "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
-        "turnId": {
+        "fromTurnId": {
           "type": "string",
-          "description": "Identifier of the retained completed turn anchoring the window."
+          "description": "Stable ID of the first turn to return. Omit when continuing by cursor."
         },
-        "direction": {
-          "$ref": "#/$defs/ChatTurnReadDirection",
-          "description": "Defaults to `around`."
+        "cursor": {
+          "type": "string",
+          "description": "Echo either cursor from a previous read page. Omit when opening by ID."
         },
         "limit": {
           "type": "integer",
-          "description": "Maximum number of whole turns, including the anchor for `around`; defaults to 10.",
+          "description": "Maximum number of whole turns on this page; defaults to 10.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "ReadChatTurnsFromTurnParams": {
+      "type": "object",
+      "description": "Open a page starting at a retained completed turn, inclusive.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "fromTurnId": {
+          "type": "string"
+        },
+        "cursor": {
+          "not": {}
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of whole turns on this page; defaults to 10.",
           "minimum": 1
         }
       },
       "required": [
         "channel",
-        "turnId"
+        "fromTurnId"
+      ]
+    },
+    "ReadChatTurnsFromCursorParams": {
+      "type": "object",
+      "description": "Continue immediately before or after a returned page. The cursor carries the direction.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "fromTurnId": {
+          "not": {}
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of whole turns on this page; defaults to 10.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "channel",
+        "cursor"
       ]
     },
     "ReadChatTurnsResult": {
       "type": "object",
-      "description": "A contiguous slice of the transcript, not a chat snapshot or a state update.",
+      "description": "A contiguous page of the transcript, not a chat snapshot or a state update.",
       "properties": {
+        "nextCursor": {
+          "type": "string",
+          "description": "Read immediately after the last returned turn; absent at the end."
+        },
         "turns": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Turn"
           },
-          "description": "Whole turns in chronological order for all three directions."
+          "description": "Consecutive whole turns, oldest first, including on a previous-page read.",
+          "minItems": 1
         },
-        "hasBefore": {
-          "type": "boolean",
-          "description": "Whether retained completed turns precede this window."
-        },
-        "hasAfter": {
-          "type": "boolean",
-          "description": "Whether retained completed turns follow this window."
+        "previousCursor": {
+          "type": "string",
+          "description": "Read immediately before the first returned turn; absent at the start."
         }
       },
       "required": [
-        "turns",
-        "hasBefore",
-        "hasAfter"
+        "turns"
       ]
     },
     "ChatTurnMatch": {
@@ -2236,6 +2294,17 @@
         }
       ],
       "description": "Identifies the destination of an atomic chat move."
+    },
+    "ReadChatTurnsParams": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ReadChatTurnsFromTurnParams"
+        },
+        {
+          "$ref": "#/$defs/ReadChatTurnsFromCursorParams"
+        }
+      ],
+      "description": "Select exactly one starting position: a turn ID or a continuation cursor."
     },
     "ChangesetOperationTarget": {
       "oneOf": [
@@ -11424,15 +11493,6 @@
         }
       ],
       "description": "An attachment associated with a {@link Message}."
-    },
-    "ChatTurnReadDirection": {
-      "enum": [
-        "around",
-        "before",
-        "after"
-      ],
-      "type": "string",
-      "description": "Which contiguous window of completed turns to read, relative to an anchor."
     },
     "ChatTurnMatchKind": {
       "enum": [

@@ -109,20 +109,6 @@ impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
     }
 }
 
-/// Which contiguous window of completed turns to read, relative to an anchor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ChatTurnReadDirection {
-    /// Include the anchor and nearby turns.
-    #[serde(rename = "around")]
-    Around,
-    /// Immediately preceding turns, excluding the anchor.
-    #[serde(rename = "before")]
-    Before,
-    /// Immediately following turns, excluding the anchor.
-    #[serde(rename = "after")]
-    After,
-}
-
 /// The searchable side of a completed turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChatTurnMatchKind {
@@ -1771,9 +1757,9 @@ pub struct ListChatTurnsResult {
     pub items: Vec<ChatTurnIndexEntry>,
 }
 
-/// Reads a byte-bounded window of completed turns directly, without changing
-/// any subscription or fetching intervening pages. Requires
-/// `ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).
+/// Reads a byte-bounded page of completed turns without changing a subscription.
+/// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
+/// Requires `ChatState.historyBrowsing`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadChatTurnsParams {
@@ -1783,26 +1769,31 @@ pub struct ReadChatTurnsParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Identifier of the retained completed turn anchoring the window.
-    pub turn_id: String,
-    /// Defaults to `around`.
+    /// Stable ID of the first turn to return. Omit when continuing by cursor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub direction: Option<ChatTurnReadDirection>,
-    /// Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+    pub from_turn_id: Option<String>,
+    /// Echo either cursor from a previous read page. Omit when opening by ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Maximum number of whole turns on this page; defaults to 10.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<i64>,
 }
 
-/// A contiguous slice of the transcript, not a chat snapshot or a state update.
+/// A contiguous page of the transcript, not a chat snapshot or a state update.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadChatTurnsResult {
-    /// Whole turns in chronological order for all three directions.
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    /// Consecutive whole turns, oldest first, including on a previous-page read.
     pub turns: Vec<Turn>,
-    /// Whether retained completed turns precede this window.
-    pub has_before: bool,
-    /// Whether retained completed turns follow this window.
-    pub has_after: bool,
+    /// Read immediately before the first returned turn; absent at the start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_cursor: Option<String>,
 }
 
 /// A match locator, not a snippet, text offset, or response-part identifier.

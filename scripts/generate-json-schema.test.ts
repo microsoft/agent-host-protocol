@@ -167,6 +167,7 @@ function schemaAccepts(
       return value === null;
     case 'array':
       return Array.isArray(value) &&
+        (typeof schema.minItems !== 'number' || value.length >= schema.minItems) &&
         (!schema.items || value.every(item => schemaAccepts(root, schema.items as JsonNode, item)));
   }
 
@@ -624,16 +625,20 @@ describe('generated JSON schemas', () => {
         };
         for (const [name, params] of [
           ['ListChatTurnsParams', { channel }],
-          ['ReadChatTurnsParams', { channel, turnId }],
+          ['ReadChatTurnsParams', { channel, fromTurnId: turnId }],
+          ['ReadChatTurnsParams', { channel, cursor: 'older' }],
         ] as const) {
           assert.ok(accepts(name, params), 'all modifiers are optional');
           assert.ok(!accepts(name, { ...params, limit: 0 }));
           assert.ok(!accepts(name, { ...params, limit: 1.5 }));
         }
         assert.ok(!accepts('ReadChatTurnsParams', { channel }));
-        assert.ok(!accepts('ReadChatTurnsParams', { channel, turnId, direction: 'latest' }));
-        assert.ok(!accepts('ReadChatTurnsResult', { turns: [], hasBefore: false }));
-        assert.ok(!accepts('ReadChatTurnsResult', { turns: [{ turnId }], hasBefore: false, hasAfter: true }));
+        assert.ok(!accepts('ReadChatTurnsParams', { channel, fromTurnId: turnId, cursor: 'older' }));
+        assert.ok(!accepts('ReadChatTurnsParams', { channel, turnId, direction: 'around' }));
+        assert.ok(!accepts('ReadChatTurnsResult', { turns: [], nextCursor: 'later' }));
+        assert.ok(!accepts('ReadChatTurnsResult', { turns: [{ turnId }] }));
+        const onlyTurn = { id: turnId, message: { text: 'only', origin: { kind: 'user' } }, responseParts: [], state: 'complete' };
+        assert.ok(accepts('ReadChatTurnsResult', { turns: [onlyTurn] }), 'neither cursor at both ends');
         const page = (preview: string) => ({ items: [{ turnId, preview }] });
         assert.ok(accepts('ListChatTurnsResult', page('🌱'.repeat(80))));
         assert.ok(!accepts('ListChatTurnsResult', page('🌱'.repeat(81))));

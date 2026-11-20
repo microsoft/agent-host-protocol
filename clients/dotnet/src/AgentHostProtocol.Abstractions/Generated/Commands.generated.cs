@@ -125,21 +125,6 @@ internal sealed class ChatMoveDestinationKindConverter : JsonConverter<ChatMoveD
         => writer.WriteStringValue(value.Value);
 }
 
-/// <summary>Which contiguous window of completed turns to read, relative to an anchor.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatTurnReadDirection>))]
-public enum ChatTurnReadDirection
-{
-    /// <summary>Include the anchor and nearby turns.</summary>
-    [WireValue("around")]
-    Around,
-    /// <summary>Immediately preceding turns, excluding the anchor.</summary>
-    [WireValue("before")]
-    Before,
-    /// <summary>Immediately following turns, excluding the anchor.</summary>
-    [WireValue("after")]
-    After,
-}
-
 /// <summary>The searchable side of a completed turn.</summary>
 [JsonConverter(typeof(WireEnumConverter<ChatTurnMatchKind>))]
 public enum ChatTurnMatchKind
@@ -1905,9 +1890,9 @@ public sealed record ListChatTurnsResult
     public required List<ChatTurnIndexEntry> Items { get; init; }
 }
 
-/// <summary>Reads a byte-bounded window of completed turns directly, without changing
-/// any subscription or fetching intervening pages. Requires
-/// `ChatState.historyBrowsing`. A missing anchor is `NotFound` (-32008).</summary>
+/// <summary>Reads a byte-bounded page of completed turns without changing a subscription.
+/// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
+/// Requires `ChatState.historyBrowsing`.</summary>
 public sealed record ReadChatTurnsParams
 {
     /// <summary>Chat URI.</summary>
@@ -1919,29 +1904,32 @@ public sealed record ReadChatTurnsParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Identifier of the retained completed turn anchoring the window.</summary>
-    public required string TurnId { get; init; }
-
-    /// <summary>Defaults to `around`.</summary>
+    /// <summary>Stable ID of the first turn to return. Omit when continuing by cursor.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ChatTurnReadDirection? Direction { get; init; }
+    public string? FromTurnId { get; init; }
 
-    /// <summary>Maximum number of whole turns, including the anchor for `around`; defaults to 10.</summary>
+    /// <summary>Echo either cursor from a previous read page. Omit when opening by ID.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Cursor { get; init; }
+
+    /// <summary>Maximum number of whole turns on this page; defaults to 10.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? Limit { get; init; }
 }
 
-/// <summary>A contiguous slice of the transcript, not a chat snapshot or a state update.</summary>
+/// <summary>A contiguous page of the transcript, not a chat snapshot or a state update.</summary>
 public sealed record ReadChatTurnsResult
 {
-    /// <summary>Whole turns in chronological order for all three directions.</summary>
+    /// <summary>Read immediately after the last returned turn; absent at the end.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NextCursor { get; init; }
+
+    /// <summary>Consecutive whole turns, oldest first, including on a previous-page read.</summary>
     public required List<Turn> Turns { get; init; }
 
-    /// <summary>Whether retained completed turns precede this window.</summary>
-    public bool HasBefore { get; init; }
-
-    /// <summary>Whether retained completed turns follow this window.</summary>
-    public bool HasAfter { get; init; }
+    /// <summary>Read immediately before the first returned turn; absent at the start.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PreviousCursor { get; init; }
 }
 
 /// <summary>A match locator, not a snippet, text offset, or response-part identifier.</summary>

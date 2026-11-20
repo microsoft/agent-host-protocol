@@ -68,16 +68,6 @@ public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
     }
 }
 
-/// Which contiguous window of completed turns to read, relative to an anchor.
-public enum ChatTurnReadDirection: String, Codable, Sendable {
-    /// Include the anchor and nearby turns.
-    case around = "around"
-    /// Immediately preceding turns, excluding the anchor.
-    case before = "before"
-    /// Immediately following turns, excluding the anchor.
-    case after = "after"
-}
-
 /// The searchable side of a completed turn.
 public enum ChatTurnMatchKind: String, Codable, Sendable {
     case request = "request"
@@ -2001,52 +1991,54 @@ public struct ReadChatTurnsParams: Codable, Sendable, Equatable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Identifier of the retained completed turn anchoring the window.
-    public var turnId: String
-    /// Defaults to `around`.
-    public var direction: ChatTurnReadDirection?
-    /// Maximum number of whole turns, including the anchor for `around`; defaults to 10.
+    /// Stable ID of the first turn to return. Omit when continuing by cursor.
+    public var fromTurnId: String?
+    /// Echo either cursor from a previous read page. Omit when opening by ID.
+    public var cursor: String?
+    /// Maximum number of whole turns on this page; defaults to 10.
     public var limit: Int?
 
     enum CodingKeys: String, CodingKey {
         case channel
         case meta = "_meta"
-        case turnId
-        case direction
+        case fromTurnId
+        case cursor
         case limit
     }
 
     public init(
         channel: String,
         meta: [String: AnyCodable]? = nil,
-        turnId: String,
-        direction: ChatTurnReadDirection? = nil,
+        fromTurnId: String? = nil,
+        cursor: String? = nil,
         limit: Int? = nil
     ) {
         self.channel = channel
         self.meta = meta
-        self.turnId = turnId
-        self.direction = direction
+        self.fromTurnId = fromTurnId
+        self.cursor = cursor
         self.limit = limit
     }
 }
 
 public struct ReadChatTurnsResult: Codable, Sendable, Equatable {
-    /// Whole turns in chronological order for all three directions.
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    public var nextCursor: String?
+    /// Consecutive whole turns, oldest first, including on a previous-page read.
     public var turns: [Turn]
-    /// Whether retained completed turns precede this window.
-    public var hasBefore: Bool
-    /// Whether retained completed turns follow this window.
-    public var hasAfter: Bool
+    /// Read immediately before the first returned turn; absent at the start.
+    public var previousCursor: String?
 
     public init(
+        nextCursor: String? = nil,
         turns: [Turn],
-        hasBefore: Bool,
-        hasAfter: Bool
+        previousCursor: String? = nil
     ) {
+        self.nextCursor = nextCursor
         self.turns = turns
-        self.hasBefore = hasBefore
-        self.hasAfter = hasAfter
+        self.previousCursor = previousCursor
     }
 }
 
