@@ -9,3 +9,12 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+  # The Swift package manifest is at the repository root. The Xcode app's
+  # nested Package.resolved is not a standalone Swift package directory.
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      swift-dependencies:
+        patterns: ["*"]
