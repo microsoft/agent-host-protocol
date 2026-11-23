@@ -1,0 +1,59 @@
+{
+  "description": "root/modelSourceRegistrationRemoved removes the registration with the given id",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "name": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            "model-a"
+          ]
+        },
+        "clientId": "client-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "name": "Source b",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apib.example.com/v1",
+          "models": [
+            "model-b"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegistrationRemoved",
+      "id": "model-source-a"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "name": "Source b",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apib.example.com/v1",
+          "models": [
+            "model-b"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
  * @module channels-root/actions
  */
 
-import type { AgentInfo } from './state.js';
+import type { AgentInfo, ModelSourceRegistration } from './state.js';
 import type { TerminalInfo } from '../channels-terminal/state.js';
 import { ActionType } from '../common/actions.js';
 
@@ -65,4 +65,37 @@ export interface RootConfigChangedAction {
   config: Record<string, unknown>;
   /** When `true`, replaces all config values instead of merging */
   replace?: boolean;
+}
+
+/**
+ * Adds a model source registration, or replaces the one with the same `id`.
+ *
+ * A client registers a source by dispatching this with its own `clientId` and
+ * no `state`. The host reports status by dispatching it again with the same
+ * registration and a `state`.
+ *
+ * @category Root Actions
+ * @stability 1.0
+ * @clientDispatchable
+ * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+ */
+export interface RootModelSourceRegistrationSetAction {
+  type: ActionType.RootModelSourceRegistrationSet;
+  /** The registration to add or replace, matched by `id`. */
+  registration: ModelSourceRegistration;
+}
+
+/**
+ * Removes the model source registration with the given `id`. A no-op when
+ * none matches.
+ *
+ * @category Root Actions
+ * @stability 1.0
+ * @clientDispatchable
+ * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+ */
+export interface RootModelSourceRegistrationRemovedAction {
+  type: ActionType.RootModelSourceRegistrationRemoved;
+  /** The registration's `id`. */
+  id: string;
 }

@@ -106,6 +106,8 @@ const (
 	ActionTypeAnnotationsEntryRemoved             ActionType = "annotations/entryRemoved"
 	ActionTypeRootTerminalsChanged                ActionType = "root/terminalsChanged"
 	ActionTypeRootConfigChanged                   ActionType = "root/configChanged"
+	ActionTypeRootModelSourceRegistrationSet      ActionType = "root/modelSourceRegistrationSet"
+	ActionTypeRootModelSourceRegistrationRemoved  ActionType = "root/modelSourceRegistrationRemoved"
 	ActionTypeTerminalData                        ActionType = "terminal/data"
 	ActionTypeTerminalInput                       ActionType = "terminal/input"
 	ActionTypeTerminalResized                     ActionType = "terminal/resized"
@@ -174,6 +176,29 @@ type RootConfigChangedAction struct {
 	Config map[string]json.RawMessage `json:"config"`
 	// When `true`, replaces all config values instead of merging
 	Replace *bool `json:"replace,omitempty"`
+}
+
+// Adds a model source registration, or replaces the one with the same `id`.
+//
+// A client registers a source by dispatching this with its own `clientId` and
+// no `state`. The host reports status by dispatching it again with the same
+// registration and a `state`.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceRegistrationSetAction struct {
+	Type ActionType `json:"type"`
+	// The registration to add or replace, matched by `id`.
+	Registration ModelSourceRegistration `json:"registration"`
+}
+
+// Removes the model source registration with the given `id`. A no-op when
+// none matches.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceRegistrationRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The registration's `id`.
+	Id string `json:"id"`
 }
 
 // Session backend initialized successfully.
@@ -1861,6 +1886,8 @@ type isStateAction interface{ isStateAction() }
 func (*RootAgentsChangedAction) isStateAction()                   {}
 func (*RootActiveSessionsChangedAction) isStateAction()           {}
 func (*RootConfigChangedAction) isStateAction()                   {}
+func (*RootModelSourceRegistrationSetAction) isStateAction()      {}
+func (*RootModelSourceRegistrationRemovedAction) isStateAction()  {}
 func (*SessionReadyAction) isStateAction()                        {}
 func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
@@ -1995,6 +2022,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "root/configChanged":
 		var value RootConfigChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceRegistrationSet":
+		var value RootModelSourceRegistrationSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceRegistrationRemoved":
+		var value RootModelSourceRegistrationRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

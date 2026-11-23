@@ -12,6 +12,7 @@ RootState {
   activeSessions?: number     // count of non-disposed sessions
   terminals?: TerminalInfo[]  // lightweight terminal catalogue
   config?: RootConfigState    // host-level configuration
+  modelSourceRegistrations?: ModelSourceRegistration[]  // registered model sources
 }
 ```
 

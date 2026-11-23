@@ -1,0 +1,6 @@
+{
+  "type": "changed",
+  "message": "`StateAction`, `AuthenticateTarget`, and `AuthenticateTargetKind` gain model source variants, so exhaustive matches and switches must handle them. Direct Rust struct literals for `RootState` must now include `model_source_registrations: None`, and those for `AgentCapabilities` must include `model_source_registration: None`.",
+  "targets": ["rust", "swift", "kotlin", "typescript"],
+  "issues": [619]
+}

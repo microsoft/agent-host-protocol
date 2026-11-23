@@ -4,7 +4,7 @@
 
 ## Status
 
-Proposal. The type sketches below show the intended shape. They are not part of the protocol until a follow-up change adds them to `types/`, regenerates the clients, and updates the guides and specification.
+Implemented by [#627](https://github.com/microsoft/agent-host-protocol/pull/627). The type sketches below show the intended shape; the canonical definitions are in `types/`.
 
 An earlier revision proposed model sources as session-scoped plugin customizations. Review pointed out that BYOK configuration belongs to the user rather than to one session, and that automations and long-running headless sessions need model sources that outlive a client's session. This revision moves them to a host-wide registry. [§11](#_11-alternatives-considered) explains the trade-off.
 

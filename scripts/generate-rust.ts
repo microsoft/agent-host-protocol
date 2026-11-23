@@ -854,6 +854,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
+  'ModelSourceStatus', 'ModelSourceSharingPolicy', 'ModelSourceRetentionPolicy',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
@@ -879,6 +880,13 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
+  { name: 'ModelSourceRegistrationCapability' },
+  { name: 'ModelSourceRegistration' },
+  { name: 'ModelSourceStartingState', omitDiscriminants: true },
+  { name: 'ModelSourceReadyState', omitDiscriminants: true },
+  { name: 'ModelSourceAuthRequirement' },
+  { name: 'ModelSourceAuthRequiredState', omitDiscriminants: true },
+  { name: 'ModelSourceErrorState', omitDiscriminants: true },
   { name: 'ModelSourceInfo' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
@@ -1236,6 +1244,19 @@ const MCP_SERVER_STATUS_UNION: UnionConfig = {
   unknown: true,
 };
 
+const MODEL_SOURCE_STATUS_UNION: UnionConfig = {
+  name: 'ModelSourceState',
+  discriminantField: 'kind',
+  doc: 'Discriminated lifecycle status of a registered model source.',
+  variants: [
+    { variantName: 'Starting', innerType: 'ModelSourceStartingState', wireValue: 'starting' },
+    { variantName: 'Ready', innerType: 'ModelSourceReadyState', wireValue: 'ready' },
+    { variantName: 'AuthRequired', innerType: 'ModelSourceAuthRequiredState', wireValue: 'authRequired', boxed: true },
+    { variantName: 'Error', innerType: 'ModelSourceErrorState', wireValue: 'error' },
+  ],
+  unknown: true,
+};
+
 const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   name: 'ToolCallContributor',
   discriminantField: 'kind',
@@ -1490,6 +1511,8 @@ pub enum ToolInput {
 
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
+  lines.push('use crate::notifications::AuthRequiredReason;');
+  lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of STATE_ENUMS) {
@@ -1588,6 +1611,8 @@ where D: serde::Deserializer<'de>,
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, MODEL_SOURCE_STATUS_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_RISK_ASSESSMENT_UNION));
@@ -1628,6 +1653,8 @@ const ACTION_VARIANTS: {
   { type: 'root/agentsChanged', variantName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
+  { type: 'root/modelSourceRegistrationSet', variantName: 'RootModelSourceRegistrationSet', tsInterface: 'RootModelSourceRegistrationSetAction' },
+  { type: 'root/modelSourceRegistrationRemoved', variantName: 'RootModelSourceRegistrationRemoved', tsInterface: 'RootModelSourceRegistrationRemovedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },
   { type: 'session/creationFailed', variantName: 'SessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
   { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
@@ -1810,7 +1837,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ModelSourceRegistration, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -1956,6 +1983,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget', omitDiscriminants: true },
+  { name: 'ModelSourceAuthenticateTarget', omitDiscriminants: true },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -1975,6 +2003,7 @@ const AUTHENTICATE_TARGET_UNION: UnionConfig = {
   doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
   variants: [
     { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
+    { variantName: 'ModelSource', innerType: 'ModelSourceAuthenticateTarget', wireValue: 'modelSource' },
   ],
 };
 
@@ -2548,6 +2577,7 @@ function checkExhaustiveness(project: Project): void {
     'ChildCustomizationType',       // TS subset alias of CustomizationType; Rust consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
+    'ModelSourceState',            // MODEL_SOURCE_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'ToolCallRiskAssessment',       // TOOL_CALL_RISK_ASSESSMENT_UNION discriminated union
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union

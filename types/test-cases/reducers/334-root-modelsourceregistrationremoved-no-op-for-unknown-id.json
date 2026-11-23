@@ -1,0 +1,46 @@
+{
+  "description": "root/modelSourceRegistrationRemoved is a no-op when no registration has the id",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "name": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            "model-a"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegistrationRemoved",
+      "id": "model-source-missing"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "name": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            "model-a"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    ]
+  }
+}

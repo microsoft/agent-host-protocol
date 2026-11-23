@@ -1,0 +1,354 @@
+{
+  "name": "model-source-registry-snapshot",
+  "group": "A",
+  "description": "A root snapshot carries model source registrations with no reported state and in each lifecycle state, including an http endpoint and a host-registered source without clientId. The agent advertises the modelSourceRegistration capability, and the ready registration appears in its catalog.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-root://",
+    "fromSeq": 4,
+    "state": {
+      "agents": [
+        {
+          "provider": "example",
+          "displayName": "Example",
+          "description": "Serves registered model sources",
+          "capabilities": {
+            "modelSourceRegistration": {
+              "formats": [
+                "example.com/model-source@1",
+                "example.com/model-source@0"
+              ]
+            }
+          },
+          "modelSources": [
+            {
+              "id": "source-ready",
+              "displayName": "OpenRouter"
+            }
+          ],
+          "models": [
+            {
+              "id": "source-ready.8f3a",
+              "provider": "example",
+              "name": "Example model",
+              "vendor": "OpenRouter",
+              "modelSourceId": "source-ready"
+            }
+          ]
+        }
+      ],
+      "modelSourceRegistrations": [
+        {
+          "id": "source-unreported",
+          "provider": "example",
+          "name": "Unreported",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "https://api.example.com/v1",
+            "wireFormat": "openai-chat",
+            "models": [
+              {
+                "id": "example-model",
+                "maxContextWindow": 128000
+              }
+            ]
+          },
+          "clientId": "client-1"
+        },
+        {
+          "id": "source-starting",
+          "provider": "example",
+          "name": "Starting",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "https://api.example.com/v1",
+            "wireFormat": "openai-chat",
+            "models": [
+              {
+                "id": "example-model",
+                "maxContextWindow": 128000
+              }
+            ]
+          },
+          "clientId": "client-1",
+          "state": {
+            "kind": "starting"
+          }
+        },
+        {
+          "id": "source-ready",
+          "provider": "example",
+          "name": "OpenRouter",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "https://api.example.com/v1",
+            "wireFormat": "openai-chat",
+            "models": [
+              {
+                "id": "example-model",
+                "maxContextWindow": 128000
+              }
+            ]
+          },
+          "clientId": "client-1",
+          "icons": [
+            {
+              "src": "https://example.com/openrouter.svg"
+            }
+          ],
+          "sharing": "host",
+          "retention": "host",
+          "state": {
+            "kind": "ready"
+          },
+          "_meta": {
+            "example.com/label": "Laptop"
+          }
+        },
+        {
+          "id": "source-auth",
+          "provider": "example",
+          "name": "Azure endpoint",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "https://api.example.com/v1",
+            "wireFormat": "openai-chat",
+            "models": [
+              {
+                "id": "example-model",
+                "maxContextWindow": 128000
+              }
+            ]
+          },
+          "clientId": "client-1",
+          "sharing": "contributingClient",
+          "retention": "contributingClient",
+          "state": {
+            "kind": "authRequired",
+            "reason": "expired",
+            "resource": {
+              "resource": "https://example.openai.azure.com",
+              "resource_name": "Azure OpenAI",
+              "authorization_servers": [
+                "https://login.microsoftonline.com/common/v2.0"
+              ],
+              "scopes_supported": [
+                "https://cognitiveservices.azure.com/.default"
+              ]
+            },
+            "description": "The access token expired."
+          }
+        },
+        {
+          "id": "source-local",
+          "provider": "example",
+          "name": "Local server",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "http://localhost:11434/v1"
+          },
+          "clientId": "client-1",
+          "state": {
+            "kind": "authRequired",
+            "reason": "required",
+            "resource": {
+              "resource": "http://localhost:11434/v1",
+              "resource_name": "Local server key"
+            }
+          }
+        },
+        {
+          "id": "source-host",
+          "provider": "example",
+          "name": "Host-configured",
+          "format": "example.com/model-source@1",
+          "definition": {
+            "baseUrl": "https://models.internal.example/v1"
+          },
+          "state": {
+            "kind": "error",
+            "error": {
+              "errorType": "policy",
+              "message": "The endpoint is not allowed by host policy."
+            }
+          }
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-root://",
+      "fromSeq": 4,
+      "state": {
+        "agents": [
+          {
+            "provider": "example",
+            "displayName": "Example",
+            "description": "Serves registered model sources",
+            "capabilities": {
+              "modelSourceRegistration": {
+                "formats": [
+                  "example.com/model-source@1",
+                  "example.com/model-source@0"
+                ]
+              }
+            },
+            "modelSources": [
+              {
+                "id": "source-ready",
+                "displayName": "OpenRouter"
+              }
+            ],
+            "models": [
+              {
+                "id": "source-ready.8f3a",
+                "provider": "example",
+                "name": "Example model",
+                "vendor": "OpenRouter",
+                "modelSourceId": "source-ready"
+              }
+            ]
+          }
+        ],
+        "modelSourceRegistrations": [
+          {
+            "id": "source-unreported",
+            "provider": "example",
+            "name": "Unreported",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "https://api.example.com/v1",
+              "wireFormat": "openai-chat",
+              "models": [
+                {
+                  "id": "example-model",
+                  "maxContextWindow": 128000
+                }
+              ]
+            },
+            "clientId": "client-1"
+          },
+          {
+            "id": "source-starting",
+            "provider": "example",
+            "name": "Starting",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "https://api.example.com/v1",
+              "wireFormat": "openai-chat",
+              "models": [
+                {
+                  "id": "example-model",
+                  "maxContextWindow": 128000
+                }
+              ]
+            },
+            "clientId": "client-1",
+            "state": {
+              "kind": "starting"
+            }
+          },
+          {
+            "id": "source-ready",
+            "provider": "example",
+            "name": "OpenRouter",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "https://api.example.com/v1",
+              "wireFormat": "openai-chat",
+              "models": [
+                {
+                  "id": "example-model",
+                  "maxContextWindow": 128000
+                }
+              ]
+            },
+            "clientId": "client-1",
+            "icons": [
+              {
+                "src": "https://example.com/openrouter.svg"
+              }
+            ],
+            "sharing": "host",
+            "retention": "host",
+            "state": {
+              "kind": "ready"
+            },
+            "_meta": {
+              "example.com/label": "Laptop"
+            }
+          },
+          {
+            "id": "source-auth",
+            "provider": "example",
+            "name": "Azure endpoint",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "https://api.example.com/v1",
+              "wireFormat": "openai-chat",
+              "models": [
+                {
+                  "id": "example-model",
+                  "maxContextWindow": 128000
+                }
+              ]
+            },
+            "clientId": "client-1",
+            "sharing": "contributingClient",
+            "retention": "contributingClient",
+            "state": {
+              "kind": "authRequired",
+              "reason": "expired",
+              "resource": {
+                "resource": "https://example.openai.azure.com",
+                "resource_name": "Azure OpenAI",
+                "authorization_servers": [
+                  "https://login.microsoftonline.com/common/v2.0"
+                ],
+                "scopes_supported": [
+                  "https://cognitiveservices.azure.com/.default"
+                ]
+              },
+              "description": "The access token expired."
+            }
+          },
+          {
+            "id": "source-local",
+            "provider": "example",
+            "name": "Local server",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "http://localhost:11434/v1"
+            },
+            "clientId": "client-1",
+            "state": {
+              "kind": "authRequired",
+              "reason": "required",
+              "resource": {
+                "resource": "http://localhost:11434/v1",
+                "resource_name": "Local server key"
+              }
+            }
+          },
+          {
+            "id": "source-host",
+            "provider": "example",
+            "name": "Host-configured",
+            "format": "example.com/model-source@1",
+            "definition": {
+              "baseUrl": "https://models.internal.example/v1"
+            },
+            "state": {
+              "kind": "error",
+              "error": {
+                "errorType": "policy",
+                "message": "The endpoint is not allowed by host policy."
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

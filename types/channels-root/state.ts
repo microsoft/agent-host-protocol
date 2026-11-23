@@ -8,9 +8,12 @@
 
 import type {
   ConfigSchema,
+  ErrorInfo,
+  Icon,
   JsonPrimitive,
   ProtectedResourceMetadata,
 } from '../common/state.js';
+import type { AuthRequiredReason } from '../common/notifications.js';
 import type { TerminalInfo } from '../channels-terminal/state.js';
 import type { Customization } from '../channels-session/state.js';
 
@@ -42,6 +45,13 @@ export interface RootState {
   terminals?: TerminalInfo[];
   /** Agent host configuration schema and current values */
   config?: RootConfigState;
+  /**
+   * Model sources registered on this host, keyed by `id`.
+   *
+   * @stability 1.0
+   * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+   */
+  modelSourceRegistrations?: ModelSourceRegistration[];
   /**
    * Additional implementation-defined metadata about the agent host itself.
    *
@@ -133,6 +143,14 @@ export interface AgentCapabilities {
    * {@link CreateSessionParams.workingDirectories}.
    */
   multipleWorkingDirectories?: MultipleWorkingDirectoriesCapability;
+  /**
+   * The agent serves models from registered model sources, in the listed
+   * definition formats.
+   *
+   * @stability 1.0
+   * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+   */
+  modelSourceRegistration?: ModelSourceRegistrationCapability;
 }
 
 /**
@@ -209,7 +227,11 @@ export interface MultipleWorkingDirectoriesCapability {
  * @category Root State
  */
 export interface ModelSourceInfo {
-  /** Model source identifier, unique within the agent's {@link AgentInfo.modelSources}. */
+  /**
+   * Model source identifier, unique within the agent's
+   * {@link AgentInfo.modelSources}. For a registered model source, this is
+   * the {@link ModelSourceRegistration.id}.
+   */
   id: string;
   /** Human-readable name */
   displayName: string;
@@ -222,7 +244,10 @@ export interface SessionModelInfo {
   /**
    * Model identifier, unique within the agent's {@link AgentInfo.models}.
    * When several model sources serve the same upstream model, the host gives
-   * each entry its own ID.
+   * each entry its own ID. An ID the host publishes for a registered model
+   * source stays bound to that registration and upstream model.
+   *
+   * @see {@link /specification/root-channel#reserved-model-ids | Reserved model IDs}
    */
   id: string;
   /** Agent provider that owns this model. Matches {@link AgentInfo.provider}. */
@@ -287,6 +312,208 @@ export interface ModelSelection {
    */
   config?: Record<string, JsonPrimitive>;
 }
+
+// ─── Model Source Registry ───────────────────────────────────────────────────
+
+/**
+ * Options for the {@link AgentCapabilities.modelSourceRegistration} capability.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceRegistrationCapability {
+  /**
+   * Definition formats the agent reads, most preferred first. Format names
+   * are defined by agent implementations and SHOULD be namespaced, for
+   * example `example.com/model-source@1`.
+   */
+  formats: string[];
+}
+
+/**
+ * A model source registered on this host by a client, or by the host itself.
+ * Its definition is in a format the agent named by `provider` reads. It never
+ * contains a credential.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+ */
+export interface ModelSourceRegistration {
+  /**
+   * Host-unique ID, chosen by whoever registers the source. Also the
+   * source's {@link ModelSourceInfo.id} in the agent's catalog, and the
+   * {@link SessionModelInfo.modelSourceId} of its models.
+   */
+  id: string;
+  /** Agent provider whose agent reads the definition and serves the models. */
+  provider: string;
+  /** Display name, published as {@link ModelSourceInfo.displayName}. */
+  name: string;
+  /** Icons for UI display. */
+  icons?: Icon[];
+  /**
+   * Definition format, one of the agent's
+   * {@link ModelSourceRegistrationCapability.formats}.
+   */
+  format: string;
+  /**
+   * How to reach the source: endpoint, wire format, models, and so on, in
+   * `format`. Its shape belongs to the agent that reads it. MUST NOT contain
+   * a credential.
+   */
+  definition: Record<string, unknown>;
+  /** The contributing client. Absent for a source the host registered itself. */
+  clientId?: string;
+  /** Who may select the source's models. Absent means `contributingClient`. */
+  sharing?: ModelSourceSharingPolicy;
+  /** What happens when the contributing client leaves. Absent means `contributingClient`. */
+  retention?: ModelSourceRetentionPolicy;
+  /** Host-reported status. Absent means the host hasn't reported one yet. */
+  state?: ModelSourceState;
+  /**
+   * Additional implementation-defined metadata for this registration.
+   * MUST NOT contain a credential.
+   */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Who may select a registered model source's models.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @nonexhaustive
+ */
+export const enum ModelSourceSharingPolicy {
+  /** Only turns and pending messages the contributing client dispatches. */
+  ContributingClient = 'contributingClient',
+  /** Any client, and work the host starts itself, such as automations. */
+  Host = 'host',
+}
+
+/**
+ * How long a registered model source lasts once its contributing client leaves.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @nonexhaustive
+ */
+export const enum ModelSourceRetentionPolicy {
+  /** Removed when the contributing client leaves, once running turns finish. */
+  ContributingClient = 'contributingClient',
+  /** Kept until a client removes it or host policy expires it. */
+  Host = 'host',
+}
+
+/**
+ * Discriminant for the {@link ModelSourceState} union.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @nonexhaustive
+ */
+export const enum ModelSourceStatus {
+  /** The agent is reading and validating the definition. */
+  Starting = 'starting',
+  /** The source is usable, and its models are in the agent's catalog. */
+  Ready = 'ready',
+  /** The source needs a credential before it can be used. */
+  AuthRequired = 'authRequired',
+  /** The source failed, or the host declined it. */
+  Error = 'error',
+}
+
+/**
+ * The agent is reading and validating the definition, or listing the
+ * source's models again after a credential change.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceStartingState {
+  kind: ModelSourceStatus.Starting;
+}
+
+/**
+ * The source is usable, and its models are in the catalog of the agent named
+ * by the registration's `provider`.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceReadyState {
+  kind: ModelSourceStatus.Ready;
+}
+
+/**
+ * What a model source needs in order to become ready. Deliberately carries no
+ * credential.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceAuthRequirement {
+  /** Why a credential is needed. */
+  reason: AuthRequiredReason;
+  /**
+   * RFC 9728 metadata for the source's endpoint. `resource.resource` is the
+   * endpoint URL as the definition names it, in any scheme the agent
+   * supports (for example `http://localhost:11434/v1`). It's the value a
+   * client passes back as `authenticate({ resource })`, and nothing fetches
+   * it. `resource.resource_name` labels the prompt (for example
+   * "OpenRouter API key"). A source that accepts OAuth access tokens
+   * advertises `authorization_servers` and `scopes_supported`. A source that
+   * takes a user-supplied secret omits them.
+   */
+  resource: ProtectedResourceMetadata;
+  /** Human-readable hint, for example the endpoint's error description. */
+  description?: string;
+}
+
+/**
+ * The source needs a credential before it can be used. A client answers with
+ * `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+ */
+export interface ModelSourceAuthRequiredState extends ModelSourceAuthRequirement {
+  kind: ModelSourceStatus.AuthRequired;
+}
+
+/**
+ * The source failed, or the host declined it, for example by policy.
+ *
+ * @category Root State
+ * @stability 1.0
+ * @preserveUnknownMembers
+ */
+export interface ModelSourceErrorState {
+  kind: ModelSourceStatus.Error;
+  /** Error details. MUST NOT contain the credential. */
+  error: ErrorInfo;
+}
+
+/**
+ * Lifecycle state of a {@link ModelSourceRegistration}, discriminated by
+ * `kind` (a {@link ModelSourceStatus} value).
+ *
+ * @category Root State
+ * @stability 1.0
+ */
+export type ModelSourceState =
+  | ModelSourceStartingState
+  | ModelSourceReadyState
+  | ModelSourceAuthRequiredState
+  | ModelSourceErrorState;
 
 // ─── Root Config Types ───────────────────────────────────────────────────────
 

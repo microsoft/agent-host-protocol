@@ -1,0 +1,26 @@
+{
+  "name": "authenticate-model-source-target",
+  "group": "A",
+  "description": "authenticate delivers an opaque secret for one registered model source through a modelSource target. An API key carries no expiresIn or scopes.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://openrouter.ai/api/v1",
+    "token": "test-api-key",
+    "target": {
+      "kind": "modelSource",
+      "modelSourceId": "source-new"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-root://",
+      "resource": "https://openrouter.ai/api/v1",
+      "token": "test-api-key",
+      "target": {
+        "kind": "modelSource",
+        "modelSourceId": "source-new"
+      }
+    }
+  ]
+}

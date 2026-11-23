@@ -773,6 +773,7 @@ const STATE_ENUMS = [
   'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
+  'ModelSourceStatus', 'ModelSourceSharingPolicy', 'ModelSourceRetentionPolicy',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationDisableConditionKind',
@@ -794,6 +795,13 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
+  { name: 'ModelSourceRegistrationCapability' },
+  { name: 'ModelSourceRegistration' },
+  { name: 'ModelSourceStartingState' },
+  { name: 'ModelSourceReadyState' },
+  { name: 'ModelSourceAuthRequirement' },
+  { name: 'ModelSourceAuthRequiredState' },
+  { name: 'ModelSourceErrorState' },
   { name: 'ModelSourceInfo' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
@@ -1289,6 +1297,19 @@ const MCP_SERVER_STATUS_UNION: UnionConfig = {
   unknown: true,
 };
 
+const MODEL_SOURCE_STATUS_UNION: UnionConfig = {
+  name: 'ModelSourceState',
+  discriminantField: 'kind',
+  doc: 'ModelSourceState is the lifecycle state of a registered model source.',
+  variants: [
+    { variantName: 'Starting', innerType: 'ModelSourceStartingState', wireValue: 'starting' },
+    { variantName: 'Ready', innerType: 'ModelSourceReadyState', wireValue: 'ready' },
+    { variantName: 'AuthRequired', innerType: 'ModelSourceAuthRequiredState', wireValue: 'authRequired' },
+    { variantName: 'Error', innerType: 'ModelSourceErrorState', wireValue: 'error' },
+  ],
+  unknown: true,
+};
+
 const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   name: 'ToolCallContributor',
   discriminantField: 'kind',
@@ -1632,7 +1653,8 @@ function generateStateFile(project: Project): string {
     CHAT_INPUT_QUESTION_UNION, CHAT_INPUT_ANSWER_VALUE_UNION, CHAT_INPUT_ANSWER_UNION,
     TOOL_RESULT_CONTENT_UNION, MESSAGE_ATTACHMENT_UNION, CUSTOMIZATION_UNION,
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
-    MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION, BACKGROUND_WORK_UNION,
+    MCP_SERVER_STATUS_UNION, MODEL_SOURCE_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION,
+    BACKGROUND_WORK_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION, AUTOMATION_TARGET_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
@@ -1656,6 +1678,8 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'root/agentsChanged', variantName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
+  { type: 'root/modelSourceRegistrationSet', variantName: 'RootModelSourceRegistrationSet', tsInterface: 'RootModelSourceRegistrationSetAction' },
+  { type: 'root/modelSourceRegistrationRemoved', variantName: 'RootModelSourceRegistrationRemoved', tsInterface: 'RootModelSourceRegistrationRemovedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },
   { type: 'session/creationFailed', variantName: 'SessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
   // Session turn/tool-call/error/usage/reasoning actions have no TypeScript interfaces in
@@ -2383,6 +2407,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
+  { name: 'ModelSourceAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
@@ -2422,6 +2447,7 @@ const AUTHENTICATE_TARGET_UNION: UnionConfig = {
   doc: 'AuthenticateTarget identifies the consumer of an authentication token.',
   variants: [
     { variantName: 'McpServer', innerType: 'McpServerAuthenticateTarget', wireValue: 'mcpServer' },
+    { variantName: 'ModelSource', innerType: 'ModelSourceAuthenticateTarget', wireValue: 'modelSource' },
   ],
 };
 
@@ -2946,7 +2972,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionToolCallConfirmedAction', 'PingParams', 'TerminalClaim',
     'TerminalContentPart', 'MessageAttachment', 'MessageAttachmentBase',
     'Customization', 'ChildCustomization', 'ChildCustomizationType',
-    'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
+    'CustomizationLoadState', 'McpServerState', 'ModelSourceState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationDisableCondition',
     'AutomationTarget',

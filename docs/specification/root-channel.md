@@ -22,6 +22,7 @@ RootState {
   activeSessions?: number
   terminals?: TerminalInfo[]
   config?: RootConfigState
+  modelSourceRegistrations?: ModelSourceRegistration[]
 }
 ```
 
@@ -29,6 +30,7 @@ RootState {
 - `activeSessions` — count of non-disposed sessions. Lightweight badge counter.
 - `terminals` — lightweight per-terminal metadata for rendering a terminal manager UI without subscribing to every terminal. See [Terminal Channel](/specification/terminal-channel) for the full state.
 - `config` — host-level configuration schema and current values.
+- `modelSourceRegistrations` — model sources clients or the host registered. See [Model source registry](#model-source-registry).
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
@@ -58,6 +60,65 @@ A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, 
   ]
 }
 ```
+
+### Model source registry
+
+Clients can register bring-your-own-key model sources with the host, so its agents can serve those models to every session and to automations. Root state lists them in [`modelSourceRegistrations`](/reference/root#modelsourceregistration), keyed by `id`. An agent that accepts registrations advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the definition formats it reads.
+
+```json
+{
+  "id": "2f6c0e1a-model-source",
+  "provider": "example",
+  "name": "OpenRouter",
+  "format": "example.com/model-source@1",
+  "definition": { "baseUrl": "https://openrouter.ai/api/v1" },
+  "clientId": "laptop",
+  "sharing": "host",
+  "retention": "host",
+  "state": { "kind": "ready" }
+}
+```
+
+`definition` says how to reach the source, in `format`. Its shape belongs to the agent that reads it, and it MUST NOT contain a credential. A client delivers the credential separately, with [`authenticate`](/specification/authentication#model-source-credentials).
+
+#### Registering
+
+A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId` and no `state`, and removes one with `root/modelSourceRegistrationRemoved`. The host reports status by dispatching `Set` again with a `state`: `starting`, `ready`, `authRequired`, or `error`. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed, because doing so clears the reported state.
+
+The host rejects a client's `Set` or `Removed`, through `rejectionReason`, when:
+
+- the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
+- `clientId` isn't the dispatching client's ID, or `state` is present;
+- `id` is already a declared `ModelSourceInfo.id` in that agent's catalog;
+- the registration belongs to another client and has `contributingClient` sharing, or the host registered it, unless host policy allows the change;
+- the host won't honor the requested `sharing` or `retention`. The client can register again with a narrower policy.
+
+When a `Set` changes a registration's `provider`, `format`, `definition`, or `clientId`, the host drops its credential, and the source goes back through `starting`. A host may also register sources itself. Those registrations have no `clientId`, and both policies behave as `host`.
+
+#### Catalog
+
+When a registration is `ready`, the host adds it to the catalog of the agent named by `provider`, through `root/agentsChanged`: a `ModelSourceInfo` with the registration's `id` and `name`, and its models in `models` with `modelSourceId` set to that `id`. The host lists the models only while the registration is `ready`. It MAY list the `ModelSourceInfo` in other states.
+
+The host checks every selection of a registered source's model: the model is listed, the chat is backed by the registration's agent provider, and the sharing policy allows it. It checks whenever it uses a selection, including when a client continues a turn with `chat/turnResume`. Otherwise it rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions. The host MUST NOT run the work on a different model.
+
+#### Sharing and retention
+
+The contributing client chooses two policies. Absent means `contributingClient`, the narrowest choice.
+
+- **Sharing.** With `contributingClient`, only turns and pending messages that client dispatches may select the source's models. With `host`, any client may, and so may work the host starts itself, such as automations.
+- **Retention.** With `contributingClient`, the source is removed when its client leaves: new work that names its models fails, turns already running on it finish, and then the host removes the registration and drops its credential. With `host`, the registration and its in-memory credential stay until a client removes it, host policy expires it, or the host restarts.
+
+The host never widens a policy, and it MAY expire `host`-retained registrations. Every client sees every registration, so clients SHOULD offer only the models they may select, using `sharing` and `clientId`.
+
+A client that reconnects with the same `clientId` within the host's grace period keeps its registrations. A client that comes back with a new `clientId` registers again under the same `id`. For a `host`-shared registration, that takes it over: `clientId` changes, the credential is dropped, and the new contributing client supplies it. After a restart, a host that persists its state SHOULD keep `host`-retained registrations, which come back in `authRequired`.
+
+#### Reserved model IDs
+
+Drafts, pending messages, history, and automation definitions keep a selection after its source goes away, and a chat keeps them when it moves to another session. Once the host publishes a model ID for a registration, that ID is bound to that registration and its upstream model for as long as the host keeps state, including after the registration is removed and across a restart. The host MUST NOT resolve the ID to anything else. It MAY publish the ID again only when the same registration comes back offering the same upstream model. A host can meet this by minting IDs it never reuses, for example with a random component.
+
+#### Automations
+
+An automation may name a registered source's model when the registration has `host` sharing and `host` retention, or was registered by the host. The host SHOULD reject an automation create or update that names any other registration's model. If the source isn't `ready` when a run starts, the run fails through the automation run lifecycle.
 
 ### Paginating the catalogue
 
@@ -110,7 +171,7 @@ target channel instead.
 | `root/sessionSummaryChanged` | server → client notification | Session catalogue entry mutated. |
 | `root/progress` | server → client notification | Generic progress for a long-running operation a client opted into (e.g. an SDK download). |
 | `unsubscribe` | client → server notification | Stop receiving root-channel messages. |
-| `dispatchAction` | client → server notification | Dispatch a root-scoped client action (currently `root/configChanged`). |
+| `dispatchAction` | client → server notification | Dispatch a root-scoped client action: `root/configChanged`, `root/modelSourceRegistrationSet`, or `root/modelSourceRegistrationRemoved`. |
 
 `auth/required` may also be emitted on `ahp-root://` when the auth requirement
 is root-scoped; see [Authentication](/specification/authentication).
@@ -125,6 +186,8 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/activeSessionsChanged` | Server          | Replaces `activeSessions`            |
 | `root/terminalsChanged`      | Server          | Replaces `terminals`                 |
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
+| `root/modelSourceRegistrationSet` | Server / Client | Adds or replaces a registration in `modelSourceRegistrations` by `id` |
+| `root/modelSourceRegistrationRemoved` | Server / Client | Removes a registration by `id` |
 
 All root-scoped action envelopes have `channel: "ahp-root://"`.
 

@@ -1,0 +1,43 @@
+{
+  "description": "root/modelSourceRegistrationSet creates the registry when it is absent",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegistrationSet",
+      "registration": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "name": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            "model-a"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "name": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            "model-a"
+          ]
+        },
+        "clientId": "client-1"
+      }
+    ]
+  }
+}

@@ -537,6 +537,23 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			state.Config.Values[k] = v
 		}
 		return ReduceOutcomeApplied
+	case *ahptypes.RootModelSourceRegistrationSetAction:
+		for i := range state.ModelSourceRegistrations {
+			if state.ModelSourceRegistrations[i].Id == a.Registration.Id {
+				state.ModelSourceRegistrations[i] = a.Registration
+				return ReduceOutcomeApplied
+			}
+		}
+		state.ModelSourceRegistrations = append(state.ModelSourceRegistrations, a.Registration)
+		return ReduceOutcomeApplied
+	case *ahptypes.RootModelSourceRegistrationRemovedAction:
+		for i := range state.ModelSourceRegistrations {
+			if state.ModelSourceRegistrations[i].Id == a.Id {
+				state.ModelSourceRegistrations = append(state.ModelSourceRegistrations[:i], state.ModelSourceRegistrations[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope
 }

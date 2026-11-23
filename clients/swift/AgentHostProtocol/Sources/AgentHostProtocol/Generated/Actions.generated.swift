@@ -93,6 +93,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case annotationsEntryRemoved
     case rootTerminalsChanged
     case rootConfigChanged
+    case rootModelSourceRegistrationSet
+    case rootModelSourceRegistrationRemoved
     case terminalData
     case terminalInput
     case terminalResized
@@ -208,6 +210,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "annotations/entryRemoved": self = .annotationsEntryRemoved
         case "root/terminalsChanged": self = .rootTerminalsChanged
         case "root/configChanged": self = .rootConfigChanged
+        case "root/modelSourceRegistrationSet": self = .rootModelSourceRegistrationSet
+        case "root/modelSourceRegistrationRemoved": self = .rootModelSourceRegistrationRemoved
         case "terminal/data": self = .terminalData
         case "terminal/input": self = .terminalInput
         case "terminal/resized": self = .terminalResized
@@ -323,6 +327,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .annotationsEntryRemoved: try container.encode("annotations/entryRemoved")
         case .rootTerminalsChanged: try container.encode("root/terminalsChanged")
         case .rootConfigChanged: try container.encode("root/configChanged")
+        case .rootModelSourceRegistrationSet: try container.encode("root/modelSourceRegistrationSet")
+        case .rootModelSourceRegistrationRemoved: try container.encode("root/modelSourceRegistrationRemoved")
         case .terminalData: try container.encode("terminal/data")
         case .terminalInput: try container.encode("terminal/input")
         case .terminalResized: try container.encode("terminal/resized")
@@ -2281,6 +2287,45 @@ public struct RootConfigChangedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Adds a model source registration, or replaces the one with the same `id`.
+///
+/// A client registers a source by dispatching this with its own `clientId` and
+/// no `state`. The host reports status by dispatching it again with the same
+/// registration and a `state`.
+///
+/// Stability: 1.0 - Early development.
+public struct RootModelSourceRegistrationSetAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The registration to add or replace, matched by `id`.
+    public var registration: ModelSourceRegistration
+
+    public init(
+        type: ActionType,
+        registration: ModelSourceRegistration
+    ) {
+        self.type = type
+        self.registration = registration
+    }
+}
+
+/// Removes the model source registration with the given `id`. A no-op when
+/// none matches.
+///
+/// Stability: 1.0 - Early development.
+public struct RootModelSourceRegistrationRemovedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The registration's `id`.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
 public struct TerminalDataAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Output data (may contain ANSI escape sequences)
@@ -2750,6 +2795,8 @@ public enum StateAction: Codable, Sendable, Equatable {
     case annotationsEntryRemoved(AnnotationsEntryRemovedAction)
     case rootTerminalsChanged(RootTerminalsChangedAction)
     case rootConfigChanged(RootConfigChangedAction)
+    case rootModelSourceRegistrationSet(RootModelSourceRegistrationSetAction)
+    case rootModelSourceRegistrationRemoved(RootModelSourceRegistrationRemovedAction)
     case terminalData(TerminalDataAction)
     case terminalInput(TerminalInputAction)
     case terminalResized(TerminalResizedAction)
@@ -2957,6 +3004,10 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .rootTerminalsChanged(try RootTerminalsChangedAction(from: decoder))
         case "root/configChanged":
             self = .rootConfigChanged(try RootConfigChangedAction(from: decoder))
+        case "root/modelSourceRegistrationSet":
+            self = .rootModelSourceRegistrationSet(try RootModelSourceRegistrationSetAction(from: decoder))
+        case "root/modelSourceRegistrationRemoved":
+            self = .rootModelSourceRegistrationRemoved(try RootModelSourceRegistrationRemovedAction(from: decoder))
         case "terminal/data":
             self = .terminalData(try TerminalDataAction(from: decoder))
         case "terminal/input":
@@ -3093,6 +3144,8 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .annotationsEntryRemoved(let v): try v.encode(to: encoder)
         case .rootTerminalsChanged(let v): try v.encode(to: encoder)
         case .rootConfigChanged(let v): try v.encode(to: encoder)
+        case .rootModelSourceRegistrationSet(let v): try v.encode(to: encoder)
+        case .rootModelSourceRegistrationRemoved(let v): try v.encode(to: encoder)
         case .terminalData(let v): try v.encode(to: encoder)
         case .terminalInput(let v): try v.encode(to: encoder)
         case .terminalResized(let v): try v.encode(to: encoder)

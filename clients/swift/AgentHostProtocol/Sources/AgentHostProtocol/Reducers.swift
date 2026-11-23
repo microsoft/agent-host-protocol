@@ -122,6 +122,16 @@ public func rootReducer(state: RootState, action: StateAction) -> RootState {
         next.config = config
         return next
 
+    case .rootModelSourceRegistrationSet(let a):
+        var next = state
+        applyModelSourceRegistrationSet(&next, a.registration)
+        return next
+
+    case .rootModelSourceRegistrationRemoved(let a):
+        var next = state
+        guard applyModelSourceRegistrationRemoved(&next, id: a.id) else { return state }
+        return next
+
     default:
         return state
     }

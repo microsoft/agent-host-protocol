@@ -1408,6 +1408,177 @@ internal sealed class McpAuthRequiredReasonConverter : JsonConverter<McpAuthRequ
         => writer.WriteStringValue(value.Value);
 }
 
+/// <summary>Discriminant for the {@link ModelSourceState} union.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ModelSourceStatusConverter))]
+public readonly struct ModelSourceStatus : IEquatable<ModelSourceStatus>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ModelSourceStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The agent is reading and validating the definition.</summary>
+    public static readonly ModelSourceStatus Starting = new ModelSourceStatus("starting");
+
+    /// <summary>The source is usable, and its models are in the agent's catalog.</summary>
+    public static readonly ModelSourceStatus Ready = new ModelSourceStatus("ready");
+
+    /// <summary>The source needs a credential before it can be used.</summary>
+    public static readonly ModelSourceStatus AuthRequired = new ModelSourceStatus("authRequired");
+
+    /// <summary>The source failed, or the host declined it.</summary>
+    public static readonly ModelSourceStatus Error = new ModelSourceStatus("error");
+
+    /// <inheritdoc />
+    public bool Equals(ModelSourceStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ModelSourceStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ModelSourceStatus left, ModelSourceStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ModelSourceStatus left, ModelSourceStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ModelSourceStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ModelSourceStatusConverter : JsonConverter<ModelSourceStatus>
+{
+    /// <inheritdoc />
+    public override ModelSourceStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ModelSourceStatus(reader.GetString() ?? throw new JsonException("ModelSourceStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ModelSourceStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Who may select a registered model source's models.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ModelSourceSharingPolicyConverter))]
+public readonly struct ModelSourceSharingPolicy : IEquatable<ModelSourceSharingPolicy>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ModelSourceSharingPolicy(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Only turns and pending messages the contributing client dispatches.</summary>
+    public static readonly ModelSourceSharingPolicy ContributingClient = new ModelSourceSharingPolicy("contributingClient");
+
+    /// <summary>Any client, and work the host starts itself, such as automations.</summary>
+    public static readonly ModelSourceSharingPolicy Host = new ModelSourceSharingPolicy("host");
+
+    /// <inheritdoc />
+    public bool Equals(ModelSourceSharingPolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ModelSourceSharingPolicy other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ModelSourceSharingPolicy left, ModelSourceSharingPolicy right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ModelSourceSharingPolicy left, ModelSourceSharingPolicy right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ModelSourceSharingPolicy"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ModelSourceSharingPolicyConverter : JsonConverter<ModelSourceSharingPolicy>
+{
+    /// <inheritdoc />
+    public override ModelSourceSharingPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ModelSourceSharingPolicy(reader.GetString() ?? throw new JsonException("ModelSourceSharingPolicy expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ModelSourceSharingPolicy value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>How long a registered model source lasts once its contributing client leaves.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ModelSourceRetentionPolicyConverter))]
+public readonly struct ModelSourceRetentionPolicy : IEquatable<ModelSourceRetentionPolicy>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ModelSourceRetentionPolicy(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Removed when the contributing client leaves, once running turns finish.</summary>
+    public static readonly ModelSourceRetentionPolicy ContributingClient = new ModelSourceRetentionPolicy("contributingClient");
+
+    /// <summary>Kept until a client removes it or host policy expires it.</summary>
+    public static readonly ModelSourceRetentionPolicy Host = new ModelSourceRetentionPolicy("host");
+
+    /// <inheritdoc />
+    public bool Equals(ModelSourceRetentionPolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ModelSourceRetentionPolicy other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ModelSourceRetentionPolicy left, ModelSourceRetentionPolicy right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ModelSourceRetentionPolicy left, ModelSourceRetentionPolicy right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ModelSourceRetentionPolicy"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ModelSourceRetentionPolicyConverter : JsonConverter<ModelSourceRetentionPolicy>
+{
+    /// <inheritdoc />
+    public override ModelSourceRetentionPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ModelSourceRetentionPolicy(reader.GetString() ?? throw new JsonException("ModelSourceRetentionPolicy expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ModelSourceRetentionPolicy value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
 /// <summary>Computation lifecycle of a {@link ChangesetState}.</summary>
 [JsonConverter(typeof(ChangesetStatusConverter))]
 public readonly struct ChangesetStatus : IEquatable<ChangesetStatus>
@@ -2055,6 +2226,12 @@ public sealed class RootState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RootConfigState? Config { get; set; }
 
+    /// <summary>Model sources registered on this host, keyed by `id`.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ModelSourceRegistration>? ModelSourceRegistrations { get; set; }
+
     /// <summary>Additional implementation-defined metadata about the agent host itself.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.</summary>
@@ -2152,6 +2329,13 @@ public sealed record AgentCapabilities
     /// {@link CreateSessionParams.workingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleWorkingDirectoriesCapability? MultipleWorkingDirectories { get; init; }
+
+    /// <summary>The agent serves models from registered model sources, in the listed
+    /// definition formats.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceRegistrationCapability? ModelSourceRegistration { get; init; }
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleChats} capability.</summary>
@@ -2213,11 +2397,185 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
+/// <summary>Options for the {@link AgentCapabilities.modelSourceRegistration} capability.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceRegistrationCapability
+{
+    /// <summary>Definition formats the agent reads, most preferred first. Format names
+    /// are defined by agent implementations and SHOULD be namespaced, for
+    /// example `example.com/model-source@1`.</summary>
+    public required List<string> Formats { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>A model source registered on this host by a client, or by the host itself.
+/// Its definition is in a format the agent named by `provider` reads. It never
+/// contains a credential.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceRegistration
+{
+    /// <summary>Host-unique ID, chosen by whoever registers the source. Also the
+    /// source's {@link ModelSourceInfo.id} in the agent's catalog, and the
+    /// {@link SessionModelInfo.modelSourceId} of its models.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Agent provider whose agent reads the definition and serves the models.</summary>
+    public required string Provider { get; init; }
+
+    /// <summary>Display name, published as {@link ModelSourceInfo.displayName}.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Icons for UI display.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Icon>? Icons { get; init; }
+
+    /// <summary>Definition format, one of the agent's
+    /// {@link ModelSourceRegistrationCapability.formats}.</summary>
+    public required string Format { get; init; }
+
+    /// <summary>How to reach the source: endpoint, wire format, models, and so on, in
+    /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
+    /// a credential.</summary>
+    public required Dictionary<string, JsonElement> Definition { get; init; }
+
+    /// <summary>The contributing client. Absent for a source the host registered itself.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClientId { get; init; }
+
+    /// <summary>Who may select the source's models. Absent means `contributingClient`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceSharingPolicy? Sharing { get; init; }
+
+    /// <summary>What happens when the contributing client leaves. Absent means `contributingClient`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceRetentionPolicy? Retention { get; init; }
+
+    /// <summary>Host-reported status. Absent means the host hasn't reported one yet.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceState? State { get; init; }
+
+    /// <summary>Additional implementation-defined metadata for this registration.
+    /// MUST NOT contain a credential.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>The agent is reading and validating the definition, or listing the
+/// source's models again after a credential change.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceStartingState
+{
+    public ModelSourceStatus Kind { get; init; } = ModelSourceStatus.Starting;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>The source is usable, and its models are in the catalog of the agent named
+/// by the registration's `provider`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceReadyState
+{
+    public ModelSourceStatus Kind { get; init; } = ModelSourceStatus.Ready;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>What a model source needs in order to become ready. Deliberately carries no
+/// credential.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceAuthRequirement
+{
+    /// <summary>Why a credential is needed.</summary>
+    public AuthRequiredReason Reason { get; init; }
+
+    /// <summary>RFC 9728 metadata for the source's endpoint. `resource.resource` is the
+    /// endpoint URL as the definition names it, in any scheme the agent
+    /// supports (for example `http://localhost:11434/v1`). It's the value a
+    /// client passes back as `authenticate({ resource })`, and nothing fetches
+    /// it. `resource.resource_name` labels the prompt (for example
+    /// "OpenRouter API key"). A source that accepts OAuth access tokens
+    /// advertises `authorization_servers` and `scopes_supported`. A source that
+    /// takes a user-supplied secret omits them.</summary>
+    public required ProtectedResourceMetadata Resource { get; init; }
+
+    /// <summary>Human-readable hint, for example the endpoint's error description.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>The source needs a credential before it can be used. A client answers with
+/// `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceAuthRequiredState
+{
+    /// <summary>Why a credential is needed.</summary>
+    public AuthRequiredReason Reason { get; init; }
+
+    /// <summary>RFC 9728 metadata for the source's endpoint. `resource.resource` is the
+    /// endpoint URL as the definition names it, in any scheme the agent
+    /// supports (for example `http://localhost:11434/v1`). It's the value a
+    /// client passes back as `authenticate({ resource })`, and nothing fetches
+    /// it. `resource.resource_name` labels the prompt (for example
+    /// "OpenRouter API key"). A source that accepts OAuth access tokens
+    /// advertises `authorization_servers` and `scopes_supported`. A source that
+    /// takes a user-supplied secret omits them.</summary>
+    public required ProtectedResourceMetadata Resource { get; init; }
+
+    /// <summary>Human-readable hint, for example the endpoint's error description.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    public ModelSourceStatus Kind { get; init; } = ModelSourceStatus.AuthRequired;
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>The source failed, or the host declined it, for example by policy.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceErrorState
+{
+    public ModelSourceStatus Kind { get; init; } = ModelSourceStatus.Error;
+
+    /// <summary>Error details. MUST NOT contain the credential.</summary>
+    public required ErrorInfo Error { get; init; }
+
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
 /// <summary>A source that an agent provider offers models from, such as a service or
 /// subscription.</summary>
 public sealed record ModelSourceInfo
 {
-    /// <summary>Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.</summary>
+    /// <summary>Model source identifier, unique within the agent's
+    /// {@link AgentInfo.modelSources}. For a registered model source, this is
+    /// the {@link ModelSourceRegistration.id}.</summary>
     public required string Id { get; init; }
 
     /// <summary>Human-readable name</summary>
@@ -2228,7 +2586,8 @@ public sealed record SessionModelInfo
 {
     /// <summary>Model identifier, unique within the agent's {@link AgentInfo.models}.
     /// When several model sources serve the same upstream model, the host gives
-    /// each entry its own ID.</summary>
+    /// each entry its own ID. An ID the host publishes for a registered model
+    /// source stays bound to that registration and upstream model.</summary>
     public required string Id { get; init; }
 
     /// <summary>Agent provider that owns this model. Matches {@link AgentInfo.provider}.</summary>
@@ -8086,6 +8445,35 @@ internal sealed class McpServerStateConverter : UnionConverter<McpServerState>
         ["authRequired"] = typeof(McpServerAuthRequiredState),
         ["error"] = typeof(McpServerErrorState),
         ["stopped"] = typeof(McpServerStoppedState),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>ModelSourceState is the lifecycle state of a registered model source.</summary>
+[JsonConverter(typeof(ModelSourceStateConverter))]
+public sealed class ModelSourceState : AhpUnion
+{
+    /// <summary>Creates an empty ModelSourceState (no active variant).</summary>
+    public ModelSourceState() { }
+
+    /// <summary>Creates a ModelSourceState wrapping the given variant value.</summary>
+    public ModelSourceState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the ModelSourceState discriminated union.</summary>
+internal sealed class ModelSourceStateConverter : UnionConverter<ModelSourceState>
+{
+    public ModelSourceStateConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["starting"] = typeof(ModelSourceStartingState),
+        ["ready"] = typeof(ModelSourceReadyState),
+        ["authRequired"] = typeof(ModelSourceAuthRequiredState),
+        ["error"] = typeof(ModelSourceErrorState),
             },
             allowUnknown: true)
     {

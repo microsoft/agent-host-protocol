@@ -116,6 +116,8 @@ value class ActionType(val rawValue: String) {
         val ANNOTATIONS_ENTRY_REMOVED: ActionType = ActionType("annotations/entryRemoved")
         val ROOT_TERMINALS_CHANGED: ActionType = ActionType("root/terminalsChanged")
         val ROOT_CONFIG_CHANGED: ActionType = ActionType("root/configChanged")
+        val ROOT_MODEL_SOURCE_REGISTRATION_SET: ActionType = ActionType("root/modelSourceRegistrationSet")
+        val ROOT_MODEL_SOURCE_REGISTRATION_REMOVED: ActionType = ActionType("root/modelSourceRegistrationRemoved")
         val TERMINAL_DATA: ActionType = ActionType("terminal/data")
         val TERMINAL_INPUT: ActionType = ActionType("terminal/input")
         val TERMINAL_RESIZED: ActionType = ActionType("terminal/resized")
@@ -1482,6 +1484,39 @@ data class RootConfigChangedAction(
     val replace: Boolean? = null
 )
 
+/**
+ * Adds a model source registration, or replaces the one with the same `id`.
+ *
+ * A client registers a source by dispatching this with its own `clientId` and
+ * no `state`. The host reports status by dispatching it again with the same
+ * registration and a `state`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceRegistrationSetAction(
+    val type: ActionType,
+    /**
+     * The registration to add or replace, matched by `id`.
+     */
+    val registration: ModelSourceRegistration
+)
+
+/**
+ * Removes the model source registration with the given `id`. A no-op when
+ * none matches.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceRegistrationRemovedAction(
+    val type: ActionType,
+    /**
+     * The registration's `id`.
+     */
+    val id: String
+)
+
 @Serializable
 data class TerminalDataAction(
     val type: ActionType,
@@ -1853,6 +1888,8 @@ sealed interface StateAction
 @JvmInline value class StateActionAnnotationsEntryRemoved(val value: AnnotationsEntryRemovedAction) : StateAction
 @JvmInline value class StateActionRootTerminalsChanged(val value: RootTerminalsChangedAction) : StateAction
 @JvmInline value class StateActionRootConfigChanged(val value: RootConfigChangedAction) : StateAction
+@JvmInline value class StateActionRootModelSourceRegistrationSet(val value: RootModelSourceRegistrationSetAction) : StateAction
+@JvmInline value class StateActionRootModelSourceRegistrationRemoved(val value: RootModelSourceRegistrationRemovedAction) : StateAction
 @JvmInline value class StateActionTerminalData(val value: TerminalDataAction) : StateAction
 @JvmInline value class StateActionTerminalInput(val value: TerminalInputAction) : StateAction
 @JvmInline value class StateActionTerminalResized(val value: TerminalResizedAction) : StateAction
@@ -1976,6 +2013,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "annotations/entryRemoved" -> StateActionAnnotationsEntryRemoved(input.json.decodeFromJsonElement(AnnotationsEntryRemovedAction.serializer(), element))
             "root/terminalsChanged" -> StateActionRootTerminalsChanged(input.json.decodeFromJsonElement(RootTerminalsChangedAction.serializer(), element))
             "root/configChanged" -> StateActionRootConfigChanged(input.json.decodeFromJsonElement(RootConfigChangedAction.serializer(), element))
+            "root/modelSourceRegistrationSet" -> StateActionRootModelSourceRegistrationSet(input.json.decodeFromJsonElement(RootModelSourceRegistrationSetAction.serializer(), element))
+            "root/modelSourceRegistrationRemoved" -> StateActionRootModelSourceRegistrationRemoved(input.json.decodeFromJsonElement(RootModelSourceRegistrationRemovedAction.serializer(), element))
             "terminal/data" -> StateActionTerminalData(input.json.decodeFromJsonElement(TerminalDataAction.serializer(), element))
             "terminal/input" -> StateActionTerminalInput(input.json.decodeFromJsonElement(TerminalInputAction.serializer(), element))
             "terminal/resized" -> StateActionTerminalResized(input.json.decodeFromJsonElement(TerminalResizedAction.serializer(), element))
@@ -2092,6 +2131,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionAnnotationsEntryRemoved -> output.json.encodeToJsonElement(AnnotationsEntryRemovedAction.serializer(), value.value)
             is StateActionRootTerminalsChanged -> output.json.encodeToJsonElement(RootTerminalsChangedAction.serializer(), value.value)
             is StateActionRootConfigChanged -> output.json.encodeToJsonElement(RootConfigChangedAction.serializer(), value.value)
+            is StateActionRootModelSourceRegistrationSet -> output.json.encodeToJsonElement(RootModelSourceRegistrationSetAction.serializer(), value.value)
+            is StateActionRootModelSourceRegistrationRemoved -> output.json.encodeToJsonElement(RootModelSourceRegistrationRemovedAction.serializer(), value.value)
             is StateActionTerminalData -> output.json.encodeToJsonElement(TerminalDataAction.serializer(), value.value)
             is StateActionTerminalInput -> output.json.encodeToJsonElement(TerminalInputAction.serializer(), value.value)
             is StateActionTerminalResized -> output.json.encodeToJsonElement(TerminalResizedAction.serializer(), value.value)

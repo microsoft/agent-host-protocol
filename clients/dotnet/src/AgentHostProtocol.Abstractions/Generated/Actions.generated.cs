@@ -199,6 +199,10 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
 
+    public static readonly ActionType RootModelSourceRegistrationSet = new ActionType("root/modelSourceRegistrationSet");
+
+    public static readonly ActionType RootModelSourceRegistrationRemoved = new ActionType("root/modelSourceRegistrationRemoved");
+
     public static readonly ActionType TerminalData = new ActionType("terminal/data");
 
     public static readonly ActionType TerminalInput = new ActionType("terminal/input");
@@ -338,6 +342,33 @@ public sealed record RootConfigChangedAction
     /// <summary>When `true`, replaces all config values instead of merging</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Replace { get; init; }
+}
+
+/// <summary>Adds a model source registration, or replaces the one with the same `id`.
+///
+/// A client registers a source by dispatching this with its own `clientId` and
+/// no `state`. The host reports status by dispatching it again with the same
+/// registration and a `state`.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceRegistrationSetAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRegistrationSet;
+
+    /// <summary>The registration to add or replace, matched by `id`.</summary>
+    public required ModelSourceRegistration Registration { get; init; }
+}
+
+/// <summary>Removes the model source registration with the given `id`. A no-op when
+/// none matches.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceRegistrationRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRegistrationRemoved;
+
+    /// <summary>The registration's `id`.</summary>
+    public required string Id { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -2858,6 +2889,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/agentsChanged"] = typeof(RootAgentsChangedAction),
         ["root/activeSessionsChanged"] = typeof(RootActiveSessionsChangedAction),
         ["root/configChanged"] = typeof(RootConfigChangedAction),
+        ["root/modelSourceRegistrationSet"] = typeof(RootModelSourceRegistrationSetAction),
+        ["root/modelSourceRegistrationRemoved"] = typeof(RootModelSourceRegistrationRemovedAction),
         ["session/ready"] = typeof(SessionReadyAction),
         ["session/creationFailed"] = typeof(SessionCreationFailedAction),
         ["session/turnStarted"] = typeof(SessionTurnStartedAction),

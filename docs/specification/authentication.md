@@ -1,6 +1,6 @@
 # Authentication
 
-AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Protected Resource Metadata) semantics for authentication discovery, and [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) (Bearer Token Usage) semantics for token delivery. Communication is JSON-RPC, not HTTP, but the vocabulary and flow mirror the HTTP standards.
+AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Protected Resource Metadata) semantics for authentication discovery, and [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) (Bearer Token Usage) semantics for token delivery. Communication is JSON-RPC, not HTTP, but the vocabulary and flow mirror the HTTP standards. A [registered model source](#model-source-credentials) takes an opaque secret, such as an API key, instead of a Bearer token.
 
 ## Overview
 
@@ -87,7 +87,7 @@ Different agents MAY require authentication with different providers. For exampl
 
 ## Token Delivery
 
-Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)):
+Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `ModelSourceAuthRequiredState.resource` (see [Model source credentials](#model-source-credentials)):
 
 ```jsonc
 // Client → Server
@@ -118,7 +118,7 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
-`target` is an optional, extensible discriminated union identifying the token's consumer. Clients SHOULD include it when answering a challenge from a specific MCP server (`McpServerAuthRequiredState` or `ToolCallAuthRequiredState`), and omit it for provider-level resources (`AgentInfo.protectedResources` or `AuthRequired` `-32007` error data). The currently defined variant is:
+`target` is an optional, extensible discriminated union identifying the token's consumer. Clients SHOULD include it when answering a challenge from a specific MCP server (`McpServerAuthRequiredState` or `ToolCallAuthRequiredState`), MUST include it when delivering a registered model source's credential, and omit it for provider-level resources (`AgentInfo.protectedResources` or `AuthRequired` `-32007` error data). The currently defined variants are `mcpServer` and [`modelSource`](#model-source-credentials):
 
 ```jsonc
 // MCP token delivery (the command still uses the root channel)
@@ -142,17 +142,54 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 `session` is the URI of the session whose `SessionState.customizations` contains the MCP server, either as a top-level entry or a child customization. `customizationId` is that server's session-unique `McpServerCustomization.id`. Clients only echo these host-published identifiers: `McpServerAuthRequiredState` lives on the customization, and `ToolCallAuthRequiredState.contributor.customizationId` identifies the same customization.
 
-When `target` is present, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
+When `target.kind` is `mcpServer`, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
 
-Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge. Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
+Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge, except a model source's. Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
 
 If the token is invalid or the resource is unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams` `-32602`).
+
+### Model source credentials
+
+A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. When the source needs a credential, the host sets the registration's state to `ModelSourceAuthRequiredState`, which carries a `reason` and RFC 9728 `resource` metadata for the source's endpoint. A client answers with a `modelSource` target that names the registration:
+
+```jsonc
+// Model source credential delivery
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.com/v1",
+    "token": "<secret>",
+    "target": { "kind": "modelSource", "modelSourceId": "2f6c0e1a-model-source" }
+  }
+}
+```
+
+The `token` is an opaque secret rather than an RFC 6750 Bearer token. The agent applies it as the registration's definition specifies, for example as an `Authorization: Bearer` or `x-api-key` header. A source that accepts OAuth access tokens, such as Microsoft Entra ID tokens, advertises `authorization_servers` and `scopes_supported`, and the client sends `expiresIn` with each short-lived token. A source that takes a user-supplied secret omits them, and the client omits `expiresIn` and `scopes`. `resource.resource_name` labels the prompt, for example "OpenRouter API key".
+
+`resource.resource` is the endpoint URL as the definition names it, in any scheme the agent supports, such as `http://localhost:11434/v1` for a local server. Unlike other protected resources, it doesn't need to be an `https` URL: the client only echoes it in `authenticate`, and nothing fetches it. Whether the agent sends a credential over plain `http` is the host's network policy.
+
+When `target.kind` is `modelSource`, the host:
+
+- MUST apply the credential only to that registration, never to other registrations, MCP servers, or agent-level resources, even when they share `resource`;
+- MUST require `resource` to equal the `resource.resource` it most recently advertised for that registration;
+- MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`);
+- MUST reject a credential, including an empty `token` that would revoke one, from a client that may not supply one, with `PermissionDenied` (`-32009`). The contributing client may always supply one. For a registration with `host` sharing, or one the host registered, any client the host allows may supply one;
+- MUST treat an empty `token` as revocation: it drops the credential, and the source returns to `authRequired` with `reason: required`.
+
+The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the registration's `definition` or `_meta`, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host drops the credential when the registration is removed, when its definition or contributing client changes, and when the host restarts.
+
+The host asks for a new credential by setting the registration's state to `authRequired` again, which survives reconnects. When `reason` is `expired`, the client MUST NOT replay the same secret: it renews the token or asks the user for a new key. A client that has the source configured answers from its own secure storage, and SHOULD check that `resource.resource` matches the endpoint in its own copy of the definition before sending a secret.
+
+If the credential fails during a turn that uses the source, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`) rather than wait. Once the source is ready again, a client can continue the turn with `chat/turnResume`, and the host checks the turn's selection again first, including the sharing policy. The host never switches the turn to a different model.
 
 ### Why keyed by `resource` and optional `target`?
 
 The RFC 9728 `resource` field identifies the protected resource, but not necessarily its consumer: different MCP servers can share a resource and scopes while using distinct OAuth clients or accounts. `target` adds the session URI and customization ID needed to distinguish these consumers, even when server names repeat across sessions or manifests. Provider-level authentication continues to omit `target` and remains keyed by `resource` and scopes.
 
-The `target.kind` discriminant is extensible so future consumers, such as [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
+The `target.kind` discriminant is extensible so new consumers, such as registered model sources or [host-owned authentication proposed in PR #404](https://github.com/microsoft/agent-host-protocol/pull/404), can add variants rather than new fields to `authenticate`.
 
 ### Account selection hints
 

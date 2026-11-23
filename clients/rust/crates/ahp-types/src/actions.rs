@@ -20,10 +20,11 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionConfigSchema,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ModelSelection, ModelSourceRegistration, PendingMessageKind, ResponsePart, SessionActiveClient,
+    SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
+    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
+    UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -118,6 +119,8 @@ pub enum ActionType {
     AnnotationsEntryRemoved,
     RootTerminalsChanged,
     RootConfigChanged,
+    RootModelSourceRegistrationSet,
+    RootModelSourceRegistrationRemoved,
     TerminalData,
     TerminalInput,
     TerminalResized,
@@ -286,6 +289,12 @@ impl serde::Serialize for ActionType {
             Self::AnnotationsEntryRemoved => serializer.serialize_str("annotations/entryRemoved"),
             Self::RootTerminalsChanged => serializer.serialize_str("root/terminalsChanged"),
             Self::RootConfigChanged => serializer.serialize_str("root/configChanged"),
+            Self::RootModelSourceRegistrationSet => {
+                serializer.serialize_str("root/modelSourceRegistrationSet")
+            }
+            Self::RootModelSourceRegistrationRemoved => {
+                serializer.serialize_str("root/modelSourceRegistrationRemoved")
+            }
             Self::TerminalData => serializer.serialize_str("terminal/data"),
             Self::TerminalInput => serializer.serialize_str("terminal/input"),
             Self::TerminalResized => serializer.serialize_str("terminal/resized"),
@@ -420,6 +429,8 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "annotations/entryRemoved" => Self::AnnotationsEntryRemoved,
             "root/terminalsChanged" => Self::RootTerminalsChanged,
             "root/configChanged" => Self::RootConfigChanged,
+            "root/modelSourceRegistrationSet" => Self::RootModelSourceRegistrationSet,
+            "root/modelSourceRegistrationRemoved" => Self::RootModelSourceRegistrationRemoved,
             "terminal/data" => Self::TerminalData,
             "terminal/input" => Self::TerminalInput,
             "terminal/resized" => Self::TerminalResized,
@@ -506,6 +517,31 @@ pub struct RootConfigChangedAction {
     /// When `true`, replaces all config values instead of merging
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replace: Option<bool>,
+}
+
+/// Adds a model source registration, or replaces the one with the same `id`.
+///
+/// A client registers a source by dispatching this with its own `clientId` and
+/// no `state`. The host reports status by dispatching it again with the same
+/// registration and a `state`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootModelSourceRegistrationSetAction {
+    /// The registration to add or replace, matched by `id`.
+    pub registration: ModelSourceRegistration,
+}
+
+/// Removes the model source registration with the given `id`. A no-op when
+/// none matches.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootModelSourceRegistrationRemovedAction {
+    /// The registration's `id`.
+    pub id: String,
 }
 
 /// Session backend initialized successfully.
@@ -2455,6 +2491,10 @@ pub enum StateAction {
     RootActiveSessionsChanged(RootActiveSessionsChangedAction),
     #[serde(rename = "root/configChanged")]
     RootConfigChanged(RootConfigChangedAction),
+    #[serde(rename = "root/modelSourceRegistrationSet")]
+    RootModelSourceRegistrationSet(RootModelSourceRegistrationSetAction),
+    #[serde(rename = "root/modelSourceRegistrationRemoved")]
+    RootModelSourceRegistrationRemoved(RootModelSourceRegistrationRemovedAction),
     #[serde(rename = "session/ready")]
     SessionReady(SessionReadyAction),
     #[serde(rename = "session/creationFailed")]

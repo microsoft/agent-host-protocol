@@ -1,0 +1,52 @@
+{
+  "name": "root-model-source-registration-set",
+  "group": "A",
+  "description": "A client registers a model source with root/modelSourceRegistrationSet: its own clientId, requested sharing and retention, an open definition, and no state.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/modelSourceRegistrationSet",
+    "registration": {
+      "id": "source-new",
+      "provider": "example",
+      "name": "OpenRouter",
+      "format": "example.com/model-source@1",
+      "definition": {
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "models": [
+          "vendor/model-a",
+          "vendor/model-b"
+        ],
+        "headers": {
+          "x-title": "Example"
+        }
+      },
+      "clientId": "client-1",
+      "sharing": "host",
+      "retention": "host"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/modelSourceRegistrationSet",
+      "registration": {
+        "id": "source-new",
+        "provider": "example",
+        "name": "OpenRouter",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "models": [
+            "vendor/model-a",
+            "vendor/model-b"
+          ],
+          "headers": {
+            "x-title": "Example"
+          }
+        },
+        "clientId": "client-1",
+        "sharing": "host",
+        "retention": "host"
+      }
+    }
+  ]
+}

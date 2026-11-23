@@ -35,6 +35,32 @@ export function rootReducer(state: RootState, action: RootAction, log?: (msg: st
         },
       };
 
+    case ActionType.RootModelSourceRegistrationSet: {
+      const list = state.modelSourceRegistrations ?? [];
+      const idx = list.findIndex(r => r.id === action.registration.id);
+      const next = list.slice();
+      if (idx < 0) {
+        next.push(action.registration);
+      } else {
+        next[idx] = action.registration;
+      }
+      return { ...state, modelSourceRegistrations: next };
+    }
+
+    case ActionType.RootModelSourceRegistrationRemoved: {
+      const list = state.modelSourceRegistrations;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(r => r.id === action.id);
+      if (idx < 0) {
+        return state;
+      }
+      const next = list.slice();
+      next.splice(idx, 1);
+      return { ...state, modelSourceRegistrations: next };
+    }
+
     default:
       softAssertNever(action, log);
       return state;

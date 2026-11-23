@@ -28,6 +28,7 @@
 //!     active_sessions: None,
 //!     terminals: None,
 //!     config: None,
+//!     model_source_registrations: None,
 //!     meta: None,
 //! };
 //!
@@ -716,6 +717,27 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
                     config.values.insert(k.clone(), v.clone());
                 }
             }
+            ReduceOutcome::Applied
+        }
+        StateAction::RootModelSourceRegistrationSet(a) => {
+            let list = state
+                .model_source_registrations
+                .get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|r| r.id == a.registration.id) {
+                list[idx] = a.registration.clone();
+            } else {
+                list.push(a.registration.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::RootModelSourceRegistrationRemoved(a) => {
+            let Some(list) = state.model_source_registrations.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list.iter().position(|r| r.id == a.id) else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,
@@ -2603,6 +2625,7 @@ mod tests {
             active_sessions: None,
             terminals: None,
             config: None,
+            model_source_registrations: None,
             meta: None,
         };
         let a = StateAction::RootActiveSessionsChanged(

@@ -103,10 +103,36 @@ public struct AHPRootReducer: Reducer {
             config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
             state.config = config
 
+        case .rootModelSourceRegistrationSet(let a):
+            applyModelSourceRegistrationSet(&state, a.registration)
+
+        case .rootModelSourceRegistrationRemoved(let a):
+            _ = applyModelSourceRegistrationRemoved(&state, id: a.id)
+
         default:
             break
         }
     }
+}
+
+/// Adds `registration` to the registry, or replaces the entry with the same `id`.
+func applyModelSourceRegistrationSet(_ state: inout RootState, _ registration: ModelSourceRegistration) {
+    var list = state.modelSourceRegistrations ?? []
+    if let idx = list.firstIndex(where: { $0.id == registration.id }) {
+        list[idx] = registration
+    } else {
+        list.append(registration)
+    }
+    state.modelSourceRegistrations = list
+}
+
+/// Removes the registration with `id`. Returns `false` when none matches.
+func applyModelSourceRegistrationRemoved(_ state: inout RootState, id: String) -> Bool {
+    guard var list = state.modelSourceRegistrations,
+          let idx = list.firstIndex(where: { $0.id == id }) else { return false }
+    list.remove(at: idx)
+    state.modelSourceRegistrations = list
+    return true
 }
 
 

@@ -436,6 +436,46 @@ const (
 	McpAuthRequiredReasonInsufficientScope McpAuthRequiredReason = "insufficientScope"
 )
 
+// Discriminant for the {@link ModelSourceState} union.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceStatus string
+
+const (
+	// The agent is reading and validating the definition.
+	ModelSourceStatusStarting ModelSourceStatus = "starting"
+	// The source is usable, and its models are in the agent's catalog.
+	ModelSourceStatusReady ModelSourceStatus = "ready"
+	// The source needs a credential before it can be used.
+	ModelSourceStatusAuthRequired ModelSourceStatus = "authRequired"
+	// The source failed, or the host declined it.
+	ModelSourceStatusError ModelSourceStatus = "error"
+)
+
+// Who may select a registered model source's models.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceSharingPolicy string
+
+const (
+	// Only turns and pending messages the contributing client dispatches.
+	ModelSourceSharingPolicyContributingClient ModelSourceSharingPolicy = "contributingClient"
+	// Any client, and work the host starts itself, such as automations.
+	ModelSourceSharingPolicyHost ModelSourceSharingPolicy = "host"
+)
+
+// How long a registered model source lasts once its contributing client leaves.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceRetentionPolicy string
+
+const (
+	// Removed when the contributing client leaves, once running turns finish.
+	ModelSourceRetentionPolicyContributingClient ModelSourceRetentionPolicy = "contributingClient"
+	// Kept until a client removes it or host policy expires it.
+	ModelSourceRetentionPolicyHost ModelSourceRetentionPolicy = "host"
+)
+
 // Computation lifecycle of a {@link ChangesetState}.
 type ChangesetStatus string
 
@@ -780,6 +820,10 @@ type RootState struct {
 	Terminals []TerminalInfo `json:"terminals,omitempty"`
 	// Agent host configuration schema and current values
 	Config *RootConfigState `json:"config,omitempty"`
+	// Model sources registered on this host, keyed by `id`.
+	//
+	// Stability: 1.0 - Early development.
+	ModelSourceRegistrations []ModelSourceRegistration `json:"modelSourceRegistrations,omitempty"`
 	// Additional implementation-defined metadata about the agent host itself.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -857,6 +901,11 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
+	// The agent serves models from registered model sources, in the listed
+	// definition formats.
+	//
+	// Stability: 1.0 - Early development.
+	ModelSourceRegistration *ModelSourceRegistrationCapability `json:"modelSourceRegistration,omitempty"`
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -910,10 +959,208 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
+// Options for the {@link AgentCapabilities.modelSourceRegistration} capability.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceRegistrationCapability struct {
+	// Definition formats the agent reads, most preferred first. Format names
+	// are defined by agent implementations and SHOULD be namespaced, for
+	// example `example.com/model-source@1`.
+	Formats []string `json:"formats"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceRegistrationCapability) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceRegistrationCapability
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "formats")
+}
+
+func (v ModelSourceRegistrationCapability) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceRegistrationCapability
+	return marshalWithExtra(wire(v), v.Extra, "formats")
+}
+
+// A model source registered on this host by a client, or by the host itself.
+// Its definition is in a format the agent named by `provider` reads. It never
+// contains a credential.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceRegistration struct {
+	// Host-unique ID, chosen by whoever registers the source. Also the
+	// source's {@link ModelSourceInfo.id} in the agent's catalog, and the
+	// {@link SessionModelInfo.modelSourceId} of its models.
+	Id string `json:"id"`
+	// Agent provider whose agent reads the definition and serves the models.
+	Provider string `json:"provider"`
+	// Display name, published as {@link ModelSourceInfo.displayName}.
+	Name string `json:"name"`
+	// Icons for UI display.
+	Icons []Icon `json:"icons,omitempty"`
+	// Definition format, one of the agent's
+	// {@link ModelSourceRegistrationCapability.formats}.
+	Format string `json:"format"`
+	// How to reach the source: endpoint, wire format, models, and so on, in
+	// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
+	// a credential.
+	Definition map[string]json.RawMessage `json:"definition"`
+	// The contributing client. Absent for a source the host registered itself.
+	ClientId *string `json:"clientId,omitempty"`
+	// Who may select the source's models. Absent means `contributingClient`.
+	Sharing *ModelSourceSharingPolicy `json:"sharing,omitempty"`
+	// What happens when the contributing client leaves. Absent means `contributingClient`.
+	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
+	// Host-reported status. Absent means the host hasn't reported one yet.
+	State *ModelSourceState `json:"state,omitempty"`
+	// Additional implementation-defined metadata for this registration.
+	// MUST NOT contain a credential.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceRegistration) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceRegistration
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "_meta")
+}
+
+func (v ModelSourceRegistration) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceRegistration
+	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "_meta")
+}
+
+// The agent is reading and validating the definition, or listing the
+// source's models again after a credential change.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceStartingState struct {
+	Kind ModelSourceStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceStartingState) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceStartingState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v ModelSourceStartingState) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceStartingState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// The source is usable, and its models are in the catalog of the agent named
+// by the registration's `provider`.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceReadyState struct {
+	Kind ModelSourceStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceReadyState) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceReadyState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind")
+}
+
+func (v ModelSourceReadyState) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceReadyState
+	return marshalWithExtra(wire(v), v.Extra, "kind")
+}
+
+// What a model source needs in order to become ready. Deliberately carries no
+// credential.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceAuthRequirement struct {
+	// Why a credential is needed.
+	Reason AuthRequiredReason `json:"reason"`
+	// RFC 9728 metadata for the source's endpoint. `resource.resource` is the
+	// endpoint URL as the definition names it, in any scheme the agent
+	// supports (for example `http://localhost:11434/v1`). It's the value a
+	// client passes back as `authenticate({ resource })`, and nothing fetches
+	// it. `resource.resource_name` labels the prompt (for example
+	// "OpenRouter API key"). A source that accepts OAuth access tokens
+	// advertises `authorization_servers` and `scopes_supported`. A source that
+	// takes a user-supplied secret omits them.
+	Resource ProtectedResourceMetadata `json:"resource"`
+	// Human-readable hint, for example the endpoint's error description.
+	Description *string `json:"description,omitempty"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceAuthRequirement) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceAuthRequirement
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "reason", "resource", "description")
+}
+
+func (v ModelSourceAuthRequirement) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceAuthRequirement
+	return marshalWithExtra(wire(v), v.Extra, "reason", "resource", "description")
+}
+
+// The source needs a credential before it can be used. A client answers with
+// `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceAuthRequiredState struct {
+	// Why a credential is needed.
+	Reason AuthRequiredReason `json:"reason"`
+	// RFC 9728 metadata for the source's endpoint. `resource.resource` is the
+	// endpoint URL as the definition names it, in any scheme the agent
+	// supports (for example `http://localhost:11434/v1`). It's the value a
+	// client passes back as `authenticate({ resource })`, and nothing fetches
+	// it. `resource.resource_name` labels the prompt (for example
+	// "OpenRouter API key"). A source that accepts OAuth access tokens
+	// advertises `authorization_servers` and `scopes_supported`. A source that
+	// takes a user-supplied secret omits them.
+	Resource ProtectedResourceMetadata `json:"resource"`
+	// Human-readable hint, for example the endpoint's error description.
+	Description *string           `json:"description,omitempty"`
+	Kind        ModelSourceStatus `json:"kind"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceAuthRequiredState) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceAuthRequiredState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "reason", "resource", "description", "kind")
+}
+
+func (v ModelSourceAuthRequiredState) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceAuthRequiredState
+	return marshalWithExtra(wire(v), v.Extra, "reason", "resource", "description", "kind")
+}
+
+// The source failed, or the host declined it, for example by policy.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceErrorState struct {
+	Kind ModelSourceStatus `json:"kind"`
+	// Error details. MUST NOT contain the credential.
+	Error ErrorInfo `json:"error"`
+	// Extra contains unrecognized wire members retained for full-object edits.
+	Extra map[string]json.RawMessage `json:"-"`
+}
+
+func (v *ModelSourceErrorState) UnmarshalJSON(data []byte) error {
+	type wire ModelSourceErrorState
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "kind", "error")
+}
+
+func (v ModelSourceErrorState) MarshalJSON() ([]byte, error) {
+	type wire ModelSourceErrorState
+	return marshalWithExtra(wire(v), v.Extra, "kind", "error")
+}
+
 // A source that an agent provider offers models from, such as a service or
 // subscription.
 type ModelSourceInfo struct {
-	// Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+	// Model source identifier, unique within the agent's
+	// {@link AgentInfo.modelSources}. For a registered model source, this is
+	// the {@link ModelSourceRegistration.id}.
 	Id string `json:"id"`
 	// Human-readable name
 	DisplayName string `json:"displayName"`
@@ -922,7 +1169,8 @@ type ModelSourceInfo struct {
 type SessionModelInfo struct {
 	// Model identifier, unique within the agent's {@link AgentInfo.models}.
 	// When several model sources serve the same upstream model, the host gives
-	// each entry its own ID.
+	// each entry its own ID. An ID the host publishes for a registered model
+	// source stays bound to that registration and upstream model.
 	Id string `json:"id"`
 	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
 	Provider string `json:"provider"`
@@ -6536,6 +6784,80 @@ func (u *McpServerState) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u McpServerState) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*McpServerStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// ModelSourceState is the discriminated lifecycle status of a registered model source.
+type ModelSourceState struct {
+	Value isModelSourceState
+}
+
+// isModelSourceState is the marker interface implemented by every
+// concrete variant of ModelSourceState.
+type isModelSourceState interface{ isModelSourceState() }
+
+func (*ModelSourceStartingState) isModelSourceState()     {}
+func (*ModelSourceReadyState) isModelSourceState()        {}
+func (*ModelSourceAuthRequiredState) isModelSourceState() {}
+func (*ModelSourceErrorState) isModelSourceState()        {}
+
+// ModelSourceStateUnknown carries an unrecognized ModelSourceState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ModelSourceStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ModelSourceStateUnknown) isModelSourceState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *ModelSourceState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "starting":
+		var value ModelSourceStartingState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "ready":
+		var value ModelSourceReadyState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "authRequired":
+		var value ModelSourceAuthRequiredState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "error":
+		var value ModelSourceErrorState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ModelSourceStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ModelSourceState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ModelSourceStateUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}
