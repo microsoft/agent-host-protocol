@@ -747,7 +747,7 @@
         },
         "modelSourceId": {
           "type": "string",
-          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}."
+          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}. For a model from a\nregistered model source, this is the {@link ModelSourceRegistration.id}."
         }
       },
       "required": [

@@ -2641,7 +2641,8 @@ public sealed record SessionModelInfo
     public string? Vendor { get; init; }
 
     /// <summary>The source this model comes from. MUST match a {@link ModelSourceInfo.id}
-    /// in the agent's {@link AgentInfo.modelSources}.</summary>
+    /// in the agent's {@link AgentInfo.modelSources}. For a model from a
+    /// registered model source, this is the {@link ModelSourceRegistration.id}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModelSourceId { get; init; }
 }

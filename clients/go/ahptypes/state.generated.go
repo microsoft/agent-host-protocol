@@ -1204,7 +1204,8 @@ type SessionModelInfo struct {
 	// recognize.
 	Vendor *string `json:"vendor,omitempty"`
 	// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
-	// in the agent's {@link AgentInfo.modelSources}.
+	// in the agent's {@link AgentInfo.modelSources}. For a model from a
+	// registered model source, this is the {@link ModelSourceRegistration.id}.
 	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 

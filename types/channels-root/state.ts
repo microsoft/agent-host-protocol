@@ -289,7 +289,8 @@ export interface SessionModelInfo {
   vendor?: string;
   /**
    * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
-   * in the agent's {@link AgentInfo.modelSources}.
+   * in the agent's {@link AgentInfo.modelSources}. For a model from a
+   * registered model source, this is the {@link ModelSourceRegistration.id}.
    */
   modelSourceId?: string;
 }
