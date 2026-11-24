@@ -36,6 +36,7 @@ import com.microsoft.agenthostprotocol.generated.CreateChatParams
 import com.microsoft.agenthostprotocol.generated.FetchDeferredTurnsParams
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
+import com.microsoft.agenthostprotocol.generated.InitializeParams
 import com.microsoft.agenthostprotocol.generated.InitializeResult
 import com.microsoft.agenthostprotocol.generated.SubscribeParams
 import com.microsoft.agenthostprotocol.generated.SubscribeResult
@@ -49,6 +50,7 @@ import com.microsoft.agenthostprotocol.generated.TcpResetParams
 import com.microsoft.agenthostprotocol.generated.CreateTcpConnectionParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadResult
+import com.microsoft.agenthostprotocol.generated.ResourceListResult
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -267,6 +269,7 @@ class RoundTripCorpusTest {
             "SessionAddedParams" -> rt(SessionAddedParams.serializer())
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
+            "InitializeParams" -> rt(InitializeParams.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
             "CreateChatParams" -> rt(CreateChatParams.serializer())
             "FetchDeferredTurnsParams" -> rt(FetchDeferredTurnsParams.serializer())
@@ -284,6 +287,7 @@ class RoundTripCorpusTest {
             "CreateTcpConnectionParams" -> rt(CreateTcpConnectionParams.serializer())
             "ResourceReadParams" -> rt(ResourceReadParams.serializer())
             "ResourceReadResult" -> rt(ResourceReadResult.serializer())
+            "ResourceListResult" -> rt(ResourceListResult.serializer())
             "AuthenticateParams" -> rt(AuthenticateParams.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +

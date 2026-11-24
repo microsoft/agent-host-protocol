@@ -162,6 +162,8 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<PartialSessionSummary>(inputJson));
             case "Implementation":
                 return Wrap(Ser.Deserialize<Implementation>(inputJson));
+            case "InitializeParams":
+                return Wrap(Ser.Deserialize<InitializeParams>(inputJson));
             case "InitializeResult":
                 return Wrap(Ser.Deserialize<InitializeResult>(inputJson));
             case "CreateChatParams":
@@ -194,6 +196,8 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<ResourceReadParams>(inputJson));
             case "ResourceReadResult":
                 return Wrap(Ser.Deserialize<ResourceReadResult>(inputJson));
+            case "ResourceListResult":
+                return Wrap(Ser.Deserialize<ResourceListResult>(inputJson));
             case "AuthenticateParams":
                 return Wrap(Ser.Deserialize<AuthenticateParams>(inputJson));
             default:

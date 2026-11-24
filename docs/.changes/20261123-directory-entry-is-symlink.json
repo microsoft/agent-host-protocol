@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional `isSymlink` boolean flag on `DirectoryEntry` in `resourceList` results.",
+  "issues": [624]
+}

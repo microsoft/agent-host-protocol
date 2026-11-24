@@ -765,7 +765,11 @@
             "file",
             "directory"
           ],
-          "description": "Whether the entry is a file or directory"
+          "description": "Whether the entry is a file or directory.\n\nFor a symbolic link (`isSymlink: true`), this reports the resolved target\nkind when known and permitted by the receiver's access policy, or `'file'`\nas a non-expandable fallback when the target was not inspected or could\nnot be resolved or accessed."
+        },
+        "isSymlink": {
+          "type": "boolean",
+          "description": "Whether the entry is a symbolic link. Callers that need target resolution\nor canonical URIs SHOULD use `resourceResolve`."
         }
       },
       "required": [
@@ -2727,6 +2731,13 @@
         "capabilities": {
           "$ref": "#/$defs/AgentCapabilities",
           "description": "Static capabilities the agent advertises about itself. Clients use these\nto gate features (multi-chat, fork) instead of switching on the provider\nid."
+        },
+        "modelSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModelSourceInfo"
+          },
+          "description": "Sources this agent offers models from. Clients use them to label and\ngroup {@link models}. A source may have no models."
         }
       },
       "required": [
@@ -2778,12 +2789,30 @@
         }
       }
     },
+    "ModelSourceInfo": {
+      "type": "object",
+      "description": "A source that an agent provider offers models from, such as a service or\nsubscription.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Model source identifier, unique within the agent's {@link AgentInfo.modelSources}."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name"
+        }
+      },
+      "required": [
+        "id",
+        "displayName"
+      ]
+    },
     "SessionModelInfo": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model identifier"
+          "description": "Model identifier, unique within the agent's {@link AgentInfo.models}.\nWhen several model sources serve the same upstream model, the host gives\neach entry its own ID. A host SHOULD keep a model's ID across catalog\nupdates and MUST NOT reuse an ID for a different source or upstream model."
         },
         "provider": {
           "type": "string",
@@ -2825,6 +2854,10 @@
         "vendor": {
           "type": "string",
           "description": "Vendor of this model as the provider reports it, for example `Anthropic`\nor `Azure OpenAI`. This is sometimes the company that serves the model\nrather than the one that built it. Not the same as {@link provider},\nwhich names the agent provider that owns this model. Absent when the\nprovider does not report a vendor. Providers MAY send any value; clients\nSHOULD fall back to a generic presentation for values they do not\nrecognize."
+        },
+        "modelSourceId": {
+          "type": "string",
+          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}."
         }
       },
       "required": [

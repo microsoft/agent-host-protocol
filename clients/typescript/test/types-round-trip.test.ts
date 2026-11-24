@@ -60,8 +60,8 @@ import type {
 } from '../src/types/channels-session/state.js';
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
 import type {
-  Implementation, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
-  ResourceReadParams, ResourceReadResult, AuthenticateParams,
+  Implementation, InitializeParams, InitializeResult, SubscribeParams, SubscribeResult, ReconnectParams, ReconnectResult,
+  ResourceListResult, ResourceReadParams, ResourceReadResult, AuthenticateParams,
 } from '../src/types/common/commands.js';
 import type { ChannelFrameParams, ChannelCreditParams } from '../src/types/common/notifications.js';
 import type { TcpDataParams, TcpEofParams, TcpResetParams } from '../src/types/channels-tcp/notifications.js';
@@ -248,6 +248,7 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'SessionAddedParams': void (parsed as SessionAddedParams); break;
     case 'PartialSessionSummary': void (parsed as Partial<SessionSummary>); break;
     case 'Implementation':     void (parsed as Implementation); break;
+    case 'InitializeParams':    void (parsed as InitializeParams); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
     case 'CreateChatParams':    void (parsed as CreateChatParams); break;
     case 'FetchDeferredTurnsParams': void (parsed as FetchDeferredTurnsParams); break;
@@ -265,6 +266,7 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'CreateTcpConnectionParams': void (parsed as CreateTcpConnectionParams); break;
     case 'ResourceReadParams':  void (parsed as ResourceReadParams); break;
     case 'ResourceReadResult':  void (parsed as ResourceReadResult); break;
+    case 'ResourceListResult':  void (parsed as ResourceListResult); break;
     case 'AuthenticateParams':  void (parsed as AuthenticateParams); break;
     default:
       throw new Error(

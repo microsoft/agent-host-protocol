@@ -1151,8 +1151,20 @@ export interface ResourceListParams extends BaseParams {
 export interface DirectoryEntry {
   /** Base name of the entry */
   name: string;
-  /** Whether the entry is a file or directory */
+  /**
+   * Whether the entry is a file or directory.
+   *
+   * For a symbolic link (`isSymlink: true`), this reports the resolved target
+   * kind when known and permitted by the receiver's access policy, or `'file'`
+   * as a non-expandable fallback when the target was not inspected or could
+   * not be resolved or accessed.
+   */
   type: 'file' | 'directory';
+  /**
+   * Whether the entry is a symbolic link. Callers that need target resolution
+   * or canonical URIs SHOULD use `resourceResolve`.
+   */
+  isSymlink?: boolean;
 }
 
 /**

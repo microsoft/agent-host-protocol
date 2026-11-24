@@ -1553,8 +1553,18 @@ public sealed record DirectoryEntry
     /// <summary>Base name of the entry</summary>
     public required string Name { get; init; }
 
-    /// <summary>Whether the entry is a file or directory</summary>
+    /// <summary>Whether the entry is a file or directory.
+    ///
+    /// For a symbolic link (`isSymlink: true`), this reports the resolved target
+    /// kind when known and permitted by the receiver's access policy, or `'file'`
+    /// as a non-expandable fallback when the target was not inspected or could
+    /// not be resolved or accessed.</summary>
     public required string Type { get; init; }
+
+    /// <summary>Whether the entry is a symbolic link. Callers that need target resolution
+    /// or canonical URIs SHOULD use `resourceResolve`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsSymlink { get; init; }
 }
 
 /// <summary>Copies a resource from one URI to another on the server's filesystem.

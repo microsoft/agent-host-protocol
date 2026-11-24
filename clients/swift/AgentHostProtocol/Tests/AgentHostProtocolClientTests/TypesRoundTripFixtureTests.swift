@@ -186,6 +186,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(PartialSessionSummary.self, from: inputData))
         case "Implementation":
             return try reencode(dec.decode(Implementation.self, from: inputData))
+        case "InitializeParams":
+            return try reencode(dec.decode(InitializeParams.self, from: inputData))
         case "InitializeResult":
             return try reencode(dec.decode(InitializeResult.self, from: inputData))
         case "CreateChatParams":
@@ -220,6 +222,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ResourceReadParams.self, from: inputData))
         case "ResourceReadResult":
             return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
+        case "ResourceListResult":
+            return try reencode(dec.decode(ResourceListResult.self, from: inputData))
         case "AuthenticateParams":
             return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
         default:
