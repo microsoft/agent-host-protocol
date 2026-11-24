@@ -2042,13 +2042,20 @@ public struct ChatState: Codable, Sendable, Equatable {
     ///
     /// Entries may be {@link DeferredTurn | deferred} only for clients that
     /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
-    public var turns: [ChatStateTurn]
+    public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
     /// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
     /// the loaded turns into state and update or clear this cursor before
     /// responding. Absence means the state contains all retained turns.
+    ///
+    /// Hosts SHOULD NOT set this for clients that declared
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+    /// SHOULD send every retained turn and defer the ones the client doesn't need
+    /// yet.
+    ///
+    /// Stability: 3 - Legacy.
     public var turnsNextCursor: String?
     /// Currently in-progress turn
     public var activeTurn: ActiveTurn?
@@ -2117,7 +2124,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         backgroundWork: [BackgroundWork]? = nil,
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
-        turns: [ChatStateTurn],
+        turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
@@ -9072,7 +9079,7 @@ public enum ChatOrigin: Codable, Sendable, Equatable {
     }
 }
 
-public struct Turn: Codable, Sendable, Equatable {
+public struct MaterializedTurn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String
     /// ISO 8601 timestamp when this turn started.
@@ -9115,13 +9122,13 @@ public struct Turn: Codable, Sendable, Equatable {
 /// The turn keeps its position in {@link ChatState.turns}, so clients can show
 /// the initiating message and outcome without downloading the response.
 /// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
-/// the host replaces the entry in place with a {@link Turn} via
+/// the host replaces the entry in place with a {@link MaterializedTurn} via
 /// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
 ///
 /// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
 /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
 /// action, or command result. Those clients receive the corresponding
-/// {@link Turn}.
+/// {@link MaterializedTurn}.
 ///
 /// Stability: 1.0 - Early development.
 public struct DeferredTurn: Codable, Sendable, Equatable {
@@ -9191,11 +9198,11 @@ public struct DeferredTurn: Codable, Sendable, Equatable {
     }
 }
 
-/// A completed turn in `ChatState.turns`: either a full ``Turn`` or a
-/// ``DeferredTurn``, discriminated by `isDeferred`.
-public enum ChatStateTurn: Codable, Sendable, Equatable {
-    /// A full turn (`isDeferred` absent or `false`).
-    case turn(Turn)
+/// A completed request/response cycle: either a ``MaterializedTurn`` with
+/// its full response or a ``DeferredTurn``, discriminated by `isDeferred`.
+public enum Turn: Codable, Sendable, Equatable {
+    /// A turn with its full response (`isDeferred` absent or `false`).
+    case materialized(MaterializedTurn)
     /// A turn whose response has not been sent yet (`isDeferred: true`).
     case deferred(DeferredTurn)
 
@@ -9208,13 +9215,13 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
         if (try? container.decodeIfPresent(Bool.self, forKey: .discriminant)) == true {
             self = .deferred(try DeferredTurn(from: decoder))
         } else {
-            self = .turn(try Turn(from: decoder))
+            self = .materialized(try MaterializedTurn(from: decoder))
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         switch self {
-        case .turn(let value): try value.encode(to: encoder)
+        case .materialized(let value): try value.encode(to: encoder)
         case .deferred(let value): try value.encode(to: encoder)
         }
     }
@@ -9228,7 +9235,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// Turn identifier
     public var id: String {
         switch self {
-        case .turn(let value): return value.id
+        case .materialized(let value): return value.id
         case .deferred(let value): return value.id
         }
     }
@@ -9236,7 +9243,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// ISO 8601 timestamp when this turn started.
     public var startedAt: String? {
         switch self {
-        case .turn(let value): return value.startedAt
+        case .materialized(let value): return value.startedAt
         case .deferred(let value): return value.startedAt
         }
     }
@@ -9244,7 +9251,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// Turn duration in milliseconds.
     public var duration: Int? {
         switch self {
-        case .turn(let value): return value.duration
+        case .materialized(let value): return value.duration
         case .deferred(let value): return value.duration
         }
     }
@@ -9252,7 +9259,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// The message that initiated the turn
     public var message: Message {
         switch self {
-        case .turn(let value): return value.message
+        case .materialized(let value): return value.message
         case .deferred(let value): return value.message
         }
     }
@@ -9260,7 +9267,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// Token usage info
     public var usage: UsageInfo? {
         switch self {
-        case .turn(let value): return value.usage
+        case .materialized(let value): return value.usage
         case .deferred(let value): return value.usage
         }
     }
@@ -9268,7 +9275,7 @@ public enum ChatStateTurn: Codable, Sendable, Equatable {
     /// How the turn ended
     public var state: TurnState {
         switch self {
-        case .turn(let value): return value.state
+        case .materialized(let value): return value.state
         case .deferred(let value): return value.state
         }
     }

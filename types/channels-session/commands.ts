@@ -130,11 +130,17 @@ export interface DisposeSessionParams extends BaseParams {}
  * Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
  * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
  *
+ * Tail-window paging is legacy. It remains supported for 1.x clients, but new
+ * clients SHOULD declare `deferredTurns` and read history with
+ * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+ *
  * @category Commands
  * @method fetchTurns
  * @direction Client → Server
  * @messageType Request
  * @version 1
+ * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+ * @stability 3
  * @example
  * ```jsonc
  * // Client → Server (load the next page indicated by ChatState.turnsNextCursor)
@@ -160,6 +166,9 @@ export interface FetchTurnsParams extends BaseParams {
 
 /**
  * Result of the `fetchTurns` command.
+ *
+ * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+ * @stability 3
  */
 export interface FetchTurnsResult {}
 

@@ -1984,13 +1984,18 @@ public sealed record ChatTruncatedAction
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
 /// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
 /// only for clients that declared
-/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.</summary>
 public sealed record ChatTurnsLoadedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnsLoaded;
 
     /// <summary>Older completed turns loaded into the state, ordered oldest-first.</summary>
-    public required List<ChatStateTurn> Turns { get; init; }
+    public required List<Turn> Turns { get; init; }
 
     /// <summary>Opaque cursor for loading the next older page, if one remains.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1998,7 +2003,7 @@ public sealed record ChatTurnsLoadedAction
 }
 
 /// <summary>Replaces {@link DeferredTurn | deferred turns} in place with their full
-/// {@link Turn | turns}.
+/// {@link MaterializedTurn | turns}.
 ///
 /// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
 /// applying any operation that needs a deferred turn's response, such as
@@ -2011,7 +2016,7 @@ public sealed record ChatTurnsMaterializedAction
     public ActionType Type { get; init; } = ActionType.ChatTurnsMaterialized;
 
     /// <summary>Full turns to replace their deferred entries.</summary>
-    public required List<Turn> Turns { get; init; }
+    public required List<MaterializedTurn> Turns { get; init; }
 }
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).

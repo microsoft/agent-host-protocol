@@ -35,28 +35,15 @@ matching compact `SessionChatSummary.status` projection synchronized through
 `session/isReadChanged` independently changes the owning session's read state;
 neither action implies the other.
 
-When a client subscribes with `view.turns`, the server MAY expose only a tail of
-the most recent completed turns in the initial snapshot. The requested number is
-advisory: the server MAY return more or fewer turns than requested. If
-`view.turns` is omitted, the server MUST return all retained turns. If older
-retained turns remain available, `ChatState.turnsNextCursor` is present. The
-client passes this opaque cursor to
-[`fetchTurns`](#commands-paramschannel--ahp-chatuuid) to ask the host to
-dispatch `chat/turnsLoaded`, which prepends older turns into the same reduced
-chat state and updates or clears `turnsNextCursor`.
-
-Hosts MUST also eagerly load older turns into state before applying any
-operation that references a turn outside the currently loaded window (for
-example, a fork, side-chat source, chat attachment, or truncation targeting an
-older turn).
-
 ### Deferred turns
 
 A client that declares `capabilities.deferredTurns` in `initialize` can receive
 completed turns without their responses. Such an entry in `ChatState.turns` is a
 [`DeferredTurn`](/reference/chat#deferredturn): it keeps the turn's `id`,
 initiating `message`, `state`, `usage`, and timing, sets `isDeferred: true`, and
-omits `responseParts`. Deferred and full turns may be interleaved. Because a
+omits `responseParts`. Every other entry is a
+[`MaterializedTurn`](/reference/chat#materializedturn) with its full response,
+and the two may be interleaved. Because a
 deferred turn stays in its position in `turns`, clients can show the full
 prompt list and outcomes without downloading every response, and actions that
 refer to turns by ID keep working.
@@ -86,9 +73,34 @@ which replaces each deferred turn in the range with its full turn in place:
 ```
 
 Hosts MUST likewise materialize a deferred turn before applying an operation
-that needs its response, such as `chat/turnResume`. Deferral is independent of
-the subscription window: `fetchTurns` may load older turns as deferred, and
-`fetchDeferredTurns` only expands turns that are already in state.
+that needs its response, such as `chat/turnResume`.
+
+Hosts SHOULD send a client that declared `deferredTurns` every retained turn,
+deferring the ones it doesn't need yet, and SHOULD NOT give it a tail window
+with `turnsNextCursor`. That client SHOULD omit `view.turns`.
+
+#### Legacy tail-window paging
+
+::: warning Deprecated
+Tail-window paging (`view.turns`, `ChatState.turnsNextCursor`, `fetchTurns`, and
+`chat/turnsLoaded`) is legacy. It remains supported for 1.x clients that do not
+declare `deferredTurns`, but new clients SHOULD use deferred turns instead.
+:::
+
+When a client subscribes with `view.turns`, the server MAY expose only a tail of
+the most recent completed turns in the initial snapshot. The requested number is
+advisory: the server MAY return more or fewer turns than requested. If
+`view.turns` is omitted, the server MUST return all retained turns. If older
+retained turns remain available, `ChatState.turnsNextCursor` is present. The
+client passes this opaque cursor to
+[`fetchTurns`](#commands-paramschannel--ahp-chatuuid) to ask the host to
+dispatch `chat/turnsLoaded`, which prepends older turns into the same reduced
+chat state and updates or clears `turnsNextCursor`.
+
+Hosts MUST eagerly load older turns into state before applying any
+operation that references a turn outside the currently loaded window (for
+example, a fork, side-chat source, chat attachment, or truncation targeting an
+older turn).
 
 ### Reasoning timing
 
@@ -428,7 +440,7 @@ This section lists wire methods that are interpreted in the context of a chat UR
 
 | Method | Kind | Purpose |
 |---|---|---|
-| `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
+| `fetchTurns` | request | Legacy: ask the host to load older historical turns into this chat state. Prefer `fetchDeferredTurns`. |
 | `fetchDeferredTurns` | request | Ask the host to replace a range of [deferred turns](#deferred-turns) with their full responses. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 

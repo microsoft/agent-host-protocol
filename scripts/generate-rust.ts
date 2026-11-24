@@ -909,8 +909,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'ChatConfigState' },
-  // `isDeferred` is the ChatStateTurn discriminator; see generateChatStateTurn.
-  { name: 'Turn', omitFields: ['isDeferred'] },
+  // `isDeferred` is the Turn union discriminator; see generateTurnUnion.
+  { name: 'MaterializedTurn', omitFields: ['isDeferred'] },
   { name: 'DeferredTurn', omitFields: ['isDeferred'] },
   { name: 'ActiveTurn' },
   { name: 'Message' },
@@ -1483,27 +1483,27 @@ impl<'de> Deserialize<'de> for Snapshot {
 }
 
 /**
- * `ChatStateTurn` is discriminated by the boolean `isDeferred`: `true` selects
- * `DeferredTurn`; absent or any other value selects the full `Turn`.
+ * `Turn` is discriminated by the boolean `isDeferred`: `true` selects
+ * `DeferredTurn`; absent or any other value selects `MaterializedTurn`.
  * Serde's internally tagged enums only support string tags, so the impls are
  * hand-written.
  */
-function generateChatStateTurn(): string {
-  return `/// A completed turn in \`ChatState.turns\`: either a full [\`Turn\`] or a
+function generateTurnUnion(): string {
+  return `/// A completed turn in \`ChatState.turns\`: either a [\`MaterializedTurn\`] or a
 /// [\`DeferredTurn\`], discriminated on the wire by \`isDeferred\`.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ChatStateTurn {
+pub enum Turn {
     /// A turn carrying its full response (\`isDeferred\` absent or \`false\`).
-    Turn(Turn),
+    Materialized(MaterializedTurn),
     /// A turn whose response has not been sent yet (\`isDeferred: true\`).
     Deferred(DeferredTurn),
 }
 
-impl ChatStateTurn {
+impl Turn {
     /// Turn identifier.
     pub fn id(&self) -> &str {
         match self {
-            Self::Turn(turn) => &turn.id,
+            Self::Materialized(turn) => &turn.id,
             Self::Deferred(turn) => &turn.id,
         }
     }
@@ -1514,19 +1514,19 @@ impl ChatStateTurn {
     }
 }
 
-impl From<Turn> for ChatStateTurn {
-    fn from(turn: Turn) -> Self {
-        Self::Turn(turn)
+impl From<MaterializedTurn> for Turn {
+    fn from(turn: MaterializedTurn) -> Self {
+        Self::Materialized(turn)
     }
 }
 
-impl From<DeferredTurn> for ChatStateTurn {
+impl From<DeferredTurn> for Turn {
     fn from(turn: DeferredTurn) -> Self {
         Self::Deferred(turn)
     }
 }
 
-impl Serialize for ChatStateTurn {
+impl Serialize for Turn {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -1540,7 +1540,7 @@ impl Serialize for ChatStateTurn {
         }
 
         match self {
-            Self::Turn(turn) => turn.serialize(serializer),
+            Self::Materialized(turn) => turn.serialize(serializer),
             Self::Deferred(turn) => WireDeferredTurn {
                 is_deferred: true,
                 turn,
@@ -1550,7 +1550,7 @@ impl Serialize for ChatStateTurn {
     }
 }
 
-impl<'de> Deserialize<'de> for ChatStateTurn {
+impl<'de> Deserialize<'de> for Turn {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -1559,7 +1559,7 @@ impl<'de> Deserialize<'de> for ChatStateTurn {
         let turn = if raw.get("isDeferred") == Some(&serde_json::Value::Bool(true)) {
             serde_json::from_value(raw).map(Self::Deferred)
         } else {
-            serde_json::from_value(raw).map(Self::Turn)
+            serde_json::from_value(raw).map(Self::Materialized)
         };
         turn.map_err(serde::de::Error::custom)
     }
@@ -1649,7 +1649,7 @@ where D: serde::Deserializer<'de>,
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin(project));
   lines.push('');
-  lines.push(generateChatStateTurn());
+  lines.push(generateTurnUnion());
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
   lines.push('');
@@ -1902,7 +1902,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatStateTurn, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, BackgroundWork, CanvasReference, CanvasState, ChangesSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, MaterializedTurn, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
@@ -2625,8 +2625,8 @@ function checkExhaustiveness(project: Project): void {
     'ChatToolCallConfirmedAction',  // emitted as merged variant
     'ChatAction',                   // source-only union covered by StateAction
     'ChatOrigin',                   // hand-generated union for inline variants
-    'ChatStateTurn',                // hand-generated union discriminated by boolean `isDeferred`
-    'TurnBase',                     // base interface, flattened into Turn / DeferredTurn via `extends`
+    'Turn',                         // hand-generated union discriminated by boolean `isDeferred`
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
     'ChatSource',
     'ChatMoveDestination',
     'PingParams',

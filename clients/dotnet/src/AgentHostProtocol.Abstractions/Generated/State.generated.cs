@@ -2644,14 +2644,21 @@ public sealed class ChatState
     ///
     /// Entries may be {@link DeferredTurn | deferred} only for clients that
     /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
-    public required List<ChatStateTurn> Turns { get; set; }
+    public required List<Turn> Turns { get; set; }
 
     /// <summary>Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
     /// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
     /// the loaded turns into state and update or clear this cursor before
-    /// responding. Absence means the state contains all retained turns.</summary>
+    /// responding. Absence means the state contains all retained turns.
+    ///
+    /// Hosts SHOULD NOT set this for clients that declared
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+    /// SHOULD send every retained turn and defer the ones the client doesn't need
+    /// yet.
+    ///
+    /// Stability: 3 - Legacy.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; set; }
 
@@ -3641,8 +3648,8 @@ public sealed class ChatConfigState
     public required Dictionary<string, JsonElement> Values { get; set; }
 }
 
-/// <summary>A completed request/response cycle.</summary>
-public sealed class Turn
+/// <summary>A completed request/response cycle, including its full response.</summary>
+public sealed class MaterializedTurn
 {
     /// <summary>Turn identifier</summary>
     public required string Id { get; set; }
@@ -3677,13 +3684,13 @@ public sealed class Turn
 /// The turn keeps its position in {@link ChatState.turns}, so clients can show
 /// the initiating message and outcome without downloading the response.
 /// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
-/// the host replaces the entry in place with a {@link Turn} via
+/// the host replaces the entry in place with a {@link MaterializedTurn} via
 /// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
 ///
 /// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
 /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
 /// action, or command result. Those clients receive the corresponding
-/// {@link Turn}.
+/// {@link MaterializedTurn}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed class DeferredTurn
@@ -8462,24 +8469,32 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
 }
 
 /// <summary>
-/// ChatStateTurn is a completed turn in ChatState.Turns: either a full
-/// <see cref="Turn"/> or a <see cref="DeferredTurn"/>, discriminated by
-/// <c>isDeferred</c>.
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
 /// </summary>
-[JsonConverter(typeof(ChatStateTurnConverter))]
-public sealed class ChatStateTurn : AhpUnion
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
 {
-    /// <summary>Creates an empty ChatStateTurn (no active variant).</summary>
-    public ChatStateTurn() { }
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
 
-    /// <summary>Creates a ChatStateTurn wrapping a <see cref="Turn"/> or <see cref="DeferredTurn"/>.</summary>
-    public ChatStateTurn(object? value) : base(value) { }
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
 }
 
-/// <summary>System.Text.Json converter for the ChatStateTurn union.</summary>
-internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
 {
-    public override ChatStateTurn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null)
         {
@@ -8492,16 +8507,16 @@ internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
             && root.TryGetProperty("isDeferred", out JsonElement flag)
             && flag.ValueKind == JsonValueKind.True;
         return isDeferred
-            ? new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
-            : new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<Turn>(options)));
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
     }
 
-    public override void Write(Utf8JsonWriter writer, ChatStateTurn value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
     {
         switch (value.Value)
         {
-            case Turn turn:
-                JsonSerializer.Serialize(writer, turn, AhpJsonTypeInfo.Get<Turn>(options));
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
                 return;
             case DeferredTurn deferred:
                 JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
@@ -8510,7 +8525,7 @@ internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
                 writer.WriteNullValue();
                 return;
             default:
-                throw new JsonException("ChatStateTurn cannot hold a " + value.Value.GetType().Name + ".");
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
         }
     }
 }

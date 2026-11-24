@@ -807,9 +807,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'ChatConfigState' },
-  // `isDeferred` is the ChatStateTurn discriminator, handled by
-  // generateChatStateTurn().
-  { name: 'Turn', omitProps: ['isDeferred'] },
+  // `isDeferred` is the Turn union discriminator, handled by
+  // generateTurnUnion().
+  { name: 'MaterializedTurn', omitProps: ['isDeferred'] },
   { name: 'DeferredTurn', omitProps: ['isDeferred'] },
   { name: 'ActiveTurn' },
   { name: 'Message' },
@@ -1261,13 +1261,13 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
 };
 
 /**
- * `ChatStateTurn = Turn | DeferredTurn` is discriminated by the boolean
+ * `Turn = MaterializedTurn | DeferredTurn` is discriminated by the boolean
  * `isDeferred`, which the string-discriminant union emitter cannot express:
- * `true` selects `DeferredTurn`, anything else (absent, `false`) selects `Turn`.
- * Neither variant struct carries the field; `DeferredTurn` injects it on
- * encode and `Turn` never emits it.
+ * `true` selects `DeferredTurn`, anything else (absent, `false`) selects
+ * `MaterializedTurn`. Neither variant struct carries the field;
+ * `DeferredTurn` injects it on encode and `MaterializedTurn` never emits it.
  */
-function generateChatStateTurn(): string {
+function generateTurnUnion(): string {
   return `// MarshalJSON encodes the deferred turn with its \`"isDeferred": true\` marker.
 func (v DeferredTurn) MarshalJSON() ([]byte, error) {
 \ttype wire DeferredTurn
@@ -1277,22 +1277,23 @@ func (v DeferredTurn) MarshalJSON() ([]byte, error) {
 \t}{wire(v), true})
 }
 
-// ChatStateTurn is a completed turn in ChatState.Turns: either a full
-// *Turn or a *DeferredTurn, discriminated by the boolean "isDeferred" field.
-type ChatStateTurn struct {
-\tValue isChatStateTurn
+// Turn is a completed turn in ChatState.Turns: either a *MaterializedTurn
+// with its full response or a *DeferredTurn, discriminated by the boolean
+// "isDeferred" field.
+type Turn struct {
+\tValue isTurn
 }
 
-// isChatStateTurn is the marker interface implemented by every
-// concrete variant of ChatStateTurn.
-type isChatStateTurn interface{ isChatStateTurn() }
+// isTurn is the marker interface implemented by every concrete variant of
+// Turn.
+type isTurn interface{ isTurn() }
 
-func (*Turn) isChatStateTurn()         {}
-func (*DeferredTurn) isChatStateTurn() {}
+func (*MaterializedTurn) isTurn() {}
+func (*DeferredTurn) isTurn()     {}
 
 // UnmarshalJSON decodes a *DeferredTurn when "isDeferred" is true and a
-// full *Turn otherwise.
-func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
+// *MaterializedTurn otherwise.
+func (u *Turn) UnmarshalJSON(data []byte) error {
 \tvar probe struct {
 \t\tIsDeferred json.RawMessage \`json:"isDeferred"\`
 \t}
@@ -1307,7 +1308,7 @@ func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
 \t\tu.Value = &value
 \t\treturn nil
 \t}
-\tvar value Turn
+\tvar value MaterializedTurn
 \tif err := json.Unmarshal(data, &value); err != nil {
 \t\treturn err
 \t}
@@ -1316,17 +1317,29 @@ func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u ChatStateTurn) MarshalJSON() ([]byte, error) {
+func (u Turn) MarshalJSON() ([]byte, error) {
 \tif u.Value == nil {
 \t\treturn []byte("null"), nil
 \t}
 \treturn json.Marshal(u.Value)
 }
 
+// Materialized returns the materialized variant, if active.
+func (u Turn) Materialized() (*MaterializedTurn, bool) {
+\tv, ok := u.Value.(*MaterializedTurn)
+\treturn v, ok
+}
+
+// Deferred returns the deferred variant, if active.
+func (u Turn) Deferred() (*DeferredTurn, bool) {
+\tv, ok := u.Value.(*DeferredTurn)
+\treturn v, ok
+}
+
 // TurnId returns the id of the active variant, or "" when Value is nil.
-func (u ChatStateTurn) TurnId() string {
+func (u Turn) TurnId() string {
 \tswitch v := u.Value.(type) {
-\tcase *Turn:
+\tcase *MaterializedTurn:
 \t\treturn v.Id
 \tcase *DeferredTurn:
 \t\treturn v.Id
@@ -1698,7 +1711,7 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
-  lines.push(generateChatStateTurn());
+  lines.push(generateTurnUnion());
   lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
@@ -2633,7 +2646,7 @@ function checkExhaustiveness(project: Project): void {
     'ActionOrigin',
     'ResponsePart',
     'TurnBase',
-    'ChatStateTurn',
+    'Turn',
     'ToolResultContent',
     'SessionToolCallApprovedAction',
     'SessionToolCallDeniedAction',

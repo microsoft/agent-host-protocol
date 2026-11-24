@@ -67,15 +67,15 @@ final class ReducersTests: XCTestCase {
     }
 
     func testChatReducerDoesNotMutateTurnsArray() {
-        let turn1 = Turn(id: "t1", message: Message(text: "First", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
-        let turn2 = Turn(id: "t2", message: Message(text: "Second", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
-        let turn3 = Turn(id: "t3", message: Message(text: "Third", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
+        let turn1 = MaterializedTurn(id: "t1", message: Message(text: "First", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
+        let turn2 = MaterializedTurn(id: "t2", message: Message(text: "Second", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
+        let turn3 = MaterializedTurn(id: "t3", message: Message(text: "Third", origin: MessageOrigin(kind: .user)), responseParts: [], state: .complete)
         let state = ChatState(
             resource: C,
             title: "T",
             status: .idle,
             modifiedAt: "1970-01-01T00:00:01.000Z",
-            turns: [.turn(turn1), .turn(turn2), .turn(turn3)]
+            turns: [.materialized(turn1), .materialized(turn2), .materialized(turn3)]
         )
         let original = state.turns
         _ = chatReducer(

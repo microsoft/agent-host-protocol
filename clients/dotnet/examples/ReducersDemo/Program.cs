@@ -15,7 +15,7 @@ var chatState = new ChatState
     Title = "Demo Chat",
     Status = SessionStatus.Idle,
     ModifiedAt = "1970-01-01T00:00:00.000Z",
-    Turns = new List<ChatStateTurn>(),
+    Turns = new List<Turn>(),
 };
 
 var actions = new List<StateAction>

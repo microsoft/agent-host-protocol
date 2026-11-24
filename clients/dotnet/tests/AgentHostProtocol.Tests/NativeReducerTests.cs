@@ -30,7 +30,7 @@ public sealed class NativeReducerTests
             Resource = "chat://c1",
             Title = "chat",
             ModifiedAt = "2024-01-01T00:00:00.000Z",
-            Turns = new List<ChatStateTurn>(),
+            Turns = new List<Turn>(),
         };
         if (withActiveTurn)
         {

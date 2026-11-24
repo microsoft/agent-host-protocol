@@ -769,6 +769,13 @@ export interface SubscribeView {
    * returned {@link ChatState} carries `turnsNextCursor`; clients pass that
    * cursor to `fetchTurns` to ask the host to page more turns into the chat
    * state.
+   *
+   * Clients that declare
+   * {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+   * field and read history through deferred turns instead.
+   *
+   * @deprecated Declare `deferredTurns` and use `fetchDeferredTurns`.
+   * @stability 3
    */
   turns?: number;
 }

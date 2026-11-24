@@ -536,7 +536,7 @@
       "properties": {
         "turns": {
           "type": "number",
-          "description": "Advisory number of most-recent completed turns to expose in a chat\nsnapshot.\n\nServers MAY return more or fewer turns than requested. When omitted, the\nhost MUST return all retained turns. When older turns remain available, the\nreturned {@link ChatState} carries `turnsNextCursor`; clients pass that\ncursor to `fetchTurns` to ask the host to page more turns into the chat\nstate."
+          "description": "Advisory number of most-recent completed turns to expose in a chat\nsnapshot.\n\nServers MAY return more or fewer turns than requested. When omitted, the\nhost MUST return all retained turns. When older turns remain available, the\nreturned {@link ChatState} carries `turnsNextCursor`; clients pass that\ncursor to `fetchTurns` to ask the host to page more turns into the chat\nstate.\n\nClients that declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this\nfield and read history through deferred turns instead.\n\nStability: 3 - Legacy."
         }
       }
     },
@@ -1356,7 +1356,7 @@
     },
     "FetchTurnsParams": {
       "type": "object",
-      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.\n\nHosts MAY load turns as {@link DeferredTurn | deferred} for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.",
+      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.\n\nHosts MAY load turns as {@link DeferredTurn | deferred} for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nTail-window paging is legacy. It remains supported for 1.x clients, but new\nclients SHOULD declare `deferredTurns` and read history with\n{@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.\n\nStability: 3 - Legacy.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1378,7 +1378,7 @@
     },
     "FetchTurnsResult": {
       "type": "object",
-      "description": "Result of the `fetchTurns` command.",
+      "description": "Result of the `fetchTurns` command.\n\nStability: 3 - Legacy.",
       "properties": {}
     },
     "CompletionsParams": {
@@ -1643,7 +1643,7 @@
     },
     "FetchDeferredTurnsParams": {
       "type": "object",
-      "description": "Requests the full responses of a range of {@link DeferredTurn | deferred\nturns} in a chat state.\n\nThe range runs from `turnId` through `endTurnId`, inclusive, in\n{@link ChatState.turns | `ChatState.turns`} order. The command result does\nnot carry turns. Instead, before responding, the host MUST dispatch\n`chat/turnsMaterialized` to replace every deferred turn in the range in place\nwith its full {@link Turn}. Full turns in the range are left unchanged.\n\nThe host MUST reject the request with `InvalidParams` if `turnId` or\n`endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.\nHosts MAY also reject ranges that exceed an implementation-defined size limit\nwith `InvalidParams`.\n\nRequires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nStability: 1.0 - Early development.",
+      "description": "Requests the full responses of a range of {@link DeferredTurn | deferred\nturns} in a chat state.\n\nThe range runs from `turnId` through `endTurnId`, inclusive, in\n{@link ChatState.turns | `ChatState.turns`} order. The command result does\nnot carry turns. Instead, before responding, the host MUST dispatch\n`chat/turnsMaterialized` to replace every deferred turn in the range in place\nwith its full {@link MaterializedTurn}. Full turns in the range are left unchanged.\n\nThe host MUST reject the request with `InvalidParams` if `turnId` or\n`endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.\nHosts MAY also reject ranges that exceed an implementation-defined size limit\nwith `InvalidParams`.\n\nRequires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -4712,13 +4712,13 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ChatStateTurn"
+            "$ref": "#/$defs/Turn"
           },
           "description": "Completed turns, oldest first.\n\nEntries may be {@link DeferredTurn | deferred} only for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}."
         },
         "turnsNextCursor": {
           "type": "string",
-          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns."
+          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns.\n\nHosts SHOULD NOT set this for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they\nSHOULD send every retained turn and defer the ones the client doesn't need\nyet.\n\nStability: 3 - Legacy."
         },
         "activeTurn": {
           "$ref": "#/$defs/ActiveTurn",
@@ -5420,7 +5420,7 @@
     },
     "TurnBase": {
       "type": "object",
-      "description": "Fields shared by {@link Turn} and {@link DeferredTurn}.",
+      "description": "Fields shared by {@link MaterializedTurn} and {@link DeferredTurn}.",
       "properties": {
         "id": {
           "type": "string",
@@ -5453,9 +5453,9 @@
         "state"
       ]
     },
-    "Turn": {
+    "MaterializedTurn": {
       "type": "object",
-      "description": "A completed request/response cycle.",
+      "description": "A completed request/response cycle, including its full response.",
       "properties": {
         "id": {
           "type": "string",
@@ -5503,7 +5503,7 @@
     },
     "DeferredTurn": {
       "type": "object",
-      "description": "A completed turn whose response the host has not sent yet.\n\nThe turn keeps its position in {@link ChatState.turns}, so clients can show\nthe initiating message and outcome without downloading the response.\nRequest the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};\nthe host replaces the entry in place with a {@link Turn} via\n{@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.\n\nHosts MUST NOT send a `DeferredTurn` to a client that did not declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,\naction, or command result. Those clients receive the corresponding\n{@link Turn}.\n\nStability: 1.0 - Early development.",
+      "description": "A completed turn whose response the host has not sent yet.\n\nThe turn keeps its position in {@link ChatState.turns}, so clients can show\nthe initiating message and outcome without downloading the response.\nRequest the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};\nthe host replaces the entry in place with a {@link MaterializedTurn} via\n{@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.\n\nHosts MUST NOT send a `DeferredTurn` to a client that did not declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,\naction, or command result. Those clients receive the corresponding\n{@link MaterializedTurn}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "id": {
           "type": "string",
@@ -9910,7 +9910,7 @@
     },
     "ChatTurnsLoadedAction": {
       "type": "object",
-      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded. Entries may be {@link DeferredTurn | deferred}\nonly for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}.",
+      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded. Entries may be {@link DeferredTurn | deferred}\nonly for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nThis belongs to the legacy tail-window paging scheme, which deferred turns\nreplace. See {@link FetchTurnsParams | `fetchTurns`}.\n\nStability: 3 - Legacy.",
       "properties": {
         "type": {
           "const": "chat/turnsLoaded"
@@ -9918,7 +9918,7 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ChatStateTurn"
+            "$ref": "#/$defs/Turn"
           },
           "description": "Older completed turns loaded into the state, ordered oldest-first."
         },
@@ -9934,7 +9934,7 @@
     },
     "ChatTurnsMaterializedAction": {
       "type": "object",
-      "description": "Replaces {@link DeferredTurn | deferred turns} in place with their full\n{@link Turn | turns}.\n\nHosts dispatch this before responding to `fetchDeferredTurns`, and before\napplying any operation that needs a deferred turn's response, such as\n`chat/turnResume`. Each entry replaces the deferred turn with the same `id`.\nEntries whose `id` does not name a deferred turn in state are ignored.\n\nStability: 1.0 - Early development.",
+      "description": "Replaces {@link DeferredTurn | deferred turns} in place with their full\n{@link MaterializedTurn | turns}.\n\nHosts dispatch this before responding to `fetchDeferredTurns`, and before\napplying any operation that needs a deferred turn's response, such as\n`chat/turnResume`. Each entry replaces the deferred turn with the same `id`.\nEntries whose `id` does not name a deferred turn in state are ignored.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "chat/turnsMaterialized"
@@ -9942,7 +9942,7 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Turn"
+            "$ref": "#/$defs/MaterializedTurn"
           },
           "description": "Full turns to replace their deferred entries."
         }
@@ -11708,16 +11708,16 @@
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
-    "ChatStateTurn": {
+    "Turn": {
       "oneOf": [
         {
-          "$ref": "#/$defs/Turn"
+          "$ref": "#/$defs/MaterializedTurn"
         },
         {
           "$ref": "#/$defs/DeferredTurn"
         }
       ],
-      "description": "A completed turn in {@link ChatState.turns}: either a full {@link Turn} or a\n{@link DeferredTurn}, discriminated by `isDeferred`."
+      "description": "A completed request/response cycle: either a {@link MaterializedTurn} with\nits full response or a {@link DeferredTurn}, discriminated by `isDeferred`."
     },
     "PendingMessageKind": {
       "enum": [

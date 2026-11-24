@@ -13,7 +13,7 @@ import type {
   ToolCallResponsePart,
   InputRequestResponsePart,
   ErrorResponsePart,
-  Turn,
+  MaterializedTurn,
   PendingMessage,
   ConfirmationOption,
   ToolCallContributor,
@@ -123,7 +123,7 @@ function findOpenInputRequestPart(
   return part.kind === ResponsePartKind.InputRequest ? { index, part } : undefined;
 }
 
-function hasResumableError(turn: Turn): boolean {
+function hasResumableError(turn: MaterializedTurn): boolean {
   const part = turn.responseParts[turn.responseParts.length - 1];
   return part?.kind === ResponsePartKind.Error && part.resumable === true;
 }
@@ -212,7 +212,7 @@ function endTurn(
     responseParts.push(errorPart);
   }
 
-  const turn: Turn = {
+  const turn: MaterializedTurn = {
     id: active.id,
     startedAt: active.startedAt,
     // Defensive clamp: the duration is producer-supplied and opaque to this

@@ -871,6 +871,12 @@ data class SubscribeView(
      * returned {@link ChatState} carries `turnsNextCursor`; clients pass that
      * cursor to `fetchTurns` to ask the host to page more turns into the chat
      * state.
+     *
+     * Clients that declare
+     * {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+     * field and read history through deferred turns instead.
+     *
+     * Stability: 3 - Legacy.
      */
     val turns: Long? = null
 )
@@ -1558,6 +1564,27 @@ data class CreateResourceWatchResult(
     val channel: String
 )
 
+/**
+ * Requests that the host load older historical turns into a chat state.
+ *
+ * The command result does not carry turns. Instead, before responding, the host
+ * MUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat
+ * channel's `turns` state, ahead of the already-loaded window, and update or
+ * clear `turnsNextCursor`.
+ *
+ * Before applying any operation that references a turn outside the currently
+ * loaded window, the host MUST eagerly load enough older turns into state for
+ * that operation to reduce against valid state.
+ *
+ * Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+ * declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * Tail-window paging is legacy. It remains supported for 1.x clients, but new
+ * clients SHOULD declare `deferredTurns` and read history with
+ * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+ *
+ * Stability: 3 - Legacy.
+ */
 @Serializable
 data class FetchTurnsParams(
     /**
@@ -1580,6 +1607,11 @@ data class FetchTurnsParams(
     val cursor: String? = null
 )
 
+/**
+ * Result of the `fetchTurns` command.
+ *
+ * Stability: 3 - Legacy.
+ */
 @Serializable
 class FetchTurnsResult
 
@@ -1591,7 +1623,7 @@ class FetchTurnsResult
  * {@link ChatState.turns | `ChatState.turns`} order. The command result does
  * not carry turns. Instead, before responding, the host MUST dispatch
  * `chat/turnsMaterialized` to replace every deferred turn in the range in place
- * with its full {@link Turn}. Full turns in the range are left unchanged.
+ * with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
  *
  * The host MUST reject the request with `InvalidParams` if `turnId` or
  * `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.

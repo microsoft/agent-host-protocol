@@ -23,8 +23,8 @@ import type {
   ToolCallContributor,
   ToolCallRiskAssessment,
   ToolInput,
+  MaterializedTurn,
   Turn,
-  ChatStateTurn,
 } from './state.js';
 import {
   ToolCallConfirmationReason,
@@ -765,20 +765,26 @@ export interface ChatTruncatedAction {
  * only for clients that declared
  * {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
  *
+ * This belongs to the legacy tail-window paging scheme, which deferred turns
+ * replace. See {@link FetchTurnsParams | `fetchTurns`}.
+ *
  * @category Chat Actions
  * @version 1
+ * @deprecated Use {@link DeferredTurn | deferred turns} and
+ * {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+ * @stability 3
  */
 export interface ChatTurnsLoadedAction {
   type: ActionType.ChatTurnsLoaded;
   /** Older completed turns loaded into the state, ordered oldest-first. */
-  turns: ChatStateTurn[];
+  turns: Turn[];
   /** Opaque cursor for loading the next older page, if one remains. */
   turnsNextCursor?: string;
 }
 
 /**
  * Replaces {@link DeferredTurn | deferred turns} in place with their full
- * {@link Turn | turns}.
+ * {@link MaterializedTurn | turns}.
  *
  * Hosts dispatch this before responding to `fetchDeferredTurns`, and before
  * applying any operation that needs a deferred turn's response, such as
@@ -792,7 +798,7 @@ export interface ChatTurnsLoadedAction {
 export interface ChatTurnsMaterializedAction {
   type: ActionType.ChatTurnsMaterialized;
   /** Full turns to replace their deferred entries. */
-  turns: Turn[];
+  turns: MaterializedTurn[];
 }
 
 // ─── Pending Message Actions ─────────────────────────────────────────────────

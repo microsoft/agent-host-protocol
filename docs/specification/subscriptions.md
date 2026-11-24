@@ -178,7 +178,9 @@ not support a requested view ignores it. Clients MUST accept a snapshot that
 contains more state than they requested.
 
 For a chat channel, `view.turns` is the number of most recent completed turns
-that the client wants in the snapshot:
+that the client wants in the snapshot. This tail window is legacy; clients that
+declare `capabilities.deferredTurns` SHOULD omit it and use
+[deferred turns](./chat-channel#deferred-turns) instead:
 
 ```json
 {
@@ -196,10 +198,6 @@ The server MAY return more or fewer turns than requested. If `view.turns` is
 absent, the server MUST return all turns that it retains. If older turns are
 available, `ChatState.turnsNextCursor` is present. The client passes that cursor
 to `fetchTurns` to load older turns into the chat state.
-
-Clients that declare `capabilities.deferredTurns` may receive some completed
-turns without their responses; see
-[Deferred turns](./chat-channel#deferred-turns).
 
 ## Unsubscribing {#unsubscribe-notification}
 

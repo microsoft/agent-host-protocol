@@ -59,8 +59,8 @@ use ahp_types::actions::{
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, BackgroundWork, CanvasState,
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
-    ChatState, ChatStateTurn, ChildCustomization, ConfirmationOption, Customization,
-    CustomizationEnablement, ErrorResponsePart, InputRequestResponsePart, McpServerCustomization,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, MaterializedTurn, McpServerCustomization,
     McpServerStartingState, McpServerState, McpServerStoppedState, PendingMessage,
     PendingMessageKind, ResourceWatchState, ResponsePart, RootState, SessionInputRequest,
     SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
@@ -410,7 +410,7 @@ fn end_turn(
         response_parts.push(ResponsePart::Error(error_part));
     }
 
-    let turn = Turn {
+    let turn = MaterializedTurn {
         id: active.id,
         started_at: Some(active.started_at),
         duration: Some(duration),
@@ -420,7 +420,7 @@ fn end_turn(
         state: turn_state,
     };
 
-    state.turns.push(ChatStateTurn::Turn(turn));
+    state.turns.push(Turn::Materialized(turn));
     state.modified_at = modified_at;
     state.status = summary_status(state, terminal_status);
     ReduceOutcome::Applied
@@ -1156,7 +1156,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             if state.active_turn.is_some() {
                 return ReduceOutcome::NoOp;
             }
-            let Some(ChatStateTurn::Turn(turn)) = state.turns.last() else {
+            let Some(Turn::Materialized(turn)) = state.turns.last() else {
                 return ReduceOutcome::NoOp;
             };
             if turn.id != a.turn_id || turn.state != TurnState::Error {
@@ -1169,7 +1169,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 return ReduceOutcome::NoOp;
             }
 
-            let Some(ChatStateTurn::Turn(turn)) = state.turns.pop() else {
+            let Some(Turn::Materialized(turn)) = state.turns.pop() else {
                 return ReduceOutcome::NoOp;
             };
             state.active_turn = Some(ActiveTurn {
@@ -1335,8 +1335,8 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
         StateAction::ChatTurnsLoaded(a) => {
-            let existing_ids: HashSet<&str> = state.turns.iter().map(ChatStateTurn::id).collect();
-            let mut older_turns: Vec<ChatStateTurn> = a
+            let existing_ids: HashSet<&str> = state.turns.iter().map(Turn::id).collect();
+            let mut older_turns: Vec<Turn> = a
                 .turns
                 .iter()
                 .filter(|turn| !existing_ids.contains(turn.id()))
@@ -1348,18 +1348,18 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             ReduceOutcome::Applied
         }
         StateAction::ChatTurnsMaterialized(a) => {
-            let materialized: HashMap<&str, &Turn> = a
+            let materialized: HashMap<&str, &MaterializedTurn> = a
                 .turns
                 .iter()
                 .map(|turn| (turn.id.as_str(), turn))
                 .collect();
             let mut changed = false;
             for entry in &mut state.turns {
-                let ChatStateTurn::Deferred(deferred) = entry else {
+                let Turn::Deferred(deferred) = entry else {
                     continue;
                 };
                 if let Some(turn) = materialized.get(deferred.id.as_str()) {
-                    *entry = ChatStateTurn::Turn((*turn).clone());
+                    *entry = Turn::Materialized((*turn).clone());
                     changed = true;
                 }
             }
@@ -2482,8 +2482,8 @@ mod tests {
         assert_eq!(apply_action_to_chat(&mut s, &a), ReduceOutcome::Applied);
         assert!(s.active_turn.is_none());
         assert_eq!(s.turns.len(), 1);
-        let ChatStateTurn::Turn(turn) = &s.turns[0] else {
-            panic!("expected a full turn");
+        let Turn::Materialized(turn) = &s.turns[0] else {
+            panic!("expected a materialized turn");
         };
         assert_eq!(turn.state, TurnState::Complete);
         assert_eq!(s.status, SessionStatus::Idle.bits());

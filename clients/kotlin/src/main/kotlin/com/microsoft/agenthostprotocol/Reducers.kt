@@ -496,7 +496,7 @@ private fun endTurn(
 
     // Defensive clamp: `duration` is producer-supplied and opaque to this
     // reducer, but a negative value would be nonsensical to display.
-    val turn = Turn(
+    val turn = MaterializedTurn(
         id = active.id,
         startedAt = active.startedAt,
         duration = maxOf(0L, duration),
@@ -507,7 +507,7 @@ private fun endTurn(
     )
 
     val withoutTurn = state.copy(
-        turns = state.turns + ChatStateTurn.Full(turn),
+        turns = state.turns + Turn.Materialized(turn),
         activeTurn = null,
         modifiedAt = addMillisecondsToTimestamp(active.startedAt, turn.duration ?: 0L),
     )
@@ -1017,7 +1017,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             state
         } else {
             val turnIndex = state.turns.lastIndex
-            val turn = (state.turns[turnIndex] as? ChatStateTurn.Full)?.value
+            val turn = (state.turns[turnIndex] as? Turn.Materialized)?.value
             if (turn == null || turn.id != a.turnId || turn.state != TurnState.ERROR) {
                 state
             } else {
@@ -1538,12 +1538,12 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val materialized = action.value.turns.associateBy { it.id }
         var changed = false
         val turns = state.turns.map { turn ->
-            val replacement = if (turn is ChatStateTurn.Deferred) materialized[turn.id] else null
+            val replacement = if (turn is Turn.Deferred) materialized[turn.id] else null
             if (replacement == null) {
                 turn
             } else {
                 changed = true
-                ChatStateTurn.Full(replacement)
+                Turn.Materialized(replacement)
             }
         }
         if (changed) state.copy(turns = turns) else state

@@ -1302,32 +1302,31 @@ public enum ChatOrigin: Codable, Sendable, Equatable {
 }
 
 /**
- * Swift memberwise-init order for `Turn`. `Turn` now inherits most fields from
- * `TurnBase`, which would otherwise move `responseParts` after `state` and
- * break existing labelled `Turn(...)` call sites.
+ * Swift memberwise-init order for `MaterializedTurn`. It inherits most fields
+ * from `TurnBase`, which would otherwise move `responseParts` after `state`.
  */
-const TURN_FIELD_ORDER = ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'];
+const MATERIALIZED_TURN_FIELD_ORDER = ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'];
 
-/** `isDeferred` is the `ChatStateTurn` discriminant, not a stored property. */
-function turnVariantProps(project: Project, name: 'Turn' | 'DeferredTurn'): SwiftProp[] {
+/** `isDeferred` is the `Turn` discriminant, not a stored property. */
+function turnVariantProps(project: Project, name: 'MaterializedTurn' | 'DeferredTurn'): SwiftProp[] {
   const iface = findInterface(project, name);
   if (!iface) throw new Error(`Interface ${name} not found`);
   return extractProps(iface, project).filter(p => p.wireName !== 'isDeferred');
 }
 
 /**
- * Emit `Turn`, `DeferredTurn`, and the `ChatStateTurn` union. `ChatStateTurn`
- * is discriminated by the boolean `isDeferred`: `true` selects
- * `DeferredTurn`; absent, `false`, or any other value selects `Turn`.
+ * Emit `MaterializedTurn`, `DeferredTurn`, and the `Turn` union. `Turn` is
+ * discriminated by the boolean `isDeferred`: `true` selects `DeferredTurn`;
+ * absent, `false`, or any other value selects `MaterializedTurn`.
  */
-function generateChatStateTurnSwift(project: Project): string {
-  const turnProps = turnVariantProps(project, 'Turn');
-  const turnNames = turnProps.map(p => p.wireName);
-  if (turnNames.length !== TURN_FIELD_ORDER.length || !TURN_FIELD_ORDER.every(n => turnNames.includes(n))) {
-    throw new Error(`Turn fields changed (${turnNames.join(', ')}); update TURN_FIELD_ORDER in generate-swift.ts`);
+function generateTurnSwift(project: Project): string {
+  const materializedProps = turnVariantProps(project, 'MaterializedTurn');
+  const materializedNames = materializedProps.map(p => p.wireName);
+  if (materializedNames.length !== MATERIALIZED_TURN_FIELD_ORDER.length || !MATERIALIZED_TURN_FIELD_ORDER.every(n => materializedNames.includes(n))) {
+    throw new Error(`MaterializedTurn fields changed (${materializedNames.join(', ')}); update MATERIALIZED_TURN_FIELD_ORDER in generate-swift.ts`);
   }
-  turnProps.sort((a, b) => TURN_FIELD_ORDER.indexOf(a.wireName) - TURN_FIELD_ORDER.indexOf(b.wireName));
-  const turn = generateSwiftStruct('Turn', turnProps);
+  materializedProps.sort((a, b) => MATERIALIZED_TURN_FIELD_ORDER.indexOf(a.wireName) - MATERIALIZED_TURN_FIELD_ORDER.indexOf(b.wireName));
+  const materialized = generateSwiftStruct('MaterializedTurn', materializedProps);
 
   const deferredIface = findInterface(project, 'DeferredTurn')!;
   const deferredProps = turnVariantProps(project, 'DeferredTurn');
@@ -1370,11 +1369,11 @@ function generateChatStateTurnSwift(project: Project): string {
   ].join('\n');
 
   const union = [
-    '/// A completed turn in `ChatState.turns`: either a full ``Turn`` or a',
-    '/// ``DeferredTurn``, discriminated by `isDeferred`.',
-    'public enum ChatStateTurn: Codable, Sendable, Equatable {',
-    '    /// A full turn (`isDeferred` absent or `false`).',
-    '    case turn(Turn)',
+    '/// A completed request/response cycle: either a ``MaterializedTurn`` with',
+    '/// its full response or a ``DeferredTurn``, discriminated by `isDeferred`.',
+    'public enum Turn: Codable, Sendable, Equatable {',
+    '    /// A turn with its full response (`isDeferred` absent or `false`).',
+    '    case materialized(MaterializedTurn)',
     '    /// A turn whose response has not been sent yet (`isDeferred: true`).',
     '    case deferred(DeferredTurn)',
     '',
@@ -1387,13 +1386,13 @@ function generateChatStateTurnSwift(project: Project): string {
     '        if (try? container.decodeIfPresent(Bool.self, forKey: .discriminant)) == true {',
     '            self = .deferred(try DeferredTurn(from: decoder))',
     '        } else {',
-    '            self = .turn(try Turn(from: decoder))',
+    '            self = .materialized(try MaterializedTurn(from: decoder))',
     '        }',
     '    }',
     '',
     '    public func encode(to encoder: Encoder) throws {',
     '        switch self {',
-    '        case .turn(let value): try value.encode(to: encoder)',
+    '        case .materialized(let value): try value.encode(to: encoder)',
     '        case .deferred(let value): try value.encode(to: encoder)',
     '        }',
     '    }',
@@ -1408,7 +1407,7 @@ function generateChatStateTurnSwift(project: Project): string {
       ...(p.doc ? p.doc.split('\n').map(line => emitSwiftDocLine(line, '    ')) : []),
       `    public var ${p.name}: ${p.type} {`,
       '        switch self {',
-      `        case .turn(let value): return value.${p.name}`,
+      `        case .materialized(let value): return value.${p.name}`,
       `        case .deferred(let value): return value.${p.name}`,
       '        }',
       '    }',
@@ -1416,7 +1415,7 @@ function generateChatStateTurnSwift(project: Project): string {
     '}',
   ].join('\n');
 
-  return [turn, deferred, union].join('\n\n');
+  return [materialized, deferred, union].join('\n\n');
 }
 
 const SESSION_ORIGIN_UNION: UnionConfig = {
@@ -1524,7 +1523,7 @@ function generateStateFile(project: Project): string {
   lines.push('// MARK: - Discriminated Unions\n');
   lines.push(generateChatOriginSwift());
   lines.push('');
-  lines.push(generateChatStateTurnSwift(project));
+  lines.push(generateTurnSwift(project));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
   lines.push('');
@@ -2730,10 +2729,10 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
-    'TurnBase',                     // base interface, flattened into Turn / DeferredTurn via `extends`
-    'Turn',                         // generateChatStateTurnSwift()
-    'DeferredTurn',                 // generateChatStateTurnSwift()
-    'ChatStateTurn',                // generateChatStateTurnSwift() boolean-discriminated union
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
+    'MaterializedTurn',             // generateTurnSwift()
+    'DeferredTurn',                 // generateTurnSwift()
+    'Turn',                         // generateTurnSwift() boolean-discriminated union
     'ToolResultContent',            // TOOL_RESULT_CONTENT_UNION discriminated union
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction

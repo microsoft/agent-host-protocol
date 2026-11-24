@@ -269,7 +269,7 @@ export interface DisposeChatParams extends BaseParams {}
  * {@link ChatState.turns | `ChatState.turns`} order. The command result does
  * not carry turns. Instead, before responding, the host MUST dispatch
  * `chat/turnsMaterialized` to replace every deferred turn in the range in place
- * with its full {@link Turn}. Full turns in the range are left unchanged.
+ * with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
  *
  * The host MUST reject the request with `InvalidParams` if `turnId` or
  * `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.

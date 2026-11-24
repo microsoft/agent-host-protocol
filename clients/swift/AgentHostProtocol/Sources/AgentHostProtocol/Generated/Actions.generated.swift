@@ -1970,16 +1970,30 @@ public struct ChatTruncatedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Loads older completed turns into this chat's state.
+///
+/// Hosts dispatch this before responding to `fetchTurns`, and before applying
+/// any operation that references a turn older than the currently loaded window.
+/// `turns` is ordered oldest-first and is prepended to the current `turns`
+/// window. `turnsNextCursor` replaces the state's cursor; omit it when all
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.
 public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Older completed turns loaded into the state, ordered oldest-first.
-    public var turns: [ChatStateTurn]
+    public var turns: [Turn]
     /// Opaque cursor for loading the next older page, if one remains.
     public var turnsNextCursor: String?
 
     public init(
         type: ActionType,
-        turns: [ChatStateTurn],
+        turns: [Turn],
         turnsNextCursor: String? = nil
     ) {
         self.type = type
@@ -1989,7 +2003,7 @@ public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
 }
 
 /// Replaces {@link DeferredTurn | deferred turns} in place with their full
-/// {@link Turn | turns}.
+/// {@link MaterializedTurn | turns}.
 ///
 /// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
 /// applying any operation that needs a deferred turn's response, such as
@@ -2000,11 +2014,11 @@ public struct ChatTurnsLoadedAction: Codable, Sendable, Equatable {
 public struct ChatTurnsMaterializedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Full turns to replace their deferred entries.
-    public var turns: [Turn]
+    public var turns: [MaterializedTurn]
 
     public init(
         type: ActionType,
-        turns: [Turn]
+        turns: [MaterializedTurn]
     ) {
         self.type = type
         self.turns = turns

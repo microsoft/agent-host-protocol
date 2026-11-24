@@ -847,9 +847,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
   { name: 'ChatConfigState', mutable: true },
-  // `Turn.isDeferred` is only ever absent or `false`; the ChatStateTurn
-  // converter selects the variant, so Turn keeps no discriminator property.
-  { name: 'Turn', mutable: true, omitProps: ['isDeferred'] },
+  // `MaterializedTurn.isDeferred` is only ever absent or `false`; the Turn
+  // converter selects the variant, so MaterializedTurn keeps no discriminator
+  // property.
+  { name: 'MaterializedTurn', mutable: true, omitProps: ['isDeferred'] },
   { name: 'DeferredTurn', mutable: true },
   { name: 'ActiveTurn', mutable: true },
   { name: 'SideChatSelection' },
@@ -1048,32 +1049,41 @@ const TERMINAL_CONTENT_PART_UNION: UnionConfig = {
   unknown: true,
 };
 
-// `ChatStateTurn` (types/channels-chat/state.ts) is `Turn | DeferredTurn`,
-// discriminated by the BOOLEAN `isDeferred` with Turn as the default variant
-// (absent or `false`). UnionConverter<T> only handles string discriminators
-// with a required tag, so emit a small dedicated converter. A boolean has no
-// unknown values, so there is no raw-JSON fallback. DeferredTurn carries its
-// own `IsDeferred = true`, so encoding by runtime type writes the tag; Turn has
-// no such property, so encoding never emits `isDeferred`.
-const CHAT_STATE_TURN_UNION_CS = `/// <summary>
-/// ChatStateTurn is a completed turn in ChatState.Turns: either a full
-/// <see cref="Turn"/> or a <see cref="DeferredTurn"/>, discriminated by
-/// <c>isDeferred</c>.
+// `Turn` (types/channels-chat/state.ts) is `MaterializedTurn | DeferredTurn`,
+// discriminated by the BOOLEAN `isDeferred` with MaterializedTurn as the
+// default variant (absent or `false`). UnionConverter<T> only handles string
+// discriminators with a required tag, so emit a small dedicated converter. A
+// boolean has no unknown values, so there is no raw-JSON fallback. DeferredTurn
+// carries its own `IsDeferred = true`, so encoding by runtime type writes the
+// tag; MaterializedTurn has no such property, so encoding never emits
+// `isDeferred`.
+const TURN_UNION_CS = `/// <summary>
+/// Turn is a completed turn in ChatState.Turns: either a
+/// <see cref="MaterializedTurn"/> or a <see cref="DeferredTurn"/>,
+/// discriminated by <c>isDeferred</c>.
 /// </summary>
-[JsonConverter(typeof(ChatStateTurnConverter))]
-public sealed class ChatStateTurn : AhpUnion
+[JsonConverter(typeof(TurnConverter))]
+public sealed class Turn : AhpUnion
 {
-    /// <summary>Creates an empty ChatStateTurn (no active variant).</summary>
-    public ChatStateTurn() { }
+    /// <summary>Creates an empty Turn (no active variant).</summary>
+    public Turn() { }
 
-    /// <summary>Creates a ChatStateTurn wrapping a <see cref="Turn"/> or <see cref="DeferredTurn"/>.</summary>
-    public ChatStateTurn(object? value) : base(value) { }
+    /// <summary>Creates a Turn wrapping a <see cref="MaterializedTurn"/> or <see cref="DeferredTurn"/>.</summary>
+    public Turn(object? value) : base(value) { }
+
+    /// <summary>The materialized variant, or <see langword="null"/> when this turn is not materialized.</summary>
+    [JsonIgnore]
+    public MaterializedTurn? Materialized => Value as MaterializedTurn;
+
+    /// <summary>The deferred variant, or <see langword="null"/> when this turn is not deferred.</summary>
+    [JsonIgnore]
+    public DeferredTurn? Deferred => Value as DeferredTurn;
 }
 
-/// <summary>System.Text.Json converter for the ChatStateTurn union.</summary>
-internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
+/// <summary>System.Text.Json converter for the Turn union.</summary>
+internal sealed class TurnConverter : JsonConverter<Turn>
 {
-    public override ChatStateTurn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override Turn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null)
         {
@@ -1086,16 +1096,16 @@ internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
             && root.TryGetProperty("isDeferred", out JsonElement flag)
             && flag.ValueKind == JsonValueKind.True;
         return isDeferred
-            ? new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
-            : new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<Turn>(options)));
+            ? new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new Turn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<MaterializedTurn>(options)));
     }
 
-    public override void Write(Utf8JsonWriter writer, ChatStateTurn value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, Turn value, JsonSerializerOptions options)
     {
         switch (value.Value)
         {
-            case Turn turn:
-                JsonSerializer.Serialize(writer, turn, AhpJsonTypeInfo.Get<Turn>(options));
+            case MaterializedTurn materialized:
+                JsonSerializer.Serialize(writer, materialized, AhpJsonTypeInfo.Get<MaterializedTurn>(options));
                 return;
             case DeferredTurn deferred:
                 JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
@@ -1104,7 +1114,7 @@ internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
                 writer.WriteNullValue();
                 return;
             default:
-                throw new JsonException("ChatStateTurn cannot hold a " + value.Value.GetType().Name + ".");
+                throw new JsonException("Turn cannot hold a " + value.Value.GetType().Name + ".");
         }
     }
 }`;
@@ -1719,7 +1729,7 @@ function generateStateFile(project: Project): string {
   }
   lines.push(generateChatOriginUnionCs(project));
   lines.push('');
-  lines.push(CHAT_STATE_TURN_UNION_CS);
+  lines.push(TURN_UNION_CS);
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
   lines.push('');
@@ -3039,9 +3049,9 @@ function checkExhaustiveness(project: Project): void {
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',
     'JsonRpcErrorCode', 'ChangesetOperationTarget', 'CustomizationEnablement',
     'ChatOrigin', 'ChatInputQuestion', 'ChatInputAnswerValue', 'ChatInputAnswer',
-    // TurnBase is denormalized into Turn and DeferredTurn; ChatStateTurn is
-    // emitted by hand (CHAT_STATE_TURN_UNION_CS) for its boolean discriminator.
-    'TurnBase', 'ChatStateTurn',
+    // TurnBase is denormalized into MaterializedTurn and DeferredTurn; Turn is
+    // emitted by hand (TURN_UNION_CS) for its boolean discriminator.
+    'TurnBase', 'Turn',
     // ToolInput is `string | ContentRef` — emitted by hand as an untagged union
     // (TOOL_INPUT_UNION_CS), not through the discriminated-union list.
     'ToolInput',

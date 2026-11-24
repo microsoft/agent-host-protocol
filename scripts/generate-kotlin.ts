@@ -665,7 +665,7 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
  * hand-rolled union serializer decodes and injects them instead.
  */
 const OMITTED_PROPS: Record<string, readonly string[]> = {
-  Turn: ['isDeferred'],
+  MaterializedTurn: ['isDeferred'],
   DeferredTurn: ['isDeferred'],
 };
 
@@ -675,7 +675,7 @@ const OMITTED_PROPS: Record<string, readonly string[]> = {
  * source-compatible.
  */
 const PROP_ORDER: Record<string, readonly string[]> = {
-  Turn: ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'],
+  MaterializedTurn: ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'],
 };
 
 function orderProps(tsInterfaceName: string, props: KotlinProp[]): KotlinProp[] {
@@ -971,62 +971,63 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
 }
 
 /**
- * `ChatStateTurn = Turn | DeferredTurn`, discriminated by the boolean
- * `isDeferred`. `true` decodes as [ChatStateTurn.Deferred]; absent, `false`,
- * or any other value decodes as [ChatStateTurn.Full]. Neither variant data
- * class carries `isDeferred`; the serializer injects `"isDeferred": true` when
+ * `Turn = MaterializedTurn | DeferredTurn`, discriminated by the boolean
+ * `isDeferred`. `true` decodes as [Turn.Deferred]; absent, `false`, or any
+ * other value decodes as [Turn.Materialized]. Neither variant data class
+ * carries `isDeferred`; the serializer injects `"isDeferred": true` when
  * encoding a deferred turn. The shared `TurnBase` fields are exposed on the
  * sealed interface so callers can read them without matching.
  */
-function generateChatStateTurnKotlin(project: Project): string {
+function generateTurnKotlin(project: Project): string {
   const base = findInterface(project, 'TurnBase');
   if (!base) throw new Error('Interface TurnBase not found');
   const baseProps = extractProps(base, project);
-  const alias = project.getSourceFiles().map(sf => sf.getTypeAlias('ChatStateTurn')).find(a => a);
-  const doc = alias ? getDocumentation(alias) : '';
+  const alias = project.getSourceFiles().map(sf => sf.getTypeAlias('Turn')).find(a => a);
+  if (!alias) throw new Error('Type alias Turn not found');
+  const doc = getDocumentation(alias);
   const overrides = baseProps
     .map(p => `        override val ${p.name}: ${p.type} get() = value.${p.name}`)
     .join('\n');
   return `${emitKDoc(doc).join('\n')}
-@Serializable(with = ChatStateTurnSerializer::class)
-sealed interface ChatStateTurn {
+@Serializable(with = TurnSerializer::class)
+sealed interface Turn {
 ${baseProps.map(p => [...emitKDoc(p.doc, '    '), `    val ${p.name}: ${p.type}`].join('\n')).join('\n')}
 
-    /** A full [Turn] carrying its response. */
-    @JvmInline value class Full(val value: Turn) : ChatStateTurn {
+    /** A [MaterializedTurn] carrying its full response. */
+    @JvmInline value class Materialized(val value: MaterializedTurn) : Turn {
 ${overrides}
     }
 
     /** A [DeferredTurn] whose response has not been sent yet. */
-    @JvmInline value class Deferred(val value: DeferredTurn) : ChatStateTurn {
+    @JvmInline value class Deferred(val value: DeferredTurn) : Turn {
 ${overrides}
     }
 }
 
-internal object ChatStateTurnSerializer : KSerializer<ChatStateTurn> {
+internal object TurnSerializer : KSerializer<Turn> {
     override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("ChatStateTurn")
+        buildClassSerialDescriptor("Turn")
 
-    override fun deserialize(decoder: Decoder): ChatStateTurn {
+    override fun deserialize(decoder: Decoder): Turn {
         val input = decoder as? JsonDecoder
-            ?: error("ChatStateTurn can only be deserialized from JSON")
+            ?: error("Turn can only be deserialized from JSON")
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
-            ?: error("Expected JsonObject for ChatStateTurn")
+            ?: error("Expected JsonObject for Turn")
         val isDeferred = (obj["isDeferred"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
         return if (isDeferred) {
-            ChatStateTurn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
+            Turn.Deferred(input.json.decodeFromJsonElement(DeferredTurn.serializer(), element))
         } else {
-            ChatStateTurn.Full(input.json.decodeFromJsonElement(Turn.serializer(), element))
+            Turn.Materialized(input.json.decodeFromJsonElement(MaterializedTurn.serializer(), element))
         }
     }
 
-    override fun serialize(encoder: Encoder, value: ChatStateTurn) {
+    override fun serialize(encoder: Encoder, value: Turn) {
         val output = encoder as? JsonEncoder
-            ?: error("ChatStateTurn can only be serialized to JSON")
+            ?: error("Turn can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is ChatStateTurn.Full -> output.json.encodeToJsonElement(Turn.serializer(), value.value)
-            is ChatStateTurn.Deferred -> JsonObject(
+            is Turn.Materialized -> output.json.encodeToJsonElement(MaterializedTurn.serializer(), value.value)
+            is Turn.Deferred -> JsonObject(
                 output.json.encodeToJsonElement(DeferredTurn.serializer(), value.value).jsonObject +
                     ("isDeferred" to JsonPrimitive(true)),
             )
@@ -1133,7 +1134,7 @@ const STATE_STRUCTS = [
   'CanvasReference', 'CanvasState',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
-  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'DeferredTurn', 'ActiveTurn', 'Message',
+  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'MaterializedTurn', 'DeferredTurn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
   'ChatInputTextAnswerValue', 'ChatInputNumberAnswerValue',
@@ -1642,7 +1643,7 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
-  lines.push(generateChatStateTurnKotlin(project));
+  lines.push(generateTurnKotlin(project));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -2596,8 +2597,8 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateDataClassFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
-    'ChatStateTurn',                // generateChatStateTurnKotlin()
-    'TurnBase',                     // base interface, flattened into Turn / DeferredTurn via `extends`
+    'Turn',                         // generateTurnKotlin()
+    'TurnBase',                     // base interface, flattened into MaterializedTurn / DeferredTurn via `extends`
     'ToolResultContent',            // generateToolResultContentUnion()
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction

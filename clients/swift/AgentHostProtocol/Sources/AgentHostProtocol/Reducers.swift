@@ -188,7 +188,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatTurnResume(let a):
         guard state.activeTurn == nil,
-              case .turn(let turn) = state.turns.last,
+              case .materialized(let turn) = state.turns.last,
               turn.id == a.turnId,
               turn.state == .error,
               case .error(let errorPart) = turn.responseParts.last,
@@ -594,7 +594,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     // ── Truncation ────────────────────────────────────────────────────────
 
     case .chatTruncated(let a):
-        let turns: [ChatStateTurn]
+        let turns: [Turn]
         if let turnId = a.turnId {
             guard let idx = state.turns.firstIndex(where: { $0.id == turnId }) else {
                 return state
@@ -623,12 +623,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatTurnsMaterialized(let a):
         let materialized = Dictionary(a.turns.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         var changed = false
-        let turns = state.turns.map { turn -> ChatStateTurn in
+        let turns = state.turns.map { turn -> Turn in
             guard case .deferred(let deferred) = turn, let replacement = materialized[deferred.id] else {
                 return turn
             }
             changed = true
-            return .turn(replacement)
+            return .materialized(replacement)
         }
         guard changed else { return state }
         var next = state
@@ -1230,7 +1230,7 @@ private func endTurn(
 
     // Defensive clamp: `duration` is producer-supplied and opaque to this
     // reducer, but a negative value would be nonsensical to display.
-    let turn = Turn(
+    let turn = MaterializedTurn(
         id: activeTurn.id,
         startedAt: activeTurn.startedAt,
         duration: max(0, duration),
@@ -1241,7 +1241,7 @@ private func endTurn(
     )
 
     var next = state
-    next.turns.append(.turn(turn))
+    next.turns.append(.materialized(turn))
     next.activeTurn = nil
     next.status = chatSummaryStatus(next, terminalStatus: terminalStatus)
     next.modifiedAt = addMillisecondsToTimestamp(activeTurn.startedAt, turn.duration ?? 0)

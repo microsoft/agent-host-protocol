@@ -515,7 +515,7 @@ describe('generated JSON schemas', () => {
         }
       });
 
-      it('distinguishes full and deferred chat-state turns by isDeferred', () => {
+      it('distinguishes materialized and deferred turns by isDeferred', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const base = { id: 't1', message: { text: 'Hi', origin: { kind: 'user' } }, state: 'complete' };
         for (const valid of [
@@ -523,10 +523,10 @@ describe('generated JSON schemas', () => {
           { ...base, responseParts: [], isDeferred: false },
           { ...base, isDeferred: true },
         ]) {
-          assert.equal(schemaAccepts(schema, defs.ChatStateTurn, valid), true, JSON.stringify(valid));
+          assert.equal(schemaAccepts(schema, defs.Turn, valid), true, JSON.stringify(valid));
         }
         for (const invalid of [base, { ...base, isDeferred: false }]) {
-          assert.equal(schemaAccepts(schema, defs.ChatStateTurn, invalid), false, JSON.stringify(invalid));
+          assert.equal(schemaAccepts(schema, defs.Turn, invalid), false, JSON.stringify(invalid));
         }
       });
 

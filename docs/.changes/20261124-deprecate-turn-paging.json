@@ -1,0 +1,4 @@
+{
+  "type": "deprecated",
+  "message": "Tail-window turn paging (`SubscribeView.turns`, `ChatState.turnsNextCursor`, `fetchTurns`, and `chat/turnsLoaded`) is now Legacy (stability 3) in favour of deferred turns. It remains supported for 1.x clients that do not declare `deferredTurns`."
+}

@@ -1524,13 +1524,20 @@ type ChatState struct {
 	//
 	// Entries may be {@link DeferredTurn | deferred} only for clients that
 	// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
-	Turns []ChatStateTurn `json:"turns"`
+	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
 	//
 	// Presence means `turns` is a tail window and more historical turns are
 	// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
 	// the loaded turns into state and update or clear this cursor before
 	// responding. Absence means the state contains all retained turns.
+	//
+	// Hosts SHOULD NOT set this for clients that declared
+	// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+	// SHOULD send every retained turn and defer the ones the client doesn't need
+	// yet.
+	//
+	// Stability: 3 - Legacy.
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
@@ -1820,8 +1827,8 @@ type ChatConfigState struct {
 	Values map[string]json.RawMessage `json:"values"`
 }
 
-// A completed request/response cycle.
-type Turn struct {
+// A completed request/response cycle, including its full response.
+type MaterializedTurn struct {
 	// Turn identifier
 	Id string `json:"id"`
 	// ISO 8601 timestamp when this turn started.
@@ -1846,13 +1853,13 @@ type Turn struct {
 // The turn keeps its position in {@link ChatState.turns}, so clients can show
 // the initiating message and outcome without downloading the response.
 // Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
-// the host replaces the entry in place with a {@link Turn} via
+// the host replaces the entry in place with a {@link MaterializedTurn} via
 // {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
 //
 // Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
 // {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
 // action, or command result. Those clients receive the corresponding
-// {@link Turn}.
+// {@link MaterializedTurn}.
 //
 // Stability: 1.0 - Early development.
 type DeferredTurn struct {
@@ -7323,22 +7330,23 @@ func (v DeferredTurn) MarshalJSON() ([]byte, error) {
 	}{wire(v), true})
 }
 
-// ChatStateTurn is a completed turn in ChatState.Turns: either a full
-// *Turn or a *DeferredTurn, discriminated by the boolean "isDeferred" field.
-type ChatStateTurn struct {
-	Value isChatStateTurn
+// Turn is a completed turn in ChatState.Turns: either a *MaterializedTurn
+// with its full response or a *DeferredTurn, discriminated by the boolean
+// "isDeferred" field.
+type Turn struct {
+	Value isTurn
 }
 
-// isChatStateTurn is the marker interface implemented by every
-// concrete variant of ChatStateTurn.
-type isChatStateTurn interface{ isChatStateTurn() }
+// isTurn is the marker interface implemented by every concrete variant of
+// Turn.
+type isTurn interface{ isTurn() }
 
-func (*Turn) isChatStateTurn()         {}
-func (*DeferredTurn) isChatStateTurn() {}
+func (*MaterializedTurn) isTurn() {}
+func (*DeferredTurn) isTurn()     {}
 
 // UnmarshalJSON decodes a *DeferredTurn when "isDeferred" is true and a
-// full *Turn otherwise.
-func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
+// *MaterializedTurn otherwise.
+func (u *Turn) UnmarshalJSON(data []byte) error {
 	var probe struct {
 		IsDeferred json.RawMessage `json:"isDeferred"`
 	}
@@ -7353,7 +7361,7 @@ func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 		return nil
 	}
-	var value Turn
+	var value MaterializedTurn
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
@@ -7362,17 +7370,29 @@ func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u ChatStateTurn) MarshalJSON() ([]byte, error) {
+func (u Turn) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
 	return json.Marshal(u.Value)
 }
 
+// Materialized returns the materialized variant, if active.
+func (u Turn) Materialized() (*MaterializedTurn, bool) {
+	v, ok := u.Value.(*MaterializedTurn)
+	return v, ok
+}
+
+// Deferred returns the deferred variant, if active.
+func (u Turn) Deferred() (*DeferredTurn, bool) {
+	v, ok := u.Value.(*DeferredTurn)
+	return v, ok
+}
+
 // TurnId returns the id of the active variant, or "" when Value is nil.
-func (u ChatStateTurn) TurnId() string {
+func (u Turn) TurnId() string {
 	switch v := u.Value.(type) {
-	case *Turn:
+	case *MaterializedTurn:
 		return v.Id
 	case *DeferredTurn:
 		return v.Id

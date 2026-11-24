@@ -1263,13 +1263,29 @@ data class ChatTruncatedAction(
     val turnId: String? = null
 )
 
+/**
+ * Loads older completed turns into this chat's state.
+ *
+ * Hosts dispatch this before responding to `fetchTurns`, and before applying
+ * any operation that references a turn older than the currently loaded window.
+ * `turns` is ordered oldest-first and is prepended to the current `turns`
+ * window. `turnsNextCursor` replaces the state's cursor; omit it when all
+ * retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+ * only for clients that declared
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * This belongs to the legacy tail-window paging scheme, which deferred turns
+ * replace. See {@link FetchTurnsParams | `fetchTurns`}.
+ *
+ * Stability: 3 - Legacy.
+ */
 @Serializable
 data class ChatTurnsLoadedAction(
     val type: ActionType,
     /**
      * Older completed turns loaded into the state, ordered oldest-first.
      */
-    val turns: List<ChatStateTurn>,
+    val turns: List<Turn>,
     /**
      * Opaque cursor for loading the next older page, if one remains.
      */
@@ -1278,7 +1294,7 @@ data class ChatTurnsLoadedAction(
 
 /**
  * Replaces {@link DeferredTurn | deferred turns} in place with their full
- * {@link Turn | turns}.
+ * {@link MaterializedTurn | turns}.
  *
  * Hosts dispatch this before responding to `fetchDeferredTurns`, and before
  * applying any operation that needs a deferred turn's response, such as
@@ -1293,7 +1309,7 @@ data class ChatTurnsMaterializedAction(
     /**
      * Full turns to replace their deferred entries.
      */
-    val turns: List<Turn>
+    val turns: List<MaterializedTurn>
 )
 
 @Serializable

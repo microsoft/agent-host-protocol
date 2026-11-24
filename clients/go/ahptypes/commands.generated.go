@@ -581,6 +581,12 @@ type SubscribeView struct {
 	// returned {@link ChatState} carries `turnsNextCursor`; clients pass that
 	// cursor to `fetchTurns` to ask the host to page more turns into the chat
 	// state.
+	//
+	// Clients that declare
+	// {@link ClientCapabilities.deferredTurns | `deferredTurns`} SHOULD omit this
+	// field and read history through deferred turns instead.
+	//
+	// Stability: 3 - Legacy.
 	Turns *int64 `json:"turns,omitempty"`
 }
 
@@ -862,7 +868,7 @@ type MoveChatResult struct {
 // {@link ChatState.turns | `ChatState.turns`} order. The command result does
 // not carry turns. Instead, before responding, the host MUST dispatch
 // `chat/turnsMaterialized` to replace every deferred turn in the range in place
-// with its full {@link Turn}. Full turns in the range are left unchanged.
+// with its full {@link MaterializedTurn}. Full turns in the range are left unchanged.
 //
 // The host MUST reject the request with `InvalidParams` if `turnId` or
 // `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
@@ -1341,6 +1347,12 @@ type CreateResourceWatchResult struct {
 //
 // Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
 // declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// Tail-window paging is legacy. It remains supported for 1.x clients, but new
+// clients SHOULD declare `deferredTurns` and read history with
+// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`} instead.
+//
+// Stability: 3 - Legacy.
 type FetchTurnsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1356,6 +1368,8 @@ type FetchTurnsParams struct {
 }
 
 // Result of the `fetchTurns` command.
+//
+// Stability: 3 - Legacy.
 type FetchTurnsResult struct {
 }
 

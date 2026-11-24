@@ -2276,13 +2276,20 @@ pub struct ChatState {
     ///
     /// Entries may be {@link DeferredTurn | deferred} only for clients that
     /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
-    pub turns: Vec<ChatStateTurn>,
+    pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
     /// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
     /// the loaded turns into state and update or clear this cursor before
     /// responding. Absence means the state contains all retained turns.
+    ///
+    /// Hosts SHOULD NOT set this for clients that declared
+    /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}. Instead, they
+    /// SHOULD send every retained turn and defer the ones the client doesn't need
+    /// yet.
+    ///
+    /// Stability: 3 - Legacy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turns_next_cursor: Option<String>,
     /// Currently in-progress turn
@@ -3086,10 +3093,10 @@ pub struct ChatConfigState {
     pub values: JsonObject,
 }
 
-/// A completed request/response cycle.
+/// A completed request/response cycle, including its full response.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Turn {
+pub struct MaterializedTurn {
     /// Turn identifier
     pub id: String,
     /// ISO 8601 timestamp when this turn started.
@@ -3117,13 +3124,13 @@ pub struct Turn {
 /// The turn keeps its position in {@link ChatState.turns}, so clients can show
 /// the initiating message and outcome without downloading the response.
 /// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
-/// the host replaces the entry in place with a {@link Turn} via
+/// the host replaces the entry in place with a {@link MaterializedTurn} via
 /// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
 ///
 /// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
 /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
 /// action, or command result. Those clients receive the corresponding
-/// {@link Turn}.
+/// {@link MaterializedTurn}.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -6928,21 +6935,21 @@ pub enum ChatOrigin {
     Unknown(serde_json::Value),
 }
 
-/// A completed turn in `ChatState.turns`: either a full [`Turn`] or a
+/// A completed turn in `ChatState.turns`: either a [`MaterializedTurn`] or a
 /// [`DeferredTurn`], discriminated on the wire by `isDeferred`.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ChatStateTurn {
+pub enum Turn {
     /// A turn carrying its full response (`isDeferred` absent or `false`).
-    Turn(Turn),
+    Materialized(MaterializedTurn),
     /// A turn whose response has not been sent yet (`isDeferred: true`).
     Deferred(DeferredTurn),
 }
 
-impl ChatStateTurn {
+impl Turn {
     /// Turn identifier.
     pub fn id(&self) -> &str {
         match self {
-            Self::Turn(turn) => &turn.id,
+            Self::Materialized(turn) => &turn.id,
             Self::Deferred(turn) => &turn.id,
         }
     }
@@ -6953,19 +6960,19 @@ impl ChatStateTurn {
     }
 }
 
-impl From<Turn> for ChatStateTurn {
-    fn from(turn: Turn) -> Self {
-        Self::Turn(turn)
+impl From<MaterializedTurn> for Turn {
+    fn from(turn: MaterializedTurn) -> Self {
+        Self::Materialized(turn)
     }
 }
 
-impl From<DeferredTurn> for ChatStateTurn {
+impl From<DeferredTurn> for Turn {
     fn from(turn: DeferredTurn) -> Self {
         Self::Deferred(turn)
     }
 }
 
-impl Serialize for ChatStateTurn {
+impl Serialize for Turn {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -6979,7 +6986,7 @@ impl Serialize for ChatStateTurn {
         }
 
         match self {
-            Self::Turn(turn) => turn.serialize(serializer),
+            Self::Materialized(turn) => turn.serialize(serializer),
             Self::Deferred(turn) => WireDeferredTurn {
                 is_deferred: true,
                 turn,
@@ -6989,7 +6996,7 @@ impl Serialize for ChatStateTurn {
     }
 }
 
-impl<'de> Deserialize<'de> for ChatStateTurn {
+impl<'de> Deserialize<'de> for Turn {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -6998,7 +7005,7 @@ impl<'de> Deserialize<'de> for ChatStateTurn {
         let turn = if raw.get("isDeferred") == Some(&serde_json::Value::Bool(true)) {
             serde_json::from_value(raw).map(Self::Deferred)
         } else {
-            serde_json::from_value(raw).map(Self::Turn)
+            serde_json::from_value(raw).map(Self::Materialized)
         };
         turn.map_err(serde::de::Error::custom)
     }

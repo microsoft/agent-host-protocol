@@ -982,16 +982,21 @@ type ChatTruncatedAction struct {
 // retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
 // only for clients that declared
 // {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// This belongs to the legacy tail-window paging scheme, which deferred turns
+// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+//
+// Stability: 3 - Legacy.
 type ChatTurnsLoadedAction struct {
 	Type ActionType `json:"type"`
 	// Older completed turns loaded into the state, ordered oldest-first.
-	Turns []ChatStateTurn `json:"turns"`
+	Turns []Turn `json:"turns"`
 	// Opaque cursor for loading the next older page, if one remains.
 	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 }
 
 // Replaces {@link DeferredTurn | deferred turns} in place with their full
-// {@link Turn | turns}.
+// {@link MaterializedTurn | turns}.
 //
 // Hosts dispatch this before responding to `fetchDeferredTurns`, and before
 // applying any operation that needs a deferred turn's response, such as
@@ -1002,7 +1007,7 @@ type ChatTurnsLoadedAction struct {
 type ChatTurnsMaterializedAction struct {
 	Type ActionType `json:"type"`
 	// Full turns to replace their deferred entries.
-	Turns []Turn `json:"turns"`
+	Turns []MaterializedTurn `json:"turns"`
 }
 
 // The read state of the session changed.

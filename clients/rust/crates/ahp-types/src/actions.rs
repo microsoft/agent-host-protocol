@@ -17,13 +17,14 @@ use crate::state::{
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
     BackgroundWork, CanvasReference, CanvasState, ChangesSummary, Changeset, ChangesetFile,
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatStateTurn,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionConfigSchema,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
+    ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    ErrorResponsePart, FileEditCollection, MaterializedTurn, McpAuthRequirement, McpServerState,
+    Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
+    SessionConfigSchema, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
+    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
+    UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -1840,18 +1841,23 @@ pub struct ChatTruncatedAction {
 /// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
 /// only for clients that declared
 /// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// This belongs to the legacy tail-window paging scheme, which deferred turns
+/// replace. See {@link FetchTurnsParams | `fetchTurns`}.
+///
+/// Stability: 3 - Legacy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnsLoadedAction {
     /// Older completed turns loaded into the state, ordered oldest-first.
-    pub turns: Vec<ChatStateTurn>,
+    pub turns: Vec<Turn>,
     /// Opaque cursor for loading the next older page, if one remains.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turns_next_cursor: Option<String>,
 }
 
 /// Replaces {@link DeferredTurn | deferred turns} in place with their full
-/// {@link Turn | turns}.
+/// {@link MaterializedTurn | turns}.
 ///
 /// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
 /// applying any operation that needs a deferred turn's response, such as
@@ -1863,7 +1869,7 @@ pub struct ChatTurnsLoadedAction {
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnsMaterializedAction {
     /// Full turns to replace their deferred entries.
-    pub turns: Vec<Turn>,
+    pub turns: Vec<MaterializedTurn>,
 }
 
 /// Client changed a mutable config value mid-session.
