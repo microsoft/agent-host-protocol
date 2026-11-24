@@ -318,6 +318,10 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v ResourceReadResult
 		dec(&v)
 		return enc(&v)
+	case "ResourceListResult":
+		var v ResourceListResult
+		dec(&v)
+		return enc(&v)
 	case "AuthenticateParams":
 		var v AuthenticateParams
 		dec(&v)

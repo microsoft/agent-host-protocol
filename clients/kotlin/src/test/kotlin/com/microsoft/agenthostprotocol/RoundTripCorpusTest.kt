@@ -48,6 +48,7 @@ import com.microsoft.agenthostprotocol.generated.TcpResetParams
 import com.microsoft.agenthostprotocol.generated.CreateTcpConnectionParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadParams
 import com.microsoft.agenthostprotocol.generated.ResourceReadResult
+import com.microsoft.agenthostprotocol.generated.ResourceListResult
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -282,6 +283,7 @@ class RoundTripCorpusTest {
             "CreateTcpConnectionParams" -> rt(CreateTcpConnectionParams.serializer())
             "ResourceReadParams" -> rt(ResourceReadParams.serializer())
             "ResourceReadResult" -> rt(ResourceReadResult.serializer())
+            "ResourceListResult" -> rt(ResourceListResult.serializer())
             "AuthenticateParams" -> rt(AuthenticateParams.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +

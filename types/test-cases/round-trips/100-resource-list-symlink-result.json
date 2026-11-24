@@ -1,0 +1,24 @@
+{
+  "name": "resource-list-symlink-result",
+  "group": "A",
+  "description": "DirectoryEntry carries optional isSymlink: omitted stays absent on re-encode, while explicit true and false values are preserved alongside file and directory types.",
+  "type": "ResourceListResult",
+  "input": {
+    "entries": [
+      { "name": "src", "type": "directory" },
+      { "name": "shared", "type": "directory", "isSymlink": true },
+      { "name": "broken-link", "type": "file", "isSymlink": true },
+      { "name": "README.md", "type": "file", "isSymlink": false }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "entries": [
+        { "name": "src", "type": "directory" },
+        { "name": "shared", "type": "directory", "isSymlink": true },
+        { "name": "broken-link", "type": "file", "isSymlink": true },
+        { "name": "README.md", "type": "file", "isSymlink": false }
+      ]
+    }
+  ]
+}
