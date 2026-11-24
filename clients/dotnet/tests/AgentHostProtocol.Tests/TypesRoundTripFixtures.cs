@@ -194,6 +194,8 @@ public sealed class TypesRoundTripFixtures
                 return Wrap(Ser.Deserialize<ResourceReadParams>(inputJson));
             case "ResourceReadResult":
                 return Wrap(Ser.Deserialize<ResourceReadResult>(inputJson));
+            case "ResourceListResult":
+                return Wrap(Ser.Deserialize<ResourceListResult>(inputJson));
             case "AuthenticateParams":
                 return Wrap(Ser.Deserialize<AuthenticateParams>(inputJson));
             default:
