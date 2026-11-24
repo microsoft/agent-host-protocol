@@ -182,9 +182,9 @@ type RootConfigChangedAction struct {
 // Adds a model source registration, or replaces the one with the same `id`.
 //
 // A client registers a source by dispatching this with its own `clientId`, and
-// with no `state` or `credentialNonce`. Replacing a registration clears its
-// status until the host reports again with
-// {@link RootModelSourceStateChangedAction}.
+// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
+// registration clears those host-reported fields until the host reports again
+// with {@link RootModelSourceStateChangedAction}.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceRegistrationSetAction struct {
@@ -203,9 +203,9 @@ type RootModelSourceRegistrationRemovedAction struct {
 	Id string `json:"id"`
 }
 
-// Updates a model source registration's status and credential nonce. A no-op
-// when no registration has `id`. Other fields of the registration are
-// preserved. Only the host dispatches it.
+// Updates a model source registration's status, credential nonce, and
+// credential resource together. A no-op when no registration has `id`. Other
+// fields of the registration are preserved. Only the host dispatches it.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceStateChangedAction struct {
@@ -216,6 +216,9 @@ type RootModelSourceStateChangedAction struct {
 	State ModelSourceState `json:"state"`
 	// The registration's current credential nonce.
 	CredentialNonce string `json:"credentialNonce"`
+	// Replaces the registration's `credentialResource`. Absent clears it, for a
+	// source that needs no credential.
+	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
 }
 
 // Session backend initialized successfully.

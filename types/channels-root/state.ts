@@ -382,13 +382,33 @@ export interface ModelSourceRegistration {
   /**
    * Host-issued token that a client echoes in
    * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-   * the credential. The host issues a new one whenever the credential is
-   * installed or dropped, and never reuses one for the same `id`. Set with
-   * `state`.
+   * the credential, and that tags every agent operation on the registration.
+   * The host issues a new one when the registration is added, when its
+   * `provider`, `format`, or `definition` changes, and whenever the
+   * credential is installed or dropped. It never reuses one for the same
+   * `id`. Set with `state`.
    *
    * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
    */
   credentialNonce?: string;
+  /**
+   * RFC 9728 metadata for the endpoint the credential is for. Present
+   * whenever the source takes a credential, in every state, so any client
+   * can deliver, rotate, or revoke one. Absent for a source that needs no
+   * credential. Set with `state`.
+   *
+   * `credentialResource.resource` is the endpoint URL as the definition
+   * names it, in any scheme the agent supports (for example
+   * `http://localhost:11434/v1`). It's the value a client passes back as
+   * `authenticate({ resource })`, and nothing fetches it.
+   * `credentialResource.resource_name` labels the prompt (for example
+   * "OpenRouter API key"). A source that accepts OAuth access tokens
+   * advertises `authorization_servers` and `scopes_supported`. A source that
+   * takes a user-supplied secret omits them.
+   *
+   * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+   */
+  credentialResource?: ProtectedResourceMetadata;
   /**
    * Additional implementation-defined metadata for this registration.
    * MUST NOT contain a credential.
@@ -454,8 +474,9 @@ export interface ModelSourceReadyState {
 }
 
 /**
- * What a model source needs in order to become ready. Deliberately carries no
- * credential.
+ * Why a model source needs a credential before it can be ready. Deliberately
+ * carries no credential. The endpoint the credential is for is the
+ * registration's {@link ModelSourceRegistration.credentialResource}.
  *
  * @category Root State
  * @stability 1.0
@@ -465,17 +486,6 @@ export interface ModelSourceAuthRequirement {
   /** Why a credential is needed. */
   reason: AuthRequiredReason;
   /**
-   * RFC 9728 metadata for the source's endpoint. `resource.resource` is the
-   * endpoint URL as the definition names it, in any scheme the agent
-   * supports (for example `http://localhost:11434/v1`). It's the value a
-   * client passes back as `authenticate({ resource })`, and nothing fetches
-   * it. `resource.resource_name` labels the prompt (for example
-   * "OpenRouter API key"). A source that accepts OAuth access tokens
-   * advertises `authorization_servers` and `scopes_supported`. A source that
-   * takes a user-supplied secret omits them.
-   */
-  resource: ProtectedResourceMetadata;
-  /**
    * Human-readable hint the host writes, for example "The endpoint rejected
    * the API key."
    */
@@ -484,7 +494,8 @@ export interface ModelSourceAuthRequirement {
 
 /**
  * The source needs a credential before it can be used. A client answers with
- * `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+ * `authenticate`, the registration's `credentialResource.resource`, and a
+ * {@link ModelSourceAuthenticateTarget}.
  *
  * @category Root State
  * @stability 1.0

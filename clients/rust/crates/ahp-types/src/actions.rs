@@ -20,11 +20,11 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, ModelSourceRegistration, ModelSourceState, PendingMessageKind, ResponsePart,
-    SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
-    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
-    ToolResultContent, Turn, UsageInfo,
+    ModelSelection, ModelSourceRegistration, ModelSourceState, PendingMessageKind,
+    ProtectedResourceMetadata, ResponsePart, SessionActiveClient, SessionConfigSchema,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -527,9 +527,9 @@ pub struct RootConfigChangedAction {
 /// Adds a model source registration, or replaces the one with the same `id`.
 ///
 /// A client registers a source by dispatching this with its own `clientId`, and
-/// with no `state` or `credentialNonce`. Replacing a registration clears its
-/// status until the host reports again with
-/// {@link RootModelSourceStateChangedAction}.
+/// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
+/// registration clears those host-reported fields until the host reports again
+/// with {@link RootModelSourceStateChangedAction}.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -550,9 +550,9 @@ pub struct RootModelSourceRegistrationRemovedAction {
     pub id: String,
 }
 
-/// Updates a model source registration's status and credential nonce. A no-op
-/// when no registration has `id`. Other fields of the registration are
-/// preserved. Only the host dispatches it.
+/// Updates a model source registration's status, credential nonce, and
+/// credential resource together. A no-op when no registration has `id`. Other
+/// fields of the registration are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -564,6 +564,10 @@ pub struct RootModelSourceStateChangedAction {
     pub state: ModelSourceState,
     /// The registration's current credential nonce.
     pub credential_nonce: String,
+    /// Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// source that needs no credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_resource: Option<ProtectedResourceMetadata>,
 }
 
 /// Session backend initialized successfully.
@@ -2514,7 +2518,7 @@ pub enum StateAction {
     #[serde(rename = "root/configChanged")]
     RootConfigChanged(RootConfigChangedAction),
     #[serde(rename = "root/modelSourceRegistrationSet")]
-    RootModelSourceRegistrationSet(RootModelSourceRegistrationSetAction),
+    RootModelSourceRegistrationSet(Box<RootModelSourceRegistrationSetAction>),
     #[serde(rename = "root/modelSourceRegistrationRemoved")]
     RootModelSourceRegistrationRemoved(RootModelSourceRegistrationRemovedAction),
     #[serde(rename = "root/modelSourceStateChanged")]

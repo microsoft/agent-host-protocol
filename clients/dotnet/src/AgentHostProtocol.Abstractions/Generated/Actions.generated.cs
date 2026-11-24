@@ -349,9 +349,9 @@ public sealed record RootConfigChangedAction
 /// <summary>Adds a model source registration, or replaces the one with the same `id`.
 ///
 /// A client registers a source by dispatching this with its own `clientId`, and
-/// with no `state` or `credentialNonce`. Replacing a registration clears its
-/// status until the host reports again with
-/// {@link RootModelSourceStateChangedAction}.
+/// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
+/// registration clears those host-reported fields until the host reports again
+/// with {@link RootModelSourceStateChangedAction}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceRegistrationSetAction
@@ -374,9 +374,9 @@ public sealed record RootModelSourceRegistrationRemovedAction
     public required string Id { get; init; }
 }
 
-/// <summary>Updates a model source registration's status and credential nonce. A no-op
-/// when no registration has `id`. Other fields of the registration are
-/// preserved. Only the host dispatches it.
+/// <summary>Updates a model source registration's status, credential nonce, and
+/// credential resource together. A no-op when no registration has `id`. Other
+/// fields of the registration are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceStateChangedAction
@@ -391,6 +391,11 @@ public sealed record RootModelSourceStateChangedAction
 
     /// <summary>The registration's current credential nonce.</summary>
     public required string CredentialNonce { get; init; }
+
+    /// <summary>Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// source that needs no credential.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ProtectedResourceMetadata? CredentialResource { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>

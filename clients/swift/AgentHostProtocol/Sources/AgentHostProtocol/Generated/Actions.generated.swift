@@ -2293,9 +2293,9 @@ public struct RootConfigChangedAction: Codable, Sendable, Equatable {
 /// Adds a model source registration, or replaces the one with the same `id`.
 ///
 /// A client registers a source by dispatching this with its own `clientId`, and
-/// with no `state` or `credentialNonce`. Replacing a registration clears its
-/// status until the host reports again with
-/// {@link RootModelSourceStateChangedAction}.
+/// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
+/// registration clears those host-reported fields until the host reports again
+/// with {@link RootModelSourceStateChangedAction}.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceRegistrationSetAction: Codable, Sendable, Equatable {
@@ -2330,9 +2330,9 @@ public struct RootModelSourceRegistrationRemovedAction: Codable, Sendable, Equat
     }
 }
 
-/// Updates a model source registration's status and credential nonce. A no-op
-/// when no registration has `id`. Other fields of the registration are
-/// preserved. Only the host dispatches it.
+/// Updates a model source registration's status, credential nonce, and
+/// credential resource together. A no-op when no registration has `id`. Other
+/// fields of the registration are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
@@ -2343,17 +2343,22 @@ public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
     public var state: ModelSourceState
     /// The registration's current credential nonce.
     public var credentialNonce: String
+    /// Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// source that needs no credential.
+    public var credentialResource: ProtectedResourceMetadata?
 
     public init(
         type: ActionType,
         id: String,
         state: ModelSourceState,
-        credentialNonce: String
+        credentialNonce: String,
+        credentialResource: ProtectedResourceMetadata? = nil
     ) {
         self.type = type
         self.id = id
         self.state = state
         self.credentialNonce = credentialNonce
+        self.credentialResource = credentialResource
     }
 }
 

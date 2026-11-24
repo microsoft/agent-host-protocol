@@ -129,7 +129,7 @@
     },
     "RootModelSourceRegistrationSetAction": {
       "type": "object",
-      "description": "Adds a model source registration, or replaces the one with the same `id`.\n\nA client registers a source by dispatching this with its own `clientId`, and\nwith no `state` or `credentialNonce`. Replacing a registration clears its\nstatus until the host reports again with\n{@link RootModelSourceStateChangedAction}.\n\nStability: 1.0 - Early development.",
+      "description": "Adds a model source registration, or replaces the one with the same `id`.\n\nA client registers a source by dispatching this with its own `clientId`, and\nwith no `state`, `credentialNonce`, or `credentialResource`. Replacing a\nregistration clears those host-reported fields until the host reports again\nwith {@link RootModelSourceStateChangedAction}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceRegistrationSet"
@@ -163,7 +163,7 @@
     },
     "RootModelSourceStateChangedAction": {
       "type": "object",
-      "description": "Updates a model source registration's status and credential nonce. A no-op\nwhen no registration has `id`. Other fields of the registration are\npreserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
+      "description": "Updates a model source registration's status, credential nonce, and\ncredential resource together. A no-op when no registration has `id`. Other\nfields of the registration are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceStateChanged"
@@ -179,6 +179,10 @@
         "credentialNonce": {
           "type": "string",
           "description": "The registration's current credential nonce."
+        },
+        "credentialResource": {
+          "$ref": "#/$defs/ProtectedResourceMetadata",
+          "description": "Replaces the registration's `credentialResource`. Absent clears it, for a\nsource that needs no credential."
         }
       },
       "required": [
@@ -3619,7 +3623,11 @@
         },
         "credentialNonce": {
           "type": "string",
-          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host issues a new one whenever the credential is\ninstalled or dropped, and never reuses one for the same `id`. Set with\n`state`."
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential, and that tags every agent operation on the registration.\nThe host issues a new one when the registration is added, when its\n`provider`, `format`, or `definition` changes, and whenever the\ncredential is installed or dropped. It never reuses one for the same\n`id`. Set with `state`."
+        },
+        "credentialResource": {
+          "$ref": "#/$defs/ProtectedResourceMetadata",
+          "description": "RFC 9728 metadata for the endpoint the credential is for. Present\nwhenever the source takes a credential, in every state, so any client\ncan deliver, rotate, or revoke one. Absent for a source that needs no\ncredential. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`, and nothing fetches it.\n`credentialResource.resource_name` labels the prompt (for example\n\"OpenRouter API key\"). A source that accepts OAuth access tokens\nadvertises `authorization_servers` and `scopes_supported`. A source that\ntakes a user-supplied secret omits them."
         },
         "_meta": {
           "type": "object",
@@ -3661,15 +3669,11 @@
     },
     "ModelSourceAuthRequirement": {
       "type": "object",
-      "description": "What a model source needs in order to become ready. Deliberately carries no\ncredential.\n\nStability: 1.0 - Early development.",
+      "description": "Why a model source needs a credential before it can be ready. Deliberately\ncarries no credential. The endpoint the credential is for is the\nregistration's {@link ModelSourceRegistration.credentialResource}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/AuthRequiredReason",
           "description": "Why a credential is needed."
-        },
-        "resource": {
-          "$ref": "#/$defs/ProtectedResourceMetadata",
-          "description": "RFC 9728 metadata for the source's endpoint. `resource.resource` is the\nendpoint URL as the definition names it, in any scheme the agent\nsupports (for example `http://localhost:11434/v1`). It's the value a\nclient passes back as `authenticate({ resource })`, and nothing fetches\nit. `resource.resource_name` labels the prompt (for example\n\"OpenRouter API key\"). A source that accepts OAuth access tokens\nadvertises `authorization_servers` and `scopes_supported`. A source that\ntakes a user-supplied secret omits them."
         },
         "description": {
           "type": "string",
@@ -3677,21 +3681,16 @@
         }
       },
       "required": [
-        "reason",
-        "resource"
+        "reason"
       ]
     },
     "ModelSourceAuthRequiredState": {
       "type": "object",
-      "description": "The source needs a credential before it can be used. A client answers with\n`authenticate` and a {@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
+      "description": "The source needs a credential before it can be used. A client answers with\n`authenticate`, the registration's `credentialResource.resource`, and a\n{@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/AuthRequiredReason",
           "description": "Why a credential is needed."
-        },
-        "resource": {
-          "$ref": "#/$defs/ProtectedResourceMetadata",
-          "description": "RFC 9728 metadata for the source's endpoint. `resource.resource` is the\nendpoint URL as the definition names it, in any scheme the agent\nsupports (for example `http://localhost:11434/v1`). It's the value a\nclient passes back as `authenticate({ resource })`, and nothing fetches\nit. `resource.resource_name` labels the prompt (for example\n\"OpenRouter API key\"). A source that accepts OAuth access tokens\nadvertises `authorization_servers` and `scopes_supported`. A source that\ntakes a user-supplied secret omits them."
         },
         "description": {
           "type": "string",
@@ -3703,7 +3702,6 @@
       },
       "required": [
         "reason",
-        "resource",
         "kind"
       ]
     },

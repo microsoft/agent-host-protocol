@@ -33,7 +33,7 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 | `root/modelSourceRegistrationSet` | **Yes** | A [model source registration](/specification/root-channel#model-source-registry) was added, or replaced by `id` |
 | `root/modelSourceRegistrationRemoved` | **Yes** | A model source registration was removed by `id` |
-| `root/modelSourceStateChanged` | No | The host reported a registration's status and credential nonce |
+| `root/modelSourceStateChanged` | No | The host reported a registration's status, credential nonce, and credential resource |
 
 ## Automation Catalogue Actions
 

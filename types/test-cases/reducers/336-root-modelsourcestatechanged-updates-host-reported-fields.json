@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceStateChanged replaces only the matching registration's state and credentialNonce, preserving its other fields and the registry order",
+  "description": "root/modelSourceStateChanged sets the matching registration's state, credentialNonce, and credentialResource together, preserving its other fields and the registry order",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -43,13 +43,13 @@
       "id": "model-source-b",
       "state": {
         "kind": "authRequired",
-        "reason": "required",
-        "resource": {
-          "resource": "https://apib.example.com/v1",
-          "resource_name": "Source b API key"
-        }
+        "reason": "required"
       },
-      "credentialNonce": "nonce-b-2"
+      "credentialNonce": "nonce-b-2",
+      "credentialResource": {
+        "resource": "https://apib.example.com/v1",
+        "resource_name": "Source b API key"
+      }
     }
   ],
   "expected": {
@@ -83,13 +83,13 @@
         "retention": "host",
         "state": {
           "kind": "authRequired",
-          "reason": "required",
-          "resource": {
-            "resource": "https://apib.example.com/v1",
-            "resource_name": "Source b API key"
-          }
+          "reason": "required"
         },
-        "credentialNonce": "nonce-b-2"
+        "credentialNonce": "nonce-b-2",
+        "credentialResource": {
+          "resource": "https://apib.example.com/v1",
+          "resource_name": "Source b API key"
+        }
       }
     ]
   }

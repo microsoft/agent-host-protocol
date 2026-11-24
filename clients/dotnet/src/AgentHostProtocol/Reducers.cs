@@ -715,7 +715,7 @@ public static class Reducers
                     }
 
                     List<ModelSourceRegistration> list = state.ModelSourceRegistrations!;
-                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce };
+                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce, CredentialResource = a.CredentialResource };
                     return ReduceOutcome.Applied;
                 }
         }

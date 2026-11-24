@@ -1367,14 +1367,14 @@ type ModelSourceAuthenticateTarget struct {
 // Pushes a credential for a protected resource. The `resource` field MUST
 // match a protected-resource identifier the client has discovered from the
 // server — whether declared statically in `AgentInfo.protectedResources`,
-// or discovered dynamically from a live `McpServerAuthRequiredState.resource`,
-// `ToolCallAuthRequiredState.auth.resource`, or
-// `ModelSourceAuthRequiredState.resource` (each surfaced only once the
-// corresponding MCP server, tool call, or model source actually challenges
-// for auth). Servers MUST accept any `resource` value they have themselves
-// advertised through one of these mechanisms, subject to the `target`
-// rules. A `modelSource` target takes only the resource the host most
-// recently advertised for that registration.
+// or discovered dynamically from a live `McpServerAuthRequiredState.resource`
+// or `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the
+// corresponding MCP server or tool call actually challenges for auth), or
+// from a registered model source's `ModelSourceRegistration.credentialResource`.
+// Servers MUST accept any `resource` value they have themselves advertised
+// through one of these mechanisms, subject to the `target` rules. A
+// `modelSource` target takes only the registration's current
+// `credentialResource.resource`.
 //
 // Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
 // (Bearer Token Usage) semantics. The client obtains the token from the
@@ -1391,7 +1391,7 @@ type AuthenticateParams struct {
 	// server has advertised — via `ProtectedResourceMetadata` in
 	// `AgentInfo.protectedResources`, or via a live
 	// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-	// or `ModelSourceAuthRequiredState.resource`.
+	// or `ModelSourceRegistration.credentialResource`.
 	Resource string `json:"resource"`
 	// Bearer token obtained from the resource's authorization server, or an
 	// opaque secret for a model source. An empty string revokes the credential.

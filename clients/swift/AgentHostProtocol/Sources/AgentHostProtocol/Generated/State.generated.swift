@@ -1840,10 +1840,26 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     public var state: ModelSourceState?
     /// Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential. The host issues a new one whenever the credential is
-    /// installed or dropped, and never reuses one for the same `id`. Set with
-    /// `state`.
+    /// the credential, and that tags every agent operation on the registration.
+    /// The host issues a new one when the registration is added, when its
+    /// `provider`, `format`, or `definition` changes, and whenever the
+    /// credential is installed or dropped. It never reuses one for the same
+    /// `id`. Set with `state`.
     public var credentialNonce: String?
+    /// RFC 9728 metadata for the endpoint the credential is for. Present
+    /// whenever the source takes a credential, in every state, so any client
+    /// can deliver, rotate, or revoke one. Absent for a source that needs no
+    /// credential. Set with `state`.
+    ///
+    /// `credentialResource.resource` is the endpoint URL as the definition
+    /// names it, in any scheme the agent supports (for example
+    /// `http://localhost:11434/v1`). It's the value a client passes back as
+    /// `authenticate({ resource })`, and nothing fetches it.
+    /// `credentialResource.resource_name` labels the prompt (for example
+    /// "OpenRouter API key"). A source that accepts OAuth access tokens
+    /// advertises `authorization_servers` and `scopes_supported`. A source that
+    /// takes a user-supplied secret omits them.
+    public var credentialResource: ProtectedResourceMetadata?
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
@@ -1861,6 +1877,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         case retention
         case state
         case credentialNonce
+        case credentialResource
         case meta = "_meta"
     }
 
@@ -1875,6 +1892,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
         credentialNonce: String? = nil,
+        credentialResource: ProtectedResourceMetadata? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
@@ -1888,6 +1906,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.retention = retention
         self.state = state
         self.credentialNonce = credentialNonce
+        self.credentialResource = credentialResource
         self.meta = meta
         self.extra = extra
     }
@@ -1904,6 +1923,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
         self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
+        self.credentialResource = try container.decodeIfPresent(ProtectedResourceMetadata.self, forKey: .credentialResource)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -1920,6 +1940,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
         try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)
+        try container.encodeIfPresent(self.credentialResource, forKey: .credentialResource)
         try container.encodeIfPresent(self.meta, forKey: .meta)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -1994,22 +2015,14 @@ public struct ModelSourceReadyState: Codable, Sendable, Equatable {
     }
 }
 
-/// What a model source needs in order to become ready. Deliberately carries no
-/// credential.
+/// Why a model source needs a credential before it can be ready. Deliberately
+/// carries no credential. The endpoint the credential is for is the
+/// registration's {@link ModelSourceRegistration.credentialResource}.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     /// Why a credential is needed.
     public var reason: AuthRequiredReason
-    /// RFC 9728 metadata for the source's endpoint. `resource.resource` is the
-    /// endpoint URL as the definition names it, in any scheme the agent
-    /// supports (for example `http://localhost:11434/v1`). It's the value a
-    /// client passes back as `authenticate({ resource })`, and nothing fetches
-    /// it. `resource.resource_name` labels the prompt (for example
-    /// "OpenRouter API key"). A source that accepts OAuth access tokens
-    /// advertises `authorization_servers` and `scopes_supported`. A source that
-    /// takes a user-supplied secret omits them.
-    public var resource: ProtectedResourceMetadata
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     public var description: String?
@@ -2018,18 +2031,15 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case reason
-        case resource
         case description
     }
 
     public init(
         reason: AuthRequiredReason,
-        resource: ProtectedResourceMetadata,
         description: String? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
-        self.resource = resource
         self.description = description
         self.extra = extra
     }
@@ -2037,7 +2047,6 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.reason = try container.decode(AuthRequiredReason.self, forKey: .reason)
-        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2045,28 +2054,19 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.reason, forKey: .reason)
-        try container.encode(self.resource, forKey: .resource)
         try container.encodeIfPresent(self.description, forKey: .description)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 /// The source needs a credential before it can be used. A client answers with
-/// `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+/// `authenticate`, the registration's `credentialResource.resource`, and a
+/// {@link ModelSourceAuthenticateTarget}.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     /// Why a credential is needed.
     public var reason: AuthRequiredReason
-    /// RFC 9728 metadata for the source's endpoint. `resource.resource` is the
-    /// endpoint URL as the definition names it, in any scheme the agent
-    /// supports (for example `http://localhost:11434/v1`). It's the value a
-    /// client passes back as `authenticate({ resource })`, and nothing fetches
-    /// it. `resource.resource_name` labels the prompt (for example
-    /// "OpenRouter API key"). A source that accepts OAuth access tokens
-    /// advertises `authorization_servers` and `scopes_supported`. A source that
-    /// takes a user-supplied secret omits them.
-    public var resource: ProtectedResourceMetadata
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     public var description: String?
@@ -2076,20 +2076,17 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case reason
-        case resource
         case description
         case kind
     }
 
     public init(
         reason: AuthRequiredReason,
-        resource: ProtectedResourceMetadata,
         description: String? = nil,
         kind: ModelSourceStatus,
         extra: [String: AnyCodable] = [:]
     ) {
         self.reason = reason
-        self.resource = resource
         self.description = description
         self.kind = kind
         self.extra = extra
@@ -2098,7 +2095,6 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.reason = try container.decode(AuthRequiredReason.self, forKey: .reason)
-        self.resource = try container.decode(ProtectedResourceMetadata.self, forKey: .resource)
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.kind = try container.decode(ModelSourceStatus.self, forKey: .kind)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
@@ -2107,7 +2103,6 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.reason, forKey: .reason)
-        try container.encode(self.resource, forKey: .resource)
         try container.encodeIfPresent(self.description, forKey: .description)
         try container.encode(self.kind, forKey: .kind)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))

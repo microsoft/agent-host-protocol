@@ -604,6 +604,7 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
             updated[idx] = updated[idx].copy(
                 state = action.value.state,
                 credentialNonce = action.value.credentialNonce,
+                credentialResource = action.value.credentialResource,
             )
             state.copy(modelSourceRegistrations = updated)
         }

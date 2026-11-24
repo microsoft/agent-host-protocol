@@ -1654,7 +1654,7 @@ data class AuthenticateParams(
      * server has advertised — via `ProtectedResourceMetadata` in
      * `AgentInfo.protectedResources`, or via a live
      * `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-     * or `ModelSourceAuthRequiredState.resource`.
+     * or `ModelSourceRegistration.credentialResource`.
      */
     val resource: String,
     /**

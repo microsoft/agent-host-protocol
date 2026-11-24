@@ -1,7 +1,7 @@
 {
   "name": "root-model-source-state-changed",
   "group": "A",
-  "description": "The host reports a registration's status and issues a credential nonce with root/modelSourceStateChanged, here asking for an API key.",
+  "description": "The host reports a registration's status with root/modelSourceStateChanged, issuing a credential nonce and the credentialResource the key is for, here asking for an API key.",
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceStateChanged",
@@ -9,13 +9,13 @@
     "state": {
       "kind": "authRequired",
       "reason": "required",
-      "resource": {
-        "resource": "https://openrouter.ai/api/v1",
-        "resource_name": "OpenRouter API key"
-      },
       "description": "The endpoint needs an API key."
     },
-    "credentialNonce": "nonce-openrouter-1"
+    "credentialNonce": "nonce-openrouter-1",
+    "credentialResource": {
+      "resource": "https://openrouter.ai/api/v1",
+      "resource_name": "OpenRouter API key"
+    }
   },
   "acceptableOutputs": [
     {
@@ -24,13 +24,13 @@
       "state": {
         "kind": "authRequired",
         "reason": "required",
-        "resource": {
-          "resource": "https://openrouter.ai/api/v1",
-          "resource_name": "OpenRouter API key"
-        },
         "description": "The endpoint needs an API key."
       },
-      "credentialNonce": "nonce-openrouter-1"
+      "credentialNonce": "nonce-openrouter-1",
+      "credentialResource": {
+        "resource": "https://openrouter.ai/api/v1",
+        "resource_name": "OpenRouter API key"
+      }
     }
   ]
 }

@@ -561,6 +561,7 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 				nonce := a.CredentialNonce
 				state.ModelSourceRegistrations[i].State = &st
 				state.ModelSourceRegistrations[i].CredentialNonce = &nonce
+				state.ModelSourceRegistrations[i].CredentialResource = a.CredentialResource
 				return ReduceOutcomeApplied
 			}
 		}

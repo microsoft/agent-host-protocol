@@ -750,6 +750,7 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             };
             registration.state = Some(a.state.clone());
             registration.credential_nonce = Some(a.credential_nonce.clone());
+            registration.credential_resource = a.credential_resource.clone();
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,

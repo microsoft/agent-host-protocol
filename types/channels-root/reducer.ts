@@ -71,7 +71,13 @@ export function rootReducer(state: RootState, action: RootAction, log?: (msg: st
         return state;
       }
       const next = list.slice();
-      next[idx] = { ...list[idx], state: action.state, credentialNonce: action.credentialNonce };
+      const updated = { ...list[idx], state: action.state, credentialNonce: action.credentialNonce };
+      if (action.credentialResource) {
+        updated.credentialResource = action.credentialResource;
+      } else {
+        delete updated.credentialResource;
+      }
+      next[idx] = updated;
       return { ...state, modelSourceRegistrations: next };
     }
 

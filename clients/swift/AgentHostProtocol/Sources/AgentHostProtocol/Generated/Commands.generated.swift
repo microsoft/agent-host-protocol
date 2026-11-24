@@ -2003,7 +2003,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// server has advertised — via `ProtectedResourceMetadata` in
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-    /// or `ModelSourceAuthRequiredState.resource`.
+    /// or `ModelSourceRegistration.credentialResource`.
     public var resource: String
     /// Bearer token obtained from the resource's authorization server, or an
     /// opaque secret for a model source. An empty string revokes the credential.

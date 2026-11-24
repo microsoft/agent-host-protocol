@@ -138,13 +138,14 @@ func applyModelSourceRegistrationRemoved(_ state: inout RootState, id: String) -
     return true
 }
 
-/// Updates the status and credential nonce of the registration with `action.id`.
-/// Returns `false` when none matches.
+/// Updates the status, credential nonce, and credential resource of the
+/// registration with `action.id`. Returns `false` when none matches.
 func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
     guard var list = state.modelSourceRegistrations,
           let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
     list[idx].state = action.state
     list[idx].credentialNonce = action.credentialNonce
+    list[idx].credentialResource = action.credentialResource
     state.modelSourceRegistrations = list
     return true
 }

@@ -2407,11 +2407,29 @@ public sealed record ModelSourceRegistration
 
     /// <summary>Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential. The host issues a new one whenever the credential is
-    /// installed or dropped, and never reuses one for the same `id`. Set with
-    /// `state`.</summary>
+    /// the credential, and that tags every agent operation on the registration.
+    /// The host issues a new one when the registration is added, when its
+    /// `provider`, `format`, or `definition` changes, and whenever the
+    /// credential is installed or dropped. It never reuses one for the same
+    /// `id`. Set with `state`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CredentialNonce { get; init; }
+
+    /// <summary>RFC 9728 metadata for the endpoint the credential is for. Present
+    /// whenever the source takes a credential, in every state, so any client
+    /// can deliver, rotate, or revoke one. Absent for a source that needs no
+    /// credential. Set with `state`.
+    ///
+    /// `credentialResource.resource` is the endpoint URL as the definition
+    /// names it, in any scheme the agent supports (for example
+    /// `http://localhost:11434/v1`). It's the value a client passes back as
+    /// `authenticate({ resource })`, and nothing fetches it.
+    /// `credentialResource.resource_name` labels the prompt (for example
+    /// "OpenRouter API key"). A source that accepts OAuth access tokens
+    /// advertises `authorization_servers` and `scopes_supported`. A source that
+    /// takes a user-supplied secret omits them.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ProtectedResourceMetadata? CredentialResource { get; init; }
 
     /// <summary>Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.</summary>
@@ -2451,24 +2469,15 @@ public sealed record ModelSourceReadyState
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>What a model source needs in order to become ready. Deliberately carries no
-/// credential.
+/// <summary>Why a model source needs a credential before it can be ready. Deliberately
+/// carries no credential. The endpoint the credential is for is the
+/// registration's {@link ModelSourceRegistration.credentialResource}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceAuthRequirement
 {
     /// <summary>Why a credential is needed.</summary>
     public AuthRequiredReason Reason { get; init; }
-
-    /// <summary>RFC 9728 metadata for the source's endpoint. `resource.resource` is the
-    /// endpoint URL as the definition names it, in any scheme the agent
-    /// supports (for example `http://localhost:11434/v1`). It's the value a
-    /// client passes back as `authenticate({ resource })`, and nothing fetches
-    /// it. `resource.resource_name` labels the prompt (for example
-    /// "OpenRouter API key"). A source that accepts OAuth access tokens
-    /// advertises `authorization_servers` and `scopes_supported`. A source that
-    /// takes a user-supplied secret omits them.</summary>
-    public required ProtectedResourceMetadata Resource { get; init; }
 
     /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."</summary>
@@ -2481,23 +2490,14 @@ public sealed record ModelSourceAuthRequirement
 }
 
 /// <summary>The source needs a credential before it can be used. A client answers with
-/// `authenticate` and a {@link ModelSourceAuthenticateTarget}.
+/// `authenticate`, the registration's `credentialResource.resource`, and a
+/// {@link ModelSourceAuthenticateTarget}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceAuthRequiredState
 {
     /// <summary>Why a credential is needed.</summary>
     public AuthRequiredReason Reason { get; init; }
-
-    /// <summary>RFC 9728 metadata for the source's endpoint. `resource.resource` is the
-    /// endpoint URL as the definition names it, in any scheme the agent
-    /// supports (for example `http://localhost:11434/v1`). It's the value a
-    /// client passes back as `authenticate({ resource })`, and nothing fetches
-    /// it. `resource.resource_name` labels the prompt (for example
-    /// "OpenRouter API key"). A source that accepts OAuth access tokens
-    /// advertises `authorization_servers` and `scopes_supported`. A source that
-    /// takes a user-supplied secret omits them.</summary>
-    public required ProtectedResourceMetadata Resource { get; init; }
 
     /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."</summary>

@@ -150,7 +150,7 @@ If the token is invalid or the resource is unrecognized, the server MUST return 
 
 ### Model source credentials
 
-A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. When the source needs a credential, the host sets the registration's state to `ModelSourceAuthRequiredState`, which carries a `reason` and RFC 9728 `resource` metadata for the source's endpoint. A client answers with a `modelSource` target that names the registration and echoes its current `credentialNonce`:
+A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. While the source takes a credential, the registration carries a host-reported `credentialResource` with RFC 9728 metadata for the source's endpoint, in every state. When the source needs a credential, the host also sets the registration's state to `ModelSourceAuthRequiredState`, which carries a `reason`. A client answers with a `modelSource` target that names the registration and echoes its current `credentialNonce`:
 
 ```jsonc
 // Model source credential delivery
@@ -173,27 +173,29 @@ A client can [register a model source](/specification/root-channel#model-source-
 
 The `token` is an opaque secret rather than an RFC 6750 Bearer token. The agent applies it as the registration's definition specifies, for example as an `Authorization: Bearer` or `x-api-key` header. A source that accepts OAuth access tokens, such as Microsoft Entra ID tokens, advertises `authorization_servers` and `scopes_supported`, and the client sends `expiresIn` with each short-lived token. A source that takes a user-supplied secret omits them, and the client omits `expiresIn` and `scopes`. `resource.resource_name` labels the prompt, for example "OpenRouter API key".
 
-`resource.resource` is the endpoint URL as the definition names it, in any scheme the agent supports, such as `http://localhost:11434/v1` for a local server. Unlike other protected resources, it doesn't need to be an `https` URL: the client only echoes it in `authenticate`, and nothing fetches it. Whether the agent sends a credential over plain `http` is the host's network policy.
+`credentialResource.resource` is the endpoint URL as the definition names it, and the value the client passes as `resource`. It may use any scheme the agent supports, such as `http://localhost:11434/v1` for a local server. Unlike other protected resources, it doesn't need to be an `https` URL: the client only echoes it in `authenticate`, and nothing fetches it. Whether the agent sends a credential over plain `http` is the host's network policy.
 
 When `target.kind` is `modelSource`, the host:
 
 - MUST apply the credential only to that registration, never to other registrations, MCP servers, or agent-level resources, even when they share `resource`;
-- MUST require `resource` to equal the `resource.resource` it most recently advertised for that registration;
+- MUST require `resource` to equal the registration's current `credentialResource.resource`;
 - MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`);
 - MUST reject a `credentialNonce` other than the one it most recently issued for that registration with `Conflict` (`-32011`). The client re-reads root state and, if the source still needs a credential, sends it again with the current nonce;
 - MUST treat an empty `token` as revocation: it drops the credential, and the source returns to `authRequired` with `reason: expired`, so no client sends the revoked secret again.
 
 Any client may deliver or revoke a registration's credential, as any client may answer an MCP server's challenge.
 
-`credentialNonce` fences every credential change. The host issues a new nonce whenever it installs or drops a credential: on delivery, rotation, expiry, rejection, and revocation, and when a change to `provider`, `format`, or `definition` drops it. That includes a removed registration that's registered again under the same `id`, and the host never reuses a nonce for the same `id`. An `authenticate` built before any of those changes is stale, so:
+`credentialNonce` fences every credential change, and works as the registration's generation. The host issues a new nonce whenever a registration is added, including one registered again under a removed `id`, and whenever its `provider`, `format`, or `definition` changes, whether or not it held a credential. It also issues one whenever it installs or drops a credential: on delivery, rotation, expiry, rejection, and revocation. It never reuses a nonce for the same `id`. An `authenticate` built before any of those changes is stale, so:
 
 - a key meant for an old definition never reaches a new one, even when the endpoint didn't change;
 - a rotation that crosses a revocation can't undo the revocation;
 - when two clients answer the same `authRequired`, the first wins, and the second gets `Conflict`, re-reads state, and finds the source ready.
 
-The host also tags each request with the nonce of the key it used, and ignores a failure from a request made with an older key, so a late failure can't drop a key that has since replaced it.
+The host tags every agent operation on the registration with the current nonce and discards any result, success or failure, that carries an older one. A late failure can't drop a key that has since replaced it, and a late success can't mark a changed or re-registered source `ready`, even after an edit that changes the definition back.
 
-The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the registration's `definition` or `_meta`, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host writes `ModelSourceAuthRequirement.description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state. The host drops the credential when the registration is removed, when its `provider`, `format`, or `definition` changes, and when the host restarts.
+`credentialResource` and `credentialNonce` stay in root state for as long as the source takes a credential, not only while it's `authRequired`. Any client, including one that connected after the source became ready, can build an `authenticate` request at any time: to rotate a short-lived token before it expires, or to revoke a key with an empty token.
+
+The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the registration's `definition`, `_meta`, or `credentialResource`, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host writes `ModelSourceAuthRequirement.description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state. The host drops the credential when the registration is removed, when its `provider`, `format`, or `definition` changes, and when the host restarts.
 
 The host asks for a new credential by setting the registration's state to `authRequired` again, which survives reconnects. When `reason` is `expired`, the client MUST NOT replay the same secret: it renews the token or asks the user for a new key. A client that has the source configured answers from its own secure storage, but MUST NOT send a stored secret unless the registration's `provider`, `format`, and `definition` match its own copy. `credentialNonce` stops a delayed reply, but not a device whose copy of the definition is out of date or a registration another client has changed.
 

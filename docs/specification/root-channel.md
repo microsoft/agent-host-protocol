@@ -75,7 +75,11 @@ Clients can register bring-your-own-key model sources with the host, so its agen
   "clientId": "laptop",
   "retention": "host",
   "state": { "kind": "ready" },
-  "credentialNonce": "9b41d7"
+  "credentialNonce": "9b41d7",
+  "credentialResource": {
+    "resource": "https://openrouter.ai/api/v1",
+    "resource_name": "OpenRouter API key"
+  }
 }
 ```
 
@@ -83,24 +87,28 @@ Clients can register bring-your-own-key model sources with the host, so its agen
 
 #### Registering
 
-A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId`, and with no `state` or `credentialNonce`. It removes one with `root/modelSourceRegistrationRemoved`. Like MCP servers, registrations have no per-client ownership: any client can change or remove any registration, and the client that changes one becomes its contributing client. A host MAY reject client changes to a registration it created itself.
+A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId`, and with no `state`, `credentialNonce`, or `credentialResource`. It removes one with `root/modelSourceRegistrationRemoved`. Like MCP servers, registrations have no per-client ownership: any client can change or remove any registration, and the client that changes one becomes its contributing client. A host MAY reject client changes to a registration it created itself.
 
 The host rejects a client's `Set`, through `rejectionReason`, when:
 
 - the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
-- `clientId` isn't the dispatching client's ID, or `state` or `credentialNonce` is present;
+- `clientId` isn't the dispatching client's ID, or `state`, `credentialNonce`, or `credentialResource` is present;
 - `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same registration doesn't count, so a ready registration can still be updated;
 - the host won't honor the requested `retention`. The client can register again with `contributingClient` retention.
 
 A client's `Removed` is a no-op when no registration has that `id`.
 
-When a `Set` changes a registration's `provider`, `format`, or `definition`, the host drops its credential, and the source goes back through `starting`. A change to `name`, `icons`, `clientId`, or `retention` keeps the credential. A host may also register sources itself. Those registrations have no `clientId`, and their retention behaves as `host`.
+When a `Set` changes a registration's `provider`, `format`, or `definition`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A change to `name`, `icons`, `clientId`, or `retention` keeps the credential and the nonce. A host may also register sources itself. Those registrations have no `clientId`, and their retention behaves as `host`.
 
 #### Status
 
-The host reports status with `root/modelSourceStateChanged`, which sets a registration's `state` (`starting`, `ready`, `authRequired`, or `error`) and its `credentialNonce`, as `session/mcpServerStateChanged` does for MCP servers. It never reports status by dispatching the registration back with `Set`. The reducer ignores an unknown `id` and changes no other field, so a late report can't bring back a removed registration or overwrite a newer definition. The host also discards an agent result for a definition the registration no longer has.
+The host reports status with `root/modelSourceStateChanged`, as `session/mcpServerStateChanged` does for MCP servers. It sets three host-reported fields together: the registration's `state` (`starting`, `ready`, `authRequired`, or `error`), its `credentialNonce`, and its `credentialResource`, which an absent value clears. It never reports status by dispatching the registration back with `Set`. The reducer ignores an unknown `id` and changes no other field, so a late report can't bring back a removed registration or overwrite a newer definition.
 
-A client's `Set` replaces the whole registration, so it clears the status until the host reports again. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed.
+`credentialNonce` is the registration's generation. The host issues a new one when a registration is added, including under a removed `id`, when its `provider`, `format`, or `definition` changes, and whenever it installs or drops a credential. It tags every agent operation on the registration, such as validation, model discovery, and inference, with the current nonce, and discards any result, success or failure, that carries an older one. A slow result from before a change therefore can't mark the current registration `ready`, even when the definition has changed back to the same value.
+
+`credentialResource` is the RFC 9728 metadata for the endpoint the credential is for. The host reports it in every state while the source takes a credential, so any client can deliver, rotate, or revoke one, and leaves it absent for a source that needs none. See [Model source credentials](/specification/authentication#model-source-credentials).
+
+A client's `Set` replaces the whole registration, so it clears the host-reported fields until the host reports again. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed.
 
 #### Catalog
 
@@ -195,7 +203,7 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
 | `root/modelSourceRegistrationSet` | Server / Client | Adds or replaces a registration in `modelSourceRegistrations` by `id` |
 | `root/modelSourceRegistrationRemoved` | Server / Client | Removes a registration by `id` |
-| `root/modelSourceStateChanged` | Server | Sets a registration's `state` and `credentialNonce`. A no-op for an unknown `id` |
+| `root/modelSourceStateChanged` | Server | Sets a registration's `state`, `credentialNonce`, and `credentialResource`. A no-op for an unknown `id` |
 
 All root-scoped action envelopes have `channel: "ahp-root://"`.
 
