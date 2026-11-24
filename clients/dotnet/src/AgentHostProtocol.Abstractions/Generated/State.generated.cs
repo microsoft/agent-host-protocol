@@ -2119,6 +2119,11 @@ public sealed record AgentInfo
     /// id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AgentCapabilities? Capabilities { get; init; }
+
+    /// <summary>Sources this agent offers models from. Clients use them to label and
+    /// group {@link models}. A source may have no models.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ModelSourceInfo>? ModelSources { get; init; }
 }
 
 /// <summary>Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -2208,9 +2213,23 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
+/// <summary>A source that an agent provider offers models from, such as a service or
+/// subscription.</summary>
+public sealed record ModelSourceInfo
+{
+    /// <summary>Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable name</summary>
+    public required string DisplayName { get; init; }
+}
+
 public sealed record SessionModelInfo
 {
-    /// <summary>Model identifier</summary>
+    /// <summary>Model identifier, unique within the agent's {@link AgentInfo.models}.
+    /// When several model sources serve the same upstream model, the host gives
+    /// each entry its own ID. A host SHOULD keep a model's ID across catalog
+    /// updates and MUST NOT reuse an ID for a different source or upstream model.</summary>
     public required string Id { get; init; }
 
     /// <summary>Agent provider that owns this model. Matches {@link AgentInfo.provider}.</summary>
@@ -2262,6 +2281,11 @@ public sealed record SessionModelInfo
     /// recognize.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Vendor { get; init; }
+
+    /// <summary>The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+    /// in the agent's {@link AgentInfo.modelSources}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ModelSourceId { get; init; }
 }
 
 /// <summary>A model selection: the chosen model ID together with any model-specific

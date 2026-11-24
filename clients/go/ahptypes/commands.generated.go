@@ -294,7 +294,7 @@ type ClientCapabilities struct {
 	// {@link McpServerCustomization.channel | `mcp://` channel}) when this
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
-	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
 }
 
 // Automation features supported by this host authority.

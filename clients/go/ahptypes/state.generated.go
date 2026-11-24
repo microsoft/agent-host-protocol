@@ -830,6 +830,9 @@ type AgentInfo struct {
 	// to gate features (multi-chat, fork) instead of switching on the provider
 	// id.
 	Capabilities *AgentCapabilities `json:"capabilities,omitempty"`
+	// Sources this agent offers models from. Clients use them to label and
+	// group {@link models}. A source may have no models.
+	ModelSources []ModelSourceInfo `json:"modelSources,omitempty"`
 }
 
 // Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
@@ -907,8 +910,20 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
+// A source that an agent provider offers models from, such as a service or
+// subscription.
+type ModelSourceInfo struct {
+	// Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+	Id string `json:"id"`
+	// Human-readable name
+	DisplayName string `json:"displayName"`
+}
+
 type SessionModelInfo struct {
-	// Model identifier
+	// Model identifier, unique within the agent's {@link AgentInfo.models}.
+	// When several model sources serve the same upstream model, the host gives
+	// each entry its own ID. A host SHOULD keep a model's ID across catalog
+	// updates and MUST NOT reuse an ID for a different source or upstream model.
 	Id string `json:"id"`
 	// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
 	Provider string `json:"provider"`
@@ -941,6 +956,9 @@ type SessionModelInfo struct {
 	// SHOULD fall back to a generic presentation for values they do not
 	// recognize.
 	Vendor *string `json:"vendor,omitempty"`
+	// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+	// in the agent's {@link AgentInfo.modelSources}.
+	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 
 // A model selection: the chosen model ID together with any model-specific
@@ -3857,7 +3875,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
@@ -4391,7 +4409,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review map[string]json.RawMessage `json:"review,omitempty"`
+	Review *map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to

@@ -1593,7 +1593,12 @@ data class AgentInfo(
      * to gate features (multi-chat, fork) instead of switching on the provider
      * id.
      */
-    val capabilities: AgentCapabilities? = null
+    val capabilities: AgentCapabilities? = null,
+    /**
+     * Sources this agent offers models from. Clients use them to label and
+     * group {@link models}. A source may have no models.
+     */
+    val modelSources: List<ModelSourceInfo>? = null
 )
 
 @Serializable
@@ -1680,9 +1685,24 @@ data class MultipleWorkingDirectoriesCapability(
 )
 
 @Serializable
+data class ModelSourceInfo(
+    /**
+     * Model source identifier, unique within the agent's {@link AgentInfo.modelSources}.
+     */
+    val id: String,
+    /**
+     * Human-readable name
+     */
+    val displayName: String
+)
+
+@Serializable
 data class SessionModelInfo(
     /**
-     * Model identifier
+     * Model identifier, unique within the agent's {@link AgentInfo.models}.
+     * When several model sources serve the same upstream model, the host gives
+     * each entry its own ID. A host SHOULD keep a model's ID across catalog
+     * updates and MUST NOT reuse an ID for a different source or upstream model.
      */
     val id: String,
     /**
@@ -1736,7 +1756,12 @@ data class SessionModelInfo(
      * SHOULD fall back to a generic presentation for values they do not
      * recognize.
      */
-    val vendor: String? = null
+    val vendor: String? = null,
+    /**
+     * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
+     * in the agent's {@link AgentInfo.modelSources}.
+     */
+    val modelSourceId: String? = null
 )
 
 @KeepGeneratedSerializer
