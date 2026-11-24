@@ -1,0 +1,152 @@
+{
+  "description": "root/modelSourceRegistrationSet with the same provider, format, and definition, compared as JSON values ignoring key order, joins: it adds the client to contributingClientIds, keeps every host-reported field, and takes displayName from the action",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-1"
+        ],
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-1"
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegistrationSet",
+      "registration": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a (window 2)",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "headers": {
+            "x-tier": "pro",
+            "x-region": "eu"
+          },
+          "models": [
+            {
+              "maxContextWindow": 128000,
+              "id": "model-a"
+            }
+          ],
+          "baseUrl": "https://apia.example.com/v1"
+        }
+      },
+      "clientId": "client-2"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a (window 2)",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "headers": {
+            "x-tier": "pro",
+            "x-region": "eu"
+          },
+          "models": [
+            {
+              "maxContextWindow": 128000,
+              "id": "model-a"
+            }
+          ],
+          "baseUrl": "https://apia.example.com/v1"
+        },
+        "contributingClientIds": [
+          "client-1",
+          "client-2"
+        ],
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-1"
+        ]
+      }
+    ]
+  }
+}

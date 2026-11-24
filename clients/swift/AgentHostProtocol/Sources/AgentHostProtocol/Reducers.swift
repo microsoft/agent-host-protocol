@@ -124,7 +124,12 @@ public func rootReducer(state: RootState, action: StateAction) -> RootState {
 
     case .rootModelSourceRegistrationSet(let a):
         var next = state
-        applyModelSourceRegistrationSet(&next, a.registration)
+        applyModelSourceRegistrationSet(&next, a.registration, clientId: a.clientId)
+        return next
+
+    case .rootModelSourceContributorRemoved(let a):
+        var next = state
+        guard applyModelSourceContributorRemoved(&next, id: a.id, clientId: a.clientId) else { return state }
         return next
 
     case .rootModelSourceRegistrationRemoved(let a):

@@ -1,0 +1,89 @@
+{
+  "description": "root/modelSourceContributorRemoved is a no-op when the client doesn't contribute the registration",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-2"
+        ],
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceContributorRemoved",
+      "id": "model-source-a",
+      "clientId": "client-9"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-2"
+        ],
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      }
+    ]
+  }
+}

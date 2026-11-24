@@ -1,0 +1,111 @@
+{
+  "description": "root/modelSourceRegistrationSet from a client that already contributes keeps it listed once, keeps the host-reported fields, and takes retention from the action",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-1",
+          "client-2"
+        ],
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRegistrationSet",
+      "registration": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "retention": "host"
+      },
+      "clientId": "client-2"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSourceRegistrations": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "example.com/model-source@1",
+        "definition": {
+          "baseUrl": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        },
+        "contributingClientIds": [
+          "client-1",
+          "client-2"
+        ],
+        "retention": "host",
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "credentialId": "key-a-1"
+      }
+    ]
+  }
+}

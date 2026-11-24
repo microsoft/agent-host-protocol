@@ -1760,6 +1760,14 @@ pub struct ModelSourceAuthenticateTarget {
     /// published in root state. The host rejects a stale one with `Conflict`
     /// (-32011).
     pub credential_nonce: String,
+    /// A client-chosen, non-secret ID for the credential, such as a hash of
+    /// where the client stores the key. The host publishes it as the
+    /// registration's `ModelSourceRegistration.credentialId`, so a client can
+    /// tell whether the host holds its current key. Clients SHOULD include it
+    /// when delivering a credential, and omit it when revoking one. MUST NOT be
+    /// derived from the secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_id: Option<String>,
 }
 
 /// Pushes a credential for a protected resource. The `resource` field MUST

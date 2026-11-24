@@ -63,7 +63,7 @@ A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, 
 
 ### Model source registry
 
-Clients can register bring-your-own-key model sources with the host, so its agents can serve those models to every session and to automations. Root state lists them in [`modelSourceRegistrations`](/reference/root#modelsourceregistration), keyed by `id`. An agent that accepts registrations advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the definition formats it reads.
+Clients can register bring-your-own-key model sources with the host, so its agents can serve those models to every session and to automations. Root state lists them in [`modelSourceRegistrations`](/reference/root#modelsourceregistration), keyed by `id`. An agent that accepts registrations advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the definition formats it reads, how long the host keeps a disconnected client's contributions (`gracePeriod`), and whether clients of different principals share the registry (`principalPolicy`).
 
 ```json
 {
@@ -72,64 +72,89 @@ Clients can register bring-your-own-key model sources with the host, so its agen
   "displayName": "OpenRouter",
   "format": "example.com/model-source@1",
   "definition": { "baseUrl": "https://openrouter.ai/api/v1" },
-  "clientId": "laptop",
+  "contributingClientIds": ["laptop-window-1", "laptop-window-2"],
   "retention": "host",
   "state": { "kind": "ready" },
   "credentialNonce": "9b41d7",
   "credentialResource": {
     "resource": "https://openrouter.ai/api/v1",
     "resource_name": "OpenRouter API key"
-  }
+  },
+  "credentialOrigins": ["https://openrouter.ai"],
+  "credentialId": "keychain-5c2a"
 }
 ```
 
-`definition` says how to reach the source, in `format`. Its shape belongs to the agent that reads it, and it MUST NOT contain a credential. A client delivers the credential separately, with [`authenticate`](/specification/authentication#model-source-credentials).
+`definition` says how to reach the source, in `format`. AHP doesn't define, standardize, or name any definition format: `format` and `definition` are opaque to AHP and belong to the agent that reads them. A definition MUST NOT contain a credential. A client delivers the credential separately, with [`authenticate`](/specification/authentication#model-source-credentials).
 
-#### Registering
+#### Contributing
 
-A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId`, and with no `state`, `credentialNonce`, or `credentialResource`. It removes one with `root/modelSourceRegistrationRemoved`. Like MCP servers, registrations have no per-client ownership: any client can change or remove any registration, and the client that changes one becomes its contributing client. A host MAY reject client changes to a registration it created itself.
+Several clients, such as two windows or two devices, can want the same source. Each one contributes it with `root/modelSourceRegistrationSet` and its own `clientId`, and each one withdraws only its own contribution with `root/modelSourceContributorRemoved`. `root/modelSourceRegistrationRemoved` removes a registration for every contributor.
+
+A registration's routing is its `provider`, `format`, and `definition`, with definitions compared as JSON values: object key order is ignored, and numbers compare by numeric value, so `1` equals `1.0`. The reducers apply the actions as follows:
+
+- **Add.** When no registration has the `id`, `Set` appends it, with `contributingClientIds` set to `[clientId]`, or absent when there's no `clientId`.
+- **Join.** When one has, and its routing is unchanged, `Set` keeps its host-reported fields (`state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and `credentialId`), adds `clientId` to `contributingClientIds` if it isn't there, and takes `displayName`, `icons`, `retention`, and `_meta` from the action. Joining doesn't disturb the status, nonce, or credential.
+- **Replace.** When the routing changed, `Set` replaces the registration, with `contributingClientIds` set to `[clientId]`. Its host-reported fields are absent until the host reports again.
+- **Withdraw.** `root/modelSourceContributorRemoved` removes `clientId` from `contributingClientIds`, leaving the field absent when no contributor remains. It never removes the registration.
+- **Remove.** `Removed` deletes the registration by `id`. Both are no-ops when nothing matches.
+
+A client dispatches `Set` with its own `clientId`, and without `contributingClientIds` or any host-reported field, when it starts with the source configured and isn't already a contributor. When contributors disagree on `displayName`, `icons`, `retention`, or `_meta`, the last `Set` wins. A client SHOULD derive `id` from a stable key in its own configuration, so every window and device with the same source shares one registration. A client SHOULD NOT replace a registration whose routing differs from its own copy unless the user changed the source in its configuration, or two clients with different configurations would replace each other indefinitely. When the user removes a source, the client withdraws its own contribution, and dispatches `Removed` only to remove the source for everyone.
 
 The host rejects a client's `Set`, through `rejectionReason`, when:
 
 - the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
-- `clientId` isn't the dispatching client's ID, or `state`, `credentialNonce`, or `credentialResource` is present;
-- `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same registration doesn't count, so a ready registration can still be updated;
-- the host won't honor the requested `retention`. The client can register again with `contributingClient` retention.
+- `clientId` is absent or isn't the dispatching client's ID;
+- the registration includes `contributingClientIds` or any host-reported field;
+- `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same registration doesn't count, so a ready registration can still be joined or changed;
+- the host won't honor the requested `retention`. The client can register again with `contributingClient` retention;
+- the host registered the source itself;
+- the host's `principalPolicy` is `isolated`, and the registration belongs to another principal.
 
-A client's `Removed` is a no-op when no registration has that `id`.
+The host rejects a client's `root/modelSourceContributorRemoved` whose `clientId` isn't the dispatching client's ID. A host MAY reject a client's `Removed` for a source it registered itself or one that belongs to another principal.
 
-When a `Set` changes a registration's `provider`, `format`, or `definition`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A change to `displayName`, `icons`, `clientId`, or `retention` keeps the credential and the nonce. A host may also register sources itself. Those registrations have no `clientId`, and their retention behaves as `host`.
+When a client's own withdrawal leaves a registration with no contributors, the host removes it with `Removed`, whatever its retention. When a `Set` replaces a registration's routing, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A join, or a change to `displayName`, `icons`, `retention`, or `_meta`, keeps the credential and the nonce. A host may also register sources itself. Those registrations have no contributing clients, and their retention behaves as `host`.
 
 #### Status
 
-The host reports status with `root/modelSourceStateChanged`, as `session/mcpServerStateChanged` does for MCP servers. It sets three host-reported fields together: the registration's `state` (`starting`, `ready`, `authRequired`, or `error`), its `credentialNonce`, and its `credentialResource`, which an absent value clears. It never reports status by dispatching the registration back with `Set`. The reducer ignores an unknown `id` and changes no other field, so a late report can't bring back a removed registration or overwrite a newer definition.
+The host reports status with `root/modelSourceStateChanged`, as `session/mcpServerStateChanged` does for MCP servers. It sets the host-reported fields together: the registration's `state` (`starting`, `ready`, `authRequired`, or `error`), its `credentialNonce`, and its `credentialResource`, `credentialOrigins`, and `credentialId`, which an absent value clears. It never reports status by dispatching the registration back with `Set`. The reducer ignores an unknown `id` and changes no other field, so a late report can't bring back a removed registration or overwrite a newer definition.
 
-`credentialNonce` is the registration's generation. The host issues a new one when a registration is added, including under a removed `id`, when its `provider`, `format`, or `definition` changes, and whenever it installs or drops a credential. It tags every agent operation on the registration, such as validation, model discovery, and inference, with the current nonce, and discards any result, success or failure, that carries an older one. A slow result from before a change therefore can't mark the current registration `ready`, even when the definition has changed back to the same value.
+An `authRequired` state carries a `reason` specific to model sources: `required` (no credential yet), `expired` (its lifetime or lease lapsed), `rejected` (the endpoint refused it), or `revoked` (a client revoked it). See [Model source credentials](/specification/authentication#model-source-credentials) for what clients do with each.
 
-`credentialResource` is the RFC 9728 metadata for the endpoint the credential is for. The host reports it in every state while the source takes a credential, so any client can deliver, rotate, or revoke one, and leaves it absent for a source that needs none. See [Model source credentials](/specification/authentication#model-source-credentials).
+`credentialNonce` is the registration's generation. The host issues a new one when a registration is added, including under a removed `id`, when its routing changes, and whenever it installs or drops a credential. It tags every agent operation on the registration, such as validation, model discovery, and inference, with the current nonce, and discards any result, success or failure, that carries an older one. A slow result from before a change therefore can't mark the current registration `ready`, even when the definition has changed back to the same value.
 
-A client's `Set` replaces the whole registration, so it clears the host-reported fields until the host reports again. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed.
+`credentialResource` is the RFC 9728 metadata for the endpoint the credential is for, and `credentialOrigins` lists every origin the host sends the credential to. The host reports both in every state while the source takes a credential, so any client can check, deliver, rotate, or revoke one, and leaves them absent for a source that needs none. `credentialId` names the key the host most recently accepted.
 
 #### Catalog
 
-When a registration is `ready`, the host adds it to the catalog of the agent named by `provider`, through `root/agentsChanged`: a `ModelSourceInfo` with the registration's `id` and `displayName`, and its models in `models` with `modelSourceId` set to that `id`. Once the registration has been `ready`, the host keeps its models listed through later `starting` and `authRequired` states, so a key rotation or expiry doesn't change the catalog or break a selection. It withdraws them when the registration is removed, when its contributing client leaves under `contributingClient` retention, when it enters `error`, or when a change to `provider`, `format`, or `definition` mints new model IDs (see [Reserved model IDs](#reserved-model-ids)). A turn that uses a listed model while the source has no usable credential ends with a resumable error, as described in [Model source credentials](/specification/authentication#model-source-credentials). The host MAY list the `ModelSourceInfo` in any state.
+When a registration is `ready`, the host adds it to the catalog of the agent named by `provider`, through `root/agentsChanged`: a `ModelSourceInfo` with the registration's `id` and `displayName`, and its models in `models` with `modelSourceId` set to that `id`. `modelSourceId` alone doesn't mark a registered source, because an agent's own sources use it too. A source is registered when `modelSourceRegistrations` has an entry with that `id` whose `provider` is the agent.
 
-Any client can select a registered source's models, in any session whose agent is the registration's `provider`. The host checks every selection: the model is listed, and the chat is backed by the registration's agent provider. It checks whenever it uses a selection, including when a client continues a turn with `chat/turnResume`. Otherwise it rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions. The host MUST NOT run the work on a different model.
+Once the registration has been `ready`, the host keeps its models listed through later `starting` and `authRequired` states, so a key rotation or expiry doesn't change the catalog or break a selection. It withdraws them when the registration is removed, when its last contributing client leaves under `contributingClient` retention, when it enters `error`, or when a routing change mints new model IDs (see [Reserved model IDs](#reserved-model-ids)). The host MAY list the `ModelSourceInfo` in any state.
+
+Any client can select a registered source's models, in any session whose agent is the registration's `provider`. The host checks every selection: the model is listed, the chat is backed by the registration's agent provider, and, under `isolated`, the turn's client acts for the registration's principal. It checks whenever it uses a selection, including when a client continues a turn with `chat/turnResume`. Otherwise it rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions. The host MUST NOT run the work on a different model. A turn that can't use its source ends with the resumable `modelSourceUnavailable` error, as described in [Model source credentials](/specification/authentication#model-source-credentials).
 
 #### Retention
 
-The contributing client chooses what happens when it leaves. Absent means `contributingClient`, the narrower choice.
+The contributing clients choose what happens when the last of them leaves. Absent means `contributingClient`, the narrower choice.
 
-- With `contributingClient`, the source goes away with its client, like a client-published plugin: the host withdraws its models from the catalog, new work that names them fails, turns already running on it finish, and then the host removes the registration and drops its credential.
-- With `host`, the source stays, like a host-declared MCP server, with its credential in memory, until a client removes it, host policy expires it, or the host restarts.
+A contributing client leaves when its connection closes and it doesn't reconnect with the same `clientId` within the host's `gracePeriod`. The host then dispatches `root/modelSourceContributorRemoved` for it. While other contributors remain, nothing else changes. When the last contributor leaves:
 
-The host MAY expire `host`-retained registrations. Every client sees every registration, including its definition, which suits hosts whose connected clients all belong to one user.
+- With `contributingClient`, the source goes away, like a client-published plugin: the host withdraws its models from the catalog, new work that names them fails, turns already running on it finish, and then the host removes the registration and drops its credential.
+- With `host`, the source stays, like a host-declared MCP server, with its credential in memory and no contributors, until a client removes it, a client that joins later withdraws, or host policy expires it. A restart drops its credential, as described below.
 
-A client that reconnects with the same `clientId` within the host's grace period keeps its registrations. A client that comes back with a new `clientId` and the same configuration registers again under the same `id`, which makes it the contributing client and keeps the credential. After a restart, a host that persists its state SHOULD keep `host`-retained registrations, which come back through `starting`, and reach `authRequired` only if they need a credential.
+Explicit withdrawal is different from leaving: when the last contributor withdraws, the source goes away whatever its retention, so `host` retention doesn't leave sources nobody wants. The host MAY expire `host`-retained registrations.
+
+A client that reconnects with the same `clientId` within the grace period is still listed. A client that comes back with a new `clientId` and the same configuration joins with `Set`, which keeps the status, nonce, and credential. After a restart, a host that persists its state SHOULD keep `host`-retained registrations, which come back through `starting`, and reach `authRequired` with `reason: required` only if they need a credential.
+
+#### Principals
+
+AHP doesn't verify which client is which, so with `principalPolicy` `shared`, or absent, every connected client may change, supply credentials for, and select every registration, as with MCP servers. Where a host can verify principals, it MAY restrict changes, credentials, and use of a registration to clients of the principal that registered it, and advertises `isolated`. Root state still lists every registration to every client, so a definition is never private. A host whose connections carry credentials scoped to one client, such as a relay that forwards each client's own sign-in, SHOULD NOT let one client's registration be used by another: it uses `isolated`, or doesn't advertise `modelSourceRegistration`.
 
 #### Reserved model IDs
 
-Drafts, pending messages, history, and automation definitions keep a selection after its source goes away, and a chat keeps them when it moves to another session. Once the host publishes a model ID for a registration, that ID is bound to that registration and its upstream model for as long as the host keeps state, including after the registration is removed and across a restart. The host MUST NOT resolve the ID to anything else. It MAY publish the ID again only when the same registration comes back offering the same upstream model. A model's upstream identity is the endpoint the agent sends its requests to plus that endpoint's model identifier. A change to `provider` or `format`, or a `definition` change that moves the endpoint, makes it a different upstream model, so the host mints new IDs, even when a different client made the change. A host can meet this by minting IDs it never reuses, for example with a random component.
+Drafts, pending messages, history, and automation definitions keep a selection after its source goes away, and a chat keeps them when it moves to another session. Once the host publishes a model ID for a registration, that ID is bound to that registration and its upstream model for as long as the host keeps state, including after the registration is removed and across a restart. The host MUST NOT resolve the ID to anything else. It MAY publish the ID again only when the same registration comes back offering the same upstream model. A model's upstream identity is the endpoint the agent sends its requests to plus that endpoint's model identifier. A change to `provider` or `format`, or a `definition` change that moves the endpoint, makes it a different upstream model, so the host mints new IDs, even when a different client made the change.
+
+A host SHOULD derive each model's ID deterministically from the registration (its `id`, `provider`, and `format`), the endpoint, and the endpoint's model identifier, for example with a hash. The same model then gets the same ID when its source is registered again or the host restarts, without a stored table, and a moved endpoint gets a new one.
 
 #### Automations
 
@@ -186,7 +211,7 @@ target channel instead.
 | `root/sessionSummaryChanged` | server → client notification | Session catalogue entry mutated. |
 | `root/progress` | server → client notification | Generic progress for a long-running operation a client opted into (e.g. an SDK download). |
 | `unsubscribe` | client → server notification | Stop receiving root-channel messages. |
-| `dispatchAction` | client → server notification | Dispatch a root-scoped client action: `root/configChanged`, `root/modelSourceRegistrationSet`, or `root/modelSourceRegistrationRemoved`. |
+| `dispatchAction` | client → server notification | Dispatch a root-scoped client action: `root/configChanged`, `root/modelSourceRegistrationSet`, `root/modelSourceContributorRemoved`, or `root/modelSourceRegistrationRemoved`. |
 
 `auth/required` may also be emitted on `ahp-root://` when the auth requirement
 is root-scoped; see [Authentication](/specification/authentication).
@@ -201,9 +226,10 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/activeSessionsChanged` | Server          | Replaces `activeSessions`            |
 | `root/terminalsChanged`      | Server          | Replaces `terminals`                 |
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
-| `root/modelSourceRegistrationSet` | Server / Client | Adds or replaces a registration in `modelSourceRegistrations` by `id` |
+| `root/modelSourceRegistrationSet` | Server / Client | Adds, joins, or replaces a registration in `modelSourceRegistrations` by `id`, maintaining `contributingClientIds` |
+| `root/modelSourceContributorRemoved` | Server / Client | Removes one client from a registration's `contributingClientIds` |
 | `root/modelSourceRegistrationRemoved` | Server / Client | Removes a registration by `id` |
-| `root/modelSourceStateChanged` | Server | Sets a registration's `state`, `credentialNonce`, and `credentialResource`. A no-op for an unknown `id` |
+| `root/modelSourceStateChanged` | Server | Sets a registration's host-reported fields. A no-op for an unknown `id` |
 
 All root-scoped action envelopes have `channel: "ahp-root://"`.
 

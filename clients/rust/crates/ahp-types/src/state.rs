@@ -11,8 +11,6 @@ use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-use crate::notifications::AuthRequiredReason;
-
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// How the server resumes sending data on a windowed subscription after
@@ -1215,14 +1213,16 @@ impl<'de> serde::Deserialize<'de> for ModelSourceStatus {
     }
 }
 
-/// How long a registered model source lasts once its contributing client leaves.
+/// How long a registered model source lasts once its last contributing client
+/// leaves. When the last contributor withdraws instead, the source goes away
+/// whatever its retention.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ModelSourceRetentionPolicy {
-    /// Removed when the contributing client leaves, once running turns finish.
+    /// Removed when the last contributing client leaves, once running turns finish.
     ContributingClient,
-    /// Kept until a client removes it or host policy expires it.
+    /// Kept until it's removed, its last contributor withdraws, or host policy expires it.
     Host,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
@@ -1250,6 +1250,101 @@ impl<'de> serde::Deserialize<'de> for ModelSourceRetentionPolicy {
         Ok(match raw.as_str() {
             "contributingClient" => Self::ContributingClient,
             "host" => Self::Host,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Why a model source needs a credential. Specific to model sources: the
+/// shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ModelSourceAuthRequiredReason {
+    /// The host holds no credential yet.
+    Required,
+    /// The credential's lifetime or lease lapsed. A client may renew it.
+    Expired,
+    /// The endpoint refused the credential. Clients don't send a credential with
+    /// the same {@link ModelSourceRegistration.credentialId} again.
+    Rejected,
+    /// A client revoked the credential. Clients don't send one again without a user's action.
+    Revoked,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ModelSourceAuthRequiredReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Required => serializer.serialize_str("required"),
+            Self::Expired => serializer.serialize_str("expired"),
+            Self::Rejected => serializer.serialize_str("rejected"),
+            Self::Revoked => serializer.serialize_str("revoked"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ModelSourceAuthRequiredReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "required" => Self::Required,
+            "expired" => Self::Expired,
+            "rejected" => Self::Rejected,
+            "revoked" => Self::Revoked,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Whether clients acting for different principals share a host's model
+/// source registry.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ModelSourcePrincipalPolicy {
+    /// Every connected client may change, supply credentials for, and select
+    /// every registration.
+    Shared,
+    /// The host verifies principals, and limits changes, credentials, and
+    /// selection of each registration to clients of the principal that
+    /// registered it. Root state still lists every registration to every
+    /// client.
+    Isolated,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ModelSourcePrincipalPolicy {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Shared => serializer.serialize_str("shared"),
+            Self::Isolated => serializer.serialize_str("isolated"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ModelSourcePrincipalPolicy {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "shared" => Self::Shared,
+            "isolated" => Self::Isolated,
             _ => Self::Unknown(raw),
         })
     }
@@ -2117,16 +2212,25 @@ pub struct MultipleWorkingDirectoriesCapability {
 pub struct ModelSourceRegistrationCapability {
     /// Definition formats the agent reads, most preferred first. Format names
     /// are defined by agent implementations and SHOULD be namespaced, for
-    /// example `example.com/model-source@1`.
+    /// example `example.com/model-source@1`. AHP doesn't define, standardize,
+    /// or name any format.
     pub formats: Vec<String>,
+    /// How long, in milliseconds, the host keeps a disconnected client's
+    /// contributions before it treats the client as having left.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grace_period: Option<i64>,
+    /// Whether clients acting for different principals share the registry.
+    /// Absent means `shared`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_policy: Option<ModelSourcePrincipalPolicy>,
     /// Unrecognized wire members retained for full-object edits.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
-/// A model source registered on this host by a client, or by the host itself.
-/// Its definition is in a format the agent named by `provider` reads. It never
-/// contains a credential.
+/// A model source registered on this host by one or more clients, or by the
+/// host itself. Its definition is in a format the agent named by `provider`
+/// reads. It never contains a credential.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2147,18 +2251,21 @@ pub struct ModelSourceRegistration {
     /// {@link ModelSourceRegistrationCapability.formats}.
     pub format: String,
     /// How to reach the source: endpoint, wire format, models, and so on, in
-    /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
-    /// a credential.
+    /// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
+    /// define it. MUST NOT contain a credential.
     pub definition: JsonObject,
-    /// The contributing client: the client that most recently registered or
-    /// changed the source. Absent for a source the host registered itself.
+    /// The clients that contribute this registration, in the order they joined.
+    /// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
+    /// and {@link RootModelSourceContributorRemovedAction}. Absent when no
+    /// client contributes it: a source the host registered itself, or a
+    /// `host`-retained one whose contributors have all left.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub client_id: Option<String>,
-    /// What happens when the contributing client leaves. Absent means `contributingClient`.
+    pub contributing_client_ids: Option<Vec<String>>,
+    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention: Option<ModelSourceRetentionPolicy>,
     /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after a client replaces the
+    /// Absent until the host reports one, and after a `Set` replaces the
     /// registration until the host reports again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<ModelSourceState>,
@@ -2186,6 +2293,19 @@ pub struct ModelSourceRegistration {
     /// takes a user-supplied secret omits them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_resource: Option<ProtectedResourceMetadata>,
+    /// Every origin the host sends the credential to, such as
+    /// `https://api.example.com`. Present whenever `credentialResource` is. A
+    /// client checks each one against its own copy of the definition before it
+    /// sends a key. Set with `state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_origins: Option<Vec<Uri>>,
+    /// The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
+    /// the credential the host most recently accepted. While the state is
+    /// `starting` or `ready`, the host holds it. While it's `authRequired`, the
+    /// `reason` says what happened to it. Absent until the host accepts a
+    /// credential. Set with `state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_id: Option<String>,
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -2229,7 +2349,7 @@ pub struct ModelSourceReadyState {
 #[serde(rename_all = "camelCase")]
 pub struct ModelSourceAuthRequirement {
     /// Why a credential is needed.
-    pub reason: AuthRequiredReason,
+    pub reason: ModelSourceAuthRequiredReason,
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2248,7 +2368,7 @@ pub struct ModelSourceAuthRequirement {
 #[serde(rename_all = "camelCase")]
 pub struct ModelSourceAuthRequiredState {
     /// Why a credential is needed.
-    pub reason: AuthRequiredReason,
+    pub reason: ModelSourceAuthRequiredReason,
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2278,7 +2398,9 @@ pub struct ModelSourceErrorState {
 pub struct ModelSourceInfo {
     /// Model source identifier, unique within the agent's
     /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSourceRegistration.id}.
+    /// the {@link ModelSourceRegistration.id}. A source is registered when
+    /// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+    /// whose `provider` is the agent.
     pub id: String,
     /// Human-readable name
     pub display_name: String,
@@ -2334,6 +2456,8 @@ pub struct SessionModelInfo {
     /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
     /// in the agent's {@link AgentInfo.modelSources}. For a model from a
     /// registered model source, this is the {@link ModelSourceRegistration.id}.
+    /// An agent's own sources use it too, so it doesn't by itself mark a
+    /// registered source.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_source_id: Option<String>,
 }
@@ -5947,7 +6071,13 @@ pub struct UsageInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorInfo {
-    /// Error type identifier
+    /// Error type identifier. Well-known values:
+    ///
+    /// - `modelSourceUnavailable`: a registered model source the turn uses
+    ///   can't serve it, for example because its credential is missing,
+    ///   expired, rejected, or revoked, or the source was removed. The error
+    ///   part is resumable. See
+    ///   [Model source credentials](/specification/authentication#model-source-credentials).
     pub error_type: String,
     /// Human-readable error message
     pub message: String,

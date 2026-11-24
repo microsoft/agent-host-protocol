@@ -107,6 +107,7 @@ const (
 	ActionTypeRootTerminalsChanged                ActionType = "root/terminalsChanged"
 	ActionTypeRootConfigChanged                   ActionType = "root/configChanged"
 	ActionTypeRootModelSourceRegistrationSet      ActionType = "root/modelSourceRegistrationSet"
+	ActionTypeRootModelSourceContributorRemoved   ActionType = "root/modelSourceContributorRemoved"
 	ActionTypeRootModelSourceRegistrationRemoved  ActionType = "root/modelSourceRegistrationRemoved"
 	ActionTypeRootModelSourceStateChanged         ActionType = "root/modelSourceStateChanged"
 	ActionTypeTerminalData                        ActionType = "terminal/data"
@@ -179,22 +180,56 @@ type RootConfigChangedAction struct {
 	Replace *bool `json:"replace,omitempty"`
 }
 
-// Adds a model source registration, or replaces the one with the same `id`.
+// Contributes a model source registration for `clientId`. A registration's
+// routing is its `provider`, `format`, and `definition`, with definitions
+// compared as JSON values: object key order is ignored, and numbers compare
+// by numeric value, so `1` equals `1.0`.
 //
-// A client registers a source by dispatching this with its own `clientId`, and
-// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
-// registration clears those host-reported fields until the host reports again
-// with {@link RootModelSourceStateChangedAction}.
+//   - **Add.** When no registration has the `id`, appends it, with
+//     `contributingClientIds` set to `[clientId]`, or absent without a
+//     `clientId`.
+//   - **Join.** When one has, and its routing is unchanged, keeps its
+//     host-reported fields (`state`, `credentialNonce`, `credentialResource`,
+//     `credentialOrigins`, and `credentialId`), adds `clientId` to
+//     `contributingClientIds` if it isn't there, and takes the other fields
+//     from the action.
+//   - **Replace.** When the routing changed, replaces the registration, with
+//     `contributingClientIds` set to `[clientId]`, or absent without a
+//     `clientId`. Its host-reported fields are absent until the host reports
+//     again with {@link RootModelSourceStateChangedAction}.
+//
+// A client dispatches this with its own `clientId`, and without
+// `contributingClientIds` or any host-reported field.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceRegistrationSetAction struct {
 	Type ActionType `json:"type"`
-	// The registration to add or replace, matched by `id`.
+	// The registration to contribute, matched by `id`.
 	Registration ModelSourceRegistration `json:"registration"`
+	// The contributing client. Absent when the host registers the source
+	// itself.
+	ClientId *string `json:"clientId,omitempty"`
 }
 
-// Removes the model source registration with the given `id`. A no-op when
-// none matches.
+// Withdraws one client's contribution to a model source registration:
+// removes `clientId` from `contributingClientIds`, leaving the field absent
+// when no contributor remains. A no-op when no registration has `id`, or
+// `clientId` doesn't contribute it. It never removes the registration.
+//
+// A client dispatches this with its own `clientId`. The host dispatches it
+// when a contributing client leaves.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceContributorRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The registration's `id`.
+	Id string `json:"id"`
+	// The contributing client to remove.
+	ClientId string `json:"clientId"`
+}
+
+// Removes the model source registration with the given `id` for every
+// contributor. A no-op when none matches.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceRegistrationRemovedAction struct {
@@ -203,9 +238,10 @@ type RootModelSourceRegistrationRemovedAction struct {
 	Id string `json:"id"`
 }
 
-// Updates a model source registration's status, credential nonce, and
-// credential resource together. A no-op when no registration has `id`. Other
-// fields of the registration are preserved. Only the host dispatches it.
+// Updates a model source registration's host-reported fields together:
+// `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+// `credentialId`. A no-op when no registration has `id`. Other fields of the
+// registration are preserved. Only the host dispatches it.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceStateChangedAction struct {
@@ -219,6 +255,10 @@ type RootModelSourceStateChangedAction struct {
 	// Replaces the registration's `credentialResource`. Absent clears it, for a
 	// source that needs no credential.
 	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
+	// Replaces the registration's `credentialOrigins`. Absent clears it.
+	CredentialOrigins []URI `json:"credentialOrigins,omitempty"`
+	// Replaces the registration's `credentialId`. Absent clears it.
+	CredentialId *string `json:"credentialId,omitempty"`
 }
 
 // Session backend initialized successfully.
@@ -1907,6 +1947,7 @@ func (*RootAgentsChangedAction) isStateAction()                   {}
 func (*RootActiveSessionsChangedAction) isStateAction()           {}
 func (*RootConfigChangedAction) isStateAction()                   {}
 func (*RootModelSourceRegistrationSetAction) isStateAction()      {}
+func (*RootModelSourceContributorRemovedAction) isStateAction()   {}
 func (*RootModelSourceRegistrationRemovedAction) isStateAction()  {}
 func (*RootModelSourceStateChangedAction) isStateAction()         {}
 func (*SessionReadyAction) isStateAction()                        {}
@@ -2049,6 +2090,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "root/modelSourceRegistrationSet":
 		var value RootModelSourceRegistrationSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceContributorRemoved":
+		var value RootModelSourceContributorRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

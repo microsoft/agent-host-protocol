@@ -12,10 +12,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       }
     ]
   },
@@ -40,10 +49,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       }
     ]
   }

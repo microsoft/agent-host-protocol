@@ -1981,15 +1981,24 @@ public struct ModelSourceAuthenticateTarget: Codable, Sendable, Equatable {
     /// published in root state. The host rejects a stale one with `Conflict`
     /// (-32011).
     public var credentialNonce: String
+    /// A client-chosen, non-secret ID for the credential, such as a hash of
+    /// where the client stores the key. The host publishes it as the
+    /// registration's `ModelSourceRegistration.credentialId`, so a client can
+    /// tell whether the host holds its current key. Clients SHOULD include it
+    /// when delivering a credential, and omit it when revoking one. MUST NOT be
+    /// derived from the secret.
+    public var credentialId: String?
 
     public init(
         kind: AuthenticateTargetKind,
         modelSourceId: String,
-        credentialNonce: String
+        credentialNonce: String,
+        credentialId: String? = nil
     ) {
         self.kind = kind
         self.modelSourceId = modelSourceId
         self.credentialNonce = credentialNonce
+        self.credentialId = credentialId
     }
 }
 

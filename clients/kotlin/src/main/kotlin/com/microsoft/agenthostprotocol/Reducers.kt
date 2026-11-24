@@ -10,8 +10,11 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.*
 import java.time.Instant
 import java.time.format.DateTimeFormatterBuilder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
 
@@ -577,11 +580,37 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
 
     is StateActionRootModelSourceRegistrationSet -> {
         val registration = action.value.registration
+        val clientId = action.value.clientId
         val list = state.modelSourceRegistrations.orEmpty()
         val idx = list.indexOfFirst { it.id == registration.id }
+        val existing = list.getOrNull(idx)?.takeIf { sameModelSourceRouting(it, registration) }
+        val contributors = existing?.contributingClientIds.orEmpty().toMutableList()
+        if (clientId != null && clientId !in contributors) contributors.add(clientId)
+        val merged = registration.copy(
+            contributingClientIds = contributors.takeIf { it.isNotEmpty() },
+            state = existing?.state,
+            credentialNonce = existing?.credentialNonce,
+            credentialResource = existing?.credentialResource,
+            credentialOrigins = existing?.credentialOrigins,
+            credentialId = existing?.credentialId,
+        )
         val updated = list.toMutableList()
-        if (idx < 0) updated.add(registration) else updated[idx] = registration
+        if (idx < 0) updated.add(merged) else updated[idx] = merged
         state.copy(modelSourceRegistrations = updated)
+    }
+
+    is StateActionRootModelSourceContributorRemoved -> {
+        val list = state.modelSourceRegistrations
+        val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
+        val contributors = list?.getOrNull(idx)?.contributingClientIds.orEmpty()
+        if (list == null || action.value.clientId !in contributors) {
+            state
+        } else {
+            val remaining = contributors.filter { it != action.value.clientId }
+            val updated = list.toMutableList()
+            updated[idx] = updated[idx].copy(contributingClientIds = remaining.takeIf { it.isNotEmpty() })
+            state.copy(modelSourceRegistrations = updated)
+        }
     }
 
     is StateActionRootModelSourceRegistrationRemoved -> {
@@ -605,12 +634,36 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
                 state = action.value.state,
                 credentialNonce = action.value.credentialNonce,
                 credentialResource = action.value.credentialResource,
+                credentialOrigins = action.value.credentialOrigins,
+                credentialId = action.value.credentialId,
             )
             state.copy(modelSourceRegistrations = updated)
         }
     }
 
     else -> state
+}
+
+/**
+ * Whether two registrations have the same `provider`, `format`, and
+ * `definition`, comparing definitions as JSON values.
+ */
+private fun sameModelSourceRouting(a: ModelSourceRegistration, b: ModelSourceRegistration): Boolean =
+    a.provider == b.provider && a.format == b.format && jsonValuesEqual(JsonObject(a.definition), JsonObject(b.definition))
+
+/**
+ * Compares JSON values regardless of object key order, with numbers compared
+ * by numeric value, so `1` equals `1.0`.
+ */
+private fun jsonValuesEqual(a: JsonElement, b: JsonElement): Boolean = when {
+    a is JsonObject && b is JsonObject ->
+        a.size == b.size && a.all { (key, value) -> b[key]?.let { jsonValuesEqual(value, it) } == true }
+    a is JsonArray && b is JsonArray ->
+        a.size == b.size && a.indices.all { jsonValuesEqual(a[it], b[it]) }
+    a is JsonPrimitive && b is JsonPrimitive && !a.isString && !b.isString &&
+        a.doubleOrNull != null && b.doubleOrNull != null ->
+        a.doubleOrNull == b.doubleOrNull
+    else -> a == b
 }
 
 // ─── Session Reducer ────────────────────────────────────────────────────────

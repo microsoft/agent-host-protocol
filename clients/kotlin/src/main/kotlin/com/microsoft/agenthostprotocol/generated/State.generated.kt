@@ -960,7 +960,9 @@ internal object ModelSourceStatusSerializer : KSerializer<ModelSourceStatus> {
 }
 
 /**
- * How long a registered model source lasts once its contributing client leaves.
+ * How long a registered model source lasts once its last contributing client
+ * leaves. When the last contributor withdraws instead, the source goes away
+ * whatever its retention.
  *
  * Stability: 1.0 - Early development.
  */
@@ -969,11 +971,11 @@ internal object ModelSourceStatusSerializer : KSerializer<ModelSourceStatus> {
 value class ModelSourceRetentionPolicy(val rawValue: String) {
     companion object {
         /**
-         * Removed when the contributing client leaves, once running turns finish.
+         * Removed when the last contributing client leaves, once running turns finish.
          */
         val CONTRIBUTING_CLIENT: ModelSourceRetentionPolicy = ModelSourceRetentionPolicy("contributingClient")
         /**
-         * Kept until a client removes it or host policy expires it.
+         * Kept until it's removed, its last contributor withdraws, or host policy expires it.
          */
         val HOST: ModelSourceRetentionPolicy = ModelSourceRetentionPolicy("host")
     }
@@ -987,6 +989,81 @@ internal object ModelSourceRetentionPolicySerializer : KSerializer<ModelSourceRe
     }
     override fun deserialize(decoder: Decoder): ModelSourceRetentionPolicy =
         ModelSourceRetentionPolicy(decoder.decodeString())
+}
+
+/**
+ * Why a model source needs a credential. Specific to model sources: the
+ * shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ModelSourceAuthRequiredReasonSerializer::class)
+@JvmInline
+value class ModelSourceAuthRequiredReason(val rawValue: String) {
+    companion object {
+        /**
+         * The host holds no credential yet.
+         */
+        val REQUIRED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("required")
+        /**
+         * The credential's lifetime or lease lapsed. A client may renew it.
+         */
+        val EXPIRED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("expired")
+        /**
+         * The endpoint refused the credential. Clients don't send a credential with
+         * the same {@link ModelSourceRegistration.credentialId} again.
+         */
+        val REJECTED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("rejected")
+        /**
+         * A client revoked the credential. Clients don't send one again without a user's action.
+         */
+        val REVOKED: ModelSourceAuthRequiredReason = ModelSourceAuthRequiredReason("revoked")
+    }
+}
+
+internal object ModelSourceAuthRequiredReasonSerializer : KSerializer<ModelSourceAuthRequiredReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelSourceAuthRequiredReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ModelSourceAuthRequiredReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ModelSourceAuthRequiredReason =
+        ModelSourceAuthRequiredReason(decoder.decodeString())
+}
+
+/**
+ * Whether clients acting for different principals share a host's model
+ * source registry.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable(with = ModelSourcePrincipalPolicySerializer::class)
+@JvmInline
+value class ModelSourcePrincipalPolicy(val rawValue: String) {
+    companion object {
+        /**
+         * Every connected client may change, supply credentials for, and select
+         * every registration.
+         */
+        val SHARED: ModelSourcePrincipalPolicy = ModelSourcePrincipalPolicy("shared")
+        /**
+         * The host verifies principals, and limits changes, credentials, and
+         * selection of each registration to clients of the principal that
+         * registered it. Root state still lists every registration to every
+         * client.
+         */
+        val ISOLATED: ModelSourcePrincipalPolicy = ModelSourcePrincipalPolicy("isolated")
+    }
+}
+
+internal object ModelSourcePrincipalPolicySerializer : KSerializer<ModelSourcePrincipalPolicy> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ModelSourcePrincipalPolicy", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ModelSourcePrincipalPolicy) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ModelSourcePrincipalPolicy =
+        ModelSourcePrincipalPolicy(decoder.decodeString())
 }
 
 /**
@@ -1778,9 +1855,20 @@ data class ModelSourceRegistrationCapability(
     /**
      * Definition formats the agent reads, most preferred first. Format names
      * are defined by agent implementations and SHOULD be namespaced, for
-     * example `example.com/model-source@1`.
+     * example `example.com/model-source@1`. AHP doesn't define, standardize,
+     * or name any format.
      */
     val formats: List<String>,
+    /**
+     * How long, in milliseconds, the host keeps a disconnected client's
+     * contributions before it treats the client as having left.
+     */
+    val gracePeriod: Long? = null,
+    /**
+     * Whether clients acting for different principals share the registry.
+     * Absent means `shared`.
+     */
+    val principalPolicy: ModelSourcePrincipalPolicy? = null,
     @Transient
     val extra: Map<String, JsonElement> = emptyMap()
 )
@@ -1792,9 +1880,9 @@ internal object ModelSourceRegistrationCapabilitySerializer : UnknownMembersSeri
 )
 
 /**
- * A model source registered on this host by a client, or by the host itself.
- * Its definition is in a format the agent named by `provider` reads. It never
- * contains a credential.
+ * A model source registered on this host by one or more clients, or by the
+ * host itself. Its definition is in a format the agent named by `provider`
+ * reads. It never contains a credential.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1826,22 +1914,25 @@ data class ModelSourceRegistration(
     val format: String,
     /**
      * How to reach the source: endpoint, wire format, models, and so on, in
-     * `format`. Its shape belongs to the agent that reads it. MUST NOT contain
-     * a credential.
+     * `format`. Its shape belongs to the agent that reads it, and AHP doesn't
+     * define it. MUST NOT contain a credential.
      */
     val definition: Map<String, JsonElement>,
     /**
-     * The contributing client: the client that most recently registered or
-     * changed the source. Absent for a source the host registered itself.
+     * The clients that contribute this registration, in the order they joined.
+     * The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
+     * and {@link RootModelSourceContributorRemovedAction}. Absent when no
+     * client contributes it: a source the host registered itself, or a
+     * `host`-retained one whose contributors have all left.
      */
-    val clientId: String? = null,
+    val contributingClientIds: List<String>? = null,
     /**
-     * What happens when the contributing client leaves. Absent means `contributingClient`.
+     * What happens when the last contributing client leaves. Absent means `contributingClient`.
      */
     val retention: ModelSourceRetentionPolicy? = null,
     /**
      * Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-     * Absent until the host reports one, and after a client replaces the
+     * Absent until the host reports one, and after a `Set` replaces the
      * registration until the host reports again.
      */
     val state: ModelSourceState? = null,
@@ -1871,6 +1962,21 @@ data class ModelSourceRegistration(
      * takes a user-supplied secret omits them.
      */
     val credentialResource: ProtectedResourceMetadata? = null,
+    /**
+     * Every origin the host sends the credential to, such as
+     * `https://api.example.com`. Present whenever `credentialResource` is. A
+     * client checks each one against its own copy of the definition before it
+     * sends a key. Set with `state`.
+     */
+    val credentialOrigins: List<String>? = null,
+    /**
+     * The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
+     * the credential the host most recently accepted. While the state is
+     * `starting` or `ready`, the host holds it. While it's `authRequired`, the
+     * `reason` says what happened to it. Absent until the host accepts a
+     * credential. Set with `state`.
+     */
+    val credentialId: String? = null,
     /**
      * Additional implementation-defined metadata for this registration.
      * MUST NOT contain a credential.
@@ -1941,7 +2047,7 @@ data class ModelSourceAuthRequirement(
     /**
      * Why a credential is needed.
      */
-    val reason: AuthRequiredReason,
+    val reason: ModelSourceAuthRequiredReason,
     /**
      * Human-readable hint the host writes, for example "The endpoint rejected
      * the API key."
@@ -1970,7 +2076,7 @@ data class ModelSourceAuthRequiredState(
     /**
      * Why a credential is needed.
      */
-    val reason: AuthRequiredReason,
+    val reason: ModelSourceAuthRequiredReason,
     /**
      * Human-readable hint the host writes, for example "The endpoint rejected
      * the API key."
@@ -2015,7 +2121,9 @@ data class ModelSourceInfo(
     /**
      * Model source identifier, unique within the agent's
      * {@link AgentInfo.modelSources}. For a registered model source, this is
-     * the {@link ModelSourceRegistration.id}.
+     * the {@link ModelSourceRegistration.id}. A source is registered when
+     * {@link RootState.modelSourceRegistrations} has an entry with this `id`
+     * whose `provider` is the agent.
      */
     val id: String,
     /**
@@ -2089,6 +2197,8 @@ data class SessionModelInfo(
      * The source this model comes from. MUST match a {@link ModelSourceInfo.id}
      * in the agent's {@link AgentInfo.modelSources}. For a model from a
      * registered model source, this is the {@link ModelSourceRegistration.id}.
+     * An agent's own sources use it too, so it doesn't by itself mark a
+     * registered source.
      */
     val modelSourceId: String? = null
 )
@@ -6066,7 +6176,13 @@ data class UsageInfo(
 @Serializable(with = ErrorInfoSerializer::class)
 data class ErrorInfo(
     /**
-     * Error type identifier
+     * Error type identifier. Well-known values:
+     *
+     * - `modelSourceUnavailable`: a registered model source the turn uses
+     * can't serve it, for example because its credential is missing,
+     * expired, rejected, or revoked, or the source was removed. The error
+     * part is resumable. See
+     * [Model source credentials](/specification/authentication#model-source-credentials).
      */
     val errorType: String,
     /**

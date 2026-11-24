@@ -1,7 +1,7 @@
 {
   "name": "root-model-source-registration-set",
   "group": "A",
-  "description": "A client registers a model source with root/modelSourceRegistrationSet: its own clientId, requested retention, an open definition, and no state.",
+  "description": "A client contributes a model source with root/modelSourceRegistrationSet: its own clientId on the action, requested retention, an open definition, and no host-reported fields.",
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceRegistrationSet",
@@ -20,9 +20,9 @@
           "x-title": "Example"
         }
       },
-      "clientId": "client-1",
       "retention": "host"
-    }
+    },
+    "clientId": "client-1"
   },
   "acceptableOutputs": [
     {
@@ -42,9 +42,9 @@
             "x-title": "Example"
           }
         },
-        "clientId": "client-1",
         "retention": "host"
-      }
+      },
+      "clientId": "client-1"
     }
   ]
 }

@@ -62,14 +62,15 @@ use ahp_types::state::{
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatConfigState, ChatInputRequest,
     ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
-    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
-    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
-    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    McpServerState, McpServerStoppedState, ModelSourceRegistration, PendingMessage,
+    PendingMessageKind, ResourceWatchState, ResponsePart, RootState, SessionInputRequest,
+    SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
+    TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState, TerminalUnclassifiedPart,
+    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
+    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
+    TurnState,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -723,10 +724,48 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             let list = state
                 .model_source_registrations
                 .get_or_insert_with(Vec::new);
-            if let Some(idx) = list.iter().position(|r| r.id == a.registration.id) {
-                list[idx] = a.registration.clone();
-            } else {
-                list.push(a.registration.clone());
+            let idx = list.iter().position(|r| r.id == a.registration.id);
+            let mut updated = a.registration.clone();
+            let mut contributors = Vec::new();
+            match idx
+                .map(|i| &list[i])
+                .filter(|existing| same_model_source_routing(existing, &a.registration))
+            {
+                Some(existing) => {
+                    copy_model_source_host_fields(&mut updated, existing);
+                    contributors.extend(existing.contributing_client_ids.iter().flatten().cloned());
+                }
+                None => clear_model_source_host_fields(&mut updated),
+            }
+            if let Some(client_id) = &a.client_id {
+                if !contributors.contains(client_id) {
+                    contributors.push(client_id.clone());
+                }
+            }
+            updated.contributing_client_ids = (!contributors.is_empty()).then_some(contributors);
+            match idx {
+                Some(i) => list[i] = updated,
+                None => list.push(updated),
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::RootModelSourceContributorRemoved(a) => {
+            let Some(registration) = state
+                .model_source_registrations
+                .as_mut()
+                .and_then(|list| list.iter_mut().find(|r| r.id == a.id))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(contributors) = registration.contributing_client_ids.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if !contributors.contains(&a.client_id) {
+                return ReduceOutcome::NoOp;
+            }
+            contributors.retain(|c| *c != a.client_id);
+            if contributors.is_empty() {
+                registration.contributing_client_ids = None;
             }
             ReduceOutcome::Applied
         }
@@ -751,10 +790,63 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             registration.state = Some(a.state.clone());
             registration.credential_nonce = Some(a.credential_nonce.clone());
             registration.credential_resource = a.credential_resource.clone();
+            registration.credential_origins = a.credential_origins.clone();
+            registration.credential_id = a.credential_id.clone();
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,
     }
+}
+
+/// Whether two registrations have the same `provider`, `format`, and
+/// `definition`, comparing definitions as JSON values.
+fn same_model_source_routing(a: &ModelSourceRegistration, b: &ModelSourceRegistration) -> bool {
+    a.provider == b.provider
+        && a.format == b.format
+        && a.definition.len() == b.definition.len()
+        && a.definition.iter().all(|(key, value)| {
+            b.definition
+                .get(key)
+                .is_some_and(|other| json_values_equal(value, other))
+        })
+}
+
+/// Compares JSON values regardless of object key order, with numbers compared
+/// by numeric value, so `1` equals `1.0`.
+fn json_values_equal(a: &serde_json::Value, b: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
+        (Value::Array(x), Value::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(l, r)| json_values_equal(l, r))
+        }
+        (Value::Object(x), Value::Object(y)) => {
+            x.len() == y.len()
+                && x.iter().all(|(key, value)| {
+                    y.get(key)
+                        .is_some_and(|other| json_values_equal(value, other))
+                })
+        }
+        _ => a == b,
+    }
+}
+
+/// Copies the host-reported fields of `from` onto `to`.
+fn copy_model_source_host_fields(to: &mut ModelSourceRegistration, from: &ModelSourceRegistration) {
+    to.state = from.state.clone();
+    to.credential_nonce = from.credential_nonce.clone();
+    to.credential_resource = from.credential_resource.clone();
+    to.credential_origins = from.credential_origins.clone();
+    to.credential_id = from.credential_id.clone();
+}
+
+/// Clears the host-reported fields of `registration`.
+fn clear_model_source_host_fields(registration: &mut ModelSourceRegistration) {
+    registration.state = None;
+    registration.credential_nonce = None;
+    registration.credential_resource = None;
+    registration.credential_origins = None;
+    registration.credential_id = None;
 }
 
 // ─── Session Reducer ──────────────────────────────────────────────────

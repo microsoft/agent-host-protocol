@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceRegistrationSet appends a registration with a new id",
+  "description": "root/modelSourceRegistrationSet appends a registration with a new id after the existing ones",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -12,10 +12,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       }
     ]
   },
@@ -30,11 +39,18 @@
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
           "models": [
-            "model-b"
-          ]
-        },
-        "clientId": "client-1"
-      }
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
+        }
+      },
+      "clientId": "client-2"
     }
   ],
   "expected": {
@@ -48,10 +64,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       },
       {
         "id": "model-source-b",
@@ -61,10 +86,19 @@
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
           "models": [
-            "model-b"
-          ]
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-2"
+        ]
       }
     ]
   }

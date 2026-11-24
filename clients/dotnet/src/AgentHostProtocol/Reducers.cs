@@ -684,15 +684,45 @@ public static class Reducers
                 {
                     List<ModelSourceRegistration> list = state.ModelSourceRegistrations ??= new List<ModelSourceRegistration>();
                     int index = list.FindIndex(r => r.Id == a.Registration.Id);
+                    ModelSourceRegistration? existing = index >= 0 && SameModelSourceRouting(list[index], a.Registration) ? list[index] : null;
+                    var contributors = new List<string>(existing?.ContributingClientIds ?? new List<string>());
+                    if (a.ClientId is not null && !contributors.Contains(a.ClientId))
+                    {
+                        contributors.Add(a.ClientId);
+                    }
+
+                    ModelSourceRegistration merged = a.Registration with
+                    {
+                        ContributingClientIds = contributors.Count > 0 ? contributors : null,
+                        State = existing?.State,
+                        CredentialNonce = existing?.CredentialNonce,
+                        CredentialResource = existing?.CredentialResource,
+                        CredentialOrigins = existing?.CredentialOrigins,
+                        CredentialId = existing?.CredentialId,
+                    };
                     if (index < 0)
                     {
-                        list.Add(a.Registration);
+                        list.Add(merged);
                     }
                     else
                     {
-                        list[index] = a.Registration;
+                        list[index] = merged;
                     }
 
+                    return ReduceOutcome.Applied;
+                }
+            case RootModelSourceContributorRemovedAction a:
+                {
+                    int index = state.ModelSourceRegistrations?.FindIndex(r => r.Id == a.Id) ?? -1;
+                    List<string>? contributors = index < 0 ? null : state.ModelSourceRegistrations![index].ContributingClientIds;
+                    if (contributors is null || !contributors.Contains(a.ClientId))
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    List<string> remaining = contributors.FindAll(id => id != a.ClientId);
+                    List<ModelSourceRegistration> list = state.ModelSourceRegistrations!;
+                    list[index] = list[index] with { ContributingClientIds = remaining.Count > 0 ? remaining : null };
                     return ReduceOutcome.Applied;
                 }
             case RootModelSourceRegistrationRemovedAction a:
@@ -715,12 +745,90 @@ public static class Reducers
                     }
 
                     List<ModelSourceRegistration> list = state.ModelSourceRegistrations!;
-                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce, CredentialResource = a.CredentialResource };
+                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce, CredentialResource = a.CredentialResource, CredentialOrigins = a.CredentialOrigins, CredentialId = a.CredentialId };
                     return ReduceOutcome.Applied;
                 }
         }
 
         return ReduceOutcome.OutOfScope;
+    }
+
+    // Whether two registrations have the same provider, format, and definition,
+    // comparing definitions as JSON values.
+    private static bool SameModelSourceRouting(ModelSourceRegistration a, ModelSourceRegistration b)
+    {
+        if (a.Provider != b.Provider || a.Format != b.Format || a.Definition.Count != b.Definition.Count)
+        {
+            return false;
+        }
+
+        foreach (KeyValuePair<string, JsonElement> entry in a.Definition)
+        {
+            if (!b.Definition.TryGetValue(entry.Key, out JsonElement other) || !JsonValuesEqual(entry.Value, other))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Compares JSON values regardless of object key order, with numbers compared
+    // by numeric value, so `1` equals `1.0`.
+    private static bool JsonValuesEqual(JsonElement a, JsonElement b)
+    {
+        if (a.ValueKind != b.ValueKind)
+        {
+            return false;
+        }
+
+        switch (a.ValueKind)
+        {
+            case JsonValueKind.Object:
+                {
+                    int count = 0;
+                    foreach (JsonProperty property in a.EnumerateObject())
+                    {
+                        count++;
+                        if (!b.TryGetProperty(property.Name, out JsonElement other) || !JsonValuesEqual(property.Value, other))
+                        {
+                            return false;
+                        }
+                    }
+
+                    foreach (JsonProperty _ in b.EnumerateObject())
+                    {
+                        count--;
+                    }
+
+                    return count == 0;
+                }
+            case JsonValueKind.Array:
+                {
+                    if (a.GetArrayLength() != b.GetArrayLength())
+                    {
+                        return false;
+                    }
+
+                    using JsonElement.ArrayEnumerator left = a.EnumerateArray();
+                    using JsonElement.ArrayEnumerator right = b.EnumerateArray();
+                    while (left.MoveNext() && right.MoveNext())
+                    {
+                        if (!JsonValuesEqual(left.Current, right.Current))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            case JsonValueKind.Number:
+                return a.GetDouble() == b.GetDouble();
+            case JsonValueKind.String:
+                return a.GetString() == b.GetString();
+            default:
+                return true;
+        }
     }
 
     // Shared config merge for the root, session, and chat `configChanged` actions:
@@ -2664,6 +2772,7 @@ public static class Reducers
     {
         "root/configChanged",
         "root/modelSourceRegistrationSet",
+        "root/modelSourceContributorRemoved",
         "root/modelSourceRegistrationRemoved",
         // Chat-channel actions (post-#213)
         "chat/turnStarted",

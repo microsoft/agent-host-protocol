@@ -939,13 +939,15 @@ public enum ModelSourceStatus: Codable, Sendable, Equatable {
     }
 }
 
-/// How long a registered model source lasts once its contributing client leaves.
+/// How long a registered model source lasts once its last contributing client
+/// leaves. When the last contributor withdraws instead, the source goes away
+/// whatever its retention.
 ///
 /// Stability: 1.0 - Early development.
 public enum ModelSourceRetentionPolicy: Codable, Sendable, Equatable {
-    /// Removed when the contributing client leaves, once running turns finish.
+    /// Removed when the last contributing client leaves, once running turns finish.
     case contributingClient
-    /// Kept until a client removes it or host policy expires it.
+    /// Kept until it's removed, its last contributor withdraws, or host policy expires it.
     case host
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
@@ -965,6 +967,83 @@ public enum ModelSourceRetentionPolicy: Codable, Sendable, Equatable {
         switch self {
         case .contributingClient: try container.encode("contributingClient")
         case .host: try container.encode("host")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Why a model source needs a credential. Specific to model sources: the
+/// shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+///
+/// Stability: 1.0 - Early development.
+public enum ModelSourceAuthRequiredReason: Codable, Sendable, Equatable {
+    /// The host holds no credential yet.
+    case required
+    /// The credential's lifetime or lease lapsed. A client may renew it.
+    case expired
+    /// The endpoint refused the credential. Clients don't send a credential with
+    /// the same {@link ModelSourceRegistration.credentialId} again.
+    case rejected
+    /// A client revoked the credential. Clients don't send one again without a user's action.
+    case revoked
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "required": self = .required
+        case "expired": self = .expired
+        case "rejected": self = .rejected
+        case "revoked": self = .revoked
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .required: try container.encode("required")
+        case .expired: try container.encode("expired")
+        case .rejected: try container.encode("rejected")
+        case .revoked: try container.encode("revoked")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Whether clients acting for different principals share a host's model
+/// source registry.
+///
+/// Stability: 1.0 - Early development.
+public enum ModelSourcePrincipalPolicy: Codable, Sendable, Equatable {
+    /// Every connected client may change, supply credentials for, and select
+    /// every registration.
+    case shared
+    /// The host verifies principals, and limits changes, credentials, and
+    /// selection of each registration to clients of the principal that
+    /// registered it. Root state still lists every registration to every
+    /// client.
+    case isolated
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "shared": self = .shared
+        case "isolated": self = .isolated
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .shared: try container.encode("shared")
+        case .isolated: try container.encode("isolated")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -1776,39 +1855,56 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable
 public struct ModelSourceRegistrationCapability: Codable, Sendable, Equatable {
     /// Definition formats the agent reads, most preferred first. Format names
     /// are defined by agent implementations and SHOULD be namespaced, for
-    /// example `example.com/model-source@1`.
+    /// example `example.com/model-source@1`. AHP doesn't define, standardize,
+    /// or name any format.
     public var formats: [String]
+    /// How long, in milliseconds, the host keeps a disconnected client's
+    /// contributions before it treats the client as having left.
+    public var gracePeriod: Int?
+    /// Whether clients acting for different principals share the registry.
+    /// Absent means `shared`.
+    public var principalPolicy: ModelSourcePrincipalPolicy?
     /// Unrecognized wire members retained for full-object edits.
     public var extra: [String: AnyCodable]
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case formats
+        case gracePeriod
+        case principalPolicy
     }
 
     public init(
         formats: [String],
+        gracePeriod: Int? = nil,
+        principalPolicy: ModelSourcePrincipalPolicy? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
         self.formats = formats
+        self.gracePeriod = gracePeriod
+        self.principalPolicy = principalPolicy
         self.extra = extra
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.formats = try container.decode([String].self, forKey: .formats)
+        self.gracePeriod = try container.decodeIfPresent(Int.self, forKey: .gracePeriod)
+        self.principalPolicy = try container.decodeIfPresent(ModelSourcePrincipalPolicy.self, forKey: .principalPolicy)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.formats, forKey: .formats)
+        try container.encodeIfPresent(self.gracePeriod, forKey: .gracePeriod)
+        try container.encodeIfPresent(self.principalPolicy, forKey: .principalPolicy)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
-/// A model source registered on this host by a client, or by the host itself.
-/// Its definition is in a format the agent named by `provider` reads. It never
-/// contains a credential.
+/// A model source registered on this host by one or more clients, or by the
+/// host itself. Its definition is in a format the agent named by `provider`
+/// reads. It never contains a credential.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceRegistration: Codable, Sendable, Equatable {
@@ -1826,16 +1922,19 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     /// {@link ModelSourceRegistrationCapability.formats}.
     public var format: String
     /// How to reach the source: endpoint, wire format, models, and so on, in
-    /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
-    /// a credential.
+    /// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
+    /// define it. MUST NOT contain a credential.
     public var definition: [String: AnyCodable]
-    /// The contributing client: the client that most recently registered or
-    /// changed the source. Absent for a source the host registered itself.
-    public var clientId: String?
-    /// What happens when the contributing client leaves. Absent means `contributingClient`.
+    /// The clients that contribute this registration, in the order they joined.
+    /// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
+    /// and {@link RootModelSourceContributorRemovedAction}. Absent when no
+    /// client contributes it: a source the host registered itself, or a
+    /// `host`-retained one whose contributors have all left.
+    public var contributingClientIds: [String]?
+    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     public var retention: ModelSourceRetentionPolicy?
     /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after a client replaces the
+    /// Absent until the host reports one, and after a `Set` replaces the
     /// registration until the host reports again.
     public var state: ModelSourceState?
     /// Host-issued token that a client echoes in
@@ -1860,6 +1959,17 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     public var credentialResource: ProtectedResourceMetadata?
+    /// Every origin the host sends the credential to, such as
+    /// `https://api.example.com`. Present whenever `credentialResource` is. A
+    /// client checks each one against its own copy of the definition before it
+    /// sends a key. Set with `state`.
+    public var credentialOrigins: [String]?
+    /// The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
+    /// the credential the host most recently accepted. While the state is
+    /// `starting` or `ready`, the host holds it. While it's `authRequired`, the
+    /// `reason` says what happened to it. Absent until the host accepts a
+    /// credential. Set with `state`.
+    public var credentialId: String?
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
@@ -1873,11 +1983,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         case icons
         case format
         case definition
-        case clientId
+        case contributingClientIds
         case retention
         case state
         case credentialNonce
         case credentialResource
+        case credentialOrigins
+        case credentialId
         case meta = "_meta"
     }
 
@@ -1888,11 +2000,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         icons: [Icon]? = nil,
         format: String,
         definition: [String: AnyCodable],
-        clientId: String? = nil,
+        contributingClientIds: [String]? = nil,
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
         credentialNonce: String? = nil,
         credentialResource: ProtectedResourceMetadata? = nil,
+        credentialOrigins: [String]? = nil,
+        credentialId: String? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
@@ -1902,11 +2016,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.icons = icons
         self.format = format
         self.definition = definition
-        self.clientId = clientId
+        self.contributingClientIds = contributingClientIds
         self.retention = retention
         self.state = state
         self.credentialNonce = credentialNonce
         self.credentialResource = credentialResource
+        self.credentialOrigins = credentialOrigins
+        self.credentialId = credentialId
         self.meta = meta
         self.extra = extra
     }
@@ -1919,11 +2035,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
         self.format = try container.decode(String.self, forKey: .format)
         self.definition = try container.decode([String: AnyCodable].self, forKey: .definition)
-        self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
+        self.contributingClientIds = try container.decodeIfPresent([String].self, forKey: .contributingClientIds)
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
         self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
         self.credentialResource = try container.decodeIfPresent(ProtectedResourceMetadata.self, forKey: .credentialResource)
+        self.credentialOrigins = try container.decodeIfPresent([String].self, forKey: .credentialOrigins)
+        self.credentialId = try container.decodeIfPresent(String.self, forKey: .credentialId)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -1936,11 +2054,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         try container.encodeIfPresent(self.icons, forKey: .icons)
         try container.encode(self.format, forKey: .format)
         try container.encode(self.definition, forKey: .definition)
-        try container.encodeIfPresent(self.clientId, forKey: .clientId)
+        try container.encodeIfPresent(self.contributingClientIds, forKey: .contributingClientIds)
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
         try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)
         try container.encodeIfPresent(self.credentialResource, forKey: .credentialResource)
+        try container.encodeIfPresent(self.credentialOrigins, forKey: .credentialOrigins)
+        try container.encodeIfPresent(self.credentialId, forKey: .credentialId)
         try container.encodeIfPresent(self.meta, forKey: .meta)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2022,7 +2142,7 @@ public struct ModelSourceReadyState: Codable, Sendable, Equatable {
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     /// Why a credential is needed.
-    public var reason: AuthRequiredReason
+    public var reason: ModelSourceAuthRequiredReason
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     public var description: String?
@@ -2035,7 +2155,7 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     }
 
     public init(
-        reason: AuthRequiredReason,
+        reason: ModelSourceAuthRequiredReason,
         description: String? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
@@ -2046,7 +2166,7 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.reason = try container.decode(AuthRequiredReason.self, forKey: .reason)
+        self.reason = try container.decode(ModelSourceAuthRequiredReason.self, forKey: .reason)
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2066,7 +2186,7 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     /// Why a credential is needed.
-    public var reason: AuthRequiredReason
+    public var reason: ModelSourceAuthRequiredReason
     /// Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."
     public var description: String?
@@ -2081,7 +2201,7 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     }
 
     public init(
-        reason: AuthRequiredReason,
+        reason: ModelSourceAuthRequiredReason,
         description: String? = nil,
         kind: ModelSourceStatus,
         extra: [String: AnyCodable] = [:]
@@ -2094,7 +2214,7 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.reason = try container.decode(AuthRequiredReason.self, forKey: .reason)
+        self.reason = try container.decode(ModelSourceAuthRequiredReason.self, forKey: .reason)
         self.description = try container.decodeIfPresent(String.self, forKey: .description)
         self.kind = try container.decode(ModelSourceStatus.self, forKey: .kind)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
@@ -2152,7 +2272,9 @@ public struct ModelSourceErrorState: Codable, Sendable, Equatable {
 public struct ModelSourceInfo: Codable, Sendable, Equatable {
     /// Model source identifier, unique within the agent's
     /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSourceRegistration.id}.
+    /// the {@link ModelSourceRegistration.id}. A source is registered when
+    /// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+    /// whose `provider` is the agent.
     public var id: String
     /// Human-readable name
     public var displayName: String
@@ -2206,6 +2328,8 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
     /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
     /// in the agent's {@link AgentInfo.modelSources}. For a model from a
     /// registered model source, this is the {@link ModelSourceRegistration.id}.
+    /// An agent's own sources use it too, so it doesn't by itself mark a
+    /// registered source.
     public var modelSourceId: String?
 
     enum CodingKeys: String, CodingKey {
@@ -7683,7 +7807,13 @@ public struct UsageInfo: Codable, Sendable, Equatable {
 }
 
 public struct ErrorInfo: Codable, Sendable, Equatable {
-    /// Error type identifier
+    /// Error type identifier. Well-known values:
+    ///
+    /// - `modelSourceUnavailable`: a registered model source the turn uses
+    /// can't serve it, for example because its credential is missing,
+    /// expired, rejected, or revoked, or the source was removed. The error
+    /// part is resumable. See
+    /// [Model source credentials](/specification/authentication#model-source-credentials).
     public var errorType: String
     /// Human-readable error message
     public var message: String

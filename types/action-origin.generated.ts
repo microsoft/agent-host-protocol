@@ -8,6 +8,7 @@ import type {
   RootTerminalsChangedAction,
   RootConfigChangedAction,
   RootModelSourceRegistrationSetAction,
+  RootModelSourceContributorRemovedAction,
   RootModelSourceRegistrationRemovedAction,
   RootModelSourceStateChangedAction,
   SessionReadyAction,
@@ -127,6 +128,7 @@ export type RootAction =
   | RootTerminalsChangedAction
   | RootConfigChangedAction
   | RootModelSourceRegistrationSetAction
+  | RootModelSourceContributorRemovedAction
   | RootModelSourceRegistrationRemovedAction
   | RootModelSourceStateChangedAction
 ;
@@ -135,6 +137,7 @@ export type RootAction =
 export type ClientRootAction =
   | RootConfigChangedAction
   | RootModelSourceRegistrationSetAction
+  | RootModelSourceContributorRemovedAction
   | RootModelSourceRegistrationRemovedAction
 ;
 
@@ -477,6 +480,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.RootTerminalsChanged]: false,
   [ActionType.RootConfigChanged]: true,
   [ActionType.RootModelSourceRegistrationSet]: true,
+  [ActionType.RootModelSourceContributorRemoved]: true,
   [ActionType.RootModelSourceRegistrationRemoved]: true,
   [ActionType.RootModelSourceStateChanged]: false,
   [ActionType.SessionReady]: false,

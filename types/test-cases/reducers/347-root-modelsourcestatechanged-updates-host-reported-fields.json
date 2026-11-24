@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceStateChanged sets the matching registration's state, credentialNonce, and credentialResource together, preserving its other fields and the registry order",
+  "description": "root/modelSourceStateChanged sets the matching registration's state, credentialNonce, credentialResource, credentialOrigins, and credentialId together, adding credential fields the registration didn't have, and preserves its other fields and the registry order",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -12,10 +12,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       },
       {
         "id": "model-source-b",
@@ -25,10 +34,19 @@
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
           "models": [
-            "model-b"
-          ]
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1",
+        "contributingClientIds": [
+          "client-1"
+        ],
         "retention": "host",
         "state": {
           "kind": "starting"
@@ -43,13 +61,18 @@
       "id": "model-source-b",
       "state": {
         "kind": "authRequired",
-        "reason": "required"
+        "reason": "rejected",
+        "description": "The endpoint rejected the API key."
       },
       "credentialNonce": "nonce-b-2",
       "credentialResource": {
         "resource": "https://apib.example.com/v1",
         "resource_name": "Source b API key"
-      }
+      },
+      "credentialOrigins": [
+        "https://apib.example.com"
+      ],
+      "credentialId": "key-b-1"
     }
   ],
   "expected": {
@@ -63,10 +86,19 @@
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
           "models": [
-            "model-a"
-          ]
+            {
+              "id": "model-a",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1"
+        "contributingClientIds": [
+          "client-1"
+        ]
       },
       {
         "id": "model-source-b",
@@ -76,20 +108,34 @@
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
           "models": [
-            "model-b"
-          ]
+            {
+              "id": "model-b",
+              "maxContextWindow": 128000
+            }
+          ],
+          "headers": {
+            "x-region": "eu",
+            "x-tier": "pro"
+          }
         },
-        "clientId": "client-1",
+        "contributingClientIds": [
+          "client-1"
+        ],
         "retention": "host",
         "state": {
           "kind": "authRequired",
-          "reason": "required"
+          "reason": "rejected",
+          "description": "The endpoint rejected the API key."
         },
         "credentialNonce": "nonce-b-2",
         "credentialResource": {
           "resource": "https://apib.example.com/v1",
           "resource_name": "Source b API key"
-        }
+        },
+        "credentialOrigins": [
+          "https://apib.example.com"
+        ],
+        "credentialId": "key-b-1"
       }
     ]
   }

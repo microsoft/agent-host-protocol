@@ -452,16 +452,53 @@ const (
 	ModelSourceStatusError ModelSourceStatus = "error"
 )
 
-// How long a registered model source lasts once its contributing client leaves.
+// How long a registered model source lasts once its last contributing client
+// leaves. When the last contributor withdraws instead, the source goes away
+// whatever its retention.
 //
 // Stability: 1.0 - Early development.
 type ModelSourceRetentionPolicy string
 
 const (
-	// Removed when the contributing client leaves, once running turns finish.
+	// Removed when the last contributing client leaves, once running turns finish.
 	ModelSourceRetentionPolicyContributingClient ModelSourceRetentionPolicy = "contributingClient"
-	// Kept until a client removes it or host policy expires it.
+	// Kept until it's removed, its last contributor withdraws, or host policy expires it.
 	ModelSourceRetentionPolicyHost ModelSourceRetentionPolicy = "host"
+)
+
+// Why a model source needs a credential. Specific to model sources: the
+// shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+//
+// Stability: 1.0 - Early development.
+type ModelSourceAuthRequiredReason string
+
+const (
+	// The host holds no credential yet.
+	ModelSourceAuthRequiredReasonRequired ModelSourceAuthRequiredReason = "required"
+	// The credential's lifetime or lease lapsed. A client may renew it.
+	ModelSourceAuthRequiredReasonExpired ModelSourceAuthRequiredReason = "expired"
+	// The endpoint refused the credential. Clients don't send a credential with
+	// the same {@link ModelSourceRegistration.credentialId} again.
+	ModelSourceAuthRequiredReasonRejected ModelSourceAuthRequiredReason = "rejected"
+	// A client revoked the credential. Clients don't send one again without a user's action.
+	ModelSourceAuthRequiredReasonRevoked ModelSourceAuthRequiredReason = "revoked"
+)
+
+// Whether clients acting for different principals share a host's model
+// source registry.
+//
+// Stability: 1.0 - Early development.
+type ModelSourcePrincipalPolicy string
+
+const (
+	// Every connected client may change, supply credentials for, and select
+	// every registration.
+	ModelSourcePrincipalPolicyShared ModelSourcePrincipalPolicy = "shared"
+	// The host verifies principals, and limits changes, credentials, and
+	// selection of each registration to clients of the principal that
+	// registered it. Root state still lists every registration to every
+	// client.
+	ModelSourcePrincipalPolicyIsolated ModelSourcePrincipalPolicy = "isolated"
 )
 
 // Computation lifecycle of a {@link ChangesetState}.
@@ -955,25 +992,32 @@ type MultipleWorkingDirectoriesCapability struct {
 type ModelSourceRegistrationCapability struct {
 	// Definition formats the agent reads, most preferred first. Format names
 	// are defined by agent implementations and SHOULD be namespaced, for
-	// example `example.com/model-source@1`.
+	// example `example.com/model-source@1`. AHP doesn't define, standardize,
+	// or name any format.
 	Formats []string `json:"formats"`
+	// How long, in milliseconds, the host keeps a disconnected client's
+	// contributions before it treats the client as having left.
+	GracePeriod *int64 `json:"gracePeriod,omitempty"`
+	// Whether clients acting for different principals share the registry.
+	// Absent means `shared`.
+	PrincipalPolicy *ModelSourcePrincipalPolicy `json:"principalPolicy,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
 	Extra map[string]json.RawMessage `json:"-"`
 }
 
 func (v *ModelSourceRegistrationCapability) UnmarshalJSON(data []byte) error {
 	type wire ModelSourceRegistrationCapability
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "formats")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "formats", "gracePeriod", "principalPolicy")
 }
 
 func (v ModelSourceRegistrationCapability) MarshalJSON() ([]byte, error) {
 	type wire ModelSourceRegistrationCapability
-	return marshalWithExtra(wire(v), v.Extra, "formats")
+	return marshalWithExtra(wire(v), v.Extra, "formats", "gracePeriod", "principalPolicy")
 }
 
-// A model source registered on this host by a client, or by the host itself.
-// Its definition is in a format the agent named by `provider` reads. It never
-// contains a credential.
+// A model source registered on this host by one or more clients, or by the
+// host itself. Its definition is in a format the agent named by `provider`
+// reads. It never contains a credential.
 //
 // Stability: 1.0 - Early development.
 type ModelSourceRegistration struct {
@@ -991,16 +1035,19 @@ type ModelSourceRegistration struct {
 	// {@link ModelSourceRegistrationCapability.formats}.
 	Format string `json:"format"`
 	// How to reach the source: endpoint, wire format, models, and so on, in
-	// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
-	// a credential.
+	// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
+	// define it. MUST NOT contain a credential.
 	Definition map[string]json.RawMessage `json:"definition"`
-	// The contributing client: the client that most recently registered or
-	// changed the source. Absent for a source the host registered itself.
-	ClientId *string `json:"clientId,omitempty"`
-	// What happens when the contributing client leaves. Absent means `contributingClient`.
+	// The clients that contribute this registration, in the order they joined.
+	// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
+	// and {@link RootModelSourceContributorRemovedAction}. Absent when no
+	// client contributes it: a source the host registered itself, or a
+	// `host`-retained one whose contributors have all left.
+	ContributingClientIds []string `json:"contributingClientIds,omitempty"`
+	// What happens when the last contributing client leaves. Absent means `contributingClient`.
 	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
 	// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-	// Absent until the host reports one, and after a client replaces the
+	// Absent until the host reports one, and after a `Set` replaces the
 	// registration until the host reports again.
 	State *ModelSourceState `json:"state,omitempty"`
 	// Host-issued token that a client echoes in
@@ -1025,6 +1072,17 @@ type ModelSourceRegistration struct {
 	// advertises `authorization_servers` and `scopes_supported`. A source that
 	// takes a user-supplied secret omits them.
 	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
+	// Every origin the host sends the credential to, such as
+	// `https://api.example.com`. Present whenever `credentialResource` is. A
+	// client checks each one against its own copy of the definition before it
+	// sends a key. Set with `state`.
+	CredentialOrigins []URI `json:"credentialOrigins,omitempty"`
+	// The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
+	// the credential the host most recently accepted. While the state is
+	// `starting` or `ready`, the host holds it. While it's `authRequired`, the
+	// `reason` says what happened to it. Absent until the host accepts a
+	// credential. Set with `state`.
+	CredentialId *string `json:"credentialId,omitempty"`
 	// Additional implementation-defined metadata for this registration.
 	// MUST NOT contain a credential.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1034,12 +1092,12 @@ type ModelSourceRegistration struct {
 
 func (v *ModelSourceRegistration) UnmarshalJSON(data []byte) error {
 	type wire ModelSourceRegistration
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "contributingClientIds", "retention", "state", "credentialNonce", "credentialResource", "credentialOrigins", "credentialId", "_meta")
 }
 
 func (v ModelSourceRegistration) MarshalJSON() ([]byte, error) {
 	type wire ModelSourceRegistration
-	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
+	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "contributingClientIds", "retention", "state", "credentialNonce", "credentialResource", "credentialOrigins", "credentialId", "_meta")
 }
 
 // The agent is reading and validating the definition, or listing the
@@ -1090,7 +1148,7 @@ func (v ModelSourceReadyState) MarshalJSON() ([]byte, error) {
 // Stability: 1.0 - Early development.
 type ModelSourceAuthRequirement struct {
 	// Why a credential is needed.
-	Reason AuthRequiredReason `json:"reason"`
+	Reason ModelSourceAuthRequiredReason `json:"reason"`
 	// Human-readable hint the host writes, for example "The endpoint rejected
 	// the API key."
 	Description *string `json:"description,omitempty"`
@@ -1115,7 +1173,7 @@ func (v ModelSourceAuthRequirement) MarshalJSON() ([]byte, error) {
 // Stability: 1.0 - Early development.
 type ModelSourceAuthRequiredState struct {
 	// Why a credential is needed.
-	Reason AuthRequiredReason `json:"reason"`
+	Reason ModelSourceAuthRequiredReason `json:"reason"`
 	// Human-readable hint the host writes, for example "The endpoint rejected
 	// the API key."
 	Description *string           `json:"description,omitempty"`
@@ -1160,7 +1218,9 @@ func (v ModelSourceErrorState) MarshalJSON() ([]byte, error) {
 type ModelSourceInfo struct {
 	// Model source identifier, unique within the agent's
 	// {@link AgentInfo.modelSources}. For a registered model source, this is
-	// the {@link ModelSourceRegistration.id}.
+	// the {@link ModelSourceRegistration.id}. A source is registered when
+	// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+	// whose `provider` is the agent.
 	Id string `json:"id"`
 	// Human-readable name
 	DisplayName string `json:"displayName"`
@@ -1206,6 +1266,8 @@ type SessionModelInfo struct {
 	// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
 	// in the agent's {@link AgentInfo.modelSources}. For a model from a
 	// registered model source, this is the {@link ModelSourceRegistration.id}.
+	// An agent's own sources use it too, so it doesn't by itself mark a
+	// registered source.
 	ModelSourceId *string `json:"modelSourceId,omitempty"`
 }
 
@@ -4538,7 +4600,13 @@ type UsageInfo struct {
 }
 
 type ErrorInfo struct {
-	// Error type identifier
+	// Error type identifier. Well-known values:
+	//
+	// - `modelSourceUnavailable`: a registered model source the turn uses
+	//   can't serve it, for example because its credential is missing,
+	//   expired, rejected, or revoked, or the source was removed. The error
+	//   part is resumable. See
+	//   [Model source credentials](/specification/authentication#model-source-credentials).
 	ErrorType string `json:"errorType"`
 	// Human-readable error message
 	Message string `json:"message"`

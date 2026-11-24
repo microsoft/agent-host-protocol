@@ -104,7 +104,10 @@ public struct AHPRootReducer: Reducer {
             state.config = config
 
         case .rootModelSourceRegistrationSet(let a):
-            applyModelSourceRegistrationSet(&state, a.registration)
+            applyModelSourceRegistrationSet(&state, a.registration, clientId: a.clientId)
+
+        case .rootModelSourceContributorRemoved(let a):
+            _ = applyModelSourceContributorRemoved(&state, id: a.id, clientId: a.clientId)
 
         case .rootModelSourceRegistrationRemoved(let a):
             _ = applyModelSourceRegistrationRemoved(&state, id: a.id)
@@ -118,15 +121,50 @@ public struct AHPRootReducer: Reducer {
     }
 }
 
-/// Adds `registration` to the registry, or replaces the entry with the same `id`.
-func applyModelSourceRegistrationSet(_ state: inout RootState, _ registration: ModelSourceRegistration) {
+/// Contributes `registration` for `clientId`: adds it, joins an entry with the
+/// same `id` and routing (keeping its host-reported fields), or replaces an
+/// entry whose routing changed.
+func applyModelSourceRegistrationSet(_ state: inout RootState, _ registration: ModelSourceRegistration, clientId: String?) {
     var list = state.modelSourceRegistrations ?? []
-    if let idx = list.firstIndex(where: { $0.id == registration.id }) {
-        list[idx] = registration
+    let idx = list.firstIndex(where: { $0.id == registration.id })
+    let existing = idx.map { list[$0] }.flatMap { sameModelSourceRouting($0, registration) ? $0 : nil }
+    var merged = registration
+    var contributors = existing?.contributingClientIds ?? []
+    if let clientId, !contributors.contains(clientId) {
+        contributors.append(clientId)
+    }
+    merged.contributingClientIds = contributors.isEmpty ? nil : contributors
+    merged.state = existing?.state
+    merged.credentialNonce = existing?.credentialNonce
+    merged.credentialResource = existing?.credentialResource
+    merged.credentialOrigins = existing?.credentialOrigins
+    merged.credentialId = existing?.credentialId
+    if let idx {
+        list[idx] = merged
     } else {
-        list.append(registration)
+        list.append(merged)
     }
     state.modelSourceRegistrations = list
+}
+
+/// Removes `clientId` from the contributors of the registration with `id`.
+/// Returns `false` when no registration has `id`, or `clientId` doesn't
+/// contribute it.
+func applyModelSourceContributorRemoved(_ state: inout RootState, id: String, clientId: String) -> Bool {
+    guard var list = state.modelSourceRegistrations,
+          let idx = list.firstIndex(where: { $0.id == id }),
+          let contributors = list[idx].contributingClientIds,
+          contributors.contains(clientId) else { return false }
+    let remaining = contributors.filter { $0 != clientId }
+    list[idx].contributingClientIds = remaining.isEmpty ? nil : remaining
+    state.modelSourceRegistrations = list
+    return true
+}
+
+/// Whether two registrations have the same `provider`, `format`, and
+/// `definition`. `AnyCodable` dictionaries compare regardless of key order.
+private func sameModelSourceRouting(_ a: ModelSourceRegistration, _ b: ModelSourceRegistration) -> Bool {
+    a.provider == b.provider && a.format == b.format && a.definition == b.definition
 }
 
 /// Removes the registration with `id`. Returns `false` when none matches.
@@ -138,14 +176,16 @@ func applyModelSourceRegistrationRemoved(_ state: inout RootState, id: String) -
     return true
 }
 
-/// Updates the status, credential nonce, and credential resource of the
-/// registration with `action.id`. Returns `false` when none matches.
+/// Updates the host-reported fields of the registration with `action.id`.
+/// Returns `false` when none matches.
 func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
     guard var list = state.modelSourceRegistrations,
           let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
     list[idx].state = action.state
     list[idx].credentialNonce = action.credentialNonce
     list[idx].credentialResource = action.credentialResource
+    list[idx].credentialOrigins = action.credentialOrigins
+    list[idx].credentialId = action.credentialId
     state.modelSourceRegistrations = list
     return true
 }

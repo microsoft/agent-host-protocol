@@ -843,7 +843,7 @@
       "properties": {
         "errorType": {
           "type": "string",
-          "description": "Error type identifier"
+          "description": "Error type identifier. Well-known values:\n\n- `modelSourceUnavailable`: a registered model source the turn uses\n  can't serve it, for example because its credential is missing,\n  expired, rejected, or revoked, or the source was removed. The error\n  part is resumable. See\n  [Model source credentials](/specification/authentication#model-source-credentials)."
         },
         "message": {
           "type": "string",
@@ -1076,7 +1076,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model source identifier, unique within the agent's\n{@link AgentInfo.modelSources}. For a registered model source, this is\nthe {@link ModelSourceRegistration.id}."
+          "description": "Model source identifier, unique within the agent's\n{@link AgentInfo.modelSources}. For a registered model source, this is\nthe {@link ModelSourceRegistration.id}. A source is registered when\n{@link RootState.modelSourceRegistrations} has an entry with this `id`\nwhose `provider` is the agent."
         },
         "displayName": {
           "type": "string",
@@ -1138,7 +1138,7 @@
         },
         "modelSourceId": {
           "type": "string",
-          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}. For a model from a\nregistered model source, this is the {@link ModelSourceRegistration.id}."
+          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}. For a model from a\nregistered model source, this is the {@link ModelSourceRegistration.id}.\nAn agent's own sources use it too, so it doesn't by itself mark a\nregistered source."
         }
       },
       "required": [
@@ -1176,7 +1176,16 @@
           "items": {
             "type": "string"
           },
-          "description": "Definition formats the agent reads, most preferred first. Format names\nare defined by agent implementations and SHOULD be namespaced, for\nexample `example.com/model-source@1`."
+          "description": "Definition formats the agent reads, most preferred first. Format names\nare defined by agent implementations and SHOULD be namespaced, for\nexample `example.com/model-source@1`. AHP doesn't define, standardize,\nor name any format."
+        },
+        "gracePeriod": {
+          "type": "integer",
+          "description": "How long, in milliseconds, the host keeps a disconnected client's\ncontributions before it treats the client as having left.",
+          "minimum": 0
+        },
+        "principalPolicy": {
+          "$ref": "#/$defs/ModelSourcePrincipalPolicy",
+          "description": "Whether clients acting for different principals share the registry.\nAbsent means `shared`."
         }
       },
       "required": [
@@ -1185,7 +1194,7 @@
     },
     "ModelSourceRegistration": {
       "type": "object",
-      "description": "A model source registered on this host by a client, or by the host itself.\nIts definition is in a format the agent named by `provider` reads. It never\ncontains a credential.\n\nStability: 1.0 - Early development.",
+      "description": "A model source registered on this host by one or more clients, or by the\nhost itself. Its definition is in a format the agent named by `provider`\nreads. It never contains a credential.\n\nStability: 1.0 - Early development.",
       "properties": {
         "id": {
           "type": "string",
@@ -1213,19 +1222,22 @@
         "definition": {
           "type": "object",
           "additionalProperties": {},
-          "description": "How to reach the source: endpoint, wire format, models, and so on, in\n`format`. Its shape belongs to the agent that reads it. MUST NOT contain\na credential."
+          "description": "How to reach the source: endpoint, wire format, models, and so on, in\n`format`. Its shape belongs to the agent that reads it, and AHP doesn't\ndefine it. MUST NOT contain a credential."
         },
-        "clientId": {
-          "type": "string",
-          "description": "The contributing client: the client that most recently registered or\nchanged the source. Absent for a source the host registered itself."
+        "contributingClientIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The clients that contribute this registration, in the order they joined.\nThe reducer maintains it from {@link RootModelSourceRegistrationSetAction}\nand {@link RootModelSourceContributorRemovedAction}. Absent when no\nclient contributes it: a source the host registered itself, or a\n`host`-retained one whose contributors have all left."
         },
         "retention": {
           "$ref": "#/$defs/ModelSourceRetentionPolicy",
-          "description": "What happens when the contributing client leaves. Absent means `contributingClient`."
+          "description": "What happens when the last contributing client leaves. Absent means `contributingClient`."
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
-          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after a client replaces the\nregistration until the host reports again."
+          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after a `Set` replaces the\nregistration until the host reports again."
         },
         "credentialNonce": {
           "type": "string",
@@ -1234,6 +1246,17 @@
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
           "description": "RFC 9728 metadata for the endpoint the credential is for. Present\nwhenever the source takes a credential, in every state, so any client\ncan deliver, rotate, or revoke one. Absent for a source that needs no\ncredential. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`, and nothing fetches it.\n`credentialResource.resource_name` labels the prompt (for example\n\"OpenRouter API key\"). A source that accepts OAuth access tokens\nadvertises `authorization_servers` and `scopes_supported`. A source that\ntakes a user-supplied secret omits them."
+        },
+        "credentialOrigins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "Every origin the host sends the credential to, such as\n`https://api.example.com`. Present whenever `credentialResource` is. A\nclient checks each one against its own copy of the definition before it\nsends a key. Set with `state`."
+        },
+        "credentialId": {
+          "type": "string",
+          "description": "The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of\nthe credential the host most recently accepted. While the state is\n`starting` or `ready`, the host holds it. While it's `authRequired`, the\n`reason` says what happened to it. Absent until the host accepts a\ncredential. Set with `state`."
         },
         "_meta": {
           "type": "object",
@@ -1278,7 +1301,7 @@
       "description": "Why a model source needs a credential before it can be ready. Deliberately\ncarries no credential. The endpoint the credential is for is the\nregistration's {@link ModelSourceRegistration.credentialResource}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
-          "$ref": "#/$defs/AuthRequiredReason",
+          "$ref": "#/$defs/ModelSourceAuthRequiredReason",
           "description": "Why a credential is needed."
         },
         "description": {
@@ -1295,7 +1318,7 @@
       "description": "The source needs a credential before it can be used. A client answers with\n`authenticate`, the registration's `credentialResource.resource`, and a\n{@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
-          "$ref": "#/$defs/AuthRequiredReason",
+          "$ref": "#/$defs/ModelSourceAuthRequiredReason",
           "description": "Why a credential is needed."
         },
         "description": {
@@ -6796,13 +6819,21 @@
       "type": "string",
       "description": "Policy configuration state for a model."
     },
+    "ModelSourcePrincipalPolicy": {
+      "enum": [
+        "shared",
+        "isolated"
+      ],
+      "type": "string",
+      "description": "Whether clients acting for different principals share a host's model\nsource registry."
+    },
     "ModelSourceRetentionPolicy": {
       "enum": [
         "contributingClient",
         "host"
       ],
       "type": "string",
-      "description": "How long a registered model source lasts once its contributing client leaves."
+      "description": "How long a registered model source lasts once its last contributing client\nleaves. When the last contributor withdraws instead, the source goes away\nwhatever its retention."
     },
     "ModelSourceState": {
       "oneOf": [
@@ -6820,6 +6851,16 @@
         }
       ],
       "description": "Lifecycle state of a {@link ModelSourceRegistration}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
+    },
+    "ModelSourceAuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired",
+        "rejected",
+        "revoked"
+      ],
+      "type": "string",
+      "description": "Why a model source needs a credential. Specific to model sources: the\nshared `AuthRequiredReason` folds rejection and revocation into `expired`."
     },
     "SessionLifecycle": {
       "enum": [

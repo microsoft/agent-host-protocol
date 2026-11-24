@@ -117,6 +117,7 @@ value class ActionType(val rawValue: String) {
         val ROOT_TERMINALS_CHANGED: ActionType = ActionType("root/terminalsChanged")
         val ROOT_CONFIG_CHANGED: ActionType = ActionType("root/configChanged")
         val ROOT_MODEL_SOURCE_REGISTRATION_SET: ActionType = ActionType("root/modelSourceRegistrationSet")
+        val ROOT_MODEL_SOURCE_CONTRIBUTOR_REMOVED: ActionType = ActionType("root/modelSourceContributorRemoved")
         val ROOT_MODEL_SOURCE_REGISTRATION_REMOVED: ActionType = ActionType("root/modelSourceRegistrationRemoved")
         val ROOT_MODEL_SOURCE_STATE_CHANGED: ActionType = ActionType("root/modelSourceStateChanged")
         val TERMINAL_DATA: ActionType = ActionType("terminal/data")
@@ -1486,12 +1487,26 @@ data class RootConfigChangedAction(
 )
 
 /**
- * Adds a model source registration, or replaces the one with the same `id`.
+ * Contributes a model source registration for `clientId`. A registration's
+ * routing is its `provider`, `format`, and `definition`, with definitions
+ * compared as JSON values: object key order is ignored, and numbers compare
+ * by numeric value, so `1` equals `1.0`.
  *
- * A client registers a source by dispatching this with its own `clientId`, and
- * with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
- * registration clears those host-reported fields until the host reports again
- * with {@link RootModelSourceStateChangedAction}.
+ * - **Add.** When no registration has the `id`, appends it, with
+ * `contributingClientIds` set to `[clientId]`, or absent without a
+ * `clientId`.
+ * - **Join.** When one has, and its routing is unchanged, keeps its
+ * host-reported fields (`state`, `credentialNonce`, `credentialResource`,
+ * `credentialOrigins`, and `credentialId`), adds `clientId` to
+ * `contributingClientIds` if it isn't there, and takes the other fields
+ * from the action.
+ * - **Replace.** When the routing changed, replaces the registration, with
+ * `contributingClientIds` set to `[clientId]`, or absent without a
+ * `clientId`. Its host-reported fields are absent until the host reports
+ * again with {@link RootModelSourceStateChangedAction}.
+ *
+ * A client dispatches this with its own `clientId`, and without
+ * `contributingClientIds` or any host-reported field.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1499,14 +1514,43 @@ data class RootConfigChangedAction(
 data class RootModelSourceRegistrationSetAction(
     val type: ActionType,
     /**
-     * The registration to add or replace, matched by `id`.
+     * The registration to contribute, matched by `id`.
      */
-    val registration: ModelSourceRegistration
+    val registration: ModelSourceRegistration,
+    /**
+     * The contributing client. Absent when the host registers the source
+     * itself.
+     */
+    val clientId: String? = null
 )
 
 /**
- * Removes the model source registration with the given `id`. A no-op when
- * none matches.
+ * Withdraws one client's contribution to a model source registration:
+ * removes `clientId` from `contributingClientIds`, leaving the field absent
+ * when no contributor remains. A no-op when no registration has `id`, or
+ * `clientId` doesn't contribute it. It never removes the registration.
+ *
+ * A client dispatches this with its own `clientId`. The host dispatches it
+ * when a contributing client leaves.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class RootModelSourceContributorRemovedAction(
+    val type: ActionType,
+    /**
+     * The registration's `id`.
+     */
+    val id: String,
+    /**
+     * The contributing client to remove.
+     */
+    val clientId: String
+)
+
+/**
+ * Removes the model source registration with the given `id` for every
+ * contributor. A no-op when none matches.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1520,9 +1564,10 @@ data class RootModelSourceRegistrationRemovedAction(
 )
 
 /**
- * Updates a model source registration's status, credential nonce, and
- * credential resource together. A no-op when no registration has `id`. Other
- * fields of the registration are preserved. Only the host dispatches it.
+ * Updates a model source registration's host-reported fields together:
+ * `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+ * `credentialId`. A no-op when no registration has `id`. Other fields of the
+ * registration are preserved. Only the host dispatches it.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1545,7 +1590,15 @@ data class RootModelSourceStateChangedAction(
      * Replaces the registration's `credentialResource`. Absent clears it, for a
      * source that needs no credential.
      */
-    val credentialResource: ProtectedResourceMetadata? = null
+    val credentialResource: ProtectedResourceMetadata? = null,
+    /**
+     * Replaces the registration's `credentialOrigins`. Absent clears it.
+     */
+    val credentialOrigins: List<String>? = null,
+    /**
+     * Replaces the registration's `credentialId`. Absent clears it.
+     */
+    val credentialId: String? = null
 )
 
 @Serializable
@@ -1920,6 +1973,7 @@ sealed interface StateAction
 @JvmInline value class StateActionRootTerminalsChanged(val value: RootTerminalsChangedAction) : StateAction
 @JvmInline value class StateActionRootConfigChanged(val value: RootConfigChangedAction) : StateAction
 @JvmInline value class StateActionRootModelSourceRegistrationSet(val value: RootModelSourceRegistrationSetAction) : StateAction
+@JvmInline value class StateActionRootModelSourceContributorRemoved(val value: RootModelSourceContributorRemovedAction) : StateAction
 @JvmInline value class StateActionRootModelSourceRegistrationRemoved(val value: RootModelSourceRegistrationRemovedAction) : StateAction
 @JvmInline value class StateActionRootModelSourceStateChanged(val value: RootModelSourceStateChangedAction) : StateAction
 @JvmInline value class StateActionTerminalData(val value: TerminalDataAction) : StateAction
@@ -2046,6 +2100,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "root/terminalsChanged" -> StateActionRootTerminalsChanged(input.json.decodeFromJsonElement(RootTerminalsChangedAction.serializer(), element))
             "root/configChanged" -> StateActionRootConfigChanged(input.json.decodeFromJsonElement(RootConfigChangedAction.serializer(), element))
             "root/modelSourceRegistrationSet" -> StateActionRootModelSourceRegistrationSet(input.json.decodeFromJsonElement(RootModelSourceRegistrationSetAction.serializer(), element))
+            "root/modelSourceContributorRemoved" -> StateActionRootModelSourceContributorRemoved(input.json.decodeFromJsonElement(RootModelSourceContributorRemovedAction.serializer(), element))
             "root/modelSourceRegistrationRemoved" -> StateActionRootModelSourceRegistrationRemoved(input.json.decodeFromJsonElement(RootModelSourceRegistrationRemovedAction.serializer(), element))
             "root/modelSourceStateChanged" -> StateActionRootModelSourceStateChanged(input.json.decodeFromJsonElement(RootModelSourceStateChangedAction.serializer(), element))
             "terminal/data" -> StateActionTerminalData(input.json.decodeFromJsonElement(TerminalDataAction.serializer(), element))
@@ -2165,6 +2220,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionRootTerminalsChanged -> output.json.encodeToJsonElement(RootTerminalsChangedAction.serializer(), value.value)
             is StateActionRootConfigChanged -> output.json.encodeToJsonElement(RootConfigChangedAction.serializer(), value.value)
             is StateActionRootModelSourceRegistrationSet -> output.json.encodeToJsonElement(RootModelSourceRegistrationSetAction.serializer(), value.value)
+            is StateActionRootModelSourceContributorRemoved -> output.json.encodeToJsonElement(RootModelSourceContributorRemovedAction.serializer(), value.value)
             is StateActionRootModelSourceRegistrationRemoved -> output.json.encodeToJsonElement(RootModelSourceRegistrationRemovedAction.serializer(), value.value)
             is StateActionRootModelSourceStateChanged -> output.json.encodeToJsonElement(RootModelSourceStateChangedAction.serializer(), value.value)
             is StateActionTerminalData -> output.json.encodeToJsonElement(TerminalDataAction.serializer(), value.value)

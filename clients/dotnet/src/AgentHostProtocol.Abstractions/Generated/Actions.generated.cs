@@ -201,6 +201,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootModelSourceRegistrationSet = new ActionType("root/modelSourceRegistrationSet");
 
+    public static readonly ActionType RootModelSourceContributorRemoved = new ActionType("root/modelSourceContributorRemoved");
+
     public static readonly ActionType RootModelSourceRegistrationRemoved = new ActionType("root/modelSourceRegistrationRemoved");
 
     public static readonly ActionType RootModelSourceStateChanged = new ActionType("root/modelSourceStateChanged");
@@ -346,24 +348,63 @@ public sealed record RootConfigChangedAction
     public bool? Replace { get; init; }
 }
 
-/// <summary>Adds a model source registration, or replaces the one with the same `id`.
+/// <summary>Contributes a model source registration for `clientId`. A registration's
+/// routing is its `provider`, `format`, and `definition`, with definitions
+/// compared as JSON values: object key order is ignored, and numbers compare
+/// by numeric value, so `1` equals `1.0`.
 ///
-/// A client registers a source by dispatching this with its own `clientId`, and
-/// with no `state`, `credentialNonce`, or `credentialResource`. Replacing a
-/// registration clears those host-reported fields until the host reports again
-/// with {@link RootModelSourceStateChangedAction}.
+/// - **Add.** When no registration has the `id`, appends it, with
+///   `contributingClientIds` set to `[clientId]`, or absent without a
+///   `clientId`.
+/// - **Join.** When one has, and its routing is unchanged, keeps its
+///   host-reported fields (`state`, `credentialNonce`, `credentialResource`,
+///   `credentialOrigins`, and `credentialId`), adds `clientId` to
+///   `contributingClientIds` if it isn't there, and takes the other fields
+///   from the action.
+/// - **Replace.** When the routing changed, replaces the registration, with
+///   `contributingClientIds` set to `[clientId]`, or absent without a
+///   `clientId`. Its host-reported fields are absent until the host reports
+///   again with {@link RootModelSourceStateChangedAction}.
+///
+/// A client dispatches this with its own `clientId`, and without
+/// `contributingClientIds` or any host-reported field.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceRegistrationSetAction
 {
     public ActionType Type { get; init; } = ActionType.RootModelSourceRegistrationSet;
 
-    /// <summary>The registration to add or replace, matched by `id`.</summary>
+    /// <summary>The registration to contribute, matched by `id`.</summary>
     public required ModelSourceRegistration Registration { get; init; }
+
+    /// <summary>The contributing client. Absent when the host registers the source
+    /// itself.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClientId { get; init; }
 }
 
-/// <summary>Removes the model source registration with the given `id`. A no-op when
-/// none matches.
+/// <summary>Withdraws one client's contribution to a model source registration:
+/// removes `clientId` from `contributingClientIds`, leaving the field absent
+/// when no contributor remains. A no-op when no registration has `id`, or
+/// `clientId` doesn't contribute it. It never removes the registration.
+///
+/// A client dispatches this with its own `clientId`. The host dispatches it
+/// when a contributing client leaves.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceContributorRemovedAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceContributorRemoved;
+
+    /// <summary>The registration's `id`.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>The contributing client to remove.</summary>
+    public required string ClientId { get; init; }
+}
+
+/// <summary>Removes the model source registration with the given `id` for every
+/// contributor. A no-op when none matches.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceRegistrationRemovedAction
@@ -374,9 +415,10 @@ public sealed record RootModelSourceRegistrationRemovedAction
     public required string Id { get; init; }
 }
 
-/// <summary>Updates a model source registration's status, credential nonce, and
-/// credential resource together. A no-op when no registration has `id`. Other
-/// fields of the registration are preserved. Only the host dispatches it.
+/// <summary>Updates a model source registration's host-reported fields together:
+/// `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+/// `credentialId`. A no-op when no registration has `id`. Other fields of the
+/// registration are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceStateChangedAction
@@ -396,6 +438,14 @@ public sealed record RootModelSourceStateChangedAction
     /// source that needs no credential.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
+
+    /// <summary>Replaces the registration's `credentialOrigins`. Absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? CredentialOrigins { get; init; }
+
+    /// <summary>Replaces the registration's `credentialId`. Absent clears it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CredentialId { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -2917,6 +2967,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/activeSessionsChanged"] = typeof(RootActiveSessionsChangedAction),
         ["root/configChanged"] = typeof(RootConfigChangedAction),
         ["root/modelSourceRegistrationSet"] = typeof(RootModelSourceRegistrationSetAction),
+        ["root/modelSourceContributorRemoved"] = typeof(RootModelSourceContributorRemovedAction),
         ["root/modelSourceRegistrationRemoved"] = typeof(RootModelSourceRegistrationRemovedAction),
         ["root/modelSourceStateChanged"] = typeof(RootModelSourceStateChangedAction),
         ["session/ready"] = typeof(SessionReadyAction),

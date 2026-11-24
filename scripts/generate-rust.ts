@@ -854,7 +854,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'BackgroundWorkKind',
   'McpServerStatus', 'McpAuthRequiredReason',
-  'ModelSourceStatus', 'ModelSourceRetentionPolicy',
+  'ModelSourceStatus', 'ModelSourceRetentionPolicy', 'ModelSourceAuthRequiredReason', 'ModelSourcePrincipalPolicy',
   'ChangesetStatus', 'ChangesetFileStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
@@ -1511,8 +1511,6 @@ pub enum ToolInput {
 
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('use crate::notifications::AuthRequiredReason;');
-  lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of STATE_ENUMS) {
@@ -1654,6 +1652,7 @@ const ACTION_VARIANTS: {
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
   { type: 'root/modelSourceRegistrationSet', variantName: 'RootModelSourceRegistrationSet', tsInterface: 'RootModelSourceRegistrationSetAction', boxed: true },
+  { type: 'root/modelSourceContributorRemoved', variantName: 'RootModelSourceContributorRemoved', tsInterface: 'RootModelSourceContributorRemovedAction' },
   { type: 'root/modelSourceRegistrationRemoved', variantName: 'RootModelSourceRegistrationRemoved', tsInterface: 'RootModelSourceRegistrationRemovedAction' },
   { type: 'root/modelSourceStateChanged', variantName: 'RootModelSourceStateChanged', tsInterface: 'RootModelSourceStateChangedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },

@@ -1469,7 +1469,9 @@ internal sealed class ModelSourceStatusConverter : JsonConverter<ModelSourceStat
         => writer.WriteStringValue(value.Value);
 }
 
-/// <summary>How long a registered model source lasts once its contributing client leaves.
+/// <summary>How long a registered model source lasts once its last contributing client
+/// leaves. When the last contributor withdraws instead, the source goes away
+/// whatever its retention.
 ///
 /// Stability: 1.0 - Early development.</summary>
 [JsonConverter(typeof(ModelSourceRetentionPolicyConverter))]
@@ -1487,10 +1489,10 @@ public readonly struct ModelSourceRetentionPolicy : IEquatable<ModelSourceRetent
     /// <summary>The raw wire value.</summary>
     public string Value => _value ?? string.Empty;
 
-    /// <summary>Removed when the contributing client leaves, once running turns finish.</summary>
+    /// <summary>Removed when the last contributing client leaves, once running turns finish.</summary>
     public static readonly ModelSourceRetentionPolicy ContributingClient = new ModelSourceRetentionPolicy("contributingClient");
 
-    /// <summary>Kept until a client removes it or host policy expires it.</summary>
+    /// <summary>Kept until it's removed, its last contributor withdraws, or host policy expires it.</summary>
     public static readonly ModelSourceRetentionPolicy Host = new ModelSourceRetentionPolicy("host");
 
     /// <inheritdoc />
@@ -1521,6 +1523,129 @@ internal sealed class ModelSourceRetentionPolicyConverter : JsonConverter<ModelS
 
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, ModelSourceRetentionPolicy value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Why a model source needs a credential. Specific to model sources: the
+/// shared `AuthRequiredReason` folds rejection and revocation into `expired`.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ModelSourceAuthRequiredReasonConverter))]
+public readonly struct ModelSourceAuthRequiredReason : IEquatable<ModelSourceAuthRequiredReason>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ModelSourceAuthRequiredReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>The host holds no credential yet.</summary>
+    public static readonly ModelSourceAuthRequiredReason Required = new ModelSourceAuthRequiredReason("required");
+
+    /// <summary>The credential's lifetime or lease lapsed. A client may renew it.</summary>
+    public static readonly ModelSourceAuthRequiredReason Expired = new ModelSourceAuthRequiredReason("expired");
+
+    /// <summary>The endpoint refused the credential. Clients don't send a credential with
+    /// the same {@link ModelSourceRegistration.credentialId} again.</summary>
+    public static readonly ModelSourceAuthRequiredReason Rejected = new ModelSourceAuthRequiredReason("rejected");
+
+    /// <summary>A client revoked the credential. Clients don't send one again without a user's action.</summary>
+    public static readonly ModelSourceAuthRequiredReason Revoked = new ModelSourceAuthRequiredReason("revoked");
+
+    /// <inheritdoc />
+    public bool Equals(ModelSourceAuthRequiredReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ModelSourceAuthRequiredReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ModelSourceAuthRequiredReason left, ModelSourceAuthRequiredReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ModelSourceAuthRequiredReason left, ModelSourceAuthRequiredReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ModelSourceAuthRequiredReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ModelSourceAuthRequiredReasonConverter : JsonConverter<ModelSourceAuthRequiredReason>
+{
+    /// <inheritdoc />
+    public override ModelSourceAuthRequiredReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ModelSourceAuthRequiredReason(reader.GetString() ?? throw new JsonException("ModelSourceAuthRequiredReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ModelSourceAuthRequiredReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
+}
+
+/// <summary>Whether clients acting for different principals share a host's model
+/// source registry.
+///
+/// Stability: 1.0 - Early development.</summary>
+[JsonConverter(typeof(ModelSourcePrincipalPolicyConverter))]
+public readonly struct ModelSourcePrincipalPolicy : IEquatable<ModelSourcePrincipalPolicy>
+{
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ModelSourcePrincipalPolicy(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    /// <summary>Every connected client may change, supply credentials for, and select
+    /// every registration.</summary>
+    public static readonly ModelSourcePrincipalPolicy Shared = new ModelSourcePrincipalPolicy("shared");
+
+    /// <summary>The host verifies principals, and limits changes, credentials, and
+    /// selection of each registration to clients of the principal that
+    /// registered it. Root state still lists every registration to every
+    /// client.</summary>
+    public static readonly ModelSourcePrincipalPolicy Isolated = new ModelSourcePrincipalPolicy("isolated");
+
+    /// <inheritdoc />
+    public bool Equals(ModelSourcePrincipalPolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ModelSourcePrincipalPolicy other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ModelSourcePrincipalPolicy left, ModelSourcePrincipalPolicy right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ModelSourcePrincipalPolicy left, ModelSourcePrincipalPolicy right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ModelSourcePrincipalPolicy"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ModelSourcePrincipalPolicyConverter : JsonConverter<ModelSourcePrincipalPolicy>
+{
+    /// <inheritdoc />
+    public override ModelSourcePrincipalPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ModelSourcePrincipalPolicy(reader.GetString() ?? throw new JsonException("ModelSourcePrincipalPolicy expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ModelSourcePrincipalPolicy value, JsonSerializerOptions options)
         => writer.WriteStringValue(value.Value);
 }
 
@@ -2351,17 +2476,28 @@ public sealed record ModelSourceRegistrationCapability
 {
     /// <summary>Definition formats the agent reads, most preferred first. Format names
     /// are defined by agent implementations and SHOULD be namespaced, for
-    /// example `example.com/model-source@1`.</summary>
+    /// example `example.com/model-source@1`. AHP doesn't define, standardize,
+    /// or name any format.</summary>
     public required List<string> Formats { get; init; }
+
+    /// <summary>How long, in milliseconds, the host keeps a disconnected client's
+    /// contributions before it treats the client as having left.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? GracePeriod { get; init; }
+
+    /// <summary>Whether clients acting for different principals share the registry.
+    /// Absent means `shared`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourcePrincipalPolicy? PrincipalPolicy { get; init; }
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>A model source registered on this host by a client, or by the host itself.
-/// Its definition is in a format the agent named by `provider` reads. It never
-/// contains a credential.
+/// <summary>A model source registered on this host by one or more clients, or by the
+/// host itself. Its definition is in a format the agent named by `provider`
+/// reads. It never contains a credential.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceRegistration
@@ -2386,21 +2522,24 @@ public sealed record ModelSourceRegistration
     public required string Format { get; init; }
 
     /// <summary>How to reach the source: endpoint, wire format, models, and so on, in
-    /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
-    /// a credential.</summary>
+    /// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
+    /// define it. MUST NOT contain a credential.</summary>
     public required Dictionary<string, JsonElement> Definition { get; init; }
 
-    /// <summary>The contributing client: the client that most recently registered or
-    /// changed the source. Absent for a source the host registered itself.</summary>
+    /// <summary>The clients that contribute this registration, in the order they joined.
+    /// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
+    /// and {@link RootModelSourceContributorRemovedAction}. Absent when no
+    /// client contributes it: a source the host registered itself, or a
+    /// `host`-retained one whose contributors have all left.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ClientId { get; init; }
+    public List<string>? ContributingClientIds { get; init; }
 
-    /// <summary>What happens when the contributing client leaves. Absent means `contributingClient`.</summary>
+    /// <summary>What happens when the last contributing client leaves. Absent means `contributingClient`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceRetentionPolicy? Retention { get; init; }
 
     /// <summary>Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after a client replaces the
+    /// Absent until the host reports one, and after a `Set` replaces the
     /// registration until the host reports again.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceState? State { get; init; }
@@ -2430,6 +2569,21 @@ public sealed record ModelSourceRegistration
     /// takes a user-supplied secret omits them.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
+
+    /// <summary>Every origin the host sends the credential to, such as
+    /// `https://api.example.com`. Present whenever `credentialResource` is. A
+    /// client checks each one against its own copy of the definition before it
+    /// sends a key. Set with `state`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? CredentialOrigins { get; init; }
+
+    /// <summary>The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
+    /// the credential the host most recently accepted. While the state is
+    /// `starting` or `ready`, the host holds it. While it's `authRequired`, the
+    /// `reason` says what happened to it. Absent until the host accepts a
+    /// credential. Set with `state`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CredentialId { get; init; }
 
     /// <summary>Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.</summary>
@@ -2477,7 +2631,7 @@ public sealed record ModelSourceReadyState
 public sealed record ModelSourceAuthRequirement
 {
     /// <summary>Why a credential is needed.</summary>
-    public AuthRequiredReason Reason { get; init; }
+    public ModelSourceAuthRequiredReason Reason { get; init; }
 
     /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."</summary>
@@ -2497,7 +2651,7 @@ public sealed record ModelSourceAuthRequirement
 public sealed record ModelSourceAuthRequiredState
 {
     /// <summary>Why a credential is needed.</summary>
-    public AuthRequiredReason Reason { get; init; }
+    public ModelSourceAuthRequiredReason Reason { get; init; }
 
     /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
     /// the API key."</summary>
@@ -2532,7 +2686,9 @@ public sealed record ModelSourceInfo
 {
     /// <summary>Model source identifier, unique within the agent's
     /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSourceRegistration.id}.</summary>
+    /// the {@link ModelSourceRegistration.id}. A source is registered when
+    /// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+    /// whose `provider` is the agent.</summary>
     public required string Id { get; init; }
 
     /// <summary>Human-readable name</summary>
@@ -2599,7 +2755,9 @@ public sealed record SessionModelInfo
 
     /// <summary>The source this model comes from. MUST match a {@link ModelSourceInfo.id}
     /// in the agent's {@link AgentInfo.modelSources}. For a model from a
-    /// registered model source, this is the {@link ModelSourceRegistration.id}.</summary>
+    /// registered model source, this is the {@link ModelSourceRegistration.id}.
+    /// An agent's own sources use it too, so it doesn't by itself mark a
+    /// registered source.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModelSourceId { get; init; }
 }
@@ -6679,7 +6837,13 @@ public sealed record UsageInfo
 
 public sealed record ErrorInfo
 {
-    /// <summary>Error type identifier</summary>
+    /// <summary>Error type identifier. Well-known values:
+    ///
+    /// - `modelSourceUnavailable`: a registered model source the turn uses
+    ///   can't serve it, for example because its credential is missing,
+    ///   expired, rejected, or revoked, or the source was removed. The error
+    ///   part is resumable. See
+    ///   [Model source credentials](/specification/authentication#model-source-credentials).</summary>
     public required string ErrorType { get; init; }
 
     /// <summary>Human-readable error message</summary>
