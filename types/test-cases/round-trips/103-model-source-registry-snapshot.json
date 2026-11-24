@@ -97,7 +97,6 @@
               "src": "https://example.com/openrouter.svg"
             }
           ],
-          "sharing": "host",
           "retention": "host",
           "state": {
             "kind": "ready"
@@ -123,7 +122,6 @@
             ]
           },
           "clientId": "client-1",
-          "sharing": "contributingClient",
           "retention": "contributingClient",
           "state": {
             "kind": "authRequired",
@@ -276,7 +274,6 @@
                 "src": "https://example.com/openrouter.svg"
               }
             ],
-            "sharing": "host",
             "retention": "host",
             "state": {
               "kind": "ready"
@@ -302,7 +299,6 @@
               ]
             },
             "clientId": "client-1",
-            "sharing": "contributingClient",
             "retention": "contributingClient",
             "state": {
               "kind": "authRequired",

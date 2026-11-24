@@ -217,6 +217,9 @@ internal static class GeneratedActionMetadata
             case RootModelSourceRegistrationSetAction value:
                 actionType = value.Type;
                 return true;
+            case RootModelSourceStateChangedAction value:
+                actionType = value.Type;
+                return true;
             case RootTerminalsChangedAction value:
                 actionType = value.Type;
                 return true;

@@ -203,6 +203,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootModelSourceRegistrationRemoved = new ActionType("root/modelSourceRegistrationRemoved");
 
+    public static readonly ActionType RootModelSourceStateChanged = new ActionType("root/modelSourceStateChanged");
+
     public static readonly ActionType TerminalData = new ActionType("terminal/data");
 
     public static readonly ActionType TerminalInput = new ActionType("terminal/input");
@@ -346,9 +348,10 @@ public sealed record RootConfigChangedAction
 
 /// <summary>Adds a model source registration, or replaces the one with the same `id`.
 ///
-/// A client registers a source by dispatching this with its own `clientId` and
-/// no `state`. The host reports status by dispatching it again with the same
-/// registration and a `state`.
+/// A client registers a source by dispatching this with its own `clientId`, and
+/// with no `state` or `credentialNonce`. Replacing a registration clears its
+/// status until the host reports again with
+/// {@link RootModelSourceStateChangedAction}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceRegistrationSetAction
@@ -369,6 +372,25 @@ public sealed record RootModelSourceRegistrationRemovedAction
 
     /// <summary>The registration's `id`.</summary>
     public required string Id { get; init; }
+}
+
+/// <summary>Updates a model source registration's status and credential nonce. A no-op
+/// when no registration has `id`. Other fields of the registration are
+/// preserved. Only the host dispatches it.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record RootModelSourceStateChangedAction
+{
+    public ActionType Type { get; init; } = ActionType.RootModelSourceStateChanged;
+
+    /// <summary>The registration's `id`.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>The new status.</summary>
+    public required ModelSourceState State { get; init; }
+
+    /// <summary>The registration's current credential nonce.</summary>
+    public required string CredentialNonce { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -2891,6 +2913,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/configChanged"] = typeof(RootConfigChangedAction),
         ["root/modelSourceRegistrationSet"] = typeof(RootModelSourceRegistrationSetAction),
         ["root/modelSourceRegistrationRemoved"] = typeof(RootModelSourceRegistrationRemovedAction),
+        ["root/modelSourceStateChanged"] = typeof(RootModelSourceStateChangedAction),
         ["session/ready"] = typeof(SessionReadyAction),
         ["session/creationFailed"] = typeof(SessionCreationFailedAction),
         ["session/turnStarted"] = typeof(SessionTurnStartedAction),

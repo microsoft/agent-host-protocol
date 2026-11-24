@@ -23,7 +23,7 @@ Individual action payloads do **not** carry their own `session: URI` or `termina
 
 ## Root Actions
 
-These mutate root state and travel on the [Root Channel](/specification/root-channel). `root/configChanged` and the model source registry actions are client-dispatchable; the rest are server-originated.
+These mutate root state and travel on the [Root Channel](/specification/root-channel). `root/configChanged`, `root/modelSourceRegistrationSet`, and `root/modelSourceRegistrationRemoved` are client-dispatchable; the rest are server-originated.
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
@@ -33,6 +33,7 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 | `root/modelSourceRegistrationSet` | **Yes** | A [model source registration](/specification/root-channel#model-source-registry) was added, or replaced by `id` |
 | `root/modelSourceRegistrationRemoved` | **Yes** | A model source registration was removed by `id` |
+| `root/modelSourceStateChanged` | No | The host reported a registration's status and credential nonce |
 
 ## Automation Catalogue Actions
 

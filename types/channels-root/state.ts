@@ -366,20 +366,25 @@ export interface ModelSourceRegistration {
    * a credential.
    */
   definition: Record<string, unknown>;
-  /** The contributing client. Absent for a source the host registered itself. */
+  /**
+   * The contributing client: the client that most recently registered or
+   * changed the source. Absent for a source the host registered itself.
+   */
   clientId?: string;
-  /** Who may select the source's models. Absent means `contributingClient`. */
-  sharing?: ModelSourceSharingPolicy;
   /** What happens when the contributing client leaves. Absent means `contributingClient`. */
   retention?: ModelSourceRetentionPolicy;
-  /** Host-reported status. Absent means the host hasn't reported one yet. */
+  /**
+   * Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+   * Absent until the host reports one, and after a client replaces the
+   * registration until the host reports again.
+   */
   state?: ModelSourceState;
   /**
    * Host-issued token that a client echoes in
    * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-   * the credential. The host changes it whenever it drops the credential
-   * because the registration changed, and never reuses one for the same
-   * `id`. Absent until the host reports a `state`.
+   * the credential. The host issues a new one whenever the credential is
+   * installed or dropped, and never reuses one for the same `id`. Set with
+   * `state`.
    *
    * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
    */
@@ -389,20 +394,6 @@ export interface ModelSourceRegistration {
    * MUST NOT contain a credential.
    */
   _meta?: Record<string, unknown>;
-}
-
-/**
- * Who may select a registered model source's models.
- *
- * @category Root State
- * @stability 1.0
- * @nonexhaustive
- */
-export const enum ModelSourceSharingPolicy {
-  /** Only turns and pending messages the contributing client dispatches. */
-  ContributingClient = 'contributingClient',
-  /** Any client, and work the host starts itself, such as automations. */
-  Host = 'host',
 }
 
 /**

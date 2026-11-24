@@ -1215,46 +1215,6 @@ impl<'de> serde::Deserialize<'de> for ModelSourceStatus {
     }
 }
 
-/// Who may select a registered model source's models.
-///
-/// Stability: 1.0 - Early development.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ModelSourceSharingPolicy {
-    /// Only turns and pending messages the contributing client dispatches.
-    ContributingClient,
-    /// Any client, and work the host starts itself, such as automations.
-    Host,
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    Unknown(String),
-}
-
-impl serde::Serialize for ModelSourceSharingPolicy {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::ContributingClient => serializer.serialize_str("contributingClient"),
-            Self::Host => serializer.serialize_str("host"),
-            Self::Unknown(value) => serializer.serialize_str(value),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ModelSourceSharingPolicy {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            "contributingClient" => Self::ContributingClient,
-            "host" => Self::Host,
-            _ => Self::Unknown(raw),
-        })
-    }
-}
-
 /// How long a registered model source lasts once its contributing client leaves.
 ///
 /// Stability: 1.0 - Early development.
@@ -2190,23 +2150,23 @@ pub struct ModelSourceRegistration {
     /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
     /// a credential.
     pub definition: JsonObject,
-    /// The contributing client. Absent for a source the host registered itself.
+    /// The contributing client: the client that most recently registered or
+    /// changed the source. Absent for a source the host registered itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
-    /// Who may select the source's models. Absent means `contributingClient`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sharing: Option<ModelSourceSharingPolicy>,
     /// What happens when the contributing client leaves. Absent means `contributingClient`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retention: Option<ModelSourceRetentionPolicy>,
-    /// Host-reported status. Absent means the host hasn't reported one yet.
+    /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+    /// Absent until the host reports one, and after a client replaces the
+    /// registration until the host reports again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<ModelSourceState>,
     /// Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential. The host changes it whenever it drops the credential
-    /// because the registration changed, and never reuses one for the same
-    /// `id`. Absent until the host reports a `state`.
+    /// the credential. The host issues a new one whenever the credential is
+    /// installed or dropped, and never reuses one for the same `id`. Set with
+    /// `state`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_nonce: Option<String>,
     /// Additional implementation-defined metadata for this registration.

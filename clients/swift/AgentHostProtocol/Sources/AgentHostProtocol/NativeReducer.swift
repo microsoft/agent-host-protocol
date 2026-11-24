@@ -109,6 +109,9 @@ public struct AHPRootReducer: Reducer {
         case .rootModelSourceRegistrationRemoved(let a):
             _ = applyModelSourceRegistrationRemoved(&state, id: a.id)
 
+        case .rootModelSourceStateChanged(let a):
+            _ = applyModelSourceStateChanged(&state, a)
+
         default:
             break
         }
@@ -131,6 +134,17 @@ func applyModelSourceRegistrationRemoved(_ state: inout RootState, id: String) -
     guard var list = state.modelSourceRegistrations,
           let idx = list.firstIndex(where: { $0.id == id }) else { return false }
     list.remove(at: idx)
+    state.modelSourceRegistrations = list
+    return true
+}
+
+/// Updates the status and credential nonce of the registration with `action.id`.
+/// Returns `false` when none matches.
+func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
+    guard var list = state.modelSourceRegistrations,
+          let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
+    list[idx].state = action.state
+    list[idx].credentialNonce = action.credentialNonce
     state.modelSourceRegistrations = list
     return true
 }

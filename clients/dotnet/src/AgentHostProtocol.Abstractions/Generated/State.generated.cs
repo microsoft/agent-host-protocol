@@ -1469,61 +1469,6 @@ internal sealed class ModelSourceStatusConverter : JsonConverter<ModelSourceStat
         => writer.WriteStringValue(value.Value);
 }
 
-/// <summary>Who may select a registered model source's models.
-///
-/// Stability: 1.0 - Early development.</summary>
-[JsonConverter(typeof(ModelSourceSharingPolicyConverter))]
-public readonly struct ModelSourceSharingPolicy : IEquatable<ModelSourceSharingPolicy>
-{
-    private readonly string? _value;
-
-    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
-    /// <param name="value">The raw wire string.</param>
-    public ModelSourceSharingPolicy(string value)
-    {
-        _value = value;
-    }
-
-    /// <summary>The raw wire value.</summary>
-    public string Value => _value ?? string.Empty;
-
-    /// <summary>Only turns and pending messages the contributing client dispatches.</summary>
-    public static readonly ModelSourceSharingPolicy ContributingClient = new ModelSourceSharingPolicy("contributingClient");
-
-    /// <summary>Any client, and work the host starts itself, such as automations.</summary>
-    public static readonly ModelSourceSharingPolicy Host = new ModelSourceSharingPolicy("host");
-
-    /// <inheritdoc />
-    public bool Equals(ModelSourceSharingPolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is ModelSourceSharingPolicy other && Equals(other);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
-
-    /// <inheritdoc />
-    public override string ToString() => Value;
-
-    /// <summary>Ordinal equality over the raw wire value.</summary>
-    public static bool operator ==(ModelSourceSharingPolicy left, ModelSourceSharingPolicy right) => left.Equals(right);
-
-    /// <summary>Ordinal inequality over the raw wire value.</summary>
-    public static bool operator !=(ModelSourceSharingPolicy left, ModelSourceSharingPolicy right) => !left.Equals(right);
-}
-
-/// <summary>Reads and writes <see cref="ModelSourceSharingPolicy"/> as its raw wire string, preserving unrecognized values.</summary>
-internal sealed class ModelSourceSharingPolicyConverter : JsonConverter<ModelSourceSharingPolicy>
-{
-    /// <inheritdoc />
-    public override ModelSourceSharingPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        => new ModelSourceSharingPolicy(reader.GetString() ?? throw new JsonException("ModelSourceSharingPolicy expects a JSON string."));
-
-    /// <inheritdoc />
-    public override void Write(Utf8JsonWriter writer, ModelSourceSharingPolicy value, JsonSerializerOptions options)
-        => writer.WriteStringValue(value.Value);
-}
-
 /// <summary>How long a registered model source lasts once its contributing client leaves.
 ///
 /// Stability: 1.0 - Early development.</summary>
@@ -2445,27 +2390,26 @@ public sealed record ModelSourceRegistration
     /// a credential.</summary>
     public required Dictionary<string, JsonElement> Definition { get; init; }
 
-    /// <summary>The contributing client. Absent for a source the host registered itself.</summary>
+    /// <summary>The contributing client: the client that most recently registered or
+    /// changed the source. Absent for a source the host registered itself.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ClientId { get; init; }
-
-    /// <summary>Who may select the source's models. Absent means `contributingClient`.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ModelSourceSharingPolicy? Sharing { get; init; }
 
     /// <summary>What happens when the contributing client leaves. Absent means `contributingClient`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceRetentionPolicy? Retention { get; init; }
 
-    /// <summary>Host-reported status. Absent means the host hasn't reported one yet.</summary>
+    /// <summary>Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+    /// Absent until the host reports one, and after a client replaces the
+    /// registration until the host reports again.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceState? State { get; init; }
 
     /// <summary>Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential. The host changes it whenever it drops the credential
-    /// because the registration changed, and never reuses one for the same
-    /// `id`. Absent until the host reports a `state`.</summary>
+    /// the credential. The host issues a new one whenever the credential is
+    /// installed or dropped, and never reuses one for the same `id`. Set with
+    /// `state`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CredentialNonce { get; init; }
 

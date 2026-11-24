@@ -15,6 +15,7 @@ import type {
   RootConfigChangedAction,
   RootModelSourceRegistrationSetAction,
   RootModelSourceRegistrationRemovedAction,
+  RootModelSourceStateChangedAction,
 } from '../channels-root/actions.js';
 
 import type {
@@ -244,6 +245,7 @@ export const enum ActionType {
   RootConfigChanged = 'root/configChanged',
   RootModelSourceRegistrationSet = 'root/modelSourceRegistrationSet',
   RootModelSourceRegistrationRemoved = 'root/modelSourceRegistrationRemoved',
+  RootModelSourceStateChanged = 'root/modelSourceStateChanged',
   TerminalData = 'terminal/data',
   TerminalInput = 'terminal/input',
   TerminalResized = 'terminal/resized',
@@ -307,6 +309,7 @@ export type StateAction =
   | RootConfigChangedAction
   | RootModelSourceRegistrationSetAction
   | RootModelSourceRegistrationRemovedAction
+  | RootModelSourceStateChangedAction
   | SessionReadyAction
   | SessionCreationFailedAction
   | SessionChatAddedAction

@@ -939,37 +939,6 @@ public enum ModelSourceStatus: Codable, Sendable, Equatable {
     }
 }
 
-/// Who may select a registered model source's models.
-///
-/// Stability: 1.0 - Early development.
-public enum ModelSourceSharingPolicy: Codable, Sendable, Equatable {
-    /// Only turns and pending messages the contributing client dispatches.
-    case contributingClient
-    /// Any client, and work the host starts itself, such as automations.
-    case host
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "contributingClient": self = .contributingClient
-        case "host": self = .host
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .contributingClient: try container.encode("contributingClient")
-        case .host: try container.encode("host")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
-}
-
 /// How long a registered model source lasts once its contributing client leaves.
 ///
 /// Stability: 1.0 - Early development.
@@ -1860,19 +1829,20 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     /// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
     /// a credential.
     public var definition: [String: AnyCodable]
-    /// The contributing client. Absent for a source the host registered itself.
+    /// The contributing client: the client that most recently registered or
+    /// changed the source. Absent for a source the host registered itself.
     public var clientId: String?
-    /// Who may select the source's models. Absent means `contributingClient`.
-    public var sharing: ModelSourceSharingPolicy?
     /// What happens when the contributing client leaves. Absent means `contributingClient`.
     public var retention: ModelSourceRetentionPolicy?
-    /// Host-reported status. Absent means the host hasn't reported one yet.
+    /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+    /// Absent until the host reports one, and after a client replaces the
+    /// registration until the host reports again.
     public var state: ModelSourceState?
     /// Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential. The host changes it whenever it drops the credential
-    /// because the registration changed, and never reuses one for the same
-    /// `id`. Absent until the host reports a `state`.
+    /// the credential. The host issues a new one whenever the credential is
+    /// installed or dropped, and never reuses one for the same `id`. Set with
+    /// `state`.
     public var credentialNonce: String?
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
@@ -1888,7 +1858,6 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         case format
         case definition
         case clientId
-        case sharing
         case retention
         case state
         case credentialNonce
@@ -1903,7 +1872,6 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         format: String,
         definition: [String: AnyCodable],
         clientId: String? = nil,
-        sharing: ModelSourceSharingPolicy? = nil,
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
         credentialNonce: String? = nil,
@@ -1917,7 +1885,6 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.format = format
         self.definition = definition
         self.clientId = clientId
-        self.sharing = sharing
         self.retention = retention
         self.state = state
         self.credentialNonce = credentialNonce
@@ -1934,7 +1901,6 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.format = try container.decode(String.self, forKey: .format)
         self.definition = try container.decode([String: AnyCodable].self, forKey: .definition)
         self.clientId = try container.decodeIfPresent(String.self, forKey: .clientId)
-        self.sharing = try container.decodeIfPresent(ModelSourceSharingPolicy.self, forKey: .sharing)
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
         self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
@@ -1951,7 +1917,6 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         try container.encode(self.format, forKey: .format)
         try container.encode(self.definition, forKey: .definition)
         try container.encodeIfPresent(self.clientId, forKey: .clientId)
-        try container.encodeIfPresent(self.sharing, forKey: .sharing)
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
         try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)

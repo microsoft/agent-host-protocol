@@ -108,6 +108,7 @@ const (
 	ActionTypeRootConfigChanged                   ActionType = "root/configChanged"
 	ActionTypeRootModelSourceRegistrationSet      ActionType = "root/modelSourceRegistrationSet"
 	ActionTypeRootModelSourceRegistrationRemoved  ActionType = "root/modelSourceRegistrationRemoved"
+	ActionTypeRootModelSourceStateChanged         ActionType = "root/modelSourceStateChanged"
 	ActionTypeTerminalData                        ActionType = "terminal/data"
 	ActionTypeTerminalInput                       ActionType = "terminal/input"
 	ActionTypeTerminalResized                     ActionType = "terminal/resized"
@@ -180,9 +181,10 @@ type RootConfigChangedAction struct {
 
 // Adds a model source registration, or replaces the one with the same `id`.
 //
-// A client registers a source by dispatching this with its own `clientId` and
-// no `state`. The host reports status by dispatching it again with the same
-// registration and a `state`.
+// A client registers a source by dispatching this with its own `clientId`, and
+// with no `state` or `credentialNonce`. Replacing a registration clears its
+// status until the host reports again with
+// {@link RootModelSourceStateChangedAction}.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceRegistrationSetAction struct {
@@ -199,6 +201,21 @@ type RootModelSourceRegistrationRemovedAction struct {
 	Type ActionType `json:"type"`
 	// The registration's `id`.
 	Id string `json:"id"`
+}
+
+// Updates a model source registration's status and credential nonce. A no-op
+// when no registration has `id`. Other fields of the registration are
+// preserved. Only the host dispatches it.
+//
+// Stability: 1.0 - Early development.
+type RootModelSourceStateChangedAction struct {
+	Type ActionType `json:"type"`
+	// The registration's `id`.
+	Id string `json:"id"`
+	// The new status.
+	State ModelSourceState `json:"state"`
+	// The registration's current credential nonce.
+	CredentialNonce string `json:"credentialNonce"`
 }
 
 // Session backend initialized successfully.
@@ -1888,6 +1905,7 @@ func (*RootActiveSessionsChangedAction) isStateAction()           {}
 func (*RootConfigChangedAction) isStateAction()                   {}
 func (*RootModelSourceRegistrationSetAction) isStateAction()      {}
 func (*RootModelSourceRegistrationRemovedAction) isStateAction()  {}
+func (*RootModelSourceStateChangedAction) isStateAction()         {}
 func (*SessionReadyAction) isStateAction()                        {}
 func (*SessionCreationFailedAction) isStateAction()               {}
 func (*SessionChatAddedAction) isStateAction()                    {}
@@ -2034,6 +2052,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "root/modelSourceRegistrationRemoved":
 		var value RootModelSourceRegistrationRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "root/modelSourceStateChanged":
+		var value RootModelSourceStateChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

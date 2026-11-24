@@ -452,18 +452,6 @@ const (
 	ModelSourceStatusError ModelSourceStatus = "error"
 )
 
-// Who may select a registered model source's models.
-//
-// Stability: 1.0 - Early development.
-type ModelSourceSharingPolicy string
-
-const (
-	// Only turns and pending messages the contributing client dispatches.
-	ModelSourceSharingPolicyContributingClient ModelSourceSharingPolicy = "contributingClient"
-	// Any client, and work the host starts itself, such as automations.
-	ModelSourceSharingPolicyHost ModelSourceSharingPolicy = "host"
-)
-
 // How long a registered model source lasts once its contributing client leaves.
 //
 // Stability: 1.0 - Early development.
@@ -1006,19 +994,20 @@ type ModelSourceRegistration struct {
 	// `format`. Its shape belongs to the agent that reads it. MUST NOT contain
 	// a credential.
 	Definition map[string]json.RawMessage `json:"definition"`
-	// The contributing client. Absent for a source the host registered itself.
+	// The contributing client: the client that most recently registered or
+	// changed the source. Absent for a source the host registered itself.
 	ClientId *string `json:"clientId,omitempty"`
-	// Who may select the source's models. Absent means `contributingClient`.
-	Sharing *ModelSourceSharingPolicy `json:"sharing,omitempty"`
 	// What happens when the contributing client leaves. Absent means `contributingClient`.
 	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
-	// Host-reported status. Absent means the host hasn't reported one yet.
+	// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+	// Absent until the host reports one, and after a client replaces the
+	// registration until the host reports again.
 	State *ModelSourceState `json:"state,omitempty"`
 	// Host-issued token that a client echoes in
 	// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-	// the credential. The host changes it whenever it drops the credential
-	// because the registration changed, and never reuses one for the same
-	// `id`. Absent until the host reports a `state`.
+	// the credential. The host issues a new one whenever the credential is
+	// installed or dropped, and never reuses one for the same `id`. Set with
+	// `state`.
 	CredentialNonce *string `json:"credentialNonce,omitempty"`
 	// Additional implementation-defined metadata for this registration.
 	// MUST NOT contain a credential.
@@ -1029,12 +1018,12 @@ type ModelSourceRegistration struct {
 
 func (v *ModelSourceRegistration) UnmarshalJSON(data []byte) error {
 	type wire ModelSourceRegistration
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "credentialNonce", "_meta")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "_meta")
 }
 
 func (v ModelSourceRegistration) MarshalJSON() ([]byte, error) {
 	type wire ModelSourceRegistration
-	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "credentialNonce", "_meta")
+	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "_meta")
 }
 
 // The agent is reading and validating the definition, or listing the

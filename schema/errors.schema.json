@@ -915,11 +915,7 @@
         },
         "clientId": {
           "type": "string",
-          "description": "The contributing client. Absent for a source the host registered itself."
-        },
-        "sharing": {
-          "$ref": "#/$defs/ModelSourceSharingPolicy",
-          "description": "Who may select the source's models. Absent means `contributingClient`."
+          "description": "The contributing client: the client that most recently registered or\nchanged the source. Absent for a source the host registered itself."
         },
         "retention": {
           "$ref": "#/$defs/ModelSourceRetentionPolicy",
@@ -927,11 +923,11 @@
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
-          "description": "Host-reported status. Absent means the host hasn't reported one yet."
+          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after a client replaces the\nregistration until the host reports again."
         },
         "credentialNonce": {
           "type": "string",
-          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host changes it whenever it drops the credential\nbecause the registration changed, and never reuses one for the same\n`id`. Absent until the host reports a `state`."
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host issues a new one whenever the credential is\ninstalled or dropped, and never reuses one for the same `id`. Set with\n`state`."
         },
         "_meta": {
           "type": "object",
@@ -8492,14 +8488,6 @@
       "type": "string",
       "description": "Policy configuration state for a model."
     },
-    "ModelSourceSharingPolicy": {
-      "enum": [
-        "contributingClient",
-        "host"
-      ],
-      "type": "string",
-      "description": "Who may select a registered model source's models."
-    },
     "ModelSourceRetentionPolicy": {
       "enum": [
         "contributingClient",
@@ -9306,6 +9294,9 @@
           "$ref": "#/$defs/RootModelSourceRegistrationRemovedAction"
         },
         {
+          "$ref": "#/$defs/RootModelSourceStateChangedAction"
+        },
+        {
           "$ref": "#/$defs/SessionReadyAction"
         },
         {
@@ -9842,7 +9833,7 @@
     },
     "RootModelSourceRegistrationSetAction": {
       "type": "object",
-      "description": "Adds a model source registration, or replaces the one with the same `id`.\n\nA client registers a source by dispatching this with its own `clientId` and\nno `state`. The host reports status by dispatching it again with the same\nregistration and a `state`.\n\nStability: 1.0 - Early development.",
+      "description": "Adds a model source registration, or replaces the one with the same `id`.\n\nA client registers a source by dispatching this with its own `clientId`, and\nwith no `state` or `credentialNonce`. Replacing a registration clears its\nstatus until the host reports again with\n{@link RootModelSourceStateChangedAction}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceRegistrationSet"
@@ -9872,6 +9863,33 @@
       "required": [
         "type",
         "id"
+      ]
+    },
+    "RootModelSourceStateChangedAction": {
+      "type": "object",
+      "description": "Updates a model source registration's status and credential nonce. A no-op\nwhen no registration has `id`. Other fields of the registration are\npreserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "root/modelSourceStateChanged"
+        },
+        "id": {
+          "type": "string",
+          "description": "The registration's `id`."
+        },
+        "state": {
+          "$ref": "#/$defs/ModelSourceState",
+          "description": "The new status."
+        },
+        "credentialNonce": {
+          "type": "string",
+          "description": "The registration's current credential nonce."
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "state",
+        "credentialNonce"
       ]
     },
     "SessionReadyAction": {

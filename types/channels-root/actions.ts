@@ -4,7 +4,7 @@
  * @module channels-root/actions
  */
 
-import type { AgentInfo, ModelSourceRegistration } from './state.js';
+import type { AgentInfo, ModelSourceRegistration, ModelSourceState } from './state.js';
 import type { TerminalInfo } from '../channels-terminal/state.js';
 import { ActionType } from '../common/actions.js';
 
@@ -70,9 +70,10 @@ export interface RootConfigChangedAction {
 /**
  * Adds a model source registration, or replaces the one with the same `id`.
  *
- * A client registers a source by dispatching this with its own `clientId` and
- * no `state`. The host reports status by dispatching it again with the same
- * registration and a `state`.
+ * A client registers a source by dispatching this with its own `clientId`, and
+ * with no `state` or `credentialNonce`. Replacing a registration clears its
+ * status until the host reports again with
+ * {@link RootModelSourceStateChangedAction}.
  *
  * @category Root Actions
  * @stability 1.0
@@ -98,4 +99,23 @@ export interface RootModelSourceRegistrationRemovedAction {
   type: ActionType.RootModelSourceRegistrationRemoved;
   /** The registration's `id`. */
   id: string;
+}
+
+/**
+ * Updates a model source registration's status and credential nonce. A no-op
+ * when no registration has `id`. Other fields of the registration are
+ * preserved. Only the host dispatches it.
+ *
+ * @category Root Actions
+ * @stability 1.0
+ * @see {@link /specification/root-channel#model-source-registry | Model source registry}
+ */
+export interface RootModelSourceStateChangedAction {
+  type: ActionType.RootModelSourceStateChanged;
+  /** The registration's `id`. */
+  id: string;
+  /** The new status. */
+  state: ModelSourceState;
+  /** The registration's current credential nonce. */
+  credentialNonce: string;
 }

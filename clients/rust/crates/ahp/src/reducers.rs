@@ -740,6 +740,18 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             list.remove(idx);
             ReduceOutcome::Applied
         }
+        StateAction::RootModelSourceStateChanged(a) => {
+            let Some(registration) = state
+                .model_source_registrations
+                .as_mut()
+                .and_then(|list| list.iter_mut().find(|r| r.id == a.id))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            registration.state = Some(a.state.clone());
+            registration.credential_nonce = Some(a.credential_nonce.clone());
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }

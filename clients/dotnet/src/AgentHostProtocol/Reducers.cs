@@ -706,6 +706,18 @@ public static class Reducers
                     state.ModelSourceRegistrations!.RemoveAt(index);
                     return ReduceOutcome.Applied;
                 }
+            case RootModelSourceStateChangedAction a:
+                {
+                    int index = state.ModelSourceRegistrations?.FindIndex(r => r.Id == a.Id) ?? -1;
+                    if (index < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    List<ModelSourceRegistration> list = state.ModelSourceRegistrations!;
+                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce };
+                    return ReduceOutcome.Applied;
+                }
         }
 
         return ReduceOutcome.OutOfScope;

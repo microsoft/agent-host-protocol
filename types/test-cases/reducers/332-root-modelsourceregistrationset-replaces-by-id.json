@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceRegistrationSet replaces the registration with the same id in place, as when the host reports its state",
+  "description": "root/modelSourceRegistrationSet replaces the registration with the same id in place. A client's replacement carries no state or credentialNonce, so it clears the reported status until the host reports again, and its clientId becomes the contributing client",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -15,7 +15,11 @@
             "model-a"
           ]
         },
-        "clientId": "client-1"
+        "clientId": "client-1",
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1"
       },
       {
         "id": "model-source-b",
@@ -38,7 +42,7 @@
       "registration": {
         "id": "model-source-a",
         "provider": "copilot",
-        "name": "Source a",
+        "name": "Source a (renamed)",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
@@ -46,11 +50,7 @@
             "model-a"
           ]
         },
-        "clientId": "client-1",
-        "state": {
-          "kind": "ready"
-        },
-        "credentialNonce": "nonce-a-1"
+        "clientId": "client-2"
       }
     }
   ],
@@ -60,7 +60,7 @@
       {
         "id": "model-source-a",
         "provider": "copilot",
-        "name": "Source a",
+        "name": "Source a (renamed)",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
@@ -68,11 +68,7 @@
             "model-a"
           ]
         },
-        "clientId": "client-1",
-        "state": {
-          "kind": "ready"
-        },
-        "credentialNonce": "nonce-a-1"
+        "clientId": "client-2"
       },
       {
         "id": "model-source-b",

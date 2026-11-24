@@ -1,0 +1,20 @@
+{
+  "description": "root/modelSourceStateChanged is a no-op when the registry is absent",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceStateChanged",
+      "id": "model-source-a",
+      "state": {
+        "kind": "starting"
+      },
+      "credentialNonce": "nonce-a-1"
+    }
+  ],
+  "expected": {
+    "agents": []
+  }
+}

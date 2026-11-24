@@ -960,36 +960,6 @@ internal object ModelSourceStatusSerializer : KSerializer<ModelSourceStatus> {
 }
 
 /**
- * Who may select a registered model source's models.
- *
- * Stability: 1.0 - Early development.
- */
-@Serializable(with = ModelSourceSharingPolicySerializer::class)
-@JvmInline
-value class ModelSourceSharingPolicy(val rawValue: String) {
-    companion object {
-        /**
-         * Only turns and pending messages the contributing client dispatches.
-         */
-        val CONTRIBUTING_CLIENT: ModelSourceSharingPolicy = ModelSourceSharingPolicy("contributingClient")
-        /**
-         * Any client, and work the host starts itself, such as automations.
-         */
-        val HOST: ModelSourceSharingPolicy = ModelSourceSharingPolicy("host")
-    }
-}
-
-internal object ModelSourceSharingPolicySerializer : KSerializer<ModelSourceSharingPolicy> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ModelSourceSharingPolicy", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: ModelSourceSharingPolicy) {
-        encoder.encodeString(value.rawValue)
-    }
-    override fun deserialize(decoder: Decoder): ModelSourceSharingPolicy =
-        ModelSourceSharingPolicy(decoder.decodeString())
-}
-
-/**
  * How long a registered model source lasts once its contributing client leaves.
  *
  * Stability: 1.0 - Early development.
@@ -1861,27 +1831,26 @@ data class ModelSourceRegistration(
      */
     val definition: Map<String, JsonElement>,
     /**
-     * The contributing client. Absent for a source the host registered itself.
+     * The contributing client: the client that most recently registered or
+     * changed the source. Absent for a source the host registered itself.
      */
     val clientId: String? = null,
-    /**
-     * Who may select the source's models. Absent means `contributingClient`.
-     */
-    val sharing: ModelSourceSharingPolicy? = null,
     /**
      * What happens when the contributing client leaves. Absent means `contributingClient`.
      */
     val retention: ModelSourceRetentionPolicy? = null,
     /**
-     * Host-reported status. Absent means the host hasn't reported one yet.
+     * Host-reported status, set with {@link RootModelSourceStateChangedAction}.
+     * Absent until the host reports one, and after a client replaces the
+     * registration until the host reports again.
      */
     val state: ModelSourceState? = null,
     /**
      * Host-issued token that a client echoes in
      * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-     * the credential. The host changes it whenever it drops the credential
-     * because the registration changed, and never reuses one for the same
-     * `id`. Absent until the host reports a `state`.
+     * the credential. The host issues a new one whenever the credential is
+     * installed or dropped, and never reuses one for the same `id`. Set with
+     * `state`.
      */
     val credentialNonce: String? = null,
     /**

@@ -61,6 +61,20 @@ export function rootReducer(state: RootState, action: RootAction, log?: (msg: st
       return { ...state, modelSourceRegistrations: next };
     }
 
+    case ActionType.RootModelSourceStateChanged: {
+      const list = state.modelSourceRegistrations;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(r => r.id === action.id);
+      if (idx < 0) {
+        return state;
+      }
+      const next = list.slice();
+      next[idx] = { ...list[idx], state: action.state, credentialNonce: action.credentialNonce };
+      return { ...state, modelSourceRegistrations: next };
+    }
+
     default:
       softAssertNever(action, log);
       return state;

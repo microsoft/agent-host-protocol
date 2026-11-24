@@ -554,6 +554,17 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.RootModelSourceStateChangedAction:
+		for i := range state.ModelSourceRegistrations {
+			if state.ModelSourceRegistrations[i].Id == a.Id {
+				st := a.State
+				nonce := a.CredentialNonce
+				state.ModelSourceRegistrations[i].State = &st
+				state.ModelSourceRegistrations[i].CredentialNonce = &nonce
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope
 }

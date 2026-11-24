@@ -826,11 +826,7 @@
         },
         "clientId": {
           "type": "string",
-          "description": "The contributing client. Absent for a source the host registered itself."
-        },
-        "sharing": {
-          "$ref": "#/$defs/ModelSourceSharingPolicy",
-          "description": "Who may select the source's models. Absent means `contributingClient`."
+          "description": "The contributing client: the client that most recently registered or\nchanged the source. Absent for a source the host registered itself."
         },
         "retention": {
           "$ref": "#/$defs/ModelSourceRetentionPolicy",
@@ -838,11 +834,11 @@
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
-          "description": "Host-reported status. Absent means the host hasn't reported one yet."
+          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after a client replaces the\nregistration until the host reports again."
         },
         "credentialNonce": {
           "type": "string",
-          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host changes it whenever it drops the credential\nbecause the registration changed, and never reuses one for the same\n`id`. Absent until the host reports a `state`."
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host issues a new one whenever the credential is\ninstalled or dropped, and never reuses one for the same `id`. Set with\n`state`."
         },
         "_meta": {
           "type": "object",
@@ -6966,14 +6962,6 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
-    },
-    "ModelSourceSharingPolicy": {
-      "enum": [
-        "contributingClient",
-        "host"
-      ],
-      "type": "string",
-      "description": "Who may select a registered model source's models."
     },
     "ModelSourceRetentionPolicy": {
       "enum": [

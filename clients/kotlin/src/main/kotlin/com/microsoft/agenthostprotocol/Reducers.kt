@@ -594,6 +594,21 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
         }
     }
 
+    is StateActionRootModelSourceStateChanged -> {
+        val list = state.modelSourceRegistrations
+        val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
+        if (list == null || idx < 0) {
+            state
+        } else {
+            val updated = list.toMutableList()
+            updated[idx] = updated[idx].copy(
+                state = action.value.state,
+                credentialNonce = action.value.credentialNonce,
+            )
+            state.copy(modelSourceRegistrations = updated)
+        }
+    }
+
     else -> state
 }
 
