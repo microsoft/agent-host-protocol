@@ -1,0 +1,50 @@
+{
+  "name": "root-model-source-set",
+  "group": "A",
+  "description": "A client registers a model source with root/modelSourceSet: the source with a nonce for its definition and requested retention, no host-reported fields, and an open definition alongside it that the reducer doesn't store.",
+  "type": "StateAction",
+  "input": {
+    "type": "root/modelSourceSet",
+    "modelSource": {
+      "id": "source-new",
+      "provider": "example",
+      "displayName": "OpenRouter",
+      "format": "openaiCompatible",
+      "nonce": "sha256-new-1",
+      "retention": "host"
+    },
+    "definition": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "models": [
+        "vendor/model-a",
+        "vendor/model-b"
+      ],
+      "headers": {
+        "x-title": "Example"
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "root/modelSourceSet",
+      "modelSource": {
+        "id": "source-new",
+        "provider": "example",
+        "displayName": "OpenRouter",
+        "format": "openaiCompatible",
+        "nonce": "sha256-new-1",
+        "retention": "host"
+      },
+      "definition": {
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "models": [
+          "vendor/model-a",
+          "vendor/model-b"
+        ],
+        "headers": {
+          "x-title": "Example"
+        }
+      }
+    }
+  ]
+}

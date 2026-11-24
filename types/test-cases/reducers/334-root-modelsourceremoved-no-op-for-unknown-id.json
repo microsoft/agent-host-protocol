@@ -1,0 +1,34 @@
+{
+  "description": "root/modelSourceRemoved is a no-op when no model source has the id",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceRemoved",
+      "id": "model-source-missing"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1"
+      }
+    ]
+  }
+}

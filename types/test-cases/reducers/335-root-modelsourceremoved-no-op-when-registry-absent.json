@@ -1,12 +1,12 @@
 {
-  "description": "root/modelSourceRegistrationRemoved is a no-op when the registry is absent",
+  "description": "root/modelSourceRemoved is a no-op when the registry is absent",
   "reducer": "root",
   "initial": {
     "agents": []
   },
   "actions": [
     {
-      "type": "root/modelSourceRegistrationRemoved",
+      "type": "root/modelSourceRemoved",
       "id": "model-source-a"
     }
   ],

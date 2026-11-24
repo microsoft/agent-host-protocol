@@ -10,11 +10,8 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.*
 import java.time.Instant
 import java.time.format.DateTimeFormatterBuilder
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
 
@@ -578,53 +575,35 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
         }
     }
 
-    is StateActionRootModelSourceRegistrationSet -> {
-        val registration = action.value.registration
-        val clientId = action.value.clientId
-        val list = state.modelSourceRegistrations.orEmpty()
-        val idx = list.indexOfFirst { it.id == registration.id }
-        val existing = list.getOrNull(idx)?.takeIf { sameModelSourceRouting(it, registration) }
-        val contributors = existing?.contributingClientIds.orEmpty().toMutableList()
-        if (clientId != null && clientId !in contributors) contributors.add(clientId)
-        val merged = registration.copy(
-            contributingClientIds = contributors.takeIf { it.isNotEmpty() },
+    is StateActionRootModelSourceSet -> {
+        val source = action.value.modelSource
+        val list = state.modelSources.orEmpty()
+        val idx = list.indexOfFirst { it.id == source.id }
+        val existing = list.getOrNull(idx)?.takeIf { sameModelSourceVersion(it, source) }
+        val merged = source.copy(
             state = existing?.state,
             credentialNonce = existing?.credentialNonce,
             credentialResource = existing?.credentialResource,
             credentialOrigins = existing?.credentialOrigins,
-            credentialId = existing?.credentialId,
+            accountId = existing?.accountId,
         )
         val updated = list.toMutableList()
         if (idx < 0) updated.add(merged) else updated[idx] = merged
-        state.copy(modelSourceRegistrations = updated)
+        state.copy(modelSources = updated)
     }
 
-    is StateActionRootModelSourceContributorRemoved -> {
-        val list = state.modelSourceRegistrations
-        val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
-        val contributors = list?.getOrNull(idx)?.contributingClientIds.orEmpty()
-        if (list == null || action.value.clientId !in contributors) {
-            state
-        } else {
-            val remaining = contributors.filter { it != action.value.clientId }
-            val updated = list.toMutableList()
-            updated[idx] = updated[idx].copy(contributingClientIds = remaining.takeIf { it.isNotEmpty() })
-            state.copy(modelSourceRegistrations = updated)
-        }
-    }
-
-    is StateActionRootModelSourceRegistrationRemoved -> {
-        val list = state.modelSourceRegistrations
+    is StateActionRootModelSourceRemoved -> {
+        val list = state.modelSources
         val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
         if (list == null || idx < 0) {
             state
         } else {
-            state.copy(modelSourceRegistrations = list.toMutableList().apply { removeAt(idx) })
+            state.copy(modelSources = list.toMutableList().apply { removeAt(idx) })
         }
     }
 
     is StateActionRootModelSourceStateChanged -> {
-        val list = state.modelSourceRegistrations
+        val list = state.modelSources
         val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
         if (list == null || idx < 0) {
             state
@@ -635,36 +614,18 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
                 credentialNonce = action.value.credentialNonce,
                 credentialResource = action.value.credentialResource,
                 credentialOrigins = action.value.credentialOrigins,
-                credentialId = action.value.credentialId,
+                accountId = action.value.accountId,
             )
-            state.copy(modelSourceRegistrations = updated)
+            state.copy(modelSources = updated)
         }
     }
 
     else -> state
 }
 
-/**
- * Whether two registrations have the same `provider`, `format`, and
- * `definition`, comparing definitions as JSON values.
- */
-private fun sameModelSourceRouting(a: ModelSourceRegistration, b: ModelSourceRegistration): Boolean =
-    a.provider == b.provider && a.format == b.format && jsonValuesEqual(JsonObject(a.definition), JsonObject(b.definition))
-
-/**
- * Compares JSON values regardless of object key order, with numbers compared
- * by numeric value, so `1` equals `1.0`.
- */
-private fun jsonValuesEqual(a: JsonElement, b: JsonElement): Boolean = when {
-    a is JsonObject && b is JsonObject ->
-        a.size == b.size && a.all { (key, value) -> b[key]?.let { jsonValuesEqual(value, it) } == true }
-    a is JsonArray && b is JsonArray ->
-        a.size == b.size && a.indices.all { jsonValuesEqual(a[it], b[it]) }
-    a is JsonPrimitive && b is JsonPrimitive && !a.isString && !b.isString &&
-        a.doubleOrNull != null && b.doubleOrNull != null ->
-        a.doubleOrNull == b.doubleOrNull
-    else -> a == b
-}
+/** Whether two model sources have the same `provider`, `format`, and definition `nonce`. */
+private fun sameModelSourceVersion(a: ModelSource, b: ModelSource): Boolean =
+    a.provider == b.provider && a.format == b.format && a.nonce == b.nonce
 
 // ─── Session Reducer ────────────────────────────────────────────────────────
 

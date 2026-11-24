@@ -1470,8 +1470,7 @@ internal sealed class ModelSourceStatusConverter : JsonConverter<ModelSourceStat
 }
 
 /// <summary>How long a registered model source lasts once its last contributing client
-/// leaves. When the last contributor withdraws instead, the source goes away
-/// whatever its retention.
+/// leaves.
 ///
 /// Stability: 1.0 - Early development.</summary>
 [JsonConverter(typeof(ModelSourceRetentionPolicyConverter))]
@@ -1492,7 +1491,7 @@ public readonly struct ModelSourceRetentionPolicy : IEquatable<ModelSourceRetent
     /// <summary>Removed when the last contributing client leaves, once running turns finish.</summary>
     public static readonly ModelSourceRetentionPolicy ContributingClient = new ModelSourceRetentionPolicy("contributingClient");
 
-    /// <summary>Kept until it's removed, its last contributor withdraws, or host policy expires it.</summary>
+    /// <summary>Kept until a client removes it, or host policy expires it.</summary>
     public static readonly ModelSourceRetentionPolicy Host = new ModelSourceRetentionPolicy("host");
 
     /// <inheritdoc />
@@ -1552,7 +1551,7 @@ public readonly struct ModelSourceAuthRequiredReason : IEquatable<ModelSourceAut
     public static readonly ModelSourceAuthRequiredReason Expired = new ModelSourceAuthRequiredReason("expired");
 
     /// <summary>The endpoint refused the credential. Clients don't send a credential with
-    /// the same {@link ModelSourceRegistration.credentialId} again.</summary>
+    /// the same {@link ModelSource.accountId} again.</summary>
     public static readonly ModelSourceAuthRequiredReason Rejected = new ModelSourceAuthRequiredReason("rejected");
 
     /// <summary>A client revoked the credential. Clients don't send one again without a user's action.</summary>
@@ -1609,12 +1608,12 @@ public readonly struct ModelSourcePrincipalPolicy : IEquatable<ModelSourcePrinci
     public string Value => _value ?? string.Empty;
 
     /// <summary>Every connected client may change, supply credentials for, and select
-    /// every registration.</summary>
+    /// every model source.</summary>
     public static readonly ModelSourcePrincipalPolicy Shared = new ModelSourcePrincipalPolicy("shared");
 
     /// <summary>The host verifies principals, and limits changes, credentials, and
-    /// selection of each registration to clients of the principal that
-    /// registered it. Root state still lists every registration to every
+    /// selection of each model source to clients of the principal that
+    /// registered it. Root state still lists every model source to every
     /// client.</summary>
     public static readonly ModelSourcePrincipalPolicy Isolated = new ModelSourcePrincipalPolicy("isolated");
 
@@ -2298,11 +2297,13 @@ public sealed class RootState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RootConfigState? Config { get; set; }
 
-    /// <summary>Model sources registered on this host, keyed by `id`.
+    /// <summary>Model sources registered on this host, keyed by `id`. When one is
+    /// ready, it also appears in its agent's {@link AgentInfo.modelSources}
+    /// catalog.
     ///
     /// Stability: 1.0 - Early development.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<ModelSourceRegistration>? ModelSourceRegistrations { get; set; }
+    public List<ModelSource>? ModelSources { get; set; }
 
     /// <summary>Additional implementation-defined metadata about the agent host itself.
     ///
@@ -2474,14 +2475,13 @@ public sealed record MultipleWorkingDirectoriesCapability
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceRegistrationCapability
 {
-    /// <summary>Definition formats the agent reads, most preferred first. Format names
-    /// are defined by agent implementations and SHOULD be namespaced, for
-    /// example `example.com/model-source@1`. AHP doesn't define, standardize,
-    /// or name any format.</summary>
+    /// <summary>Definition formats the agent reads, most preferred first: recognized
+    /// values of {@link ModelSource.format}, or namespaced names for formats
+    /// the agent defines itself.</summary>
     public required List<string> Formats { get; init; }
 
-    /// <summary>How long, in milliseconds, the host keeps a disconnected client's
-    /// contributions before it treats the client as having left.</summary>
+    /// <summary>How long, in milliseconds, the host keeps counting a disconnected client
+    /// as a contributing client before it treats the client as having left.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? GracePeriod { get; init; }
 
@@ -2495,12 +2495,13 @@ public sealed record ModelSourceRegistrationCapability
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
-/// <summary>A model source registered on this host by one or more clients, or by the
-/// host itself. Its definition is in a format the agent named by `provider`
-/// reads. It never contains a credential.
+/// <summary>A model source registered on this host by a client, or by the host itself.
+/// The definition that tells the agent named by `provider` how to reach it
+/// travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
+/// here is a credential.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record ModelSourceRegistration
+public sealed record ModelSource
 {
     /// <summary>Host-unique ID, chosen by whoever registers the source. Also the
     /// source's {@link ModelSourceInfo.id} in the agent's catalog, and the
@@ -2517,40 +2518,43 @@ public sealed record ModelSourceRegistration
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Icon>? Icons { get; init; }
 
-    /// <summary>Definition format, one of the agent's
-    /// {@link ModelSourceRegistrationCapability.formats}.</summary>
+    /// <summary>The definition's format, one of the agent's
+    /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
+    /// include:
+    ///
+    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as
+    ///   OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.
+    /// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+    /// - `'azureOpenai'`: an Azure OpenAI deployment.
+    /// - `'gemini'`: Google's Gemini API.
+    ///
+    /// AHP doesn't define what a definition contains, even for these. Agents
+    /// MAY read other formats, named with a namespace such as
+    /// `example.com/model-source@1` so they don't collide.</summary>
     public required string Format { get; init; }
 
-    /// <summary>How to reach the source: endpoint, wire format, models, and so on, in
-    /// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
-    /// define it. MUST NOT contain a credential.</summary>
-    public required Dictionary<string, JsonElement> Definition { get; init; }
-
-    /// <summary>The clients that contribute this registration, in the order they joined.
-    /// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
-    /// and {@link RootModelSourceContributorRemovedAction}. Absent when no
-    /// client contributes it: a source the host registered itself, or a
-    /// `host`-retained one whose contributors have all left.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? ContributingClientIds { get; init; }
+    /// <summary>Opaque version token for the definition, such as a hash of it, chosen by
+    /// whoever registers the source. A client compares it with its own copy
+    /// instead of the definition, and the reducer compares it to tell an update
+    /// from a re-registration of the same definition.</summary>
+    public required string Nonce { get; init; }
 
     /// <summary>What happens when the last contributing client leaves. Absent means `contributingClient`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceRetentionPolicy? Retention { get; init; }
 
     /// <summary>Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after a `Set` replaces the
-    /// registration until the host reports again.</summary>
+    /// Absent until the host reports one, and after an update replaces the
+    /// definition until the host reports again.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceState? State { get; init; }
 
     /// <summary>Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential, and that tags every agent operation on the registration.
-    /// The host issues a new one when the registration is added, when its
-    /// `provider`, `format`, or `definition` changes, and whenever the
-    /// credential is installed or dropped. It never reuses one for the same
-    /// `id`. Set with `state`.</summary>
+    /// the credential, and that tags every agent operation on the source. The
+    /// host issues a new one when the source is added or updated, and whenever
+    /// the credential is installed or dropped. It never reuses one for the
+    /// same `id`. Set with `state`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CredentialNonce { get; init; }
 
@@ -2571,21 +2575,21 @@ public sealed record ModelSourceRegistration
     public ProtectedResourceMetadata? CredentialResource { get; init; }
 
     /// <summary>Every origin the host sends the credential to, such as
-    /// `https://api.example.com`. Present whenever `credentialResource` is. A
-    /// client checks each one against its own copy of the definition before it
-    /// sends a key. Set with `state`.</summary>
+    /// `https://api.example.com`, derived from the definition it holds. Present
+    /// whenever `credentialResource` is. A client checks each one against its
+    /// own copy of the definition before it sends a key. Set with `state`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? CredentialOrigins { get; init; }
 
-    /// <summary>The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
-    /// the credential the host most recently accepted. While the state is
-    /// `starting` or `ready`, the host holds it. While it's `authRequired`, the
-    /// `reason` says what happened to it. Absent until the host accepts a
-    /// credential. Set with `state`.</summary>
+    /// <summary>The {@link AuthenticateParams.accountId} the client sent with the
+    /// credential the host most recently accepted. While the state is
+    /// `starting` or `ready`, the host holds that credential. While it's
+    /// `authRequired`, the `reason` says what happened to it. Absent until the
+    /// host accepts a credential sent with an `accountId`. Set with `state`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? CredentialId { get; init; }
+    public string? AccountId { get; init; }
 
-    /// <summary>Additional implementation-defined metadata for this registration.
+    /// <summary>Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.</summary>
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2610,7 +2614,7 @@ public sealed record ModelSourceStartingState
 }
 
 /// <summary>The source is usable, and its models are in the catalog of the agent named
-/// by the registration's `provider`. They stay listed through later `starting`
+/// by the model source's `provider`. They stay listed through later `starting`
 /// and `authRequired` states.
 ///
 /// Stability: 1.0 - Early development.</summary>
@@ -2625,7 +2629,7 @@ public sealed record ModelSourceReadyState
 
 /// <summary>Why a model source needs a credential before it can be ready. Deliberately
 /// carries no credential. The endpoint the credential is for is the
-/// registration's {@link ModelSourceRegistration.credentialResource}.
+/// model source's {@link ModelSource.credentialResource}.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceAuthRequirement
@@ -2644,7 +2648,7 @@ public sealed record ModelSourceAuthRequirement
 }
 
 /// <summary>The source needs a credential before it can be used. A client answers with
-/// `authenticate`, the registration's `credentialResource.resource`, and a
+/// `authenticate`, the model source's `credentialResource.resource`, and a
 /// {@link ModelSourceAuthenticateTarget}.
 ///
 /// Stability: 1.0 - Early development.</summary>
@@ -2686,8 +2690,8 @@ public sealed record ModelSourceInfo
 {
     /// <summary>Model source identifier, unique within the agent's
     /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSourceRegistration.id}. A source is registered when
-    /// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+    /// the {@link ModelSource.id}. A source is registered when
+    /// {@link RootState.modelSources} has an entry with this `id`
     /// whose `provider` is the agent.</summary>
     public required string Id { get; init; }
 
@@ -2755,7 +2759,7 @@ public sealed record SessionModelInfo
 
     /// <summary>The source this model comes from. MUST match a {@link ModelSourceInfo.id}
     /// in the agent's {@link AgentInfo.modelSources}. For a model from a
-    /// registered model source, this is the {@link ModelSourceRegistration.id}.
+    /// registered model source, this is the {@link ModelSource.id}.
     /// An agent's own sources use it too, so it doesn't by itself mark a
     /// registered source.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

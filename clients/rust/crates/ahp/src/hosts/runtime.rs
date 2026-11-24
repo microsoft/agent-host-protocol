@@ -99,7 +99,7 @@ pub(super) fn spawn(
             active_sessions: None,
             terminals: None,
             config: None,
-            model_source_registrations: None,
+            model_sources: None,
             meta: None,
         },
         subscriptions: config.initial_subscriptions.clone(),

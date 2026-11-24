@@ -13,9 +13,8 @@ import type {
   RootActiveSessionsChangedAction,
   RootTerminalsChangedAction,
   RootConfigChangedAction,
-  RootModelSourceRegistrationSetAction,
-  RootModelSourceContributorRemovedAction,
-  RootModelSourceRegistrationRemovedAction,
+  RootModelSourceSetAction,
+  RootModelSourceRemovedAction,
   RootModelSourceStateChangedAction,
 } from '../channels-root/actions.js';
 
@@ -244,9 +243,8 @@ export const enum ActionType {
   AnnotationsEntryRemoved = 'annotations/entryRemoved',
   RootTerminalsChanged = 'root/terminalsChanged',
   RootConfigChanged = 'root/configChanged',
-  RootModelSourceRegistrationSet = 'root/modelSourceRegistrationSet',
-  RootModelSourceContributorRemoved = 'root/modelSourceContributorRemoved',
-  RootModelSourceRegistrationRemoved = 'root/modelSourceRegistrationRemoved',
+  RootModelSourceSet = 'root/modelSourceSet',
+  RootModelSourceRemoved = 'root/modelSourceRemoved',
   RootModelSourceStateChanged = 'root/modelSourceStateChanged',
   TerminalData = 'terminal/data',
   TerminalInput = 'terminal/input',
@@ -309,9 +307,8 @@ export type StateAction =
   | RootActiveSessionsChangedAction
   | RootTerminalsChangedAction
   | RootConfigChangedAction
-  | RootModelSourceRegistrationSetAction
-  | RootModelSourceContributorRemovedAction
-  | RootModelSourceRegistrationRemovedAction
+  | RootModelSourceSetAction
+  | RootModelSourceRemovedAction
   | RootModelSourceStateChangedAction
   | SessionReadyAction
   | SessionCreationFailedAction

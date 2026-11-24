@@ -1,7 +1,7 @@
 {
   "name": "root-model-source-state-changed",
   "group": "A",
-  "description": "The host reports with root/modelSourceStateChanged that the endpoint rejected a key, issuing a new credential nonce and naming the rejected key's credentialId, along with the credentialResource and every origin the key is sent to.",
+  "description": "The host reports with root/modelSourceStateChanged that the endpoint rejected a key, issuing a new credential nonce and naming the rejected key's accountId, along with the credentialResource and every origin the key is sent to.",
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceStateChanged",
@@ -19,7 +19,7 @@
     "credentialOrigins": [
       "https://openrouter.ai"
     ],
-    "credentialId": "keychain-openrouter-1"
+    "accountId": "keychain-openrouter-1"
   },
   "acceptableOutputs": [
     {
@@ -38,7 +38,7 @@
       "credentialOrigins": [
         "https://openrouter.ai"
       ],
-      "credentialId": "keychain-openrouter-1"
+      "accountId": "keychain-openrouter-1"
     }
   ]
 }

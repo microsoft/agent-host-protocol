@@ -1626,24 +1626,15 @@ data class McpServerAuthenticateTarget(
 data class ModelSourceAuthenticateTarget(
     val kind: AuthenticateTargetKind,
     /**
-     * The registration's `ModelSourceRegistration.id`.
+     * The registration's `ModelSource.id`.
      */
     val modelSourceId: String,
     /**
-     * The registration's current `ModelSourceRegistration.credentialNonce`, as
+     * The registration's current `ModelSource.credentialNonce`, as
      * published in root state. The host rejects a stale one with `Conflict`
      * (-32011).
      */
-    val credentialNonce: String,
-    /**
-     * A client-chosen, non-secret ID for the credential, such as a hash of
-     * where the client stores the key. The host publishes it as the
-     * registration's `ModelSourceRegistration.credentialId`, so a client can
-     * tell whether the host holds its current key. Clients SHOULD include it
-     * when delivering a credential, and omit it when revoking one. MUST NOT be
-     * derived from the secret.
-     */
-    val credentialId: String? = null
+    val credentialNonce: String
 )
 
 @Serializable
@@ -1663,7 +1654,7 @@ data class AuthenticateParams(
      * server has advertised — via `ProtectedResourceMetadata` in
      * `AgentInfo.protectedResources`, or via a live
      * `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-     * or `ModelSourceRegistration.credentialResource`.
+     * or `ModelSource.credentialResource`.
      */
     val resource: String,
     /**
@@ -1726,6 +1717,12 @@ data class AuthenticateParams(
      * Hosts can compare `accountId` values to detect when the underlying account has changed.
      * Hosts MUST treat `accountId` as an opaque string.
      * see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+     *
+     * With a `modelSource` target, clients SHOULD include it when delivering a
+     * credential and omit it when revoking one, and the host publishes it as
+     * the source's `ModelSource.accountId`. It MUST NOT be derived from the
+     * secret. For an API key with no account of its own, a client uses an ID
+     * that changes whenever the user replaces the key.
      */
     val accountId: String? = null
 )

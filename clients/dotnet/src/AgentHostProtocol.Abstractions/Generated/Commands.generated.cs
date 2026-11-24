@@ -1892,22 +1892,13 @@ public sealed record ModelSourceAuthenticateTarget
 {
     public AuthenticateTargetKind Kind { get; init; } = AuthenticateTargetKind.ModelSource;
 
-    /// <summary>The registration's `ModelSourceRegistration.id`.</summary>
+    /// <summary>The registration's `ModelSource.id`.</summary>
     public required string ModelSourceId { get; init; }
 
-    /// <summary>The registration's current `ModelSourceRegistration.credentialNonce`, as
+    /// <summary>The registration's current `ModelSource.credentialNonce`, as
     /// published in root state. The host rejects a stale one with `Conflict`
     /// (-32011).</summary>
     public required string CredentialNonce { get; init; }
-
-    /// <summary>A client-chosen, non-secret ID for the credential, such as a hash of
-    /// where the client stores the key. The host publishes it as the
-    /// registration's `ModelSourceRegistration.credentialId`, so a client can
-    /// tell whether the host holds its current key. Clients SHOULD include it
-    /// when delivering a credential, and omit it when revoking one. MUST NOT be
-    /// derived from the secret.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? CredentialId { get; init; }
 }
 
 /// <summary>Pushes a credential for a protected resource. The `resource` field MUST
@@ -1916,7 +1907,7 @@ public sealed record ModelSourceAuthenticateTarget
 /// or discovered dynamically from a live `McpServerAuthRequiredState.resource`
 /// or `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the
 /// corresponding MCP server or tool call actually challenges for auth), or
-/// from a registered model source's `ModelSourceRegistration.credentialResource`.
+/// from a registered model source's `ModelSource.credentialResource`.
 /// Servers MUST accept any `resource` value they have themselves advertised
 /// through one of these mechanisms, subject to the `target` rules. A
 /// `modelSource` target takes only the registration's current
@@ -1941,7 +1932,7 @@ public sealed record AuthenticateParams
     /// server has advertised — via `ProtectedResourceMetadata` in
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-    /// or `ModelSourceRegistration.credentialResource`.</summary>
+    /// or `ModelSource.credentialResource`.</summary>
     public required string Resource { get; init; }
 
     /// <summary>Bearer token obtained from the resource's authorization server, or an
@@ -2001,7 +1992,13 @@ public sealed record AuthenticateParams
     /// <summary>Optional identifier for the client's selected account, sent alongside the token.
     /// Hosts can compare `accountId` values to detect when the underlying account has changed.
     /// Hosts MUST treat `accountId` as an opaque string.
-    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.</summary>
+    /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    ///
+    /// With a `modelSource` target, clients SHOULD include it when delivering a
+    /// credential and omit it when revoking one, and the host publishes it as
+    /// the source's `ModelSource.accountId`. It MUST NOT be derived from the
+    /// secret. For an API key with no account of its own, a client uses an ID
+    /// that changes whenever the user replaces the key.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AccountId { get; init; }
 }

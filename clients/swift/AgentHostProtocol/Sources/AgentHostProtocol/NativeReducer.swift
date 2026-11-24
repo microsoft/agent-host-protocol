@@ -103,14 +103,11 @@ public struct AHPRootReducer: Reducer {
             config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
             state.config = config
 
-        case .rootModelSourceRegistrationSet(let a):
-            applyModelSourceRegistrationSet(&state, a.registration, clientId: a.clientId)
+        case .rootModelSourceSet(let a):
+            applyModelSourceSet(&state, a.modelSource)
 
-        case .rootModelSourceContributorRemoved(let a):
-            _ = applyModelSourceContributorRemoved(&state, id: a.id, clientId: a.clientId)
-
-        case .rootModelSourceRegistrationRemoved(let a):
-            _ = applyModelSourceRegistrationRemoved(&state, id: a.id)
+        case .rootModelSourceRemoved(let a):
+            _ = applyModelSourceRemoved(&state, id: a.id)
 
         case .rootModelSourceStateChanged(let a):
             _ = applyModelSourceStateChanged(&state, a)
@@ -121,72 +118,53 @@ public struct AHPRootReducer: Reducer {
     }
 }
 
-/// Contributes `registration` for `clientId`: adds it, joins an entry with the
-/// same `id` and routing (keeping its host-reported fields), or replaces an
-/// entry whose routing changed.
-func applyModelSourceRegistrationSet(_ state: inout RootState, _ registration: ModelSourceRegistration, clientId: String?) {
-    var list = state.modelSourceRegistrations ?? []
-    let idx = list.firstIndex(where: { $0.id == registration.id })
-    let existing = idx.map { list[$0] }.flatMap { sameModelSourceRouting($0, registration) ? $0 : nil }
-    var merged = registration
-    var contributors = existing?.contributingClientIds ?? []
-    if let clientId, !contributors.contains(clientId) {
-        contributors.append(clientId)
-    }
-    merged.contributingClientIds = contributors.isEmpty ? nil : contributors
+/// Adds `source`, re-registers the entry with the same `id`, `provider`,
+/// `format`, and `nonce` (keeping its host-reported fields), or updates an
+/// entry where any of those differ.
+func applyModelSourceSet(_ state: inout RootState, _ source: ModelSource) {
+    var list = state.modelSources ?? []
+    let idx = list.firstIndex(where: { $0.id == source.id })
+    let existing = idx.map { list[$0] }.flatMap { sameModelSourceVersion($0, source) ? $0 : nil }
+    var merged = source
     merged.state = existing?.state
     merged.credentialNonce = existing?.credentialNonce
     merged.credentialResource = existing?.credentialResource
     merged.credentialOrigins = existing?.credentialOrigins
-    merged.credentialId = existing?.credentialId
+    merged.accountId = existing?.accountId
     if let idx {
         list[idx] = merged
     } else {
         list.append(merged)
     }
-    state.modelSourceRegistrations = list
+    state.modelSources = list
 }
 
-/// Removes `clientId` from the contributors of the registration with `id`.
-/// Returns `false` when no registration has `id`, or `clientId` doesn't
-/// contribute it.
-func applyModelSourceContributorRemoved(_ state: inout RootState, id: String, clientId: String) -> Bool {
-    guard var list = state.modelSourceRegistrations,
-          let idx = list.firstIndex(where: { $0.id == id }),
-          let contributors = list[idx].contributingClientIds,
-          contributors.contains(clientId) else { return false }
-    let remaining = contributors.filter { $0 != clientId }
-    list[idx].contributingClientIds = remaining.isEmpty ? nil : remaining
-    state.modelSourceRegistrations = list
-    return true
-}
-
-/// Whether two registrations have the same `provider`, `format`, and
-/// `definition`. `AnyCodable` dictionaries compare regardless of key order.
-private func sameModelSourceRouting(_ a: ModelSourceRegistration, _ b: ModelSourceRegistration) -> Bool {
-    a.provider == b.provider && a.format == b.format && a.definition == b.definition
-}
-
-/// Removes the registration with `id`. Returns `false` when none matches.
-func applyModelSourceRegistrationRemoved(_ state: inout RootState, id: String) -> Bool {
-    guard var list = state.modelSourceRegistrations,
+/// Removes the model source with `id`. Returns `false` when none matches.
+func applyModelSourceRemoved(_ state: inout RootState, id: String) -> Bool {
+    guard var list = state.modelSources,
           let idx = list.firstIndex(where: { $0.id == id }) else { return false }
     list.remove(at: idx)
-    state.modelSourceRegistrations = list
+    state.modelSources = list
     return true
 }
 
-/// Updates the host-reported fields of the registration with `action.id`.
+/// Whether two model sources have the same `provider`, `format`, and
+/// definition `nonce`.
+private func sameModelSourceVersion(_ a: ModelSource, _ b: ModelSource) -> Bool {
+    a.provider == b.provider && a.format == b.format && a.nonce == b.nonce
+}
+
+/// Updates the host-reported fields of the model source with `action.id`.
 /// Returns `false` when none matches.
 func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
-    guard var list = state.modelSourceRegistrations,
+    guard var list = state.modelSources,
           let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
     list[idx].state = action.state
     list[idx].credentialNonce = action.credentialNonce
     list[idx].credentialResource = action.credentialResource
     list[idx].credentialOrigins = action.credentialOrigins
-    list[idx].credentialId = action.credentialId
-    state.modelSourceRegistrations = list
+    list[idx].accountId = action.accountId
+    state.modelSources = list
     return true
 }
 

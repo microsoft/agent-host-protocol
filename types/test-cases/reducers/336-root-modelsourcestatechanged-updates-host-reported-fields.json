@@ -1,0 +1,82 @@
+{
+  "description": "root/modelSourceStateChanged sets the matching model source's state, credentialNonce, credentialResource, credentialOrigins, and accountId together, adding credential fields it didn't have, and preserves its other fields and the registry order",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "openaiCompatible",
+        "nonce": "definition-b-v1",
+        "retention": "host",
+        "state": {
+          "kind": "starting"
+        },
+        "credentialNonce": "nonce-b-1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceStateChanged",
+      "id": "model-source-b",
+      "state": {
+        "kind": "authRequired",
+        "reason": "rejected",
+        "description": "The endpoint rejected the API key."
+      },
+      "credentialNonce": "nonce-b-2",
+      "credentialResource": {
+        "resource": "https://apib.example.com/v1",
+        "resource_name": "Source b API key"
+      },
+      "credentialOrigins": [
+        "https://apib.example.com"
+      ],
+      "accountId": "account-b-1"
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "openaiCompatible",
+        "nonce": "definition-b-v1",
+        "retention": "host",
+        "state": {
+          "kind": "authRequired",
+          "reason": "rejected",
+          "description": "The endpoint rejected the API key."
+        },
+        "credentialNonce": "nonce-b-2",
+        "credentialResource": {
+          "resource": "https://apib.example.com/v1",
+          "resource_name": "Source b API key"
+        },
+        "credentialOrigins": [
+          "https://apib.example.com"
+        ],
+        "accountId": "account-b-1"
+      }
+    ]
+  }
+}

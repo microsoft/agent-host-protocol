@@ -2,7 +2,6 @@ package ahp
 
 import (
 	"encoding/json"
-	"reflect"
 	"time"
 
 	"github.com/microsoft/agent-host-protocol/clients/go/ahptypes"
@@ -538,66 +537,47 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			state.Config.Values[k] = v
 		}
 		return ReduceOutcomeApplied
-	case *ahptypes.RootModelSourceRegistrationSetAction:
-		updated := a.Registration
-		var contributors []string
-		idx := modelSourceRegistrationIndex(state.ModelSourceRegistrations, updated.Id)
-		if idx >= 0 && sameModelSourceRouting(state.ModelSourceRegistrations[idx], updated) {
-			copyModelSourceHostFields(&updated, state.ModelSourceRegistrations[idx])
-			contributors = append(contributors, state.ModelSourceRegistrations[idx].ContributingClientIds...)
+	case *ahptypes.RootModelSourceSetAction:
+		updated := a.ModelSource
+		idx := modelSourceIndex(state.ModelSources, updated.Id)
+		if idx >= 0 && sameModelSourceVersion(state.ModelSources[idx], updated) {
+			copyModelSourceHostFields(&updated, state.ModelSources[idx])
 		} else {
-			copyModelSourceHostFields(&updated, ahptypes.ModelSourceRegistration{})
+			copyModelSourceHostFields(&updated, ahptypes.ModelSource{})
 		}
-		if a.ClientId != nil && !containsString(contributors, *a.ClientId) {
-			contributors = append(contributors, *a.ClientId)
-		}
-		updated.ContributingClientIds = contributors
 		if idx >= 0 {
-			state.ModelSourceRegistrations[idx] = updated
+			state.ModelSources[idx] = updated
 		} else {
-			state.ModelSourceRegistrations = append(state.ModelSourceRegistrations, updated)
+			state.ModelSources = append(state.ModelSources, updated)
 		}
 		return ReduceOutcomeApplied
-	case *ahptypes.RootModelSourceContributorRemovedAction:
-		idx := modelSourceRegistrationIndex(state.ModelSourceRegistrations, a.Id)
-		if idx < 0 || !containsString(state.ModelSourceRegistrations[idx].ContributingClientIds, a.ClientId) {
-			return ReduceOutcomeNoOp
-		}
-		var remaining []string
-		for _, id := range state.ModelSourceRegistrations[idx].ContributingClientIds {
-			if id != a.ClientId {
-				remaining = append(remaining, id)
-			}
-		}
-		state.ModelSourceRegistrations[idx].ContributingClientIds = remaining
-		return ReduceOutcomeApplied
-	case *ahptypes.RootModelSourceRegistrationRemovedAction:
-		idx := modelSourceRegistrationIndex(state.ModelSourceRegistrations, a.Id)
+	case *ahptypes.RootModelSourceRemovedAction:
+		idx := modelSourceIndex(state.ModelSources, a.Id)
 		if idx < 0 {
 			return ReduceOutcomeNoOp
 		}
-		state.ModelSourceRegistrations = append(state.ModelSourceRegistrations[:idx], state.ModelSourceRegistrations[idx+1:]...)
+		state.ModelSources = append(state.ModelSources[:idx], state.ModelSources[idx+1:]...)
 		return ReduceOutcomeApplied
 	case *ahptypes.RootModelSourceStateChangedAction:
-		idx := modelSourceRegistrationIndex(state.ModelSourceRegistrations, a.Id)
+		idx := modelSourceIndex(state.ModelSources, a.Id)
 		if idx < 0 {
 			return ReduceOutcomeNoOp
 		}
 		st := a.State
 		nonce := a.CredentialNonce
-		copyModelSourceHostFields(&state.ModelSourceRegistrations[idx], ahptypes.ModelSourceRegistration{
+		copyModelSourceHostFields(&state.ModelSources[idx], ahptypes.ModelSource{
 			State:              &st,
 			CredentialNonce:    &nonce,
 			CredentialResource: a.CredentialResource,
 			CredentialOrigins:  a.CredentialOrigins,
-			CredentialId:       a.CredentialId,
+			AccountId:          a.AccountId,
 		})
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }
 
-func modelSourceRegistrationIndex(list []ahptypes.ModelSourceRegistration, id string) int {
+func modelSourceIndex(list []ahptypes.ModelSource, id string) int {
 	for i := range list {
 		if list[i].Id == id {
 			return i
@@ -608,45 +588,18 @@ func modelSourceRegistrationIndex(list []ahptypes.ModelSourceRegistration, id st
 
 // copyModelSourceHostFields copies the host-reported fields of from onto to,
 // clearing the ones from lacks.
-func copyModelSourceHostFields(to *ahptypes.ModelSourceRegistration, from ahptypes.ModelSourceRegistration) {
+func copyModelSourceHostFields(to *ahptypes.ModelSource, from ahptypes.ModelSource) {
 	to.State = from.State
 	to.CredentialNonce = from.CredentialNonce
 	to.CredentialResource = from.CredentialResource
 	to.CredentialOrigins = from.CredentialOrigins
-	to.CredentialId = from.CredentialId
+	to.AccountId = from.AccountId
 }
 
-// sameModelSourceRouting reports whether two registrations have the same
-// provider, format, and definition, comparing definitions as JSON values.
-func sameModelSourceRouting(a, b ahptypes.ModelSourceRegistration) bool {
-	return a.Provider == b.Provider && a.Format == b.Format && jsonValuesEqual(a.Definition, b.Definition)
-}
-
-// jsonValuesEqual compares two values by their JSON meaning, ignoring object
-// key order and formatting.
-func jsonValuesEqual(a, b any) bool {
-	return reflect.DeepEqual(normalizeJSON(a), normalizeJSON(b))
-}
-
-func normalizeJSON(v any) any {
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return nil
-	}
-	var out any
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil
-	}
-	return out
-}
-
-func containsString(list []string, value string) bool {
-	for _, item := range list {
-		if item == value {
-			return true
-		}
-	}
-	return false
+// sameModelSourceVersion reports whether two model sources have the same
+// provider, format, and definition nonce.
+func sameModelSourceVersion(a, b ahptypes.ModelSource) bool {
+	return a.Provider == b.Provider && a.Format == b.Format && a.Nonce == b.Nonce
 }
 
 // ─── Chat Reducer ──────────────────────────────────────────────────────

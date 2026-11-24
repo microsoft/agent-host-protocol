@@ -1356,19 +1356,12 @@ type McpServerAuthenticateTarget struct {
 // Stability: 1.0 - Early development.
 type ModelSourceAuthenticateTarget struct {
 	Kind AuthenticateTargetKind `json:"kind"`
-	// The registration's `ModelSourceRegistration.id`.
+	// The registration's `ModelSource.id`.
 	ModelSourceId string `json:"modelSourceId"`
-	// The registration's current `ModelSourceRegistration.credentialNonce`, as
+	// The registration's current `ModelSource.credentialNonce`, as
 	// published in root state. The host rejects a stale one with `Conflict`
 	// (-32011).
 	CredentialNonce string `json:"credentialNonce"`
-	// A client-chosen, non-secret ID for the credential, such as a hash of
-	// where the client stores the key. The host publishes it as the
-	// registration's `ModelSourceRegistration.credentialId`, so a client can
-	// tell whether the host holds its current key. Clients SHOULD include it
-	// when delivering a credential, and omit it when revoking one. MUST NOT be
-	// derived from the secret.
-	CredentialId *string `json:"credentialId,omitempty"`
 }
 
 // Pushes a credential for a protected resource. The `resource` field MUST
@@ -1377,7 +1370,7 @@ type ModelSourceAuthenticateTarget struct {
 // or discovered dynamically from a live `McpServerAuthRequiredState.resource`
 // or `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the
 // corresponding MCP server or tool call actually challenges for auth), or
-// from a registered model source's `ModelSourceRegistration.credentialResource`.
+// from a registered model source's `ModelSource.credentialResource`.
 // Servers MUST accept any `resource` value they have themselves advertised
 // through one of these mechanisms, subject to the `target` rules. A
 // `modelSource` target takes only the registration's current
@@ -1398,7 +1391,7 @@ type AuthenticateParams struct {
 	// server has advertised — via `ProtectedResourceMetadata` in
 	// `AgentInfo.protectedResources`, or via a live
 	// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-	// or `ModelSourceRegistration.credentialResource`.
+	// or `ModelSource.credentialResource`.
 	Resource string `json:"resource"`
 	// Bearer token obtained from the resource's authorization server, or an
 	// opaque secret for a model source. An empty string revokes the credential.
@@ -1451,6 +1444,12 @@ type AuthenticateParams struct {
 	// Hosts can compare `accountId` values to detect when the underlying account has changed.
 	// Hosts MUST treat `accountId` as an opaque string.
 	// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+	//
+	// With a `modelSource` target, clients SHOULD include it when delivering a
+	// credential and omit it when revoking one, and the host publishes it as
+	// the source's `ModelSource.accountId`. It MUST NOT be derived from the
+	// secret. For an API key with no account of its own, a client uses an ID
+	// that changes whenever the user replaces the key.
 	AccountId *string `json:"accountId,omitempty"`
 }
 

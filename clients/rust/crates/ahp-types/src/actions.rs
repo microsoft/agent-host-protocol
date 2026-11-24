@@ -20,11 +20,11 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, ModelSourceRegistration, ModelSourceState, PendingMessageKind,
-    ProtectedResourceMetadata, ResponsePart, SessionActiveClient, SessionConfigSchema,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ModelSelection, ModelSource, ModelSourceState, PendingMessageKind, ProtectedResourceMetadata,
+    ResponsePart, SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
+    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
+    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
+    ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -119,9 +119,8 @@ pub enum ActionType {
     AnnotationsEntryRemoved,
     RootTerminalsChanged,
     RootConfigChanged,
-    RootModelSourceRegistrationSet,
-    RootModelSourceContributorRemoved,
-    RootModelSourceRegistrationRemoved,
+    RootModelSourceSet,
+    RootModelSourceRemoved,
     RootModelSourceStateChanged,
     TerminalData,
     TerminalInput,
@@ -291,15 +290,8 @@ impl serde::Serialize for ActionType {
             Self::AnnotationsEntryRemoved => serializer.serialize_str("annotations/entryRemoved"),
             Self::RootTerminalsChanged => serializer.serialize_str("root/terminalsChanged"),
             Self::RootConfigChanged => serializer.serialize_str("root/configChanged"),
-            Self::RootModelSourceRegistrationSet => {
-                serializer.serialize_str("root/modelSourceRegistrationSet")
-            }
-            Self::RootModelSourceContributorRemoved => {
-                serializer.serialize_str("root/modelSourceContributorRemoved")
-            }
-            Self::RootModelSourceRegistrationRemoved => {
-                serializer.serialize_str("root/modelSourceRegistrationRemoved")
-            }
+            Self::RootModelSourceSet => serializer.serialize_str("root/modelSourceSet"),
+            Self::RootModelSourceRemoved => serializer.serialize_str("root/modelSourceRemoved"),
             Self::RootModelSourceStateChanged => {
                 serializer.serialize_str("root/modelSourceStateChanged")
             }
@@ -437,9 +429,8 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "annotations/entryRemoved" => Self::AnnotationsEntryRemoved,
             "root/terminalsChanged" => Self::RootTerminalsChanged,
             "root/configChanged" => Self::RootConfigChanged,
-            "root/modelSourceRegistrationSet" => Self::RootModelSourceRegistrationSet,
-            "root/modelSourceContributorRemoved" => Self::RootModelSourceContributorRemoved,
-            "root/modelSourceRegistrationRemoved" => Self::RootModelSourceRegistrationRemoved,
+            "root/modelSourceSet" => Self::RootModelSourceSet,
+            "root/modelSourceRemoved" => Self::RootModelSourceRemoved,
             "root/modelSourceStateChanged" => Self::RootModelSourceStateChanged,
             "terminal/data" => Self::TerminalData,
             "terminal/input" => Self::TerminalInput,
@@ -529,93 +520,69 @@ pub struct RootConfigChangedAction {
     pub replace: Option<bool>,
 }
 
-/// Contributes a model source registration for `clientId`. A registration's
-/// routing is its `provider`, `format`, and `definition`, with definitions
-/// compared as JSON values: object key order is ignored, and numbers compare
-/// by numeric value, so `1` equals `1.0`.
+/// Adds a model source, or updates the one with the same `id`. The reducer
+/// stores `modelSource` without the definition:
 ///
-/// - **Add.** When no registration has the `id`, appends it, with
-///   `contributingClientIds` set to `[clientId]`, or absent without a
-///   `clientId`.
-/// - **Join.** When one has, and its routing is unchanged, keeps its
-///   host-reported fields (`state`, `credentialNonce`, `credentialResource`,
-///   `credentialOrigins`, and `credentialId`), adds `clientId` to
-///   `contributingClientIds` if it isn't there, and takes the other fields
-///   from the action.
-/// - **Replace.** When the routing changed, replaces the registration, with
-///   `contributingClientIds` set to `[clientId]`, or absent without a
-///   `clientId`. Its host-reported fields are absent until the host reports
-///   again with {@link RootModelSourceStateChangedAction}.
+/// - **Add.** When no model source has the `id`, appends `modelSource`.
+/// - **Re-register.** When one has, with the same `provider`, `format`, and
+///   `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,
+///   `credentialResource`, `credentialOrigins`, and `accountId`) and takes
+///   the other fields from the action.
+/// - **Update.** When any of the three differs, replaces the source. Its
+///   host-reported fields are absent until the host reports again with
+///   {@link RootModelSourceStateChangedAction}.
 ///
-/// A client dispatches this with its own `clientId`, and without
-/// `contributingClientIds` or any host-reported field.
+/// A client dispatches this without any host-reported field. The host learns
+/// which client registered the source from the envelope's `origin`.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RootModelSourceRegistrationSetAction {
-    /// The registration to contribute, matched by `id`.
-    pub registration: ModelSourceRegistration,
-    /// The contributing client. Absent when the host registers the source
-    /// itself.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub client_id: Option<String>,
+pub struct RootModelSourceSetAction {
+    /// The model source to add or update, matched by `id`, without host-reported fields.
+    pub model_source: ModelSource,
+    /// How to reach the source, in `modelSource.format`: endpoint, wire format,
+    /// models, and so on. The host hands it to the agent, and the reducer
+    /// doesn't store it. MUST NOT contain a credential.
+    pub definition: JsonObject,
 }
 
-/// Withdraws one client's contribution to a model source registration:
-/// removes `clientId` from `contributingClientIds`, leaving the field absent
-/// when no contributor remains. A no-op when no registration has `id`, or
-/// `clientId` doesn't contribute it. It never removes the registration.
-///
-/// A client dispatches this with its own `clientId`. The host dispatches it
-/// when a contributing client leaves.
+/// Removes the model source with the given `id`, for every client. A no-op
+/// when none matches.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RootModelSourceContributorRemovedAction {
-    /// The registration's `id`.
-    pub id: String,
-    /// The contributing client to remove.
-    pub client_id: String,
-}
-
-/// Removes the model source registration with the given `id` for every
-/// contributor. A no-op when none matches.
-///
-/// Stability: 1.0 - Early development.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RootModelSourceRegistrationRemovedAction {
-    /// The registration's `id`.
+pub struct RootModelSourceRemovedAction {
+    /// The model source's `id`.
     pub id: String,
 }
 
-/// Updates a model source registration's host-reported fields together:
-/// `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
-/// `credentialId`. A no-op when no registration has `id`. Other fields of the
-/// registration are preserved. Only the host dispatches it.
+/// Updates a model source's host-reported fields together: `state`,
+/// `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+/// `accountId`. A no-op when no model source has `id`. Other fields of the
+/// source are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootModelSourceStateChangedAction {
-    /// The registration's `id`.
+    /// The model source's `id`.
     pub id: String,
     /// The new status.
     pub state: ModelSourceState,
-    /// The registration's current credential nonce.
+    /// The model source's current credential nonce.
     pub credential_nonce: String,
-    /// Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// Replaces the source's `credentialResource`. Absent clears it, for a
     /// source that needs no credential.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_resource: Option<ProtectedResourceMetadata>,
-    /// Replaces the registration's `credentialOrigins`. Absent clears it.
+    /// Replaces the source's `credentialOrigins`. Absent clears it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_origins: Option<Vec<Uri>>,
-    /// Replaces the registration's `credentialId`. Absent clears it.
+    /// Replaces the source's `accountId`. Absent clears it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credential_id: Option<String>,
+    pub account_id: Option<String>,
 }
 
 /// Session backend initialized successfully.
@@ -2565,12 +2532,10 @@ pub enum StateAction {
     RootActiveSessionsChanged(RootActiveSessionsChangedAction),
     #[serde(rename = "root/configChanged")]
     RootConfigChanged(RootConfigChangedAction),
-    #[serde(rename = "root/modelSourceRegistrationSet")]
-    RootModelSourceRegistrationSet(Box<RootModelSourceRegistrationSetAction>),
-    #[serde(rename = "root/modelSourceContributorRemoved")]
-    RootModelSourceContributorRemoved(RootModelSourceContributorRemovedAction),
-    #[serde(rename = "root/modelSourceRegistrationRemoved")]
-    RootModelSourceRegistrationRemoved(RootModelSourceRegistrationRemovedAction),
+    #[serde(rename = "root/modelSourceSet")]
+    RootModelSourceSet(Box<RootModelSourceSetAction>),
+    #[serde(rename = "root/modelSourceRemoved")]
+    RootModelSourceRemoved(RootModelSourceRemovedAction),
     #[serde(rename = "root/modelSourceStateChanged")]
     RootModelSourceStateChanged(RootModelSourceStateChangedAction),
     #[serde(rename = "session/ready")]

@@ -1,0 +1,102 @@
+{
+  "description": "root/modelSourceSet with the same provider, format, and nonce re-registers: it keeps every host-reported field and takes displayName, icons, retention, and _meta from the action",
+  "reducer": "root",
+  "initial": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1",
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "accountId": "account-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "openaiCompatible",
+        "nonce": "definition-b-v1"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "root/modelSourceSet",
+      "modelSource": {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a (renamed)",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1",
+        "icons": [
+          {
+            "src": "https://apia.example.com/icon.png"
+          }
+        ],
+        "retention": "host",
+        "_meta": {
+          "example.com/window": "2"
+        }
+      },
+      "definition": {
+        "baseUrl": "https://apia.example.com/v1",
+        "models": [
+          "model-a"
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "modelSources": [
+      {
+        "id": "model-source-a",
+        "provider": "copilot",
+        "displayName": "Source a (renamed)",
+        "format": "openaiCompatible",
+        "nonce": "definition-a-v1",
+        "icons": [
+          {
+            "src": "https://apia.example.com/icon.png"
+          }
+        ],
+        "retention": "host",
+        "_meta": {
+          "example.com/window": "2"
+        },
+        "state": {
+          "kind": "ready"
+        },
+        "credentialNonce": "nonce-a-1",
+        "credentialResource": {
+          "resource": "https://apia.example.com/v1",
+          "resource_name": "Source a API key"
+        },
+        "credentialOrigins": [
+          "https://apia.example.com"
+        ],
+        "accountId": "account-a-1"
+      },
+      {
+        "id": "model-source-b",
+        "provider": "copilot",
+        "displayName": "Source b",
+        "format": "openaiCompatible",
+        "nonce": "definition-b-v1"
+      }
+    ]
+  }
+}

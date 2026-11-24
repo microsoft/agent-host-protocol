@@ -940,14 +940,13 @@ public enum ModelSourceStatus: Codable, Sendable, Equatable {
 }
 
 /// How long a registered model source lasts once its last contributing client
-/// leaves. When the last contributor withdraws instead, the source goes away
-/// whatever its retention.
+/// leaves.
 ///
 /// Stability: 1.0 - Early development.
 public enum ModelSourceRetentionPolicy: Codable, Sendable, Equatable {
     /// Removed when the last contributing client leaves, once running turns finish.
     case contributingClient
-    /// Kept until it's removed, its last contributor withdraws, or host policy expires it.
+    /// Kept until a client removes it, or host policy expires it.
     case host
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
@@ -982,7 +981,7 @@ public enum ModelSourceAuthRequiredReason: Codable, Sendable, Equatable {
     /// The credential's lifetime or lease lapsed. A client may renew it.
     case expired
     /// The endpoint refused the credential. Clients don't send a credential with
-    /// the same {@link ModelSourceRegistration.credentialId} again.
+    /// the same {@link ModelSource.accountId} again.
     case rejected
     /// A client revoked the credential. Clients don't send one again without a user's action.
     case revoked
@@ -1019,11 +1018,11 @@ public enum ModelSourceAuthRequiredReason: Codable, Sendable, Equatable {
 /// Stability: 1.0 - Early development.
 public enum ModelSourcePrincipalPolicy: Codable, Sendable, Equatable {
     /// Every connected client may change, supply credentials for, and select
-    /// every registration.
+    /// every model source.
     case shared
     /// The host verifies principals, and limits changes, credentials, and
-    /// selection of each registration to clients of the principal that
-    /// registered it. Root state still lists every registration to every
+    /// selection of each model source to clients of the principal that
+    /// registered it. Root state still lists every model source to every
     /// client.
     case isolated
     /// Unknown raw value from a newer protocol version, preserved verbatim.
@@ -1642,10 +1641,12 @@ public struct RootState: Codable, Sendable, Equatable {
     public var terminals: [TerminalInfo]?
     /// Agent host configuration schema and current values
     public var config: RootConfigState?
-    /// Model sources registered on this host, keyed by `id`.
+    /// Model sources registered on this host, keyed by `id`. When one is
+    /// ready, it also appears in its agent's {@link AgentInfo.modelSources}
+    /// catalog.
     ///
     /// Stability: 1.0 - Early development.
-    public var modelSourceRegistrations: [ModelSourceRegistration]?
+    public var modelSources: [ModelSource]?
     /// Additional implementation-defined metadata about the agent host itself.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1656,7 +1657,7 @@ public struct RootState: Codable, Sendable, Equatable {
         case activeSessions
         case terminals
         case config
-        case modelSourceRegistrations
+        case modelSources
         case meta = "_meta"
     }
 
@@ -1665,14 +1666,14 @@ public struct RootState: Codable, Sendable, Equatable {
         activeSessions: Int? = nil,
         terminals: [TerminalInfo]? = nil,
         config: RootConfigState? = nil,
-        modelSourceRegistrations: [ModelSourceRegistration]? = nil,
+        modelSources: [ModelSource]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.agents = agents
         self.activeSessions = activeSessions
         self.terminals = terminals
         self.config = config
-        self.modelSourceRegistrations = modelSourceRegistrations
+        self.modelSources = modelSources
         self.meta = meta
     }
 }
@@ -1853,13 +1854,12 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceRegistrationCapability: Codable, Sendable, Equatable {
-    /// Definition formats the agent reads, most preferred first. Format names
-    /// are defined by agent implementations and SHOULD be namespaced, for
-    /// example `example.com/model-source@1`. AHP doesn't define, standardize,
-    /// or name any format.
+    /// Definition formats the agent reads, most preferred first: recognized
+    /// values of {@link ModelSource.format}, or namespaced names for formats
+    /// the agent defines itself.
     public var formats: [String]
-    /// How long, in milliseconds, the host keeps a disconnected client's
-    /// contributions before it treats the client as having left.
+    /// How long, in milliseconds, the host keeps counting a disconnected client
+    /// as a contributing client before it treats the client as having left.
     public var gracePeriod: Int?
     /// Whether clients acting for different principals share the registry.
     /// Absent means `shared`.
@@ -1902,12 +1902,13 @@ public struct ModelSourceRegistrationCapability: Codable, Sendable, Equatable {
     }
 }
 
-/// A model source registered on this host by one or more clients, or by the
-/// host itself. Its definition is in a format the agent named by `provider`
-/// reads. It never contains a credential.
+/// A model source registered on this host by a client, or by the host itself.
+/// The definition that tells the agent named by `provider` how to reach it
+/// travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
+/// here is a credential.
 ///
 /// Stability: 1.0 - Early development.
-public struct ModelSourceRegistration: Codable, Sendable, Equatable {
+public struct ModelSource: Codable, Sendable, Equatable {
     /// Host-unique ID, chosen by whoever registers the source. Also the
     /// source's {@link ModelSourceInfo.id} in the agent's catalog, and the
     /// {@link SessionModelInfo.modelSourceId} of its models.
@@ -1918,32 +1919,37 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     public var displayName: String
     /// Icons for UI display.
     public var icons: [Icon]?
-    /// Definition format, one of the agent's
-    /// {@link ModelSourceRegistrationCapability.formats}.
+    /// The definition's format, one of the agent's
+    /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
+    /// include:
+    ///
+    /// - `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as
+    /// OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.
+    /// - `'anthropic'`: an endpoint that implements Anthropic's Messages API.
+    /// - `'azureOpenai'`: an Azure OpenAI deployment.
+    /// - `'gemini'`: Google's Gemini API.
+    ///
+    /// AHP doesn't define what a definition contains, even for these. Agents
+    /// MAY read other formats, named with a namespace such as
+    /// `example.com/model-source@1` so they don't collide.
     public var format: String
-    /// How to reach the source: endpoint, wire format, models, and so on, in
-    /// `format`. Its shape belongs to the agent that reads it, and AHP doesn't
-    /// define it. MUST NOT contain a credential.
-    public var definition: [String: AnyCodable]
-    /// The clients that contribute this registration, in the order they joined.
-    /// The reducer maintains it from {@link RootModelSourceRegistrationSetAction}
-    /// and {@link RootModelSourceContributorRemovedAction}. Absent when no
-    /// client contributes it: a source the host registered itself, or a
-    /// `host`-retained one whose contributors have all left.
-    public var contributingClientIds: [String]?
+    /// Opaque version token for the definition, such as a hash of it, chosen by
+    /// whoever registers the source. A client compares it with its own copy
+    /// instead of the definition, and the reducer compares it to tell an update
+    /// from a re-registration of the same definition.
+    public var nonce: String
     /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     public var retention: ModelSourceRetentionPolicy?
     /// Host-reported status, set with {@link RootModelSourceStateChangedAction}.
-    /// Absent until the host reports one, and after a `Set` replaces the
-    /// registration until the host reports again.
+    /// Absent until the host reports one, and after an update replaces the
+    /// definition until the host reports again.
     public var state: ModelSourceState?
     /// Host-issued token that a client echoes in
     /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential, and that tags every agent operation on the registration.
-    /// The host issues a new one when the registration is added, when its
-    /// `provider`, `format`, or `definition` changes, and whenever the
-    /// credential is installed or dropped. It never reuses one for the same
-    /// `id`. Set with `state`.
+    /// the credential, and that tags every agent operation on the source. The
+    /// host issues a new one when the source is added or updated, and whenever
+    /// the credential is installed or dropped. It never reuses one for the
+    /// same `id`. Set with `state`.
     public var credentialNonce: String?
     /// RFC 9728 metadata for the endpoint the credential is for. Present
     /// whenever the source takes a credential, in every state, so any client
@@ -1960,17 +1966,17 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     /// takes a user-supplied secret omits them.
     public var credentialResource: ProtectedResourceMetadata?
     /// Every origin the host sends the credential to, such as
-    /// `https://api.example.com`. Present whenever `credentialResource` is. A
-    /// client checks each one against its own copy of the definition before it
-    /// sends a key. Set with `state`.
+    /// `https://api.example.com`, derived from the definition it holds. Present
+    /// whenever `credentialResource` is. A client checks each one against its
+    /// own copy of the definition before it sends a key. Set with `state`.
     public var credentialOrigins: [String]?
-    /// The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of
-    /// the credential the host most recently accepted. While the state is
-    /// `starting` or `ready`, the host holds it. While it's `authRequired`, the
-    /// `reason` says what happened to it. Absent until the host accepts a
-    /// credential. Set with `state`.
-    public var credentialId: String?
-    /// Additional implementation-defined metadata for this registration.
+    /// The {@link AuthenticateParams.accountId} the client sent with the
+    /// credential the host most recently accepted. While the state is
+    /// `starting` or `ready`, the host holds that credential. While it's
+    /// `authRequired`, the `reason` says what happened to it. Absent until the
+    /// host accepts a credential sent with an `accountId`. Set with `state`.
+    public var accountId: String?
+    /// Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
     /// Unrecognized wire members retained for full-object edits.
@@ -1982,14 +1988,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         case displayName
         case icons
         case format
-        case definition
-        case contributingClientIds
+        case nonce
         case retention
         case state
         case credentialNonce
         case credentialResource
         case credentialOrigins
-        case credentialId
+        case accountId
         case meta = "_meta"
     }
 
@@ -1999,14 +2004,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         displayName: String,
         icons: [Icon]? = nil,
         format: String,
-        definition: [String: AnyCodable],
-        contributingClientIds: [String]? = nil,
+        nonce: String,
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
         credentialNonce: String? = nil,
         credentialResource: ProtectedResourceMetadata? = nil,
         credentialOrigins: [String]? = nil,
-        credentialId: String? = nil,
+        accountId: String? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
@@ -2015,14 +2019,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.displayName = displayName
         self.icons = icons
         self.format = format
-        self.definition = definition
-        self.contributingClientIds = contributingClientIds
+        self.nonce = nonce
         self.retention = retention
         self.state = state
         self.credentialNonce = credentialNonce
         self.credentialResource = credentialResource
         self.credentialOrigins = credentialOrigins
-        self.credentialId = credentialId
+        self.accountId = accountId
         self.meta = meta
         self.extra = extra
     }
@@ -2034,14 +2037,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.displayName = try container.decode(String.self, forKey: .displayName)
         self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
         self.format = try container.decode(String.self, forKey: .format)
-        self.definition = try container.decode([String: AnyCodable].self, forKey: .definition)
-        self.contributingClientIds = try container.decodeIfPresent([String].self, forKey: .contributingClientIds)
+        self.nonce = try container.decode(String.self, forKey: .nonce)
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
         self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
         self.credentialResource = try container.decodeIfPresent(ProtectedResourceMetadata.self, forKey: .credentialResource)
         self.credentialOrigins = try container.decodeIfPresent([String].self, forKey: .credentialOrigins)
-        self.credentialId = try container.decodeIfPresent(String.self, forKey: .credentialId)
+        self.accountId = try container.decodeIfPresent(String.self, forKey: .accountId)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2053,14 +2055,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         try container.encode(self.displayName, forKey: .displayName)
         try container.encodeIfPresent(self.icons, forKey: .icons)
         try container.encode(self.format, forKey: .format)
-        try container.encode(self.definition, forKey: .definition)
-        try container.encodeIfPresent(self.contributingClientIds, forKey: .contributingClientIds)
+        try container.encode(self.nonce, forKey: .nonce)
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
         try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)
         try container.encodeIfPresent(self.credentialResource, forKey: .credentialResource)
         try container.encodeIfPresent(self.credentialOrigins, forKey: .credentialOrigins)
-        try container.encodeIfPresent(self.credentialId, forKey: .credentialId)
+        try container.encodeIfPresent(self.accountId, forKey: .accountId)
         try container.encodeIfPresent(self.meta, forKey: .meta)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2101,7 +2102,7 @@ public struct ModelSourceStartingState: Codable, Sendable, Equatable {
 }
 
 /// The source is usable, and its models are in the catalog of the agent named
-/// by the registration's `provider`. They stay listed through later `starting`
+/// by the model source's `provider`. They stay listed through later `starting`
 /// and `authRequired` states.
 ///
 /// Stability: 1.0 - Early development.
@@ -2137,7 +2138,7 @@ public struct ModelSourceReadyState: Codable, Sendable, Equatable {
 
 /// Why a model source needs a credential before it can be ready. Deliberately
 /// carries no credential. The endpoint the credential is for is the
-/// registration's {@link ModelSourceRegistration.credentialResource}.
+/// model source's {@link ModelSource.credentialResource}.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
@@ -2180,7 +2181,7 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
 }
 
 /// The source needs a credential before it can be used. A client answers with
-/// `authenticate`, the registration's `credentialResource.resource`, and a
+/// `authenticate`, the model source's `credentialResource.resource`, and a
 /// {@link ModelSourceAuthenticateTarget}.
 ///
 /// Stability: 1.0 - Early development.
@@ -2272,8 +2273,8 @@ public struct ModelSourceErrorState: Codable, Sendable, Equatable {
 public struct ModelSourceInfo: Codable, Sendable, Equatable {
     /// Model source identifier, unique within the agent's
     /// {@link AgentInfo.modelSources}. For a registered model source, this is
-    /// the {@link ModelSourceRegistration.id}. A source is registered when
-    /// {@link RootState.modelSourceRegistrations} has an entry with this `id`
+    /// the {@link ModelSource.id}. A source is registered when
+    /// {@link RootState.modelSources} has an entry with this `id`
     /// whose `provider` is the agent.
     public var id: String
     /// Human-readable name
@@ -2327,7 +2328,7 @@ public struct SessionModelInfo: Codable, Sendable, Equatable {
     public var vendor: String?
     /// The source this model comes from. MUST match a {@link ModelSourceInfo.id}
     /// in the agent's {@link AgentInfo.modelSources}. For a model from a
-    /// registered model source, this is the {@link ModelSourceRegistration.id}.
+    /// registered model source, this is the {@link ModelSource.id}.
     /// An agent's own sources use it too, so it doesn't by itself mark a
     /// registered source.
     public var modelSourceId: String?

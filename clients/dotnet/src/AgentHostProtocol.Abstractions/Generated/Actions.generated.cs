@@ -199,11 +199,9 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
 
-    public static readonly ActionType RootModelSourceRegistrationSet = new ActionType("root/modelSourceRegistrationSet");
+    public static readonly ActionType RootModelSourceSet = new ActionType("root/modelSourceSet");
 
-    public static readonly ActionType RootModelSourceContributorRemoved = new ActionType("root/modelSourceContributorRemoved");
-
-    public static readonly ActionType RootModelSourceRegistrationRemoved = new ActionType("root/modelSourceRegistrationRemoved");
+    public static readonly ActionType RootModelSourceRemoved = new ActionType("root/modelSourceRemoved");
 
     public static readonly ActionType RootModelSourceStateChanged = new ActionType("root/modelSourceStateChanged");
 
@@ -348,104 +346,78 @@ public sealed record RootConfigChangedAction
     public bool? Replace { get; init; }
 }
 
-/// <summary>Contributes a model source registration for `clientId`. A registration's
-/// routing is its `provider`, `format`, and `definition`, with definitions
-/// compared as JSON values: object key order is ignored, and numbers compare
-/// by numeric value, so `1` equals `1.0`.
+/// <summary>Adds a model source, or updates the one with the same `id`. The reducer
+/// stores `modelSource` without the definition:
 ///
-/// - **Add.** When no registration has the `id`, appends it, with
-///   `contributingClientIds` set to `[clientId]`, or absent without a
-///   `clientId`.
-/// - **Join.** When one has, and its routing is unchanged, keeps its
-///   host-reported fields (`state`, `credentialNonce`, `credentialResource`,
-///   `credentialOrigins`, and `credentialId`), adds `clientId` to
-///   `contributingClientIds` if it isn't there, and takes the other fields
-///   from the action.
-/// - **Replace.** When the routing changed, replaces the registration, with
-///   `contributingClientIds` set to `[clientId]`, or absent without a
-///   `clientId`. Its host-reported fields are absent until the host reports
-///   again with {@link RootModelSourceStateChangedAction}.
+/// - **Add.** When no model source has the `id`, appends `modelSource`.
+/// - **Re-register.** When one has, with the same `provider`, `format`, and
+///   `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,
+///   `credentialResource`, `credentialOrigins`, and `accountId`) and takes
+///   the other fields from the action.
+/// - **Update.** When any of the three differs, replaces the source. Its
+///   host-reported fields are absent until the host reports again with
+///   {@link RootModelSourceStateChangedAction}.
 ///
-/// A client dispatches this with its own `clientId`, and without
-/// `contributingClientIds` or any host-reported field.
+/// A client dispatches this without any host-reported field. The host learns
+/// which client registered the source from the envelope's `origin`.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record RootModelSourceRegistrationSetAction
+public sealed record RootModelSourceSetAction
 {
-    public ActionType Type { get; init; } = ActionType.RootModelSourceRegistrationSet;
+    public ActionType Type { get; init; } = ActionType.RootModelSourceSet;
 
-    /// <summary>The registration to contribute, matched by `id`.</summary>
-    public required ModelSourceRegistration Registration { get; init; }
+    /// <summary>The model source to add or update, matched by `id`, without host-reported fields.</summary>
+    public required ModelSource ModelSource { get; init; }
 
-    /// <summary>The contributing client. Absent when the host registers the source
-    /// itself.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? ClientId { get; init; }
+    /// <summary>How to reach the source, in `modelSource.format`: endpoint, wire format,
+    /// models, and so on. The host hands it to the agent, and the reducer
+    /// doesn't store it. MUST NOT contain a credential.</summary>
+    public required Dictionary<string, JsonElement> Definition { get; init; }
 }
 
-/// <summary>Withdraws one client's contribution to a model source registration:
-/// removes `clientId` from `contributingClientIds`, leaving the field absent
-/// when no contributor remains. A no-op when no registration has `id`, or
-/// `clientId` doesn't contribute it. It never removes the registration.
-///
-/// A client dispatches this with its own `clientId`. The host dispatches it
-/// when a contributing client leaves.
+/// <summary>Removes the model source with the given `id`, for every client. A no-op
+/// when none matches.
 ///
 /// Stability: 1.0 - Early development.</summary>
-public sealed record RootModelSourceContributorRemovedAction
+public sealed record RootModelSourceRemovedAction
 {
-    public ActionType Type { get; init; } = ActionType.RootModelSourceContributorRemoved;
+    public ActionType Type { get; init; } = ActionType.RootModelSourceRemoved;
 
-    /// <summary>The registration's `id`.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>The contributing client to remove.</summary>
-    public required string ClientId { get; init; }
-}
-
-/// <summary>Removes the model source registration with the given `id` for every
-/// contributor. A no-op when none matches.
-///
-/// Stability: 1.0 - Early development.</summary>
-public sealed record RootModelSourceRegistrationRemovedAction
-{
-    public ActionType Type { get; init; } = ActionType.RootModelSourceRegistrationRemoved;
-
-    /// <summary>The registration's `id`.</summary>
+    /// <summary>The model source's `id`.</summary>
     public required string Id { get; init; }
 }
 
-/// <summary>Updates a model source registration's host-reported fields together:
-/// `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
-/// `credentialId`. A no-op when no registration has `id`. Other fields of the
-/// registration are preserved. Only the host dispatches it.
+/// <summary>Updates a model source's host-reported fields together: `state`,
+/// `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+/// `accountId`. A no-op when no model source has `id`. Other fields of the
+/// source are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceStateChangedAction
 {
     public ActionType Type { get; init; } = ActionType.RootModelSourceStateChanged;
 
-    /// <summary>The registration's `id`.</summary>
+    /// <summary>The model source's `id`.</summary>
     public required string Id { get; init; }
 
     /// <summary>The new status.</summary>
     public required ModelSourceState State { get; init; }
 
-    /// <summary>The registration's current credential nonce.</summary>
+    /// <summary>The model source's current credential nonce.</summary>
     public required string CredentialNonce { get; init; }
 
-    /// <summary>Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// <summary>Replaces the source's `credentialResource`. Absent clears it, for a
     /// source that needs no credential.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
 
-    /// <summary>Replaces the registration's `credentialOrigins`. Absent clears it.</summary>
+    /// <summary>Replaces the source's `credentialOrigins`. Absent clears it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? CredentialOrigins { get; init; }
 
-    /// <summary>Replaces the registration's `credentialId`. Absent clears it.</summary>
+    /// <summary>Replaces the source's `accountId`. Absent clears it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? CredentialId { get; init; }
+    public string? AccountId { get; init; }
 }
 
 /// <summary>Session backend initialized successfully.</summary>
@@ -2966,9 +2938,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["root/agentsChanged"] = typeof(RootAgentsChangedAction),
         ["root/activeSessionsChanged"] = typeof(RootActiveSessionsChangedAction),
         ["root/configChanged"] = typeof(RootConfigChangedAction),
-        ["root/modelSourceRegistrationSet"] = typeof(RootModelSourceRegistrationSetAction),
-        ["root/modelSourceContributorRemoved"] = typeof(RootModelSourceContributorRemovedAction),
-        ["root/modelSourceRegistrationRemoved"] = typeof(RootModelSourceRegistrationRemovedAction),
+        ["root/modelSourceSet"] = typeof(RootModelSourceSetAction),
+        ["root/modelSourceRemoved"] = typeof(RootModelSourceRemovedAction),
         ["root/modelSourceStateChanged"] = typeof(RootModelSourceStateChangedAction),
         ["session/ready"] = typeof(SessionReadyAction),
         ["session/creationFailed"] = typeof(SessionCreationFailedAction),

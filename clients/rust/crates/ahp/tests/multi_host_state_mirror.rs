@@ -41,7 +41,7 @@ fn root_snapshot(agents: Vec<AgentInfo>) -> Snapshot {
             active_sessions: None,
             terminals: None,
             config: None,
-            model_source_registrations: None,
+            model_sources: None,
             meta: None,
         })),
         from_seq: 0,

@@ -1975,30 +1975,21 @@ public struct McpServerAuthenticateTarget: Codable, Sendable, Equatable {
 /// Stability: 1.0 - Early development.
 public struct ModelSourceAuthenticateTarget: Codable, Sendable, Equatable {
     public var kind: AuthenticateTargetKind
-    /// The registration's `ModelSourceRegistration.id`.
+    /// The registration's `ModelSource.id`.
     public var modelSourceId: String
-    /// The registration's current `ModelSourceRegistration.credentialNonce`, as
+    /// The registration's current `ModelSource.credentialNonce`, as
     /// published in root state. The host rejects a stale one with `Conflict`
     /// (-32011).
     public var credentialNonce: String
-    /// A client-chosen, non-secret ID for the credential, such as a hash of
-    /// where the client stores the key. The host publishes it as the
-    /// registration's `ModelSourceRegistration.credentialId`, so a client can
-    /// tell whether the host holds its current key. Clients SHOULD include it
-    /// when delivering a credential, and omit it when revoking one. MUST NOT be
-    /// derived from the secret.
-    public var credentialId: String?
 
     public init(
         kind: AuthenticateTargetKind,
         modelSourceId: String,
-        credentialNonce: String,
-        credentialId: String? = nil
+        credentialNonce: String
     ) {
         self.kind = kind
         self.modelSourceId = modelSourceId
         self.credentialNonce = credentialNonce
-        self.credentialId = credentialId
     }
 }
 
@@ -2012,7 +2003,7 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// server has advertised — via `ProtectedResourceMetadata` in
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,
-    /// or `ModelSourceRegistration.credentialResource`.
+    /// or `ModelSource.credentialResource`.
     public var resource: String
     /// Bearer token obtained from the resource's authorization server, or an
     /// opaque secret for a model source. An empty string revokes the credential.
@@ -2065,6 +2056,12 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// Hosts can compare `accountId` values to detect when the underlying account has changed.
     /// Hosts MUST treat `accountId` as an opaque string.
     /// see {@link /specification/authentication#account-selection-hints | Account selection hints}.
+    ///
+    /// With a `modelSource` target, clients SHOULD include it when delivering a
+    /// credential and omit it when revoking one, and the host publishes it as
+    /// the source's `ModelSource.accountId`. It MUST NOT be derived from the
+    /// secret. For an API key with no account of its own, a client uses an ID
+    /// that changes whenever the user replaces the key.
     public var accountId: String?
 
     enum CodingKeys: String, CodingKey {

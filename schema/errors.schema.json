@@ -650,12 +650,12 @@
           "$ref": "#/$defs/RootConfigState",
           "description": "Agent host configuration schema and current values"
         },
-        "modelSourceRegistrations": {
+        "modelSources": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ModelSourceRegistration"
+            "$ref": "#/$defs/ModelSource"
           },
-          "description": "Model sources registered on this host, keyed by `id`.\n\nStability: 1.0 - Early development."
+          "description": "Model sources registered on this host, keyed by `id`. When one is\nready, it also appears in its agent's {@link AgentInfo.modelSources}\ncatalog.\n\nStability: 1.0 - Early development."
         },
         "_meta": {
           "type": "object",
@@ -774,7 +774,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model source identifier, unique within the agent's\n{@link AgentInfo.modelSources}. For a registered model source, this is\nthe {@link ModelSourceRegistration.id}. A source is registered when\n{@link RootState.modelSourceRegistrations} has an entry with this `id`\nwhose `provider` is the agent."
+          "description": "Model source identifier, unique within the agent's\n{@link AgentInfo.modelSources}. For a registered model source, this is\nthe {@link ModelSource.id}. A source is registered when\n{@link RootState.modelSources} has an entry with this `id`\nwhose `provider` is the agent."
         },
         "displayName": {
           "type": "string",
@@ -836,7 +836,7 @@
         },
         "modelSourceId": {
           "type": "string",
-          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}. For a model from a\nregistered model source, this is the {@link ModelSourceRegistration.id}.\nAn agent's own sources use it too, so it doesn't by itself mark a\nregistered source."
+          "description": "The source this model comes from. MUST match a {@link ModelSourceInfo.id}\nin the agent's {@link AgentInfo.modelSources}. For a model from a\nregistered model source, this is the {@link ModelSource.id}.\nAn agent's own sources use it too, so it doesn't by itself mark a\nregistered source."
         }
       },
       "required": [
@@ -874,11 +874,11 @@
           "items": {
             "type": "string"
           },
-          "description": "Definition formats the agent reads, most preferred first. Format names\nare defined by agent implementations and SHOULD be namespaced, for\nexample `example.com/model-source@1`. AHP doesn't define, standardize,\nor name any format."
+          "description": "Definition formats the agent reads, most preferred first: recognized\nvalues of {@link ModelSource.format}, or namespaced names for formats\nthe agent defines itself."
         },
         "gracePeriod": {
           "type": "integer",
-          "description": "How long, in milliseconds, the host keeps a disconnected client's\ncontributions before it treats the client as having left.",
+          "description": "How long, in milliseconds, the host keeps counting a disconnected client\nas a contributing client before it treats the client as having left.",
           "minimum": 0
         },
         "principalPolicy": {
@@ -890,9 +890,9 @@
         "formats"
       ]
     },
-    "ModelSourceRegistration": {
+    "ModelSource": {
       "type": "object",
-      "description": "A model source registered on this host by one or more clients, or by the\nhost itself. Its definition is in a format the agent named by `provider`\nreads. It never contains a credential.\n\nStability: 1.0 - Early development.",
+      "description": "A model source registered on this host by a client, or by the host itself.\nThe definition that tells the agent named by `provider` how to reach it\ntravels on {@link RootModelSourceSetAction} and isn't kept here. Nothing\nhere is a credential.\n\nStability: 1.0 - Early development.",
       "properties": {
         "id": {
           "type": "string",
@@ -915,19 +915,11 @@
         },
         "format": {
           "type": "string",
-          "description": "Definition format, one of the agent's\n{@link ModelSourceRegistrationCapability.formats}."
+          "description": "The definition's format, one of the agent's\n{@link ModelSourceRegistrationCapability.formats}. Recognized values\ninclude:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as\n  OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nAHP doesn't define what a definition contains, even for these. Agents\nMAY read other formats, named with a namespace such as\n`example.com/model-source@1` so they don't collide."
         },
-        "definition": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "How to reach the source: endpoint, wire format, models, and so on, in\n`format`. Its shape belongs to the agent that reads it, and AHP doesn't\ndefine it. MUST NOT contain a credential."
-        },
-        "contributingClientIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "The clients that contribute this registration, in the order they joined.\nThe reducer maintains it from {@link RootModelSourceRegistrationSetAction}\nand {@link RootModelSourceContributorRemovedAction}. Absent when no\nclient contributes it: a source the host registered itself, or a\n`host`-retained one whose contributors have all left."
+        "nonce": {
+          "type": "string",
+          "description": "Opaque version token for the definition, such as a hash of it, chosen by\nwhoever registers the source. A client compares it with its own copy\ninstead of the definition, and the reducer compares it to tell an update\nfrom a re-registration of the same definition."
         },
         "retention": {
           "$ref": "#/$defs/ModelSourceRetentionPolicy",
@@ -935,11 +927,11 @@
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
-          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after a `Set` replaces the\nregistration until the host reports again."
+          "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after an update replaces the\ndefinition until the host reports again."
         },
         "credentialNonce": {
           "type": "string",
-          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential, and that tags every agent operation on the registration.\nThe host issues a new one when the registration is added, when its\n`provider`, `format`, or `definition` changes, and whenever the\ncredential is installed or dropped. It never reuses one for the same\n`id`. Set with `state`."
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential, and that tags every agent operation on the source. The\nhost issues a new one when the source is added or updated, and whenever\nthe credential is installed or dropped. It never reuses one for the\nsame `id`. Set with `state`."
         },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
@@ -950,16 +942,16 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Every origin the host sends the credential to, such as\n`https://api.example.com`. Present whenever `credentialResource` is. A\nclient checks each one against its own copy of the definition before it\nsends a key. Set with `state`."
+          "description": "Every origin the host sends the credential to, such as\n`https://api.example.com`, derived from the definition it holds. Present\nwhenever `credentialResource` is. A client checks each one against its\nown copy of the definition before it sends a key. Set with `state`."
         },
-        "credentialId": {
+        "accountId": {
           "type": "string",
-          "description": "The client-supplied {@link ModelSourceAuthenticateTarget.credentialId} of\nthe credential the host most recently accepted. While the state is\n`starting` or `ready`, the host holds it. While it's `authRequired`, the\n`reason` says what happened to it. Absent until the host accepts a\ncredential. Set with `state`."
+          "description": "The {@link AuthenticateParams.accountId} the client sent with the\ncredential the host most recently accepted. While the state is\n`starting` or `ready`, the host holds that credential. While it's\n`authRequired`, the `reason` says what happened to it. Absent until the\nhost accepts a credential sent with an `accountId`. Set with `state`."
         },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for this registration.\nMUST NOT contain a credential."
+          "description": "Additional implementation-defined metadata for this model source.\nMUST NOT contain a credential."
         }
       },
       "required": [
@@ -967,7 +959,7 @@
         "provider",
         "displayName",
         "format",
-        "definition"
+        "nonce"
       ]
     },
     "ModelSourceStartingState": {
@@ -984,7 +976,7 @@
     },
     "ModelSourceReadyState": {
       "type": "object",
-      "description": "The source is usable, and its models are in the catalog of the agent named\nby the registration's `provider`. They stay listed through later `starting`\nand `authRequired` states.\n\nStability: 1.0 - Early development.",
+      "description": "The source is usable, and its models are in the catalog of the agent named\nby the model source's `provider`. They stay listed through later `starting`\nand `authRequired` states.\n\nStability: 1.0 - Early development.",
       "properties": {
         "kind": {
           "const": "ready"
@@ -996,7 +988,7 @@
     },
     "ModelSourceAuthRequirement": {
       "type": "object",
-      "description": "Why a model source needs a credential before it can be ready. Deliberately\ncarries no credential. The endpoint the credential is for is the\nregistration's {@link ModelSourceRegistration.credentialResource}.\n\nStability: 1.0 - Early development.",
+      "description": "Why a model source needs a credential before it can be ready. Deliberately\ncarries no credential. The endpoint the credential is for is the\nmodel source's {@link ModelSource.credentialResource}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/ModelSourceAuthRequiredReason",
@@ -1013,7 +1005,7 @@
     },
     "ModelSourceAuthRequiredState": {
       "type": "object",
-      "description": "The source needs a credential before it can be used. A client answers with\n`authenticate`, the registration's `credentialResource.resource`, and a\n{@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
+      "description": "The source needs a credential before it can be used. A client answers with\n`authenticate`, the model source's `credentialResource.resource`, and a\n{@link ModelSourceAuthenticateTarget}.\n\nStability: 1.0 - Early development.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/ModelSourceAuthRequiredReason",
@@ -7503,15 +7495,11 @@
         },
         "modelSourceId": {
           "type": "string",
-          "description": "The registration's `ModelSourceRegistration.id`."
+          "description": "The registration's `ModelSource.id`."
         },
         "credentialNonce": {
           "type": "string",
-          "description": "The registration's current `ModelSourceRegistration.credentialNonce`, as\npublished in root state. The host rejects a stale one with `Conflict`\n(-32011)."
-        },
-        "credentialId": {
-          "type": "string",
-          "description": "A client-chosen, non-secret ID for the credential, such as a hash of\nwhere the client stores the key. The host publishes it as the\nregistration's `ModelSourceRegistration.credentialId`, so a client can\ntell whether the host holds its current key. Clients SHOULD include it\nwhen delivering a credential, and omit it when revoking one. MUST NOT be\nderived from the secret."
+          "description": "The registration's current `ModelSource.credentialNonce`, as\npublished in root state. The host rejects a stale one with `Conflict`\n(-32011)."
         }
       },
       "required": [
@@ -7522,7 +7510,7 @@
     },
     "AuthenticateParams": {
       "type": "object",
-      "description": "Pushes a credential for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth), or\nfrom a registered model source's `ModelSourceRegistration.credentialResource`.\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these mechanisms, subject to the `target` rules. A\n`modelSource` target takes only the registration's current\n`credentialResource.resource`.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command. A model source's token is instead an\nopaque secret, such as an API key.",
+      "description": "Pushes a credential for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (each surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth), or\nfrom a registered model source's `ModelSource.credentialResource`.\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these mechanisms, subject to the `target` rules. A\n`modelSource` target takes only the registration's current\n`credentialResource.resource`.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command. A model source's token is instead an\nopaque secret, such as an API key.",
       "properties": {
         "channel": {
           "type": "string",
@@ -7537,7 +7525,7 @@
         },
         "resource": {
           "type": "string",
-          "description": "The protected resource identifier. MUST match a `resource` value the\nserver has advertised — via `ProtectedResourceMetadata` in\n`AgentInfo.protectedResources`, or via a live\n`McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,\nor `ModelSourceRegistration.credentialResource`."
+          "description": "The protected resource identifier. MUST match a `resource` value the\nserver has advertised — via `ProtectedResourceMetadata` in\n`AgentInfo.protectedResources`, or via a live\n`McpServerAuthRequiredState.resource`, `ToolCallAuthRequiredState.auth.resource`,\nor `ModelSource.credentialResource`."
         },
         "token": {
           "type": "string",
@@ -7561,7 +7549,7 @@
         },
         "accountId": {
           "type": "string",
-          "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.",
+          "description": "Optional identifier for the client's selected account, sent alongside the token.\nHosts can compare `accountId` values to detect when the underlying account has changed.\nHosts MUST treat `accountId` as an opaque string.\nsee {@link /specification/authentication#account-selection-hints | Account selection hints}.\n\nWith a `modelSource` target, clients SHOULD include it when delivering a\ncredential and omit it when revoking one, and the host publishes it as\nthe source's `ModelSource.accountId`. It MUST NOT be derived from the\nsecret. For an API key with no account of its own, a client uses an ID\nthat changes whenever the user replaces the key.",
           "minLength": 1
         }
       },
@@ -8523,7 +8511,7 @@
         "host"
       ],
       "type": "string",
-      "description": "How long a registered model source lasts once its last contributing client\nleaves. When the last contributor withdraws instead, the source goes away\nwhatever its retention."
+      "description": "How long a registered model source lasts once its last contributing client\nleaves."
     },
     "ModelSourceState": {
       "oneOf": [
@@ -8540,7 +8528,7 @@
           "$ref": "#/$defs/ModelSourceErrorState"
         }
       ],
-      "description": "Lifecycle state of a {@link ModelSourceRegistration}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
+      "description": "Lifecycle state of a {@link ModelSource}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
     },
     "ModelSourceAuthRequiredReason": {
       "enum": [
@@ -9319,13 +9307,10 @@
           "$ref": "#/$defs/RootConfigChangedAction"
         },
         {
-          "$ref": "#/$defs/RootModelSourceRegistrationSetAction"
+          "$ref": "#/$defs/RootModelSourceSetAction"
         },
         {
-          "$ref": "#/$defs/RootModelSourceContributorRemovedAction"
-        },
-        {
-          "$ref": "#/$defs/RootModelSourceRegistrationRemovedAction"
+          "$ref": "#/$defs/RootModelSourceRemovedAction"
         },
         {
           "$ref": "#/$defs/RootModelSourceStateChangedAction"
@@ -9865,59 +9850,39 @@
         "config"
       ]
     },
-    "RootModelSourceRegistrationSetAction": {
+    "RootModelSourceSetAction": {
       "type": "object",
-      "description": "Contributes a model source registration for `clientId`. A registration's\nrouting is its `provider`, `format`, and `definition`, with definitions\ncompared as JSON values: object key order is ignored, and numbers compare\nby numeric value, so `1` equals `1.0`.\n\n- **Add.** When no registration has the `id`, appends it, with\n  `contributingClientIds` set to `[clientId]`, or absent without a\n  `clientId`.\n- **Join.** When one has, and its routing is unchanged, keeps its\n  host-reported fields (`state`, `credentialNonce`, `credentialResource`,\n  `credentialOrigins`, and `credentialId`), adds `clientId` to\n  `contributingClientIds` if it isn't there, and takes the other fields\n  from the action.\n- **Replace.** When the routing changed, replaces the registration, with\n  `contributingClientIds` set to `[clientId]`, or absent without a\n  `clientId`. Its host-reported fields are absent until the host reports\n  again with {@link RootModelSourceStateChangedAction}.\n\nA client dispatches this with its own `clientId`, and without\n`contributingClientIds` or any host-reported field.\n\nStability: 1.0 - Early development.",
+      "description": "Adds a model source, or updates the one with the same `id`. The reducer\nstores `modelSource` without the definition:\n\n- **Add.** When no model source has the `id`, appends `modelSource`.\n- **Re-register.** When one has, with the same `provider`, `format`, and\n  `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,\n  `credentialResource`, `credentialOrigins`, and `accountId`) and takes\n  the other fields from the action.\n- **Update.** When any of the three differs, replaces the source. Its\n  host-reported fields are absent until the host reports again with\n  {@link RootModelSourceStateChangedAction}.\n\nA client dispatches this without any host-reported field. The host learns\nwhich client registered the source from the envelope's `origin`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
-          "const": "root/modelSourceRegistrationSet"
+          "const": "root/modelSourceSet"
         },
-        "registration": {
-          "$ref": "#/$defs/ModelSourceRegistration",
-          "description": "The registration to contribute, matched by `id`."
+        "modelSource": {
+          "$ref": "#/$defs/ModelSource",
+          "description": "The model source to add or update, matched by `id`, without host-reported fields."
         },
-        "clientId": {
-          "type": "string",
-          "description": "The contributing client. Absent when the host registers the source\nitself."
+        "definition": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "How to reach the source, in `modelSource.format`: endpoint, wire format,\nmodels, and so on. The host hands it to the agent, and the reducer\ndoesn't store it. MUST NOT contain a credential."
         }
       },
       "required": [
         "type",
-        "registration"
+        "modelSource",
+        "definition"
       ]
     },
-    "RootModelSourceContributorRemovedAction": {
+    "RootModelSourceRemovedAction": {
       "type": "object",
-      "description": "Withdraws one client's contribution to a model source registration:\nremoves `clientId` from `contributingClientIds`, leaving the field absent\nwhen no contributor remains. A no-op when no registration has `id`, or\n`clientId` doesn't contribute it. It never removes the registration.\n\nA client dispatches this with its own `clientId`. The host dispatches it\nwhen a contributing client leaves.\n\nStability: 1.0 - Early development.",
+      "description": "Removes the model source with the given `id`, for every client. A no-op\nwhen none matches.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
-          "const": "root/modelSourceContributorRemoved"
+          "const": "root/modelSourceRemoved"
         },
         "id": {
           "type": "string",
-          "description": "The registration's `id`."
-        },
-        "clientId": {
-          "type": "string",
-          "description": "The contributing client to remove."
-        }
-      },
-      "required": [
-        "type",
-        "id",
-        "clientId"
-      ]
-    },
-    "RootModelSourceRegistrationRemovedAction": {
-      "type": "object",
-      "description": "Removes the model source registration with the given `id` for every\ncontributor. A no-op when none matches.\n\nStability: 1.0 - Early development.",
-      "properties": {
-        "type": {
-          "const": "root/modelSourceRegistrationRemoved"
-        },
-        "id": {
-          "type": "string",
-          "description": "The registration's `id`."
+          "description": "The model source's `id`."
         }
       },
       "required": [
@@ -9927,14 +9892,14 @@
     },
     "RootModelSourceStateChangedAction": {
       "type": "object",
-      "description": "Updates a model source registration's host-reported fields together:\n`state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and\n`credentialId`. A no-op when no registration has `id`. Other fields of the\nregistration are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
+      "description": "Updates a model source's host-reported fields together: `state`,\n`credentialNonce`, `credentialResource`, `credentialOrigins`, and\n`accountId`. A no-op when no model source has `id`. Other fields of the\nsource are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceStateChanged"
         },
         "id": {
           "type": "string",
-          "description": "The registration's `id`."
+          "description": "The model source's `id`."
         },
         "state": {
           "$ref": "#/$defs/ModelSourceState",
@@ -9942,22 +9907,22 @@
         },
         "credentialNonce": {
           "type": "string",
-          "description": "The registration's current credential nonce."
+          "description": "The model source's current credential nonce."
         },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
-          "description": "Replaces the registration's `credentialResource`. Absent clears it, for a\nsource that needs no credential."
+          "description": "Replaces the source's `credentialResource`. Absent clears it, for a\nsource that needs no credential."
         },
         "credentialOrigins": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Replaces the registration's `credentialOrigins`. Absent clears it."
+          "description": "Replaces the source's `credentialOrigins`. Absent clears it."
         },
-        "credentialId": {
+        "accountId": {
           "type": "string",
-          "description": "Replaces the registration's `credentialId`. Absent clears it."
+          "description": "Replaces the source's `accountId`. Absent clears it."
         }
       },
       "required": [

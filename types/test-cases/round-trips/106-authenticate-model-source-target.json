@@ -1,17 +1,17 @@
 {
   "name": "authenticate-model-source-target",
   "group": "A",
-  "description": "authenticate delivers an opaque secret for one registered model source through a modelSource target that echoes the registration's credentialNonce and names the key with a non-secret credentialId. An API key carries no expiresIn or scopes.",
+  "description": "authenticate delivers an opaque secret for one registered model source through a modelSource target that echoes the source's credentialNonce, and names the key with the existing accountId parameter. An API key carries no expiresIn or scopes.",
   "type": "AuthenticateParams",
   "input": {
     "channel": "ahp-root://",
     "resource": "https://openrouter.ai/api/v1",
     "token": "test-api-key",
+    "accountId": "keychain-openrouter-1",
     "target": {
       "kind": "modelSource",
       "modelSourceId": "source-new",
-      "credentialNonce": "nonce-openrouter-1",
-      "credentialId": "keychain-openrouter-1"
+      "credentialNonce": "nonce-openrouter-1"
     }
   },
   "acceptableOutputs": [
@@ -19,11 +19,11 @@
       "channel": "ahp-root://",
       "resource": "https://openrouter.ai/api/v1",
       "token": "test-api-key",
+      "accountId": "keychain-openrouter-1",
       "target": {
         "kind": "modelSource",
         "modelSourceId": "source-new",
-        "credentialNonce": "nonce-openrouter-1",
-        "credentialId": "keychain-openrouter-1"
+        "credentialNonce": "nonce-openrouter-1"
       }
     }
   ]

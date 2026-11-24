@@ -23,7 +23,7 @@ Individual action payloads do **not** carry their own `session: URI` or `termina
 
 ## Root Actions
 
-These mutate root state and travel on the [Root Channel](/specification/root-channel). `root/configChanged`, `root/modelSourceRegistrationSet`, `root/modelSourceContributorRemoved`, and `root/modelSourceRegistrationRemoved` are client-dispatchable; the rest are server-originated.
+These mutate root state and travel on the [Root Channel](/specification/root-channel). `root/configChanged`, `root/modelSourceSet`, and `root/modelSourceRemoved` are client-dispatchable; the rest are server-originated.
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
@@ -31,10 +31,9 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/activeSessionsChanged` | No | Count of active sessions changed |
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
-| `root/modelSourceRegistrationSet` | **Yes** | A client contributed a [model source registration](/specification/root-channel#model-source-registry): added, joined, or replaced by `id` |
-| `root/modelSourceContributorRemoved` | **Yes** | A client withdrew its contribution to a registration, or left |
-| `root/modelSourceRegistrationRemoved` | **Yes** | A model source registration was removed by `id` |
-| `root/modelSourceStateChanged` | No | The host reported a registration's status and credential fields |
+| `root/modelSourceSet` | **Yes** | A [model source](/specification/root-channel#model-source-registry) was added, re-registered, or updated by `id` |
+| `root/modelSourceRemoved` | **Yes** | A model source was removed by `id` |
+| `root/modelSourceStateChanged` | No | The host reported a model source's status and credential fields |
 
 ## Automation Catalogue Actions
 

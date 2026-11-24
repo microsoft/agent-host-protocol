@@ -93,9 +93,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case annotationsEntryRemoved
     case rootTerminalsChanged
     case rootConfigChanged
-    case rootModelSourceRegistrationSet
-    case rootModelSourceContributorRemoved
-    case rootModelSourceRegistrationRemoved
+    case rootModelSourceSet
+    case rootModelSourceRemoved
     case rootModelSourceStateChanged
     case terminalData
     case terminalInput
@@ -212,9 +211,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "annotations/entryRemoved": self = .annotationsEntryRemoved
         case "root/terminalsChanged": self = .rootTerminalsChanged
         case "root/configChanged": self = .rootConfigChanged
-        case "root/modelSourceRegistrationSet": self = .rootModelSourceRegistrationSet
-        case "root/modelSourceContributorRemoved": self = .rootModelSourceContributorRemoved
-        case "root/modelSourceRegistrationRemoved": self = .rootModelSourceRegistrationRemoved
+        case "root/modelSourceSet": self = .rootModelSourceSet
+        case "root/modelSourceRemoved": self = .rootModelSourceRemoved
         case "root/modelSourceStateChanged": self = .rootModelSourceStateChanged
         case "terminal/data": self = .terminalData
         case "terminal/input": self = .terminalInput
@@ -331,9 +329,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .annotationsEntryRemoved: try container.encode("annotations/entryRemoved")
         case .rootTerminalsChanged: try container.encode("root/terminalsChanged")
         case .rootConfigChanged: try container.encode("root/configChanged")
-        case .rootModelSourceRegistrationSet: try container.encode("root/modelSourceRegistrationSet")
-        case .rootModelSourceContributorRemoved: try container.encode("root/modelSourceContributorRemoved")
-        case .rootModelSourceRegistrationRemoved: try container.encode("root/modelSourceRegistrationRemoved")
+        case .rootModelSourceSet: try container.encode("root/modelSourceSet")
+        case .rootModelSourceRemoved: try container.encode("root/modelSourceRemoved")
         case .rootModelSourceStateChanged: try container.encode("root/modelSourceStateChanged")
         case .terminalData: try container.encode("terminal/data")
         case .terminalInput: try container.encode("terminal/input")
@@ -2293,81 +2290,49 @@ public struct RootConfigChangedAction: Codable, Sendable, Equatable {
     }
 }
 
-/// Contributes a model source registration for `clientId`. A registration's
-/// routing is its `provider`, `format`, and `definition`, with definitions
-/// compared as JSON values: object key order is ignored, and numbers compare
-/// by numeric value, so `1` equals `1.0`.
+/// Adds a model source, or updates the one with the same `id`. The reducer
+/// stores `modelSource` without the definition:
 ///
-/// - **Add.** When no registration has the `id`, appends it, with
-/// `contributingClientIds` set to `[clientId]`, or absent without a
-/// `clientId`.
-/// - **Join.** When one has, and its routing is unchanged, keeps its
-/// host-reported fields (`state`, `credentialNonce`, `credentialResource`,
-/// `credentialOrigins`, and `credentialId`), adds `clientId` to
-/// `contributingClientIds` if it isn't there, and takes the other fields
-/// from the action.
-/// - **Replace.** When the routing changed, replaces the registration, with
-/// `contributingClientIds` set to `[clientId]`, or absent without a
-/// `clientId`. Its host-reported fields are absent until the host reports
-/// again with {@link RootModelSourceStateChangedAction}.
+/// - **Add.** When no model source has the `id`, appends `modelSource`.
+/// - **Re-register.** When one has, with the same `provider`, `format`, and
+/// `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,
+/// `credentialResource`, `credentialOrigins`, and `accountId`) and takes
+/// the other fields from the action.
+/// - **Update.** When any of the three differs, replaces the source. Its
+/// host-reported fields are absent until the host reports again with
+/// {@link RootModelSourceStateChangedAction}.
 ///
-/// A client dispatches this with its own `clientId`, and without
-/// `contributingClientIds` or any host-reported field.
+/// A client dispatches this without any host-reported field. The host learns
+/// which client registered the source from the envelope's `origin`.
 ///
 /// Stability: 1.0 - Early development.
-public struct RootModelSourceRegistrationSetAction: Codable, Sendable, Equatable {
+public struct RootModelSourceSetAction: Codable, Sendable, Equatable {
     public var type: ActionType
-    /// The registration to contribute, matched by `id`.
-    public var registration: ModelSourceRegistration
-    /// The contributing client. Absent when the host registers the source
-    /// itself.
-    public var clientId: String?
+    /// The model source to add or update, matched by `id`, without host-reported fields.
+    public var modelSource: ModelSource
+    /// How to reach the source, in `modelSource.format`: endpoint, wire format,
+    /// models, and so on. The host hands it to the agent, and the reducer
+    /// doesn't store it. MUST NOT contain a credential.
+    public var definition: [String: AnyCodable]
 
     public init(
         type: ActionType,
-        registration: ModelSourceRegistration,
-        clientId: String? = nil
+        modelSource: ModelSource,
+        definition: [String: AnyCodable]
     ) {
         self.type = type
-        self.registration = registration
-        self.clientId = clientId
+        self.modelSource = modelSource
+        self.definition = definition
     }
 }
 
-/// Withdraws one client's contribution to a model source registration:
-/// removes `clientId` from `contributingClientIds`, leaving the field absent
-/// when no contributor remains. A no-op when no registration has `id`, or
-/// `clientId` doesn't contribute it. It never removes the registration.
-///
-/// A client dispatches this with its own `clientId`. The host dispatches it
-/// when a contributing client leaves.
+/// Removes the model source with the given `id`, for every client. A no-op
+/// when none matches.
 ///
 /// Stability: 1.0 - Early development.
-public struct RootModelSourceContributorRemovedAction: Codable, Sendable, Equatable {
+public struct RootModelSourceRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
-    /// The registration's `id`.
-    public var id: String
-    /// The contributing client to remove.
-    public var clientId: String
-
-    public init(
-        type: ActionType,
-        id: String,
-        clientId: String
-    ) {
-        self.type = type
-        self.id = id
-        self.clientId = clientId
-    }
-}
-
-/// Removes the model source registration with the given `id` for every
-/// contributor. A no-op when none matches.
-///
-/// Stability: 1.0 - Early development.
-public struct RootModelSourceRegistrationRemovedAction: Codable, Sendable, Equatable {
-    public var type: ActionType
-    /// The registration's `id`.
+    /// The model source's `id`.
     public var id: String
 
     public init(
@@ -2379,27 +2344,27 @@ public struct RootModelSourceRegistrationRemovedAction: Codable, Sendable, Equat
     }
 }
 
-/// Updates a model source registration's host-reported fields together:
-/// `state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and
-/// `credentialId`. A no-op when no registration has `id`. Other fields of the
-/// registration are preserved. Only the host dispatches it.
+/// Updates a model source's host-reported fields together: `state`,
+/// `credentialNonce`, `credentialResource`, `credentialOrigins`, and
+/// `accountId`. A no-op when no model source has `id`. Other fields of the
+/// source are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
-    /// The registration's `id`.
+    /// The model source's `id`.
     public var id: String
     /// The new status.
     public var state: ModelSourceState
-    /// The registration's current credential nonce.
+    /// The model source's current credential nonce.
     public var credentialNonce: String
-    /// Replaces the registration's `credentialResource`. Absent clears it, for a
+    /// Replaces the source's `credentialResource`. Absent clears it, for a
     /// source that needs no credential.
     public var credentialResource: ProtectedResourceMetadata?
-    /// Replaces the registration's `credentialOrigins`. Absent clears it.
+    /// Replaces the source's `credentialOrigins`. Absent clears it.
     public var credentialOrigins: [String]?
-    /// Replaces the registration's `credentialId`. Absent clears it.
-    public var credentialId: String?
+    /// Replaces the source's `accountId`. Absent clears it.
+    public var accountId: String?
 
     public init(
         type: ActionType,
@@ -2408,7 +2373,7 @@ public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
         credentialNonce: String,
         credentialResource: ProtectedResourceMetadata? = nil,
         credentialOrigins: [String]? = nil,
-        credentialId: String? = nil
+        accountId: String? = nil
     ) {
         self.type = type
         self.id = id
@@ -2416,7 +2381,7 @@ public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
         self.credentialNonce = credentialNonce
         self.credentialResource = credentialResource
         self.credentialOrigins = credentialOrigins
-        self.credentialId = credentialId
+        self.accountId = accountId
     }
 }
 
@@ -2889,9 +2854,8 @@ public enum StateAction: Codable, Sendable, Equatable {
     case annotationsEntryRemoved(AnnotationsEntryRemovedAction)
     case rootTerminalsChanged(RootTerminalsChangedAction)
     case rootConfigChanged(RootConfigChangedAction)
-    case rootModelSourceRegistrationSet(RootModelSourceRegistrationSetAction)
-    case rootModelSourceContributorRemoved(RootModelSourceContributorRemovedAction)
-    case rootModelSourceRegistrationRemoved(RootModelSourceRegistrationRemovedAction)
+    case rootModelSourceSet(RootModelSourceSetAction)
+    case rootModelSourceRemoved(RootModelSourceRemovedAction)
     case rootModelSourceStateChanged(RootModelSourceStateChangedAction)
     case terminalData(TerminalDataAction)
     case terminalInput(TerminalInputAction)
@@ -3100,12 +3064,10 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .rootTerminalsChanged(try RootTerminalsChangedAction(from: decoder))
         case "root/configChanged":
             self = .rootConfigChanged(try RootConfigChangedAction(from: decoder))
-        case "root/modelSourceRegistrationSet":
-            self = .rootModelSourceRegistrationSet(try RootModelSourceRegistrationSetAction(from: decoder))
-        case "root/modelSourceContributorRemoved":
-            self = .rootModelSourceContributorRemoved(try RootModelSourceContributorRemovedAction(from: decoder))
-        case "root/modelSourceRegistrationRemoved":
-            self = .rootModelSourceRegistrationRemoved(try RootModelSourceRegistrationRemovedAction(from: decoder))
+        case "root/modelSourceSet":
+            self = .rootModelSourceSet(try RootModelSourceSetAction(from: decoder))
+        case "root/modelSourceRemoved":
+            self = .rootModelSourceRemoved(try RootModelSourceRemovedAction(from: decoder))
         case "root/modelSourceStateChanged":
             self = .rootModelSourceStateChanged(try RootModelSourceStateChangedAction(from: decoder))
         case "terminal/data":
@@ -3244,9 +3206,8 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .annotationsEntryRemoved(let v): try v.encode(to: encoder)
         case .rootTerminalsChanged(let v): try v.encode(to: encoder)
         case .rootConfigChanged(let v): try v.encode(to: encoder)
-        case .rootModelSourceRegistrationSet(let v): try v.encode(to: encoder)
-        case .rootModelSourceContributorRemoved(let v): try v.encode(to: encoder)
-        case .rootModelSourceRegistrationRemoved(let v): try v.encode(to: encoder)
+        case .rootModelSourceSet(let v): try v.encode(to: encoder)
+        case .rootModelSourceRemoved(let v): try v.encode(to: encoder)
         case .rootModelSourceStateChanged(let v): try v.encode(to: encoder)
         case .terminalData(let v): try v.encode(to: encoder)
         case .terminalInput(let v): try v.encode(to: encoder)

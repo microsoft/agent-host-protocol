@@ -1,6 +1,6 @@
 {
   "type": "changed",
-  "message": "`StateAction`, `AuthenticateTarget`, and `AuthenticateTargetKind` gain model source variants, so exhaustive matches and switches must handle them. `AuthenticateTarget` is now a union, so TypeScript code that reads `target.session` or `target.customizationId` must first narrow on `target.kind`. Direct Rust struct literals for `RootState` must now include `model_source_registrations: None`, and those for `AgentCapabilities` must include `model_source_registration: None`.",
+  "message": "`StateAction`, `AuthenticateTarget`, and `AuthenticateTargetKind` gain model source variants, so exhaustive matches and switches must handle them. `AuthenticateTarget` is now a union, so TypeScript code that reads `target.session` or `target.customizationId` must first narrow on `target.kind`. Direct Rust struct literals for `RootState` must now include `model_sources: None`, and those for `AgentCapabilities` must include `model_source_registration: None`.",
   "targets": ["rust", "swift", "kotlin", "typescript"],
   "issues": [619]
 }
