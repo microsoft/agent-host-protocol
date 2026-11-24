@@ -268,6 +268,11 @@ type InitializeResult struct {
 	//
 	// Stability: 1.0 - Early development.
 	TcpConnections *TcpConnectionsCapability `json:"tcpConnections,omitempty"`
+	// Present when the host supports `createSearch`, which searches files,
+	// sessions, and chats and streams the results on an `ahp-search:` channel.
+	//
+	// Stability: 1.0 - Early development.
+	Search *SearchCapability `json:"search,omitempty"`
 	// Present when chats in one session may be backed by different agent
 	// providers (see {@link CreateChatParams.provider} and
 	// {@link ChatState.provider}).
@@ -1286,6 +1291,36 @@ type CreateResourceWatchResult struct {
 	// caller subscribes to this URI to start receiving change events and
 	// unsubscribes to release the watcher.
 	Channel URI `json:"channel"`
+}
+
+// Starts a search on the host.
+//
+// The client chooses the channel URI and then subscribes to it to receive the
+// search's {@link SearchState} and its results. The client replaces the query
+// by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+// and cancels the search by unsubscribing.
+//
+// The client MUST NOT send this command unless `InitializeResult.search` is
+// present, and MUST NOT include a target whose kind is not listed in
+// {@link SearchCapability.targets}.
+//
+// Stability: 1.0 - Early development.
+type CreateSearchParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// What to search for and where.
+	Query SearchQuery `json:"query"`
+}
+
+// Result of the `createSearch` command.
+//
+// An empty object on success.
+//
+// Stability: 1.0 - Early development.
+type CreateSearchResult struct {
 }
 
 // Requests that the host load older historical turns into a chat state.

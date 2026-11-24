@@ -214,6 +214,15 @@ internal static class GeneratedActionMetadata
             case RootTerminalsChangedAction value:
                 actionType = value.Type;
                 return true;
+            case SearchLifecycleChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SearchQueryChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SearchResultsChangedAction value:
+                actionType = value.Type;
+                return true;
             case SessionActiveClientRemovedAction value:
                 actionType = value.Type;
                 return true;

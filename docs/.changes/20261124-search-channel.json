@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Experimental `ahp-search:` channel: `createSearch` searches file names, file text, session titles, and chat messages and streams scored, highlighted results into `SearchState`. Clients change the query with `search/queryChanged` (results stay visible while the lifecycle is `pending`) and cancel by unsubscribing; hosts append or replace results with `search/resultsChanged` and report progress with `search/lifecycleChanged`."
+}

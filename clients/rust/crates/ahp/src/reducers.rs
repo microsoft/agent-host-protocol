@@ -62,13 +62,14 @@ use ahp_types::state::{
     ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerCustomization, McpServerStartingState,
     McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
-    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
-    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    ResponsePart, RootState, SearchLifecycleState, SearchPendingLifecycleState,
+    SearchRunningLifecycleState, SearchState, SessionInputRequest, SessionLifecycle, SessionState,
+    SessionStatus, TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState,
+    TerminalLifecycleState, TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn, TurnState,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -2247,6 +2248,38 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
+// ─── Search Reducer ───────────────────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`SearchState`] in place.
+pub fn apply_action_to_search(state: &mut SearchState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::SearchQueryChanged(a) => {
+            state.query = a.query.clone();
+            state.lifecycle = SearchLifecycleState::Pending(SearchPendingLifecycleState {});
+            ReduceOutcome::Applied
+        }
+        StateAction::SearchResultsChanged(a) => {
+            if a.replace != Some(true) {
+                if a.results.is_empty() {
+                    return ReduceOutcome::NoOp;
+                }
+                state.results.extend(a.results.iter().cloned());
+                return ReduceOutcome::Applied;
+            }
+            state.results = a.results.clone();
+            if matches!(state.lifecycle, SearchLifecycleState::Pending(_)) {
+                state.lifecycle = SearchLifecycleState::Running(SearchRunningLifecycleState {});
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SearchLifecycleChanged(a) => {
+            state.lifecycle = a.lifecycle.clone();
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
 /// Apply a [`StateAction`] to an [`AutomationState`] in place.
 pub fn apply_action_to_automation(
     state: &mut AutomationState,
@@ -2843,6 +2876,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
+                "search" => run_fixture::<SearchState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_search,
                     &file_name,
                     description,
                 ),

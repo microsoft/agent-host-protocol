@@ -1,0 +1,66 @@
+{
+  "name": "search-resultschanged-append-action",
+  "group": "A",
+  "description": "The search/resultsChanged action without replace preserves a batch of typed results.",
+  "type": "StateAction",
+  "input": {
+    "type": "search/resultsChanged",
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/src/index.ts",
+        "match": {
+          "text": "export function parseConfig(raw: string) {",
+          "highlights": [
+            {
+              "rangeStart": 16,
+              "rangeEnd": 27
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 11,
+            "character": 16
+          },
+          "end": {
+            "line": 11,
+            "character": 27
+          }
+        },
+        "score": 0.75
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "search/resultsChanged",
+      "results": [
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/src/index.ts",
+          "match": {
+            "text": "export function parseConfig(raw: string) {",
+            "highlights": [
+              {
+                "rangeStart": 16,
+                "rangeEnd": 27
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 11,
+              "character": 16
+            },
+            "end": {
+              "line": 11,
+              "character": 27
+            }
+          },
+          "score": 0.75
+        }
+      ]
+    }
+  ]
+}

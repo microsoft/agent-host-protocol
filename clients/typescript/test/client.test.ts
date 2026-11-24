@@ -44,6 +44,7 @@ import { AutomationOperation, type AutomationEntry } from '../src/types/channels
 import { MessageKind } from '../src/types/channels-chat/state.js';
 import { SessionLifecycle, SessionStatus } from '../src/types/channels-session/state.js';
 import type { CanvasState } from '../src/types/channels-canvas/state.js';
+import { SearchCompletionReason, SearchLifecycleStatus, SearchTargetKind, type SearchState } from '../src/types/channels-search/state.js';
 import type { Snapshot } from '../src/types/common/state.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -220,6 +221,30 @@ test('state mirror replaces and clears live canvas sources', () => {
   assert.deepEqual({ replaced, unavailable: mirror.canvases.get(resource) }, {
     replaced: replacement,
     unavailable,
+  });
+});
+
+test('state mirror reduces search actions on search channels', () => {
+  const mirror = new AhpStateMirror();
+  const resource = 'ahp-search:/s1';
+  const initial: SearchState = {
+    query: { text: 'parseConfig', targets: [{ kind: SearchTargetKind.Sessions }] },
+    results: [],
+    lifecycle: { status: SearchLifecycleStatus.Pending },
+  };
+  mirror.applySnapshot({ resource, state: initial, fromSeq: 1 });
+  mirror.apply({
+    channel: resource,
+    serverSeq: 2,
+    origin: undefined,
+    action: {
+      type: ActionType.SearchLifecycleChanged,
+      lifecycle: { status: SearchLifecycleStatus.Completed, reason: SearchCompletionReason.Exhausted },
+    },
+  });
+  assert.deepEqual(mirror.getSearch(resource), {
+    ...initial,
+    lifecycle: { status: SearchLifecycleStatus.Completed, reason: SearchCompletionReason.Exhausted },
   });
 });
 

@@ -1,0 +1,50 @@
+{
+  "name": "initialize-search-capability",
+  "group": "A",
+  "description": "InitializeResult preserves the search capability and its supported target kinds.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.2.0",
+    "serverSeq": 7,
+    "snapshots": [
+      {
+        "resource": "ahp-root://",
+        "state": {
+          "agents": []
+        },
+        "fromSeq": 7
+      }
+    ],
+    "search": {
+      "targets": [
+        "fileNames",
+        "fileText",
+        "sessions",
+        "chatMessages"
+      ]
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "1.2.0",
+      "serverSeq": 7,
+      "snapshots": [
+        {
+          "resource": "ahp-root://",
+          "state": {
+            "agents": []
+          },
+          "fromSeq": 7
+        }
+      ],
+      "search": {
+        "targets": [
+          "fileNames",
+          "fileText",
+          "sessions",
+          "chatMessages"
+        ]
+      }
+    }
+  ]
+}

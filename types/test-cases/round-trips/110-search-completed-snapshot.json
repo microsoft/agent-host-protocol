@@ -1,0 +1,242 @@
+{
+  "name": "search-completed-snapshot",
+  "group": "A",
+  "description": "A completed search snapshot preserves its query, every target and result kind, and the completed lifecycle.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-search:/q1",
+    "state": {
+      "query": {
+        "text": "parseConfig",
+        "matchCase": true,
+        "wholeWord": true,
+        "targets": [
+          {
+            "kind": "fileNames",
+            "roots": [
+              "file:///workspace"
+            ],
+            "includeIgnored": true
+          },
+          {
+            "kind": "fileText",
+            "roots": [
+              "file:///workspace",
+              "file:///other"
+            ],
+            "includes": [
+              "src/**"
+            ],
+            "excludes": [
+              "**/dist/**"
+            ]
+          },
+          {
+            "kind": "sessions"
+          },
+          {
+            "kind": "chatMessages",
+            "chats": [
+              "ahp-chat:/c1"
+            ]
+          }
+        ],
+        "maxResults": 4
+      },
+      "results": [
+        {
+          "kind": "fileName",
+          "resource": "file:///workspace/src/parseConfig.ts",
+          "match": {
+            "text": "src/parseConfig.ts",
+            "highlights": [
+              {
+                "rangeStart": 4,
+                "rangeEnd": 15
+              }
+            ]
+          },
+          "score": 0.5
+        },
+        {
+          "kind": "fileText",
+          "resource": "file:///workspace/src/index.ts",
+          "match": {
+            "text": "export function parseConfig(raw: string) {",
+            "highlights": [
+              {
+                "rangeStart": 16,
+                "rangeEnd": 27
+              }
+            ]
+          },
+          "range": {
+            "start": {
+              "line": 11,
+              "character": 16
+            },
+            "end": {
+              "line": 11,
+              "character": 27
+            }
+          },
+          "score": 0.75
+        },
+        {
+          "kind": "session",
+          "resource": "ahp-session:/s1",
+          "match": {
+            "text": "Fix parseConfig crash",
+            "highlights": [
+              {
+                "rangeStart": 4,
+                "rangeEnd": 15
+              }
+            ]
+          },
+          "title": "Fix parseConfig crash"
+        },
+        {
+          "kind": "chatMessage",
+          "resource": "ahp-chat:/c1",
+          "match": {
+            "text": "\u2026the bug is in parseConfig when\u2026",
+            "highlights": [
+              {
+                "rangeStart": 15,
+                "rangeEnd": 26
+              }
+            ]
+          },
+          "title": "Fix parseConfig crash",
+          "turnId": "t45",
+          "score": 0.25
+        }
+      ],
+      "lifecycle": {
+        "status": "completed",
+        "reason": "limitReached"
+      }
+    },
+    "fromSeq": 7
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-search:/q1",
+      "state": {
+        "query": {
+          "text": "parseConfig",
+          "matchCase": true,
+          "wholeWord": true,
+          "targets": [
+            {
+              "kind": "fileNames",
+              "roots": [
+                "file:///workspace"
+              ],
+              "includeIgnored": true
+            },
+            {
+              "kind": "fileText",
+              "roots": [
+                "file:///workspace",
+                "file:///other"
+              ],
+              "includes": [
+                "src/**"
+              ],
+              "excludes": [
+                "**/dist/**"
+              ]
+            },
+            {
+              "kind": "sessions"
+            },
+            {
+              "kind": "chatMessages",
+              "chats": [
+                "ahp-chat:/c1"
+              ]
+            }
+          ],
+          "maxResults": 4
+        },
+        "results": [
+          {
+            "kind": "fileName",
+            "resource": "file:///workspace/src/parseConfig.ts",
+            "match": {
+              "text": "src/parseConfig.ts",
+              "highlights": [
+                {
+                  "rangeStart": 4,
+                  "rangeEnd": 15
+                }
+              ]
+            },
+            "score": 0.5
+          },
+          {
+            "kind": "fileText",
+            "resource": "file:///workspace/src/index.ts",
+            "match": {
+              "text": "export function parseConfig(raw: string) {",
+              "highlights": [
+                {
+                  "rangeStart": 16,
+                  "rangeEnd": 27
+                }
+              ]
+            },
+            "range": {
+              "start": {
+                "line": 11,
+                "character": 16
+              },
+              "end": {
+                "line": 11,
+                "character": 27
+              }
+            },
+            "score": 0.75
+          },
+          {
+            "kind": "session",
+            "resource": "ahp-session:/s1",
+            "match": {
+              "text": "Fix parseConfig crash",
+              "highlights": [
+                {
+                  "rangeStart": 4,
+                  "rangeEnd": 15
+                }
+              ]
+            },
+            "title": "Fix parseConfig crash"
+          },
+          {
+            "kind": "chatMessage",
+            "resource": "ahp-chat:/c1",
+            "match": {
+              "text": "\u2026the bug is in parseConfig when\u2026",
+              "highlights": [
+                {
+                  "rangeStart": 15,
+                  "rangeEnd": 26
+                }
+              ]
+            },
+            "title": "Fix parseConfig crash",
+            "turnId": "t45",
+            "score": 0.25
+          }
+        ],
+        "lifecycle": {
+          "status": "completed",
+          "reason": "limitReached"
+        }
+      },
+      "fromSeq": 7
+    }
+  ]
+}

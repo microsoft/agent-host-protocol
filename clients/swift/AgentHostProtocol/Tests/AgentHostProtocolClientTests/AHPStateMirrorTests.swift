@@ -69,6 +69,29 @@ final class AHPStateMirrorTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
+    func testSearchQueryChangeKeepsResultsAndResetsLifecycle() async {
+        let mirror = AHPStateMirror()
+        let resource = "ahp-search:/s1"
+        let initial = SearchState(
+            query: SearchQuery(text: "parseConfig", targets: [.sessions(SessionsSearchTarget(kind: .sessions))]),
+            results: [],
+            lifecycle: .completed(SearchCompletedLifecycleState(status: .completed, reason: .exhausted))
+        )
+        await mirror.applySnapshot(Snapshot(resource: resource, state: .search(initial), fromSeq: 1))
+        let next = SearchQuery(text: "loadConfig", targets: [.sessions(SessionsSearchTarget(kind: .sessions))])
+        await mirror.apply(ActionEnvelope(
+            channel: resource,
+            action: .searchQueryChanged(SearchQueryChangedAction(type: .searchQueryChanged, query: next)),
+            serverSeq: 2
+        ))
+        let changed = await mirror.searches
+        await mirror.reset()
+        let remaining = await mirror.searches
+        XCTAssertEqual(changed[resource]?.query.text, "loadConfig")
+        XCTAssertEqual(changed[resource]?.lifecycle, .pending(SearchPendingLifecycleState(status: .pending)))
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
     func testApplySnapshotSeedsRootState() async {
         let mirror = AHPStateMirror()
         let agents = [

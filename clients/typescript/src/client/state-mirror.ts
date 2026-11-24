@@ -2,8 +2,8 @@
  * Convenience reducer-driven state store, mirroring the Swift
  * `AHPStateMirror` and the Rust reducers example.
  *
- * Tracks root, session, canvas, terminal, changeset, automation catalogue, and
- * automation-run state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
+ * Tracks root, session, canvas, terminal, changeset, automation catalogue,
+ * automation-run, and search state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
  * the mirror keeps those resources up to date via the generated reducers.
  *
  * Useful for simple clients. Larger apps will usually keep their own
@@ -19,6 +19,7 @@ import type {
   AutomationAction,
   AutomationRunAction,
   RootAction,
+  SearchAction,
   SessionAction,
   TerminalAction,
 } from '../types/action-origin.generated.js';
@@ -29,6 +30,7 @@ import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../types/channels-automation/state.js';
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
+import type { SearchState } from '../types/channels-search/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
 import { canvasReducer } from '../types/channels-canvas/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
@@ -36,6 +38,7 @@ import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
 import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
+import { searchReducer } from '../types/channels-search/reducer.js';
 import { isCanvasState } from './canvas-state.js';
 
 const ROOT_URI = 'ahp-root://' as const;
@@ -54,6 +57,7 @@ export class AhpStateMirror {
   private automationCatalogState: AutomationState = INITIAL_AUTOMATION_CATALOG;
   private readonly automationsMap = new Map<URI, AutomationEntry>();
   private readonly automationRunsMap = new Map<URI, AutomationRunState>();
+  private readonly searchesMap = new Map<URI, SearchState>();
 
   /** Current root state. */
   get root(): RootState {
@@ -94,6 +98,11 @@ export class AhpStateMirror {
     return this.automationRunsMap;
   }
 
+  /** All known searches keyed by their channel URI. */
+  get searches(): ReadonlyMap<URI, SearchState> {
+    return this.searchesMap;
+  }
+
 
   /** Look up a session by URI. */
   getSession(uri: URI): SessionState | undefined {
@@ -112,6 +121,11 @@ export class AhpStateMirror {
   /** Look up a catalogued automation by URI. */
   getAutomation(uri: URI): AutomationEntry | undefined {
     return this.automationsMap.get(uri);
+  }
+
+  /** Look up a search by its channel URI. */
+  getSearch(uri: URI): SearchState | undefined {
+    return this.searchesMap.get(uri);
   }
 
   /**
@@ -149,6 +163,10 @@ export class AhpStateMirror {
     }
     if (resource.startsWith('ahp-automation-run:')) {
       this.automationRunsMap.set(resource, snapshot.state as AutomationRunState);
+      return;
+    }
+    if (resource.startsWith('ahp-search:')) {
+      this.searchesMap.set(resource, snapshot.state as SearchState);
       return;
     }
   }
@@ -202,6 +220,12 @@ export class AhpStateMirror {
       const current = this.automationRunsMap.get(channel);
       if (!current) return;
       this.automationRunsMap.set(channel, automationRunReducer(current, action as AutomationRunAction));
+      return;
+    }
+    if (channel.startsWith('ahp-search:')) {
+      const current = this.searchesMap.get(channel);
+      if (!current) return;
+      this.searchesMap.set(channel, searchReducer(current, action as SearchAction));
       return;
     }
   }

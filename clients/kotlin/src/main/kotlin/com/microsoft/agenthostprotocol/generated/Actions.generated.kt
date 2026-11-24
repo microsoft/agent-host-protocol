@@ -128,6 +128,9 @@ value class ActionType(val rawValue: String) {
         val TERMINAL_COMMAND_EXECUTED: ActionType = ActionType("terminal/commandExecuted")
         val TERMINAL_COMMAND_FINISHED: ActionType = ActionType("terminal/commandFinished")
         val RESOURCE_WATCH_CHANGED: ActionType = ActionType("resourceWatch/changed")
+        val SEARCH_QUERY_CHANGED: ActionType = ActionType("search/queryChanged")
+        val SEARCH_RESULTS_CHANGED: ActionType = ActionType("search/resultsChanged")
+        val SEARCH_LIFECYCLE_CHANGED: ActionType = ActionType("search/lifecycleChanged")
         val AUTOMATION_CREATE_REQUESTED: ActionType = ActionType("automation/createRequested")
         val AUTOMATION_UPDATE_REQUESTED: ActionType = ActionType("automation/updateRequested")
         val AUTOMATION_SET: ActionType = ActionType("automation/set")
@@ -1605,6 +1608,87 @@ data class ResourceWatchChangedAction(
     val changes: JsonElement
 )
 
+/**
+ * Replaces the search's query and restarts the search.
+ *
+ * Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+ * {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+ * visible until the host replaces them, so the client does not flash an empty
+ * list.
+ *
+ * After the host applies this action, it stops the previous search and drops
+ * any of its results that it has not dispatched yet. The host MUST then
+ * dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+ * `replace: true` before any other search action. The replacement can keep
+ * old results that still match the new query, and can be empty. If the new
+ * query is not valid,
+ * for example because it contains an invalid regular expression, the host
+ * replaces the results with an empty list and then changes the lifecycle to
+ * {@link SearchLifecycleStatus.Failed | failed}.
+ *
+ * Only clients dispatch this action.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchQueryChangedAction(
+    val type: ActionType,
+    /**
+     * The new query.
+     */
+    val query: SearchQuery
+)
+
+/**
+ * Adds results to {@link SearchState.results}, or replaces them.
+ *
+ * By default, the reducer appends `results`. Set `replace` to `true` to
+ * replace every result instead; if {@link SearchState.lifecycle} is
+ * {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+ * it to {@link SearchLifecycleStatus.Running | running}.
+ *
+ * The host MUST dispatch a replacement first after a
+ * {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+ * replace the results at other times, for example to re-rank them, to remove
+ * duplicates, or to update a completed search when a watched file changes.
+ * The host MUST NOT dispatch an empty `results` list unless `replace` is
+ * `true`.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchResultsChangedAction(
+    val type: ActionType,
+    /**
+     * The results to append, in the order the host found them, or the replacement results.
+     */
+    val results: List<SearchResult>,
+    /**
+     * When `true`, replaces every result instead of appending.
+     */
+    val replace: Boolean? = null
+)
+
+/**
+ * Replaces {@link SearchState.lifecycle}.
+ *
+ * The host dispatches this to complete or fail a search, or to move a
+ * completed search back to {@link SearchLifecycleStatus.Running | running} when it
+ * searches again, for example after a watched file changes. The host MUST NOT
+ * change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+ * {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+data class SearchLifecycleChangedAction(
+    val type: ActionType,
+    /**
+     * The new lifecycle.
+     */
+    val lifecycle: SearchLifecycleState
+)
+
 @Serializable
 data class AutomationCreateRequestedAction(
     val type: ActionType,
@@ -1865,6 +1949,9 @@ sealed interface StateAction
 @JvmInline value class StateActionTerminalCommandExecuted(val value: TerminalCommandExecutedAction) : StateAction
 @JvmInline value class StateActionTerminalCommandFinished(val value: TerminalCommandFinishedAction) : StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
+@JvmInline value class StateActionSearchQueryChanged(val value: SearchQueryChangedAction) : StateAction
+@JvmInline value class StateActionSearchResultsChanged(val value: SearchResultsChangedAction) : StateAction
+@JvmInline value class StateActionSearchLifecycleChanged(val value: SearchLifecycleChangedAction) : StateAction
 @JvmInline value class StateActionAutomationCreateRequested(val value: AutomationCreateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationUpdateRequested(val value: AutomationUpdateRequestedAction) : StateAction
 @JvmInline value class StateActionAutomationSet(val value: AutomationSetAction) : StateAction
@@ -1988,6 +2075,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "terminal/commandExecuted" -> StateActionTerminalCommandExecuted(input.json.decodeFromJsonElement(TerminalCommandExecutedAction.serializer(), element))
             "terminal/commandFinished" -> StateActionTerminalCommandFinished(input.json.decodeFromJsonElement(TerminalCommandFinishedAction.serializer(), element))
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
+            "search/queryChanged" -> StateActionSearchQueryChanged(input.json.decodeFromJsonElement(SearchQueryChangedAction.serializer(), element))
+            "search/resultsChanged" -> StateActionSearchResultsChanged(input.json.decodeFromJsonElement(SearchResultsChangedAction.serializer(), element))
+            "search/lifecycleChanged" -> StateActionSearchLifecycleChanged(input.json.decodeFromJsonElement(SearchLifecycleChangedAction.serializer(), element))
             "automation/createRequested" -> StateActionAutomationCreateRequested(input.json.decodeFromJsonElement(AutomationCreateRequestedAction.serializer(), element))
             "automation/updateRequested" -> StateActionAutomationUpdateRequested(input.json.decodeFromJsonElement(AutomationUpdateRequestedAction.serializer(), element))
             "automation/set" -> StateActionAutomationSet(input.json.decodeFromJsonElement(AutomationSetAction.serializer(), element))
@@ -2104,6 +2194,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionTerminalCommandExecuted -> output.json.encodeToJsonElement(TerminalCommandExecutedAction.serializer(), value.value)
             is StateActionTerminalCommandFinished -> output.json.encodeToJsonElement(TerminalCommandFinishedAction.serializer(), value.value)
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
+            is StateActionSearchQueryChanged -> output.json.encodeToJsonElement(SearchQueryChangedAction.serializer(), value.value)
+            is StateActionSearchResultsChanged -> output.json.encodeToJsonElement(SearchResultsChangedAction.serializer(), value.value)
+            is StateActionSearchLifecycleChanged -> output.json.encodeToJsonElement(SearchLifecycleChangedAction.serializer(), value.value)
             is StateActionAutomationCreateRequested -> output.json.encodeToJsonElement(AutomationCreateRequestedAction.serializer(), value.value)
             is StateActionAutomationUpdateRequested -> output.json.encodeToJsonElement(AutomationUpdateRequestedAction.serializer(), value.value)
             is StateActionAutomationSet -> output.json.encodeToJsonElement(AutomationSetAction.serializer(), value.value)

@@ -24,6 +24,7 @@ public sealed class MultiHostStateMirror
     private readonly ConcurrentDictionary<HostedResourceKey, CanvasState> _canvases = new();
     private readonly ConcurrentDictionary<HostedResourceKey, TerminalState> _terminals = new();
     private readonly ConcurrentDictionary<HostedResourceKey, ChangesetState> _changesets = new();
+    private readonly ConcurrentDictionary<HostedResourceKey, SearchState> _searches = new();
 
     /// <summary>Stores <paramref name="root"/> for <paramref name="hostId"/>.</summary>
     public void PutRoot(HostId hostId, RootState root)
@@ -102,6 +103,19 @@ public sealed class MultiHostStateMirror
     public (ChangesetState? Value, bool Found) Changeset(HostId hostId, string uri) =>
         _changesets.TryGetValue(new HostedResourceKey(hostId, uri), out var v) ? (v, true) : (default, false);
 
+    /// <summary>Stores a search snapshot under (hostId, uri).</summary>
+    public void PutSearch(HostId hostId, string uri, SearchState state)
+    {
+        Guard.ThrowIfNull(hostId, nameof(hostId));
+        Guard.ThrowIfNull(uri, nameof(uri));
+        Guard.ThrowIfNull(state, nameof(state));
+        _searches[new HostedResourceKey(hostId, uri)] = state;
+    }
+
+    /// <summary>Returns the search snapshot at (hostId, uri), or (default, false) if absent.</summary>
+    public (SearchState? Value, bool Found) Search(HostId hostId, string uri) =>
+        _searches.TryGetValue(new HostedResourceKey(hostId, uri), out var v) ? (v, true) : (default, false);
+
     /// <summary>Removes every snapshot belonging to <paramref name="hostId"/>.</summary>
     public void DropHost(HostId hostId)
     {
@@ -111,6 +125,7 @@ public sealed class MultiHostStateMirror
         foreach (var k in _canvases.Keys) if (k.HostId.Equals(hostId)) _canvases.TryRemove(k, out _);
         foreach (var k in _terminals.Keys) if (k.HostId.Equals(hostId)) _terminals.TryRemove(k, out _);
         foreach (var k in _changesets.Keys) if (k.HostId.Equals(hostId)) _changesets.TryRemove(k, out _);
+        foreach (var k in _searches.Keys) if (k.HostId.Equals(hostId)) _searches.TryRemove(k, out _);
     }
 
     /// <summary>Removes the snapshot at (hostId, uri) across every resource kind.</summary>
@@ -122,5 +137,6 @@ public sealed class MultiHostStateMirror
         _canvases.TryRemove(key, out _);
         _terminals.TryRemove(key, out _);
         _changesets.TryRemove(key, out _);
+        _searches.TryRemove(key, out _);
     }
 }

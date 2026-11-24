@@ -28,6 +28,7 @@ export const PROTOCOL_SOURCE_DIRS: readonly string[] = [
   'channels-automation',
   'channels-automation-run',
   'channels-tcp',
+  'channels-search',
 ];
 
 /**

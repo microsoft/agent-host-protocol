@@ -778,6 +778,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 // `mutable: true` marks the STATE types the reducers mutate in place — these
@@ -954,6 +956,23 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
+  { name: 'SearchCapability' },
+  { name: 'SearchQuery' },
+  { name: 'FileNamesSearchTarget' },
+  { name: 'FileTextSearchTarget' },
+  { name: 'SessionsSearchTarget' },
+  { name: 'ChatMessagesSearchTarget' },
+  { name: 'SearchHighlight' },
+  { name: 'SearchMatch' },
+  { name: 'FileNameSearchResult' },
+  { name: 'FileTextSearchResult' },
+  { name: 'SessionSearchResult' },
+  { name: 'ChatMessageSearchResult' },
+  { name: 'SearchPendingLifecycleState' },
+  { name: 'SearchRunningLifecycleState' },
+  { name: 'SearchCompletedLifecycleState' },
+  { name: 'SearchFailedLifecycleState' },
+  { name: 'SearchState', mutable: true },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1397,6 +1416,45 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  doc: 'SearchTarget is one place to search.',
+  variants: [
+    { variantName: 'FileNames', innerType: 'FileNamesSearchTarget', wireValue: 'fileNames' },
+    { variantName: 'FileText', innerType: 'FileTextSearchTarget', wireValue: 'fileText' },
+    { variantName: 'Sessions', innerType: 'SessionsSearchTarget', wireValue: 'sessions' },
+    { variantName: 'ChatMessages', innerType: 'ChatMessagesSearchTarget', wireValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  doc: 'SearchResult is one search match.',
+  variants: [
+    { variantName: 'FileName', innerType: 'FileNameSearchResult', wireValue: 'fileName' },
+    { variantName: 'FileText', innerType: 'FileTextSearchResult', wireValue: 'fileText' },
+    { variantName: 'Session', innerType: 'SessionSearchResult', wireValue: 'session' },
+    { variantName: 'ChatMessage', innerType: 'ChatMessageSearchResult', wireValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  doc: 'SearchLifecycleState is the lifecycle of a search.',
+  variants: [
+    { variantName: 'Pending', innerType: 'SearchPendingLifecycleState', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'SearchRunningLifecycleState', wireValue: 'running' },
+    { variantName: 'Completed', innerType: 'SearchCompletedLifecycleState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'SearchFailedLifecycleState', wireValue: 'failed' },
+  ],
+  unknown: true,
+};
+
 function generateCustomizationEnablementUnionCs(project: Project): string {
   const extra = aliasPreservesUnknownMembers(project, 'CustomizationEnablement')
     ? '    [JsonExtensionData]\n    public Dictionary<string, JsonElement>? Extra { get; set; }\n'
@@ -1458,9 +1516,9 @@ function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, canvas, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// automation-run, or empty state. Read
+  /// automation-run, search, or empty state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (empty → chat → session → canvas → terminal → changeset → resource-watch → annotations → root).
+/// (empty → chat → search → session → canvas → terminal → changeset → resource-watch → annotations → root).
 /// An object with no members is an empty state, used by channels whose state has no fields.
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
@@ -1499,6 +1557,9 @@ public sealed class SnapshotState
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
 
+    /// <summary>Search state variant, when populated.</summary>
+    public SearchState? Search { get; set; }
+
     /// <summary>
     /// A state that this version does not recognize, such as the state of a channel
     /// added in a later protocol version. Kept as raw JSON so it re-encodes unchanged.
@@ -1532,6 +1593,11 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         else if (root.TryGetProperty("turns", out _))
         {
             result.Chat = root.Deserialize(AhpJsonTypeInfo.Get<ChatState>(options));
+        }
+        // SearchState also has a required \`lifecycle\`, so probe it before SessionState.
+        else if (root.TryGetProperty("query", out _) && root.TryGetProperty("results", out _))
+        {
+            result.Search = root.Deserialize(AhpJsonTypeInfo.Get<SearchState>(options));
         }
         else if (root.TryGetProperty("lifecycle", out _))
         {
@@ -1581,6 +1647,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
+        if (value.Search is not null) { JsonSerializer.Serialize(writer, value.Search, AhpJsonTypeInfo.Get<SearchState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, AhpJsonTypeInfo.Get<ChangesetState>(options)); return; }
@@ -1635,6 +1702,7 @@ function generateStateFile(project: Project): string {
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_DISABLE_CONDITION_UNION, AUTOMATION_TARGET_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
+    SEARCH_TARGET_UNION, SEARCH_RESULT_UNION, SEARCH_LIFECYCLE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(project, u));
     lines.push('');
@@ -1769,6 +1837,9 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', variantName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', variantName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', variantName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'annotations/set', variantName: 'AnnotationsSet', tsInterface: 'AnnotationsSetAction' },
   { type: 'annotations/removed', variantName: 'AnnotationsRemoved', tsInterface: 'AnnotationsRemovedAction' },
   { type: 'annotations/entrySet', variantName: 'AnnotationsEntrySet', tsInterface: 'AnnotationsEntrySetAction' },
@@ -2379,6 +2450,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ResourceMkdirParams' }, { name: 'ResourceMkdirResult' },
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
+  { name: 'CreateSearchParams' }, { name: 'CreateSearchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
@@ -2951,6 +3023,10 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTarget',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'BackgroundWork', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
+    'SearchTarget', 'SearchResult', 'SearchLifecycleState',
+    // FileSearchTargetBase / SearchResultBase are base interfaces flattened into
+    // their variant records via `extends`.
+    'FileSearchTargetBase', 'SearchResultBase',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',
     'AhpError', 'AhpErrorDetailsMap', 'AhpErrorCode', 'AhpErrorCodeWithData',

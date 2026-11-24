@@ -1,0 +1,102 @@
+{
+  "description": "search/lifecycleChanged to failed keeps earlier results",
+  "reducer": "search",
+  "initial": {
+    "query": {
+      "text": "parseConfig",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/a.ts",
+        "match": {
+          "text": "parseConfig()",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 11
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        }
+      }
+    ],
+    "lifecycle": {
+      "status": "running"
+    }
+  },
+  "actions": [
+    {
+      "type": "search/lifecycleChanged",
+      "lifecycle": {
+        "status": "failed",
+        "error": {
+          "errorType": "timeout",
+          "message": "Search timed out"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "query": {
+      "text": "parseConfig",
+      "targets": [
+        {
+          "kind": "fileText",
+          "roots": [
+            "file:///workspace"
+          ]
+        }
+      ]
+    },
+    "results": [
+      {
+        "kind": "fileText",
+        "resource": "file:///workspace/a.ts",
+        "match": {
+          "text": "parseConfig()",
+          "highlights": [
+            {
+              "rangeStart": 0,
+              "rangeEnd": 11
+            }
+          ]
+        },
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        }
+      }
+    ],
+    "lifecycle": {
+      "status": "failed",
+      "error": {
+        "errorType": "timeout",
+        "message": "Search timed out"
+      }
+    }
+  }
+}

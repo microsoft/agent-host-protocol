@@ -160,6 +160,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | EmptyState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | CanvasState | AutomationState | AutomationRunState | SearchState | EmptyState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -867,6 +868,7 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    @JvmInline value class Search(val value: SearchState) : SnapshotState
     /** A state that this version does not recognize, kept as raw JSON so it re-encodes unchanged. */
     @JvmInline value class Unknown(val raw: JsonObject) : SnapshotState
 }
@@ -883,7 +885,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
         // \`automation\`, \`origin\`, and \`sessions\`; AutomationState has
-        // required \`entries\`; SessionState has required
+        // required \`entries\`; SearchState has required \`query\` +
+        // \`results\` (checked before session, because it also has a required
+        // \`lifecycle\`); SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
@@ -897,6 +901,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
+            obj.containsKey("query") && obj.containsKey("results") ->
+                SnapshotState.Search(input.json.decodeFromJsonElement(SearchState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("instanceId") && obj.containsKey("extensionId") && obj.containsKey("canvasId") ->
@@ -930,6 +936,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Search -> output.json.encodeToJsonElement(SearchState.serializer(), value.value)
             is SnapshotState.Unknown -> value.raw
         }
         output.encodeJsonElement(element)
@@ -1018,6 +1025,8 @@ const STATE_ENUMS = [
   'AutomationDisableConditionKind',
   'AutomationTargetKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'SearchTargetKind', 'SearchResultKind',
+  'SearchLifecycleStatus', 'SearchCompletionReason',
 ];
 
 const STATE_STRUCTS = [
@@ -1095,6 +1104,12 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'SearchCapability', 'SearchQuery',
+  'FileNamesSearchTarget', 'FileTextSearchTarget', 'SessionsSearchTarget', 'ChatMessagesSearchTarget',
+  'SearchHighlight', 'SearchMatch',
+  'FileNameSearchResult', 'FileTextSearchResult', 'SessionSearchResult', 'ChatMessageSearchResult',
+  'SearchPendingLifecycleState', 'SearchRunningLifecycleState', 'SearchCompletedLifecycleState', 'SearchFailedLifecycleState',
+  'SearchState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1442,6 +1457,43 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
+const SEARCH_TARGET_UNION: UnionConfig = {
+  name: 'SearchTarget',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'FileNames', structName: 'FileNamesSearchTarget', discriminantValue: 'fileNames' },
+    { caseName: 'FileText', structName: 'FileTextSearchTarget', discriminantValue: 'fileText' },
+    { caseName: 'Sessions', structName: 'SessionsSearchTarget', discriminantValue: 'sessions' },
+    { caseName: 'ChatMessages', structName: 'ChatMessagesSearchTarget', discriminantValue: 'chatMessages' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_RESULT_UNION: UnionConfig = {
+  name: 'SearchResult',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'FileName', structName: 'FileNameSearchResult', discriminantValue: 'fileName' },
+    { caseName: 'FileText', structName: 'FileTextSearchResult', discriminantValue: 'fileText' },
+    { caseName: 'Session', structName: 'SessionSearchResult', discriminantValue: 'session' },
+    { caseName: 'ChatMessage', structName: 'ChatMessageSearchResult', discriminantValue: 'chatMessage' },
+  ],
+  unknown: true,
+};
+
+const SEARCH_LIFECYCLE_UNION: UnionConfig = {
+  name: 'SearchLifecycleState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Pending', structName: 'SearchPendingLifecycleState', discriminantValue: 'pending' },
+    { caseName: 'Running', structName: 'SearchRunningLifecycleState', discriminantValue: 'running' },
+    { caseName: 'Completed', structName: 'SearchCompletedLifecycleState', discriminantValue: 'completed' },
+    { caseName: 'Failed', structName: 'SearchFailedLifecycleState', discriminantValue: 'failed' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [
     GENERATED_HEADER.replace('package ', '@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)\n\npackage '),
@@ -1542,6 +1594,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_TARGET_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, SEARCH_LIFECYCLE_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1653,6 +1711,9 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'search/queryChanged', caseName: 'SearchQueryChanged', tsInterface: 'SearchQueryChangedAction' },
+  { type: 'search/resultsChanged', caseName: 'SearchResultsChanged', tsInterface: 'SearchResultsChangedAction' },
+  { type: 'search/lifecycleChanged', caseName: 'SearchLifecycleChanged', tsInterface: 'SearchLifecycleChangedAction' },
   { type: 'automation/createRequested', caseName: 'AutomationCreateRequested', tsInterface: 'AutomationCreateRequestedAction' },
   { type: 'automation/updateRequested', caseName: 'AutomationUpdateRequested', tsInterface: 'AutomationUpdateRequestedAction' },
   { type: 'automation/set', caseName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
@@ -1852,6 +1913,7 @@ const COMMAND_STRUCTS = [
   'ResourceMkdirParams', 'ResourceMkdirResult',
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
+  'CreateSearchParams', 'CreateSearchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
@@ -2517,6 +2579,11 @@ function checkExhaustiveness(project: Project): void {
     'TerminalLifecycleState',       // TERMINAL_LIFECYCLE_STATE_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'BackgroundWork',               // BACKGROUND_WORK_UNION discriminated union
+    'SearchTarget',                 // SEARCH_TARGET_UNION discriminated union
+    'SearchResult',                 // SEARCH_RESULT_UNION discriminated union
+    'SearchLifecycleState',              // SEARCH_LIFECYCLE_UNION discriminated union
+    'FileSearchTargetBase',         // base interface, flattened into the file search target data classes via `extends`
+    'SearchResultBase',             // base interface, flattened into the search result data classes via `extends`
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union

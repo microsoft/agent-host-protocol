@@ -105,6 +105,9 @@ public enum ActionType: Codable, Sendable, Equatable {
     case terminalCommandExecuted
     case terminalCommandFinished
     case resourceWatchChanged
+    case searchQueryChanged
+    case searchResultsChanged
+    case searchLifecycleChanged
     case automationCreateRequested
     case automationUpdateRequested
     case automationSet
@@ -220,6 +223,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "terminal/commandExecuted": self = .terminalCommandExecuted
         case "terminal/commandFinished": self = .terminalCommandFinished
         case "resourceWatch/changed": self = .resourceWatchChanged
+        case "search/queryChanged": self = .searchQueryChanged
+        case "search/resultsChanged": self = .searchResultsChanged
+        case "search/lifecycleChanged": self = .searchLifecycleChanged
         case "automation/createRequested": self = .automationCreateRequested
         case "automation/updateRequested": self = .automationUpdateRequested
         case "automation/set": self = .automationSet
@@ -335,6 +341,9 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .terminalCommandExecuted: try container.encode("terminal/commandExecuted")
         case .terminalCommandFinished: try container.encode("terminal/commandFinished")
         case .resourceWatchChanged: try container.encode("resourceWatch/changed")
+        case .searchQueryChanged: try container.encode("search/queryChanged")
+        case .searchResultsChanged: try container.encode("search/resultsChanged")
+        case .searchLifecycleChanged: try container.encode("search/lifecycleChanged")
         case .automationCreateRequested: try container.encode("automation/createRequested")
         case .automationUpdateRequested: try container.encode("automation/updateRequested")
         case .automationSet: try container.encode("automation/set")
@@ -2464,6 +2473,96 @@ public struct ResourceWatchChangedAction: Codable, Sendable, Equatable {
     }
 }
 
+/// Replaces the search's query and restarts the search.
+///
+/// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+/// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+/// visible until the host replaces them, so the client does not flash an empty
+/// list.
+///
+/// After the host applies this action, it stops the previous search and drops
+/// any of its results that it has not dispatched yet. The host MUST then
+/// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+/// `replace: true` before any other search action. The replacement can keep
+/// old results that still match the new query, and can be empty. If the new
+/// query is not valid,
+/// for example because it contains an invalid regular expression, the host
+/// replaces the results with an empty list and then changes the lifecycle to
+/// {@link SearchLifecycleStatus.Failed | failed}.
+///
+/// Only clients dispatch this action.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchQueryChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The new query.
+    public var query: SearchQuery
+
+    public init(
+        type: ActionType,
+        query: SearchQuery
+    ) {
+        self.type = type
+        self.query = query
+    }
+}
+
+/// Adds results to {@link SearchState.results}, or replaces them.
+///
+/// By default, the reducer appends `results`. Set `replace` to `true` to
+/// replace every result instead; if {@link SearchState.lifecycle} is
+/// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+/// it to {@link SearchLifecycleStatus.Running | running}.
+///
+/// The host MUST dispatch a replacement first after a
+/// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+/// replace the results at other times, for example to re-rank them, to remove
+/// duplicates, or to update a completed search when a watched file changes.
+/// The host MUST NOT dispatch an empty `results` list unless `replace` is
+/// `true`.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchResultsChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The results to append, in the order the host found them, or the replacement results.
+    public var results: [SearchResult]
+    /// When `true`, replaces every result instead of appending.
+    public var replace: Bool?
+
+    public init(
+        type: ActionType,
+        results: [SearchResult],
+        replace: Bool? = nil
+    ) {
+        self.type = type
+        self.results = results
+        self.replace = replace
+    }
+}
+
+/// Replaces {@link SearchState.lifecycle}.
+///
+/// The host dispatches this to complete or fail a search, or to move a
+/// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+/// searches again, for example after a watched file changes. The host MUST NOT
+/// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+/// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+///
+/// Stability: 1.0 - Early development.
+public struct SearchLifecycleChangedAction: Codable, Sendable, Equatable {
+    public var type: ActionType
+    /// The new lifecycle.
+    public var lifecycle: SearchLifecycleState
+
+    public init(
+        type: ActionType,
+        lifecycle: SearchLifecycleState
+    ) {
+        self.type = type
+        self.lifecycle = lifecycle
+    }
+}
+
 public struct AutomationCreateRequestedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
@@ -2762,6 +2861,9 @@ public enum StateAction: Codable, Sendable, Equatable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
+    case searchQueryChanged(SearchQueryChangedAction)
+    case searchResultsChanged(SearchResultsChangedAction)
+    case searchLifecycleChanged(SearchLifecycleChangedAction)
     case automationCreateRequested(AutomationCreateRequestedAction)
     case automationUpdateRequested(AutomationUpdateRequestedAction)
     case automationSet(AutomationSetAction)
@@ -2981,6 +3083,12 @@ public enum StateAction: Codable, Sendable, Equatable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
+        case "search/queryChanged":
+            self = .searchQueryChanged(try SearchQueryChangedAction(from: decoder))
+        case "search/resultsChanged":
+            self = .searchResultsChanged(try SearchResultsChangedAction(from: decoder))
+        case "search/lifecycleChanged":
+            self = .searchLifecycleChanged(try SearchLifecycleChangedAction(from: decoder))
         case "automation/createRequested":
             self = .automationCreateRequested(try AutomationCreateRequestedAction(from: decoder))
         case "automation/updateRequested":
@@ -3105,6 +3213,9 @@ public enum StateAction: Codable, Sendable, Equatable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
+        case .searchQueryChanged(let v): try v.encode(to: encoder)
+        case .searchResultsChanged(let v): try v.encode(to: encoder)
+        case .searchLifecycleChanged(let v): try v.encode(to: encoder)
         case .automationCreateRequested(let v): try v.encode(to: encoder)
         case .automationUpdateRequested(let v): try v.encode(to: encoder)
         case .automationSet(let v): try v.encode(to: encoder)

@@ -484,6 +484,11 @@ public struct InitializeResult: Codable, Sendable, Equatable {
     ///
     /// Stability: 1.0 - Early development.
     public var tcpConnections: TcpConnectionsCapability?
+    /// Present when the host supports `createSearch`, which searches files,
+    /// sessions, and chats and streams the results on an `ahp-search:` channel.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var search: SearchCapability?
     /// Present when chats in one session may be backed by different agent
     /// providers (see {@link CreateChatParams.provider} and
     /// {@link ChatState.provider}).
@@ -505,6 +510,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         case telemetry
         case automations
         case tcpConnections
+        case search
         case multipleChatProviders
     }
 
@@ -521,6 +527,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         telemetry: TelemetryCapabilities? = nil,
         automations: AutomationCapabilities? = nil,
         tcpConnections: TcpConnectionsCapability? = nil,
+        search: SearchCapability? = nil,
         multipleChatProviders: MultipleChatProvidersCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
@@ -535,6 +542,7 @@ public struct InitializeResult: Codable, Sendable, Equatable {
         self.telemetry = telemetry
         self.automations = automations
         self.tcpConnections = tcpConnections
+        self.search = search
         self.multipleChatProviders = multipleChatProviders
     }
 }
@@ -1878,6 +1886,57 @@ public struct CreateResourceWatchResult: Codable, Sendable, Equatable {
     }
 }
 
+/// Starts a search on the host.
+///
+/// The client chooses the channel URI and then subscribes to it to receive the
+/// search's {@link SearchState} and its results. The client replaces the query
+/// by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+/// and cancels the search by unsubscribing.
+///
+/// The client MUST NOT send this command unless `InitializeResult.search` is
+/// present, and MUST NOT include a target whose kind is not listed in
+/// {@link SearchCapability.targets}.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateSearchParams: Codable, Sendable, Equatable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// What to search for and where.
+    public var query: SearchQuery
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case query
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        query: SearchQuery
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.query = query
+    }
+}
+
+/// Result of the `createSearch` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.
+public struct CreateSearchResult: Codable, Sendable, Equatable {
+
+    public init(
+
+    ) {
+    }
+}
+
 public struct FetchTurnsParams: Codable, Sendable, Equatable {
     /// Channel URI this command targets.
     public var channel: String
@@ -2968,6 +3027,11 @@ extension DisposeTerminalParams: AHPCommand {
 extension CreateResourceWatchParams: AHPCommand {
     public typealias Result = CreateResourceWatchResult
     public static let method = "createResourceWatch"
+}
+
+extension CreateSearchParams: AHPCommand {
+    public typealias Result = CreateSearchResult
+    public static let method = "createSearch"
 }
 
 extension ListSessionsParams: AHPCommand {

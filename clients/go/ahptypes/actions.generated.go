@@ -118,6 +118,9 @@ const (
 	ActionTypeTerminalCommandExecuted             ActionType = "terminal/commandExecuted"
 	ActionTypeTerminalCommandFinished             ActionType = "terminal/commandFinished"
 	ActionTypeResourceWatchChanged                ActionType = "resourceWatch/changed"
+	ActionTypeSearchQueryChanged                  ActionType = "search/queryChanged"
+	ActionTypeSearchResultsChanged                ActionType = "search/resultsChanged"
+	ActionTypeSearchLifecycleChanged              ActionType = "search/lifecycleChanged"
 	ActionTypeAutomationCreateRequested           ActionType = "automation/createRequested"
 	ActionTypeAutomationUpdateRequested           ActionType = "automation/updateRequested"
 	ActionTypeAutomationSet                       ActionType = "automation/set"
@@ -1729,6 +1732,70 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
+// Replaces the search's query and restarts the search.
+//
+// Keeps {@link SearchState.results} and sets {@link SearchState.lifecycle} to
+// {@link SearchLifecycleStatus.Pending | pending}. The old results stay
+// visible until the host replaces them, so the client does not flash an empty
+// list.
+//
+// After the host applies this action, it stops the previous search and drops
+// any of its results that it has not dispatched yet. The host MUST then
+// dispatch {@link SearchResultsChangedAction | `search/resultsChanged`} with
+// `replace: true` before any other search action. The replacement can keep
+// old results that still match the new query, and can be empty. If the new
+// query is not valid,
+// for example because it contains an invalid regular expression, the host
+// replaces the results with an empty list and then changes the lifecycle to
+// {@link SearchLifecycleStatus.Failed | failed}.
+//
+// Only clients dispatch this action.
+//
+// Stability: 1.0 - Early development.
+type SearchQueryChangedAction struct {
+	Type ActionType `json:"type"`
+	// The new query.
+	Query SearchQuery `json:"query"`
+}
+
+// Adds results to {@link SearchState.results}, or replaces them.
+//
+// By default, the reducer appends `results`. Set `replace` to `true` to
+// replace every result instead; if {@link SearchState.lifecycle} is
+// {@link SearchLifecycleStatus.Pending | pending}, a replacement also changes
+// it to {@link SearchLifecycleStatus.Running | running}.
+//
+// The host MUST dispatch a replacement first after a
+// {@link SearchQueryChangedAction | `search/queryChanged`}. It MAY also
+// replace the results at other times, for example to re-rank them, to remove
+// duplicates, or to update a completed search when a watched file changes.
+// The host MUST NOT dispatch an empty `results` list unless `replace` is
+// `true`.
+//
+// Stability: 1.0 - Early development.
+type SearchResultsChangedAction struct {
+	Type ActionType `json:"type"`
+	// The results to append, in the order the host found them, or the replacement results.
+	Results []SearchResult `json:"results"`
+	// When `true`, replaces every result instead of appending.
+	Replace *bool `json:"replace,omitempty"`
+}
+
+// Replaces {@link SearchState.lifecycle}.
+//
+// The host dispatches this to complete or fail a search, or to move a
+// completed search back to {@link SearchLifecycleStatus.Running | running} when it
+// searches again, for example after a watched file changes. The host MUST NOT
+// change the lifecycle to {@link SearchLifecycleStatus.Pending | pending}; only
+// {@link SearchQueryChangedAction | `search/queryChanged`} does that.
+//
+// Stability: 1.0 - Early development.
+type SearchLifecycleChangedAction struct {
+	Type ActionType `json:"type"`
+	// The new lifecycle.
+	Lifecycle SearchLifecycleState `json:"lifecycle"`
+}
+
 // Ask the host to create a durable automation at a client-chosen resource.
 //
 // Clients may dispatch this action only when the host advertises its `create`
@@ -1957,6 +2024,9 @@ func (*TerminalCommandDetectionAvailableAction) isStateAction()   {}
 func (*TerminalCommandExecutedAction) isStateAction()             {}
 func (*TerminalCommandFinishedAction) isStateAction()             {}
 func (*ResourceWatchChangedAction) isStateAction()                {}
+func (*SearchQueryChangedAction) isStateAction()                  {}
+func (*SearchResultsChangedAction) isStateAction()                {}
+func (*SearchLifecycleChangedAction) isStateAction()              {}
 func (*AutomationCreateRequestedAction) isStateAction()           {}
 func (*AutomationUpdateRequestedAction) isStateAction()           {}
 func (*AutomationSetAction) isStateAction()                       {}
@@ -2571,6 +2641,24 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "resourceWatch/changed":
 		var value ResourceWatchChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/queryChanged":
+		var value SearchQueryChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/resultsChanged":
+		var value SearchResultsChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "search/lifecycleChanged":
+		var value SearchLifecycleChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

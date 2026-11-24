@@ -530,6 +530,13 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TcpConnectionsCapability? TcpConnections { get; init; }
 
+    /// <summary>Present when the host supports `createSearch`, which searches files,
+    /// sessions, and chats and streams the results on an `ahp-search:` channel.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SearchCapability? Search { get; init; }
+
     /// <summary>Present when chats in one session may be backed by different agent
     /// providers (see {@link CreateChatParams.provider} and
     /// {@link ChatState.provider}).
@@ -1805,6 +1812,42 @@ public sealed record CreateResourceWatchResult
     /// caller subscribes to this URI to start receiving change events and
     /// unsubscribes to release the watcher.</summary>
     public required string Channel { get; init; }
+}
+
+/// <summary>Starts a search on the host.
+///
+/// The client chooses the channel URI and then subscribes to it to receive the
+/// search's {@link SearchState} and its results. The client replaces the query
+/// by dispatching {@link SearchQueryChangedAction | `search/queryChanged`},
+/// and cancels the search by unsubscribing.
+///
+/// The client MUST NOT send this command unless `InitializeResult.search` is
+/// present, and MUST NOT include a target whose kind is not listed in
+/// {@link SearchCapability.targets}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateSearchParams
+{
+    /// <summary>The client-chosen URI for the new channel, for example `ahp-search:/&lt;uuid&gt;`.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>What to search for and where.</summary>
+    public required SearchQuery Query { get; init; }
+}
+
+/// <summary>Result of the `createSearch` command.
+///
+/// An empty object on success.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record CreateSearchResult
+{
 }
 
 /// <summary>Requests that the host load older historical turns into a chat state.

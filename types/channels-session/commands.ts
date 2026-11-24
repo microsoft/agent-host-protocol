@@ -262,12 +262,18 @@ export interface CompletionItem {
    * attachment's own `rangeStart`/`rangeEnd` (when present) refer to
    * positions in the final {@link Message.text} after the item is
    * accepted.
+   *
+   * @integer
+   * @minimum 0
    */
   rangeStart?: number;
 
   /**
    * The end of the range in the input's `text` that is replaced by
    * `insertText`. See {@link rangeStart}.
+   *
+   * @integer
+   * @minimum 1
    */
   rangeEnd?: number;
 

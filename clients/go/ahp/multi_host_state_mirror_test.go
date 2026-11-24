@@ -29,6 +29,30 @@ func TestMultiHostStateMirrorCanvasLifecycle(t *testing.T) {
 	}
 }
 
+func TestMultiHostStateMirrorSearchLifecycle(t *testing.T) {
+	mirror := NewMultiHostStateMirror()
+	uri := ahptypes.URI("ahp-search:/s1")
+	state := ahptypes.SearchState{
+		Query:   ahptypes.SearchQuery{Text: "parseConfig"},
+		Results: []ahptypes.SearchResult{},
+		Lifecycle: ahptypes.SearchLifecycleState{Value: &ahptypes.SearchPendingLifecycleState{
+			Status: ahptypes.SearchLifecycleStatusPending,
+		}},
+	}
+	mirror.PutSearch("host-a", uri, state)
+	mirror.PutSearch("host-b", uri, state)
+	mirror.DropResource("host-a", uri)
+	_, removed := mirror.Search("host-a", uri)
+	retained, found := mirror.Search("host-b", uri)
+	mirror.PutSearch("host-a", uri, state)
+	mirror.DropHost("host-a")
+	_, dropped := mirror.Search("host-a", uri)
+	_, otherHost := mirror.Search("host-b", uri)
+	if removed || !found || !reflect.DeepEqual(retained, state) || dropped || !otherHost {
+		t.Fatal("search state was not isolated or removed with its resource and host")
+	}
+}
+
 func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	mirror := NewMultiHostStateMirror()
 	automationURI := ahptypes.URI("ahp-automation:/nightly")

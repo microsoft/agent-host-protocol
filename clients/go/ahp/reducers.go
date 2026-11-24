@@ -2019,6 +2019,37 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 	return ReduceOutcomeOutOfScope
 }
 
+// ─── Search Reducer ────────────────────────────────────────────────────
+
+// ApplyActionToSearch applies action to the [ahptypes.SearchState] in
+// place. Returns [ReduceOutcomeOutOfScope] for actions that target a
+// different state tree.
+func ApplyActionToSearch(state *ahptypes.SearchState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.SearchQueryChangedAction:
+		state.Query = a.Query
+		state.Lifecycle = ahptypes.SearchLifecycleState{Value: &ahptypes.SearchPendingLifecycleState{Status: ahptypes.SearchLifecycleStatusPending}}
+		return ReduceOutcomeApplied
+	case *ahptypes.SearchResultsChangedAction:
+		if a.Replace == nil || !*a.Replace {
+			if len(a.Results) == 0 {
+				return ReduceOutcomeNoOp
+			}
+			state.Results = append(state.Results, a.Results...)
+			return ReduceOutcomeApplied
+		}
+		state.Results = append([]ahptypes.SearchResult{}, a.Results...)
+		if _, pending := state.Lifecycle.Value.(*ahptypes.SearchPendingLifecycleState); pending {
+			state.Lifecycle = ahptypes.SearchLifecycleState{Value: &ahptypes.SearchRunningLifecycleState{Status: ahptypes.SearchLifecycleStatusRunning}}
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.SearchLifecycleChangedAction:
+		state.Lifecycle = a.Lifecycle
+		return ReduceOutcomeApplied
+	}
+	return ReduceOutcomeOutOfScope
+}
+
 // ApplyActionToAutomation applies an action to automation catalogue state.
 func ApplyActionToAutomation(state *ahptypes.AutomationState, action ahptypes.StateAction) ReduceOutcome {
 	switch a := action.Value.(type) {

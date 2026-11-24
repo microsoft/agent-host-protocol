@@ -31,6 +31,7 @@ export {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  searchReducer,
   automationReducer,
   automationRunReducer,
   isClientDispatchable,

@@ -40,14 +40,15 @@ use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
     AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, CanvasState,
-    ChangesetState, ChatState, ResourceWatchState, RootState, SessionState, SnapshotState,
-    TerminalState,
+    ChangesetState, ChatState, ResourceWatchState, RootState, SearchState, SessionState,
+    SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
     apply_action_to_automation, apply_action_to_automation_run, apply_action_to_canvas,
-    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_chat, apply_action_to_root, apply_action_to_search, apply_action_to_session,
+    apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -102,6 +103,7 @@ pub struct MultiHostStateMirror {
     automation_catalogs: HashMap<HostId, AutomationState>,
     automations: HashMap<HostedResourceKey, AutomationEntry>,
     automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
+    searches: HashMap<HostedResourceKey, SearchState>,
 }
 
 impl MultiHostStateMirror {
@@ -165,6 +167,11 @@ impl MultiHostStateMirror {
         &self.automation_runs
     }
 
+    /// Borrow search states keyed by `(host_id, uri)`.
+    pub fn searches(&self) -> &HashMap<HostedResourceKey, SearchState> {
+        &self.searches
+    }
+
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
@@ -225,6 +232,10 @@ impl MultiHostStateMirror {
             apply_action_to_terminal(terminal, &envelope.action);
             return;
         }
+        if let Some(search) = self.searches.get_mut(&key) {
+            apply_action_to_search(search, &envelope.action);
+            return;
+        }
         if let Some(run) = self.automation_runs.get_mut(&key) {
             apply_action_to_automation_run(run, &envelope.action);
         }
@@ -235,7 +246,7 @@ impl MultiHostStateMirror {
 
     /// Seed the mirror from a [`Snapshot`](ahp_types::state::Snapshot)
     /// scoped to `host` — root, session, terminal, changeset,
-    /// resource-watch, annotations, automation, or automation-run as the
+    /// resource-watch, annotations, automation, automation-run, or search as the
     /// snapshot's `state` discriminator dictates.
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
@@ -275,12 +286,15 @@ impl MultiHostStateMirror {
             SnapshotState::AutomationRun(state) => {
                 self.automation_runs.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Search(state) => {
+                self.searches.insert(key, state.as_ref().clone());
+            }
         }
     }
 
     /// Drop every slot keyed under `host` — root state, sessions,
     /// terminals, changesets, resource watches, annotations, automations,
-    /// and automation runs.
+    /// automation runs, and searches.
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
@@ -293,6 +307,7 @@ impl MultiHostStateMirror {
         self.automation_catalogs.remove(host);
         self.automations.retain(|key, _| &key.host_id != host);
         self.automation_runs.retain(|key, _| &key.host_id != host);
+        self.searches.retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
@@ -308,6 +323,7 @@ impl MultiHostStateMirror {
         self.automation_catalogs.clear();
         self.automations.clear();
         self.automation_runs.clear();
+        self.searches.clear();
     }
 
     fn replace_automations(&mut self, host: &HostId, automations: Vec<AutomationEntry>) {

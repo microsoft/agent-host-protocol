@@ -63,6 +63,7 @@ type _ExpectedCommands =
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'
+  | 'createSearch'
   | 'listSessions'
   | 'resourceRead'
   | 'resourceWrite'
