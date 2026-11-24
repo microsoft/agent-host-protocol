@@ -343,7 +343,7 @@ export interface RootModelSourceRegistrationRemovedAction {
 }
 ```
 
-A registration's routing is its `provider`, `format`, and `definition`, with definitions compared as JSON values, ignoring object key order. The reducers apply the actions as follows:
+A registration's routing is its `provider`, `format`, and `definition`, with definitions compared as JSON values: object key order is ignored, and numbers compare by numeric value, so `1` equals `1.0`. Every client's reducer has to reach the same answer, or one client would clear host-reported fields the host kept. The reducers apply the actions as follows:
 
 - **Add.** When no registration has the `id`, `Set` appends the registration, with `contributingClientIds` set to `[clientId]`, or absent when there's no `clientId`.
 - **Join.** When one has, and its routing is unchanged, `Set` keeps the existing host-reported fields (`state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and `credentialId`), adds `clientId` to `contributingClientIds` if it isn't there, and takes `displayName`, `icons`, `retention`, and `_meta` from the action. Joining doesn't disturb the status, nonce, or credential.
@@ -658,7 +658,7 @@ sequenceDiagram
 A contributing client leaves when its connection closes and it doesn't reconnect with the same `clientId` within the host's grace period, which the host advertises as `gracePeriod`. The host then dispatches `root/modelSourceContributorRemoved` for it. While other contributors remain, nothing else changes. When the last contributor leaves:
 
 - **`contributingClient` retention (the default).** The host stops new work on the source and withdraws its models from the catalog: a new turn or a pending message that names one of its models fails. Turns already running on it SHOULD finish, and the host MAY bound how long it waits. Any client can still cancel such a turn with the existing cancellation actions. The host then removes the registration and drops its credential.
-- **`host` retention.** The registration stays, with its credential in memory and no contributors, until a client removes it, a client that joins later withdraws, host policy expires it, or the host restarts (see below). It keeps serving every client and automation. If its credential expires or is rejected, the source goes to `authRequired`, and work that needs it fails until a client answers.
+- **`host` retention.** The registration stays, with its credential in memory and no contributors, until a client removes it, a client that joins later withdraws, or host policy expires it. A restart drops its credential (see below). It keeps serving every client and automation. If its credential expires or is rejected, the source goes to `authRequired`, and work that needs it fails until a client answers.
 
 A client that comes back with the same `clientId` within the grace period is still listed, and dispatches `Set` only for the sources it changed. A client that comes back with a new `clientId` and the same configuration joins with `Set`, which keeps the status, nonce, and credential.
 
