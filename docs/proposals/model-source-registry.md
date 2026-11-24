@@ -127,12 +127,30 @@ export interface ModelSourceRegistration {
    */
   state?: ModelSourceState;
   /**
-   * Host-issued token that a client echoes when it delivers the credential.
-   * The host issues a new one whenever the credential is installed or
-   * dropped, and never reuses one for the same `id`. Set with `state`.
+   * Host-issued token that a client echoes when it delivers the credential,
+   * and that tags every agent operation on the registration. The host issues
+   * a new one when the registration is added, when its `provider`, `format`,
+   * or `definition` changes, and whenever the credential is installed or
+   * dropped. It never reuses one for the same `id`. Set with `state`.
    * See §4.4.
    */
   credentialNonce?: string;
+  /**
+   * RFC 9728 metadata for the endpoint the credential is for. Present
+   * whenever the source takes a credential, in every state, so any client
+   * can deliver, rotate, or revoke one. Absent for a source that needs no
+   * credential. Set with `state`.
+   *
+   * `credentialResource.resource` is the endpoint URL as the definition
+   * names it, in any scheme the agent supports (for example
+   * `http://localhost:11434/v1`). It's the value a client passes back as
+   * `authenticate({ resource })`, and nothing fetches it.
+   * `credentialResource.resource_name` labels the prompt (for example
+   * "OpenRouter API key"). A source that accepts OAuth access tokens
+   * advertises `authorization_servers` and `scopes_supported`. A source
+   * that takes a user-supplied secret omits them.
+   */
+  credentialResource?: ProtectedResourceMetadata;
   _meta?: Record<string, unknown>;
 }
 ```
@@ -176,25 +194,15 @@ export interface ModelSourceReadyState {
 }
 
 /**
- * What a model source needs in order to become ready. Deliberately
- * carries no credential.
+ * Why a model source needs a credential before it can be ready. Deliberately
+ * carries no credential. The endpoint the credential is for is the
+ * registration's `credentialResource`.
  *
  * @preserveUnknownMembers
  */
 export interface ModelSourceAuthRequirement {
   /** Why a credential is needed. */
   reason: AuthRequiredReason;
-  /**
-   * RFC 9728 metadata for the source's endpoint. `resource.resource` is
-   * the endpoint URL as the definition names it, in any scheme the agent
-   * supports (for example `http://localhost:11434/v1`). It's the value a
-   * client passes back as `authenticate({ resource })`, and nothing fetches
-   * it. `resource.resource_name` labels the prompt (for example
-   * "OpenRouter API key"). A source that accepts OAuth access tokens
-   * advertises `authorization_servers` and `scopes_supported`. A source
-   * that takes a user-supplied secret omits them.
-   */
-  resource: ProtectedResourceMetadata;
   /** Human-readable hint the host writes, for example "The endpoint rejected the API key." */
   description?: string;
 }
@@ -244,18 +252,21 @@ The host reports status with its own narrow action, as it does for MCP servers w
 // types/channels-root/actions.ts
 
 /**
- * Updates a registration's status and credential nonce. A no-op when no
- * registration has `id`. Only the host dispatches it.
+ * Updates a registration's status, credential nonce, and credential
+ * resource together. A no-op when no registration has `id`. Only the host
+ * dispatches it.
  */
 export interface RootModelSourceStateChangedAction {
   type: ActionType.RootModelSourceStateChanged; // 'root/modelSourceStateChanged'
   id: string;
   state: ModelSourceState;
   credentialNonce: string;
+  /** Replaces the registration's `credentialResource`. Absent clears it. */
+  credentialResource?: ProtectedResourceMetadata;
 }
 ```
 
-Because the reducer ignores an unknown `id`, a status report that arrives after a registration is removed can't bring it back. Because it changes only `state` and `credentialNonce`, it can't overwrite a client's newer definition. The host also discards an agent result for a definition the registration no longer has, so a slow result for an old definition can't mark a new one `ready`.
+Because the reducer ignores an unknown `id`, a status report that arrives after a registration is removed can't bring it back. Because it changes only the three host-reported fields, it can't overwrite a client's newer definition. The host also tags every agent operation on the registration, such as validation, model discovery, and inference, with its current `credentialNonce`, and discards any result whose nonce is no longer current ([§4.4](#_4-4-credential-delivery-through-authenticate)). A slow result from before a definition change, a re-registration, or a key change therefore can't mark the current registration `ready`, even when the definition has changed back to the same value.
 
 ### 4.3 Registering and removing
 
@@ -285,20 +296,20 @@ export interface RootModelSourceRegistrationRemovedAction {
 
 The reducers follow the keyed-collection convention: `Set` appends or replaces by `id`, and `Removed` deletes by `id` or returns the state unchanged.
 
-A client registers by dispatching `Set` with `clientId` set to its own ID, and with no `state` or `credentialNonce`. Replacing the registration clears its status until the host reports again with `root/modelSourceStateChanged`, so a client SHOULD NOT dispatch `Set` for a registration that hasn't changed.
+A client registers by dispatching `Set` with `clientId` set to its own ID, and with no `state`, `credentialNonce`, or `credentialResource`. Replacing the registration clears those host-reported fields until the host reports again with `root/modelSourceStateChanged`, so a client SHOULD NOT dispatch `Set` for a registration that hasn't changed.
 
 Like MCP servers, registrations have no per-client ownership. Any client can change or remove any registration, and the client that changes one becomes its contributing client. A host MAY reject client changes to a registration it created itself.
 
 The host rejects a client-dispatched `Set`, through `ActionEnvelope.rejectionReason`, when:
 
 - the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
-- `clientId` isn't the dispatching client's ID, or `state` or `credentialNonce` is present;
+- `clientId` isn't the dispatching client's ID, or `state`, `credentialNonce`, or `credentialResource` is present;
 - `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same registration doesn't count, so a ready registration can still be updated;
 - the host won't honor the requested `retention`. The client can register again with `contributingClient` retention.
 
 A client-dispatched `Removed` carries only an `id`. When no registration has that `id`, the action is a no-op, as the keyed-collection convention requires.
 
-When a `Set` changes an existing registration's `provider`, `format`, or `definition`, the host drops its credential, and the source goes back through `starting`. A changed definition must never receive a key that was supplied for a different one. A change to `name`, `icons`, `clientId`, or `retention` keeps the credential.
+When a `Set` changes an existing registration's `provider`, `format`, or `definition`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A changed definition must never receive a key that was supplied for a different one. A change to `name`, `icons`, `clientId`, or `retention` keeps the credential and the nonce.
 
 ### 4.4 Credential delivery through `authenticate`
 
@@ -358,22 +369,24 @@ The `token` is an opaque secret. The agent applies it as the definition specifie
 
 Clients MUST include a `modelSource` target when they deliver a registered source's credential. A token without a target can't be scoped to one registration (see [§7](#_7-credential-rules)), so it never satisfies a model source's challenge. The host rejects an untargeted `resource` that matches only model source challenges with `InvalidParams` (`-32602`). Untargeted tokens keep working for MCP servers and agent-level resources.
 
-`credentialNonce` fences every credential change. The host issues a new nonce whenever it installs or drops a credential: on delivery, rotation, expiry, rejection, and revocation, and when a change to `provider`, `format`, or `definition` drops it ([§4.3](#_4-3-registering-and-removing)). That includes a removed registration that's registered again under the same `id`. An `authenticate` built before any of those changes is stale, so:
+`credentialNonce` fences every credential change, and works as the registration's generation. The host issues a new nonce whenever a registration is added, including one registered again under a removed `id`, and whenever its `provider`, `format`, or `definition` changes, whether or not it held a credential. It also issues one whenever it installs or drops a credential: on delivery, rotation, expiry, rejection, and revocation. An `authenticate` built before any of those changes is stale, so:
 
 - a key meant for an old definition never reaches a new one, even when the endpoint didn't change;
 - a rotation that crosses a revocation can't undo the revocation;
 - when two clients answer the same `authRequired`, the first wins, and the second gets `Conflict`, re-reads state, and finds the source ready.
 
-The host also tags each request with the nonce of the key it used, and ignores a failure from a request made with an older key, so a late failure can't drop a key that has since replaced it. Random values meet the rule that a nonce is never reused for the same `id`.
+The host tags every agent operation on the registration with the current nonce and discards any result, success or failure, that carries an older one. A late failure can't drop a key that has since replaced it, and a late success can't mark a changed or re-registered source `ready`, even after an edit that changes the definition back. Random values meet the rule that a nonce is never reused for the same `id`.
+
+`credentialResource` and `credentialNonce` stay in root state for as long as the source takes a credential, not only while it's `authRequired`. Any client, including one that connected after the source became ready, can build an `authenticate` request at any time: to rotate a short-lived token before it expires, or to revoke a key with an empty token.
 
 Like `McpServerAuthenticateTarget`, the target doesn't carry `@preserveUnknownMembers`: the client builds it for one request, so there are no unknown members to keep.
 
-`resource.resource` doesn't need to be an `https` URL, unlike other RFC 9728 resource identifiers. RFC 9728 requires `https` because an OAuth client fetches metadata from that URL. Here the client only echoes the value, so a local server such as `http://localhost:11434/v1` works. Whether the agent sends a credential over plain `http` is the host's network policy.
+`credentialResource.resource` doesn't need to be an `https` URL, unlike other RFC 9728 resource identifiers. RFC 9728 requires `https` because an OAuth client fetches metadata from that URL. Here the client only echoes the value, so a local server such as `http://localhost:11434/v1` works. Whether the agent sends a credential over plain `http` is the host's network policy.
 
 When `target.kind` is `modelSource`, the host:
 
 - MUST apply the credential only to that registration. It never applies it to other registrations, MCP servers, or agent-level resources, even when they share `resource`.
-- MUST require `resource` to equal the `resource.resource` it most recently advertised for that registration.
+- MUST require `resource` to equal the registration's current `credentialResource.resource`.
 - MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`).
 - MUST reject a `credentialNonce` other than the one it most recently issued for that registration with `Conflict` (`-32011`). The client re-reads root state and, if the source still needs a credential, sends it again with the current nonce.
 - MUST treat an empty `token` as revocation: it drops the credential, and the source returns to `authRequired` with `reason: expired`, so no client sends the revoked secret again.
@@ -469,8 +482,8 @@ What a follow-up implementation would touch:
 
 | Symbol | File | Kind |
 | --- | --- | --- |
-| `RootState.modelSourceRegistrations`, `ModelSourceRegistration` (including the host-issued `credentialNonce`) | `channels-root/state.ts` | added |
-| `ModelSourceStatus`, four `ModelSource*State` variants, `ModelSourceState`, `ModelSourceAuthRequirement` | `channels-root/state.ts` | added (lifecycle union) |
+| `RootState.modelSourceRegistrations`, `ModelSourceRegistration` (including the host-reported `credentialNonce` and `credentialResource`) | `channels-root/state.ts` | added |
+| `ModelSourceStatus`, four `ModelSource*State` variants, `ModelSourceState`, `ModelSourceAuthRequirement` (`reason` and `description`) | `channels-root/state.ts` | added (lifecycle union) |
 | `ModelSourceRetentionPolicy` | `channels-root/state.ts` | added |
 | `AgentCapabilities.modelSourceRegistration`, `ModelSourceRegistrationCapability` | `channels-root/state.ts` | added (capability) |
 | `root/modelSourceRegistrationSet`, `root/modelSourceRegistrationRemoved` | `channels-root/actions.ts`, `common/actions.ts`, `version/registry.ts` | added (client-dispatchable, introduced in the development version) |
@@ -499,7 +512,7 @@ sequenceDiagram
 
     C->>H: root/modelSourceRegistrationSet (id, provider, format, definition)
     H->>A: read and validate the definition
-    H-->>C: root/modelSourceStateChanged (authRequired, credentialNonce)
+    H-->>C: root/modelSourceStateChanged (authRequired, credentialNonce, credentialResource)
 
     C->>H: authenticate({ resource, token, target: { kind: 'modelSource', modelSourceId, credentialNonce } })
     H-->>C: {}
@@ -517,7 +530,7 @@ sequenceDiagram
 
 1. The client reads the agent's `modelSourceRegistration` capability and picks a format it can write.
 2. It dispatches `root/modelSourceRegistrationSet`. The host's agent reads and validates the definition, and the host reports `starting` with `root/modelSourceStateChanged`.
-3. If a credential is needed, the host reports `authRequired` with a `credentialNonce`. The client calls `authenticate` with a `modelSource` target that echoes it.
+3. If a credential is needed, the host reports `authRequired` with a `credentialNonce` and the `credentialResource` the key is for. The client calls `authenticate` with that `resource` and a `modelSource` target that echoes the nonce.
 4. The agent lists models. The host reports `ready`, with a new nonce because a key was installed, and adds the source and its models to the agent's catalog.
 5. Any client can select those models in any session on that agent, and so can automations if the source has `host` retention.
 6. When the contributing client disconnects, the retention policy decides whether the source stays (see [§6](#_6-lifecycle)).
@@ -558,7 +571,7 @@ Credentials are gone after a restart, because they were never persisted. `contri
 
 ## 7. Credential rules
 
-1. **Never in state, actions, or notifications.** All of these are broadcast to subscribers. That includes `definition`, `_meta`, `ErrorInfo`, and `ModelSourceAuthRequirement`. A secret travels only in `authenticate`. The host writes `description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state.
+1. **Never in state, actions, or notifications.** All of these are broadcast to subscribers. That includes `definition`, `_meta`, `ErrorInfo`, `credentialResource`, and `ModelSourceAuthRequirement`. A secret travels only in `authenticate`. The host writes `description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state.
 2. **Memory only.** The host holds it only in memory. It is never persisted and never placed in environment variables, command lines, logs, telemetry, or error messages. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: rule 4 keeps the host from handing the secret to tools, but the same secret can also live where the agent can read it, such as a `.env` file or the user's shell environment, and a host can only redact values it knows.
 3. **Scoped to one registration and one `credentialNonce`.** It is never shared with other registrations, MCP servers, or the agent's own protected resources, and a key sent for an earlier definition never reaches a later one.
 4. **Attached only to that source's requests**, as its definition specifies. It is never sent to another origin, including on redirect, and never exposed to the model, tools, terminals, or hooks.
