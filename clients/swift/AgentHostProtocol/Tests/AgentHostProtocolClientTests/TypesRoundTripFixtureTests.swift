@@ -218,6 +218,8 @@ final class TypesRoundTripFixtureTests: XCTestCase {
             return try reencode(dec.decode(ResourceReadParams.self, from: inputData))
         case "ResourceReadResult":
             return try reencode(dec.decode(ResourceReadResult.self, from: inputData))
+        case "ResourceListResult":
+            return try reencode(dec.decode(ResourceListResult.self, from: inputData))
         case "AuthenticateParams":
             return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
         default:

@@ -1377,8 +1377,17 @@ pub struct ResourceListResult {
 pub struct DirectoryEntry {
     /// Base name of the entry
     pub name: String,
-    /// Whether the entry is a file or directory
+    /// Whether the entry is a file or directory.
+    ///
+    /// For a symbolic link (`isSymlink: true`), this reports the resolved target
+    /// kind when known and permitted by the receiver's access policy, or `'file'`
+    /// as a non-expandable fallback when the target was not inspected or could
+    /// not be resolved or accessed.
     pub r#type: String,
+    /// Whether the entry is a symbolic link. Callers that need target resolution
+    /// or canonical URIs SHOULD use `resourceResolve`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_symlink: Option<bool>,
 }
 
 /// Copies a resource from one URI to another on the server's filesystem.
