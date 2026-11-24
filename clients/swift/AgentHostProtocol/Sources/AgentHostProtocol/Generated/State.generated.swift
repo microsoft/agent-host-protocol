@@ -1702,7 +1702,8 @@ public struct ModelSourceInfo: Codable, Sendable, Equatable {
 public struct SessionModelInfo: Codable, Sendable, Equatable {
     /// Model identifier, unique within the agent's {@link AgentInfo.models}.
     /// When several model sources serve the same upstream model, the host gives
-    /// each entry its own ID.
+    /// each entry its own ID. A host SHOULD keep a model's ID across catalog
+    /// updates and MUST NOT reuse an ID for a different source or upstream model.
     public var id: String
     /// Agent provider that owns this model. Matches {@link AgentInfo.provider}.
     public var provider: String

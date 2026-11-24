@@ -39,6 +39,7 @@ An agent provider can offer models from more than one source, such as different 
 - Source IDs MUST be unique within the agent's `modelSources`.
 - A model's `modelSourceId` MUST match an entry in the same agent's `modelSources`.
 - Model IDs MUST be unique within the agent's `models`. When two sources serve the same upstream model, the host gives each entry its own ID and maps that ID to the upstream model.
+- Model IDs are stable. A host SHOULD keep a model's ID across catalog updates, so saved selections keep working. It MUST NOT reuse an ID for a different source or upstream model, even after the model leaves `models`. A saved selection whose ID is no longer in `models` is unavailable.
 - A source can have no models.
 
 A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, which also determines the source.
