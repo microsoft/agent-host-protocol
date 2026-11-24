@@ -1012,42 +1012,6 @@ public enum ModelSourceAuthRequiredReason: Codable, Sendable, Equatable {
     }
 }
 
-/// Whether clients acting for different principals share a host's model
-/// source registry.
-///
-/// Stability: 1.0 - Early development.
-public enum ModelSourcePrincipalPolicy: Codable, Sendable, Equatable {
-    /// Every connected client may change, supply credentials for, and select
-    /// every model source.
-    case shared
-    /// The host verifies principals, and limits changes, credentials, and
-    /// selection of each model source to clients of the principal that
-    /// registered it. Root state still lists every model source to every
-    /// client.
-    case isolated
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "shared": self = .shared
-        case "isolated": self = .isolated
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .shared: try container.encode("shared")
-        case .isolated: try container.encode("isolated")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
-}
-
 /// Computation lifecycle of a {@link ChangesetState}.
 public enum ChangesetStatus: Codable, Sendable, Equatable {
     /// The server is computing this changeset for the first time.
@@ -1854,58 +1818,74 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSourceRegistrationCapability: Codable, Sendable, Equatable {
-    /// Definition formats the agent reads, most preferred first: recognized
-    /// values of {@link ModelSource.format}, or namespaced names for formats
-    /// the agent defines itself.
-    public var formats: [String]
-    /// How long, in milliseconds, the host keeps counting a disconnected client
-    /// as a contributing client before it treats the client as having left.
-    public var gracePeriod: Int?
-    /// Whether clients acting for different principals share the registry.
-    /// Absent means `shared`.
-    public var principalPolicy: ModelSourcePrincipalPolicy?
+    /// Definition formats the agent reads, most preferred first.
+    public var formats: [ModelSourceFormatInfo]
     /// Unrecognized wire members retained for full-object edits.
     public var extra: [String: AnyCodable]
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case formats
-        case gracePeriod
-        case principalPolicy
     }
 
     public init(
-        formats: [String],
-        gracePeriod: Int? = nil,
-        principalPolicy: ModelSourcePrincipalPolicy? = nil,
+        formats: [ModelSourceFormatInfo],
         extra: [String: AnyCodable] = [:]
     ) {
         self.formats = formats
-        self.gracePeriod = gracePeriod
-        self.principalPolicy = principalPolicy
         self.extra = extra
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.formats = try container.decode([String].self, forKey: .formats)
-        self.gracePeriod = try container.decodeIfPresent(Int.self, forKey: .gracePeriod)
-        self.principalPolicy = try container.decodeIfPresent(ModelSourcePrincipalPolicy.self, forKey: .principalPolicy)
+        self.formats = try container.decode([ModelSourceFormatInfo].self, forKey: .formats)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.formats, forKey: .formats)
-        try container.encodeIfPresent(self.gracePeriod, forKey: .gracePeriod)
-        try container.encodeIfPresent(self.principalPolicy, forKey: .principalPolicy)
+        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+}
+
+/// A definition format an agent reads. An object so it can grow, for example
+/// with a JSON Schema for the format's definitions.
+///
+/// Stability: 1.0 - Early development.
+public struct ModelSourceFormatInfo: Codable, Sendable, Equatable {
+    /// A recognized {@link ModelSource.format} value, or a namespaced name for
+    /// a format the agent defines itself.
+    public var format: String
+    /// Unrecognized wire members retained for full-object edits.
+    public var extra: [String: AnyCodable]
+
+    enum CodingKeys: String, CodingKey, CaseIterable {
+        case format
+    }
+
+    public init(
+        format: String,
+        extra: [String: AnyCodable] = [:]
+    ) {
+        self.format = format
+        self.extra = extra
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.format = try container.decode(String.self, forKey: .format)
+        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.format, forKey: .format)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
 /// A model source registered on this host by a client, or by the host itself.
-/// The definition that tells the agent named by `provider` how to reach it
-/// travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
-/// here is a credential.
+/// Nothing here is a credential.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSource: Codable, Sendable, Equatable {
@@ -1919,7 +1899,7 @@ public struct ModelSource: Codable, Sendable, Equatable {
     public var displayName: String
     /// Icons for UI display.
     public var icons: [Icon]?
-    /// The definition's format, one of the agent's
+    /// The definition's format: the `format` of one of the agent's
     /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
     /// include:
     ///
@@ -1929,14 +1909,31 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// - `'azureOpenai'`: an Azure OpenAI deployment.
     /// - `'gemini'`: Google's Gemini API.
     ///
-    /// AHP doesn't define what a definition contains, even for these. Agents
-    /// MAY read other formats, named with a namespace such as
+    /// Agents MAY read other formats, named with a namespace such as
     /// `example.com/model-source@1` so they don't collide.
     public var format: String
-    /// Opaque version token for the definition, such as a hash of it, chosen by
-    /// whoever registers the source. A client compares it with its own copy
-    /// instead of the definition, and the reducer compares it to tell an update
-    /// from a re-registration of the same definition.
+    /// How to reach the source, in `format`: endpoint, wire API, models, and so
+    /// on. The agent reads it, and AHP doesn't validate it. Every client can
+    /// read it, so it MUST NOT contain a credential.
+    ///
+    /// Suggested shapes for the recognized formats. Agents MAY read more
+    /// members, and MAY discover models when `models` is absent.
+    ///
+    /// - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
+    /// - `anthropic`: `{ endpoint, models? }`
+    /// - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
+    /// deployment name as a model `id`
+    /// - `gemini`: `{ endpoint, models? }`
+    ///
+    /// `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
+    /// Each `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,
+    /// supportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},
+    /// where `id` is the endpoint's own model identifier.
+    public var definition: [String: AnyCodable]
+    /// Opaque version token for `definition`, such as a hash of it, chosen by
+    /// whoever registers the source. Reducers compare it, instead of the
+    /// definition, to tell an update from a re-registration of the same
+    /// definition.
     public var nonce: String
     /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     public var retention: ModelSourceRetentionPolicy?
@@ -1944,13 +1941,6 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// Absent until the host reports one, and after an update replaces the
     /// definition until the host reports again.
     public var state: ModelSourceState?
-    /// Host-issued token that a client echoes in
-    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential, and that tags every agent operation on the source. The
-    /// host issues a new one when the source is added or updated, and whenever
-    /// the credential is installed or dropped. It never reuses one for the
-    /// same `id`. Set with `state`.
-    public var credentialNonce: String?
     /// RFC 9728 metadata for the endpoint the credential is for. Present
     /// whenever the source takes a credential, in every state, so any client
     /// can deliver, rotate, or revoke one. Absent for a source that needs no
@@ -1965,11 +1955,6 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     public var credentialResource: ProtectedResourceMetadata?
-    /// Every origin the host sends the credential to, such as
-    /// `https://api.example.com`, derived from the definition it holds. Present
-    /// whenever `credentialResource` is. A client checks each one against its
-    /// own copy of the definition before it sends a key. Set with `state`.
-    public var credentialOrigins: [String]?
     /// The {@link AuthenticateParams.accountId} the client sent with the
     /// credential the host most recently accepted. While the state is
     /// `starting` or `ready`, the host holds that credential. While it's
@@ -1988,12 +1973,11 @@ public struct ModelSource: Codable, Sendable, Equatable {
         case displayName
         case icons
         case format
+        case definition
         case nonce
         case retention
         case state
-        case credentialNonce
         case credentialResource
-        case credentialOrigins
         case accountId
         case meta = "_meta"
     }
@@ -2004,12 +1988,11 @@ public struct ModelSource: Codable, Sendable, Equatable {
         displayName: String,
         icons: [Icon]? = nil,
         format: String,
+        definition: [String: AnyCodable],
         nonce: String,
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
-        credentialNonce: String? = nil,
         credentialResource: ProtectedResourceMetadata? = nil,
-        credentialOrigins: [String]? = nil,
         accountId: String? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
@@ -2019,12 +2002,11 @@ public struct ModelSource: Codable, Sendable, Equatable {
         self.displayName = displayName
         self.icons = icons
         self.format = format
+        self.definition = definition
         self.nonce = nonce
         self.retention = retention
         self.state = state
-        self.credentialNonce = credentialNonce
         self.credentialResource = credentialResource
-        self.credentialOrigins = credentialOrigins
         self.accountId = accountId
         self.meta = meta
         self.extra = extra
@@ -2037,12 +2019,11 @@ public struct ModelSource: Codable, Sendable, Equatable {
         self.displayName = try container.decode(String.self, forKey: .displayName)
         self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
         self.format = try container.decode(String.self, forKey: .format)
+        self.definition = try container.decode([String: AnyCodable].self, forKey: .definition)
         self.nonce = try container.decode(String.self, forKey: .nonce)
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
-        self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
         self.credentialResource = try container.decodeIfPresent(ProtectedResourceMetadata.self, forKey: .credentialResource)
-        self.credentialOrigins = try container.decodeIfPresent([String].self, forKey: .credentialOrigins)
         self.accountId = try container.decodeIfPresent(String.self, forKey: .accountId)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
@@ -2055,12 +2036,11 @@ public struct ModelSource: Codable, Sendable, Equatable {
         try container.encode(self.displayName, forKey: .displayName)
         try container.encodeIfPresent(self.icons, forKey: .icons)
         try container.encode(self.format, forKey: .format)
+        try container.encode(self.definition, forKey: .definition)
         try container.encode(self.nonce, forKey: .nonce)
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
-        try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)
         try container.encodeIfPresent(self.credentialResource, forKey: .credentialResource)
-        try container.encodeIfPresent(self.credentialOrigins, forKey: .credentialOrigins)
         try container.encodeIfPresent(self.accountId, forKey: .accountId)
         try container.encodeIfPresent(self.meta, forKey: .meta)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))

@@ -1628,13 +1628,7 @@ data class ModelSourceAuthenticateTarget(
     /**
      * The registration's `ModelSource.id`.
      */
-    val modelSourceId: String,
-    /**
-     * The registration's current `ModelSource.credentialNonce`, as
-     * published in root state. The host rejects a stale one with `Conflict`
-     * (-32011).
-     */
-    val credentialNonce: String
+    val modelSourceId: String
 )
 
 @Serializable
@@ -1704,7 +1698,8 @@ data class AuthenticateParams(
      *
      * A registered model source takes its credential only through a
      * `modelSource` target, and the host rejects an untargeted `resource` that
-     * matches only model source challenges with `InvalidParams` (-32602). See
+     * matches only model source challenges with `InvalidParams` (-32602). A
+     * delivery replaces whatever credential the host holds for the source. See
      * [Model source credentials](/specification/authentication#model-source-credentials)
      * for its rules.
      *

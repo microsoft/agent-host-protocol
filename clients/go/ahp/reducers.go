@@ -564,12 +564,9 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 			return ReduceOutcomeNoOp
 		}
 		st := a.State
-		nonce := a.CredentialNonce
 		copyModelSourceHostFields(&state.ModelSources[idx], ahptypes.ModelSource{
 			State:              &st,
-			CredentialNonce:    &nonce,
 			CredentialResource: a.CredentialResource,
-			CredentialOrigins:  a.CredentialOrigins,
 			AccountId:          a.AccountId,
 		})
 		return ReduceOutcomeApplied
@@ -590,9 +587,7 @@ func modelSourceIndex(list []ahptypes.ModelSource, id string) int {
 // clearing the ones from lacks.
 func copyModelSourceHostFields(to *ahptypes.ModelSource, from ahptypes.ModelSource) {
 	to.State = from.State
-	to.CredentialNonce = from.CredentialNonce
 	to.CredentialResource = from.CredentialResource
-	to.CredentialOrigins = from.CredentialOrigins
 	to.AccountId = from.AccountId
 }
 

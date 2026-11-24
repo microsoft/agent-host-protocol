@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceSet with a different nonce updates the model source: it replaces the source and clears the host-reported fields until the host reports again",
+  "description": "root/modelSourceSet with a different nonce updates the model source: it replaces the source, including its definition, and clears the host-reported fields until the host reports again",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -9,18 +9,22 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1",
         "state": {
           "kind": "ready"
         },
-        "credentialNonce": "nonce-a-1",
         "credentialResource": {
           "resource": "https://apia.example.com/v1",
           "resource_name": "Source a API key"
         },
-        "credentialOrigins": [
-          "https://apia.example.com"
-        ],
         "accountId": "account-a-1"
       },
       {
@@ -28,6 +32,14 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1"
       }
     ]
@@ -40,13 +52,15 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v2",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v2"
-      },
-      "definition": {
-        "baseUrl": "https://apia.example.com/v2",
-        "models": [
-          "model-a"
-        ]
       }
     }
   ],
@@ -58,6 +72,14 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v2",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v2"
       },
       {
@@ -65,6 +87,14 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1"
       }
     ]

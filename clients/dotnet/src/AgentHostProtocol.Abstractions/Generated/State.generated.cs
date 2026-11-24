@@ -1588,66 +1588,6 @@ internal sealed class ModelSourceAuthRequiredReasonConverter : JsonConverter<Mod
         => writer.WriteStringValue(value.Value);
 }
 
-/// <summary>Whether clients acting for different principals share a host's model
-/// source registry.
-///
-/// Stability: 1.0 - Early development.</summary>
-[JsonConverter(typeof(ModelSourcePrincipalPolicyConverter))]
-public readonly struct ModelSourcePrincipalPolicy : IEquatable<ModelSourcePrincipalPolicy>
-{
-    private readonly string? _value;
-
-    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
-    /// <param name="value">The raw wire string.</param>
-    public ModelSourcePrincipalPolicy(string value)
-    {
-        _value = value;
-    }
-
-    /// <summary>The raw wire value.</summary>
-    public string Value => _value ?? string.Empty;
-
-    /// <summary>Every connected client may change, supply credentials for, and select
-    /// every model source.</summary>
-    public static readonly ModelSourcePrincipalPolicy Shared = new ModelSourcePrincipalPolicy("shared");
-
-    /// <summary>The host verifies principals, and limits changes, credentials, and
-    /// selection of each model source to clients of the principal that
-    /// registered it. Root state still lists every model source to every
-    /// client.</summary>
-    public static readonly ModelSourcePrincipalPolicy Isolated = new ModelSourcePrincipalPolicy("isolated");
-
-    /// <inheritdoc />
-    public bool Equals(ModelSourcePrincipalPolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is ModelSourcePrincipalPolicy other && Equals(other);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
-
-    /// <inheritdoc />
-    public override string ToString() => Value;
-
-    /// <summary>Ordinal equality over the raw wire value.</summary>
-    public static bool operator ==(ModelSourcePrincipalPolicy left, ModelSourcePrincipalPolicy right) => left.Equals(right);
-
-    /// <summary>Ordinal inequality over the raw wire value.</summary>
-    public static bool operator !=(ModelSourcePrincipalPolicy left, ModelSourcePrincipalPolicy right) => !left.Equals(right);
-}
-
-/// <summary>Reads and writes <see cref="ModelSourcePrincipalPolicy"/> as its raw wire string, preserving unrecognized values.</summary>
-internal sealed class ModelSourcePrincipalPolicyConverter : JsonConverter<ModelSourcePrincipalPolicy>
-{
-    /// <inheritdoc />
-    public override ModelSourcePrincipalPolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        => new ModelSourcePrincipalPolicy(reader.GetString() ?? throw new JsonException("ModelSourcePrincipalPolicy expects a JSON string."));
-
-    /// <inheritdoc />
-    public override void Write(Utf8JsonWriter writer, ModelSourcePrincipalPolicy value, JsonSerializerOptions options)
-        => writer.WriteStringValue(value.Value);
-}
-
 /// <summary>Computation lifecycle of a {@link ChangesetState}.</summary>
 [JsonConverter(typeof(ChangesetStatusConverter))]
 public readonly struct ChangesetStatus : IEquatable<ChangesetStatus>
@@ -2475,20 +2415,23 @@ public sealed record MultipleWorkingDirectoriesCapability
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSourceRegistrationCapability
 {
-    /// <summary>Definition formats the agent reads, most preferred first: recognized
-    /// values of {@link ModelSource.format}, or namespaced names for formats
-    /// the agent defines itself.</summary>
-    public required List<string> Formats { get; init; }
+    /// <summary>Definition formats the agent reads, most preferred first.</summary>
+    public required List<ModelSourceFormatInfo> Formats { get; init; }
 
-    /// <summary>How long, in milliseconds, the host keeps counting a disconnected client
-    /// as a contributing client before it treats the client as having left.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public long? GracePeriod { get; init; }
+    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
 
-    /// <summary>Whether clients acting for different principals share the registry.
-    /// Absent means `shared`.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ModelSourcePrincipalPolicy? PrincipalPolicy { get; init; }
+/// <summary>A definition format an agent reads. An object so it can grow, for example
+/// with a JSON Schema for the format's definitions.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ModelSourceFormatInfo
+{
+    /// <summary>A recognized {@link ModelSource.format} value, or a namespaced name for
+    /// a format the agent defines itself.</summary>
+    public required string Format { get; init; }
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>
     [JsonExtensionData]
@@ -2496,9 +2439,7 @@ public sealed record ModelSourceRegistrationCapability
 }
 
 /// <summary>A model source registered on this host by a client, or by the host itself.
-/// The definition that tells the agent named by `provider` how to reach it
-/// travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
-/// here is a credential.
+/// Nothing here is a credential.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSource
@@ -2518,7 +2459,7 @@ public sealed record ModelSource
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Icon>? Icons { get; init; }
 
-    /// <summary>The definition's format, one of the agent's
+    /// <summary>The definition's format: the `format` of one of the agent's
     /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
     /// include:
     ///
@@ -2528,15 +2469,33 @@ public sealed record ModelSource
     /// - `'azureOpenai'`: an Azure OpenAI deployment.
     /// - `'gemini'`: Google's Gemini API.
     ///
-    /// AHP doesn't define what a definition contains, even for these. Agents
-    /// MAY read other formats, named with a namespace such as
+    /// Agents MAY read other formats, named with a namespace such as
     /// `example.com/model-source@1` so they don't collide.</summary>
     public required string Format { get; init; }
 
-    /// <summary>Opaque version token for the definition, such as a hash of it, chosen by
-    /// whoever registers the source. A client compares it with its own copy
-    /// instead of the definition, and the reducer compares it to tell an update
-    /// from a re-registration of the same definition.</summary>
+    /// <summary>How to reach the source, in `format`: endpoint, wire API, models, and so
+    /// on. The agent reads it, and AHP doesn't validate it. Every client can
+    /// read it, so it MUST NOT contain a credential.
+    ///
+    /// Suggested shapes for the recognized formats. Agents MAY read more
+    /// members, and MAY discover models when `models` is absent.
+    ///
+    /// - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
+    /// - `anthropic`: `{ endpoint, models? }`
+    /// - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
+    ///   deployment name as a model `id`
+    /// - `gemini`: `{ endpoint, models? }`
+    ///
+    /// `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
+    /// Each `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,
+    /// supportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},
+    /// where `id` is the endpoint's own model identifier.</summary>
+    public required Dictionary<string, JsonElement> Definition { get; init; }
+
+    /// <summary>Opaque version token for `definition`, such as a hash of it, chosen by
+    /// whoever registers the source. Reducers compare it, instead of the
+    /// definition, to tell an update from a re-registration of the same
+    /// definition.</summary>
     public required string Nonce { get; init; }
 
     /// <summary>What happens when the last contributing client leaves. Absent means `contributingClient`.</summary>
@@ -2548,15 +2507,6 @@ public sealed record ModelSource
     /// definition until the host reports again.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceState? State { get; init; }
-
-    /// <summary>Host-issued token that a client echoes in
-    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential, and that tags every agent operation on the source. The
-    /// host issues a new one when the source is added or updated, and whenever
-    /// the credential is installed or dropped. It never reuses one for the
-    /// same `id`. Set with `state`.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? CredentialNonce { get; init; }
 
     /// <summary>RFC 9728 metadata for the endpoint the credential is for. Present
     /// whenever the source takes a credential, in every state, so any client
@@ -2573,13 +2523,6 @@ public sealed record ModelSource
     /// takes a user-supplied secret omits them.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
-
-    /// <summary>Every origin the host sends the credential to, such as
-    /// `https://api.example.com`, derived from the definition it holds. Present
-    /// whenever `credentialResource` is. A client checks each one against its
-    /// own copy of the definition before it sends a key. Set with `state`.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? CredentialOrigins { get; init; }
 
     /// <summary>The {@link AuthenticateParams.accountId} the client sent with the
     /// credential the host most recently accepted. While the state is

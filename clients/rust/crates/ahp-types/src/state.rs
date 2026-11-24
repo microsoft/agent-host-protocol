@@ -1304,51 +1304,6 @@ impl<'de> serde::Deserialize<'de> for ModelSourceAuthRequiredReason {
     }
 }
 
-/// Whether clients acting for different principals share a host's model
-/// source registry.
-///
-/// Stability: 1.0 - Early development.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ModelSourcePrincipalPolicy {
-    /// Every connected client may change, supply credentials for, and select
-    /// every model source.
-    Shared,
-    /// The host verifies principals, and limits changes, credentials, and
-    /// selection of each model source to clients of the principal that
-    /// registered it. Root state still lists every model source to every
-    /// client.
-    Isolated,
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    Unknown(String),
-}
-
-impl serde::Serialize for ModelSourcePrincipalPolicy {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Self::Shared => serializer.serialize_str("shared"),
-            Self::Isolated => serializer.serialize_str("isolated"),
-            Self::Unknown(value) => serializer.serialize_str(value),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for ModelSourcePrincipalPolicy {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(match raw.as_str() {
-            "shared" => Self::Shared,
-            "isolated" => Self::Isolated,
-            _ => Self::Unknown(raw),
-        })
-    }
-}
-
 /// Computation lifecycle of a {@link ChangesetState}.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChangesetStatus {
@@ -2211,27 +2166,30 @@ pub struct MultipleWorkingDirectoriesCapability {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSourceRegistrationCapability {
-    /// Definition formats the agent reads, most preferred first: recognized
-    /// values of {@link ModelSource.format}, or namespaced names for formats
-    /// the agent defines itself.
-    pub formats: Vec<String>,
-    /// How long, in milliseconds, the host keeps counting a disconnected client
-    /// as a contributing client before it treats the client as having left.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grace_period: Option<i64>,
-    /// Whether clients acting for different principals share the registry.
-    /// Absent means `shared`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub principal_policy: Option<ModelSourcePrincipalPolicy>,
+    /// Definition formats the agent reads, most preferred first.
+    pub formats: Vec<ModelSourceFormatInfo>,
+    /// Unrecognized wire members retained for full-object edits.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// A definition format an agent reads. An object so it can grow, for example
+/// with a JSON Schema for the format's definitions.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSourceFormatInfo {
+    /// A recognized {@link ModelSource.format} value, or a namespaced name for
+    /// a format the agent defines itself.
+    pub format: String,
     /// Unrecognized wire members retained for full-object edits.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// A model source registered on this host by a client, or by the host itself.
-/// The definition that tells the agent named by `provider` how to reach it
-/// travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
-/// here is a credential.
+/// Nothing here is a credential.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2248,7 +2206,7 @@ pub struct ModelSource {
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
-    /// The definition's format, one of the agent's
+    /// The definition's format: the `format` of one of the agent's
     /// {@link ModelSourceRegistrationCapability.formats}. Recognized values
     /// include:
     ///
@@ -2258,14 +2216,31 @@ pub struct ModelSource {
     /// - `'azureOpenai'`: an Azure OpenAI deployment.
     /// - `'gemini'`: Google's Gemini API.
     ///
-    /// AHP doesn't define what a definition contains, even for these. Agents
-    /// MAY read other formats, named with a namespace such as
+    /// Agents MAY read other formats, named with a namespace such as
     /// `example.com/model-source@1` so they don't collide.
     pub format: String,
-    /// Opaque version token for the definition, such as a hash of it, chosen by
-    /// whoever registers the source. A client compares it with its own copy
-    /// instead of the definition, and the reducer compares it to tell an update
-    /// from a re-registration of the same definition.
+    /// How to reach the source, in `format`: endpoint, wire API, models, and so
+    /// on. The agent reads it, and AHP doesn't validate it. Every client can
+    /// read it, so it MUST NOT contain a credential.
+    ///
+    /// Suggested shapes for the recognized formats. Agents MAY read more
+    /// members, and MAY discover models when `models` is absent.
+    ///
+    /// - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
+    /// - `anthropic`: `{ endpoint, models? }`
+    /// - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
+    ///   deployment name as a model `id`
+    /// - `gemini`: `{ endpoint, models? }`
+    ///
+    /// `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
+    /// Each `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,
+    /// supportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},
+    /// where `id` is the endpoint's own model identifier.
+    pub definition: JsonObject,
+    /// Opaque version token for `definition`, such as a hash of it, chosen by
+    /// whoever registers the source. Reducers compare it, instead of the
+    /// definition, to tell an update from a re-registration of the same
+    /// definition.
     pub nonce: String,
     /// What happens when the last contributing client leaves. Absent means `contributingClient`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2275,14 +2250,6 @@ pub struct ModelSource {
     /// definition until the host reports again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<ModelSourceState>,
-    /// Host-issued token that a client echoes in
-    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-    /// the credential, and that tags every agent operation on the source. The
-    /// host issues a new one when the source is added or updated, and whenever
-    /// the credential is installed or dropped. It never reuses one for the
-    /// same `id`. Set with `state`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credential_nonce: Option<String>,
     /// RFC 9728 metadata for the endpoint the credential is for. Present
     /// whenever the source takes a credential, in every state, so any client
     /// can deliver, rotate, or revoke one. Absent for a source that needs no
@@ -2298,12 +2265,6 @@ pub struct ModelSource {
     /// takes a user-supplied secret omits them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_resource: Option<ProtectedResourceMetadata>,
-    /// Every origin the host sends the credential to, such as
-    /// `https://api.example.com`, derived from the definition it holds. Present
-    /// whenever `credentialResource` is. A client checks each one against its
-    /// own copy of the definition before it sends a key. Set with `state`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub credential_origins: Option<Vec<Uri>>,
     /// The {@link AuthenticateParams.accountId} the client sent with the
     /// credential the host most recently accepted. While the state is
     /// `starting` or `ready`, the host holds that credential. While it's

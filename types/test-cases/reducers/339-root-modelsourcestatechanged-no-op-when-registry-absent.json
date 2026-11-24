@@ -10,8 +10,7 @@
       "id": "model-source-a",
       "state": {
         "kind": "starting"
-      },
-      "credentialNonce": "nonce-a-1"
+      }
     }
   ],
   "expected": {

@@ -582,9 +582,7 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
         val existing = list.getOrNull(idx)?.takeIf { sameModelSourceVersion(it, source) }
         val merged = source.copy(
             state = existing?.state,
-            credentialNonce = existing?.credentialNonce,
             credentialResource = existing?.credentialResource,
-            credentialOrigins = existing?.credentialOrigins,
             accountId = existing?.accountId,
         )
         val updated = list.toMutableList()
@@ -611,9 +609,7 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
             val updated = list.toMutableList()
             updated[idx] = updated[idx].copy(
                 state = action.value.state,
-                credentialNonce = action.value.credentialNonce,
                 credentialResource = action.value.credentialResource,
-                credentialOrigins = action.value.credentialOrigins,
                 accountId = action.value.accountId,
             )
             state.copy(modelSources = updated)

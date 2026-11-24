@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceStateChanged sets the matching model source's state, credentialNonce, credentialResource, credentialOrigins, and accountId together, adding credential fields it didn't have, and preserves its other fields and the registry order",
+  "description": "root/modelSourceStateChanged sets the matching model source's state, credentialResource, and accountId together, adding credential fields it didn't have, and preserves its other fields and the registry order",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -9,6 +9,14 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1"
       },
       {
@@ -16,12 +24,19 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1",
         "retention": "host",
         "state": {
           "kind": "starting"
-        },
-        "credentialNonce": "nonce-b-1"
+        }
       }
     ]
   },
@@ -34,14 +49,10 @@
         "reason": "rejected",
         "description": "The endpoint rejected the API key."
       },
-      "credentialNonce": "nonce-b-2",
       "credentialResource": {
         "resource": "https://apib.example.com/v1",
         "resource_name": "Source b API key"
       },
-      "credentialOrigins": [
-        "https://apib.example.com"
-      ],
       "accountId": "account-b-1"
     }
   ],
@@ -53,6 +64,14 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1"
       },
       {
@@ -60,6 +79,14 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1",
         "retention": "host",
         "state": {
@@ -67,14 +94,10 @@
           "reason": "rejected",
           "description": "The endpoint rejected the API key."
         },
-        "credentialNonce": "nonce-b-2",
         "credentialResource": {
           "resource": "https://apib.example.com/v1",
           "resource_name": "Source b API key"
         },
-        "credentialOrigins": [
-          "https://apib.example.com"
-        ],
         "accountId": "account-b-1"
       }
     ]

@@ -1031,41 +1031,6 @@ internal object ModelSourceAuthRequiredReasonSerializer : KSerializer<ModelSourc
 }
 
 /**
- * Whether clients acting for different principals share a host's model
- * source registry.
- *
- * Stability: 1.0 - Early development.
- */
-@Serializable(with = ModelSourcePrincipalPolicySerializer::class)
-@JvmInline
-value class ModelSourcePrincipalPolicy(val rawValue: String) {
-    companion object {
-        /**
-         * Every connected client may change, supply credentials for, and select
-         * every model source.
-         */
-        val SHARED: ModelSourcePrincipalPolicy = ModelSourcePrincipalPolicy("shared")
-        /**
-         * The host verifies principals, and limits changes, credentials, and
-         * selection of each model source to clients of the principal that
-         * registered it. Root state still lists every model source to every
-         * client.
-         */
-        val ISOLATED: ModelSourcePrincipalPolicy = ModelSourcePrincipalPolicy("isolated")
-    }
-}
-
-internal object ModelSourcePrincipalPolicySerializer : KSerializer<ModelSourcePrincipalPolicy> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ModelSourcePrincipalPolicy", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: ModelSourcePrincipalPolicy) {
-        encoder.encodeString(value.rawValue)
-    }
-    override fun deserialize(decoder: Decoder): ModelSourcePrincipalPolicy =
-        ModelSourcePrincipalPolicy(decoder.decodeString())
-}
-
-/**
  * Computation lifecycle of a {@link ChangesetState}.
  */
 @Serializable(with = ChangesetStatusSerializer::class)
@@ -1854,21 +1819,9 @@ data class MultipleWorkingDirectoriesCapability(
 @Serializable(with = ModelSourceRegistrationCapabilitySerializer::class)
 data class ModelSourceRegistrationCapability(
     /**
-     * Definition formats the agent reads, most preferred first: recognized
-     * values of {@link ModelSource.format}, or namespaced names for formats
-     * the agent defines itself.
+     * Definition formats the agent reads, most preferred first.
      */
-    val formats: List<String>,
-    /**
-     * How long, in milliseconds, the host keeps counting a disconnected client
-     * as a contributing client before it treats the client as having left.
-     */
-    val gracePeriod: Long? = null,
-    /**
-     * Whether clients acting for different principals share the registry.
-     * Absent means `shared`.
-     */
-    val principalPolicy: ModelSourcePrincipalPolicy? = null,
+    val formats: List<ModelSourceFormatInfo>,
     @Transient
     val extra: Map<String, JsonElement> = emptyMap()
 )
@@ -1880,10 +1833,32 @@ internal object ModelSourceRegistrationCapabilitySerializer : UnknownMembersSeri
 )
 
 /**
+ * A definition format an agent reads. An object so it can grow, for example
+ * with a JSON Schema for the format's definitions.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@KeepGeneratedSerializer
+@Serializable(with = ModelSourceFormatInfoSerializer::class)
+data class ModelSourceFormatInfo(
+    /**
+     * A recognized {@link ModelSource.format} value, or a namespaced name for
+     * a format the agent defines itself.
+     */
+    val format: String,
+    @Transient
+    val extra: Map<String, JsonElement> = emptyMap()
+)
+
+internal object ModelSourceFormatInfoSerializer : UnknownMembersSerializer<ModelSourceFormatInfo>(
+    ModelSourceFormatInfo.generatedSerializer(),
+    { it.extra },
+    { value, extra -> value.copy(extra = extra) },
+)
+
+/**
  * A model source registered on this host by a client, or by the host itself.
- * The definition that tells the agent named by `provider` how to reach it
- * travels on {@link RootModelSourceSetAction} and isn't kept here. Nothing
- * here is a credential.
+ * Nothing here is a credential.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1909,7 +1884,7 @@ data class ModelSource(
      */
     val icons: List<Icon>? = null,
     /**
-     * The definition's format, one of the agent's
+     * The definition's format: the `format` of one of the agent's
      * {@link ModelSourceRegistrationCapability.formats}. Recognized values
      * include:
      *
@@ -1919,16 +1894,35 @@ data class ModelSource(
      * - `'azureOpenai'`: an Azure OpenAI deployment.
      * - `'gemini'`: Google's Gemini API.
      *
-     * AHP doesn't define what a definition contains, even for these. Agents
-     * MAY read other formats, named with a namespace such as
+     * Agents MAY read other formats, named with a namespace such as
      * `example.com/model-source@1` so they don't collide.
      */
     val format: String,
     /**
-     * Opaque version token for the definition, such as a hash of it, chosen by
-     * whoever registers the source. A client compares it with its own copy
-     * instead of the definition, and the reducer compares it to tell an update
-     * from a re-registration of the same definition.
+     * How to reach the source, in `format`: endpoint, wire API, models, and so
+     * on. The agent reads it, and AHP doesn't validate it. Every client can
+     * read it, so it MUST NOT contain a credential.
+     *
+     * Suggested shapes for the recognized formats. Agents MAY read more
+     * members, and MAY discover models when `models` is absent.
+     *
+     * - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
+     * - `anthropic`: `{ endpoint, models? }`
+     * - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
+     * deployment name as a model `id`
+     * - `gemini`: `{ endpoint, models? }`
+     *
+     * `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
+     * Each `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,
+     * supportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},
+     * where `id` is the endpoint's own model identifier.
+     */
+    val definition: Map<String, JsonElement>,
+    /**
+     * Opaque version token for `definition`, such as a hash of it, chosen by
+     * whoever registers the source. Reducers compare it, instead of the
+     * definition, to tell an update from a re-registration of the same
+     * definition.
      */
     val nonce: String,
     /**
@@ -1941,15 +1935,6 @@ data class ModelSource(
      * definition until the host reports again.
      */
     val state: ModelSourceState? = null,
-    /**
-     * Host-issued token that a client echoes in
-     * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
-     * the credential, and that tags every agent operation on the source. The
-     * host issues a new one when the source is added or updated, and whenever
-     * the credential is installed or dropped. It never reuses one for the
-     * same `id`. Set with `state`.
-     */
-    val credentialNonce: String? = null,
     /**
      * RFC 9728 metadata for the endpoint the credential is for. Present
      * whenever the source takes a credential, in every state, so any client
@@ -1966,13 +1951,6 @@ data class ModelSource(
      * takes a user-supplied secret omits them.
      */
     val credentialResource: ProtectedResourceMetadata? = null,
-    /**
-     * Every origin the host sends the credential to, such as
-     * `https://api.example.com`, derived from the definition it holds. Present
-     * whenever `credentialResource` is. A client checks each one against its
-     * own copy of the definition before it sends a key. Set with `state`.
-     */
-    val credentialOrigins: List<String>? = null,
     /**
      * The {@link AuthenticateParams.accountId} the client sent with the
      * credential the host most recently accepted. While the state is

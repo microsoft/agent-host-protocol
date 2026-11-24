@@ -688,9 +688,7 @@ public static class Reducers
                     ModelSource merged = a.ModelSource with
                     {
                         State = existing?.State,
-                        CredentialNonce = existing?.CredentialNonce,
                         CredentialResource = existing?.CredentialResource,
-                        CredentialOrigins = existing?.CredentialOrigins,
                         AccountId = existing?.AccountId,
                     };
                     if (index < 0)
@@ -724,7 +722,7 @@ public static class Reducers
                     }
 
                     List<ModelSource> list = state.ModelSources!;
-                    list[index] = list[index] with { State = a.State, CredentialNonce = a.CredentialNonce, CredentialResource = a.CredentialResource, CredentialOrigins = a.CredentialOrigins, AccountId = a.AccountId };
+                    list[index] = list[index] with { State = a.State, CredentialResource = a.CredentialResource, AccountId = a.AccountId };
                     return ReduceOutcome.Applied;
                 }
         }

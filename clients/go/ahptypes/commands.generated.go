@@ -1358,10 +1358,6 @@ type ModelSourceAuthenticateTarget struct {
 	Kind AuthenticateTargetKind `json:"kind"`
 	// The registration's `ModelSource.id`.
 	ModelSourceId string `json:"modelSourceId"`
-	// The registration's current `ModelSource.credentialNonce`, as
-	// published in root state. The host rejects a stale one with `Conflict`
-	// (-32011).
-	CredentialNonce string `json:"credentialNonce"`
 }
 
 // Pushes a credential for a protected resource. The `resource` field MUST
@@ -1433,7 +1429,8 @@ type AuthenticateParams struct {
 	//
 	// A registered model source takes its credential only through a
 	// `modelSource` target, and the host rejects an untargeted `resource` that
-	// matches only model source challenges with `InvalidParams` (-32602). See
+	// matches only model source challenges with `InvalidParams` (-32602). A
+	// delivery replaces whatever credential the host holds for the source. See
 	// [Model source credentials](/specification/authentication#model-source-credentials)
 	// for its rules.
 	//

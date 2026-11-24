@@ -9,6 +9,14 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1"
       }
     ]
@@ -19,8 +27,7 @@
       "id": "model-source-removed",
       "state": {
         "kind": "ready"
-      },
-      "credentialNonce": "nonce-removed-1"
+      }
     }
   ],
   "expected": {
@@ -31,6 +38,14 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1"
       }
     ]

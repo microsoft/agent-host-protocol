@@ -1063,16 +1063,11 @@
         "modelSourceId": {
           "type": "string",
           "description": "The registration's `ModelSource.id`."
-        },
-        "credentialNonce": {
-          "type": "string",
-          "description": "The registration's current `ModelSource.credentialNonce`, as\npublished in root state. The host rejects a stale one with `Conflict`\n(-32011)."
         }
       },
       "required": [
         "kind",
-        "modelSourceId",
-        "credentialNonce"
+        "modelSourceId"
       ]
     },
     "AuthenticateParams": {
@@ -1112,7 +1107,7 @@
         },
         "target": {
           "$ref": "#/$defs/AuthenticateTarget",
-          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, MUST include it when delivering a\nregistered model source's credential, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nFor an `mcpServer` target, the host MUST apply the token only to that MCP\nserver in that session, never to sibling servers, other sessions, or\nagent-level resources, even if they share the resource and scopes.\n`resource` MUST still equal that server's advertised\n`McpAuthRequirement.resource.resource`. The host MUST reject an unknown\nsession or customization, or a customization that is not an MCP server,\nwith `InvalidParams` (-32602).\n\nA registered model source takes its credential only through a\n`modelSource` target, and the host rejects an untargeted `resource` that\nmatches only model source challenges with `InvalidParams` (-32602). See\n[Model source credentials](/specification/authentication#model-source-credentials)\nfor its rules.\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
+          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, MUST include it when delivering a\nregistered model source's credential, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nFor an `mcpServer` target, the host MUST apply the token only to that MCP\nserver in that session, never to sibling servers, other sessions, or\nagent-level resources, even if they share the resource and scopes.\n`resource` MUST still equal that server's advertised\n`McpAuthRequirement.resource.resource`. The host MUST reject an unknown\nsession or customization, or a customization that is not an MCP server,\nwith `InvalidParams` (-32602).\n\nA registered model source takes its credential only through a\n`modelSource` target, and the host rejects an untargeted `resource` that\nmatches only model source challenges with `InvalidParams` (-32602). A\ndelivery replaces whatever credential the host holds for the source. See\n[Model source credentials](/specification/authentication#model-source-credentials)\nfor its rules.\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
         },
         "accountId": {
           "type": "string",
@@ -2892,27 +2887,31 @@
         "formats": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/ModelSourceFormatInfo"
           },
-          "description": "Definition formats the agent reads, most preferred first: recognized\nvalues of {@link ModelSource.format}, or namespaced names for formats\nthe agent defines itself."
-        },
-        "gracePeriod": {
-          "type": "integer",
-          "description": "How long, in milliseconds, the host keeps counting a disconnected client\nas a contributing client before it treats the client as having left.",
-          "minimum": 0
-        },
-        "principalPolicy": {
-          "$ref": "#/$defs/ModelSourcePrincipalPolicy",
-          "description": "Whether clients acting for different principals share the registry.\nAbsent means `shared`."
+          "description": "Definition formats the agent reads, most preferred first."
         }
       },
       "required": [
         "formats"
       ]
     },
+    "ModelSourceFormatInfo": {
+      "type": "object",
+      "description": "A definition format an agent reads. An object so it can grow, for example\nwith a JSON Schema for the format's definitions.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "format": {
+          "type": "string",
+          "description": "A recognized {@link ModelSource.format} value, or a namespaced name for\na format the agent defines itself."
+        }
+      },
+      "required": [
+        "format"
+      ]
+    },
     "ModelSource": {
       "type": "object",
-      "description": "A model source registered on this host by a client, or by the host itself.\nThe definition that tells the agent named by `provider` how to reach it\ntravels on {@link RootModelSourceSetAction} and isn't kept here. Nothing\nhere is a credential.\n\nStability: 1.0 - Early development.",
+      "description": "A model source registered on this host by a client, or by the host itself.\nNothing here is a credential.\n\nStability: 1.0 - Early development.",
       "properties": {
         "id": {
           "type": "string",
@@ -2935,11 +2934,16 @@
         },
         "format": {
           "type": "string",
-          "description": "The definition's format, one of the agent's\n{@link ModelSourceRegistrationCapability.formats}. Recognized values\ninclude:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as\n  OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nAHP doesn't define what a definition contains, even for these. Agents\nMAY read other formats, named with a namespace such as\n`example.com/model-source@1` so they don't collide."
+          "description": "The definition's format: the `format` of one of the agent's\n{@link ModelSourceRegistrationCapability.formats}. Recognized values\ninclude:\n\n- `'openaiCompatible'`: an endpoint that implements OpenAI's API, such as\n  OpenAI, OpenRouter, xAI, or a local server like Ollama or LM Studio.\n- `'anthropic'`: an endpoint that implements Anthropic's Messages API.\n- `'azureOpenai'`: an Azure OpenAI deployment.\n- `'gemini'`: Google's Gemini API.\n\nAgents MAY read other formats, named with a namespace such as\n`example.com/model-source@1` so they don't collide."
+        },
+        "definition": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it, and AHP doesn't validate it. Every client can\nread it, so it MUST NOT contain a credential.\n\nSuggested shapes for the recognized formats. Agents MAY read more\nmembers, and MAY discover models when `models` is absent.\n\n- `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`\n- `anthropic`: `{ endpoint, models? }`\n- `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each\n  deployment name as a model `id`\n- `gemini`: `{ endpoint, models? }`\n\n`endpoint` is the API's base URI, such as `https://api.example.com/v1`.\nEach `models` entry is `{ id, name?, maxContextWindow?, maxOutputTokens?,\nsupportsVision?, supportsTools? }`, named as in {@link SessionModelInfo},\nwhere `id` is the endpoint's own model identifier."
         },
         "nonce": {
           "type": "string",
-          "description": "Opaque version token for the definition, such as a hash of it, chosen by\nwhoever registers the source. A client compares it with its own copy\ninstead of the definition, and the reducer compares it to tell an update\nfrom a re-registration of the same definition."
+          "description": "Opaque version token for `definition`, such as a hash of it, chosen by\nwhoever registers the source. Reducers compare it, instead of the\ndefinition, to tell an update from a re-registration of the same\ndefinition."
         },
         "retention": {
           "$ref": "#/$defs/ModelSourceRetentionPolicy",
@@ -2949,20 +2953,9 @@
           "$ref": "#/$defs/ModelSourceState",
           "description": "Host-reported status, set with {@link RootModelSourceStateChangedAction}.\nAbsent until the host reports one, and after an update replaces the\ndefinition until the host reports again."
         },
-        "credentialNonce": {
-          "type": "string",
-          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential, and that tags every agent operation on the source. The\nhost issues a new one when the source is added or updated, and whenever\nthe credential is installed or dropped. It never reuses one for the\nsame `id`. Set with `state`."
-        },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
           "description": "RFC 9728 metadata for the endpoint the credential is for. Present\nwhenever the source takes a credential, in every state, so any client\ncan deliver, rotate, or revoke one. Absent for a source that needs no\ncredential. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`, and nothing fetches it.\n`credentialResource.resource_name` labels the prompt (for example\n\"OpenRouter API key\"). A source that accepts OAuth access tokens\nadvertises `authorization_servers` and `scopes_supported`. A source that\ntakes a user-supplied secret omits them."
-        },
-        "credentialOrigins": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/URI"
-          },
-          "description": "Every origin the host sends the credential to, such as\n`https://api.example.com`, derived from the definition it holds. Present\nwhenever `credentialResource` is. A client checks each one against its\nown copy of the definition before it sends a key. Set with `state`."
         },
         "accountId": {
           "type": "string",
@@ -2979,6 +2972,7 @@
         "provider",
         "displayName",
         "format",
+        "definition",
         "nonce"
       ]
     },
@@ -8582,25 +8576,19 @@
     },
     "RootModelSourceSetAction": {
       "type": "object",
-      "description": "Adds a model source, or updates the one with the same `id`. The reducer\nstores `modelSource` without the definition:\n\n- **Add.** When no model source has the `id`, appends `modelSource`.\n- **Re-register.** When one has, with the same `provider`, `format`, and\n  `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,\n  `credentialResource`, `credentialOrigins`, and `accountId`) and takes\n  the other fields from the action.\n- **Update.** When any of the three differs, replaces the source. Its\n  host-reported fields are absent until the host reports again with\n  {@link RootModelSourceStateChangedAction}.\n\nA client dispatches this without any host-reported field. The host learns\nwhich client registered the source from the envelope's `origin`.\n\nStability: 1.0 - Early development.",
+      "description": "Adds a model source, or updates the one with the same `id`:\n\n- **Add.** When no model source has the `id`, appends `modelSource`.\n- **Re-register.** When one has, with the same `provider`, `format`, and\n  `nonce`, keeps its host-reported fields (`state`, `credentialResource`,\n  and `accountId`) and takes everything else from the action.\n- **Update.** When any of the three differs, replaces the source. Its\n  host-reported fields are absent until the host reports again with\n  {@link RootModelSourceStateChangedAction}.\n\nA client dispatches this without any host-reported field. The host learns\nwhich client registered the source from the envelope's `origin`.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceSet"
         },
         "modelSource": {
           "$ref": "#/$defs/ModelSource",
-          "description": "The model source to add or update, matched by `id`, without host-reported fields."
-        },
-        "definition": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "How to reach the source, in `modelSource.format`: endpoint, wire format,\nmodels, and so on. The host hands it to the agent, and the reducer\ndoesn't store it. MUST NOT contain a credential."
+          "description": "The model source to add or update, matched by `id`, including its\n`definition`, without host-reported fields."
         }
       },
       "required": [
         "type",
-        "modelSource",
-        "definition"
+        "modelSource"
       ]
     },
     "RootModelSourceRemovedAction": {
@@ -8622,7 +8610,7 @@
     },
     "RootModelSourceStateChangedAction": {
       "type": "object",
-      "description": "Updates a model source's host-reported fields together: `state`,\n`credentialNonce`, `credentialResource`, `credentialOrigins`, and\n`accountId`. A no-op when no model source has `id`. Other fields of the\nsource are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
+      "description": "Updates a model source's host-reported fields together: `state`,\n`credentialResource`, and `accountId`. A no-op when no model source has\n`id`. Other fields of the source are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceStateChanged"
@@ -8635,20 +8623,9 @@
           "$ref": "#/$defs/ModelSourceState",
           "description": "The new status."
         },
-        "credentialNonce": {
-          "type": "string",
-          "description": "The model source's current credential nonce."
-        },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
           "description": "Replaces the source's `credentialResource`. Absent clears it, for a\nsource that needs no credential."
-        },
-        "credentialOrigins": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/URI"
-          },
-          "description": "Replaces the source's `credentialOrigins`. Absent clears it."
         },
         "accountId": {
           "type": "string",
@@ -8658,8 +8635,7 @@
       "required": [
         "type",
         "id",
-        "state",
-        "credentialNonce"
+        "state"
       ]
     },
     "SessionReadyAction": {
@@ -11609,14 +11585,6 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
-    },
-    "ModelSourcePrincipalPolicy": {
-      "enum": [
-        "shared",
-        "isolated"
-      ],
-      "type": "string",
-      "description": "Whether clients acting for different principals share a host's model\nsource registry."
     },
     "ModelSourceRetentionPolicy": {
       "enum": [

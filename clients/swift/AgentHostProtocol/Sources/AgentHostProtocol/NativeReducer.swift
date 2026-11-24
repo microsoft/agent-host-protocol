@@ -127,9 +127,7 @@ func applyModelSourceSet(_ state: inout RootState, _ source: ModelSource) {
     let existing = idx.map { list[$0] }.flatMap { sameModelSourceVersion($0, source) ? $0 : nil }
     var merged = source
     merged.state = existing?.state
-    merged.credentialNonce = existing?.credentialNonce
     merged.credentialResource = existing?.credentialResource
-    merged.credentialOrigins = existing?.credentialOrigins
     merged.accountId = existing?.accountId
     if let idx {
         list[idx] = merged
@@ -160,9 +158,7 @@ func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelS
     guard var list = state.modelSources,
           let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
     list[idx].state = action.state
-    list[idx].credentialNonce = action.credentialNonce
     list[idx].credentialResource = action.credentialResource
-    list[idx].credentialOrigins = action.credentialOrigins
     list[idx].accountId = action.accountId
     state.modelSources = list
     return true

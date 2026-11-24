@@ -1,5 +1,5 @@
 {
-  "description": "root/modelSourceSet with the same provider, format, and nonce re-registers: it keeps every host-reported field and takes displayName, icons, retention, and _meta from the action",
+  "description": "root/modelSourceSet with the same provider, format, and nonce re-registers: it keeps every host-reported field (state, credentialResource, and accountId) and takes everything else from the action, including displayName, icons, retention, and _meta",
   "reducer": "root",
   "initial": {
     "agents": [],
@@ -9,18 +9,22 @@
         "provider": "copilot",
         "displayName": "Source a",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1",
         "state": {
           "kind": "ready"
         },
-        "credentialNonce": "nonce-a-1",
         "credentialResource": {
           "resource": "https://apia.example.com/v1",
           "resource_name": "Source a API key"
         },
-        "credentialOrigins": [
-          "https://apia.example.com"
-        ],
         "accountId": "account-a-1"
       },
       {
@@ -28,6 +32,14 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1"
       }
     ]
@@ -40,6 +52,14 @@
         "provider": "copilot",
         "displayName": "Source a (renamed)",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1",
         "icons": [
           {
@@ -50,12 +70,6 @@
         "_meta": {
           "example.com/window": "2"
         }
-      },
-      "definition": {
-        "baseUrl": "https://apia.example.com/v1",
-        "models": [
-          "model-a"
-        ]
       }
     }
   ],
@@ -67,6 +81,14 @@
         "provider": "copilot",
         "displayName": "Source a (renamed)",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apia.example.com/v1",
+          "models": [
+            {
+              "id": "model-a"
+            }
+          ]
+        },
         "nonce": "definition-a-v1",
         "icons": [
           {
@@ -80,14 +102,10 @@
         "state": {
           "kind": "ready"
         },
-        "credentialNonce": "nonce-a-1",
         "credentialResource": {
           "resource": "https://apia.example.com/v1",
           "resource_name": "Source a API key"
         },
-        "credentialOrigins": [
-          "https://apia.example.com"
-        ],
         "accountId": "account-a-1"
       },
       {
@@ -95,6 +113,14 @@
         "provider": "copilot",
         "displayName": "Source b",
         "format": "openaiCompatible",
+        "definition": {
+          "endpoint": "https://apib.example.com/v1",
+          "models": [
+            {
+              "id": "model-b"
+            }
+          ]
+        },
         "nonce": "definition-b-v1"
       }
     ]

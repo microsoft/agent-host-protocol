@@ -1,7 +1,7 @@
 {
   "name": "model-source-registry-snapshot",
   "group": "A",
-  "description": "A root snapshot carries registered model sources with no reported state and in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each source carries a nonce for its definition, which isn't kept in state. Sources that take a credential carry a host-reported credentialResource and credentialOrigins in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with the recognized formats it reads and a namespaced one, its contributor grace period, and its principal policy, and its catalog lists the ready source and the authRequired one whose key expired, since models stay listed after a source has been ready.",
+  "description": "A root snapshot carries registered model sources with no reported state and in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each source carries its definition, in the suggested shape for its recognized format or an agent's own shape, including members the suggested shapes don't name, and a nonce for it. Sources that take a credential carry a host-reported credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects for the recognized formats it reads and a namespaced one, and its catalog lists the ready source and the authRequired one whose key expired, since models stay listed after a source has been ready.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-root://",
@@ -15,14 +15,22 @@
           "capabilities": {
             "modelSourceRegistration": {
               "formats": [
-                "openaiCompatible",
-                "anthropic",
-                "azureOpenai",
-                "gemini",
-                "example.com/model-source@1"
-              ],
-              "gracePeriod": 30000,
-              "principalPolicy": "shared"
+                {
+                  "format": "openaiCompatible"
+                },
+                {
+                  "format": "anthropic"
+                },
+                {
+                  "format": "azureOpenai"
+                },
+                {
+                  "format": "gemini"
+                },
+                {
+                  "format": "example.com/model-source@1"
+                }
+              ]
             }
           },
           "modelSources": [
@@ -59,6 +67,9 @@
           "provider": "example",
           "displayName": "Unreported",
           "format": "anthropic",
+          "definition": {
+            "endpoint": "https://api.anthropic.example.com/v1"
+          },
           "nonce": "sha256-unreported-1"
         },
         {
@@ -66,17 +77,39 @@
           "provider": "example",
           "displayName": "Starting",
           "format": "gemini",
+          "definition": {
+            "endpoint": "https://gemini.example.com/v1beta",
+            "models": [
+              {
+                "id": "gemini-model"
+              }
+            ]
+          },
           "nonce": "sha256-starting-1",
           "state": {
             "kind": "starting"
-          },
-          "credentialNonce": "nonce-starting-1"
+          }
         },
         {
           "id": "source-ready",
           "provider": "example",
           "displayName": "OpenRouter",
           "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://api.example.com/v1",
+            "wireApi": "chatCompletions",
+            "models": [
+              {
+                "id": "vendor/model-a",
+                "name": "Example model",
+                "maxContextWindow": 128000,
+                "maxOutputTokens": 16384,
+                "supportsVision": true,
+                "supportsTools": true
+              }
+            ],
+            "fileEndpoint": "https://files.example.com/v1"
+          },
           "nonce": "sha256-ready-1",
           "icons": [
             {
@@ -87,15 +120,10 @@
           "state": {
             "kind": "ready"
           },
-          "credentialNonce": "nonce-ready-1",
           "credentialResource": {
             "resource": "https://api.example.com/v1",
             "resource_name": "OpenRouter API key"
           },
-          "credentialOrigins": [
-            "https://api.example.com",
-            "https://files.example.com"
-          ],
           "accountId": "keychain-openrouter-1",
           "_meta": {
             "example.com/label": "Laptop"
@@ -106,6 +134,15 @@
           "provider": "example",
           "displayName": "Azure endpoint",
           "format": "azureOpenai",
+          "definition": {
+            "endpoint": "https://example.openai.azure.com/openai/v1",
+            "apiVersion": "2024-10-21",
+            "models": [
+              {
+                "id": "example-deployment"
+              }
+            ]
+          },
           "nonce": "sha256-auth-1",
           "retention": "contributingClient",
           "state": {
@@ -113,7 +150,6 @@
             "reason": "expired",
             "description": "The access token expired."
           },
-          "credentialNonce": "nonce-auth-1",
           "credentialResource": {
             "resource": "https://example.openai.azure.com/openai/v1",
             "resource_name": "Azure OpenAI",
@@ -124,9 +160,6 @@
               "https://cognitiveservices.azure.com/.default"
             ]
           },
-          "credentialOrigins": [
-            "https://example.openai.azure.com"
-          ],
           "accountId": "entra-azure-1"
         },
         {
@@ -134,25 +167,33 @@
           "provider": "example",
           "displayName": "Local server",
           "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "http://localhost:11434/v1",
+            "wireApi": "responses"
+          },
           "nonce": "sha256-local-1",
           "state": {
             "kind": "authRequired",
             "reason": "required"
           },
-          "credentialNonce": "nonce-local-1",
           "credentialResource": {
             "resource": "http://localhost:11434/v1",
             "resource_name": "Local server key"
-          },
-          "credentialOrigins": [
-            "http://localhost:11434"
-          ]
+          }
         },
         {
           "id": "source-rejected",
           "provider": "example",
           "displayName": "Rejected key",
           "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://api.example.com/v1",
+            "models": [
+              {
+                "id": "vendor/model-a"
+              }
+            ]
+          },
           "nonce": "sha256-rejected-1",
           "icons": [
             {
@@ -165,15 +206,10 @@
             "reason": "rejected",
             "description": "The endpoint rejected the API key."
           },
-          "credentialNonce": "nonce-rejected-2",
           "credentialResource": {
             "resource": "https://api.example.com/v1",
             "resource_name": "OpenRouter API key"
           },
-          "credentialOrigins": [
-            "https://api.example.com",
-            "https://files.example.com"
-          ],
           "accountId": "keychain-rejected-1"
         },
         {
@@ -181,6 +217,14 @@
           "provider": "example",
           "displayName": "Revoked key",
           "format": "openaiCompatible",
+          "definition": {
+            "endpoint": "https://api.example.com/v1",
+            "models": [
+              {
+                "id": "vendor/model-a"
+              }
+            ]
+          },
           "nonce": "sha256-revoked-1",
           "icons": [
             {
@@ -192,15 +236,10 @@
             "kind": "authRequired",
             "reason": "revoked"
           },
-          "credentialNonce": "nonce-revoked-3",
           "credentialResource": {
             "resource": "https://api.example.com/v1",
             "resource_name": "OpenRouter API key"
           },
-          "credentialOrigins": [
-            "https://api.example.com",
-            "https://files.example.com"
-          ],
           "accountId": "keychain-revoked-1"
         },
         {
@@ -208,6 +247,12 @@
           "provider": "example",
           "displayName": "Host-configured",
           "format": "example.com/model-source@1",
+          "definition": {
+            "endpoint": "https://models.internal.example.com",
+            "routing": {
+              "region": "example-1"
+            }
+          },
           "nonce": "sha256-host-1",
           "state": {
             "kind": "error",
@@ -215,8 +260,7 @@
               "errorType": "policy",
               "message": "The endpoint is not allowed by host policy."
             }
-          },
-          "credentialNonce": "nonce-host-1"
+          }
         }
       ]
     }
@@ -234,14 +278,22 @@
             "capabilities": {
               "modelSourceRegistration": {
                 "formats": [
-                  "openaiCompatible",
-                  "anthropic",
-                  "azureOpenai",
-                  "gemini",
-                  "example.com/model-source@1"
-                ],
-                "gracePeriod": 30000,
-                "principalPolicy": "shared"
+                  {
+                    "format": "openaiCompatible"
+                  },
+                  {
+                    "format": "anthropic"
+                  },
+                  {
+                    "format": "azureOpenai"
+                  },
+                  {
+                    "format": "gemini"
+                  },
+                  {
+                    "format": "example.com/model-source@1"
+                  }
+                ]
               }
             },
             "modelSources": [
@@ -278,6 +330,9 @@
             "provider": "example",
             "displayName": "Unreported",
             "format": "anthropic",
+            "definition": {
+              "endpoint": "https://api.anthropic.example.com/v1"
+            },
             "nonce": "sha256-unreported-1"
           },
           {
@@ -285,17 +340,39 @@
             "provider": "example",
             "displayName": "Starting",
             "format": "gemini",
+            "definition": {
+              "endpoint": "https://gemini.example.com/v1beta",
+              "models": [
+                {
+                  "id": "gemini-model"
+                }
+              ]
+            },
             "nonce": "sha256-starting-1",
             "state": {
               "kind": "starting"
-            },
-            "credentialNonce": "nonce-starting-1"
+            }
           },
           {
             "id": "source-ready",
             "provider": "example",
             "displayName": "OpenRouter",
             "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "wireApi": "chatCompletions",
+              "models": [
+                {
+                  "id": "vendor/model-a",
+                  "name": "Example model",
+                  "maxContextWindow": 128000,
+                  "maxOutputTokens": 16384,
+                  "supportsVision": true,
+                  "supportsTools": true
+                }
+              ],
+              "fileEndpoint": "https://files.example.com/v1"
+            },
             "nonce": "sha256-ready-1",
             "icons": [
               {
@@ -306,15 +383,10 @@
             "state": {
               "kind": "ready"
             },
-            "credentialNonce": "nonce-ready-1",
             "credentialResource": {
               "resource": "https://api.example.com/v1",
               "resource_name": "OpenRouter API key"
             },
-            "credentialOrigins": [
-              "https://api.example.com",
-              "https://files.example.com"
-            ],
             "accountId": "keychain-openrouter-1",
             "_meta": {
               "example.com/label": "Laptop"
@@ -325,6 +397,15 @@
             "provider": "example",
             "displayName": "Azure endpoint",
             "format": "azureOpenai",
+            "definition": {
+              "endpoint": "https://example.openai.azure.com/openai/v1",
+              "apiVersion": "2024-10-21",
+              "models": [
+                {
+                  "id": "example-deployment"
+                }
+              ]
+            },
             "nonce": "sha256-auth-1",
             "retention": "contributingClient",
             "state": {
@@ -332,7 +413,6 @@
               "reason": "expired",
               "description": "The access token expired."
             },
-            "credentialNonce": "nonce-auth-1",
             "credentialResource": {
               "resource": "https://example.openai.azure.com/openai/v1",
               "resource_name": "Azure OpenAI",
@@ -343,9 +423,6 @@
                 "https://cognitiveservices.azure.com/.default"
               ]
             },
-            "credentialOrigins": [
-              "https://example.openai.azure.com"
-            ],
             "accountId": "entra-azure-1"
           },
           {
@@ -353,25 +430,33 @@
             "provider": "example",
             "displayName": "Local server",
             "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "http://localhost:11434/v1",
+              "wireApi": "responses"
+            },
             "nonce": "sha256-local-1",
             "state": {
               "kind": "authRequired",
               "reason": "required"
             },
-            "credentialNonce": "nonce-local-1",
             "credentialResource": {
               "resource": "http://localhost:11434/v1",
               "resource_name": "Local server key"
-            },
-            "credentialOrigins": [
-              "http://localhost:11434"
-            ]
+            }
           },
           {
             "id": "source-rejected",
             "provider": "example",
             "displayName": "Rejected key",
             "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            },
             "nonce": "sha256-rejected-1",
             "icons": [
               {
@@ -384,15 +469,10 @@
               "reason": "rejected",
               "description": "The endpoint rejected the API key."
             },
-            "credentialNonce": "nonce-rejected-2",
             "credentialResource": {
               "resource": "https://api.example.com/v1",
               "resource_name": "OpenRouter API key"
             },
-            "credentialOrigins": [
-              "https://api.example.com",
-              "https://files.example.com"
-            ],
             "accountId": "keychain-rejected-1"
           },
           {
@@ -400,6 +480,14 @@
             "provider": "example",
             "displayName": "Revoked key",
             "format": "openaiCompatible",
+            "definition": {
+              "endpoint": "https://api.example.com/v1",
+              "models": [
+                {
+                  "id": "vendor/model-a"
+                }
+              ]
+            },
             "nonce": "sha256-revoked-1",
             "icons": [
               {
@@ -411,15 +499,10 @@
               "kind": "authRequired",
               "reason": "revoked"
             },
-            "credentialNonce": "nonce-revoked-3",
             "credentialResource": {
               "resource": "https://api.example.com/v1",
               "resource_name": "OpenRouter API key"
             },
-            "credentialOrigins": [
-              "https://api.example.com",
-              "https://files.example.com"
-            ],
             "accountId": "keychain-revoked-1"
           },
           {
@@ -427,6 +510,12 @@
             "provider": "example",
             "displayName": "Host-configured",
             "format": "example.com/model-source@1",
+            "definition": {
+              "endpoint": "https://models.internal.example.com",
+              "routing": {
+                "region": "example-1"
+              }
+            },
             "nonce": "sha256-host-1",
             "state": {
               "kind": "error",
@@ -434,8 +523,7 @@
                 "errorType": "policy",
                 "message": "The endpoint is not allowed by host policy."
               }
-            },
-            "credentialNonce": "nonce-host-1"
+            }
           }
         ]
       }

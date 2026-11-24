@@ -179,14 +179,12 @@ type RootConfigChangedAction struct {
 	Replace *bool `json:"replace,omitempty"`
 }
 
-// Adds a model source, or updates the one with the same `id`. The reducer
-// stores `modelSource` without the definition:
+// Adds a model source, or updates the one with the same `id`:
 //
 //   - **Add.** When no model source has the `id`, appends `modelSource`.
 //   - **Re-register.** When one has, with the same `provider`, `format`, and
-//     `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,
-//     `credentialResource`, `credentialOrigins`, and `accountId`) and takes
-//     the other fields from the action.
+//     `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
+//     and `accountId`) and takes everything else from the action.
 //   - **Update.** When any of the three differs, replaces the source. Its
 //     host-reported fields are absent until the host reports again with
 //     {@link RootModelSourceStateChangedAction}.
@@ -197,12 +195,9 @@ type RootConfigChangedAction struct {
 // Stability: 1.0 - Early development.
 type RootModelSourceSetAction struct {
 	Type ActionType `json:"type"`
-	// The model source to add or update, matched by `id`, without host-reported fields.
+	// The model source to add or update, matched by `id`, including its
+	// `definition`, without host-reported fields.
 	ModelSource ModelSource `json:"modelSource"`
-	// How to reach the source, in `modelSource.format`: endpoint, wire format,
-	// models, and so on. The host hands it to the agent, and the reducer
-	// doesn't store it. MUST NOT contain a credential.
-	Definition map[string]json.RawMessage `json:"definition"`
 }
 
 // Removes the model source with the given `id`, for every client. A no-op
@@ -216,9 +211,8 @@ type RootModelSourceRemovedAction struct {
 }
 
 // Updates a model source's host-reported fields together: `state`,
-// `credentialNonce`, `credentialResource`, `credentialOrigins`, and
-// `accountId`. A no-op when no model source has `id`. Other fields of the
-// source are preserved. Only the host dispatches it.
+// `credentialResource`, and `accountId`. A no-op when no model source has
+// `id`. Other fields of the source are preserved. Only the host dispatches it.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceStateChangedAction struct {
@@ -227,13 +221,9 @@ type RootModelSourceStateChangedAction struct {
 	Id string `json:"id"`
 	// The new status.
 	State ModelSourceState `json:"state"`
-	// The model source's current credential nonce.
-	CredentialNonce string `json:"credentialNonce"`
 	// Replaces the source's `credentialResource`. Absent clears it, for a
 	// source that needs no credential.
 	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
-	// Replaces the source's `credentialOrigins`. Absent clears it.
-	CredentialOrigins []URI `json:"credentialOrigins,omitempty"`
 	// Replaces the source's `accountId`. Absent clears it.
 	AccountId *string `json:"accountId,omitempty"`
 }

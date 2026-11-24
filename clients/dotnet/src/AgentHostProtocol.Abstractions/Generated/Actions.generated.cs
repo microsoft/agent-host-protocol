@@ -346,14 +346,12 @@ public sealed record RootConfigChangedAction
     public bool? Replace { get; init; }
 }
 
-/// <summary>Adds a model source, or updates the one with the same `id`. The reducer
-/// stores `modelSource` without the definition:
+/// <summary>Adds a model source, or updates the one with the same `id`:
 ///
 /// - **Add.** When no model source has the `id`, appends `modelSource`.
 /// - **Re-register.** When one has, with the same `provider`, `format`, and
-///   `nonce`, keeps its host-reported fields (`state`, `credentialNonce`,
-///   `credentialResource`, `credentialOrigins`, and `accountId`) and takes
-///   the other fields from the action.
+///   `nonce`, keeps its host-reported fields (`state`, `credentialResource`,
+///   and `accountId`) and takes everything else from the action.
 /// - **Update.** When any of the three differs, replaces the source. Its
 ///   host-reported fields are absent until the host reports again with
 ///   {@link RootModelSourceStateChangedAction}.
@@ -366,13 +364,9 @@ public sealed record RootModelSourceSetAction
 {
     public ActionType Type { get; init; } = ActionType.RootModelSourceSet;
 
-    /// <summary>The model source to add or update, matched by `id`, without host-reported fields.</summary>
+    /// <summary>The model source to add or update, matched by `id`, including its
+    /// `definition`, without host-reported fields.</summary>
     public required ModelSource ModelSource { get; init; }
-
-    /// <summary>How to reach the source, in `modelSource.format`: endpoint, wire format,
-    /// models, and so on. The host hands it to the agent, and the reducer
-    /// doesn't store it. MUST NOT contain a credential.</summary>
-    public required Dictionary<string, JsonElement> Definition { get; init; }
 }
 
 /// <summary>Removes the model source with the given `id`, for every client. A no-op
@@ -388,9 +382,8 @@ public sealed record RootModelSourceRemovedAction
 }
 
 /// <summary>Updates a model source's host-reported fields together: `state`,
-/// `credentialNonce`, `credentialResource`, `credentialOrigins`, and
-/// `accountId`. A no-op when no model source has `id`. Other fields of the
-/// source are preserved. Only the host dispatches it.
+/// `credentialResource`, and `accountId`. A no-op when no model source has
+/// `id`. Other fields of the source are preserved. Only the host dispatches it.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceStateChangedAction
@@ -403,17 +396,10 @@ public sealed record RootModelSourceStateChangedAction
     /// <summary>The new status.</summary>
     public required ModelSourceState State { get; init; }
 
-    /// <summary>The model source's current credential nonce.</summary>
-    public required string CredentialNonce { get; init; }
-
     /// <summary>Replaces the source's `credentialResource`. Absent clears it, for a
     /// source that needs no credential.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
-
-    /// <summary>Replaces the source's `credentialOrigins`. Absent clears it.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? CredentialOrigins { get; init; }
 
     /// <summary>Replaces the source's `accountId`. Absent clears it.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

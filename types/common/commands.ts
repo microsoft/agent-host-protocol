@@ -1494,12 +1494,6 @@ export interface ModelSourceAuthenticateTarget {
   kind: AuthenticateTargetKind.ModelSource;
   /** The registration's `ModelSource.id`. */
   modelSourceId: string;
-  /**
-   * The registration's current `ModelSource.credentialNonce`, as
-   * published in root state. The host rejects a stale one with `Conflict`
-   * (-32011).
-   */
-  credentialNonce: string;
 }
 
 /**
@@ -1611,7 +1605,8 @@ export interface AuthenticateParams extends BaseParams {
    *
    * A registered model source takes its credential only through a
    * `modelSource` target, and the host rejects an untargeted `resource` that
-   * matches only model source challenges with `InvalidParams` (-32602). See
+   * matches only model source challenges with `InvalidParams` (-32602). A
+   * delivery replaces whatever credential the host holds for the source. See
    * [Model source credentials](/specification/authentication#model-source-credentials)
    * for its rules.
    *

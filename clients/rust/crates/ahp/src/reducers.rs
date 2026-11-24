@@ -756,9 +756,7 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
                 return ReduceOutcome::NoOp;
             };
             source.state = Some(a.state.clone());
-            source.credential_nonce = Some(a.credential_nonce.clone());
             source.credential_resource = a.credential_resource.clone();
-            source.credential_origins = a.credential_origins.clone();
             source.account_id = a.account_id.clone();
             ReduceOutcome::Applied
         }
@@ -775,18 +773,14 @@ fn same_model_source_version(a: &ModelSource, b: &ModelSource) -> bool {
 /// Copies the host-reported fields of `from` onto `to`.
 fn copy_model_source_host_fields(to: &mut ModelSource, from: &ModelSource) {
     to.state = from.state.clone();
-    to.credential_nonce = from.credential_nonce.clone();
     to.credential_resource = from.credential_resource.clone();
-    to.credential_origins = from.credential_origins.clone();
     to.account_id = from.account_id.clone();
 }
 
 /// Clears the host-reported fields of `source`.
 fn clear_model_source_host_fields(source: &mut ModelSource) {
     source.state = None;
-    source.credential_nonce = None;
     source.credential_resource = None;
-    source.credential_origins = None;
     source.account_id = None;
 }
 
