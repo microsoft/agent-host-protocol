@@ -7180,7 +7180,11 @@
             "file",
             "directory"
           ],
-          "description": "Whether the entry is a file or directory"
+          "description": "Whether the entry is a file or directory.\n\nFor a symbolic link (`isSymlink: true`), this reports the resolved target\nkind when known and permitted by the receiver's access policy, or `'file'`\nas a non-expandable fallback when the target was not inspected or could\nnot be resolved or accessed."
+        },
+        "isSymlink": {
+          "type": "boolean",
+          "description": "Whether the entry is a symbolic link. Callers that need target resolution\nor canonical URIs SHOULD use `resourceResolve`."
         }
       },
       "required": [

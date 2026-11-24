@@ -1518,15 +1518,25 @@ public struct ResourceListResult: Codable, Sendable, Equatable {
 public struct DirectoryEntry: Codable, Sendable, Equatable {
     /// Base name of the entry
     public var name: String
-    /// Whether the entry is a file or directory
+    /// Whether the entry is a file or directory.
+    ///
+    /// For a symbolic link (`isSymlink: true`), this reports the resolved target
+    /// kind when known and permitted by the receiver's access policy, or `'file'`
+    /// as a non-expandable fallback when the target was not inspected or could
+    /// not be resolved or accessed.
     public var type: String
+    /// Whether the entry is a symbolic link. Callers that need target resolution
+    /// or canonical URIs SHOULD use `resourceResolve`.
+    public var isSymlink: Bool?
 
     public init(
         name: String,
-        type: String
+        type: String,
+        isSymlink: Bool? = nil
     ) {
         self.name = name
         self.type = type
+        self.isSymlink = isSymlink
     }
 }
 
