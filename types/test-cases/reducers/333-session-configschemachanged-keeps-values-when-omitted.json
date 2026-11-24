@@ -1,0 +1,90 @@
+{
+  "description": "session/configSchemaChanged keeps current values when values is omitted",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          }
+        }
+      },
+      "values": {
+        "target": "worktree"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/configSchemaChanged",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enumDynamic": true
+          }
+        },
+        "required": [
+          "baseBranch"
+        ]
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "folder",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enumDynamic": true
+          }
+        },
+        "required": [
+          "baseBranch"
+        ]
+      },
+      "values": {
+        "target": "worktree"
+      }
+    }
+  }
+}

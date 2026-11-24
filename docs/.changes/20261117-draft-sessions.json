@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Draft sessions: `SessionLifecycle.Draft`, `SessionStatus.IsDraft`, `CreateSessionParams.draft`, and the `session/draftSubmitted` and `session/configSchemaChanged` actions, gated by `InitializeResult.draftSessions` and `ClientCapabilities.draftSessions`. `sessionConfigCompletions` can target a session URI."
+}

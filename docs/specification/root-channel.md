@@ -32,6 +32,8 @@ RootState {
 
 The session list is **not** part of root state. Clients fetch it imperatively via [`listSessions`](/reference/root#listsessions) and patch it from `root/*` notifications described below.
 
+The catalogue includes [draft sessions](/specification/session-channel#draft-sessions), marked with `SessionStatus.IsDraft`, only for clients that declared `ClientCapabilities.draftSessions`. Other clients first see a draft when it is submitted.
+
 ### Paginating the catalogue
 
 A large catalogue can be fetched incrementally. [`listSessions`](/reference/root#listsessions) accepts an optional `limit` (the maximum number of entries the client wants in the page — the server SHOULD respect it, but MAY return fewer and MAY impose its own upper cap) and an optional opaque `cursor`. The result carries the page in `items` plus an optional `nextCursor`:
@@ -69,8 +71,8 @@ target channel instead.
 | `resourceRequest` | request | Permission grant/revocation flow is connection-level. Symmetrical: either peer MAY initiate. |
 | `createResourceWatch` | request | Opens a file-change watcher; the receiver returns an `ahp-resource-watch:/<id>` channel. May also be issued **server → client** to watch a client-side URI. The watcher is released when subscribers unsubscribe — no explicit dispose call. |
 | `authenticate` | request | Bearer-token push for protected resources is connection-level. |
-| `resolveSessionConfig` | request | Pre-creation config resolution happens before any session channel exists. |
-| `sessionConfigCompletions` | request | Completes dynamic fields in pre-creation session config. |
+| `resolveSessionConfig` | request | Pre-creation config resolution happens before any session channel exists. Hosts with [draft sessions](/specification/session-channel#draft-sessions) resolve a draft's config in its state instead. |
+| `sessionConfigCompletions` | request | Completes dynamic fields in pre-creation session config. May also target a session URI, such as a draft's. |
 | `listAutomationTriggerDefinitions` | request | Describes host-defined event triggers. |
 
 ### Notifications (`params.channel = "ahp-root://"`)
