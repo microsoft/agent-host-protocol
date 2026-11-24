@@ -2907,11 +2907,6 @@
         "kind"
       ]
     },
-    "ChatHistoryBrowsingCapability": {
-      "type": "object",
-      "description": "Presence advertises `listChatTurns` and `readChatTurns` for this chat.",
-      "properties": {}
-    },
     "ChatState": {
       "type": "object",
       "description": "Full state for a single chat, loaded when a client subscribes to the chat's\nURI.\n\nThe lightweight catalog representation of a chat is {@link ChatSummary},\ncarried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`\n**denormalizes** every {@link ChatSummary} field directly onto itself so\nsubscribers receive one flat object instead of having to merge a nested\n`summary` sub-object. Producers MUST keep the two representations\nconsistent: any change to the inlined fields below SHOULD also be\nannounced on the parent session via the matching\n{@link SessionChatUpdatedAction | `session/chatUpdated`} action.",
@@ -2991,13 +2986,9 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Turn"
+            "$ref": "#/$defs/ChatStateTurn"
           },
-          "description": "Completed turns"
-        },
-        "historyBrowsing": {
-          "$ref": "#/$defs/ChatHistoryBrowsingCapability",
-          "description": "Browse retained history independently of the subscription window. Absent when unsupported."
+          "description": "Completed turns, oldest first.\n\nEntries may be {@link DeferredTurn | deferred} only for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}."
         },
         "turnsNextCursor": {
           "type": "string",
@@ -3701,6 +3692,41 @@
         "state"
       ]
     },
+    "TurnBase": {
+      "type": "object",
+      "description": "Fields shared by {@link Turn} and {@link DeferredTurn}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state"
+      ]
+    },
     "Turn": {
       "type": "object",
       "description": "A completed request/response cycle.",
@@ -3721,12 +3747,53 @@
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
         },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": false,
+          "description": "Absent or `false`: this turn carries its full response."
+        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/ResponsePart"
           },
           "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state",
+        "responseParts"
+      ]
+    },
+    "DeferredTurn": {
+      "type": "object",
+      "description": "A completed turn whose response the host has not sent yet.\n\nThe turn keeps its position in {@link ChatState.turns}, so clients can show\nthe initiating message and outcome without downloading the response.\nRequest the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};\nthe host replaces the entry in place with a {@link Turn} via\n{@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.\n\nHosts MUST NOT send a `DeferredTurn` to a client that did not declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,\naction, or command result. Those clients receive the corresponding\n{@link Turn}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
         },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
@@ -3735,13 +3802,18 @@
         "state": {
           "$ref": "#/$defs/TurnState",
           "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": true,
+          "description": "Marks a turn without `responseParts`."
         }
       },
       "required": [
         "id",
         "message",
-        "responseParts",
-        "state"
+        "state",
+        "isDeferred"
       ]
     },
     "ActiveTurn": {
@@ -6883,6 +6955,17 @@
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
+    "ChatStateTurn": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Turn"
+        },
+        {
+          "$ref": "#/$defs/DeferredTurn"
+        }
+      ],
+      "description": "A completed turn in {@link ChatState.turns}: either a full {@link Turn} or a\n{@link DeferredTurn}, discriminated by `isDeferred`."
+    },
     "PendingMessageKind": {
       "enum": [
         "steering",
@@ -6941,6 +7024,15 @@
         }
       ]
     },
+    "TurnState": {
+      "enum": [
+        "complete",
+        "cancelled",
+        "error"
+      ],
+      "type": "string",
+      "description": "How a turn ended."
+    },
     "ResponsePart": {
       "oneOf": [
         {
@@ -6965,15 +7057,6 @@
           "$ref": "#/$defs/ErrorResponsePart"
         }
       ]
-    },
-    "TurnState": {
-      "enum": [
-        "complete",
-        "cancelled",
-        "error"
-      ],
-      "type": "string",
-      "description": "How a turn ended."
     },
     "MessageKind": {
       "enum": [

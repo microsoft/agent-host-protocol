@@ -876,10 +876,6 @@ type MultipleChatsCapability struct {
 	SideChat *bool `json:"sideChat,omitempty"`
 }
 
-// Presence advertises `listChatTurns` and `readChatTurns` for this chat.
-type ChatHistoryBrowsingCapability struct {
-}
-
 // Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
 type MultipleWorkingDirectoriesCapability struct {
 	// The agent's **first** working directory (index `0` of
@@ -1524,10 +1520,11 @@ type ChatState struct {
 	Canvases []CanvasReference `json:"canvases,omitempty"`
 	// This chat's configuration. See {@link ChatConfigState}.
 	Config *ChatConfigState `json:"config,omitempty"`
-	// Completed turns
-	Turns []Turn `json:"turns"`
-	// Browse retained history independently of the subscription window. Absent when unsupported.
-	HistoryBrowsing *ChatHistoryBrowsingCapability `json:"historyBrowsing,omitempty"`
+	// Completed turns, oldest first.
+	//
+	// Entries may be {@link DeferredTurn | deferred} only for clients that
+	// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+	Turns []ChatStateTurn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
 	//
 	// Presence means `turns` is a tail window and more historical turns are
@@ -1833,11 +1830,40 @@ type Turn struct {
 	Duration *int64 `json:"duration,omitempty"`
 	// The message that initiated the turn
 	Message Message `json:"message"`
+	// Token usage info
+	Usage *UsageInfo `json:"usage,omitempty"`
+	// How the turn ended
+	State TurnState `json:"state"`
 	// All response content in stream order: text, tool calls, reasoning, and content refs.
 	//
 	// Consumers should derive display text by concatenating markdown parts,
 	// and find tool calls by filtering for `ToolCall` parts.
 	ResponseParts []ResponsePart `json:"responseParts"`
+}
+
+// A completed turn whose response the host has not sent yet.
+//
+// The turn keeps its position in {@link ChatState.turns}, so clients can show
+// the initiating message and outcome without downloading the response.
+// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+// the host replaces the entry in place with a {@link Turn} via
+// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+//
+// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+// action, or command result. Those clients receive the corresponding
+// {@link Turn}.
+//
+// Stability: 1.0 - Early development.
+type DeferredTurn struct {
+	// Turn identifier
+	Id string `json:"id"`
+	// ISO 8601 timestamp when this turn started.
+	StartedAt *string `json:"startedAt,omitempty"`
+	// Turn duration in milliseconds.
+	Duration *int64 `json:"duration,omitempty"`
+	// The message that initiated the turn
+	Message Message `json:"message"`
 	// Token usage info
 	Usage *UsageInfo `json:"usage,omitempty"`
 	// How the turn ended
@@ -7286,6 +7312,72 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 		object["status"] = json.RawMessage("\"cancelled\"")
 	}
 	return json.Marshal(object)
+}
+
+// MarshalJSON encodes the deferred turn with its `"isDeferred": true` marker.
+func (v DeferredTurn) MarshalJSON() ([]byte, error) {
+	type wire DeferredTurn
+	return json.Marshal(struct {
+		wire
+		IsDeferred bool `json:"isDeferred"`
+	}{wire(v), true})
+}
+
+// ChatStateTurn is a completed turn in ChatState.Turns: either a full
+// *Turn or a *DeferredTurn, discriminated by the boolean "isDeferred" field.
+type ChatStateTurn struct {
+	Value isChatStateTurn
+}
+
+// isChatStateTurn is the marker interface implemented by every
+// concrete variant of ChatStateTurn.
+type isChatStateTurn interface{ isChatStateTurn() }
+
+func (*Turn) isChatStateTurn()         {}
+func (*DeferredTurn) isChatStateTurn() {}
+
+// UnmarshalJSON decodes a *DeferredTurn when "isDeferred" is true and a
+// full *Turn otherwise.
+func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
+	var probe struct {
+		IsDeferred json.RawMessage `json:"isDeferred"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return err
+	}
+	if string(probe.IsDeferred) == "true" {
+		var value DeferredTurn
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+		return nil
+	}
+	var value Turn
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	u.Value = &value
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ChatStateTurn) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// TurnId returns the id of the active variant, or "" when Value is nil.
+func (u ChatStateTurn) TurnId() string {
+	switch v := u.Value.(type) {
+	case *Turn:
+		return v.Id
+	case *DeferredTurn:
+		return v.Id
+	}
+	return ""
 }
 
 // ChatOrigin describes how a chat came into existence.

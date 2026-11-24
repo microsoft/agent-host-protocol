@@ -552,8 +552,27 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Client understands {@link DeferredTurn} entries in
+     * {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+     * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+     *
+     * Hosts MAY then defer any completed turn they send this client. Hosts
+     * MUST NOT send deferred turns to clients that omit this capability.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val deferredTurns: DeferredTurnsCapability? = null
 )
+
+/**
+ * Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+ *
+ * Stability: 1.0 - Early development.
+ */
+@Serializable
+class DeferredTurnsCapability
 
 @Serializable
 data class AutomationCapabilities(
@@ -1564,107 +1583,49 @@ data class FetchTurnsParams(
 @Serializable
 class FetchTurnsResult
 
+/**
+ * Requests the full responses of a range of {@link DeferredTurn | deferred
+ * turns} in a chat state.
+ *
+ * The range runs from `turnId` through `endTurnId`, inclusive, in
+ * {@link ChatState.turns | `ChatState.turns`} order. The command result does
+ * not carry turns. Instead, before responding, the host MUST dispatch
+ * `chat/turnsMaterialized` to replace every deferred turn in the range in place
+ * with its full {@link Turn}. Full turns in the range are left unchanged.
+ *
+ * The host MUST reject the request with `InvalidParams` if `turnId` or
+ * `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+ * Hosts MAY also reject ranges that exceed an implementation-defined size limit
+ * with `InvalidParams`.
+ *
+ * Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * Stability: 1.0 - Early development.
+ */
 @Serializable
-data class ChatTurnIndexEntry(
+data class FetchDeferredTurnsParams(
     /**
-     * Stable identifier of the completed turn in this chat.
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * ID of the first turn in the range.
      */
     val turnId: String,
     /**
-     * First nonempty trimmed prompt line, or empty string. If truncated, the
-     * 80 Unicode scalar values include the trailing ellipsis.
+     * ID of the last turn in the range, inclusive. Omit to request only `turnId`.
      */
-    val preview: String,
-    /**
-     * The turn's ISO 8601 start time, if known.
-     */
-    val startedAt: String? = null
+    val endTurnId: String? = null
 )
 
 @Serializable
-data class ListChatTurnsParams(
-    /**
-     * Channel URI this command targets.
-     */
-    val channel: String,
-    /**
-     * Optional JSON-serializable metadata associated with this request.
-     * Receivers MUST ignore keys they do not understand.
-     */
-    @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null,
-    /**
-     * Maximum number of entries to return in this page. The server SHOULD respect
-     * this bound but MAY return fewer entries and MAY impose its own upper cap.
-     * Omit to let the server choose the page size.
-     */
-    val limit: Long? = null,
-    /**
-     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
-     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
-     * as opaque — do not parse, modify, or persist them across connections. An
-     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
-     */
-    val cursor: String? = null
-)
-
-@Serializable
-data class ListChatTurnsResult(
-    /**
-     * Opaque cursor for the next page. Present when more entries exist beyond the
-     * returned page; absent signals the end of the collection. Pass it back as
-     * {@link PaginatedParams.cursor} to fetch the following page.
-     */
-    val nextCursor: String? = null,
-    /**
-     * One entry per eligible prompt in transcript order.
-     */
-    val items: List<ChatTurnIndexEntry>
-)
-
-@Serializable
-data class ReadChatTurnsParams(
-    /**
-     * Channel URI this command targets.
-     */
-    val channel: String,
-    /**
-     * Optional JSON-serializable metadata associated with this request.
-     * Receivers MUST ignore keys they do not understand.
-     */
-    @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null,
-    /**
-     * Stable ID of the first turn to return. Omit when continuing by cursor.
-     */
-    val fromTurnId: String? = null,
-    /**
-     * Echo either cursor from a previous read page. Omit when opening by ID.
-     */
-    val cursor: String? = null,
-    /**
-     * Maximum number of whole turns on this page; defaults to 10.
-     */
-    val limit: Long? = null
-)
-
-@Serializable
-data class ReadChatTurnsResult(
-    /**
-     * Opaque cursor for the next page. Present when more entries exist beyond the
-     * returned page; absent signals the end of the collection. Pass it back as
-     * {@link PaginatedParams.cursor} to fetch the following page.
-     */
-    val nextCursor: String? = null,
-    /**
-     * Consecutive whole turns, oldest first, including on a previous-page read.
-     */
-    val turns: List<Turn>,
-    /**
-     * Read immediately before the first returned turn; absent at the start.
-     */
-    val previousCursor: String? = null
-)
+class FetchDeferredTurnsResult
 
 @Serializable
 data class UnsubscribeParams(

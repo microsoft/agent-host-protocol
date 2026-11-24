@@ -1641,14 +1641,6 @@ public struct MultipleChatsCapability: Codable, Sendable, Equatable {
     }
 }
 
-public struct ChatHistoryBrowsingCapability: Codable, Sendable, Equatable {
-
-    public init(
-
-    ) {
-    }
-}
-
 public struct MultipleWorkingDirectoriesCapability: Codable, Sendable, Equatable {
     /// The agent's **first** working directory (index `0` of
     /// {@link CreateSessionParams.workingDirectories}) is an immutable primary:
@@ -2046,10 +2038,11 @@ public struct ChatState: Codable, Sendable, Equatable {
     public var canvases: [CanvasReference]?
     /// This chat's configuration. See {@link ChatConfigState}.
     public var config: ChatConfigState?
-    /// Completed turns
-    public var turns: [Turn]
-    /// Browse retained history independently of the subscription window. Absent when unsupported.
-    public var historyBrowsing: ChatHistoryBrowsingCapability?
+    /// Completed turns, oldest first.
+    ///
+    /// Entries may be {@link DeferredTurn | deferred} only for clients that
+    /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+    public var turns: [ChatStateTurn]
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
@@ -2100,7 +2093,6 @@ public struct ChatState: Codable, Sendable, Equatable {
         case canvases
         case config
         case turns
-        case historyBrowsing
         case turnsNextCursor
         case activeTurn
         case steeringMessage
@@ -2125,8 +2117,7 @@ public struct ChatState: Codable, Sendable, Equatable {
         backgroundWork: [BackgroundWork]? = nil,
         canvases: [CanvasReference]? = nil,
         config: ChatConfigState? = nil,
-        turns: [Turn],
-        historyBrowsing: ChatHistoryBrowsingCapability? = nil,
+        turns: [ChatStateTurn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
@@ -2150,7 +2141,6 @@ public struct ChatState: Codable, Sendable, Equatable {
         self.canvases = canvases
         self.config = config
         self.turns = turns
-        self.historyBrowsing = historyBrowsing
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
         self.steeringMessage = steeringMessage
@@ -2893,44 +2883,6 @@ public struct ChatConfigState: Codable, Sendable, Equatable {
     ) {
         self.schema = schema
         self.values = values
-    }
-}
-
-public struct Turn: Codable, Sendable, Equatable {
-    /// Turn identifier
-    public var id: String
-    /// ISO 8601 timestamp when this turn started.
-    public var startedAt: String?
-    /// Turn duration in milliseconds.
-    public var duration: Int?
-    /// The message that initiated the turn
-    public var message: Message
-    /// All response content in stream order: text, tool calls, reasoning, and content refs.
-    ///
-    /// Consumers should derive display text by concatenating markdown parts,
-    /// and find tool calls by filtering for `ToolCall` parts.
-    public var responseParts: [ResponsePart]
-    /// Token usage info
-    public var usage: UsageInfo?
-    /// How the turn ended
-    public var state: TurnState
-
-    public init(
-        id: String,
-        startedAt: String? = nil,
-        duration: Int? = nil,
-        message: Message,
-        responseParts: [ResponsePart],
-        usage: UsageInfo? = nil,
-        state: TurnState
-    ) {
-        self.id = id
-        self.startedAt = startedAt
-        self.duration = duration
-        self.message = message
-        self.responseParts = responseParts
-        self.usage = usage
-        self.state = state
     }
 }
 
@@ -9116,6 +9068,208 @@ public enum ChatOrigin: Codable, Sendable, Equatable {
         case .fork(let value): try value.encode(to: encoder)
         case .sideChat(let value): try value.encode(to: encoder)
         case .tool(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public struct Turn: Codable, Sendable, Equatable {
+    /// Turn identifier
+    public var id: String
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String?
+    /// Turn duration in milliseconds.
+    public var duration: Int?
+    /// The message that initiated the turn
+    public var message: Message
+    /// All response content in stream order: text, tool calls, reasoning, and content refs.
+    ///
+    /// Consumers should derive display text by concatenating markdown parts,
+    /// and find tool calls by filtering for `ToolCall` parts.
+    public var responseParts: [ResponsePart]
+    /// Token usage info
+    public var usage: UsageInfo?
+    /// How the turn ended
+    public var state: TurnState
+
+    public init(
+        id: String,
+        startedAt: String? = nil,
+        duration: Int? = nil,
+        message: Message,
+        responseParts: [ResponsePart],
+        usage: UsageInfo? = nil,
+        state: TurnState
+    ) {
+        self.id = id
+        self.startedAt = startedAt
+        self.duration = duration
+        self.message = message
+        self.responseParts = responseParts
+        self.usage = usage
+        self.state = state
+    }
+}
+
+/// A completed turn whose response the host has not sent yet.
+///
+/// The turn keeps its position in {@link ChatState.turns}, so clients can show
+/// the initiating message and outcome without downloading the response.
+/// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+/// the host replaces the entry in place with a {@link Turn} via
+/// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+///
+/// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+/// action, or command result. Those clients receive the corresponding
+/// {@link Turn}.
+///
+/// Stability: 1.0 - Early development.
+public struct DeferredTurn: Codable, Sendable, Equatable {
+    /// Turn identifier
+    public var id: String
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String?
+    /// Turn duration in milliseconds.
+    public var duration: Int?
+    /// The message that initiated the turn
+    public var message: Message
+    /// Token usage info
+    public var usage: UsageInfo?
+    /// How the turn ended
+    public var state: TurnState
+    /// Discriminant: always `true` for a turn without `responseParts`.
+    public var isDeferred: Bool { true }
+
+    private enum CodingKeys: String, CodingKey {
+        case isDeferred
+        case id
+        case startedAt
+        case duration
+        case message
+        case usage
+        case state
+    }
+
+    public init(
+        id: String,
+        startedAt: String? = nil,
+        duration: Int? = nil,
+        message: Message,
+        usage: UsageInfo? = nil,
+        state: TurnState
+    ) {
+        self.id = id
+        self.startedAt = startedAt
+        self.duration = duration
+        self.message = message
+        self.usage = usage
+        self.state = state
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard try container.decode(Bool.self, forKey: .isDeferred) else {
+            throw DecodingError.dataCorruptedError(forKey: .isDeferred, in: container, debugDescription: "Expected DeferredTurn isDeferred true")
+        }
+        self.id = try container.decode(String.self, forKey: .id)
+        self.startedAt = try container.decodeIfPresent(String.self, forKey: .startedAt)
+        self.duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        self.message = try container.decode(Message.self, forKey: .message)
+        self.usage = try container.decodeIfPresent(UsageInfo.self, forKey: .usage)
+        self.state = try container.decode(TurnState.self, forKey: .state)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(true, forKey: .isDeferred)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(startedAt, forKey: .startedAt)
+        try container.encodeIfPresent(duration, forKey: .duration)
+        try container.encode(message, forKey: .message)
+        try container.encodeIfPresent(usage, forKey: .usage)
+        try container.encode(state, forKey: .state)
+    }
+}
+
+/// A completed turn in `ChatState.turns`: either a full ``Turn`` or a
+/// ``DeferredTurn``, discriminated by `isDeferred`.
+public enum ChatStateTurn: Codable, Sendable, Equatable {
+    /// A full turn (`isDeferred` absent or `false`).
+    case turn(Turn)
+    /// A turn whose response has not been sent yet (`isDeferred: true`).
+    case deferred(DeferredTurn)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "isDeferred"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        if (try? container.decodeIfPresent(Bool.self, forKey: .discriminant)) == true {
+            self = .deferred(try DeferredTurn(from: decoder))
+        } else {
+            self = .turn(try Turn(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .turn(let value): try value.encode(to: encoder)
+        case .deferred(let value): try value.encode(to: encoder)
+        }
+    }
+
+    /// `true` when this entry is a ``DeferredTurn``.
+    public var isDeferred: Bool {
+        if case .deferred = self { return true }
+        return false
+    }
+
+    /// Turn identifier
+    public var id: String {
+        switch self {
+        case .turn(let value): return value.id
+        case .deferred(let value): return value.id
+        }
+    }
+
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String? {
+        switch self {
+        case .turn(let value): return value.startedAt
+        case .deferred(let value): return value.startedAt
+        }
+    }
+
+    /// Turn duration in milliseconds.
+    public var duration: Int? {
+        switch self {
+        case .turn(let value): return value.duration
+        case .deferred(let value): return value.duration
+        }
+    }
+
+    /// The message that initiated the turn
+    public var message: Message {
+        switch self {
+        case .turn(let value): return value.message
+        case .deferred(let value): return value.message
+        }
+    }
+
+    /// Token usage info
+    public var usage: UsageInfo? {
+        switch self {
+        case .turn(let value): return value.usage
+        case .deferred(let value): return value.usage
+        }
+    }
+
+    /// How the turn ended
+    public var state: TurnState {
+        switch self {
+        case .turn(let value): return value.state
+        case .deferred(let value): return value.state
         }
     }
 }

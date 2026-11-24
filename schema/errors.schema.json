@@ -2605,11 +2605,6 @@
         "kind"
       ]
     },
-    "ChatHistoryBrowsingCapability": {
-      "type": "object",
-      "description": "Presence advertises `listChatTurns` and `readChatTurns` for this chat.",
-      "properties": {}
-    },
     "ChatState": {
       "type": "object",
       "description": "Full state for a single chat, loaded when a client subscribes to the chat's\nURI.\n\nThe lightweight catalog representation of a chat is {@link ChatSummary},\ncarried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`\n**denormalizes** every {@link ChatSummary} field directly onto itself so\nsubscribers receive one flat object instead of having to merge a nested\n`summary` sub-object. Producers MUST keep the two representations\nconsistent: any change to the inlined fields below SHOULD also be\nannounced on the parent session via the matching\n{@link SessionChatUpdatedAction | `session/chatUpdated`} action.",
@@ -2689,13 +2684,9 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Turn"
+            "$ref": "#/$defs/ChatStateTurn"
           },
-          "description": "Completed turns"
-        },
-        "historyBrowsing": {
-          "$ref": "#/$defs/ChatHistoryBrowsingCapability",
-          "description": "Browse retained history independently of the subscription window. Absent when unsupported."
+          "description": "Completed turns, oldest first.\n\nEntries may be {@link DeferredTurn | deferred} only for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}."
         },
         "turnsNextCursor": {
           "type": "string",
@@ -3399,6 +3390,41 @@
         "state"
       ]
     },
+    "TurnBase": {
+      "type": "object",
+      "description": "Fields shared by {@link Turn} and {@link DeferredTurn}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state"
+      ]
+    },
     "Turn": {
       "type": "object",
       "description": "A completed request/response cycle.",
@@ -3419,12 +3445,53 @@
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
         },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": false,
+          "description": "Absent or `false`: this turn carries its full response."
+        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/ResponsePart"
           },
           "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "state",
+        "responseParts"
+      ]
+    },
+    "DeferredTurn": {
+      "type": "object",
+      "description": "A completed turn whose response the host has not sent yet.\n\nThe turn keeps its position in {@link ChatState.turns}, so clients can show\nthe initiating message and outcome without downloading the response.\nRequest the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};\nthe host replaces the entry in place with a {@link Turn} via\n{@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.\n\nHosts MUST NOT send a `DeferredTurn` to a client that did not declare\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,\naction, or command result. Those clients receive the corresponding\n{@link Turn}.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
         },
         "usage": {
           "$ref": "#/$defs/UsageInfo",
@@ -3433,13 +3500,18 @@
         "state": {
           "$ref": "#/$defs/TurnState",
           "description": "How the turn ended"
+        },
+        "isDeferred": {
+          "type": "boolean",
+          "const": true,
+          "description": "Marks a turn without `responseParts`."
         }
       },
       "required": [
         "id",
         "message",
-        "responseParts",
-        "state"
+        "state",
+        "isDeferred"
       ]
     },
     "ActiveTurn": {
@@ -6354,8 +6426,17 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
+        },
+        "deferredTurns": {
+          "$ref": "#/$defs/DeferredTurnsCapability",
+          "description": "Client understands {@link DeferredTurn} entries in\n{@link ChatState.turns | `ChatState.turns`} and can request their responses with\n{@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.\n\nHosts MAY then defer any completed turn they send this client. Hosts\nMUST NOT send deferred turns to clients that omit this capability.\n\nStability: 1.0 - Early development."
         }
       }
+    },
+    "DeferredTurnsCapability": {
+      "type": "object",
+      "description": "Presence-only client capability for {@link ClientCapabilities.deferredTurns}.\n\nStability: 1.0 - Early development.",
+      "properties": {}
     },
     "HostEnvironment": {
       "type": "object",
@@ -7573,7 +7654,7 @@
     },
     "FetchTurnsParams": {
       "type": "object",
-      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any state-changing operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.",
+      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.\n\nHosts MAY load turns as {@link DeferredTurn | deferred} for clients that\ndeclared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -7858,191 +7939,37 @@
         "channel"
       ]
     },
-    "ChatTurnIndexEntry": {
+    "FetchDeferredTurnsParams": {
       "type": "object",
-      "description": "A prompt in the retained history, identified by its turn rather than its position.",
+      "description": "Requests the full responses of a range of {@link DeferredTurn | deferred\nturns} in a chat state.\n\nThe range runs from `turnId` through `endTurnId`, inclusive, in\n{@link ChatState.turns | `ChatState.turns`} order. The command result does\nnot carry turns. Instead, before responding, the host MUST dispatch\n`chat/turnsMaterialized` to replace every deferred turn in the range in place\nwith its full {@link Turn}. Full turns in the range are left unchanged.\n\nThe host MUST reject the request with `InvalidParams` if `turnId` or\n`endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.\nHosts MAY also reject ranges that exceed an implementation-defined size limit\nwith `InvalidParams`.\n\nRequires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.\n\nStability: 1.0 - Early development.",
       "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "turnId": {
           "type": "string",
-          "description": "Stable identifier of the completed turn in this chat."
+          "description": "ID of the first turn in the range."
         },
-        "preview": {
+        "endTurnId": {
           "type": "string",
-          "description": "First nonempty trimmed prompt line, or empty string. If truncated, the\n80 Unicode scalar values include the trailing ellipsis.",
-          "maxLength": 80
-        },
-        "startedAt": {
-          "type": "string",
-          "description": "The turn's ISO 8601 start time, if known."
-        }
-      },
-      "required": [
-        "turnId",
-        "preview"
-      ]
-    },
-    "ListChatTurnsParams": {
-      "type": "object",
-      "description": "Lists every visible non-system prompt in retained turns, oldest first, across pages.\nRequires `ChatState.historyBrowsing`. Does not load turns into state.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Maximum entries in the page; defaults to 100. The host may return fewer.",
-          "minimum": 1
-        },
-        "cursor": {
-          "type": "string",
-          "description": "Opaque index cursor for this chat; omit to start at the oldest eligible prompt."
-        }
-      },
-      "required": [
-        "channel"
-      ]
-    },
-    "ListChatTurnsResult": {
-      "type": "object",
-      "description": "One chronological page of the prompt index.",
-      "properties": {
-        "nextCursor": {
-          "type": "string",
-          "description": "Continue this index after the last entry; absent at the end of the index."
-        },
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ChatTurnIndexEntry"
-          },
-          "description": "One entry per eligible prompt in transcript order."
-        }
-      },
-      "required": [
-        "items"
-      ]
-    },
-    "ReadChatTurnsPageParams": {
-      "type": "object",
-      "description": "Reads a byte-bounded page of completed turns without changing a subscription.\nSupply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).\nRequires `ChatState.historyBrowsing`.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "fromTurnId": {
-          "type": "string",
-          "description": "Stable ID of the first turn to return. Omit when continuing by cursor."
-        },
-        "cursor": {
-          "type": "string",
-          "description": "Echo either cursor from a previous read page. Omit when opening by ID."
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Maximum number of whole turns on this page; defaults to 10.",
-          "minimum": 1
-        }
-      },
-      "required": [
-        "channel"
-      ]
-    },
-    "ReadChatTurnsFromTurnParams": {
-      "type": "object",
-      "description": "Open a page starting at a retained completed turn, inclusive.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "fromTurnId": {
-          "type": "string"
-        },
-        "cursor": {
-          "not": {}
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Maximum number of whole turns on this page; defaults to 10.",
-          "minimum": 1
+          "description": "ID of the last turn in the range, inclusive. Omit to request only `turnId`."
         }
       },
       "required": [
         "channel",
-        "fromTurnId"
+        "turnId"
       ]
     },
-    "ReadChatTurnsFromCursorParams": {
+    "FetchDeferredTurnsResult": {
       "type": "object",
-      "description": "Continue immediately before or after a returned page. The cursor carries the direction.",
-      "properties": {
-        "channel": {
-          "$ref": "#/$defs/URI",
-          "description": "Chat URI."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "fromTurnId": {
-          "not": {}
-        },
-        "cursor": {
-          "type": "string"
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Maximum number of whole turns on this page; defaults to 10.",
-          "minimum": 1
-        }
-      },
-      "required": [
-        "channel",
-        "cursor"
-      ]
-    },
-    "ReadChatTurnsResult": {
-      "type": "object",
-      "description": "A contiguous page of the transcript, not a chat snapshot or a state update.",
-      "properties": {
-        "nextCursor": {
-          "type": "string",
-          "description": "Read immediately after the last returned turn; absent at the end."
-        },
-        "turns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Turn"
-          },
-          "description": "Consecutive whole turns, oldest first, including on a previous-page read.",
-          "minItems": 1
-        },
-        "previousCursor": {
-          "type": "string",
-          "description": "Read immediately before the first returned turn; absent at the start."
-        }
-      },
-      "required": [
-        "turns"
-      ]
+      "description": "Result of the `fetchDeferredTurns` command.",
+      "properties": {}
     },
     "CreateTerminalParams": {
       "type": "object",
@@ -8739,6 +8666,17 @@
       ],
       "description": "Work running in the background for a chat, such as a shell or a subagent.\nClients that don't recognize a `kind` should keep the entry and may render it\nfrom the common fields."
     },
+    "ChatStateTurn": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Turn"
+        },
+        {
+          "$ref": "#/$defs/DeferredTurn"
+        }
+      ],
+      "description": "A completed turn in {@link ChatState.turns}: either a full {@link Turn} or a\n{@link DeferredTurn}, discriminated by `isDeferred`."
+    },
     "PendingMessageKind": {
       "enum": [
         "steering",
@@ -8797,6 +8735,15 @@
         }
       ]
     },
+    "TurnState": {
+      "enum": [
+        "complete",
+        "cancelled",
+        "error"
+      ],
+      "type": "string",
+      "description": "How a turn ended."
+    },
     "ResponsePart": {
       "oneOf": [
         {
@@ -8821,15 +8768,6 @@
           "$ref": "#/$defs/ErrorResponsePart"
         }
       ]
-    },
-    "TurnState": {
-      "enum": [
-        "complete",
-        "cancelled",
-        "error"
-      ],
-      "type": "string",
-      "description": "How a turn ended."
     },
     "MessageKind": {
       "enum": [
@@ -9425,6 +9363,9 @@
         },
         {
           "$ref": "#/$defs/ChatTurnsLoadedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnsMaterializedAction"
         },
         {
           "$ref": "#/$defs/ChangesetStatusChangedAction"
@@ -10846,7 +10787,7 @@
     },
     "ChatTurnResumeAction": {
       "type": "object",
-      "description": "Resumes the latest errored turn without adding another message.\n\nThe turn MUST be the latest turn, its state MUST be `error`, and its final\nresponse part MUST be a resumable error. The reducer reopens the same turn\nwith its existing message, response parts, and usage intact. The host then\nresumes the provider's execution for that turn.",
+      "description": "Resumes the latest errored turn without adding another message.\n\nThe turn MUST be the latest turn, its state MUST be `error`, and its final\nresponse part MUST be a resumable error. The reducer reopens the same turn\nwith its existing message, response parts, and usage intact. The host then\nresumes the provider's execution for that turn. A deferred turn cannot be\nresumed until it is materialized.",
       "properties": {
         "type": {
           "const": "chat/turnResume"
@@ -11341,7 +11282,7 @@
     },
     "ChatTurnsLoadedAction": {
       "type": "object",
-      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany state-changing operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
+      "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded. Entries may be {@link DeferredTurn | deferred}\nonly for clients that declared\n{@link ClientCapabilities.deferredTurns | `deferredTurns`}.",
       "properties": {
         "type": {
           "const": "chat/turnsLoaded"
@@ -11349,13 +11290,33 @@
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Turn"
+            "$ref": "#/$defs/ChatStateTurn"
           },
           "description": "Older completed turns loaded into the state, ordered oldest-first."
         },
         "turnsNextCursor": {
           "type": "string",
           "description": "Opaque cursor for loading the next older page, if one remains."
+        }
+      },
+      "required": [
+        "type",
+        "turns"
+      ]
+    },
+    "ChatTurnsMaterializedAction": {
+      "type": "object",
+      "description": "Replaces {@link DeferredTurn | deferred turns} in place with their full\n{@link Turn | turns}.\n\nHosts dispatch this before responding to `fetchDeferredTurns`, and before\napplying any operation that needs a deferred turn's response, such as\n`chat/turnResume`. Each entry replaces the deferred turn with the same `id`.\nEntries whose `id` does not name a deferred turn in state are ignored.\n\nStability: 1.0 - Early development.",
+      "properties": {
+        "type": {
+          "const": "chat/turnsMaterialized"
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "description": "Full turns to replace their deferred entries."
         }
       },
       "required": [
@@ -12043,6 +12004,8 @@
           "const": "chat/toolCallConfirmed"
         },
         "approved": {
+          "type": "boolean",
+          "const": true,
           "description": "The tool call was approved"
         },
         "confirmed": {
@@ -12087,6 +12050,8 @@
           "const": "chat/toolCallConfirmed"
         },
         "approved": {
+          "type": "boolean",
+          "const": false,
           "description": "The tool call was denied"
         },
         "reason": {

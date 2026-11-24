@@ -17,8 +17,8 @@ use crate::state::{
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
     BackgroundWork, CanvasReference, CanvasState, ChangesSummary, Changeset, ChangesetFile,
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatStateTurn,
+    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
     ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionConfigSchema,
     SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
@@ -97,6 +97,7 @@ pub enum ActionType {
     SessionMcpServerBackgroundRequested,
     ChatTruncated,
     ChatTurnsLoaded,
+    ChatTurnsMaterialized,
     SessionIsReadChanged,
     SessionIsArchivedChanged,
     SessionActivityChanged,
@@ -259,6 +260,7 @@ impl serde::Serialize for ActionType {
             }
             Self::ChatTruncated => serializer.serialize_str("chat/truncated"),
             Self::ChatTurnsLoaded => serializer.serialize_str("chat/turnsLoaded"),
+            Self::ChatTurnsMaterialized => serializer.serialize_str("chat/turnsMaterialized"),
             Self::SessionIsReadChanged => serializer.serialize_str("session/isReadChanged"),
             Self::SessionIsArchivedChanged => serializer.serialize_str("session/isArchivedChanged"),
             Self::SessionActivityChanged => serializer.serialize_str("session/activityChanged"),
@@ -399,6 +401,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/mcpServerBackgroundRequested" => Self::SessionMcpServerBackgroundRequested,
             "chat/truncated" => Self::ChatTruncated,
             "chat/turnsLoaded" => Self::ChatTurnsLoaded,
+            "chat/turnsMaterialized" => Self::ChatTurnsMaterialized,
             "session/isReadChanged" => Self::SessionIsReadChanged,
             "session/isArchivedChanged" => Self::SessionIsArchivedChanged,
             "session/activityChanged" => Self::SessionActivityChanged,
@@ -1083,7 +1086,8 @@ impl Serialize for ChatErrorAction {
 /// The turn MUST be the latest turn, its state MUST be `error`, and its final
 /// response part MUST be a resumable error. The reducer reopens the same turn
 /// with its existing message, response parts, and usage intact. The host then
-/// resumes the provider's execution for that turn.
+/// resumes the provider's execution for that turn. A deferred turn cannot be
+/// resumed until it is materialized.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnResumeAction {
@@ -1830,18 +1834,36 @@ pub struct ChatTruncatedAction {
 /// Loads older completed turns into this chat's state.
 ///
 /// Hosts dispatch this before responding to `fetchTurns`, and before applying
-/// any state-changing operation that references a turn older than the currently loaded window.
+/// any operation that references a turn older than the currently loaded window.
 /// `turns` is ordered oldest-first and is prepended to the current `turns`
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
-/// retained turns are now loaded.
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatTurnsLoadedAction {
     /// Older completed turns loaded into the state, ordered oldest-first.
-    pub turns: Vec<Turn>,
+    pub turns: Vec<ChatStateTurn>,
     /// Opaque cursor for loading the next older page, if one remains.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turns_next_cursor: Option<String>,
+}
+
+/// Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link Turn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTurnsMaterializedAction {
+    /// Full turns to replace their deferred entries.
+    pub turns: Vec<Turn>,
 }
 
 /// Client changed a mutable config value mid-session.
@@ -2591,6 +2613,8 @@ pub enum StateAction {
     ChatTruncated(ChatTruncatedAction),
     #[serde(rename = "chat/turnsLoaded")]
     ChatTurnsLoaded(ChatTurnsLoadedAction),
+    #[serde(rename = "chat/turnsMaterialized")]
+    ChatTurnsMaterialized(ChatTurnsMaterializedAction),
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged(SessionConfigChangedAction),
     #[serde(rename = "session/metaChanged")]

@@ -589,6 +589,24 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+
+    /// <summary>Client understands {@link DeferredTurn} entries in
+    /// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+    /// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+    ///
+    /// Hosts MAY then defer any completed turn they send this client. Hosts
+    /// MUST NOT send deferred turns to clients that omit this capability.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DeferredTurnsCapability? DeferredTurns { get; init; }
+}
+
+/// <summary>Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record DeferredTurnsCapability
+{
 }
 
 /// <summary>Automation features supported by this host authority.
@@ -1150,6 +1168,47 @@ public sealed record DisposeChatParams
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Requests the full responses of a range of {@link DeferredTurn | deferred
+/// turns} in a chat state.
+///
+/// The range runs from `turnId` through `endTurnId`, inclusive, in
+/// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+/// not carry turns. Instead, before responding, the host MUST dispatch
+/// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+/// with its full {@link Turn}. Full turns in the range are left unchanged.
+///
+/// The host MUST reject the request with `InvalidParams` if `turnId` or
+/// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+/// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+/// with `InvalidParams`.
+///
+/// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record FetchDeferredTurnsParams
+{
+    /// <summary>Chat URI</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>ID of the first turn in the range.</summary>
+    public required string TurnId { get; init; }
+
+    /// <summary>ID of the last turn in the range, inclusive. Omit to request only `turnId`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EndTurnId { get; init; }
+}
+
+/// <summary>Result of the `fetchDeferredTurns` command.</summary>
+public sealed record FetchDeferredTurnsResult
+{
 }
 
 /// <summary>Moves a chat within or into an existing session.</summary>
@@ -1804,9 +1863,12 @@ public sealed record CreateResourceWatchResult
 /// channel's `turns` state, ahead of the already-loaded window, and update or
 /// clear `turnsNextCursor`.
 ///
-/// Before applying any state-changing operation that references a turn outside the currently
+/// Before applying any operation that references a turn outside the currently
 /// loaded window, the host MUST eagerly load enough older turns into state for
-/// that operation to reduce against valid state.</summary>
+/// that operation to reduce against valid state.
+///
+/// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+/// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
 public sealed record FetchTurnsParams
 {
     /// <summary>Chat URI</summary>
@@ -1830,96 +1892,6 @@ public sealed record FetchTurnsParams
 /// <summary>Result of the `fetchTurns` command.</summary>
 public sealed record FetchTurnsResult
 {
-}
-
-/// <summary>A prompt in the retained history, identified by its turn rather than its position.</summary>
-public sealed record ChatTurnIndexEntry
-{
-    /// <summary>Stable identifier of the completed turn in this chat.</summary>
-    public required string TurnId { get; init; }
-
-    /// <summary>First nonempty trimmed prompt line, or empty string. If truncated, the
-    /// 80 Unicode scalar values include the trailing ellipsis.</summary>
-    public required string Preview { get; init; }
-
-    /// <summary>The turn's ISO 8601 start time, if known.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? StartedAt { get; init; }
-}
-
-/// <summary>Lists every visible non-system prompt in retained turns, oldest first, across pages.
-/// Requires `ChatState.historyBrowsing`. Does not load turns into state.</summary>
-public sealed record ListChatTurnsParams
-{
-    /// <summary>Chat URI.</summary>
-    public required string Channel { get; init; }
-
-    /// <summary>Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.</summary>
-    [JsonPropertyName("_meta")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Meta { get; init; }
-
-    /// <summary>Maximum entries in the page; defaults to 100. The host may return fewer.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public long? Limit { get; init; }
-
-    /// <summary>Opaque index cursor for this chat; omit to start at the oldest eligible prompt.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Cursor { get; init; }
-}
-
-/// <summary>One chronological page of the prompt index.</summary>
-public sealed record ListChatTurnsResult
-{
-    /// <summary>Continue this index after the last entry; absent at the end of the index.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? NextCursor { get; init; }
-
-    /// <summary>One entry per eligible prompt in transcript order.</summary>
-    public required List<ChatTurnIndexEntry> Items { get; init; }
-}
-
-/// <summary>Reads a byte-bounded page of completed turns without changing a subscription.
-/// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
-/// Requires `ChatState.historyBrowsing`.</summary>
-public sealed record ReadChatTurnsParams
-{
-    /// <summary>Chat URI.</summary>
-    public required string Channel { get; init; }
-
-    /// <summary>Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.</summary>
-    [JsonPropertyName("_meta")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Meta { get; init; }
-
-    /// <summary>Stable ID of the first turn to return. Omit when continuing by cursor.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? FromTurnId { get; init; }
-
-    /// <summary>Echo either cursor from a previous read page. Omit when opening by ID.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Cursor { get; init; }
-
-    /// <summary>Maximum number of whole turns on this page; defaults to 10.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public long? Limit { get; init; }
-}
-
-/// <summary>A contiguous page of the transcript, not a chat snapshot or a state update.</summary>
-public sealed record ReadChatTurnsResult
-{
-    /// <summary>Read immediately after the last returned turn; absent at the end.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? NextCursor { get; init; }
-
-    /// <summary>Consecutive whole turns, oldest first, including on a previous-page read.</summary>
-    public required List<Turn> Turns { get; init; }
-
-    /// <summary>Read immediately before the first returned turn; absent at the start.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? PreviousCursor { get; init; }
 }
 
 /// <summary>Stop receiving updates for a channel.</summary>

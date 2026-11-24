@@ -157,6 +157,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
 
+    public static readonly ActionType ChatTurnsMaterialized = new ActionType("chat/turnsMaterialized");
+
     public static readonly ActionType SessionIsReadChanged = new ActionType("session/isReadChanged");
 
     public static readonly ActionType SessionIsArchivedChanged = new ActionType("session/isArchivedChanged");
@@ -1760,7 +1762,8 @@ public sealed record ChatErrorAction
 /// The turn MUST be the latest turn, its state MUST be `error`, and its final
 /// response part MUST be a resumable error. The reducer reopens the same turn
 /// with its existing message, response parts, and usage intact. The host then
-/// resumes the provider's execution for that turn.</summary>
+/// resumes the provider's execution for that turn. A deferred turn cannot be
+/// resumed until it is materialized.</summary>
 public sealed record ChatTurnResumeAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnResume;
@@ -1976,20 +1979,39 @@ public sealed record ChatTruncatedAction
 /// <summary>Loads older completed turns into this chat's state.
 ///
 /// Hosts dispatch this before responding to `fetchTurns`, and before applying
-/// any state-changing operation that references a turn older than the currently loaded window.
+/// any operation that references a turn older than the currently loaded window.
 /// `turns` is ordered oldest-first and is prepended to the current `turns`
 /// window. `turnsNextCursor` replaces the state's cursor; omit it when all
-/// retained turns are now loaded.</summary>
+/// retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+/// only for clients that declared
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
 public sealed record ChatTurnsLoadedAction
 {
     public ActionType Type { get; init; } = ActionType.ChatTurnsLoaded;
 
     /// <summary>Older completed turns loaded into the state, ordered oldest-first.</summary>
-    public required List<Turn> Turns { get; init; }
+    public required List<ChatStateTurn> Turns { get; init; }
 
     /// <summary>Opaque cursor for loading the next older page, if one remains.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TurnsNextCursor { get; init; }
+}
+
+/// <summary>Replaces {@link DeferredTurn | deferred turns} in place with their full
+/// {@link Turn | turns}.
+///
+/// Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+/// applying any operation that needs a deferred turn's response, such as
+/// `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+/// Entries whose `id` does not name a deferred turn in state are ignored.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed record ChatTurnsMaterializedAction
+{
+    public ActionType Type { get; init; } = ActionType.ChatTurnsMaterialized;
+
+    /// <summary>Full turns to replace their deferred entries.</summary>
+    public required List<Turn> Turns { get; init; }
 }
 
 /// <summary>A pending message was set (upsert semantics: creates or replaces).
@@ -2936,6 +2958,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/reasoning"] = typeof(ChatReasoningAction),
         ["chat/truncated"] = typeof(ChatTruncatedAction),
         ["chat/turnsLoaded"] = typeof(ChatTurnsLoadedAction),
+        ["chat/turnsMaterialized"] = typeof(ChatTurnsMaterializedAction),
         ["chat/pendingMessageSet"] = typeof(ChatPendingMessageSetAction),
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),

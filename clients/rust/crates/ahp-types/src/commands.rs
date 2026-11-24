@@ -476,7 +476,24 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Client understands {@link DeferredTurn} entries in
+    /// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+    /// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+    ///
+    /// Hosts MAY then defer any completed turn they send this client. Hosts
+    /// MUST NOT send deferred turns to clients that omit this capability.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deferred_turns: Option<DeferredTurnsCapability>,
 }
+
+/// Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeferredTurnsCapability {}
 
 /// Automation features supported by this host authority.
 ///
@@ -1062,6 +1079,44 @@ pub struct DisposeChatParams {
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
 }
+
+/// Requests the full responses of a range of {@link DeferredTurn | deferred
+/// turns} in a chat state.
+///
+/// The range runs from `turnId` through `endTurnId`, inclusive, in
+/// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+/// not carry turns. Instead, before responding, the host MUST dispatch
+/// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+/// with its full {@link Turn}. Full turns in the range are left unchanged.
+///
+/// The host MUST reject the request with `InvalidParams` if `turnId` or
+/// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+/// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+/// with `InvalidParams`.
+///
+/// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchDeferredTurnsParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// ID of the first turn in the range.
+    pub turn_id: String,
+    /// ID of the last turn in the range, inclusive. Omit to request only `turnId`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_turn_id: Option<String>,
+}
+
+/// Result of the `fetchDeferredTurns` command.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchDeferredTurnsResult {}
 
 /// Moves a chat within or into an existing session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1671,9 +1726,12 @@ pub struct CreateResourceWatchResult {
 /// channel's `turns` state, ahead of the already-loaded window, and update or
 /// clear `turnsNextCursor`.
 ///
-/// Before applying any state-changing operation that references a turn outside the currently
+/// Before applying any operation that references a turn outside the currently
 /// loaded window, the host MUST eagerly load enough older turns into state for
 /// that operation to reduce against valid state.
+///
+/// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+/// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchTurnsParams {
@@ -1696,96 +1754,6 @@ pub struct FetchTurnsParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchTurnsResult {}
-
-/// A prompt in the retained history, identified by its turn rather than its position.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatTurnIndexEntry {
-    /// Stable identifier of the completed turn in this chat.
-    pub turn_id: String,
-    /// First nonempty trimmed prompt line, or empty string. If truncated, the
-    /// 80 Unicode scalar values include the trailing ellipsis.
-    pub preview: String,
-    /// The turn's ISO 8601 start time, if known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started_at: Option<String>,
-}
-
-/// Lists every visible non-system prompt in retained turns, oldest first, across pages.
-/// Requires `ChatState.historyBrowsing`. Does not load turns into state.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListChatTurnsParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Maximum number of entries to return in this page. The server SHOULD respect
-    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
-    /// Omit to let the server choose the page size.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
-    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
-    /// as opaque — do not parse, modify, or persist them across connections. An
-    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<String>,
-}
-
-/// One chronological page of the prompt index.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListChatTurnsResult {
-    /// Opaque cursor for the next page. Present when more entries exist beyond the
-    /// returned page; absent signals the end of the collection. Pass it back as
-    /// {@link PaginatedParams.cursor} to fetch the following page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<String>,
-    /// One entry per eligible prompt in transcript order.
-    pub items: Vec<ChatTurnIndexEntry>,
-}
-
-/// Reads a byte-bounded page of completed turns without changing a subscription.
-/// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
-/// Requires `ChatState.historyBrowsing`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReadChatTurnsParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Stable ID of the first turn to return. Omit when continuing by cursor.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub from_turn_id: Option<String>,
-    /// Echo either cursor from a previous read page. Omit when opening by ID.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<String>,
-    /// Maximum number of whole turns on this page; defaults to 10.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-}
-
-/// A contiguous page of the transcript, not a chat snapshot or a state update.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReadChatTurnsResult {
-    /// Opaque cursor for the next page. Present when more entries exist beyond the
-    /// returned page; absent signals the end of the collection. Pass it back as
-    /// {@link PaginatedParams.cursor} to fetch the following page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<String>,
-    /// Consecutive whole turns, oldest first, including on a previous-page read.
-    pub turns: Vec<Turn>,
-    /// Read immediately before the first returned turn; absent at the start.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub previous_cursor: Option<String>,
-}
 
 /// Stop receiving updates for a channel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1967,11 +1967,6 @@ pub struct MultipleChatsCapability {
     pub side_chat: Option<bool>,
 }
 
-/// Presence advertises `listChatTurns` and `readChatTurns` for this chat.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatHistoryBrowsingCapability {}
-
 /// Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -2277,11 +2272,11 @@ pub struct ChatState {
     /// This chat's configuration. See {@link ChatConfigState}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<ChatConfigState>,
-    /// Completed turns
-    pub turns: Vec<Turn>,
-    /// Browse retained history independently of the subscription window. Absent when unsupported.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub history_browsing: Option<ChatHistoryBrowsingCapability>,
+    /// Completed turns, oldest first.
+    ///
+    /// Entries may be {@link DeferredTurn | deferred} only for clients that
+    /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+    pub turns: Vec<ChatStateTurn>,
     /// Cursor for loading older completed turns into this chat state.
     ///
     /// Presence means `turns` is a tail window and more historical turns are
@@ -3105,11 +3100,45 @@ pub struct Turn {
     pub duration: Option<i64>,
     /// The message that initiated the turn
     pub message: Message,
+    /// Token usage info
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<UsageInfo>,
+    /// How the turn ended
+    pub state: TurnState,
     /// All response content in stream order: text, tool calls, reasoning, and content refs.
     ///
     /// Consumers should derive display text by concatenating markdown parts,
     /// and find tool calls by filtering for `ToolCall` parts.
     pub response_parts: Vec<ResponsePart>,
+}
+
+/// A completed turn whose response the host has not sent yet.
+///
+/// The turn keeps its position in {@link ChatState.turns}, so clients can show
+/// the initiating message and outcome without downloading the response.
+/// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+/// the host replaces the entry in place with a {@link Turn} via
+/// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+///
+/// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+/// action, or command result. Those clients receive the corresponding
+/// {@link Turn}.
+///
+/// Stability: 1.0 - Early development.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeferredTurn {
+    /// Turn identifier
+    pub id: String,
+    /// ISO 8601 timestamp when this turn started.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Turn duration in milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
+    /// The message that initiated the turn
+    pub message: Message,
     /// Token usage info
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<UsageInfo>,
@@ -6897,6 +6926,82 @@ pub enum ChatOrigin {
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+/// A completed turn in `ChatState.turns`: either a full [`Turn`] or a
+/// [`DeferredTurn`], discriminated on the wire by `isDeferred`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChatStateTurn {
+    /// A turn carrying its full response (`isDeferred` absent or `false`).
+    Turn(Turn),
+    /// A turn whose response has not been sent yet (`isDeferred: true`).
+    Deferred(DeferredTurn),
+}
+
+impl ChatStateTurn {
+    /// Turn identifier.
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Turn(turn) => &turn.id,
+            Self::Deferred(turn) => &turn.id,
+        }
+    }
+
+    /// Returns `true` for a [`DeferredTurn`].
+    pub fn is_deferred(&self) -> bool {
+        matches!(self, Self::Deferred(_))
+    }
+}
+
+impl From<Turn> for ChatStateTurn {
+    fn from(turn: Turn) -> Self {
+        Self::Turn(turn)
+    }
+}
+
+impl From<DeferredTurn> for ChatStateTurn {
+    fn from(turn: DeferredTurn) -> Self {
+        Self::Deferred(turn)
+    }
+}
+
+impl Serialize for ChatStateTurn {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WireDeferredTurn<'a> {
+            is_deferred: bool,
+            #[serde(flatten)]
+            turn: &'a DeferredTurn,
+        }
+
+        match self {
+            Self::Turn(turn) => turn.serialize(serializer),
+            Self::Deferred(turn) => WireDeferredTurn {
+                is_deferred: true,
+                turn,
+            }
+            .serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatStateTurn {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let turn = if raw.get("isDeferred") == Some(&serde_json::Value::Bool(true)) {
+            serde_json::from_value(raw).map(Self::Deferred)
+        } else {
+            serde_json::from_value(raw).map(Self::Turn)
+        };
+        turn.map_err(serde::de::Error::custom)
+    }
 }
 
 /// A single part of a response stream (text, tool call, reasoning, content reference).

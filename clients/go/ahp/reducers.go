@@ -257,7 +257,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		State:         turnState,
 	}
 
-	state.Turns = append(state.Turns, turn)
+	state.Turns = append(state.Turns, ahptypes.ChatStateTurn{Value: &turn})
 	state.ModifiedAt = addMillisecondsToTimestamp(active.StartedAt, duration)
 	state.Status = summaryStatus(state, terminalStatus)
 	return ReduceOutcomeApplied
@@ -577,8 +577,8 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			return ReduceOutcomeNoOp
 		}
 		turnIndex := len(state.Turns) - 1
-		turn := state.Turns[turnIndex]
-		if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError || !hasResumableError(&turn) {
+		turn, ok := state.Turns[turnIndex].Value.(*ahptypes.Turn)
+		if !ok || turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError || !hasResumableError(turn) {
 			return ReduceOutcomeNoOp
 		}
 
@@ -752,17 +752,19 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatTurnsLoadedAction:
 		existingIds := make(map[string]struct{}, len(state.Turns))
 		for _, turn := range state.Turns {
-			existingIds[turn.Id] = struct{}{}
+			existingIds[turn.TurnId()] = struct{}{}
 		}
-		olderTurns := make([]ahptypes.Turn, 0, len(a.Turns)+len(state.Turns))
+		olderTurns := make([]ahptypes.ChatStateTurn, 0, len(a.Turns)+len(state.Turns))
 		for _, turn := range a.Turns {
-			if _, ok := existingIds[turn.Id]; !ok {
+			if _, ok := existingIds[turn.TurnId()]; !ok {
 				olderTurns = append(olderTurns, turn)
 			}
 		}
 		state.Turns = append(olderTurns, state.Turns...)
 		state.TurnsNextCursor = a.TurnsNextCursor
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatTurnsMaterializedAction:
+		return applyTurnsMaterialized(state, a.Turns)
 	case *ahptypes.ChatInputRequestedAction:
 		return upsertInputRequest(state, a.Request)
 	case *ahptypes.ChatInputAnswerChangedAction:
@@ -1683,12 +1685,12 @@ func findMcpServerCustomization(state *ahptypes.SessionState, id string) *ahptyp
 
 func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {
 	if turnID == nil {
-		state.Turns = []ahptypes.Turn{}
+		state.Turns = []ahptypes.ChatStateTurn{}
 		state.TurnsNextCursor = nil
 	} else {
 		idx := -1
 		for i := range state.Turns {
-			if state.Turns[i].Id == *turnID {
+			if state.Turns[i].TurnId() == *turnID {
 				idx = i
 				break
 			}
@@ -1700,6 +1702,33 @@ func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {
 	}
 	state.ActiveTurn = nil
 	state.Status = summaryStatus(state, nil)
+	return ReduceOutcomeApplied
+}
+
+// applyTurnsMaterialized replaces deferred turns in place with the full
+// turns carrying the same id. Ids that are unknown or already name a full
+// turn are ignored.
+func applyTurnsMaterialized(state *ahptypes.ChatState, turns []ahptypes.Turn) ReduceOutcome {
+	materialized := make(map[string]ahptypes.Turn, len(turns))
+	for _, turn := range turns {
+		materialized[turn.Id] = turn
+	}
+	changed := false
+	for i := range state.Turns {
+		deferred, ok := state.Turns[i].Value.(*ahptypes.DeferredTurn)
+		if !ok {
+			continue
+		}
+		replacement, ok := materialized[deferred.Id]
+		if !ok {
+			continue
+		}
+		state.Turns[i] = ahptypes.ChatStateTurn{Value: &replacement}
+		changed = true
+	}
+	if !changed {
+		return ReduceOutcomeNoOp
+	}
 	return ReduceOutcomeApplied
 }
 

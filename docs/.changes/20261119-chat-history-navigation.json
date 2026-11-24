@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `ChatState.historyBrowsing` advertises `listChatTurns` for the prompt index and `readChatTurns` to open a retained turn by ID and page in either direction by cursor, without loading intervening turns into a subscription."
-}

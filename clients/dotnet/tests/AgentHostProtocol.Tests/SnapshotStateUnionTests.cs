@@ -185,7 +185,7 @@ public sealed class SnapshotStateUnionTests
                 Resource = "ahp-session:/s1#chat",
                 Title = "chat-snapshot",
                 ModifiedAt = "0",
-                Turns = new List<Turn>(),
+                Turns = new List<ChatStateTurn>(),
             },
         };
 

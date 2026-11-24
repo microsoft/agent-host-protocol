@@ -1,0 +1,50 @@
+{
+  "description": "chat/turnResume is a no-op when the latest errored turn is deferred",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "usage": null,
+        "state": "error",
+        "isDeferred": true
+      }
+    ],
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnResume",
+      "turnId": "t1"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "usage": null,
+        "state": "error",
+        "isDeferred": true
+      }
+    ],
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

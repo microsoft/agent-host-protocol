@@ -53,7 +53,7 @@ route any message using only its `method` and `params.channel`.
 | `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | `ahp-root://`. Either peer can send these requests. |
 | `runAutomation`, `fetchAutomationRuns` | `ahp-automations://` |
 | `createSession`, `disposeSession`, `createChat` | The session URI. For `createSession`, this is the URI of the new session. |
-| `fetchTurns`, `listChatTurns`, `readChatTurns`, `completions`, `disposeChat` | The chat URI |
+| `fetchTurns`, `fetchDeferredTurns`, `completions`, `disposeChat` | The chat URI |
 | `moveChat` | The URI of the chat to move |
 | `createTerminal`, `disposeTerminal` | The terminal URI. For `createTerminal`, this is the URI of the new terminal. |
 | `createTcpConnection` | The URI of the new TCP channel |
@@ -197,7 +197,9 @@ absent, the server MUST return all turns that it retains. If older turns are
 available, `ChatState.turnsNextCursor` is present. The client passes that cursor
 to `fetchTurns` to load older turns into the chat state.
 
-When advertised, [read-only history navigation](./chat-channel#read-only-history-navigation) can locate and read distant turns without changing this window or using its cursor.
+Clients that declare `capabilities.deferredTurns` may receive some completed
+turns without their responses; see
+[Deferred turns](./chat-channel#deferred-turns).
 
 ## Unsubscribing {#unsubscribe-notification}
 

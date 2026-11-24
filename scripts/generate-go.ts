@@ -39,7 +39,7 @@ import {
 import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readWindowExemptMethods } from './read-window-exempt.js';
@@ -293,7 +293,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = findWireFields(sf, name);
+    const iface = sf.getInterface(name);
     if (iface) return iface;
   }
   return undefined;
@@ -477,6 +477,8 @@ interface StructOpts {
    * where the literal value differs from the inner struct's own enum.
    */
   includeDiscriminants?: boolean;
+  /** Wire properties to leave out of the struct (handled by custom (un)marshalers). */
+  omitProps?: string[];
 }
 
 function generateGoStruct(goName: string, props: GoProp[], opts: StructOpts = {}): string {
@@ -542,7 +544,8 @@ function generateStructFromInterface(
   const iface = findInterface(project, tsInterfaceName);
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
   const name = goNameOverride ?? stripIPrefix(tsInterfaceName);
-  const props = extractProps(iface, project);
+  const omitted = new Set(opts.omitProps ?? []);
+  const props = extractProps(iface, project).filter((p) => !omitted.has(p.wireName));
   const ifaceDoc = getDocumentation(iface);
   return generateGoStruct(name, props, { doc: ifaceDoc, preserveUnknownMembers: preservesUnknownMembers(iface), ...opts });
 }
@@ -765,7 +768,7 @@ const STATE_ENUMS = [
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
 
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string; omitProps?: string[] }[] = [
   { name: 'TcpConnectionsCapability' },
   { name: 'ChannelReceiveLimits' },
   { name: 'ChannelFlowControl' }, { name: 'ResumedChannelSubscription' },
@@ -776,7 +779,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AgentInfo' },
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
-  { name: 'ChatHistoryBrowsingCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
@@ -805,7 +807,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'ChatConfigState' },
-  { name: 'Turn' },
+  // `isDeferred` is the ChatStateTurn discriminator, handled by
+  // generateChatStateTurn().
+  { name: 'Turn', omitProps: ['isDeferred'] },
+  { name: 'DeferredTurn', omitProps: ['isDeferred'] },
   { name: 'ActiveTurn' },
   { name: 'Message' },
   { name: 'MessageOrigin' },
@@ -1255,6 +1260,81 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnMarshal: true,
 };
 
+/**
+ * `ChatStateTurn = Turn | DeferredTurn` is discriminated by the boolean
+ * `isDeferred`, which the string-discriminant union emitter cannot express:
+ * `true` selects `DeferredTurn`, anything else (absent, `false`) selects `Turn`.
+ * Neither variant struct carries the field; `DeferredTurn` injects it on
+ * encode and `Turn` never emits it.
+ */
+function generateChatStateTurn(): string {
+  return `// MarshalJSON encodes the deferred turn with its \`"isDeferred": true\` marker.
+func (v DeferredTurn) MarshalJSON() ([]byte, error) {
+\ttype wire DeferredTurn
+\treturn json.Marshal(struct {
+\t\twire
+\t\tIsDeferred bool \`json:"isDeferred"\`
+\t}{wire(v), true})
+}
+
+// ChatStateTurn is a completed turn in ChatState.Turns: either a full
+// *Turn or a *DeferredTurn, discriminated by the boolean "isDeferred" field.
+type ChatStateTurn struct {
+\tValue isChatStateTurn
+}
+
+// isChatStateTurn is the marker interface implemented by every
+// concrete variant of ChatStateTurn.
+type isChatStateTurn interface{ isChatStateTurn() }
+
+func (*Turn) isChatStateTurn()         {}
+func (*DeferredTurn) isChatStateTurn() {}
+
+// UnmarshalJSON decodes a *DeferredTurn when "isDeferred" is true and a
+// full *Turn otherwise.
+func (u *ChatStateTurn) UnmarshalJSON(data []byte) error {
+\tvar probe struct {
+\t\tIsDeferred json.RawMessage \`json:"isDeferred"\`
+\t}
+\tif err := json.Unmarshal(data, &probe); err != nil {
+\t\treturn err
+\t}
+\tif string(probe.IsDeferred) == "true" {
+\t\tvar value DeferredTurn
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn err
+\t\t}
+\t\tu.Value = &value
+\t\treturn nil
+\t}
+\tvar value Turn
+\tif err := json.Unmarshal(data, &value); err != nil {
+\t\treturn err
+\t}
+\tu.Value = &value
+\treturn nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ChatStateTurn) MarshalJSON() ([]byte, error) {
+\tif u.Value == nil {
+\t\treturn []byte("null"), nil
+\t}
+\treturn json.Marshal(u.Value)
+}
+
+// TurnId returns the id of the active variant, or "" when Value is nil.
+func (u ChatStateTurn) TurnId() string {
+\tswitch v := u.Value.(type) {
+\tcase *Turn:
+\t\treturn v.Id
+\tcase *DeferredTurn:
+\t\treturn v.Id
+\t}
+\treturn ""
+}`;
+}
+
 function generateChatOriginGo(): string {
   return `// ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
@@ -1550,6 +1630,7 @@ function generateStateFile(project: Project): string {
       lines.push(
         generateStructFromInterface(project, entry.name, entry.goName, {
           omitDiscriminants: entry.omitDiscriminants,
+          omitProps: entry.omitProps,
         }),
       );
       lines.push('');
@@ -1617,6 +1698,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateChatStateTurn());
+  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1681,6 +1764,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', variantName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', variantName: 'ChatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/isReadChanged', variantName: 'SessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
   { type: 'session/isArchivedChanged', variantName: 'SessionIsArchivedChanged', tsInterface: 'SessionIsArchivedChangedAction' },
   { type: 'session/activityChanged', variantName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
@@ -1846,7 +1930,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestina
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'CreateTcpConnectionParams' }, { name: 'CreateTcpConnectionResult' },
   { name: 'InitializeParams' }, { name: 'HostEnvironment' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'ClientCapabilities' }, { name: 'DeferredTurnsCapability' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -1867,6 +1951,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'DisposeSessionParams' },
   { name: 'ForkChatSource' }, { name: 'SideChatSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
   { name: 'ChatMoveToSessionDestination' }, { name: 'ChatMoveToNewSessionDestination' }, { name: 'MoveChatParams' }, { name: 'MoveChatResult' },
+  { name: 'FetchDeferredTurnsParams' }, { name: 'FetchDeferredTurnsResult' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1880,8 +1965,6 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ResourceRequestParams' }, { name: 'ResourceRequestResult' },
   { name: 'CreateResourceWatchParams' }, { name: 'CreateResourceWatchResult' },
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
-  { name: 'ChatTurnIndexEntry' }, { name: 'ListChatTurnsParams' }, { name: 'ListChatTurnsResult' },
-  { name: 'ReadChatTurnsParams' }, { name: 'ReadChatTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'McpServerAuthenticateTarget' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
@@ -2549,6 +2632,8 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',
     'ActionOrigin',
     'ResponsePart',
+    'TurnBase',
+    'ChatStateTurn',
     'ToolResultContent',
     'SessionToolCallApprovedAction',
     'SessionToolCallDeniedAction',

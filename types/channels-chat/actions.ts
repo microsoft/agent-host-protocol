@@ -24,6 +24,7 @@ import type {
   ToolCallRiskAssessment,
   ToolInput,
   Turn,
+  ChatStateTurn,
 } from './state.js';
 import {
   ToolCallConfirmationReason,
@@ -519,7 +520,8 @@ export interface ChatErrorAction {
  * The turn MUST be the latest turn, its state MUST be `error`, and its final
  * response part MUST be a resumable error. The reducer reopens the same turn
  * with its existing message, response parts, and usage intact. The host then
- * resumes the provider's execution for that turn.
+ * resumes the provider's execution for that turn. A deferred turn cannot be
+ * resumed until it is materialized.
  *
  * @category Chat Actions
  * @version 1
@@ -756,10 +758,12 @@ export interface ChatTruncatedAction {
  * Loads older completed turns into this chat's state.
  *
  * Hosts dispatch this before responding to `fetchTurns`, and before applying
- * any state-changing operation that references a turn older than the currently loaded window.
+ * any operation that references a turn older than the currently loaded window.
  * `turns` is ordered oldest-first and is prepended to the current `turns`
  * window. `turnsNextCursor` replaces the state's cursor; omit it when all
- * retained turns are now loaded.
+ * retained turns are now loaded. Entries may be {@link DeferredTurn | deferred}
+ * only for clients that declared
+ * {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
  *
  * @category Chat Actions
  * @version 1
@@ -767,9 +771,28 @@ export interface ChatTruncatedAction {
 export interface ChatTurnsLoadedAction {
   type: ActionType.ChatTurnsLoaded;
   /** Older completed turns loaded into the state, ordered oldest-first. */
-  turns: Turn[];
+  turns: ChatStateTurn[];
   /** Opaque cursor for loading the next older page, if one remains. */
   turnsNextCursor?: string;
+}
+
+/**
+ * Replaces {@link DeferredTurn | deferred turns} in place with their full
+ * {@link Turn | turns}.
+ *
+ * Hosts dispatch this before responding to `fetchDeferredTurns`, and before
+ * applying any operation that needs a deferred turn's response, such as
+ * `chat/turnResume`. Each entry replaces the deferred turn with the same `id`.
+ * Entries whose `id` does not name a deferred turn in state are ignored.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @stability 1.0
+ */
+export interface ChatTurnsMaterializedAction {
+  type: ActionType.ChatTurnsMaterialized;
+  /** Full turns to replace their deferred entries. */
+  turns: Turn[];
 }
 
 // ─── Pending Message Actions ─────────────────────────────────────────────────
@@ -1041,6 +1064,7 @@ export type ChatAction =
   | ChatReasoningAction
   | ChatTruncatedAction
   | ChatTurnsLoadedAction
+  | ChatTurnsMaterializedAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction

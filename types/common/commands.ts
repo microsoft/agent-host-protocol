@@ -233,7 +233,26 @@ export interface ClientCapabilities {
    * App-bearing tool calls as ordinary MCP tool calls.
    */
   mcpApps?: Record<string, never>;
+  /**
+   * Client understands {@link DeferredTurn} entries in
+   * {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+   * {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+   *
+   * Hosts MAY then defer any completed turn they send this client. Hosts
+   * MUST NOT send deferred turns to clients that omit this capability.
+   *
+   * @stability 1.0
+   */
+  deferredTurns?: DeferredTurnsCapability;
 }
+
+/**
+ * Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+ *
+ * @category Commands
+ * @stability 1.0
+ */
+export interface DeferredTurnsCapability {}
 
 /**
  * Native filesystem path grammar used by a host environment.

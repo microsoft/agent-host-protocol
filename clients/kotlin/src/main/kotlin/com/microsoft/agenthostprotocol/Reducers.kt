@@ -507,7 +507,7 @@ private fun endTurn(
     )
 
     val withoutTurn = state.copy(
-        turns = state.turns + turn,
+        turns = state.turns + ChatStateTurn.Full(turn),
         activeTurn = null,
         modifiedAt = addMillisecondsToTimestamp(active.startedAt, turn.duration ?: 0L),
     )
@@ -1017,8 +1017,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             state
         } else {
             val turnIndex = state.turns.lastIndex
-            val turn = state.turns[turnIndex]
-            if (turn.id != a.turnId || turn.state != TurnState.ERROR) {
+            val turn = (state.turns[turnIndex] as? ChatStateTurn.Full)?.value
+            if (turn == null || turn.id != a.turnId || turn.state != TurnState.ERROR) {
                 state
             } else {
                 val errorPart = turn.responseParts.lastOrNull() as? ResponsePartError
@@ -1532,6 +1532,21 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             turns = olderTurns + state.turns,
             turnsNextCursor = a.turnsNextCursor,
         )
+    }
+
+    is StateActionChatTurnsMaterialized -> {
+        val materialized = action.value.turns.associateBy { it.id }
+        var changed = false
+        val turns = state.turns.map { turn ->
+            val replacement = if (turn is ChatStateTurn.Deferred) materialized[turn.id] else null
+            if (replacement == null) {
+                turn
+            } else {
+                changed = true
+                ChatStateTurn.Full(replacement)
+            }
+        }
+        if (changed) state.copy(turns = turns) else state
     }
 
     // ── Session Input Requests ────────────────────────────────────────────

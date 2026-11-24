@@ -33,10 +33,7 @@ import com.microsoft.agenthostprotocol.generated.AuthenticateParams
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.CreateChatParams
-import com.microsoft.agenthostprotocol.generated.ListChatTurnsParams
-import com.microsoft.agenthostprotocol.generated.ListChatTurnsResult
-import com.microsoft.agenthostprotocol.generated.ReadChatTurnsParams
-import com.microsoft.agenthostprotocol.generated.ReadChatTurnsResult
+import com.microsoft.agenthostprotocol.generated.FetchDeferredTurnsParams
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeResult
@@ -272,10 +269,7 @@ class RoundTripCorpusTest {
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
             "CreateChatParams" -> rt(CreateChatParams.serializer())
-            "ListChatTurnsParams" -> rt(ListChatTurnsParams.serializer())
-            "ListChatTurnsResult" -> rt(ListChatTurnsResult.serializer())
-            "ReadChatTurnsParams" -> rt(ReadChatTurnsParams.serializer())
-            "ReadChatTurnsResult" -> rt(ReadChatTurnsResult.serializer())
+            "FetchDeferredTurnsParams" -> rt(FetchDeferredTurnsParams.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
             "Snapshot" -> rt(Snapshot.serializer())
             "SubscribeParams" -> rt(SubscribeParams.serializer())

@@ -1,12 +1,13 @@
 /**
- * Chat lifecycle and read-only history navigation commands.
+ * Chat Channel Commands — `createChat`, `moveChat`, `disposeChat`, and
+ * `fetchDeferredTurns`.
  *
  * @module channels-chat/commands
  */
 
 import type { URI } from '../common/state.js';
-import type { BaseParams, PaginatedParams, PaginatedResult } from '../common/commands.js';
-import type { Message, SideChatSelection, Turn } from './state.js';
+import type { BaseParams } from '../common/commands.js';
+import type { Message, SideChatSelection } from './state.js';
 
 // ─── createChat ──────────────────────────────────────────────────────────────
 
@@ -258,108 +259,51 @@ export interface MoveChatResult {
  */
 export interface DisposeChatParams extends BaseParams {}
 
-// ─── Read-only history navigation ────────────────────────────────────────────
+// ─── fetchDeferredTurns ──────────────────────────────────────────────────────
 
-/** A prompt in the retained history, identified by its turn rather than its position. */
-export interface ChatTurnIndexEntry {
-  /** Stable identifier of the completed turn in this chat. */
+/**
+ * Requests the full responses of a range of {@link DeferredTurn | deferred
+ * turns} in a chat state.
+ *
+ * The range runs from `turnId` through `endTurnId`, inclusive, in
+ * {@link ChatState.turns | `ChatState.turns`} order. The command result does
+ * not carry turns. Instead, before responding, the host MUST dispatch
+ * `chat/turnsMaterialized` to replace every deferred turn in the range in place
+ * with its full {@link Turn}. Full turns in the range are left unchanged.
+ *
+ * The host MUST reject the request with `InvalidParams` if `turnId` or
+ * `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+ * Hosts MAY also reject ranges that exceed an implementation-defined size limit
+ * with `InvalidParams`.
+ *
+ * Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+ *
+ * @category Commands
+ * @method fetchDeferredTurns
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ * @stability 1.0
+ * @example
+ * ```jsonc
+ * // Client → Server (open turn t45 and the turns through t49)
+ * { "jsonrpc": "2.0", "id": 9, "method": "fetchDeferredTurns",
+ *   "params": { "channel": "ahp-chat:/<uuid>", "turnId": "t45", "endTurnId": "t49" } }
+ *
+ * // Server dispatches chat/turnsMaterialized, then responds
+ * { "jsonrpc": "2.0", "id": 9, "result": {} }
+ * ```
+ */
+export interface FetchDeferredTurnsParams extends BaseParams {
+  /** Chat URI */
+  channel: URI;
+  /** ID of the first turn in the range. */
   turnId: string;
-  /**
-   * First nonempty trimmed prompt line, or empty string. If truncated, the
-   * 80 Unicode scalar values include the trailing ellipsis.
-   * @maxLength 80
-   */
-  preview: string;
-  /** The turn's ISO 8601 start time, if known. */
-  startedAt?: string;
+  /** ID of the last turn in the range, inclusive. Omit to request only `turnId`. */
+  endTurnId?: string;
 }
 
 /**
- * Lists every visible non-system prompt in retained turns, oldest first, across pages.
- * Requires `ChatState.historyBrowsing`. Does not load turns into state.
- *
- * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
- * @category Commands
- * @method listChatTurns
- * @direction Client → Server
- * @messageType Request
- * @version 1
+ * Result of the `fetchDeferredTurns` command.
  */
-export interface ListChatTurnsParams extends BaseParams, PaginatedParams {
-  /** Chat URI. */
-  channel: URI;
-  /** Opaque index cursor for this chat; omit to start at the oldest eligible prompt. */
-  cursor?: string;
-  /**
-   * Maximum entries in the page; defaults to 100. The host may return fewer.
-   * @integer
-   * @minimum 1
-   */
-  limit?: number;
-}
-
-/** One chronological page of the prompt index. */
-export interface ListChatTurnsResult extends PaginatedResult {
-  /** One entry per eligible prompt in transcript order. */
-  items: ChatTurnIndexEntry[];
-  /** Continue this index after the last entry; absent at the end of the index. */
-  nextCursor?: string;
-}
-
-/**
- * Reads a byte-bounded page of completed turns without changing a subscription.
- * Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
- * Requires `ChatState.historyBrowsing`.
- *
- * @see {@link /specification/chat-channel#read-only-history-navigation | Read-only history navigation}
- * @category Commands
- * @method readChatTurns
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-interface ReadChatTurnsPageParams extends BaseParams {
-  /** Chat URI. */
-  channel: URI;
-  /** Stable ID of the first turn to return. Omit when continuing by cursor. */
-  fromTurnId?: string;
-  /** Echo either cursor from a previous read page. Omit when opening by ID. */
-  cursor?: string;
-  /**
-   * Maximum number of whole turns on this page; defaults to 10.
-   * @integer
-   * @minimum 1
-   */
-  limit?: number;
-}
-
-/** Open a page starting at a retained completed turn, inclusive. */
-interface ReadChatTurnsFromTurnParams extends ReadChatTurnsPageParams {
-  fromTurnId: string;
-  cursor?: never;
-}
-
-/** Continue immediately before or after a returned page. The cursor carries the direction. */
-interface ReadChatTurnsFromCursorParams extends ReadChatTurnsPageParams {
-  fromTurnId?: never;
-  cursor: string;
-}
-
-/**
- * Select exactly one starting position: a turn ID or a continuation cursor.
- * @wireFields ReadChatTurnsPageParams
- */
-export type ReadChatTurnsParams = ReadChatTurnsFromTurnParams | ReadChatTurnsFromCursorParams;
-
-/** A contiguous page of the transcript, not a chat snapshot or a state update. */
-export interface ReadChatTurnsResult extends PaginatedResult {
-  /**
-   * Consecutive whole turns, oldest first, including on a previous-page read.
-   * @minItems 1
-   */
-  turns: Turn[];
-  /** Read immediately before the first returned turn; absent at the start. */
-  previousCursor?: string;
-  /** Read immediately after the last returned turn; absent at the end. */
-  nextCursor?: string;
-}
+export interface FetchDeferredTurnsResult {}

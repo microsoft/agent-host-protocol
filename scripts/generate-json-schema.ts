@@ -32,7 +32,6 @@ interface JsonSchema {
   required?: string[];
   additionalProperties?: boolean | JsonSchema;
   items?: JsonSchema;
-  minItems?: number;
   contains?: JsonSchema;
   minContains?: number;
   maxContains?: number;
@@ -41,7 +40,6 @@ interface JsonSchema {
   minimum?: number;
   maximum?: number;
   minLength?: number;
-  maxLength?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -232,6 +230,7 @@ function typeTextToSchema(typeText: string, project: Project, _depth = 0): JsonS
   if (cleaned === 'string') return { type: 'string' };
   if (cleaned === 'number') return { type: 'number' };
   if (cleaned === 'boolean') return { type: 'boolean' };
+  if (cleaned === 'true' || cleaned === 'false') return { type: 'boolean', const: cleaned === 'true' };
   if (cleaned === 'null') return { type: 'null' };
   if (cleaned === 'unknown') return {};
   if (cleaned === 'object') return { type: 'object' };
@@ -412,8 +411,7 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const name = prop.getName();
     const typeText = getPropertyType(prop);
     const desc = getPropertyDescription(prop);
-    // An optional never field forbids the key on this branch of an exclusive union.
-    const propSchema: JsonSchema = typeText === 'never' ? { not: {} } : typeTextToSchema(typeText, project);
+    const propSchema = typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
     if (hasPropertyTag(prop, 'integer')) {
       if (propSchema.type !== 'number') {
@@ -434,23 +432,14 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
         propSchema[constraint] = value;
       }
     }
-    for (const constraint of ['minLength', 'maxLength'] as const) {
-      const length = getNumericPropertyTag(prop, constraint);
-      if (length !== undefined) {
-        if (propSchema.type !== 'string' || !Number.isInteger(length) || length < 0) {
-          throw new Error(
-            `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @${constraint} on ${typeText}`,
-          );
-        }
-        propSchema[constraint] = length;
+    const minLength = getNumericPropertyTag(prop, 'minLength');
+    if (minLength !== undefined) {
+      if (propSchema.type !== 'string' || !Number.isInteger(minLength) || minLength < 0) {
+        throw new Error(
+          `${prop.getSourceFile().getFilePath()}: ${name} uses invalid @minLength on ${typeText}`,
+        );
       }
-    }
-    const minItems = getNumericPropertyTag(prop, 'minItems');
-    if (minItems !== undefined) {
-      if (propSchema.type !== 'array' || !Number.isInteger(minItems) || minItems < 0) {
-        throw new Error(`${iface.getName()}.${name} uses invalid @minItems on ${typeText}`);
-      }
-      propSchema.minItems = minItems;
+      propSchema.minLength = minLength;
     }
     const uniqueItemsBy = getUniqueItemsByConstraints(prop);
     if (uniqueItemsBy) {

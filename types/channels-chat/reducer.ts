@@ -424,7 +424,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       }
       const turnIndex = state.turns.length - 1;
       const turn = state.turns[turnIndex];
-      if (!turn || turn.id !== action.turnId || turn.state !== TurnState.Error || !hasResumableError(turn)) {
+      if (!turn || turn.isDeferred || turn.id !== action.turnId || turn.state !== TurnState.Error || !hasResumableError(turn)) {
         return state;
       }
       const turns = state.turns.slice();
@@ -828,6 +828,20 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         turns: [...olderTurns, ...state.turns],
         turnsNextCursor: action.turnsNextCursor,
       };
+    }
+
+    case ActionType.ChatTurnsMaterialized: {
+      const materialized = new Map(action.turns.map(turn => [turn.id, turn]));
+      let changed = false;
+      const turns = state.turns.map(turn => {
+        const replacement = turn.isDeferred ? materialized.get(turn.id) : undefined;
+        if (!replacement) {
+          return turn;
+        }
+        changed = true;
+        return replacement;
+      });
+      return changed ? { ...state, turns } : state;
     }
 
     // ── Session Input Requests ─────────────────────────────────────────────

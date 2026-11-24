@@ -46,39 +46,49 @@ dispatch `chat/turnsLoaded`, which prepends older turns into the same reduced
 chat state and updates or clears `turnsNextCursor`.
 
 Hosts MUST also eagerly load older turns into state before applying any
-state-changing operation that references a turn outside the currently loaded window (for
+operation that references a turn outside the currently loaded window (for
 example, a fork, side-chat source, chat attachment, or truncation targeting an
 older turn).
 
-### Read-only history navigation
+### Deferred turns
 
-When `ChatState.historyBrowsing` is present (for example, `"historyBrowsing": {}`), the host supports both `listChatTurns` and `readChatTurns` on that chat URI. Absence means unsupported. A client discovers support from the snapshot, including after reconnect; it MUST NOT infer support from the protocol version or `turnsNextCursor`.
+A client that declares `capabilities.deferredTurns` in `initialize` can receive
+completed turns without their responses. Such an entry in `ChatState.turns` is a
+[`DeferredTurn`](/reference/chat#deferredturn): it keeps the turn's `id`,
+initiating `message`, `state`, `usage`, and timing, sets `isDeferred: true`, and
+omits `responseParts`. Deferred and full turns may be interleaved. Because a
+deferred turn stays in its position in `turns`, clients can show the full
+prompt list and outcomes without downloading every response, and actions that
+refer to turns by ID keep working.
 
-These are reads of the host's retained, completed transcript, including turns outside the subscription window. “Completed” means a `Turn` with any terminal state, not just `complete`. Drafts, pending messages and `activeTurn` are not history. Apply the same access checks and visibility rules as for reading the chat. Each result is private to the caller. The commands MUST NOT create or expand a subscription, fetch the gap, dispatch `chat/turnsLoaded`, change `turnsNextCursor`, or mark the chat read. The reader's position is client-local, not replayable chat state.
+Hosts MUST NOT send a deferred turn to a client that did not declare the
+capability, whether in a snapshot, an action such as `chat/turnsLoaded`, or a
+command result. Those clients receive full turns, so the feature is
+wire-compatible with existing clients.
 
-#### List the prompt index
+To read deferred turns, the client sends
+[`fetchDeferredTurns`](/reference/chat#fetchdeferredturns) with the first
+`turnId` and an optional inclusive `endTurnId`. Before responding, the host
+dispatches [`chat/turnsMaterialized`](/reference/chat#chatturnsmaterializedaction),
+which replaces each deferred turn in the range with its full turn in place:
 
-`listChatTurns` returns one `{ turnId, preview, startedAt? }` per eligible turn, **oldest first in transcript order**, not timestamp or ID order. A turn is eligible when its initiating message is a prompt shown in the transcript: exclude system notifications and hidden requests. Include a visible attachment-only prompt, even if it has no text. Hosts MUST NOT sample or bucket entries; following all pages yields the complete eligible index, not just prompts in `ChatState.turns`.
+```jsonc
+// Client → Server: open turn t45 and read through t49
+{ "jsonrpc": "2.0", "id": 9, "method": "fetchDeferredTurns",
+  "params": { "channel": "ahp-chat:/<uuid>", "turnId": "t45", "endTurnId": "t49" } }
 
-`preview` is the first nonempty trimmed line of visible request text, or `""` if none exists. When the line exceeds 80 Unicode scalar values, use its first 79 followed by `…`. Do not include attachment bodies, metadata, or response text. Copy `Turn.startedAt` when present; do not synthesize a timestamp.
+// Server → Client: replace the deferred entries in place
+{ "jsonrpc": "2.0", "method": "action", "params": { "channel": "ahp-chat:/<uuid>",
+  "serverSeq": 120, "action": { "type": "chat/turnsMaterialized", "turns": [ /* full t45…t49 */ ] } } }
 
-#### Open a turn and page by cursor
+// Server → Client
+{ "jsonrpc": "2.0", "id": 9, "result": {} }
+```
 
-To open a turn, send `readChatTurns` with the chat `channel` and `fromTurnId`. The first returned turn MUST be that retained completed turn, followed by its immediate successors. Do not fill the page with earlier turns near the end of history. If the ID is unknown, pruned, or still active, return `NotFound` (`-32008`), not a nearby substitute.
-
-Every successful page contains one or more consecutive whole turns, oldest first. Return a `previousCursor` if and only if earlier turns exist, and a `nextCursor` if and only if later turns exist, relative to this page in the same traversal. To scroll, echo either token as `cursor` instead of `fromTurnId`. A previous page ends immediately before the current page; a next page starts immediately after it. Neither repeats the boundary turn, even when the page size changes.
-
-For example, `{ "channel": "ahp-chat:/c1", "fromTurnId": "t45", "limit": 5 }` can return turns 45–49. With the same limit and enough space, sending the page's `previousCursor` returns 40–44 in that order; sending its `nextCursor` returns 50–54. The live subscription at turn 100 is unchanged.
-
-The default `limit` is 10 turns per request. Hosts MUST also bound the serialized response size. Target at most 4 MiB of UTF-8 encoded JSON per result; a smaller budget is permitted. If the required turn (the requested ID on opening, or the immediate neighbor on continuation) alone exceeds this target, the host may return it alone **only** within a finite, transport-safe hard byte limit. If it cannot fit, return `InternalError` (`-32603`) with an explanatory message. Never truncate or skip it to make a smaller page.
-
-#### Continuation and errors
-
-For `listChatTurns`, omit `cursor` for the first page; the default `limit` is 100 entries. Echo `nextCursor` unchanged for the following page. Its absence means the traversal is complete. For both commands `limit` must be a positive integer; hosts may cap it and return fewer.
-
-Cursors are opaque and scoped to the connection, method, and chat. They are not `turnsNextCursor` values. Following cursors in one direction MUST enumerate that side of the first page's ordered history without duplicates or omissions. New completions do not join a traversal already in progress. A retry of the same cursor resumes from the same boundary or fails explicitly. If a change to retained history or cursor expiry prevents a consistent continuation, return `Conflict` (`-32011`); the client discards that traversal. Restart a list without a cursor; restart a read with a retained `fromTurnId`. Discard cursors on reconnect.
-
-Return `InvalidParams` (`-32602`) for malformed, unrecognized or mis-scoped cursors, an invalid limit, or a read with both or neither of `fromTurnId` and `cursor`. An unavailable command, including for a chat that does not advertise `historyBrowsing`, returns `MethodNotFound` (`-32601`); a host that implements the command returns `NotFound` (`-32008`) for an unknown chat. Unsupported is not an empty index. Clients without support can still use their subscribed state and the existing explicit `fetchTurns` backfill operation.
+Hosts MUST likewise materialize a deferred turn before applying an operation
+that needs its response, such as `chat/turnResume`. Deferral is independent of
+the subscription window: `fetchTurns` may load older turns as deferred, and
+`fetchDeferredTurns` only expands turns that are already in state.
 
 ### Reasoning timing
 
@@ -419,8 +429,7 @@ This section lists wire methods that are interpreted in the context of a chat UR
 | Method | Kind | Purpose |
 |---|---|---|
 | `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
-| `listChatTurns` | request | Page the retained prompt index without loading turns into state. |
-| `readChatTurns` | request | Open a retained turn by ID or read the adjacent page by cursor. |
+| `fetchDeferredTurns` | request | Ask the host to replace a range of [deferred turns](#deferred-turns) with their full responses. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 
 `createChat` is dispatched against the owning session URI (`params.channel = "ahp-session:/<sid>"`).

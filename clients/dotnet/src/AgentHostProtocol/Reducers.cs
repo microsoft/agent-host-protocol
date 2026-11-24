@@ -359,7 +359,7 @@ public static class Reducers
             State = turnState,
         };
 
-        state.Turns.Add(turn);
+        state.Turns.Add(new ChatStateTurn(turn));
         state.ModifiedAt = AddMillisecondsToTimestamp(active.StartedAt, turn.Duration ?? 0);
         state.Status = ChatSummaryStatus(state, terminalStatus);
         return ReduceOutcome.Applied;
@@ -995,8 +995,9 @@ public static class Reducers
                     return ReduceOutcome.NoOp;
                 }
 
-                Turn resumableTurn = state.Turns[state.Turns.Count - 1];
-                if (resumableTurn.Id != a.TurnId
+                // A deferred turn has no response to resume until it is materialized.
+                if (state.Turns[state.Turns.Count - 1].Value is not Turn resumableTurn
+                    || resumableTurn.Id != a.TurnId
                     || resumableTurn.State != TurnState.Error
                     || resumableTurn.ResponseParts.Count == 0
                     || resumableTurn.ResponseParts[resumableTurn.ResponseParts.Count - 1].Value is not ErrorResponsePart { Resumable: true })
@@ -1159,6 +1160,8 @@ public static class Reducers
                 return ApplyChatTruncated(state, a.TurnId);
             case ChatTurnsLoadedAction a:
                 return ApplyChatTurnsLoaded(state, a);
+            case ChatTurnsMaterializedAction a:
+                return ApplyChatTurnsMaterialized(state, a);
             case ChatInputRequestedAction a:
                 return UpsertChatInputRequestPart(state, a.Request);
             case ChatInputAnswerChangedAction a:
@@ -1672,14 +1675,14 @@ public static class Reducers
     {
         if (turnId is null)
         {
-            state.Turns = new List<Turn>();
+            state.Turns = new List<ChatStateTurn>();
             // Truncating all turns discards any tail-window cursor: the state
             // now holds every retained turn, so there is nothing older to page.
             state.TurnsNextCursor = null;
         }
         else
         {
-            int idx = state.Turns.FindIndex(t => t.Id == turnId);
+            int idx = state.Turns.FindIndex(t => ChatStateTurnId(t) == turnId);
             if (idx < 0)
             {
                 return ReduceOutcome.NoOp;
@@ -1700,16 +1703,16 @@ public static class Reducers
         // turns; any that duplicate an already-loaded turn id are dropped.
         // `turnsNextCursor` replaces the state's cursor (absent when all
         // retained turns are now loaded).
-        var existingIds = new HashSet<string>();
-        foreach (Turn turn in state.Turns)
+        var existingIds = new HashSet<string?>();
+        foreach (ChatStateTurn turn in state.Turns)
         {
-            existingIds.Add(turn.Id);
+            existingIds.Add(ChatStateTurnId(turn));
         }
 
-        var merged = new List<Turn>(a.Turns.Count + state.Turns.Count);
-        foreach (Turn turn in a.Turns)
+        var merged = new List<ChatStateTurn>(a.Turns.Count + state.Turns.Count);
+        foreach (ChatStateTurn turn in a.Turns)
         {
-            if (!existingIds.Contains(turn.Id))
+            if (!existingIds.Contains(ChatStateTurnId(turn)))
             {
                 merged.Add(turn);
             }
@@ -1720,6 +1723,37 @@ public static class Reducers
         state.TurnsNextCursor = a.TurnsNextCursor;
         return ReduceOutcome.Applied;
     }
+
+    private static ReduceOutcome ApplyChatTurnsMaterialized(ChatState state, ChatTurnsMaterializedAction a)
+    {
+        // Replaces deferred turns in place with their full turns. Action turns
+        // whose id is unknown or already names a full turn are ignored.
+        var materialized = new Dictionary<string, Turn>();
+        foreach (Turn turn in a.Turns)
+        {
+            materialized[turn.Id] = turn;
+        }
+
+        bool changed = false;
+        for (int i = 0; i < state.Turns.Count; i++)
+        {
+            if (state.Turns[i].Value is DeferredTurn deferred
+                && materialized.TryGetValue(deferred.Id, out Turn? replacement))
+            {
+                state.Turns[i] = new ChatStateTurn(replacement);
+                changed = true;
+            }
+        }
+
+        return changed ? ReduceOutcome.Applied : ReduceOutcome.NoOp;
+    }
+
+    private static string? ChatStateTurnId(ChatStateTurn turn) => turn.Value switch
+    {
+        Turn t => t.Id,
+        DeferredTurn d => d.Id,
+        _ => null,
+    };
 
     private static ReduceOutcome ApplyChatInputAnswerChanged(ChatState state, ChatInputAnswerChangedAction a)
     {

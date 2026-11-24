@@ -188,7 +188,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatTurnResume(let a):
         guard state.activeTurn == nil,
-              let turn = state.turns.last,
+              case .turn(let turn) = state.turns.last,
               turn.id == a.turnId,
               turn.state == .error,
               case .error(let errorPart) = turn.responseParts.last,
@@ -594,7 +594,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     // ── Truncation ────────────────────────────────────────────────────────
 
     case .chatTruncated(let a):
-        let turns: [Turn]
+        let turns: [ChatStateTurn]
         if let turnId = a.turnId {
             guard let idx = state.turns.firstIndex(where: { $0.id == turnId }) else {
                 return state
@@ -618,6 +618,21 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         var next = state
         next.turns = olderTurns + state.turns
         next.turnsNextCursor = a.turnsNextCursor
+        return next
+
+    case .chatTurnsMaterialized(let a):
+        let materialized = Dictionary(a.turns.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        var changed = false
+        let turns = state.turns.map { turn -> ChatStateTurn in
+            guard case .deferred(let deferred) = turn, let replacement = materialized[deferred.id] else {
+                return turn
+            }
+            changed = true
+            return .turn(replacement)
+        }
+        guard changed else { return state }
+        var next = state
+        next.turns = turns
         return next
 
     // ── Session Input Requests ─────────────────────────────────────────────
@@ -1226,7 +1241,7 @@ private func endTurn(
     )
 
     var next = state
-    next.turns.append(turn)
+    next.turns.append(.turn(turn))
     next.activeTurn = nil
     next.status = chatSummaryStatus(next, terminalStatus: terminalStatus)
     next.modifiedAt = addMillisecondsToTimestamp(activeTurn.startedAt, turn.duration ?? 0)

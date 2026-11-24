@@ -21,7 +21,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
-import { findProtocolSourceFiles, findWireFields } from './find-protocol-sources.js';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 import { getDocumentation, readStability } from './read-stability.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import {
@@ -243,7 +243,7 @@ function getAllProperties(iface: InterfaceDeclaration, project: Project): Proper
 
 function findInterface(project: Project, name: string): InterfaceDeclaration | undefined {
   for (const sf of project.getSourceFiles()) {
-    const iface = findWireFields(sf, name);
+    const iface = sf.getInterface(name);
     if (iface) return iface;
   }
   return undefined;
@@ -750,14 +750,13 @@ const STATE_STRUCTS = [
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
-  'ChatHistoryBrowsingCapability',
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'BackgroundShellWork', 'BackgroundSubagentWork',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
-  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'Turn', 'ActiveTurn', 'Message',
+  'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'ChatConfigState', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
   'ChatInputTextAnswerValue', 'ChatInputNumberAnswerValue',
@@ -1302,6 +1301,124 @@ public enum ChatOrigin: Codable, Sendable, Equatable {
 }`;
 }
 
+/**
+ * Swift memberwise-init order for `Turn`. `Turn` now inherits most fields from
+ * `TurnBase`, which would otherwise move `responseParts` after `state` and
+ * break existing labelled `Turn(...)` call sites.
+ */
+const TURN_FIELD_ORDER = ['id', 'startedAt', 'duration', 'message', 'responseParts', 'usage', 'state'];
+
+/** `isDeferred` is the `ChatStateTurn` discriminant, not a stored property. */
+function turnVariantProps(project: Project, name: 'Turn' | 'DeferredTurn'): SwiftProp[] {
+  const iface = findInterface(project, name);
+  if (!iface) throw new Error(`Interface ${name} not found`);
+  return extractProps(iface, project).filter(p => p.wireName !== 'isDeferred');
+}
+
+/**
+ * Emit `Turn`, `DeferredTurn`, and the `ChatStateTurn` union. `ChatStateTurn`
+ * is discriminated by the boolean `isDeferred`: `true` selects
+ * `DeferredTurn`; absent, `false`, or any other value selects `Turn`.
+ */
+function generateChatStateTurnSwift(project: Project): string {
+  const turnProps = turnVariantProps(project, 'Turn');
+  const turnNames = turnProps.map(p => p.wireName);
+  if (turnNames.length !== TURN_FIELD_ORDER.length || !TURN_FIELD_ORDER.every(n => turnNames.includes(n))) {
+    throw new Error(`Turn fields changed (${turnNames.join(', ')}); update TURN_FIELD_ORDER in generate-swift.ts`);
+  }
+  turnProps.sort((a, b) => TURN_FIELD_ORDER.indexOf(a.wireName) - TURN_FIELD_ORDER.indexOf(b.wireName));
+  const turn = generateSwiftStruct('Turn', turnProps);
+
+  const deferredIface = findInterface(project, 'DeferredTurn')!;
+  const deferredProps = turnVariantProps(project, 'DeferredTurn');
+  const decodeType = (p: SwiftProp) => p.type.replace(/\?$/, '');
+  const deferred = [
+    ...getDocumentation(deferredIface).split('\n').map(line => emitSwiftDocLine(line)),
+    'public struct DeferredTurn: Codable, Sendable, Equatable {',
+    ...deferredProps.flatMap(p => [
+      ...(p.doc ? p.doc.split('\n').map(line => emitSwiftDocLine(line, '    ')) : []),
+      `    public var ${p.name}: ${p.type}`,
+    ]),
+    '    /// Discriminant: always `true` for a turn without `responseParts`.',
+    '    public var isDeferred: Bool { true }',
+    '',
+    '    private enum CodingKeys: String, CodingKey {',
+    '        case isDeferred',
+    ...deferredProps.map(p => `        case ${p.name}`),
+    '    }',
+    '',
+    '    public init(',
+    deferredProps.map(p => `        ${p.name}: ${p.type}${p.optional ? ' = nil' : ''}`).join(',\n'),
+    '    ) {',
+    ...deferredProps.map(p => `        self.${p.name} = ${p.name}`),
+    '    }',
+    '',
+    '    public init(from decoder: Decoder) throws {',
+    '        let container = try decoder.container(keyedBy: CodingKeys.self)',
+    '        guard try container.decode(Bool.self, forKey: .isDeferred) else {',
+    '            throw DecodingError.dataCorruptedError(forKey: .isDeferred, in: container, debugDescription: "Expected DeferredTurn isDeferred true")',
+    '        }',
+    ...deferredProps.map(p => `        self.${p.name} = try container.${p.optional ? 'decodeIfPresent' : 'decode'}(${decodeType(p)}.self, forKey: .${p.name})`),
+    '    }',
+    '',
+    '    public func encode(to encoder: Encoder) throws {',
+    '        var container = encoder.container(keyedBy: CodingKeys.self)',
+    '        try container.encode(true, forKey: .isDeferred)',
+    ...deferredProps.map(p => `        try container.${p.optional ? 'encodeIfPresent' : 'encode'}(${p.name}, forKey: .${p.name})`),
+    '    }',
+    '}',
+  ].join('\n');
+
+  const union = [
+    '/// A completed turn in `ChatState.turns`: either a full ``Turn`` or a',
+    '/// ``DeferredTurn``, discriminated by `isDeferred`.',
+    'public enum ChatStateTurn: Codable, Sendable, Equatable {',
+    '    /// A full turn (`isDeferred` absent or `false`).',
+    '    case turn(Turn)',
+    '    /// A turn whose response has not been sent yet (`isDeferred: true`).',
+    '    case deferred(DeferredTurn)',
+    '',
+    '    private enum DiscriminantKey: String, CodingKey {',
+    '        case discriminant = "isDeferred"',
+    '    }',
+    '',
+    '    public init(from decoder: Decoder) throws {',
+    '        let container = try decoder.container(keyedBy: DiscriminantKey.self)',
+    '        if (try? container.decodeIfPresent(Bool.self, forKey: .discriminant)) == true {',
+    '            self = .deferred(try DeferredTurn(from: decoder))',
+    '        } else {',
+    '            self = .turn(try Turn(from: decoder))',
+    '        }',
+    '    }',
+    '',
+    '    public func encode(to encoder: Encoder) throws {',
+    '        switch self {',
+    '        case .turn(let value): try value.encode(to: encoder)',
+    '        case .deferred(let value): try value.encode(to: encoder)',
+    '        }',
+    '    }',
+    '',
+    '    /// `true` when this entry is a ``DeferredTurn``.',
+    '    public var isDeferred: Bool {',
+    '        if case .deferred = self { return true }',
+    '        return false',
+    '    }',
+    ...deferredProps.flatMap(p => [
+      '',
+      ...(p.doc ? p.doc.split('\n').map(line => emitSwiftDocLine(line, '    ')) : []),
+      `    public var ${p.name}: ${p.type} {`,
+      '        switch self {',
+      `        case .turn(let value): return value.${p.name}`,
+      `        case .deferred(let value): return value.${p.name}`,
+      '        }',
+      '    }',
+    ]),
+    '}',
+  ].join('\n');
+
+  return [turn, deferred, union].join('\n\n');
+}
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1406,6 +1523,8 @@ function generateStateFile(project: Project): string {
 
   lines.push('// MARK: - Discriminated Unions\n');
   lines.push(generateChatOriginSwift());
+  lines.push('');
+  lines.push(generateChatStateTurnSwift(project));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
   lines.push('');
@@ -1536,6 +1655,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/mcpServerBackgroundRequested', caseName: 'sessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'chat/truncated', caseName: 'chatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', caseName: 'chatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
+  { type: 'chat/turnsMaterialized', caseName: 'chatTurnsMaterialized', tsInterface: 'ChatTurnsMaterializedAction' },
   { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'sessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'changeset/statusChanged', caseName: 'changesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
@@ -1781,6 +1901,7 @@ const COMMAND_STRUCTS = [
   'AutomationChatTargetCapability',
   'AutomationOneTimeCapability',
   'MultipleChatProvidersCapability',
+  'DeferredTurnsCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'ChannelDeliveryResumeParams', 'ChannelDeliveryResumeOptions',
@@ -1788,6 +1909,7 @@ const COMMAND_STRUCTS = [
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
+  'FetchDeferredTurnsParams', 'FetchDeferredTurnsResult',
   'ChatMoveToSessionDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
   'ResourceReadParams', 'ResourceReadResult',
@@ -1801,8 +1923,6 @@ const COMMAND_STRUCTS = [
   'ResourceRequestParams', 'ResourceRequestResult',
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
-  'ChatTurnIndexEntry', 'ListChatTurnsParams', 'ListChatTurnsResult',
-  'ReadChatTurnsParams', 'ReadChatTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'McpServerAuthenticateTarget',
   'AuthenticateParams', 'AuthenticateResult',
@@ -2382,12 +2502,8 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "fetchTurns", params: params)
     }
 
-    public static func listChatTurns(id: Int, params: ListChatTurnsParams) -> JsonRpcRequest<ListChatTurnsParams> {
-        JsonRpcRequest(id: id, method: "listChatTurns", params: params)
-    }
-
-    public static func readChatTurns(id: Int, params: ReadChatTurnsParams) -> JsonRpcRequest<ReadChatTurnsParams> {
-        JsonRpcRequest(id: id, method: "readChatTurns", params: params)
+    public static func fetchDeferredTurns(id: Int, params: FetchDeferredTurnsParams) -> JsonRpcRequest<FetchDeferredTurnsParams> {
+        JsonRpcRequest(id: id, method: "fetchDeferredTurns", params: params)
     }
 
     public static func authenticate(id: Int, params: AuthenticateParams) -> JsonRpcRequest<AuthenticateParams> {
@@ -2614,6 +2730,10 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
+    'TurnBase',                     // base interface, flattened into Turn / DeferredTurn via `extends`
+    'Turn',                         // generateChatStateTurnSwift()
+    'DeferredTurn',                 // generateChatStateTurnSwift()
+    'ChatStateTurn',                // generateChatStateTurnSwift() boolean-discriminated union
     'ToolResultContent',            // TOOL_RESULT_CONTENT_UNION discriminated union
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction

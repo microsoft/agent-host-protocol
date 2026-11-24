@@ -1,8 +1,0 @@
-{
-  "name": "read-chat-turns-by-cursor",
-  "group": "A",
-  "description": "Scroll by passing the previous page's token without a turn ID or direction.",
-  "type": "ReadChatTurnsParams",
-  "input": { "channel": "ahp-chat:/c1", "cursor": "older", "limit": 5 },
-  "acceptableOutputs": [{ "channel": "ahp-chat:/c1", "cursor": "older", "limit": 5 }]
-}

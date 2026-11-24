@@ -2173,11 +2173,6 @@ public sealed record MultipleChatsCapability
     public bool? SideChat { get; init; }
 }
 
-/// <summary>Presence advertises `listChatTurns` and `readChatTurns` for this chat.</summary>
-public sealed record ChatHistoryBrowsingCapability
-{
-}
-
 /// <summary>Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.</summary>
 public sealed record MultipleWorkingDirectoriesCapability
 {
@@ -2645,12 +2640,11 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatConfigState? Config { get; set; }
 
-    /// <summary>Completed turns</summary>
-    public required List<Turn> Turns { get; set; }
-
-    /// <summary>Browse retained history independently of the subscription window. Absent when unsupported.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ChatHistoryBrowsingCapability? HistoryBrowsing { get; set; }
+    /// <summary>Completed turns, oldest first.
+    ///
+    /// Entries may be {@link DeferredTurn | deferred} only for clients that
+    /// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.</summary>
+    public required List<ChatStateTurn> Turns { get; set; }
 
     /// <summary>Cursor for loading older completed turns into this chat state.
     ///
@@ -3664,11 +3658,49 @@ public sealed class Turn
     /// <summary>The message that initiated the turn</summary>
     public required Message Message { get; set; }
 
+    /// <summary>Token usage info</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UsageInfo? Usage { get; set; }
+
+    /// <summary>How the turn ended</summary>
+    public TurnState State { get; set; }
+
     /// <summary>All response content in stream order: text, tool calls, reasoning, and content refs.
     ///
     /// Consumers should derive display text by concatenating markdown parts,
     /// and find tool calls by filtering for `ToolCall` parts.</summary>
     public required List<ResponsePart> ResponseParts { get; set; }
+}
+
+/// <summary>A completed turn whose response the host has not sent yet.
+///
+/// The turn keeps its position in {@link ChatState.turns}, so clients can show
+/// the initiating message and outcome without downloading the response.
+/// Request the response with {@link FetchDeferredTurnsParams | `fetchDeferredTurns`};
+/// the host replaces the entry in place with a {@link Turn} via
+/// {@link ChatTurnsMaterializedAction | `chat/turnsMaterialized`}.
+///
+/// Hosts MUST NOT send a `DeferredTurn` to a client that did not declare
+/// {@link ClientCapabilities.deferredTurns | `deferredTurns`}, in a snapshot,
+/// action, or command result. Those clients receive the corresponding
+/// {@link Turn}.
+///
+/// Stability: 1.0 - Early development.</summary>
+public sealed class DeferredTurn
+{
+    /// <summary>Turn identifier</summary>
+    public required string Id { get; set; }
+
+    /// <summary>ISO 8601 timestamp when this turn started.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
+    /// <summary>Turn duration in milliseconds.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; set; }
+
+    /// <summary>The message that initiated the turn</summary>
+    public required Message Message { get; set; }
 
     /// <summary>Token usage info</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3676,6 +3708,9 @@ public sealed class Turn
 
     /// <summary>How the turn ended</summary>
     public TurnState State { get; set; }
+
+    /// <summary>Marks a turn without `responseParts`.</summary>
+    public bool IsDeferred { get; set; } = true;
 }
 
 /// <summary>An in-progress turn — the assistant is actively streaming.</summary>
@@ -8423,6 +8458,60 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
             },
             allowUnknown: true)
     {
+    }
+}
+
+/// <summary>
+/// ChatStateTurn is a completed turn in ChatState.Turns: either a full
+/// <see cref="Turn"/> or a <see cref="DeferredTurn"/>, discriminated by
+/// <c>isDeferred</c>.
+/// </summary>
+[JsonConverter(typeof(ChatStateTurnConverter))]
+public sealed class ChatStateTurn : AhpUnion
+{
+    /// <summary>Creates an empty ChatStateTurn (no active variant).</summary>
+    public ChatStateTurn() { }
+
+    /// <summary>Creates a ChatStateTurn wrapping a <see cref="Turn"/> or <see cref="DeferredTurn"/>.</summary>
+    public ChatStateTurn(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the ChatStateTurn union.</summary>
+internal sealed class ChatStateTurnConverter : JsonConverter<ChatStateTurn>
+{
+    public override ChatStateTurn? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        using JsonDocument doc = JsonDocument.ParseValue(ref reader);
+        JsonElement root = doc.RootElement;
+        bool isDeferred = root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty("isDeferred", out JsonElement flag)
+            && flag.ValueKind == JsonValueKind.True;
+        return isDeferred
+            ? new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<DeferredTurn>(options)))
+            : new ChatStateTurn(JsonSerializer.Deserialize(root, AhpJsonTypeInfo.Get<Turn>(options)));
+    }
+
+    public override void Write(Utf8JsonWriter writer, ChatStateTurn value, JsonSerializerOptions options)
+    {
+        switch (value.Value)
+        {
+            case Turn turn:
+                JsonSerializer.Serialize(writer, turn, AhpJsonTypeInfo.Get<Turn>(options));
+                return;
+            case DeferredTurn deferred:
+                JsonSerializer.Serialize(writer, deferred, AhpJsonTypeInfo.Get<DeferredTurn>(options));
+                return;
+            case null:
+                writer.WriteNullValue();
+                return;
+            default:
+                throw new JsonException("ChatStateTurn cannot hold a " + value.Value.GetType().Name + ".");
+        }
     }
 }
 

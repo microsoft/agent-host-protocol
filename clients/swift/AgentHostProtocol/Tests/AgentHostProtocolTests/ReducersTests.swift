@@ -75,7 +75,7 @@ final class ReducersTests: XCTestCase {
             title: "T",
             status: .idle,
             modifiedAt: "1970-01-01T00:00:01.000Z",
-            turns: [turn1, turn2, turn3]
+            turns: [.turn(turn1), .turn(turn2), .turn(turn3)]
         )
         let original = state.turns
         _ = chatReducer(

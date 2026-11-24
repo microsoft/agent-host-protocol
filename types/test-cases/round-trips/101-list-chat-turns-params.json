@@ -1,8 +1,0 @@
-{
-  "name": "list-chat-turns-params",
-  "group": "A",
-  "description": "Continue a prompt index using its own opaque cursor, not the subscription cursor.",
-  "type": "ListChatTurnsParams",
-  "input": { "channel": "ahp-chat:/c1", "cursor": "index-page-two", "limit": 2 },
-  "acceptableOutputs": [{ "channel": "ahp-chat:/c1", "cursor": "index-page-two", "limit": 2 }]
-}

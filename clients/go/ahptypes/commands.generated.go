@@ -295,6 +295,21 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client understands {@link DeferredTurn} entries in
+	// {@link ChatState.turns | `ChatState.turns`} and can request their responses with
+	// {@link FetchDeferredTurnsParams | `fetchDeferredTurns`}.
+	//
+	// Hosts MAY then defer any completed turn they send this client. Hosts
+	// MUST NOT send deferred turns to clients that omit this capability.
+	//
+	// Stability: 1.0 - Early development.
+	DeferredTurns *DeferredTurnsCapability `json:"deferredTurns,omitempty"`
+}
+
+// Presence-only client capability for {@link ClientCapabilities.deferredTurns}.
+//
+// Stability: 1.0 - Early development.
+type DeferredTurnsCapability struct {
 }
 
 // Automation features supported by this host authority.
@@ -840,6 +855,39 @@ type MoveChatResult struct {
 	Session URI `json:"session"`
 }
 
+// Requests the full responses of a range of {@link DeferredTurn | deferred
+// turns} in a chat state.
+//
+// The range runs from `turnId` through `endTurnId`, inclusive, in
+// {@link ChatState.turns | `ChatState.turns`} order. The command result does
+// not carry turns. Instead, before responding, the host MUST dispatch
+// `chat/turnsMaterialized` to replace every deferred turn in the range in place
+// with its full {@link Turn}. Full turns in the range are left unchanged.
+//
+// The host MUST reject the request with `InvalidParams` if `turnId` or
+// `endTurnId` is not in the chat state, or if `endTurnId` precedes `turnId`.
+// Hosts MAY also reject ranges that exceed an implementation-defined size limit
+// with `InvalidParams`.
+//
+// Requires {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
+//
+// Stability: 1.0 - Early development.
+type FetchDeferredTurnsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// ID of the first turn in the range.
+	TurnId string `json:"turnId"`
+	// ID of the last turn in the range, inclusive. Omit to request only `turnId`.
+	EndTurnId *string `json:"endTurnId,omitempty"`
+}
+
+// Result of the `fetchDeferredTurns` command.
+type FetchDeferredTurnsResult struct {
+}
+
 // Returns a list of session summaries. Used to populate session lists and sidebars.
 //
 // The session list is **not** part of the state tree because it can be arbitrarily
@@ -1287,9 +1335,12 @@ type CreateResourceWatchResult struct {
 // channel's `turns` state, ahead of the already-loaded window, and update or
 // clear `turnsNextCursor`.
 //
-// Before applying any state-changing operation that references a turn outside the currently
+// Before applying any operation that references a turn outside the currently
 // loaded window, the host MUST eagerly load enough older turns into state for
 // that operation to reduce against valid state.
+//
+// Hosts MAY load turns as {@link DeferredTurn | deferred} for clients that
+// declared {@link ClientCapabilities.deferredTurns | `deferredTurns`}.
 type FetchTurnsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1306,75 +1357,6 @@ type FetchTurnsParams struct {
 
 // Result of the `fetchTurns` command.
 type FetchTurnsResult struct {
-}
-
-// A prompt in the retained history, identified by its turn rather than its position.
-type ChatTurnIndexEntry struct {
-	// Stable identifier of the completed turn in this chat.
-	TurnId string `json:"turnId"`
-	// First nonempty trimmed prompt line, or empty string. If truncated, the
-	// 80 Unicode scalar values include the trailing ellipsis.
-	Preview string `json:"preview"`
-	// The turn's ISO 8601 start time, if known.
-	StartedAt *string `json:"startedAt,omitempty"`
-}
-
-// Lists every visible non-system prompt in retained turns, oldest first, across pages.
-// Requires `ChatState.historyBrowsing`. Does not load turns into state.
-type ListChatTurnsParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
-	// Optional JSON-serializable metadata associated with this request.
-	// Receivers MUST ignore keys they do not understand.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Maximum number of entries to return in this page. The server SHOULD respect
-	// this bound but MAY return fewer entries and MAY impose its own upper cap.
-	// Omit to let the server choose the page size.
-	Limit *int64 `json:"limit,omitempty"`
-	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
-	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
-	// as opaque — do not parse, modify, or persist them across connections. An
-	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
-	Cursor *string `json:"cursor,omitempty"`
-}
-
-// One chronological page of the prompt index.
-type ListChatTurnsResult struct {
-	// Opaque cursor for the next page. Present when more entries exist beyond the
-	// returned page; absent signals the end of the collection. Pass it back as
-	// {@link PaginatedParams.cursor} to fetch the following page.
-	NextCursor *string `json:"nextCursor,omitempty"`
-	// One entry per eligible prompt in transcript order.
-	Items []ChatTurnIndexEntry `json:"items"`
-}
-
-// Reads a byte-bounded page of completed turns without changing a subscription.
-// Supply exactly one of `fromTurnId` (open at that turn) or `cursor` (scroll).
-// Requires `ChatState.historyBrowsing`.
-type ReadChatTurnsParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
-	// Optional JSON-serializable metadata associated with this request.
-	// Receivers MUST ignore keys they do not understand.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Stable ID of the first turn to return. Omit when continuing by cursor.
-	FromTurnId *string `json:"fromTurnId,omitempty"`
-	// Echo either cursor from a previous read page. Omit when opening by ID.
-	Cursor *string `json:"cursor,omitempty"`
-	// Maximum number of whole turns on this page; defaults to 10.
-	Limit *int64 `json:"limit,omitempty"`
-}
-
-// A contiguous page of the transcript, not a chat snapshot or a state update.
-type ReadChatTurnsResult struct {
-	// Opaque cursor for the next page. Present when more entries exist beyond the
-	// returned page; absent signals the end of the collection. Pass it back as
-	// {@link PaginatedParams.cursor} to fetch the following page.
-	NextCursor *string `json:"nextCursor,omitempty"`
-	// Consecutive whole turns, oldest first, including on a previous-page read.
-	Turns []Turn `json:"turns"`
-	// Read immediately before the first returned turn; absent at the start.
-	PreviousCursor *string `json:"previousCursor,omitempty"`
 }
 
 // Stop receiving updates for a channel.
