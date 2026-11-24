@@ -3486,7 +3486,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Model identifier, unique within the agent's {@link AgentInfo.models}.\nWhen several model sources serve the same upstream model, the host gives\neach entry its own ID. An ID the host publishes for a registered model\nsource stays bound to that registration and upstream model."
+          "description": "Model identifier, unique within the agent's {@link AgentInfo.models}.\nWhen several model sources serve the same upstream model, the host gives\neach entry its own ID. A host SHOULD keep a model's ID across catalog\nupdates and MUST NOT reuse an ID for a different source or upstream model."
         },
         "provider": {
           "type": "string",
