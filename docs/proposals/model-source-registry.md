@@ -389,7 +389,7 @@ When a registration is `ready`, the host adds it to the catalog of the agent nam
 - a `ModelSourceInfo` in `AgentInfo.modelSources`, with the registration's `id` and its `name` as `displayName`;
 - its models in `AgentInfo.models`, each with `modelSourceId` set to the registration's `id`.
 
-The host lists a registration's models only while it's `ready`. It MAY list the `ModelSourceInfo` in other states, since #543 allows a source with no models.
+The host adds a registration's models when it first becomes `ready`, and keeps them listed through later `starting` and `authRequired` states, so a key rotation or expiry doesn't change the catalog or break a selection. It withdraws them when the registration is removed, when its contributing client leaves under `contributingClient` retention, when it enters `error`, or when a change to `provider`, `format`, or `definition` mints new model IDs (see Reserved model IDs below). A turn that uses a listed model while the source has no usable credential fails like a mid-turn credential failure ([§6](#rotation-expiry-and-revocation)). The host MAY list the `ModelSourceInfo` in any state, since #543 allows a source with no models.
 
 Each model follows #543's catalog rules:
 
@@ -545,10 +545,10 @@ A selection that names a removed source's model fails. The host MUST NOT run the
 
 ### Rotation, expiry, and revocation
 
-- **Rotation.** A new `authenticate` with the current nonce replaces the credential, and the host issues a new nonce. The host MAY pass through `starting` while the agent re-lists models, keeping model IDs stable.
+- **Rotation.** A new `authenticate` with the current nonce replaces the credential, and the host issues a new nonce. The host MAY pass through `starting` while the agent re-lists models, keeping the models listed and their IDs stable.
 - **Expiry and rejection.** When a credential expires or the endpoint rejects it, the source goes to `authRequired` with `reason: expired` and a new nonce. A client MUST NOT replay the same secret: it renews the token or asks the user for a new key. Clients holding short-lived tokens SHOULD deliver a fresh one before `expiresIn` elapses.
 - **Revocation.** An empty `token` drops the credential, and the source returns to `authRequired` with `reason: expired` and a new nonce. Under the expiry rule, no client sends the revoked secret again, including other devices that have it stored, and the new nonce rejects a delivery that was already in flight.
-- **Mid-turn.** If the credential fails during a turn that uses the source, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`). Once the source is ready again, a client can continue the same turn with `chat/turnResume`, and the host checks the turn's selection again first. The host never switches models. It doesn't hold the turn open: `SessionStatus.InputNeeded` comes from `inputNeeded` entries and blocked tool calls, and none of them covers a model source, so a held turn would look like it's still running.
+- **Mid-turn.** If the credential fails during a turn that uses the source, or a turn starts while the source has no usable credential, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`). Once the source is ready again, a client can continue the same turn with `chat/turnResume`, and the host checks the turn's selection again first. The host never switches models. It doesn't hold the turn open: `SessionStatus.InputNeeded` comes from `inputNeeded` entries and blocked tool calls, and none of them covers a model source, so a held turn would look like it's still running.
 
 ### Host restart
 
@@ -588,7 +588,6 @@ Hosts apply policy appropriate to the source, for example by declining registrat
 - **Keys that survive a restart.** `host` retention keeps a key only in memory. Keeping it across restarts needs the host to store it, which #404 doesn't cover yet: its flows are OAuth only, and its account consumers are agents and MCP servers. An API key also has no authority-qualified account for [#459](https://github.com/microsoft/agent-host-protocol/pull/459)'s revocation.
 - **Several users on one host.** AHP can't verify which client is which, so this proposal, like MCP, trusts every connected client equally, and every client sees every definition. A host shared by several users would need verified client identities, per-client access control, and a way to hide registrations from clients that may not use them. That last part would be a new pattern for root state.
 - **Duplicates.** Two devices that sync the same configuration can register under the same `id` and share one registration. Devices that don't sync get two registrations for the same service. Should a host merge them?
-- **Catalog across a re-auth.** Models are listed only while a source is `ready`, so a credential refresh briefly removes them. Should the host keep listing them during `authRequired`?
 - **Re-registering unchanged sources.** A client-dispatched `Set` clears the reported status until the host reports again, so clients compare before they register again. Would a revision field be clearer?
 
 ---
