@@ -1894,6 +1894,8 @@ pub struct Icon {
 pub struct ProtectedResourceMetadata {
     /// REQUIRED. The protected resource's resource identifier, a URL using the
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
+    /// A registered model source's endpoint may use any scheme the agent
+    /// supports, because nothing fetches it.
     pub resource: String,
     /// OPTIONAL. Human-readable name of the protected resource.
     #[serde(
@@ -2200,6 +2202,13 @@ pub struct ModelSourceRegistration {
     /// Host-reported status. Absent means the host hasn't reported one yet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<ModelSourceState>,
+    /// Host-issued token that a client echoes in
+    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+    /// the credential. The host changes it whenever it drops the credential
+    /// because the registration changed, and never reuses one for the same
+    /// `id`. Absent until the host reports a `state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_nonce: Option<String>,
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -2251,7 +2260,8 @@ pub struct ModelSourceAuthRequirement {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     pub resource: ProtectedResourceMetadata,
-    /// Human-readable hint, for example the endpoint's error description.
+    /// Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Unrecognized wire members retained for full-object edits.
@@ -2277,7 +2287,8 @@ pub struct ModelSourceAuthRequiredState {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     pub resource: ProtectedResourceMetadata,
-    /// Human-readable hint, for example the endpoint's error description.
+    /// Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Unrecognized wire members retained for full-object edits.
@@ -2291,7 +2302,7 @@ pub struct ModelSourceAuthRequiredState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelSourceErrorState {
-    /// Error details. MUST NOT contain the credential.
+    /// Error details the host writes. MUST NOT contain the credential.
     pub error: ErrorInfo,
     /// Unrecognized wire members retained for full-object edits.
     #[serde(flatten, deserialize_with = "deserialize_extra_without_kind")]

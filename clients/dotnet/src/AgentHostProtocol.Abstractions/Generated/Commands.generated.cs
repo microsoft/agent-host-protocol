@@ -1894,6 +1894,11 @@ public sealed record ModelSourceAuthenticateTarget
 
     /// <summary>The registration's `ModelSourceRegistration.id`.</summary>
     public required string ModelSourceId { get; init; }
+
+    /// <summary>The registration's current `ModelSourceRegistration.credentialNonce`, as
+    /// published in root state. The host rejects a stale one with `Conflict`
+    /// (-32011).</summary>
+    public required string CredentialNonce { get; init; }
 }
 
 /// <summary>Pushes a credential for a protected resource. The `resource` field MUST
@@ -1904,7 +1909,9 @@ public sealed record ModelSourceAuthenticateTarget
 /// `ModelSourceAuthRequiredState.resource` (each surfaced only once the
 /// corresponding MCP server, tool call, or model source actually challenges
 /// for auth). Servers MUST accept any `resource` value they have themselves
-/// advertised through one of these mechanisms.
+/// advertised through one of these mechanisms, subject to the `target`
+/// rules. A `modelSource` target takes only the resource the host most
+/// recently advertised for that registration.
 ///
 /// Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
 /// (Bearer Token Usage) semantics. The client obtains the token from the
@@ -1972,7 +1979,8 @@ public sealed record AuthenticateParams
     /// with `InvalidParams` (-32602).
     ///
     /// A registered model source takes its credential only through a
-    /// `modelSource` target. See
+    /// `modelSource` target, and the host rejects an untargeted `resource` that
+    /// matches only model source challenges with `InvalidParams` (-32602). See
     /// [Model source credentials](/specification/authentication#model-source-credentials)
     /// for its rules.
     ///

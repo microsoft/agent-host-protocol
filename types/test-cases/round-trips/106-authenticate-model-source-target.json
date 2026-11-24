@@ -1,7 +1,7 @@
 {
   "name": "authenticate-model-source-target",
   "group": "A",
-  "description": "authenticate delivers an opaque secret for one registered model source through a modelSource target. An API key carries no expiresIn or scopes.",
+  "description": "authenticate delivers an opaque secret for one registered model source through a modelSource target that echoes the registration's credentialNonce. An API key carries no expiresIn or scopes.",
   "type": "AuthenticateParams",
   "input": {
     "channel": "ahp-root://",
@@ -9,7 +9,8 @@
     "token": "test-api-key",
     "target": {
       "kind": "modelSource",
-      "modelSourceId": "source-new"
+      "modelSourceId": "source-new",
+      "credentialNonce": "nonce-openrouter-1"
     }
   },
   "acceptableOutputs": [
@@ -19,7 +20,8 @@
       "token": "test-api-key",
       "target": {
         "kind": "modelSource",
-        "modelSourceId": "source-new"
+        "modelSourceId": "source-new",
+        "credentialNonce": "nonce-openrouter-1"
       }
     }
   ]

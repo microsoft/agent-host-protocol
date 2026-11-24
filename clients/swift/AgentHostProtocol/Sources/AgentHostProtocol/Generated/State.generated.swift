@@ -1476,6 +1476,8 @@ public struct Icon: Codable, Sendable, Equatable {
 public struct ProtectedResourceMetadata: Codable, Sendable, Equatable {
     /// REQUIRED. The protected resource's resource identifier, a URL using the
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
+    /// A registered model source's endpoint may use any scheme the agent
+    /// supports, because nothing fetches it.
     public var resource: String
     /// OPTIONAL. Human-readable name of the protected resource.
     public var resourceName: String?
@@ -1866,6 +1868,12 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     public var retention: ModelSourceRetentionPolicy?
     /// Host-reported status. Absent means the host hasn't reported one yet.
     public var state: ModelSourceState?
+    /// Host-issued token that a client echoes in
+    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+    /// the credential. The host changes it whenever it drops the credential
+    /// because the registration changed, and never reuses one for the same
+    /// `id`. Absent until the host reports a `state`.
+    public var credentialNonce: String?
     /// Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
@@ -1883,6 +1891,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         case sharing
         case retention
         case state
+        case credentialNonce
         case meta = "_meta"
     }
 
@@ -1897,6 +1906,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         sharing: ModelSourceSharingPolicy? = nil,
         retention: ModelSourceRetentionPolicy? = nil,
         state: ModelSourceState? = nil,
+        credentialNonce: String? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
@@ -1910,6 +1920,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.sharing = sharing
         self.retention = retention
         self.state = state
+        self.credentialNonce = credentialNonce
         self.meta = meta
         self.extra = extra
     }
@@ -1926,6 +1937,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         self.sharing = try container.decodeIfPresent(ModelSourceSharingPolicy.self, forKey: .sharing)
         self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
         self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
+        self.credentialNonce = try container.decodeIfPresent(String.self, forKey: .credentialNonce)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
         self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -1942,6 +1954,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         try container.encodeIfPresent(self.sharing, forKey: .sharing)
         try container.encodeIfPresent(self.retention, forKey: .retention)
         try container.encodeIfPresent(self.state, forKey: .state)
+        try container.encodeIfPresent(self.credentialNonce, forKey: .credentialNonce)
         try container.encodeIfPresent(self.meta, forKey: .meta)
         try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
@@ -2031,7 +2044,8 @@ public struct ModelSourceAuthRequirement: Codable, Sendable, Equatable {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     public var resource: ProtectedResourceMetadata
-    /// Human-readable hint, for example the endpoint's error description.
+    /// Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."
     public var description: String?
     /// Unrecognized wire members retained for full-object edits.
     public var extra: [String: AnyCodable]
@@ -2087,7 +2101,8 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
     /// advertises `authorization_servers` and `scopes_supported`. A source that
     /// takes a user-supplied secret omits them.
     public var resource: ProtectedResourceMetadata
-    /// Human-readable hint, for example the endpoint's error description.
+    /// Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."
     public var description: String?
     public var kind: ModelSourceStatus
     /// Unrecognized wire members retained for full-object edits.
@@ -2138,7 +2153,7 @@ public struct ModelSourceAuthRequiredState: Codable, Sendable, Equatable {
 /// Stability: 1.0 - Early development.
 public struct ModelSourceErrorState: Codable, Sendable, Equatable {
     public var kind: ModelSourceStatus
-    /// Error details. MUST NOT contain the credential.
+    /// Error details the host writes. MUST NOT contain the credential.
     public var error: ErrorInfo
     /// Unrecognized wire members retained for full-object edits.
     public var extra: [String: AnyCodable]

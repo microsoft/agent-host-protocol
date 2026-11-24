@@ -2860,7 +2860,7 @@
       "properties": {
         "resource": {
           "type": "string",
-          "description": "REQUIRED. The protected resource's resource identifier, a URL using the\n`https` scheme with no fragment component (e.g. `\"https://api.github.com\"`)."
+          "description": "REQUIRED. The protected resource's resource identifier, a URL using the\n`https` scheme with no fragment component (e.g. `\"https://api.github.com\"`).\nA registered model source's endpoint may use any scheme the agent\nsupports, because nothing fetches it."
         },
         "resource_name": {
           "type": "string",
@@ -3594,6 +3594,10 @@
           "$ref": "#/$defs/ModelSourceState",
           "description": "Host-reported status. Absent means the host hasn't reported one yet."
         },
+        "credentialNonce": {
+          "type": "string",
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host changes it whenever it drops the credential\nbecause the registration changed, and never reuses one for the same\n`id`. Absent until the host reports a `state`."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -3646,7 +3650,7 @@
         },
         "description": {
           "type": "string",
-          "description": "Human-readable hint, for example the endpoint's error description."
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
         }
       },
       "required": [
@@ -3668,7 +3672,7 @@
         },
         "description": {
           "type": "string",
-          "description": "Human-readable hint, for example the endpoint's error description."
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
         },
         "kind": {
           "const": "authRequired"
@@ -3689,7 +3693,7 @@
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details. MUST NOT contain the credential."
+          "description": "Error details the host writes. MUST NOT contain the credential."
         }
       },
       "required": [

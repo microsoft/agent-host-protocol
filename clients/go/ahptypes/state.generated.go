@@ -767,6 +767,8 @@ func (v Icon) MarshalJSON() ([]byte, error) {
 type ProtectedResourceMetadata struct {
 	// REQUIRED. The protected resource's resource identifier, a URL using the
 	// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
+	// A registered model source's endpoint may use any scheme the agent
+	// supports, because nothing fetches it.
 	Resource string `json:"resource"`
 	// OPTIONAL. Human-readable name of the protected resource.
 	ResourceName *string `json:"resource_name,omitempty"`
@@ -1012,6 +1014,12 @@ type ModelSourceRegistration struct {
 	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
 	// Host-reported status. Absent means the host hasn't reported one yet.
 	State *ModelSourceState `json:"state,omitempty"`
+	// Host-issued token that a client echoes in
+	// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+	// the credential. The host changes it whenever it drops the credential
+	// because the registration changed, and never reuses one for the same
+	// `id`. Absent until the host reports a `state`.
+	CredentialNonce *string `json:"credentialNonce,omitempty"`
 	// Additional implementation-defined metadata for this registration.
 	// MUST NOT contain a credential.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1021,12 +1029,12 @@ type ModelSourceRegistration struct {
 
 func (v *ModelSourceRegistration) UnmarshalJSON(data []byte) error {
 	type wire ModelSourceRegistration
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "_meta")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "credentialNonce", "_meta")
 }
 
 func (v ModelSourceRegistration) MarshalJSON() ([]byte, error) {
 	type wire ModelSourceRegistration
-	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "_meta")
+	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "sharing", "retention", "state", "credentialNonce", "_meta")
 }
 
 // The agent is reading and validating the definition, or listing the
@@ -1085,7 +1093,8 @@ type ModelSourceAuthRequirement struct {
 	// advertises `authorization_servers` and `scopes_supported`. A source that
 	// takes a user-supplied secret omits them.
 	Resource ProtectedResourceMetadata `json:"resource"`
-	// Human-readable hint, for example the endpoint's error description.
+	// Human-readable hint the host writes, for example "The endpoint rejected
+	// the API key."
 	Description *string `json:"description,omitempty"`
 	// Extra contains unrecognized wire members retained for full-object edits.
 	Extra map[string]json.RawMessage `json:"-"`
@@ -1117,7 +1126,8 @@ type ModelSourceAuthRequiredState struct {
 	// advertises `authorization_servers` and `scopes_supported`. A source that
 	// takes a user-supplied secret omits them.
 	Resource ProtectedResourceMetadata `json:"resource"`
-	// Human-readable hint, for example the endpoint's error description.
+	// Human-readable hint the host writes, for example "The endpoint rejected
+	// the API key."
 	Description *string           `json:"description,omitempty"`
 	Kind        ModelSourceStatus `json:"kind"`
 	// Extra contains unrecognized wire members retained for full-object edits.
@@ -1139,7 +1149,7 @@ func (v ModelSourceAuthRequiredState) MarshalJSON() ([]byte, error) {
 // Stability: 1.0 - Early development.
 type ModelSourceErrorState struct {
 	Kind ModelSourceStatus `json:"kind"`
-	// Error details. MUST NOT contain the credential.
+	// Error details the host writes. MUST NOT contain the credential.
 	Error ErrorInfo `json:"error"`
 	// Extra contains unrecognized wire members retained for full-object edits.
 	Extra map[string]json.RawMessage `json:"-"`

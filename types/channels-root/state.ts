@@ -375,6 +375,16 @@ export interface ModelSourceRegistration {
   /** Host-reported status. Absent means the host hasn't reported one yet. */
   state?: ModelSourceState;
   /**
+   * Host-issued token that a client echoes in
+   * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+   * the credential. The host changes it whenever it drops the credential
+   * because the registration changed, and never reuses one for the same
+   * `id`. Absent until the host reports a `state`.
+   *
+   * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+   */
+  credentialNonce?: string;
+  /**
    * Additional implementation-defined metadata for this registration.
    * MUST NOT contain a credential.
    */
@@ -473,7 +483,10 @@ export interface ModelSourceAuthRequirement {
    * takes a user-supplied secret omits them.
    */
   resource: ProtectedResourceMetadata;
-  /** Human-readable hint, for example the endpoint's error description. */
+  /**
+   * Human-readable hint the host writes, for example "The endpoint rejected
+   * the API key."
+   */
   description?: string;
 }
 
@@ -499,7 +512,7 @@ export interface ModelSourceAuthRequiredState extends ModelSourceAuthRequirement
  */
 export interface ModelSourceErrorState {
   kind: ModelSourceStatus.Error;
-  /** Error details. MUST NOT contain the credential. */
+  /** Error details the host writes. MUST NOT contain the credential. */
   error: ErrorInfo;
 }
 

@@ -2143,7 +2143,9 @@ public sealed record Icon
 public sealed record ProtectedResourceMetadata
 {
     /// <summary>REQUIRED. The protected resource's resource identifier, a URL using the
-    /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).</summary>
+    /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
+    /// A registered model source's endpoint may use any scheme the agent
+    /// supports, because nothing fetches it.</summary>
     public required string Resource { get; init; }
 
     /// <summary>OPTIONAL. Human-readable name of the protected resource.</summary>
@@ -2459,6 +2461,14 @@ public sealed record ModelSourceRegistration
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelSourceState? State { get; init; }
 
+    /// <summary>Host-issued token that a client echoes in
+    /// {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+    /// the credential. The host changes it whenever it drops the credential
+    /// because the registration changed, and never reuses one for the same
+    /// `id`. Absent until the host reports a `state`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CredentialNonce { get; init; }
+
     /// <summary>Additional implementation-defined metadata for this registration.
     /// MUST NOT contain a credential.</summary>
     [JsonPropertyName("_meta")]
@@ -2515,7 +2525,8 @@ public sealed record ModelSourceAuthRequirement
     /// takes a user-supplied secret omits them.</summary>
     public required ProtectedResourceMetadata Resource { get; init; }
 
-    /// <summary>Human-readable hint, for example the endpoint's error description.</summary>
+    /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
 
@@ -2543,7 +2554,8 @@ public sealed record ModelSourceAuthRequiredState
     /// takes a user-supplied secret omits them.</summary>
     public required ProtectedResourceMetadata Resource { get; init; }
 
-    /// <summary>Human-readable hint, for example the endpoint's error description.</summary>
+    /// <summary>Human-readable hint the host writes, for example "The endpoint rejected
+    /// the API key."</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
 
@@ -2561,7 +2573,7 @@ public sealed record ModelSourceErrorState
 {
     public ModelSourceStatus Kind { get; init; } = ModelSourceStatus.Error;
 
-    /// <summary>Error details. MUST NOT contain the credential.</summary>
+    /// <summary>Error details the host writes. MUST NOT contain the credential.</summary>
     public required ErrorInfo Error { get; init; }
 
     /// <summary>Unrecognized wire members retained for full-object edits.</summary>

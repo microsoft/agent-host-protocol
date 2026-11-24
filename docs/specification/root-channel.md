@@ -75,7 +75,8 @@ Clients can register bring-your-own-key model sources with the host, so its agen
   "clientId": "laptop",
   "sharing": "host",
   "retention": "host",
-  "state": { "kind": "ready" }
+  "state": { "kind": "ready" },
+  "credentialNonce": "9b41d7"
 }
 ```
 
@@ -83,17 +84,23 @@ Clients can register bring-your-own-key model sources with the host, so its agen
 
 #### Registering
 
-A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId` and no `state`, and removes one with `root/modelSourceRegistrationRemoved`. The host reports status by dispatching `Set` again with a `state`: `starting`, `ready`, `authRequired`, or `error`. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed, because doing so clears the reported state.
+A client registers a source by dispatching `root/modelSourceRegistrationSet` with its own `clientId`, and with no `state` or `credentialNonce`. It removes one with `root/modelSourceRegistrationRemoved`. The host reports status by dispatching `Set` again with a `state` (`starting`, `ready`, `authRequired`, or `error`) and a `credentialNonce`. A client SHOULD NOT dispatch `Set` for a registration that hasn't changed, because doing so clears the reported state.
 
-The host rejects a client's `Set` or `Removed`, through `rejectionReason`, when:
+The host builds each status `Set` from the registration as it currently stands. It discards an agent result for a definition the registration no longer has, and never dispatches a status `Set` for a removed registration, so a late result can't undo a client's change or bring back a removed source.
+
+A client may change or remove a registration when it's the contributing client, or when the registration has `host` sharing, which lets another of the user's clients take it over. It may not change one that belongs to another client with `contributingClient` sharing, or one the host registered, unless host policy allows it.
+
+The host rejects a client's `Set`, through `rejectionReason`, when:
 
 - the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
-- `clientId` isn't the dispatching client's ID, or `state` is present;
-- `id` is already a declared `ModelSourceInfo.id` in that agent's catalog;
-- the registration belongs to another client and has `contributingClient` sharing, or the host registered it, unless host policy allows the change;
+- `clientId` isn't the dispatching client's ID, or `state` or `credentialNonce` is present;
+- `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same registration doesn't count, so a ready registration can still be updated;
+- a registration with this `id` already exists, and the dispatching client may not change it;
 - the host won't honor the requested `sharing` or `retention`. The client can register again with a narrower policy.
 
-When a `Set` changes a registration's `provider`, `format`, `definition`, or `clientId`, the host drops its credential, and the source goes back through `starting`. A host may also register sources itself. Those registrations have no `clientId`, and both policies behave as `host`.
+A client's `Removed` is a no-op when no registration has that `id`. Otherwise the host rejects it only when the dispatching client may not change that registration. The registration's state, policies, and catalog entry don't affect removal.
+
+When a `Set` changes a registration's `provider`, `format`, `definition`, or `clientId`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A host may also register sources itself. Those registrations have no `clientId`, and both policies behave as `host`.
 
 #### Catalog
 
@@ -106,15 +113,15 @@ The host checks every selection of a registered source's model: the model is lis
 The contributing client chooses two policies. Absent means `contributingClient`, the narrowest choice.
 
 - **Sharing.** With `contributingClient`, only turns and pending messages that client dispatches may select the source's models. With `host`, any client may, and so may work the host starts itself, such as automations.
-- **Retention.** With `contributingClient`, the source is removed when its client leaves: new work that names its models fails, turns already running on it finish, and then the host removes the registration and drops its credential. With `host`, the registration and its in-memory credential stay until a client removes it, host policy expires it, or the host restarts.
+- **Retention.** With `contributingClient`, the source is removed when its client leaves: the host withdraws its models from the catalog, new work that names them fails, turns already running on it finish, and then the host removes the registration and drops its credential. With `host`, the registration and its in-memory credential stay until a client removes it, host policy expires it, or the host restarts.
 
 The host never widens a policy, and it MAY expire `host`-retained registrations. Every client sees every registration, so clients SHOULD offer only the models they may select, using `sharing` and `clientId`.
 
-A client that reconnects with the same `clientId` within the host's grace period keeps its registrations. A client that comes back with a new `clientId` registers again under the same `id`. For a `host`-shared registration, that takes it over: `clientId` changes, the credential is dropped, and the new contributing client supplies it. After a restart, a host that persists its state SHOULD keep `host`-retained registrations, which come back in `authRequired`.
+A client that reconnects with the same `clientId` within the host's grace period keeps its registrations. A client that comes back with a new `clientId` registers again under the same `id`. For a `host`-shared registration, that takes it over: `clientId` changes, the credential is dropped, and the new contributing client supplies it. After a restart, a host that persists its state SHOULD keep `host`-retained registrations, which come back through `starting`, and reach `authRequired` only if they need a credential.
 
 #### Reserved model IDs
 
-Drafts, pending messages, history, and automation definitions keep a selection after its source goes away, and a chat keeps them when it moves to another session. Once the host publishes a model ID for a registration, that ID is bound to that registration and its upstream model for as long as the host keeps state, including after the registration is removed and across a restart. The host MUST NOT resolve the ID to anything else. It MAY publish the ID again only when the same registration comes back offering the same upstream model. A host can meet this by minting IDs it never reuses, for example with a random component.
+Drafts, pending messages, history, and automation definitions keep a selection after its source goes away, and a chat keeps them when it moves to another session. Once the host publishes a model ID for a registration, that ID is bound to that registration and its upstream model for as long as the host keeps state, including after the registration is removed and across a restart. The host MUST NOT resolve the ID to anything else. It MAY publish the ID again only when the same registration comes back offering the same upstream model. A model's upstream identity is the endpoint the agent sends its requests to plus that endpoint's model identifier. A change to `provider` or `format`, or a `definition` change that moves the endpoint, makes it a different upstream model, so the host mints new IDs, even when another client has taken the registration over. A host can meet this by minting IDs it never reuses, for example with a random component.
 
 #### Automations
 

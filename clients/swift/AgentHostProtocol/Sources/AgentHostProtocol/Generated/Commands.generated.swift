@@ -1977,13 +1977,19 @@ public struct ModelSourceAuthenticateTarget: Codable, Sendable, Equatable {
     public var kind: AuthenticateTargetKind
     /// The registration's `ModelSourceRegistration.id`.
     public var modelSourceId: String
+    /// The registration's current `ModelSourceRegistration.credentialNonce`, as
+    /// published in root state. The host rejects a stale one with `Conflict`
+    /// (-32011).
+    public var credentialNonce: String
 
     public init(
         kind: AuthenticateTargetKind,
-        modelSourceId: String
+        modelSourceId: String,
+        credentialNonce: String
     ) {
         self.kind = kind
         self.modelSourceId = modelSourceId
+        self.credentialNonce = credentialNonce
     }
 }
 
@@ -2038,7 +2044,8 @@ public struct AuthenticateParams: Codable, Sendable, Equatable {
     /// with `InvalidParams` (-32602).
     ///
     /// A registered model source takes its credential only through a
-    /// `modelSource` target. See
+    /// `modelSource` target, and the host rejects an untargeted `resource` that
+    /// matches only model source challenges with `InvalidParams` (-32602). See
     /// [Model source credentials](/specification/authentication#model-source-credentials)
     /// for its rules.
     ///

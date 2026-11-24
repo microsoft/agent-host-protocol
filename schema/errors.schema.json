@@ -195,7 +195,7 @@
       "properties": {
         "resource": {
           "type": "string",
-          "description": "REQUIRED. The protected resource's resource identifier, a URL using the\n`https` scheme with no fragment component (e.g. `\"https://api.github.com\"`)."
+          "description": "REQUIRED. The protected resource's resource identifier, a URL using the\n`https` scheme with no fragment component (e.g. `\"https://api.github.com\"`).\nA registered model source's endpoint may use any scheme the agent\nsupports, because nothing fetches it."
         },
         "resource_name": {
           "type": "string",
@@ -929,6 +929,10 @@
           "$ref": "#/$defs/ModelSourceState",
           "description": "Host-reported status. Absent means the host hasn't reported one yet."
         },
+        "credentialNonce": {
+          "type": "string",
+          "description": "Host-issued token that a client echoes in\n{@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers\nthe credential. The host changes it whenever it drops the credential\nbecause the registration changed, and never reuses one for the same\n`id`. Absent until the host reports a `state`."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -981,7 +985,7 @@
         },
         "description": {
           "type": "string",
-          "description": "Human-readable hint, for example the endpoint's error description."
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
         }
       },
       "required": [
@@ -1003,7 +1007,7 @@
         },
         "description": {
           "type": "string",
-          "description": "Human-readable hint, for example the endpoint's error description."
+          "description": "Human-readable hint the host writes, for example \"The endpoint rejected\nthe API key.\""
         },
         "kind": {
           "const": "authRequired"
@@ -1024,7 +1028,7 @@
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details. MUST NOT contain the credential."
+          "description": "Error details the host writes. MUST NOT contain the credential."
         }
       },
       "required": [
@@ -7487,16 +7491,21 @@
         "modelSourceId": {
           "type": "string",
           "description": "The registration's `ModelSourceRegistration.id`."
+        },
+        "credentialNonce": {
+          "type": "string",
+          "description": "The registration's current `ModelSourceRegistration.credentialNonce`, as\npublished in root state. The host rejects a stale one with `Conflict`\n(-32011)."
         }
       },
       "required": [
         "kind",
-        "modelSourceId"
+        "modelSourceId",
+        "credentialNonce"
       ]
     },
     "AuthenticateParams": {
       "type": "object",
-      "description": "Pushes a credential for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`,\n`ToolCallAuthRequiredState.auth.resource`, or\n`ModelSourceAuthRequiredState.resource` (each surfaced only once the\ncorresponding MCP server, tool call, or model source actually challenges\nfor auth). Servers MUST accept any `resource` value they have themselves\nadvertised through one of these mechanisms.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command. A model source's token is instead an\nopaque secret, such as an API key.",
+      "description": "Pushes a credential for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`,\n`ToolCallAuthRequiredState.auth.resource`, or\n`ModelSourceAuthRequiredState.resource` (each surfaced only once the\ncorresponding MCP server, tool call, or model source actually challenges\nfor auth). Servers MUST accept any `resource` value they have themselves\nadvertised through one of these mechanisms, subject to the `target`\nrules. A `modelSource` target takes only the resource the host most\nrecently advertised for that registration.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command. A model source's token is instead an\nopaque secret, such as an API key.",
       "properties": {
         "channel": {
           "type": "string",
@@ -7531,7 +7540,7 @@
         },
         "target": {
           "$ref": "#/$defs/AuthenticateTarget",
-          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, MUST include it when delivering a\nregistered model source's credential, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nFor an `mcpServer` target, the host MUST apply the token only to that MCP\nserver in that session, never to sibling servers, other sessions, or\nagent-level resources, even if they share the resource and scopes.\n`resource` MUST still equal that server's advertised\n`McpAuthRequirement.resource.resource`. The host MUST reject an unknown\nsession or customization, or a customization that is not an MCP server,\nwith `InvalidParams` (-32602).\n\nA registered model source takes its credential only through a\n`modelSource` target. See\n[Model source credentials](/specification/authentication#model-source-credentials)\nfor its rules.\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
+          "description": "Optional consumer of the token. Clients SHOULD include this when answering\na specific MCP server's `McpServerAuthRequiredState` or\n`ToolCallAuthRequiredState` challenge, MUST include it when delivering a\nregistered model source's credential, and omit it for provider-level\nresources (`AgentInfo.protectedResources` or `AuthRequired` -32007 data).\n\nFor an `mcpServer` target, the host MUST apply the token only to that MCP\nserver in that session, never to sibling servers, other sessions, or\nagent-level resources, even if they share the resource and scopes.\n`resource` MUST still equal that server's advertised\n`McpAuthRequirement.resource.resource`. The host MUST reject an unknown\nsession or customization, or a customization that is not an MCP server,\nwith `InvalidParams` (-32602).\n\nA registered model source takes its credential only through a\n`modelSource` target, and the host rejects an untargeted `resource` that\nmatches only model source challenges with `InvalidParams` (-32602). See\n[Model source credentials](/specification/authentication#model-source-credentials)\nfor its rules.\n\nWithout a target, resource/scope matching is unchanged; the token may\nsatisfy every matching pending challenge. Older hosts ignore this field."
         },
         "accountId": {
           "type": "string",

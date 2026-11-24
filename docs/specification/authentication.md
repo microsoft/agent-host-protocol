@@ -144,13 +144,13 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 When `target.kind` is `mcpServer`, the host MUST apply the token only to that MCP server in that session — never to sibling servers, other sessions, or agent-level resources — even when they share `resource` and scopes. `resource` MUST still equal the targeted server's advertised `McpAuthRequirement.resource.resource`. If the session or customization is unknown, or the customization is not an MCP server, the host MUST reject the request with `InvalidParams` (`-32602`).
 
-Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge, except a model source's. Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
+Without `target`, hosts retain resource/scope matching for backwards compatibility; a token may satisfy every matching pending challenge, except a model source's. The host rejects an untargeted `resource` that matches only model source challenges with `InvalidParams` (`-32602`). Older hosts ignore the unknown field and retain this untargeted behavior, so isolation is not guaranteed with older hosts. No capability or protocol version bump is required.
 
 If the token is invalid or the resource is unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams` `-32602`).
 
 ### Model source credentials
 
-A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. When the source needs a credential, the host sets the registration's state to `ModelSourceAuthRequiredState`, which carries a `reason` and RFC 9728 `resource` metadata for the source's endpoint. A client answers with a `modelSource` target that names the registration:
+A client can [register a model source](/specification/root-channel#model-source-registry), such as an endpoint configured with the user's own API key, with the host. When the source needs a credential, the host sets the registration's state to `ModelSourceAuthRequiredState`, which carries a `reason` and RFC 9728 `resource` metadata for the source's endpoint. A client answers with a `modelSource` target that names the registration and echoes its current `credentialNonce`:
 
 ```jsonc
 // Model source credential delivery
@@ -162,7 +162,11 @@ A client can [register a model source](/specification/root-channel#model-source-
     "channel": "ahp-root://",
     "resource": "https://api.example.com/v1",
     "token": "<secret>",
-    "target": { "kind": "modelSource", "modelSourceId": "2f6c0e1a-model-source" }
+    "target": {
+      "kind": "modelSource",
+      "modelSourceId": "2f6c0e1a-model-source",
+      "credentialNonce": "9b41d7"
+    }
   }
 }
 ```
@@ -176,12 +180,15 @@ When `target.kind` is `modelSource`, the host:
 - MUST apply the credential only to that registration, never to other registrations, MCP servers, or agent-level resources, even when they share `resource`;
 - MUST require `resource` to equal the `resource.resource` it most recently advertised for that registration;
 - MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`);
+- MUST reject a `credentialNonce` other than the one it most recently issued for that registration with `Conflict` (`-32011`). The client re-reads root state and, if the source still needs a credential, sends it again with the current nonce;
 - MUST reject a credential, including an empty `token` that would revoke one, from a client that may not supply one, with `PermissionDenied` (`-32009`). The contributing client may always supply one. For a registration with `host` sharing, or one the host registered, any client the host allows may supply one;
-- MUST treat an empty `token` as revocation: it drops the credential, and the source returns to `authRequired` with `reason: required`.
+- MUST treat an empty `token` as revocation: it drops the credential, and the source returns to `authRequired` with `reason: expired`, so no client sends the revoked secret again.
 
-The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the registration's `definition` or `_meta`, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host drops the credential when the registration is removed, when its definition or contributing client changes, and when the host restarts.
+`credentialNonce` keeps a delayed `authenticate` from reaching a definition it wasn't meant for: a key sent for an old definition with the same endpoint would otherwise still match the `id` and `resource`. The host issues a new nonce whenever it drops the credential because the registration changed, including when a removed registration is registered again under the same `id`, and never reuses one for the same `id`. It keeps the nonce across rotation, expiry, and revocation.
 
-The host asks for a new credential by setting the registration's state to `authRequired` again, which survives reconnects. When `reason` is `expired`, the client MUST NOT replay the same secret: it renews the token or asks the user for a new key. A client that has the source configured answers from its own secure storage, and SHOULD check that `resource.resource` matches the endpoint in its own copy of the definition before sending a secret.
+The host holds the credential in memory only and never persists it. It never places the credential in state, actions, notifications, the registration's `definition` or `_meta`, `ErrorInfo`, environment variables, command lines, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: the same secret can also live where the agent can read it, such as a `.env` file, and a host can only redact values it knows. The host writes `ModelSourceAuthRequirement.description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state. The host drops the credential when the registration is removed, when its `provider`, `format`, `definition`, or contributing client changes, and when the host restarts.
+
+The host asks for a new credential by setting the registration's state to `authRequired` again, which survives reconnects. When `reason` is `expired`, the client MUST NOT replay the same secret: it renews the token or asks the user for a new key. A client that has the source configured answers from its own secure storage, but MUST NOT send a stored secret unless the registration's `provider`, `format`, and `definition` match its own copy. `credentialNonce` stops a delayed reply, but not a device whose copy of the definition is out of date or a registration another client has taken over.
 
 If the credential fails during a turn that uses the source, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`) rather than wait. Once the source is ready again, a client can continue the turn with `chat/turnResume`, and the host checks the turn's selection again first, including the sharing policy. The host never switches the turn to a different model.
 

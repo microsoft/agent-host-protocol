@@ -1,5 +1,5 @@
 {
   "type": "added",
-  "message": "Model source registry: clients can register bring-your-own-key model sources with the host through `RootState.modelSourceRegistrations` and the client-dispatchable `root/modelSourceRegistrationSet` and `root/modelSourceRegistrationRemoved` actions, and deliver each source's credential with a `modelSource` `authenticate` target. Agents advertise the definition formats they read with `AgentCapabilities.modelSourceRegistration`.",
+  "message": "Model source registry: clients can register bring-your-own-key model sources with the host through `RootState.modelSourceRegistrations` and the client-dispatchable `root/modelSourceRegistrationSet` and `root/modelSourceRegistrationRemoved` actions, and deliver each source's credential with a `modelSource` `authenticate` target that echoes the registration's host-issued `credentialNonce`. Agents advertise the definition formats they read with `AgentCapabilities.modelSourceRegistration`.",
   "issues": [619]
 }

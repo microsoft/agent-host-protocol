@@ -73,7 +73,8 @@
           "clientId": "client-1",
           "state": {
             "kind": "starting"
-          }
+          },
+          "credentialNonce": "nonce-starting-1"
         },
         {
           "id": "source-ready",
@@ -101,6 +102,7 @@
           "state": {
             "kind": "ready"
           },
+          "credentialNonce": "nonce-ready-1",
           "_meta": {
             "example.com/label": "Laptop"
           }
@@ -111,7 +113,7 @@
           "name": "Azure endpoint",
           "format": "example.com/model-source@1",
           "definition": {
-            "baseUrl": "https://api.example.com/v1",
+            "baseUrl": "https://example.openai.azure.com/openai/v1",
             "wireFormat": "openai-chat",
             "models": [
               {
@@ -127,7 +129,7 @@
             "kind": "authRequired",
             "reason": "expired",
             "resource": {
-              "resource": "https://example.openai.azure.com",
+              "resource": "https://example.openai.azure.com/openai/v1",
               "resource_name": "Azure OpenAI",
               "authorization_servers": [
                 "https://login.microsoftonline.com/common/v2.0"
@@ -137,7 +139,8 @@
               ]
             },
             "description": "The access token expired."
-          }
+          },
+          "credentialNonce": "nonce-auth-1"
         },
         {
           "id": "source-local",
@@ -155,7 +158,8 @@
               "resource": "http://localhost:11434/v1",
               "resource_name": "Local server key"
             }
-          }
+          },
+          "credentialNonce": "nonce-local-1"
         },
         {
           "id": "source-host",
@@ -171,7 +175,8 @@
               "errorType": "policy",
               "message": "The endpoint is not allowed by host policy."
             }
-          }
+          },
+          "credentialNonce": "nonce-host-1"
         }
       ]
     }
@@ -247,7 +252,8 @@
             "clientId": "client-1",
             "state": {
               "kind": "starting"
-            }
+            },
+            "credentialNonce": "nonce-starting-1"
           },
           {
             "id": "source-ready",
@@ -275,6 +281,7 @@
             "state": {
               "kind": "ready"
             },
+            "credentialNonce": "nonce-ready-1",
             "_meta": {
               "example.com/label": "Laptop"
             }
@@ -285,7 +292,7 @@
             "name": "Azure endpoint",
             "format": "example.com/model-source@1",
             "definition": {
-              "baseUrl": "https://api.example.com/v1",
+              "baseUrl": "https://example.openai.azure.com/openai/v1",
               "wireFormat": "openai-chat",
               "models": [
                 {
@@ -301,7 +308,7 @@
               "kind": "authRequired",
               "reason": "expired",
               "resource": {
-                "resource": "https://example.openai.azure.com",
+                "resource": "https://example.openai.azure.com/openai/v1",
                 "resource_name": "Azure OpenAI",
                 "authorization_servers": [
                   "https://login.microsoftonline.com/common/v2.0"
@@ -311,7 +318,8 @@
                 ]
               },
               "description": "The access token expired."
-            }
+            },
+            "credentialNonce": "nonce-auth-1"
           },
           {
             "id": "source-local",
@@ -329,7 +337,8 @@
                 "resource": "http://localhost:11434/v1",
                 "resource_name": "Local server key"
               }
-            }
+            },
+            "credentialNonce": "nonce-local-1"
           },
           {
             "id": "source-host",
@@ -345,7 +354,8 @@
                 "errorType": "policy",
                 "message": "The endpoint is not allowed by host policy."
               }
-            }
+            },
+            "credentialNonce": "nonce-host-1"
           }
         ]
       }

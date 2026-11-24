@@ -1536,6 +1536,8 @@ data class ProtectedResourceMetadata(
     /**
      * REQUIRED. The protected resource's resource identifier, a URL using the
      * `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
+     * A registered model source's endpoint may use any scheme the agent
+     * supports, because nothing fetches it.
      */
     val resource: String,
     /**
@@ -1875,6 +1877,14 @@ data class ModelSourceRegistration(
      */
     val state: ModelSourceState? = null,
     /**
+     * Host-issued token that a client echoes in
+     * {@link ModelSourceAuthenticateTarget.credentialNonce} when it delivers
+     * the credential. The host changes it whenever it drops the credential
+     * because the registration changed, and never reuses one for the same
+     * `id`. Absent until the host reports a `state`.
+     */
+    val credentialNonce: String? = null,
+    /**
      * Additional implementation-defined metadata for this registration.
      * MUST NOT contain a credential.
      */
@@ -1955,7 +1965,8 @@ data class ModelSourceAuthRequirement(
      */
     val resource: ProtectedResourceMetadata,
     /**
-     * Human-readable hint, for example the endpoint's error description.
+     * Human-readable hint the host writes, for example "The endpoint rejected
+     * the API key."
      */
     val description: String? = null,
     @Transient
@@ -1993,7 +2004,8 @@ data class ModelSourceAuthRequiredState(
      */
     val resource: ProtectedResourceMetadata,
     /**
-     * Human-readable hint, for example the endpoint's error description.
+     * Human-readable hint the host writes, for example "The endpoint rejected
+     * the API key."
      */
     val description: String? = null,
     val kind: ModelSourceStatus,
@@ -2017,7 +2029,7 @@ internal object ModelSourceAuthRequiredStateSerializer : UnknownMembersSerialize
 data class ModelSourceErrorState(
     val kind: ModelSourceStatus,
     /**
-     * Error details. MUST NOT contain the credential.
+     * Error details the host writes. MUST NOT contain the credential.
      */
     val error: ErrorInfo,
     @Transient
