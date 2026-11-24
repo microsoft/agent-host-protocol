@@ -1,7 +1,7 @@
 {
   "name": "model-source-registry-snapshot",
   "group": "A",
-  "description": "A root snapshot carries model source registrations with no reported state and in each lifecycle state, including an http endpoint and a host-registered source without clientId. The agent advertises the modelSourceRegistration capability, and the ready registration appears in its catalog.",
+  "description": "A root snapshot carries model source registrations with no reported state and in each lifecycle state, including an http endpoint and a host-registered source without clientId. The agent advertises the modelSourceRegistration capability, and its catalog lists the ready registration and the authRequired one whose key expired, since models stay listed after a registration has been ready.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-root://",
@@ -24,6 +24,10 @@
             {
               "id": "source-ready",
               "displayName": "OpenRouter"
+            },
+            {
+              "id": "source-auth",
+              "displayName": "Azure endpoint"
             }
           ],
           "models": [
@@ -33,6 +37,13 @@
               "name": "Example model",
               "vendor": "OpenRouter",
               "modelSourceId": "source-ready"
+            },
+            {
+              "id": "source-auth.c71e",
+              "provider": "example",
+              "name": "Example model",
+              "vendor": "Azure OpenAI",
+              "modelSourceId": "source-auth"
             }
           ]
         }
@@ -201,6 +212,10 @@
               {
                 "id": "source-ready",
                 "displayName": "OpenRouter"
+              },
+              {
+                "id": "source-auth",
+                "displayName": "Azure endpoint"
               }
             ],
             "models": [
@@ -210,6 +225,13 @@
                 "name": "Example model",
                 "vendor": "OpenRouter",
                 "modelSourceId": "source-ready"
+              },
+              {
+                "id": "source-auth.c71e",
+                "provider": "example",
+                "name": "Example model",
+                "vendor": "Azure OpenAI",
+                "modelSourceId": "source-auth"
               }
             ]
           }

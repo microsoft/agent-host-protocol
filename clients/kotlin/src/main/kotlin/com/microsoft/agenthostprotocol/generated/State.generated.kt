@@ -1891,7 +1891,8 @@ internal object ModelSourceStartingStateSerializer : UnknownMembersSerializer<Mo
 
 /**
  * The source is usable, and its models are in the catalog of the agent named
- * by the registration's `provider`.
+ * by the registration's `provider`. They stay listed through later `starting`
+ * and `authRequired` states.
  *
  * Stability: 1.0 - Early development.
  */

@@ -197,7 +197,7 @@ The host holds the credential in memory only and never persists it. It never pla
 
 The host asks for a new credential by setting the registration's state to `authRequired` again, which survives reconnects. When `reason` is `expired`, the client MUST NOT replay the same secret: it renews the token or asks the user for a new key. A client that has the source configured answers from its own secure storage, but MUST NOT send a stored secret unless the registration's `provider`, `format`, and `definition` match its own copy. `credentialNonce` stops a delayed reply, but not a device whose copy of the definition is out of date or a registration another client has changed.
 
-If the credential fails during a turn that uses the source, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`) rather than wait. Once the source is ready again, a client can continue the turn with `chat/turnResume`, and the host checks the turn's selection again first. The host never switches the turn to a different model.
+If the credential fails during a turn that uses the source, or a turn starts while the source has no usable credential, the host SHOULD end the turn with a resumable error (`chat/error` with `part.resumable: true`) rather than wait. Once the source is ready again, a client can continue the turn with `chat/turnResume`, and the host checks the turn's selection again first. The host never switches the turn to a different model.
 
 ### Why keyed by `resource` and optional `target`?
 

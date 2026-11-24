@@ -3649,7 +3649,7 @@
     },
     "ModelSourceReadyState": {
       "type": "object",
-      "description": "The source is usable, and its models are in the catalog of the agent named\nby the registration's `provider`.\n\nStability: 1.0 - Early development.",
+      "description": "The source is usable, and its models are in the catalog of the agent named\nby the registration's `provider`. They stay listed through later `starting`\nand `authRequired` states.\n\nStability: 1.0 - Early development.",
       "properties": {
         "kind": {
           "const": "ready"

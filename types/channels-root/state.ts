@@ -442,7 +442,8 @@ export interface ModelSourceStartingState {
 
 /**
  * The source is usable, and its models are in the catalog of the agent named
- * by the registration's `provider`.
+ * by the registration's `provider`. They stay listed through later `starting`
+ * and `authRequired` states.
  *
  * @category Root State
  * @stability 1.0
