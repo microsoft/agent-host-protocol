@@ -52,7 +52,7 @@
         {
           "id": "source-unreported",
           "provider": "example",
-          "name": "Unreported",
+          "displayName": "Unreported",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "https://api.example.com/v1",
@@ -69,7 +69,7 @@
         {
           "id": "source-starting",
           "provider": "example",
-          "name": "Starting",
+          "displayName": "Starting",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "https://api.example.com/v1",
@@ -90,7 +90,7 @@
         {
           "id": "source-ready",
           "provider": "example",
-          "name": "OpenRouter",
+          "displayName": "OpenRouter",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "https://api.example.com/v1",
@@ -124,7 +124,7 @@
         {
           "id": "source-auth",
           "provider": "example",
-          "name": "Azure endpoint",
+          "displayName": "Azure endpoint",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "https://example.openai.azure.com/openai/v1",
@@ -158,7 +158,7 @@
         {
           "id": "source-local",
           "provider": "example",
-          "name": "Local server",
+          "displayName": "Local server",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "http://localhost:11434/v1"
@@ -177,7 +177,7 @@
         {
           "id": "source-host",
           "provider": "example",
-          "name": "Host-configured",
+          "displayName": "Host-configured",
           "format": "example.com/model-source@1",
           "definition": {
             "baseUrl": "https://models.internal.example/v1"
@@ -244,7 +244,7 @@
           {
             "id": "source-unreported",
             "provider": "example",
-            "name": "Unreported",
+            "displayName": "Unreported",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "https://api.example.com/v1",
@@ -261,7 +261,7 @@
           {
             "id": "source-starting",
             "provider": "example",
-            "name": "Starting",
+            "displayName": "Starting",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "https://api.example.com/v1",
@@ -282,7 +282,7 @@
           {
             "id": "source-ready",
             "provider": "example",
-            "name": "OpenRouter",
+            "displayName": "OpenRouter",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "https://api.example.com/v1",
@@ -316,7 +316,7 @@
           {
             "id": "source-auth",
             "provider": "example",
-            "name": "Azure endpoint",
+            "displayName": "Azure endpoint",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "https://example.openai.azure.com/openai/v1",
@@ -350,7 +350,7 @@
           {
             "id": "source-local",
             "provider": "example",
-            "name": "Local server",
+            "displayName": "Local server",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "http://localhost:11434/v1"
@@ -369,7 +369,7 @@
           {
             "id": "source-host",
             "provider": "example",
-            "name": "Host-configured",
+            "displayName": "Host-configured",
             "format": "example.com/model-source@1",
             "definition": {
               "baseUrl": "https://models.internal.example/v1"

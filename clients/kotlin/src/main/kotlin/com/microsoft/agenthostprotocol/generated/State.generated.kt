@@ -1812,9 +1812,9 @@ data class ModelSourceRegistration(
      */
     val provider: String,
     /**
-     * Display name, published as {@link ModelSourceInfo.displayName}.
+     * Human-readable name, published as {@link ModelSourceInfo.displayName}.
      */
-    val name: String,
+    val displayName: String,
     /**
      * Icons for UI display.
      */

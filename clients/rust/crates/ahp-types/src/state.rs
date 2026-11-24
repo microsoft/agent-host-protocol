@@ -2138,8 +2138,8 @@ pub struct ModelSourceRegistration {
     pub id: String,
     /// Agent provider whose agent reads the definition and serves the models.
     pub provider: String,
-    /// Display name, published as {@link ModelSourceInfo.displayName}.
-    pub name: String,
+    /// Human-readable name, published as {@link ModelSourceInfo.displayName}.
+    pub display_name: String,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,

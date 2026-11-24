@@ -893,9 +893,9 @@
           "type": "string",
           "description": "Agent provider whose agent reads the definition and serves the models."
         },
-        "name": {
+        "displayName": {
           "type": "string",
-          "description": "Display name, published as {@link ModelSourceInfo.displayName}."
+          "description": "Human-readable name, published as {@link ModelSourceInfo.displayName}."
         },
         "icons": {
           "type": "array",
@@ -942,7 +942,7 @@
       "required": [
         "id",
         "provider",
-        "name",
+        "displayName",
         "format",
         "definition"
       ]

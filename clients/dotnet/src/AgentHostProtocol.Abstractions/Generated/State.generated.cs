@@ -2374,8 +2374,8 @@ public sealed record ModelSourceRegistration
     /// <summary>Agent provider whose agent reads the definition and serves the models.</summary>
     public required string Provider { get; init; }
 
-    /// <summary>Display name, published as {@link ModelSourceInfo.displayName}.</summary>
-    public required string Name { get; init; }
+    /// <summary>Human-readable name, published as {@link ModelSourceInfo.displayName}.</summary>
+    public required string DisplayName { get; init; }
 
     /// <summary>Icons for UI display.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

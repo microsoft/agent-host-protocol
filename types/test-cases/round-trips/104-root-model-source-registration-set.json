@@ -8,7 +8,7 @@
     "registration": {
       "id": "source-new",
       "provider": "example",
-      "name": "OpenRouter",
+      "displayName": "OpenRouter",
       "format": "example.com/model-source@1",
       "definition": {
         "baseUrl": "https://openrouter.ai/api/v1",
@@ -30,7 +30,7 @@
       "registration": {
         "id": "source-new",
         "provider": "example",
-        "name": "OpenRouter",
+        "displayName": "OpenRouter",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://openrouter.ai/api/v1",

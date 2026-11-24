@@ -87,7 +87,7 @@ Different agents MAY require authentication with different providers. For exampl
 
 ## Token Delivery
 
-Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `ModelSourceAuthRequiredState.resource` (see [Model source credentials](#model-source-credentials)):
+Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value the server has itself advertised — either statically via the agent's `protectedResources` metadata, or dynamically via a live MCP authentication challenge (`McpServerAuthRequiredState.resource` or, for a single blocked tool call, `ToolCallAuthRequiredState.auth.resource` — see [MCP Servers](/guide/mcp#authentication)) or a registered model source's `ModelSourceRegistration.credentialResource.resource`, which stays available while the source is ready for rotation and revocation (see [Model source credentials](#model-source-credentials)):
 
 ```jsonc
 // Client → Server

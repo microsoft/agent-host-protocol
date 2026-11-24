@@ -351,8 +351,8 @@ export interface ModelSourceRegistration {
   id: string;
   /** Agent provider whose agent reads the definition and serves the models. */
   provider: string;
-  /** Display name, published as {@link ModelSourceInfo.displayName}. */
-  name: string;
+  /** Human-readable name, published as {@link ModelSourceInfo.displayName}. */
+  displayName: string;
   /** Icons for UI display. */
   icons?: Icon[];
   /**

@@ -1818,8 +1818,8 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     public var id: String
     /// Agent provider whose agent reads the definition and serves the models.
     public var provider: String
-    /// Display name, published as {@link ModelSourceInfo.displayName}.
-    public var name: String
+    /// Human-readable name, published as {@link ModelSourceInfo.displayName}.
+    public var displayName: String
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Definition format, one of the agent's
@@ -1869,7 +1869,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case provider
-        case name
+        case displayName
         case icons
         case format
         case definition
@@ -1884,7 +1884,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     public init(
         id: String,
         provider: String,
-        name: String,
+        displayName: String,
         icons: [Icon]? = nil,
         format: String,
         definition: [String: AnyCodable],
@@ -1898,7 +1898,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     ) {
         self.id = id
         self.provider = provider
-        self.name = name
+        self.displayName = displayName
         self.icons = icons
         self.format = format
         self.definition = definition
@@ -1915,7 +1915,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
         self.provider = try container.decode(String.self, forKey: .provider)
-        self.name = try container.decode(String.self, forKey: .name)
+        self.displayName = try container.decode(String.self, forKey: .displayName)
         self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
         self.format = try container.decode(String.self, forKey: .format)
         self.definition = try container.decode([String: AnyCodable].self, forKey: .definition)
@@ -1932,7 +1932,7 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.id, forKey: .id)
         try container.encode(self.provider, forKey: .provider)
-        try container.encode(self.name, forKey: .name)
+        try container.encode(self.displayName, forKey: .displayName)
         try container.encodeIfPresent(self.icons, forKey: .icons)
         try container.encode(self.format, forKey: .format)
         try container.encode(self.definition, forKey: .definition)

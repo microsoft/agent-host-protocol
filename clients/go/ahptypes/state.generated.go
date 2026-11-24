@@ -983,8 +983,8 @@ type ModelSourceRegistration struct {
 	Id string `json:"id"`
 	// Agent provider whose agent reads the definition and serves the models.
 	Provider string `json:"provider"`
-	// Display name, published as {@link ModelSourceInfo.displayName}.
-	Name string `json:"name"`
+	// Human-readable name, published as {@link ModelSourceInfo.displayName}.
+	DisplayName string `json:"displayName"`
 	// Icons for UI display.
 	Icons []Icon `json:"icons,omitempty"`
 	// Definition format, one of the agent's
@@ -1034,12 +1034,12 @@ type ModelSourceRegistration struct {
 
 func (v *ModelSourceRegistration) UnmarshalJSON(data []byte) error {
 	type wire ModelSourceRegistration
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
 }
 
 func (v ModelSourceRegistration) MarshalJSON() ([]byte, error) {
 	type wire ModelSourceRegistration
-	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "name", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
+	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "clientId", "retention", "state", "credentialNonce", "credentialResource", "_meta")
 }
 
 // The agent is reading and validating the definition, or listing the

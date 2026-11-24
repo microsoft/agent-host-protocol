@@ -69,7 +69,7 @@ Clients can register bring-your-own-key model sources with the host, so its agen
 {
   "id": "2f6c0e1a-model-source",
   "provider": "example",
-  "name": "OpenRouter",
+  "displayName": "OpenRouter",
   "format": "example.com/model-source@1",
   "definition": { "baseUrl": "https://openrouter.ai/api/v1" },
   "clientId": "laptop",
@@ -98,7 +98,7 @@ The host rejects a client's `Set`, through `rejectionReason`, when:
 
 A client's `Removed` is a no-op when no registration has that `id`.
 
-When a `Set` changes a registration's `provider`, `format`, or `definition`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A change to `name`, `icons`, `clientId`, or `retention` keeps the credential and the nonce. A host may also register sources itself. Those registrations have no `clientId`, and their retention behaves as `host`.
+When a `Set` changes a registration's `provider`, `format`, or `definition`, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A change to `displayName`, `icons`, `clientId`, or `retention` keeps the credential and the nonce. A host may also register sources itself. Those registrations have no `clientId`, and their retention behaves as `host`.
 
 #### Status
 
@@ -112,7 +112,7 @@ A client's `Set` replaces the whole registration, so it clears the host-reported
 
 #### Catalog
 
-When a registration is `ready`, the host adds it to the catalog of the agent named by `provider`, through `root/agentsChanged`: a `ModelSourceInfo` with the registration's `id` and `name`, and its models in `models` with `modelSourceId` set to that `id`. Once the registration has been `ready`, the host keeps its models listed through later `starting` and `authRequired` states, so a key rotation or expiry doesn't change the catalog or break a selection. It withdraws them when the registration is removed, when its contributing client leaves under `contributingClient` retention, when it enters `error`, or when a change to `provider`, `format`, or `definition` mints new model IDs (see [Reserved model IDs](#reserved-model-ids)). A turn that uses a listed model while the source has no usable credential ends with a resumable error, as described in [Model source credentials](/specification/authentication#model-source-credentials). The host MAY list the `ModelSourceInfo` in any state.
+When a registration is `ready`, the host adds it to the catalog of the agent named by `provider`, through `root/agentsChanged`: a `ModelSourceInfo` with the registration's `id` and `displayName`, and its models in `models` with `modelSourceId` set to that `id`. Once the registration has been `ready`, the host keeps its models listed through later `starting` and `authRequired` states, so a key rotation or expiry doesn't change the catalog or break a selection. It withdraws them when the registration is removed, when its contributing client leaves under `contributingClient` retention, when it enters `error`, or when a change to `provider`, `format`, or `definition` mints new model IDs (see [Reserved model IDs](#reserved-model-ids)). A turn that uses a listed model while the source has no usable credential ends with a resumable error, as described in [Model source credentials](/specification/authentication#model-source-credentials). The host MAY list the `ModelSourceInfo` in any state.
 
 Any client can select a registered source's models, in any session whose agent is the registration's `provider`. The host checks every selection: the model is listed, and the chat is backed by the registration's agent provider. It checks whenever it uses a selection, including when a client continues a turn with `chat/turnResume`. Otherwise it rejects the selection through the existing failure paths: `InvalidParams` for requests, and `rejectionReason` for dispatched actions. The host MUST NOT run the work on a different model.
 

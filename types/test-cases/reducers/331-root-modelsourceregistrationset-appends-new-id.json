@@ -7,7 +7,7 @@
       {
         "id": "model-source-a",
         "provider": "copilot",
-        "name": "Source a",
+        "displayName": "Source a",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
@@ -25,7 +25,7 @@
       "registration": {
         "id": "model-source-b",
         "provider": "copilot",
-        "name": "Source b",
+        "displayName": "Source b",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
@@ -43,7 +43,7 @@
       {
         "id": "model-source-a",
         "provider": "copilot",
-        "name": "Source a",
+        "displayName": "Source a",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apia.example.com/v1",
@@ -56,7 +56,7 @@
       {
         "id": "model-source-b",
         "provider": "copilot",
-        "name": "Source b",
+        "displayName": "Source b",
         "format": "example.com/model-source@1",
         "definition": {
           "baseUrl": "https://apib.example.com/v1",
