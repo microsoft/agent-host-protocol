@@ -18,7 +18,7 @@ It assumes the direction #543 is taking after review:
 
 - A **model source** is #543's term for an independently selectable source of model access, described by `ModelSourceInfo` in an agent's catalog.
 - A **registered model source**, or **registration**, is an entry in the host's registry, `RootState.modelSources`: a model source a client or the host added, with its status.
-- A **model source definition** is what tells the agent how to reach the source: the endpoint, the wire format, and any curated model list, in a format the agent understands. It travels on the action that registers the source, and isn't kept in state.
+- A **model source definition** is what tells the agent how to reach the source: the endpoint, the wire format, and any curated model list, in a format the agent understands. It's part of the registration, so every client can see it.
 - A **contributing client** is a client that registered a source and hasn't left. The host tracks contributing clients itself, from the origin of each registering action. They aren't in state.
 - A **principal** is the user or account a host has verified a client acts for. AHP doesn't define how a host verifies one.
 - An **agent provider** is the existing `provider` field (`AgentInfo.provider`). Nothing new is called a "provider".
@@ -57,7 +57,7 @@ AHP carries only four things:
 3. **Credential.** A client supplies a secret, scoped to one registered source.
 4. **Selection.** The source's models appear in the agent's catalog and are selected like any other model.
 
-AHP suggests a few recognized format names ([§4.1](#_4-1-the-registry)), but doesn't define what a definition contains, even for those. `definition` is opaque to AHP and belongs to the agent.
+AHP suggests a few recognized format names, and a shape for each ([§4.1](#_4-1-the-registry)), but doesn't validate definitions. `definition` belongs to the agent.
 
 ---
 
@@ -68,7 +68,7 @@ AHP suggests a few recognized format names ([§4.1](#_4-1-the-registry)), but do
 - **Keyed collections.** The registry follows the `Set` and `Removed` convention used for `activeClients`, `customizations`, and other keyed lists.
 - **MCP server authentication.** An MCP server publishes `McpServerAuthRequiredState`, and the client answers with `authenticate` and a `target` naming that server. The [authentication spec](/specification/authentication#why-keyed-by-resource-and-optional-target) notes that `target.kind` is extensible for exactly this kind of addition.
 - **MCP server status.** The host reports a server's lifecycle with `session/mcpServerStateChanged`, a narrow action that updates only the server's state. A registration's status works the same way.
-- **No per-client ownership.** Any client in a session can start, stop, or enable an MCP server and answer its authentication challenge. AHP checks a `clientId` only to route a client tool's result back from the client that runs it. Registrations follow the same model by default: every connected client can use and change them. A host that can verify principals MAY restrict them ([§4.7](#_4-7-discovering-support)).
+- **No per-client ownership.** Any client in a session can start, stop, or enable an MCP server and answer its authentication challenge. AHP checks a `clientId` only to route a client tool's result back from the client that runs it. Registrations follow the same model: every connected client can use and change them. A host that can verify principals MAY restrict them ([§4.7](#_4-7-discovering-support)).
 - **Container provenance and `nonce`.** A client-published plugin carries a `nonce`, an opaque version token the host compares to detect changes without re-reading the plugin, and a host-reported `load` state that is absent until the host reports one. A registered source carries a `nonce` for its definition the same way, and its host-reported fields are absent until the host reports them.
 - **Action origin.** Every client-dispatched action's envelope carries the dispatcher's `clientId` in `ActionEnvelope.origin`. The host learns who registered a source from it, so the registry itself doesn't need client IDs.
 
@@ -94,9 +94,7 @@ export interface RootState {
 
 /**
  * A model source registered on this host by a client, or by the host
- * itself. The definition that tells the agent named by `provider` how to
- * reach it travels on `root/modelSourceSet` and isn't kept here. Nothing
- * here is a credential.
+ * itself. Nothing here is a credential.
  *
  * @category Root State
  * @stability 1.0
@@ -116,7 +114,7 @@ export interface ModelSource {
   /** Icons for UI display. */
   icons?: Icon[];
   /**
-   * The definition's format, one of the agent's
+   * The definition's format: the `format` of one of the agent's
    * `ModelSourceRegistrationCapability.formats`. Recognized values include:
    *
    * - `'openaiCompatible'`: an endpoint that implements OpenAI's API, such
@@ -130,10 +128,30 @@ export interface ModelSource {
    */
   format: string;
   /**
-   * Opaque version token for the definition, such as a hash of it, chosen
-   * by whoever registers the source. A client compares it with its own copy
-   * instead of the definition, and the reducer compares it to tell an update
-   * from a re-registration of the same definition.
+   * How to reach the source, in `format`: endpoint, wire API, models, and
+   * so on. The agent reads it, and AHP doesn't validate it. Every client
+   * can read it, so it MUST NOT contain a credential.
+   *
+   * Suggested shapes for the recognized formats. Agents MAY read more
+   * members, and MAY discover models when `models` is absent.
+   *
+   * - `openaiCompatible`: `{ endpoint, wireApi?: 'chatCompletions' | 'responses', models? }`
+   * - `anthropic`: `{ endpoint, models? }`
+   * - `azureOpenai`: `{ endpoint, apiVersion?, models? }`, with each
+   *   deployment name as a model `id`
+   * - `gemini`: `{ endpoint, models? }`
+   *
+   * `endpoint` is the API's base URI, such as `https://api.example.com/v1`.
+   * Each `models` entry is `{ id, name?, maxContextWindow?,
+   * maxOutputTokens?, supportsVision?, supportsTools? }`, named as in
+   * `SessionModelInfo`, where `id` is the endpoint's own model identifier.
+   */
+  definition: Record<string, unknown>;
+  /**
+   * Opaque version token for `definition`, such as a hash of it, chosen by
+   * whoever registers the source. Reducers compare it, instead of the
+   * definition, to tell an update from a re-registration of the same
+   * definition.
    */
   nonce: string;
   /** What happens when the last contributing client leaves. Absent means `contributingClient`. */
@@ -146,22 +164,12 @@ export interface ModelSource {
   /** Host-reported status. */
   state?: ModelSourceState;
   /**
-   * Host-issued token that a client echoes when it delivers the credential,
-   * and that tags every agent operation on the source. See §4.4.
-   */
-  credentialNonce?: string;
-  /**
    * RFC 9728 metadata for the endpoint the credential is for. Present
    * whenever the source takes a credential, in every state, so any client
    * can deliver, rotate, or revoke one. Absent for a source that needs no
    * credential.
    */
   credentialResource?: ProtectedResourceMetadata;
-  /**
-   * Every origin the host sends the credential to, such as
-   * `https://api.example.com`. Present whenever `credentialResource` is.
-   */
-  credentialOrigins?: URI[];
   /**
    * The `accountId` the client sent with the credential the host most
    * recently accepted. While the state is `starting` or `ready`, the host
@@ -174,11 +182,11 @@ export interface ModelSource {
 }
 ```
 
-The `format` values follow the pattern of `Changeset.changeKind`: AHP recognizes a few names so clients and agents can agree on common cases, but it doesn't define what a definition contains, even for those ([§9](#_9-open-questions)). `definition` is opaque to AHP and belongs to the agent.
+The `format` values follow the pattern of `Changeset.changeKind`: AHP recognizes a few names, and suggests a shape for each, so clients and agents can agree on common cases. It doesn't validate definitions, even for those, and an agent may expect more than the suggested shape ([§9](#_9-open-questions)). `definition` belongs to the agent.
 
-The definition travels only on `root/modelSourceSet` ([§4.3](#_4-3-registering-updating-and-removing)). The host hands it to the agent and keeps it privately, and the reducer stores the source without it. Clients don't need the definition after it's submitted: they compare `nonce` with their own copy, and check where a key would go with the host-reported `credentialOrigins`. Actions are broadcast and replayed, so the definition is still never secret, and it MUST NOT contain a credential.
+The definition is part of the registration, so any client can show, for example, which endpoint a source uses, and check it against its own copy before it sends a key ([§7](#_7-credential-rules)). Root state and the action stream are broadcast and replayed, so a definition is never secret, and it MUST NOT contain a credential. `nonce` versions the definition, so reducers compare a string rather than JSON ([§4.3](#_4-3-registering-updating-and-removing)).
 
-`credentialResource.resource` is the endpoint URL as the definition names it, and the value a client passes back as `authenticate({ resource })`. `credentialResource.resource_name` labels the prompt, for example "OpenRouter API key". A source that accepts OAuth access tokens advertises `authorization_servers` and `scopes_supported`. A source that takes a user-supplied secret omits them. A source whose models use several endpoints lists every origin in `credentialOrigins`, so a client can check them all before it sends a key ([§7](#_7-credential-rules)).
+`credentialResource.resource` is the endpoint URI as the definition names it, and the value a client passes back as `authenticate({ resource })`. `credentialResource.resource_name` labels the prompt, for example "OpenRouter API key". A source that accepts OAuth access tokens advertises `authorization_servers` and `scopes_supported`. A source that takes a user-supplied secret omits them.
 
 A host may register sources itself, for example from configuration on a remote machine. Those sources have no contributing clients, and their retention behaves as `host`.
 
@@ -301,17 +309,14 @@ export interface RootModelSourceStateChangedAction {
   type: ActionType.RootModelSourceStateChanged; // 'root/modelSourceStateChanged'
   id: string;
   state: ModelSourceState;
-  credentialNonce: string;
   /** Replaces the source's `credentialResource`. Absent clears it. */
   credentialResource?: ProtectedResourceMetadata;
-  /** Replaces the source's `credentialOrigins`. Absent clears it. */
-  credentialOrigins?: URI[];
   /** Replaces the source's `accountId`. Absent clears it. */
   accountId?: string;
 }
 ```
 
-Because the reducer ignores an unknown `id`, a status report that arrives after a registration is removed can't bring it back. Because it changes only the host-reported fields, it can't overwrite a client's newer definition. The host also tags every agent operation on the registration, such as validation, model discovery, and inference, with its current `credentialNonce`, and discards any result whose nonce is no longer current ([§4.4](#_4-4-credential-delivery-through-authenticate)). A slow result from before an update, a removal and re-add under the same `id`, or a key change therefore can't mark the current source `ready`, even when the definition has changed back to the same value.
+Because the reducer ignores an unknown `id`, a status report that arrives after a registration is removed can't bring it back. Because it changes only the host-reported fields, it can't overwrite a client's newer definition.
 
 ### 4.3 Registering, updating, and removing
 
@@ -325,14 +330,8 @@ Because the reducer ignores an unknown `id`, a status report that arrives after 
  */
 export interface RootModelSourceSetAction {
   type: ActionType.RootModelSourceSet; // 'root/modelSourceSet'
-  /** The model source, without host-reported fields. */
+  /** The model source, including its `definition`, without host-reported fields. */
   modelSource: ModelSource;
-  /**
-   * How to reach the source, in `modelSource.format`: endpoint, wire
-   * format, models, and so on. The host hands it to the agent. The reducer
-   * doesn't store it. MUST NOT contain a credential.
-   */
-  definition: Record<string, unknown>;
 }
 
 /**
@@ -349,7 +348,7 @@ export interface RootModelSourceRemovedAction {
 The reducers follow the keyed-collection convention, with one twist so that re-registering the same definition doesn't disturb a working source:
 
 - **Add.** When no model source has the `id`, `Set` appends `modelSource`.
-- **Re-register.** When one has, with the same `provider`, `format`, and `nonce`, `Set` keeps its host-reported fields (`state`, `credentialNonce`, `credentialResource`, `credentialOrigins`, and `accountId`) and takes `displayName`, `icons`, `retention`, and `_meta` from the action. The status, nonce, and credential are undisturbed.
+- **Re-register.** When one has, with the same `provider`, `format`, and `nonce`, `Set` keeps its host-reported fields (`state`, `credentialResource`, and `accountId`) and takes everything else from the action. The status and credential are undisturbed.
 - **Update.** When any of the three differs, `Set` replaces the source. Its host-reported fields are absent until the host reports again.
 - **Remove.** `Removed` deletes the source by `id`, or returns the state unchanged.
 
@@ -365,7 +364,7 @@ The host rejects a client-dispatched `Set`, through `ActionEnvelope.rejectionRea
 
 - the agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format`;
 - `modelSource` includes any host-reported field;
-- its `provider`, `format`, and `nonce` match the existing source's, but `definition` differs from the definition the host holds. A re-registration must not carry a different definition, because reducers keep the credential for it;
+- its `provider`, `format`, and `nonce` match the existing source's, but its `definition` differs. A re-registration must not carry a different definition, because reducers keep the credential for it;
 - `id` equals a `ModelSourceInfo.id` that the agent declares itself. The catalog entry the host publishes for this same source doesn't count, so a ready source can still be re-registered or updated;
 - the host won't honor the requested `retention`. The client can register again with `contributingClient` retention;
 - the source is one the host registered itself;
@@ -375,7 +374,7 @@ A host MAY reject a client's `Removed` for a source it registered itself, or one
 
 The host tracks contributing clients itself, from `ActionEnvelope.origin`. An add or a re-registration adds the dispatching client. An update makes the dispatching client the only one, because the others registered a different definition. When the last contributing client leaves, retention decides what happens ([§6](#_6-lifecycle)).
 
-When `Set` updates a source, because its `provider`, `format`, or `nonce` changed, the host drops its credential, issues a new `credentialNonce`, and the source goes back through `starting`. A changed definition must never receive a key that was supplied for a different one. A re-registration, or a change to `displayName`, `icons`, `retention`, or `_meta`, keeps the credential and the nonce.
+When `Set` updates a source, because its `provider`, `format`, or `nonce` changed, the host drops its credential, and the source goes back through `starting`. A changed definition must never receive a key that was supplied for a different one. A re-registration, or a change to `displayName`, `icons`, `retention`, or `_meta`, keeps the credential.
 
 ### 4.4 Credential delivery through `authenticate`
 
@@ -400,11 +399,6 @@ export interface ModelSourceAuthenticateTarget {
   kind: AuthenticateTargetKind.ModelSource;
   /** The model source's `id`. */
   modelSourceId: string;
-  /**
-   * The model source's current `credentialNonce`, as published in root
-   * state. The host rejects a stale one with `Conflict` (-32011).
-   */
-  credentialNonce: string;
 }
 
 export type AuthenticateTarget =
@@ -425,8 +419,7 @@ export type AuthenticateTarget =
     "accountId": "keychain-5c2a",
     "target": {
       "kind": "modelSource",
-      "modelSourceId": "2f6c0e1a-model-source",
-      "credentialNonce": "9b41d7"
+      "modelSourceId": "2f6c0e1a-model-source"
     }
   }
 }
@@ -438,15 +431,9 @@ Clients MUST include a `modelSource` target when they deliver a registered sourc
 
 Clients SHOULD include the existing `accountId` parameter when they deliver a credential, and omit it when they revoke one. The host publishes it as the source's `accountId`, which lets a client that reloads, or one on another device, tell whether the host holds its current key. `accountId` is opaque and MUST NOT be derived from the secret. For an API key that has no account of its own, a client uses an ID that changes whenever the user replaces the key, such as one derived from where it stores the key and when the key last changed.
 
-`credentialNonce` fences every credential change, and works as the source's generation. The host issues a new nonce whenever a source is added, including one registered again under a removed `id`, and whenever `Set` updates it, whether or not it held a credential. It also issues one whenever it installs or drops a credential: on delivery, rotation, expiry, rejection, and revocation. An `authenticate` built before any of those changes is stale, so:
+As with MCP servers, the target names the source but not a version of it. A delivery replaces whatever credential the host holds for the source, so when two clients answer the same `authRequired`, the later one wins.
 
-- a key meant for an old definition never reaches a new one, even when the endpoint didn't change;
-- a rotation that crosses a revocation can't undo the revocation;
-- when two clients answer the same `authRequired`, the first wins, and the second gets `Conflict`, re-reads state, and finds the source ready.
-
-The host tags every agent operation on the source with the current nonce and discards any result, success or failure, that carries an older one. A late failure can't drop a key that has since replaced it, and a late success can't mark an updated or re-added source `ready`, even after an edit that changes the definition back. Random values meet the rule that a nonce is never reused for the same `id`.
-
-The credential fields stay in root state for as long as the source takes a credential, not only while it's `authRequired`. Any client, including one that connected after the source became ready, can build an `authenticate` request at any time: to rotate a short-lived token before it expires, or to revoke a key with an empty token.
+`credentialResource` stays in root state for as long as the source takes a credential, not only while it's `authRequired`. Any client, including one that connected after the source became ready, can build an `authenticate` request at any time: to rotate a short-lived token before it expires, or to revoke a key with an empty token.
 
 **When a client delivers.** A client delivers a credential only in answer to the source's current state, reading it from its own secure storage or token provider each time. It MUST NOT cache a credential it delivered, or replay one, for example after a reconnect. It delivers one when:
 
@@ -467,7 +454,6 @@ When `target.kind` is `modelSource`, the host:
 - MUST apply the credential only to that model source. It never applies it to other model sources, MCP servers, or agent-level resources, even when they share `resource`.
 - MUST require `resource` to equal the source's current `credentialResource.resource`.
 - MUST reject an unknown `modelSourceId` with `InvalidParams` (`-32602`).
-- MUST reject a `credentialNonce` other than the one it most recently issued for that source with `Conflict` (`-32011`). The client re-reads root state and, if the source still needs a credential, sends it again with the current nonce.
 - MUST publish the request's `accountId` as the source's `accountId` when it accepts a credential, and clear it when the request has none.
 - MUST treat an empty `token` as revocation: it stops using the credential at once, drops it, and reports `authRequired` with `reason: revoked`.
 
@@ -532,7 +518,7 @@ The host rejects `host` retention when it won't honor it ([§4.3](#_4-3-register
 
 ### 4.7 Discovering support
 
-A client needs to know whether an agent accepts registrations, in what format, how long the host tolerates a disconnect, and whether the registry is shared across principals. Unlike the per-agent markers #543 dropped, this capability carries information a client can't get any other way.
+A client needs to know whether an agent accepts registrations, and in what formats. Unlike the per-agent markers #543 dropped, this capability carries information a client can't get any other way.
 
 ```ts
 // types/channels-root/state.ts
@@ -549,44 +535,32 @@ export interface AgentCapabilities {
  * @preserveUnknownMembers
  */
 export interface ModelSourceRegistrationCapability {
-  /**
-   * Definition formats the agent reads, most preferred first: recognized
-   * values of `ModelSource.format`, or namespaced names for formats the
-   * agent defines itself.
-   */
-  formats: string[];
-  /**
-   * How long, in milliseconds, the host keeps counting a disconnected
-   * client as a contributing client before it treats the client as having
-   * left.
-   *
-   * @integer
-   * @minimum 0
-   */
-  gracePeriod?: number;
-  /** Whether clients acting for different principals share the registry. Absent means `shared`. */
-  principalPolicy?: ModelSourcePrincipalPolicy;
+  /** Definition formats the agent reads, most preferred first. */
+  formats: ModelSourceFormatInfo[];
 }
 
 /**
+ * A definition format an agent reads. An object rather than a string so it
+ * can grow, for example with a JSON Schema for the format's definitions.
+ *
  * @category Root State
- * @nonexhaustive
+ * @stability 1.0
+ * @preserveUnknownMembers
  */
-export const enum ModelSourcePrincipalPolicy {
-  /** Every connected client may change, supply credentials for, and select every model source. */
-  Shared = 'shared',
+export interface ModelSourceFormatInfo {
   /**
-   * The host verifies principals, and limits changes, credentials, and
-   * selection of each model source to clients of the principal that
-   * registered it.
+   * A recognized `ModelSource.format` value, or a namespaced name for a
+   * format the agent defines itself.
    */
-  Isolated = 'isolated',
+  format: string;
 }
 ```
 
-A client that knows none of an agent's formats doesn't register with it. AHP recognizes a few format names ([§4.1](#_4-1-the-registry)) but doesn't define what a definition contains.
+A client that knows none of an agent's formats doesn't register with it. AHP recognizes a few format names and suggests a shape for each ([§4.1](#_4-1-the-registry)), but doesn't validate definitions.
 
-**Principals.** AHP doesn't verify which client is which, so by default every connected client is trusted equally, as with MCP servers. Where a host can verify principals, it MAY restrict changes, credentials, and use of a model source to clients of the principal that registered it, and advertises `isolated`. Root state still lists every model source to every client, and the action stream carries every definition, so neither is private. A host whose connections carry credentials scoped to one client, such as a relay that forwards each client's own sign-in, SHOULD NOT let one client's model source be used by another: it uses `isolated`, or doesn't advertise `modelSourceRegistration`.
+How long the host waits for a disconnected client to come back ([§6](#_6-lifecycle)), and whether it restricts sources by principal, are host policy. They aren't in the capability, because a client doesn't change what it does or shows because of them.
+
+**Principals.** AHP doesn't verify which client is which, so every connected client is trusted equally, as with MCP servers. Where a host can verify principals, it MAY restrict changes, credentials, and use of a model source to clients of the principal that registered it, and rejects the rest through the usual failure paths. Root state still lists every model source, with its definition, to every client, so neither is private. A host whose connections carry credentials scoped to one client, such as a relay that forwards each client's own sign-in, SHOULD NOT let one client's model source be used by another: it restricts sources by principal, or doesn't advertise `modelSourceRegistration`.
 
 ### 4.8 Change table
 
@@ -594,15 +568,15 @@ What a follow-up implementation would touch:
 
 | Symbol | File | Kind |
 | --- | --- | --- |
-| `RootState.modelSources`, `ModelSource` (including `nonce`, the recognized `format` values, and the host-reported `credentialNonce`, `credentialResource`, `credentialOrigins`, and `accountId`) | `channels-root/state.ts` | added |
+| `RootState.modelSources`, `ModelSource` (including `definition` with suggested shapes for the recognized `format` values, `nonce`, and the host-reported `credentialResource` and `accountId`) | `channels-root/state.ts` | added |
 | `ModelSourceStatus`, four `ModelSource*State` variants, `ModelSourceState`, `ModelSourceAuthRequirement`, `ModelSourceAuthRequiredReason` | `channels-root/state.ts` | added (lifecycle union) |
 | `ModelSourceRetentionPolicy` | `channels-root/state.ts` | added |
-| `AgentCapabilities.modelSourceRegistration`, `ModelSourceRegistrationCapability`, `ModelSourcePrincipalPolicy` | `channels-root/state.ts` | added (capability) |
-| `root/modelSourceSet` (with `definition`, which the reducer doesn't store), `root/modelSourceRemoved` | `channels-root/actions.ts`, `common/actions.ts`, `version/registry.ts` | added (client-dispatchable, introduced in the development version) |
+| `AgentCapabilities.modelSourceRegistration`, `ModelSourceRegistrationCapability`, `ModelSourceFormatInfo` | `channels-root/state.ts` | added (capability) |
+| `root/modelSourceSet`, `root/modelSourceRemoved` | `channels-root/actions.ts`, `common/actions.ts`, `version/registry.ts` | added (client-dispatchable, introduced in the development version) |
 | `root/modelSourceStateChanged` | `channels-root/actions.ts`, `common/actions.ts`, `version/registry.ts` | added (host-only, introduced in the development version) |
 | Root reducer | `channels-root/reducer.ts` | add, re-register, update, remove, and status change, with fixtures for every branch |
 | Client reducers | `clients/{go,rust,kotlin,swift,dotnet}/` | apply the three root actions, so they pass the shared fixtures |
-| `AuthenticateTargetKind.ModelSource`, `ModelSourceAuthenticateTarget` (with `modelSourceId` and `credentialNonce`), `AuthenticateTarget` | `common/commands.ts` | added, widened |
+| `AuthenticateTargetKind.ModelSource`, `ModelSourceAuthenticateTarget` (with `modelSourceId`), `AuthenticateTarget` | `common/commands.ts` | added, widened |
 | `AuthenticateParams.target`, `resource`, and `accountId` docs | `common/commands.ts` | generalized beyond MCP servers, including opaque secrets that aren't Bearer tokens |
 | `ErrorInfo.errorType` docs | `common/state.ts` | the well-known `modelSourceUnavailable` value |
 | `ModelSourceInfo`, `SessionModelInfo.modelSourceId` docs | `channels-root/state.ts` | registered sources, provenance, and reserved IDs |
@@ -621,17 +595,17 @@ sequenceDiagram
     participant E as Model endpoint
 
     C->>H: initialize
-    H-->>C: root snapshot (agent advertises modelSourceRegistration with formats and gracePeriod)
+    H-->>C: root snapshot (agent advertises modelSourceRegistration with its formats)
 
-    C->>H: root/modelSourceSet (modelSource with nonce, definition)
+    C->>H: root/modelSourceSet (modelSource with definition and nonce)
     H->>A: read and validate the definition
-    H-->>C: root/modelSourceStateChanged (authRequired, credentialNonce, credentialResource, credentialOrigins)
+    H-->>C: root/modelSourceStateChanged (authRequired, credentialResource)
 
-    C->>H: authenticate({ resource, token, accountId, target: { kind: 'modelSource', modelSourceId, credentialNonce } })
+    C->>H: authenticate({ resource, token, accountId, target: { kind: 'modelSource', modelSourceId } })
     H-->>C: {}
     A->>E: list models (credential attached)
     E-->>A: models
-    H-->>C: root/modelSourceStateChanged (ready, new credentialNonce, accountId)
+    H-->>C: root/modelSourceStateChanged (ready, accountId)
     H-->>C: root/agentsChanged (the source and its models join the agent catalog)
 
     C->>H: chat/turnStarted in any session on that agent (message.model: { id })
@@ -642,10 +616,10 @@ sequenceDiagram
 ```
 
 1. The client reads the agent's `modelSourceRegistration` capability and picks a format it can write.
-2. It dispatches `root/modelSourceSet` with the source, its `nonce`, and the definition. The host counts the client as a contributing client, the agent reads and validates the definition, and the host reports `starting` with `root/modelSourceStateChanged`.
-3. If a credential is needed, the host reports `authRequired` with a `credentialNonce`, the `credentialResource` the key is for, and every origin it would send the key to. The client checks those against its own copy and calls `authenticate` with that `resource`, an `accountId` naming its key, and a `modelSource` target that echoes the nonce.
-4. The agent lists models. The host reports `ready`, with a new nonce because a key was installed, and the `accountId` of the key it now holds. It adds the source and its models to the agent's catalog.
-5. Another window or device that has the same source configured dispatches the same `Set`. Its `nonce` matches, so it becomes a contributing client without disturbing the status, nonce, or credential. It sees the `accountId` and doesn't send its key again.
+2. It dispatches `root/modelSourceSet` with the source, including its definition and `nonce`. The host counts the client as a contributing client, the agent reads and validates the definition, and the host reports `starting` with `root/modelSourceStateChanged`.
+3. If a credential is needed, the host reports `authRequired` with the `credentialResource` the key is for. The client checks the source's definition against its own copy and calls `authenticate` with that `resource`, an `accountId` naming its key, and a `modelSource` target.
+4. The agent lists models. The host reports `ready`, with the `accountId` of the key it now holds. It adds the source and its models to the agent's catalog.
+5. Another window or device that has the same source configured dispatches the same `Set`. Its `nonce` matches, so it becomes a contributing client without disturbing the status or credential. It sees the `accountId` and doesn't send its key again.
 6. Any client can select those models in any session on that agent, and so can automations if the source has `host` retention.
 7. When the last contributing client leaves, the retention policy decides whether the source stays (see [§6](#_6-lifecycle)).
 
@@ -655,12 +629,12 @@ sequenceDiagram
 
 ### When a contributing client leaves
 
-A contributing client leaves when its connection closes and it doesn't reconnect with the same `clientId` within the host's grace period, which the host advertises as `gracePeriod`. The host stops counting it. While other contributing clients remain, nothing else changes. When the last one leaves:
+A contributing client leaves when its connection closes and it doesn't reconnect with the same `clientId` within a grace period the host chooses. The host stops counting it. While other contributing clients remain, nothing else changes. When the last one leaves:
 
 - **`contributingClient` retention (the default).** The host stops new work on the source and withdraws its models from the catalog: a new turn or a pending message that names one of its models fails. Turns already running on it SHOULD finish, and the host MAY bound how long it waits. Any client can still cancel such a turn with the existing cancellation actions. The host then removes the source with `root/modelSourceRemoved` and drops its credential.
 - **`host` retention.** The source stays, with its credential in memory and no contributing clients, until a client removes it or host policy expires it. A restart drops its credential (see below). It keeps serving every client and automation. If its credential expires or is rejected, the source goes to `authRequired`, and work that needs it fails until a client answers.
 
-A client that comes back with the same `clientId` within the grace period is still counted, and dispatches `Set` only for the sources it changed. A client that comes back with a new `clientId` and the same configuration re-registers with `Set`, which keeps the status, nonce, and credential.
+A client that comes back with the same `clientId` within the grace period is still counted, and dispatches `Set` only for the sources it changed. A client that comes back with a new `clientId` and the same configuration re-registers with `Set`, which keeps the status and credential.
 
 ### Removal and revocation stop work at once
 
@@ -675,10 +649,10 @@ A selection that names a removed source's model fails. The host MUST NOT run the
 
 ### Rotation, expiry, rejection, and revocation
 
-- **Rotation.** A new `authenticate` with the current nonce replaces the credential, and the host issues a new nonce and publishes the new `accountId`. The host MAY pass through `starting` while the agent re-lists models, keeping the models listed and their IDs stable.
-- **Expiry.** When a credential's lifetime or lease lapses, the host drops it, and the source goes to `authRequired` with `reason: expired` and a new nonce. A client may renew it: a fresh token, or the same static key with a new lease. Clients holding short-lived tokens or leases SHOULD renew before `expiresIn` elapses.
-- **Rejection.** When the endpoint refuses a credential, the source goes to `authRequired` with `reason: rejected` and a new nonce, and `accountId` still names the refused key. No client sends a credential with that `accountId` again. A client whose key differs may send it, or ask the user for a new one.
-- **Revocation.** An empty `token` drops the credential at once, and the source goes to `authRequired` with `reason: revoked` and a new nonce. No client delivers a credential again without a user's action, including other devices that have the key stored, and the new nonce rejects a delivery that was already in flight.
+- **Rotation.** A new `authenticate` replaces the credential, and the host publishes the new `accountId`. The host MAY pass through `starting` while the agent re-lists models, keeping the models listed and their IDs stable.
+- **Expiry.** When a credential's lifetime or lease lapses, the host drops it, and the source goes to `authRequired` with `reason: expired`. A client may renew it: a fresh token, or the same static key with a new lease. Clients holding short-lived tokens or leases SHOULD renew before `expiresIn` elapses.
+- **Rejection.** When the endpoint refuses a credential, the source goes to `authRequired` with `reason: rejected`, and `accountId` still names the refused key. No client sends a credential with that `accountId` again. A client whose key differs may send it, or ask the user for a new one.
+- **Revocation.** An empty `token` drops the credential at once, and the source goes to `authRequired` with `reason: revoked`. No client delivers a credential again without a user's action, including other devices that have the key stored.
 
 ### Turns on an unavailable source
 
@@ -692,21 +666,21 @@ Credentials are gone after a restart, because they were never persisted. `contri
 
 ## 7. Credential rules
 
-1. **Never in state, actions, or notifications.** All of these are broadcast to subscribers. That includes the definition on `root/modelSourceSet`, `nonce`, `_meta`, `ErrorInfo`, `credentialResource`, `credentialOrigins`, `accountId`, and `ModelSourceAuthRequirement`. A secret travels only in `authenticate`, and neither `nonce` nor `accountId` is derived from it. The host writes `description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state.
+1. **Never in state, actions, or notifications.** All of these are broadcast to subscribers. That includes the `definition`, `nonce`, `_meta`, `ErrorInfo`, `credentialResource`, `accountId`, and `ModelSourceAuthRequirement`. A secret travels only in `authenticate`, and neither `nonce` nor `accountId` is derived from it. The host writes `description` and `ErrorInfo` itself, and SHOULD NOT copy upstream response bodies or headers into them: an endpoint's error text can echo part of a key, and every client can read root state.
 2. **Memory only.** The host holds it only in memory. It is never persisted and never placed in environment variables, command lines, logs, telemetry, or error messages. The host SHOULD also redact it from tool output before storing that output or sending it to the model. That's best effort: rule 4 keeps the host from handing the secret to tools, but the same secret can also live where the agent can read it, such as a `.env` file or the user's shell environment, and a host can only redact values it knows.
-3. **Scoped to one model source and one `credentialNonce`.** It is never shared with other model sources, MCP servers, or the agent's own protected resources, and a key sent for an earlier definition never reaches a later one.
-4. **Sent only where the host says.** The host attaches it only to that source's requests, as its definition specifies, and only to origins in `credentialOrigins`. It is never sent to another origin, including on redirect, and never exposed to the model, tools, terminals, or hooks.
+3. **Scoped to one model source.** It is never shared with other model sources, MCP servers, or the agent's own protected resources.
+4. **Sent only where the definition says.** The host attaches it only to that source's requests, as its definition specifies, and only to the endpoints its definition names. It is never sent to another origin, including on redirect, and never exposed to the model, tools, terminals, or hooks.
 5. **Dropped** when the source is removed, when `Set` updates it, when it's revoked, when its lease lapses, and when the host restarts.
 6. **Re-requested through state.** The host asks again by setting `authRequired`. State survives reconnects; `auth/required` notifications are not replayed.
 7. **Delivered only in answer to state.** Clients MUST NOT cache a model source credential they delivered, or replay one, for example on reconnect. They deliver one only in answer to the source's current state ([§4.4](#_4-4-credential-delivery-through-authenticate)), reading it from their own secure storage or token provider. Clients SHOULD NOT prompt the user for a key they don't have.
-8. **Checked by the client.** A client MUST NOT send a stored secret unless the source's `provider`, `format`, and `nonce` match its own copy, and every origin in `credentialOrigins` is one its own copy of the definition sends the key to. The host derives `credentialOrigins` from the definition it actually holds, so the origin check doesn't depend on another client choosing `nonce` honestly. `credentialNonce` stops a delayed reply, but not a device whose copy is out of date or a source another client has changed.
+8. **Checked by the client.** A client MUST NOT send a stored secret unless the source's `provider` and `format` match its own copy, and every endpoint in the source's `definition` that the key would reach is one its own copy sends the key to. It checks the definition itself rather than trusting `nonce`, which another client chooses.
 9. **Reached from the host.** Endpoints in a definition, including loopback and private addresses, are resolved and reached from the host machine: `localhost` in a source registered with a remote host is that host, not the client's machine. Hosts SHOULD apply an egress policy to registered endpoints: deny link-local and cloud metadata addresses, and require `https` for any credentialed endpoint that isn't a loopback address, unless the host has opted in to plain `http`.
 
 ---
 
 ## 8. Out of scope for AHP
 
-- Defining what a definition contains, even for the recognized `format` values. `definition` stays opaque and belongs to the agent.
+- Validating definitions. AHP suggests a shape for each recognized `format` value ([§4.1](#_4-1-the-registry)), but `definition` is open JSON that belongs to the agent.
 - Endpoint validation beyond rule 9's egress policy, model discovery, capability derivation, and wire protocols. These belong to the agent.
 - Client-side credential storage, and keys the host stores itself. That is host-owned authentication ([#404](https://github.com/microsoft/agent-host-protocol/pull/404)); see the open questions.
 - How a host verifies principals.
@@ -720,9 +694,9 @@ Hosts apply policy appropriate to the source, for example by declining registrat
 ## 9. Open questions
 
 - **Holding a turn for a credential.** A turn whose credential fails ends with the resumable `modelSourceUnavailable` error (see [§6](#turns-on-an-unavailable-source)). Should a host instead be able to hold the turn visibly, with a `modelSourceAuthentication` input request in `SessionState.inputNeeded`? It would carry a `ModelSourceAuthRequirement`, the way MCP's tool authentication request carries an `McpAuthRequirement`.
-- **Definitions for the recognized formats.** AHP recognizes a few `format` names but doesn't define what their definitions contain, so two agents that both read `openaiCompatible` may still expect different definitions. Should AHP define a small shared definition for each recognized format, for example in [Open Plugins](https://open-plugins.com/), so one definition works with any agent?
+- **Definitions for the recognized formats.** AHP suggests a shape for each recognized `format` but doesn't require it, so two agents that both read `openaiCompatible` may still expect different definitions. Should the suggested shapes become normative, for example as a JSON Schema on `ModelSourceFormatInfo`, or in [Open Plugins](https://open-plugins.com/), so one definition works with any agent?
 - **Keys that survive a restart, and host-owned authentication.** `host` retention keeps a key only in memory. Keeping it across restarts needs the host to store it, which #404 doesn't cover yet: its flows are OAuth only, and its account consumers are agents and MCP servers. Once host-owned authentication lands, it's likely to become the canonical place for model source credentials, and the `modelSource` target and the `accountId` published here would follow it. An API key also has no authority-qualified account for [#459](https://github.com/microsoft/agent-host-protocol/pull/459)'s revocation.
-- **Hiding sources from other principals.** `isolated` lets a host restrict who changes, supplies credentials for, and uses a model source, but root state still lists every source, and the action stream carries every definition, to every client. Should a host be able to hide sources from clients of other principals? That would be a new pattern for root state.
+- **Hiding sources from other principals.** A host that restricts sources by principal limits who changes, supplies credentials for, and uses a model source, but root state still lists every source, with its definition, to every client. Should a host be able to hide sources from clients of other principals? That would be a new pattern for root state.
 - **Duplicates.** Clients that derive different `id`s for the same service get two sources. Should a host merge them?
 
 ---
@@ -747,9 +721,11 @@ Hosts apply policy appropriate to the source, for example by declining registrat
   - Per-session enablement and per-session model sets, which the customization lifecycle provides, don't match how BYOK is configured.
 - **A `SessionActiveClient.modelSources` field with host-published copies.** The first draft of #619. It makes the client the source of truth for model metadata it can't validate, and has the same session-scope problems.
 - **Host configuration.** Model sources could be values in `RootConfigState`, changed with `root/configChanged`. Config has no per-entry provenance, status, or credential target, so each would need adding anyway.
-- **Per-client sharing and ownership.** An earlier draft let the contributing client limit who could use a source and who could change it, so one client couldn't spend another's key. AHP can't verify which client is which, any connected client can already run tools as the host's user, and MCP servers have no such limits. The rules added complexity without protection, so they were dropped. A host that can verify principals advertises `isolated` instead ([§4.7](#_4-7-discovering-support)).
+- **Per-client sharing and ownership.** An earlier draft let the contributing client limit who could use a source and who could change it, so one client couldn't spend another's key. AHP can't verify which client is which, any connected client can already run tools as the host's user, and MCP servers have no such limits. The rules added complexity without protection, so they were dropped. A host that can verify principals may restrict sources instead ([§4.7](#_4-7-discovering-support)).
 - **Client IDs in state.** Earlier drafts recorded the client that last wrote a source, and then a list of contributing clients with a per-client withdrawal action. A source can outlive the connections that registered it, so those IDs mean little to other clients. The host learns who registered a source from `ActionEnvelope.origin` and tracks contributing clients itself, which is all `contributingClient` retention needs.
-- **Definitions in state.** An earlier draft kept each definition in root state so clients could compare it with their own, which forced every client's reducer to compare JSON values the same way. Only the host and its agent need the definition after it's submitted. A `nonce` lets clients compare versions, as `ClientPluginCustomization.nonce` does, and the host-reported `credentialOrigins` lets them check where a key would go.
+- **Definitions only on the action.** An earlier revision kept the definition out of root state: it traveled only on `root/modelSourceSet`, and the host published the origins a key would reach as `credentialOrigins`. Clients then couldn't show which endpoint a source uses, so the definition is back in state. `nonce` still spares reducers from comparing JSON, as `ClientPluginCustomization.nonce` does.
+- **A host-issued credential nonce.** An earlier revision had the host issue a `credentialNonce` that every `authenticate` echoed and that tagged every agent operation, so a delayed delivery or agent result couldn't apply to a newer definition or key. MCP server authentication has no such fence, the races it closed need a delivery to cross another client's change to the same source, and a host can discard stale agent results without a protocol field, so it was dropped.
+- **Host policy in the capability.** An earlier revision advertised the host's disconnect grace period and whether it restricted sources by principal. A client doesn't change what it does or shows because of either, so both stay host policy.
 - **Hiding registrations per connection.** Root state is one shared, replayable state, and this proposal trusts every connected client, so it doesn't project different registries to different clients.
 - **Reporting status by rewriting the registration.** An earlier draft had the host dispatch the whole registration back with `state` added. A late status write could then bring back a removed registration or overwrite a newer definition, which took several extra rules to prevent. A narrow status action, as MCP uses, prevents both by construction.
 - **Host-to-client credential fetch per request.** The host would ask the contributing client for the key on each request, so it never rests on the host. AHP has host-to-client requests, such as the `resource*` family, but a fetch per model request adds a client round trip to every request and can't serve headless work once the client leaves.
@@ -763,7 +739,7 @@ Applying the [doctrine's design tests](/guide/doctrine#design-tests):
 - **Can a minimal client ignore this and still render a coherent session?** Yes. It sees ordinary models in the agent's catalog, and turns use whichever model it picks.
 - **Is the durable, user-visible result represented in state?** Yes. Registrations, their status, and their models live in root state. The credential is deliberately not state, because it is a secret.
 - **Does the host remain the authority?** Yes. The host validates registrations, decides status and policy, mints model IDs, and checks every selection. Clients send a definition and a secret, never a catalog.
-- **Does this expose an agent implementation detail?** Only the format name. The definition's content, discovery, wire protocol, model ID mapping, and how a key is attached stay with the agent.
+- **Does this expose an agent implementation detail?** Only the format name, and a suggested definition shape for the recognized formats. Reading the definition, discovery, wire protocol, model ID mapping, and how a key is attached stay with the agent.
 - **Does it fit an existing channel?** Yes. The registry is root state, and the credential uses root `authenticate`. No new channel.
 - **Can clients discover support through capabilities or optional state?** Yes, through the agent's `modelSourceRegistration` capability and its formats.
 - **Is provider-specific metadata an enhancement rather than a requirement?** Yes. `_meta` on registrations and models stays optional.
