@@ -194,8 +194,6 @@ It gives the host identity claims, such as the issuer or the account's tenant, t
 
 The ID Token is client-supplied information about the account, not a credential. Hosts MUST NOT use it to authorize access, and its claims are unverified unless the host validates the token.
 
-Older hosts ignore `idToken`. No capability or protocol-version change is required.
-
 ## Error Handling
 
 ### `AuthRequired` Error Code
