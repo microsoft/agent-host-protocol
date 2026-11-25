@@ -1586,9 +1586,14 @@ data class RootModelSourceRegisterRequestedAction(
      */
     val icons: List<Icon>? = null,
     /**
-     * The source's format, definition, and retention.
+     * The source's format and definition.
      */
     val registration: ModelSourceRegistration,
+    /**
+     * What happens to the source when the last contributing client leaves.
+     * Absent means `contributingClient`. The host keeps it privately.
+     */
+    val retention: ModelSourceRetentionPolicy? = null,
     /**
      * Additional implementation-defined metadata for this model source.
      * MUST NOT contain a credential.

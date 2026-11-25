@@ -1,7 +1,7 @@
 {
   "name": "root-model-source-register-requested",
   "group": "A",
-  "description": "A client asks the host to register a model source with root/modelSourceRegisterRequested, giving its registration: the format, a definition in a common shape plus a member the agent defines, and the requested retention.",
+  "description": "A client asks the host to register a model source with root/modelSourceRegisterRequested, giving its registration (the format, and a definition in a common shape plus a member the agent defines) and the retention the host keeps privately.",
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceRegisterRequested",
@@ -27,9 +27,9 @@
         "headers": {
           "x-title": "Example"
         }
-      },
-      "retention": "host"
-    }
+      }
+    },
+    "retention": "host"
   },
   "acceptableOutputs": [
     {
@@ -56,9 +56,9 @@
           "headers": {
             "x-title": "Example"
           }
-        },
-        "retention": "host"
-      }
+        }
+      },
+      "retention": "host"
     }
   ]
 }

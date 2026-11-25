@@ -2687,10 +2687,6 @@ public sealed record ModelSourceRegistration
     /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
     /// named as in {@link SessionModelInfo}.</summary>
     public required Dictionary<string, JsonElement> Definition { get; init; }
-
-    /// <summary>What happens when the last contributing client leaves. Absent means `contributingClient`.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ModelSourceRetentionPolicy? Retention { get; init; }
 }
 
 /// <summary>A source that an agent provider offers models from, such as a service,

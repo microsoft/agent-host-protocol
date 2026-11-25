@@ -34,7 +34,6 @@ ModelSource {
   registration?: {                      // absent on built-in sources
     format: string
     definition: Record<string, unknown> // how the agent reaches the source; never a credential
-    retention?: 'contributingClient' | 'host'
   }
   state: ModelSourceState               // starting | ready | authRequired | error
   credentialResource?: ProtectedResourceMetadata
@@ -48,7 +47,7 @@ An agent that serves models from client-registered sources advertises [`AgentCap
 
 Registration follows the same pattern as automations: the client asks, and the host publishes the result.
 
-1. A client dispatches [`root/modelSourceRegisterRequested`](/reference/root#rootmodelsourceregisterrequestedaction) with the source's `modelSourceId`, `provider`, `displayName`, and a `registration` holding its `format` and a `definition` that tells the agent how to reach it. Every client can read a definition, so it MUST NOT contain a credential. The request doesn't change state.
+1. A client dispatches [`root/modelSourceRegisterRequested`](/reference/root#rootmodelsourceregisterrequestedaction) with the source's `modelSourceId`, `provider`, `displayName`, a `registration` holding its `format` and a `definition` that tells the agent how to reach it, and optionally the [`retention`](#retention) it wants. Every client can read a definition, so it MUST NOT contain a credential. The request doesn't change state.
 2. The host validates the request and publishes the source with [`root/modelSourceSet`](/reference/root#rootmodelsourcesetaction), which adds it or replaces the one with the same `id`. When the registration is unchanged, the host keeps the source's status and credential. When the definition changes, it drops the credential and the source goes back to `starting`.
 
 [`root/modelSourceRemoved`](/reference/root#rootmodelsourceremovedaction) removes a source for every client. The host rejects either client action when it breaks the rules in [Server Validation of Client Actions](/specification/root-channel#server-validation-of-client-actions).
@@ -110,7 +109,7 @@ Clients MUST NOT cache a model source credential they delivered, or replay one, 
 
 ## Retention
 
-A registered source's `registration.retention` decides what happens when its last contributing client disconnects and doesn't return within a grace period the host chooses:
+The `retention` a client requests with `root/modelSourceRegisterRequested` decides what happens when a source's last contributing client disconnects and doesn't return within a grace period the host chooses. The host keeps it privately, so it isn't in state:
 
 - `contributingClient`, the default: the host stops new work on the source, lets running turns finish, and then removes it.
 - `host`: the source stays until a client removes it or host policy expires it.

@@ -2386,9 +2386,6 @@ pub struct ModelSourceRegistration {
     /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
     /// named as in {@link SessionModelInfo}.
     pub definition: JsonObject,
-    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retention: Option<ModelSourceRetentionPolicy>,
 }
 
 /// A source that an agent provider offers models from, such as a service,

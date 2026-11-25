@@ -2080,17 +2080,13 @@ public struct ModelSourceRegistration: Codable, Sendable, Equatable {
     /// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
     /// named as in {@link SessionModelInfo}.
     public var definition: [String: AnyCodable]
-    /// What happens when the last contributing client leaves. Absent means `contributingClient`.
-    public var retention: ModelSourceRetentionPolicy?
 
     public init(
         format: String,
-        definition: [String: AnyCodable],
-        retention: ModelSourceRetentionPolicy? = nil
+        definition: [String: AnyCodable]
     ) {
         self.format = format
         self.definition = definition
-        self.retention = retention
     }
 }
 

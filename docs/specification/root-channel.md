@@ -112,7 +112,7 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | --- | --- | --- |
 | `root/modelSourceRegisterRequested` | The agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `registration.format` | Server MUST reject the action |
 | `root/modelSourceRegisterRequested` | The existing source with that `modelSourceId` is one the host registered itself | Server MUST reject the action |
-| `root/modelSourceRegisterRequested` | The host won't honor the requested `registration.retention` | Server MUST reject the action |
+| `root/modelSourceRegisterRequested` | The host won't honor the requested `retention` | Server MUST reject the action |
 | `root/modelSourceRemoved` | The source is one the host registered itself | Server MAY reject the action |
 | `root/modelSourceRegisterRequested`, `root/modelSourceRemoved` | The host restricts sources by principal, and the source belongs to another principal | Server MAY reject the action |
 

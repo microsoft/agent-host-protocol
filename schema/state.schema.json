@@ -851,10 +851,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it. Every client can read it, so it MUST NOT contain\na credential.\n\nAn agent that reads one of the common format names might expect a shape\nlike `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is\nthe API's base URI and each `models` entry is `{ id, name?,\nmaxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,\nnamed as in {@link SessionModelInfo}."
-        },
-        "retention": {
-          "$ref": "#/$defs/ModelSourceRetentionPolicy",
-          "description": "What happens when the last contributing client leaves. Absent means `contributingClient`."
         }
       },
       "required": [
@@ -7578,14 +7574,6 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
-    },
-    "ModelSourceRetentionPolicy": {
-      "enum": [
-        "contributingClient",
-        "host"
-      ],
-      "type": "string",
-      "description": "How long a registered model source lasts once its last contributing client\nleaves."
     },
     "ModelSourceAuthRequiredReason": {
       "enum": [

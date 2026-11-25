@@ -65,8 +65,7 @@
                 "id": "model-a"
               }
             ]
-          },
-          "retention": "host"
+          }
         },
         "state": {
           "kind": "starting"
@@ -90,8 +89,7 @@
                 "id": "model-a"
               }
             ]
-          },
-          "retention": "host"
+          }
         },
         "state": {
           "kind": "starting"

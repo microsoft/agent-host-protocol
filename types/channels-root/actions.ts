@@ -4,7 +4,7 @@
  * @module channels-root/actions
  */
 
-import type { AgentInfo, ModelSource, ModelSourceRegistration } from './state.js';
+import type { AgentInfo, ModelSource, ModelSourceRegistration, ModelSourceRetentionPolicy } from './state.js';
 import type { TerminalInfo } from '../channels-terminal/state.js';
 import type { Icon } from '../common/state.js';
 import { ActionType } from '../common/actions.js';
@@ -91,8 +91,13 @@ export interface RootModelSourceRegisterRequestedAction {
   displayName: string;
   /** Icons for UI display. */
   icons?: Icon[];
-  /** The source's format, definition, and retention. */
+  /** The source's format and definition. */
   registration: ModelSourceRegistration;
+  /**
+   * What happens to the source when the last contributing client leaves.
+   * Absent means `contributingClient`. The host keeps it privately.
+   */
+  retention?: ModelSourceRetentionPolicy;
   /**
    * Additional implementation-defined metadata for this model source.
    * MUST NOT contain a credential.

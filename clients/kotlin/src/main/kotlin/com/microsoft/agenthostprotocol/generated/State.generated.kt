@@ -2056,11 +2056,7 @@ data class ModelSourceRegistration(
      * maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
      * named as in {@link SessionModelInfo}.
      */
-    val definition: Map<String, JsonElement>,
-    /**
-     * What happens when the last contributing client leaves. Absent means `contributingClient`.
-     */
-    val retention: ModelSourceRetentionPolicy? = null
+    val definition: Map<String, JsonElement>
 )
 
 /**

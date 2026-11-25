@@ -222,8 +222,11 @@ type RootModelSourceRegisterRequestedAction struct {
 	DisplayName string `json:"displayName"`
 	// Icons for UI display.
 	Icons []Icon `json:"icons,omitempty"`
-	// The source's format, definition, and retention.
+	// The source's format and definition.
 	Registration ModelSourceRegistration `json:"registration"`
+	// What happens to the source when the last contributing client leaves.
+	// Absent means `contributingClient`. The host keeps it privately.
+	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
 	// Additional implementation-defined metadata for this model source.
 	// MUST NOT contain a credential.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`

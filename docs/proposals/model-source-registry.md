@@ -7,7 +7,7 @@
 Implemented by [#627](https://github.com/microsoft/agent-host-protocol/pull/627). The type sketches below show the intended shape; the canonical definitions are in `types/` and the [Model Sources guide](/guide/model-sources). Review of #627 changed the shape in these ways:
 
 - `RootState.modelSources` lists every model source, including an agent's built-in ones, and replaces `ModelSourceInfo` and `AgentInfo.modelSources`. `state` is required.
-- A registered source's `format`, `definition`, and `retention` are grouped in `ModelSource.registration`, and there's no `nonce`: the host compares definitions itself.
+- A registered source's `format` and `definition` are grouped in `ModelSource.registration`, and there's no `nonce`: the host compares definitions itself. `retention` is only on the registration request, and the host keeps it privately.
 - Clients dispatch `root/modelSourceRegisterRequested`, which doesn't change state. The host publishes every source and status change with `root/modelSourceSet`, which replaces the entry, so there's no `root/modelSourceStateChanged`. `root/modelSourceRemoved` takes a `modelSourceId`.
 - Requests and turns on an unavailable source fail with `AhpErrorCodes.ModelSourceUnavailable`, which a turn carries in `ErrorInfo.errorCode`.
 

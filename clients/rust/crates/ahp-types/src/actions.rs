@@ -21,11 +21,11 @@ use crate::state::{
     ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, FileEditCollection, Icon, MaterializedTurn, McpAuthRequirement,
     McpServerState, Message, ModelSelection, ModelSource, ModelSourceRegistration,
-    PendingMessageKind, ResponsePart, SearchLifecycleState, SearchQuery, SearchResult,
-    SessionActiveClient, SessionConfigSchema, SessionInputRequest, SideChatSelection,
-    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
-    ToolResultContent, Turn, UsageInfo,
+    ModelSourceRetentionPolicy, PendingMessageKind, ResponsePart, SearchLifecycleState,
+    SearchQuery, SearchResult, SessionActiveClient, SessionConfigSchema, SessionInputRequest,
+    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
+    ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -576,8 +576,12 @@ pub struct RootModelSourceRegisterRequestedAction {
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
-    /// The source's format, definition, and retention.
+    /// The source's format and definition.
     pub registration: ModelSourceRegistration,
+    /// What happens to the source when the last contributing client leaves.
+    /// Absent means `contributingClient`. The host keeps it privately.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention: Option<ModelSourceRetentionPolicy>,
     /// Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]

@@ -1,7 +1,7 @@
 {
   "name": "model-source-registry-snapshot",
   "group": "A",
-  "description": "A root snapshot lists an agent's built-in model source, with no registration, alongside registered model sources in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint, a host-retained source, and a host-registered source in a namespaced format. Each registered source carries its format and definition, including members an agent defines itself, in its registration. Sources that take a credential carry credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
+  "description": "A root snapshot lists an agent's built-in model source, with no registration, alongside registered model sources in each lifecycle state and auth reason (required, expired, rejected, and revoked), including an http endpoint and a host-registered source in a namespaced format. Each registered source carries its format and definition, including members an agent defines itself, in its registration. Sources that take a credential carry credentialResource in every state, and accountId once the host has accepted a key sent with one. The agent advertises the modelSourceRegistration capability with format objects, and its catalog lists the built-in source's model, the ready source's, and the authRequired one's whose key expired, since models stay listed after a source has been ready.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-root://",
@@ -110,8 +110,7 @@
                 }
               ],
               "fileEndpoint": "https://files.example.com/v1"
-            },
-            "retention": "host"
+            }
           },
           "state": {
             "kind": "ready"
@@ -139,8 +138,7 @@
                   "id": "example-deployment"
                 }
               ]
-            },
-            "retention": "contributingClient"
+            }
           },
           "state": {
             "kind": "authRequired",
@@ -197,8 +195,7 @@
                   "id": "vendor/model-a"
                 }
               ]
-            },
-            "retention": "host"
+            }
           },
           "state": {
             "kind": "authRequired",
@@ -229,8 +226,7 @@
                   "id": "vendor/model-a"
                 }
               ]
-            },
-            "retention": "host"
+            }
           },
           "state": {
             "kind": "authRequired",
@@ -374,8 +370,7 @@
                   }
                 ],
                 "fileEndpoint": "https://files.example.com/v1"
-              },
-              "retention": "host"
+              }
             },
             "state": {
               "kind": "ready"
@@ -403,8 +398,7 @@
                     "id": "example-deployment"
                   }
                 ]
-              },
-              "retention": "contributingClient"
+              }
             },
             "state": {
               "kind": "authRequired",
@@ -461,8 +455,7 @@
                     "id": "vendor/model-a"
                   }
                 ]
-              },
-              "retention": "host"
+              }
             },
             "state": {
               "kind": "authRequired",
@@ -493,8 +486,7 @@
                     "id": "vendor/model-a"
                   }
                 ]
-              },
-              "retention": "host"
+              }
             },
             "state": {
               "kind": "authRequired",

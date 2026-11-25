@@ -1067,8 +1067,6 @@ type ModelSourceRegistration struct {
 	// maxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,
 	// named as in {@link SessionModelInfo}.
 	Definition map[string]json.RawMessage `json:"definition"`
-	// What happens when the last contributing client leaves. Absent means `contributingClient`.
-	Retention *ModelSourceRetentionPolicy `json:"retention,omitempty"`
 }
 
 // A source that an agent provider offers models from, such as a service,

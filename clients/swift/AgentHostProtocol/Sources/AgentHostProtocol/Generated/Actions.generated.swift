@@ -2394,8 +2394,11 @@ public struct RootModelSourceRegisterRequestedAction: Codable, Sendable, Equatab
     public var displayName: String
     /// Icons for UI display.
     public var icons: [Icon]?
-    /// The source's format, definition, and retention.
+    /// The source's format and definition.
     public var registration: ModelSourceRegistration
+    /// What happens to the source when the last contributing client leaves.
+    /// Absent means `contributingClient`. The host keeps it privately.
+    public var retention: ModelSourceRetentionPolicy?
     /// Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
@@ -2407,6 +2410,7 @@ public struct RootModelSourceRegisterRequestedAction: Codable, Sendable, Equatab
         case displayName
         case icons
         case registration
+        case retention
         case meta = "_meta"
     }
 
@@ -2417,6 +2421,7 @@ public struct RootModelSourceRegisterRequestedAction: Codable, Sendable, Equatab
         displayName: String,
         icons: [Icon]? = nil,
         registration: ModelSourceRegistration,
+        retention: ModelSourceRetentionPolicy? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
@@ -2425,6 +2430,7 @@ public struct RootModelSourceRegisterRequestedAction: Codable, Sendable, Equatab
         self.displayName = displayName
         self.icons = icons
         self.registration = registration
+        self.retention = retention
         self.meta = meta
     }
 }

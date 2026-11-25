@@ -18,8 +18,7 @@
               "id": "vendor/model-a"
             }
           ]
-        },
-        "retention": "host"
+        }
       },
       "state": {
         "kind": "authRequired",
@@ -49,8 +48,7 @@
                 "id": "vendor/model-a"
               }
             ]
-          },
-          "retention": "host"
+          }
         },
         "state": {
           "kind": "authRequired",

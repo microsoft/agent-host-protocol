@@ -941,10 +941,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "How to reach the source, in `format`: endpoint, wire API, models, and so\non. The agent reads it. Every client can read it, so it MUST NOT contain\na credential.\n\nAn agent that reads one of the common format names might expect a shape\nlike `{ endpoint, wireApi?, apiVersion?, models? }`, where `endpoint` is\nthe API's base URI and each `models` entry is `{ id, name?,\nmaxContextWindow?, maxOutputTokens?, supportsVision?, supportsTools? }`,\nnamed as in {@link SessionModelInfo}."
-        },
-        "retention": {
-          "$ref": "#/$defs/ModelSourceRetentionPolicy",
-          "description": "What happens when the last contributing client leaves. Absent means `contributingClient`."
         }
       },
       "required": [
@@ -9126,14 +9122,6 @@
       ],
       "description": "Lifecycle state of a {@link ModelSource}, discriminated by\n`kind` (a {@link ModelSourceStatus} value)."
     },
-    "ModelSourceRetentionPolicy": {
-      "enum": [
-        "contributingClient",
-        "host"
-      ],
-      "type": "string",
-      "description": "How long a registered model source lasts once its last contributing client\nleaves."
-    },
     "ModelSourceAuthRequiredReason": {
       "enum": [
         "required",
@@ -10574,7 +10562,11 @@
         },
         "registration": {
           "$ref": "#/$defs/ModelSourceRegistration",
-          "description": "The source's format, definition, and retention."
+          "description": "The source's format and definition."
+        },
+        "retention": {
+          "$ref": "#/$defs/ModelSourceRetentionPolicy",
+          "description": "What happens to the source when the last contributing client leaves.\nAbsent means `contributingClient`. The host keeps it privately."
         },
         "_meta": {
           "type": "object",
@@ -12979,6 +12971,14 @@
       "required": [
         "type"
       ]
+    },
+    "ModelSourceRetentionPolicy": {
+      "enum": [
+        "contributingClient",
+        "host"
+      ],
+      "type": "string",
+      "description": "How long a registered model source lasts once its last contributing client\nleaves."
     },
     "ChatToolCallApprovedAction": {
       "type": "object",

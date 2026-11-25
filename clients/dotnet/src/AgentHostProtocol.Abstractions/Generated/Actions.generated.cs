@@ -404,8 +404,13 @@ public sealed record RootModelSourceRegisterRequestedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Icon>? Icons { get; init; }
 
-    /// <summary>The source's format, definition, and retention.</summary>
+    /// <summary>The source's format and definition.</summary>
     public required ModelSourceRegistration Registration { get; init; }
+
+    /// <summary>What happens to the source when the last contributing client leaves.
+    /// Absent means `contributingClient`. The host keeps it privately.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelSourceRetentionPolicy? Retention { get; init; }
 
     /// <summary>Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.</summary>
