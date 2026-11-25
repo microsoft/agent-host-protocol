@@ -158,6 +158,8 @@ The `target.kind` discriminant is extensible so future consumers, such as [host-
 
 Clients MAY include `accountId` alongside the token to identify their selected account. Hosts can compare `accountId` values to detect when the underlying account has changed. When present, `accountId` MUST be a nonempty string, and hosts MUST treat it as opaque.
 
+Clients MAY also include `accountLabel`, a human-readable label for the selected account. It is client-supplied, display-only metadata and need not be unique or stable. Hosts MUST NOT use it to identify accounts, detect account changes, or authorize access; token validation remains authoritative.
+
 ```jsonc
 {
   "jsonrpc": "2.0",
@@ -167,10 +169,15 @@ Clients MAY include `accountId` alongside the token to identify their selected a
     "channel": "ahp-root://",
     "resource": "https://api.example.com",
     "token": "access_token",
-    "accountId": "client-selection-7"
+    "accountId": "client-selection-7",
+    "accountLabel": "Example account"
   }
 }
 ```
+
+`accountLabel` is optional independently of `accountId`. Older hosts ignore it, and newer hosts continue accepting requests that omit it. No capability or protocol-version change is required.
+
+Wire compatibility does not imply native source or binary compatibility: Rust struct literals must add `account_label: None` when omitting the label, and existing Kotlin data-class binaries must be rebuilt against the updated generated model.
 
 ## Error Handling
 
