@@ -2461,7 +2461,7 @@ const (
 \tErrorCodeAlreadyExists               int32 = -32010
 \t// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
 \tErrorCodeTcpConnectionOpenFailed     int32 = -32012
-\t// ErrorCodeModelSourceUnavailable indicates that a request selects a model whose registered model source can't serve it.
+\t// ErrorCodeModelSourceUnavailable indicates that a request or turn needs a registered model source that can't serve it.
 \tErrorCodeModelSourceUnavailable       int32 = -32013
 )
 

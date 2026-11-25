@@ -1,0 +1,36 @@
+{
+  "name": "chat-error-part-error-code",
+  "group": "A",
+  "description": "A chat/error part's ErrorInfo carries an AhpErrorCodes value in errorCode, here ModelSourceUnavailable for a turn whose registered model source can't serve it.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/error",
+    "turnId": "turn-1",
+    "duration": 250,
+    "part": {
+      "kind": "error",
+      "error": {
+        "errorType": "modelSourceUnavailable",
+        "errorCode": -32013,
+        "message": "The model source needs a credential."
+      },
+      "resumable": true
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/error",
+      "turnId": "turn-1",
+      "duration": 250,
+      "part": {
+        "kind": "error",
+        "error": {
+          "errorType": "modelSourceUnavailable",
+          "errorCode": -32013,
+          "message": "The model source needs a credential."
+        },
+        "resumable": true
+      }
+    }
+  ]
+}

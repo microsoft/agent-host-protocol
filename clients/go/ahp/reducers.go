@@ -552,14 +552,14 @@ func ApplyActionToRoot(state *ahptypes.RootState, action ahptypes.StateAction) R
 		}
 		return ReduceOutcomeApplied
 	case *ahptypes.RootModelSourceRemovedAction:
-		idx := modelSourceIndex(state.ModelSources, a.Id)
+		idx := modelSourceIndex(state.ModelSources, a.ModelSourceId)
 		if idx < 0 {
 			return ReduceOutcomeNoOp
 		}
 		state.ModelSources = append(state.ModelSources[:idx], state.ModelSources[idx+1:]...)
 		return ReduceOutcomeApplied
 	case *ahptypes.RootModelSourceStateChangedAction:
-		idx := modelSourceIndex(state.ModelSources, a.Id)
+		idx := modelSourceIndex(state.ModelSources, a.ModelSourceId)
 		if idx < 0 {
 			return ReduceOutcomeNoOp
 		}

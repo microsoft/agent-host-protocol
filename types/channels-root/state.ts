@@ -319,12 +319,10 @@ export interface ModelSourceFormatInfo {
 /**
  * A source that an agent provider offers models from, such as a service,
  * subscription, or endpoint. The host lists the sources an agent provides
- * itself, and clients can register more with a definition. Nothing here is
- * a credential.
+ * itself, and clients can register more with a definition.
  *
  * @category Root State
  * @stability 1.0
- * @preserveUnknownMembers
  * @see {@link /guide/model-sources | Model Sources guide}
  */
 export interface ModelSource {
@@ -390,7 +388,7 @@ export interface ModelSource {
    * `credentialResource.resource` is the endpoint URL as the definition
    * names it, in any scheme the agent supports (for example
    * `http://localhost:11434/v1`). It's the value a client passes back as
-   * `authenticate({ resource })`, and nothing fetches it.
+   * `authenticate({ resource })`.
    *
    * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
    */

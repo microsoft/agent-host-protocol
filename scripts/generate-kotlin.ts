@@ -144,6 +144,7 @@ function mapType(tsType: string): string {
 
   // Type aliases
   if (tsType === 'URI') return 'String';
+  if (tsType === 'AhpErrorCode') return 'Int';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
@@ -2442,7 +2443,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
-  lines.push("    /** A request selects a model whose registered model source can't serve it */");
+  lines.push("    /** A request or turn needs a registered model source that can't serve it */");
   lines.push('    const val MODEL_SOURCE_UNAVAILABLE: Int = -32013');
   lines.push('}');
   lines.push('');

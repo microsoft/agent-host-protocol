@@ -55,7 +55,7 @@ export function rootReducer(state: RootState, action: RootAction, log?: (msg: st
       if (!list) {
         return state;
       }
-      const idx = list.findIndex(source => source.id === action.id);
+      const idx = list.findIndex(source => source.id === action.modelSourceId);
       if (idx < 0) {
         return state;
       }
@@ -69,7 +69,7 @@ export function rootReducer(state: RootState, action: RootAction, log?: (msg: st
       if (!list) {
         return state;
       }
-      const idx = list.findIndex(source => source.id === action.id);
+      const idx = list.findIndex(source => source.id === action.modelSourceId);
       if (idx < 0) {
         return state;
       }

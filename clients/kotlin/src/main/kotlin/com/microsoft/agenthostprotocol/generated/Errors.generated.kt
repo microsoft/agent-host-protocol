@@ -57,7 +57,7 @@ object AhpErrorCodes {
     const val PERMISSION_DENIED: Int = -32009
     /** The target resource already exists and the operation does not allow overwriting */
     const val ALREADY_EXISTS: Int = -32010
-    /** A request selects a model whose registered model source can't serve it */
+    /** A request or turn needs a registered model source that can't serve it */
     const val MODEL_SOURCE_UNAVAILABLE: Int = -32013
 }
 

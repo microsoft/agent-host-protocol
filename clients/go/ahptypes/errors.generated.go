@@ -38,7 +38,7 @@ const (
 	ErrorCodeAlreadyExists    int32 = -32010
 	// ErrorCodeTcpConnectionOpenFailed indicates that the host could not open a TCP connection.
 	ErrorCodeTcpConnectionOpenFailed int32 = -32012
-	// ErrorCodeModelSourceUnavailable indicates that a request selects a model whose registered model source can't serve it.
+	// ErrorCodeModelSourceUnavailable indicates that a request or turn needs a registered model source that can't serve it.
 	ErrorCodeModelSourceUnavailable int32 = -32013
 )
 

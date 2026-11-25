@@ -24,7 +24,7 @@
   "actions": [
     {
       "type": "root/modelSourceRemoved",
-      "id": "model-source-missing"
+      "modelSourceId": "model-source-missing"
     }
   ],
   "expected": {

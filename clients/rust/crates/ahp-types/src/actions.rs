@@ -555,27 +555,28 @@ pub struct RootModelSourceSetAction {
     pub model_source: ModelSource,
 }
 
-/// Removes the model source with the given `id`, for every client. A no-op
-/// when none matches.
+/// Removes the model source with the given `modelSourceId`, for every client.
+/// A no-op when none matches.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootModelSourceRemovedAction {
     /// The model source's `id`.
-    pub id: String,
+    pub model_source_id: String,
 }
 
 /// Updates a model source's host-reported fields together: `state`,
 /// `credentialResource`, and `accountId`. A no-op when no model source has
-/// `id`. Other fields of the source are preserved. Only the host dispatches it.
+/// `modelSourceId`. Other fields of the source are preserved. Only the host
+/// dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootModelSourceStateChangedAction {
     /// The model source's `id`.
-    pub id: String,
+    pub model_source_id: String,
     /// The new status.
     pub state: ModelSourceState,
     /// Replaces the source's `credentialResource`. Absent clears it, for a

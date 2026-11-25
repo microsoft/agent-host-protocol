@@ -95,8 +95,8 @@ export interface RootModelSourceSetAction {
 }
 
 /**
- * Removes the model source with the given `id`, for every client. A no-op
- * when none matches.
+ * Removes the model source with the given `modelSourceId`, for every client.
+ * A no-op when none matches.
  *
  * @category Root Actions
  * @stability 1.0
@@ -106,13 +106,14 @@ export interface RootModelSourceSetAction {
 export interface RootModelSourceRemovedAction {
   type: ActionType.RootModelSourceRemoved;
   /** The model source's `id`. */
-  id: string;
+  modelSourceId: string;
 }
 
 /**
  * Updates a model source's host-reported fields together: `state`,
  * `credentialResource`, and `accountId`. A no-op when no model source has
- * `id`. Other fields of the source are preserved. Only the host dispatches it.
+ * `modelSourceId`. Other fields of the source are preserved. Only the host
+ * dispatches it.
  *
  * @category Root Actions
  * @stability 1.0
@@ -121,7 +122,7 @@ export interface RootModelSourceRemovedAction {
 export interface RootModelSourceStateChangedAction {
   type: ActionType.RootModelSourceStateChanged;
   /** The model source's `id`. */
-  id: string;
+  modelSourceId: string;
   /** The new status. */
   state: ModelSourceState;
   /**

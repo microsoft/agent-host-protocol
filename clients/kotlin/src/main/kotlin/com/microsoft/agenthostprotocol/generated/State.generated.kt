@@ -1966,13 +1966,11 @@ data class ModelSourceFormatInfo(
 /**
  * A source that an agent provider offers models from, such as a service,
  * subscription, or endpoint. The host lists the sources an agent provides
- * itself, and clients can register more with a definition. Nothing here is
- * a credential.
+ * itself, and clients can register more with a definition.
  *
  * Stability: 1.0 - Early development.
  */
-@KeepGeneratedSerializer
-@Serializable(with = ModelSourceSerializer::class)
+@Serializable
 data class ModelSource(
     /**
      * Host-unique ID, chosen by whoever registers the source. Also the
@@ -2044,7 +2042,7 @@ data class ModelSource(
      * `credentialResource.resource` is the endpoint URL as the definition
      * names it, in any scheme the agent supports (for example
      * `http://localhost:11434/v1`). It's the value a client passes back as
-     * `authenticate({ resource })`, and nothing fetches it.
+     * `authenticate({ resource })`.
      */
     val credentialResource: ProtectedResourceMetadata? = null,
     /**
@@ -2057,15 +2055,7 @@ data class ModelSource(
      * MUST NOT contain a credential.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null,
-    @Transient
-    val extra: Map<String, JsonElement> = emptyMap()
-)
-
-internal object ModelSourceSerializer : UnknownMembersSerializer<ModelSource>(
-    ModelSource.generatedSerializer(),
-    { it.extra },
-    { value, extra -> value.copy(extra = extra) },
+    val meta: Map<String, JsonElement>? = null
 )
 
 /**
@@ -6242,13 +6232,17 @@ data class UsageInfo(
 @Serializable(with = ErrorInfoSerializer::class)
 data class ErrorInfo(
     /**
-     * Error type identifier. Well-known values:
-     *
-     * - `modelSourceUnavailable`: a turn's registered model source can't serve
-     * it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-     * See [Unavailable sources](/guide/model-sources#unavailable-sources).
+     * Error type identifier
      */
     val errorType: String,
+    /**
+     * The {@link AhpErrorCodes} value for this error, when one applies. For
+     * example, a turn whose registered model source can't serve it ends with
+     * `ModelSourceUnavailable`.
+     *
+     * Stability: 1.0 - Early development.
+     */
+    val errorCode: Int? = null,
     /**
      * Human-readable error message
      */

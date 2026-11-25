@@ -172,6 +172,7 @@ function mapType(tsType: string): string {
   if (tsType === 'true' || tsType === 'false') return 'bool';
 
   if (tsType === 'URI') return 'string';
+  if (tsType === 'AhpErrorCode') return 'int';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.

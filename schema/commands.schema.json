@@ -2631,7 +2631,11 @@
       "properties": {
         "errorType": {
           "type": "string",
-          "description": "Error type identifier. Well-known values:\n\n- `modelSourceUnavailable`: a turn's registered model source can't serve\n  it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.\n  See [Unavailable sources](/guide/model-sources#unavailable-sources)."
+          "description": "Error type identifier"
+        },
+        "errorCode": {
+          "$ref": "#/$defs/AhpErrorCode",
+          "description": "The {@link AhpErrorCodes} value for this error, when one applies. For\nexample, a turn whose registered model source can't serve it ends with\n`ModelSourceUnavailable`.\n\nStability: 1.0 - Early development."
         },
         "message": {
           "type": "string",
@@ -2964,7 +2968,7 @@
     },
     "ModelSource": {
       "type": "object",
-      "description": "A source that an agent provider offers models from, such as a service,\nsubscription, or endpoint. The host lists the sources an agent provides\nitself, and clients can register more with a definition. Nothing here is\na credential.\n\nStability: 1.0 - Early development.",
+      "description": "A source that an agent provider offers models from, such as a service,\nsubscription, or endpoint. The host lists the sources an agent provides\nitself, and clients can register more with a definition.\n\nStability: 1.0 - Early development.",
       "properties": {
         "id": {
           "type": "string",
@@ -3008,7 +3012,7 @@
         },
         "credentialResource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
-          "description": "RFC 9728 metadata for the endpoint a registered source's credential is\nfor. Present whenever the source takes a credential, in every state, so\nany client can deliver or rotate one. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`, and nothing fetches it."
+          "description": "RFC 9728 metadata for the endpoint a registered source's credential is\nfor. Present whenever the source takes a credential, in every state, so\nany client can deliver or rotate one. Set with `state`.\n\n`credentialResource.resource` is the endpoint URL as the definition\nnames it, in any scheme the agent supports (for example\n`http://localhost:11434/v1`). It's the value a client passes back as\n`authenticate({ resource })`."
         },
         "accountId": {
           "type": "string",
@@ -9195,29 +9199,29 @@
     },
     "RootModelSourceRemovedAction": {
       "type": "object",
-      "description": "Removes the model source with the given `id`, for every client. A no-op\nwhen none matches.\n\nStability: 1.0 - Early development.",
+      "description": "Removes the model source with the given `modelSourceId`, for every client.\nA no-op when none matches.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceRemoved"
         },
-        "id": {
+        "modelSourceId": {
           "type": "string",
           "description": "The model source's `id`."
         }
       },
       "required": [
         "type",
-        "id"
+        "modelSourceId"
       ]
     },
     "RootModelSourceStateChangedAction": {
       "type": "object",
-      "description": "Updates a model source's host-reported fields together: `state`,\n`credentialResource`, and `accountId`. A no-op when no model source has\n`id`. Other fields of the source are preserved. Only the host dispatches it.\n\nStability: 1.0 - Early development.",
+      "description": "Updates a model source's host-reported fields together: `state`,\n`credentialResource`, and `accountId`. A no-op when no model source has\n`modelSourceId`. Other fields of the source are preserved. Only the host\ndispatches it.\n\nStability: 1.0 - Early development.",
       "properties": {
         "type": {
           "const": "root/modelSourceStateChanged"
         },
-        "id": {
+        "modelSourceId": {
           "type": "string",
           "description": "The model source's `id`."
         },
@@ -9236,7 +9240,7 @@
       },
       "required": [
         "type",
-        "id",
+        "modelSourceId",
         "state"
       ]
     },
@@ -12258,6 +12262,10 @@
         }
       ],
       "description": "A primitive JSON value: a string, number, boolean, or `null`."
+    },
+    "AhpErrorCode": {
+      "type": "integer",
+      "description": "An AHP application error code, such as a value of `AhpErrorCodes`."
     },
     "Customization": {
       "oneOf": [

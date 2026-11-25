@@ -704,7 +704,7 @@ public static class Reducers
                 }
             case RootModelSourceRemovedAction a:
                 {
-                    int index = state.ModelSources?.FindIndex(s => s.Id == a.Id) ?? -1;
+                    int index = state.ModelSources?.FindIndex(s => s.Id == a.ModelSourceId) ?? -1;
                     if (index < 0)
                     {
                         return ReduceOutcome.NoOp;
@@ -715,7 +715,7 @@ public static class Reducers
                 }
             case RootModelSourceStateChangedAction a:
                 {
-                    int index = state.ModelSources?.FindIndex(s => s.Id == a.Id) ?? -1;
+                    int index = state.ModelSources?.FindIndex(s => s.Id == a.ModelSourceId) ?? -1;
                     if (index < 0)
                     {
                         return ReduceOutcome.NoOp;

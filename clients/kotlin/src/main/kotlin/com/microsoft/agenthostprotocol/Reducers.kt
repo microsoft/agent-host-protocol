@@ -598,7 +598,7 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
 
     is StateActionRootModelSourceRemoved -> {
         val list = state.modelSources
-        val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
+        val idx = list?.indexOfFirst { it.id == action.value.modelSourceId } ?: -1
         if (list == null || idx < 0) {
             state
         } else {
@@ -608,7 +608,7 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
 
     is StateActionRootModelSourceStateChanged -> {
         val list = state.modelSources
-        val idx = list?.indexOfFirst { it.id == action.value.id } ?: -1
+        val idx = list?.indexOfFirst { it.id == action.value.modelSourceId } ?: -1
         if (list == null || idx < 0) {
             state
         } else {

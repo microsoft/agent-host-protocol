@@ -1041,8 +1041,7 @@ type ModelSourceFormatInfo struct {
 
 // A source that an agent provider offers models from, such as a service,
 // subscription, or endpoint. The host lists the sources an agent provides
-// itself, and clients can register more with a definition. Nothing here is
-// a credential.
+// itself, and clients can register more with a definition.
 //
 // Stability: 1.0 - Early development.
 type ModelSource struct {
@@ -1097,7 +1096,7 @@ type ModelSource struct {
 	// `credentialResource.resource` is the endpoint URL as the definition
 	// names it, in any scheme the agent supports (for example
 	// `http://localhost:11434/v1`). It's the value a client passes back as
-	// `authenticate({ resource })`, and nothing fetches it.
+	// `authenticate({ resource })`.
 	CredentialResource *ProtectedResourceMetadata `json:"credentialResource,omitempty"`
 	// The {@link AuthenticateParams.accountId} sent with the credential the
 	// host most recently accepted. Set with `state`.
@@ -1105,18 +1104,6 @@ type ModelSource struct {
 	// Additional implementation-defined metadata for this model source.
 	// MUST NOT contain a credential.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Extra contains unrecognized wire members retained for full-object edits.
-	Extra map[string]json.RawMessage `json:"-"`
-}
-
-func (v *ModelSource) UnmarshalJSON(data []byte) error {
-	type wire ModelSource
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "nonce", "retention", "state", "credentialResource", "accountId", "_meta")
-}
-
-func (v ModelSource) MarshalJSON() ([]byte, error) {
-	type wire ModelSource
-	return marshalWithExtra(wire(v), v.Extra, "id", "provider", "displayName", "icons", "format", "definition", "nonce", "retention", "state", "credentialResource", "accountId", "_meta")
 }
 
 // The agent is reading and validating the definition, or listing the
@@ -4583,12 +4570,14 @@ type UsageInfo struct {
 }
 
 type ErrorInfo struct {
-	// Error type identifier. Well-known values:
-	//
-	// - `modelSourceUnavailable`: a turn's registered model source can't serve
-	//   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-	//   See [Unavailable sources](/guide/model-sources#unavailable-sources).
+	// Error type identifier
 	ErrorType string `json:"errorType"`
+	// The {@link AhpErrorCodes} value for this error, when one applies. For
+	// example, a turn whose registered model source can't serve it ends with
+	// `ModelSourceUnavailable`.
+	//
+	// Stability: 1.0 - Early development.
+	ErrorCode *AhpErrorCode `json:"errorCode,omitempty"`
 	// Human-readable error message
 	Message string `json:"message"`
 	// Stack trace
@@ -4603,12 +4592,12 @@ type ErrorInfo struct {
 
 func (v *ErrorInfo) UnmarshalJSON(data []byte) error {
 	type wire ErrorInfo
-	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "errorType", "message", "stack", "_meta")
+	return unmarshalWithExtra(data, (*wire)(v), &v.Extra, "errorType", "errorCode", "message", "stack", "_meta")
 }
 
 func (v ErrorInfo) MarshalJSON() ([]byte, error) {
 	type wire ErrorInfo
-	return marshalWithExtra(wire(v), v.Extra, "errorType", "message", "stack", "_meta")
+	return marshalWithExtra(wire(v), v.Extra, "errorType", "errorCode", "message", "stack", "_meta")
 }
 
 // A point-in-time snapshot of a subscribed resource's state, returned by

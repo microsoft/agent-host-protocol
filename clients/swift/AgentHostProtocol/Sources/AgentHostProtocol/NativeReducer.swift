@@ -107,7 +107,7 @@ public struct AHPRootReducer: Reducer {
             applyModelSourceSet(&state, a.modelSource)
 
         case .rootModelSourceRemoved(let a):
-            _ = applyModelSourceRemoved(&state, id: a.id)
+            _ = applyModelSourceRemoved(&state, id: a.modelSourceId)
 
         case .rootModelSourceStateChanged(let a):
             _ = applyModelSourceStateChanged(&state, a)
@@ -156,7 +156,7 @@ private func sameModelSourceVersion(_ a: ModelSource, _ b: ModelSource) -> Bool 
 /// Returns `false` when none matches.
 func applyModelSourceStateChanged(_ state: inout RootState, _ action: RootModelSourceStateChangedAction) -> Bool {
     guard var list = state.modelSources,
-          let idx = list.firstIndex(where: { $0.id == action.id }) else { return false }
+          let idx = list.firstIndex(where: { $0.id == action.modelSourceId }) else { return false }
     list[idx].state = action.state
     list[idx].credentialResource = action.credentialResource
     list[idx].accountId = action.accountId

@@ -1983,8 +1983,7 @@ public struct ModelSourceFormatInfo: Codable, Sendable, Equatable {
 
 /// A source that an agent provider offers models from, such as a service,
 /// subscription, or endpoint. The host lists the sources an agent provides
-/// itself, and clients can register more with a definition. Nothing here is
-/// a credential.
+/// itself, and clients can register more with a definition.
 ///
 /// Stability: 1.0 - Early development.
 public struct ModelSource: Codable, Sendable, Equatable {
@@ -2039,7 +2038,7 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// `credentialResource.resource` is the endpoint URL as the definition
     /// names it, in any scheme the agent supports (for example
     /// `http://localhost:11434/v1`). It's the value a client passes back as
-    /// `authenticate({ resource })`, and nothing fetches it.
+    /// `authenticate({ resource })`.
     public var credentialResource: ProtectedResourceMetadata?
     /// The {@link AuthenticateParams.accountId} sent with the credential the
     /// host most recently accepted. Set with `state`.
@@ -2047,10 +2046,8 @@ public struct ModelSource: Codable, Sendable, Equatable {
     /// Additional implementation-defined metadata for this model source.
     /// MUST NOT contain a credential.
     public var meta: [String: AnyCodable]?
-    /// Unrecognized wire members retained for full-object edits.
-    public var extra: [String: AnyCodable]
 
-    enum CodingKeys: String, CodingKey, CaseIterable {
+    enum CodingKeys: String, CodingKey {
         case id
         case provider
         case displayName
@@ -2077,8 +2074,7 @@ public struct ModelSource: Codable, Sendable, Equatable {
         state: ModelSourceState? = nil,
         credentialResource: ProtectedResourceMetadata? = nil,
         accountId: String? = nil,
-        meta: [String: AnyCodable]? = nil,
-        extra: [String: AnyCodable] = [:]
+        meta: [String: AnyCodable]? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -2092,41 +2088,6 @@ public struct ModelSource: Codable, Sendable, Equatable {
         self.credentialResource = credentialResource
         self.accountId = accountId
         self.meta = meta
-        self.extra = extra
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(String.self, forKey: .id)
-        self.provider = try container.decode(String.self, forKey: .provider)
-        self.displayName = try container.decode(String.self, forKey: .displayName)
-        self.icons = try container.decodeIfPresent([Icon].self, forKey: .icons)
-        self.format = try container.decodeIfPresent(String.self, forKey: .format)
-        self.definition = try container.decodeIfPresent([String: AnyCodable].self, forKey: .definition)
-        self.nonce = try container.decodeIfPresent(String.self, forKey: .nonce)
-        self.retention = try container.decodeIfPresent(ModelSourceRetentionPolicy.self, forKey: .retention)
-        self.state = try container.decodeIfPresent(ModelSourceState.self, forKey: .state)
-        self.credentialResource = try container.decodeIfPresent(ProtectedResourceMetadata.self, forKey: .credentialResource)
-        self.accountId = try container.decodeIfPresent(String.self, forKey: .accountId)
-        self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
-        self.extra = try decodeUnknownMembers(from: decoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(self.id, forKey: .id)
-        try container.encode(self.provider, forKey: .provider)
-        try container.encode(self.displayName, forKey: .displayName)
-        try container.encodeIfPresent(self.icons, forKey: .icons)
-        try container.encodeIfPresent(self.format, forKey: .format)
-        try container.encodeIfPresent(self.definition, forKey: .definition)
-        try container.encodeIfPresent(self.nonce, forKey: .nonce)
-        try container.encodeIfPresent(self.retention, forKey: .retention)
-        try container.encodeIfPresent(self.state, forKey: .state)
-        try container.encodeIfPresent(self.credentialResource, forKey: .credentialResource)
-        try container.encodeIfPresent(self.accountId, forKey: .accountId)
-        try container.encodeIfPresent(self.meta, forKey: .meta)
-        try encodeUnknownMembers(extra, to: encoder, known: Set(CodingKeys.allCases.map(\.rawValue)))
     }
 }
 
@@ -7710,12 +7671,14 @@ public struct UsageInfo: Codable, Sendable, Equatable {
 }
 
 public struct ErrorInfo: Codable, Sendable, Equatable {
-    /// Error type identifier. Well-known values:
-    ///
-    /// - `modelSourceUnavailable`: a turn's registered model source can't serve
-    /// it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-    /// See [Unavailable sources](/guide/model-sources#unavailable-sources).
+    /// Error type identifier
     public var errorType: String
+    /// The {@link AhpErrorCodes} value for this error, when one applies. For
+    /// example, a turn whose registered model source can't serve it ends with
+    /// `ModelSourceUnavailable`.
+    ///
+    /// Stability: 1.0 - Early development.
+    public var errorCode: Int?
     /// Human-readable error message
     public var message: String
     /// Stack trace
@@ -7729,6 +7692,7 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case errorType
+        case errorCode
         case message
         case stack
         case meta = "_meta"
@@ -7736,12 +7700,14 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
 
     public init(
         errorType: String,
+        errorCode: Int? = nil,
         message: String,
         stack: String? = nil,
         meta: [String: AnyCodable]? = nil,
         extra: [String: AnyCodable] = [:]
     ) {
         self.errorType = errorType
+        self.errorCode = errorCode
         self.message = message
         self.stack = stack
         self.meta = meta
@@ -7751,6 +7717,7 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.errorType = try container.decode(String.self, forKey: .errorType)
+        self.errorCode = try container.decodeIfPresent(Int.self, forKey: .errorCode)
         self.message = try container.decode(String.self, forKey: .message)
         self.stack = try container.decodeIfPresent(String.self, forKey: .stack)
         self.meta = try container.decodeIfPresent([String: AnyCodable].self, forKey: .meta)
@@ -7760,6 +7727,7 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.errorType, forKey: .errorType)
+        try container.encodeIfPresent(self.errorCode, forKey: .errorCode)
         try container.encode(self.message, forKey: .message)
         try container.encodeIfPresent(self.stack, forKey: .stack)
         try container.encodeIfPresent(self.meta, forKey: .meta)

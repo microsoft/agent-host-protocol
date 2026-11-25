@@ -5,7 +5,7 @@
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceStateChanged",
-    "id": "source-new",
+    "modelSourceId": "source-new",
     "state": {
       "kind": "authRequired",
       "reason": "rejected",
@@ -20,7 +20,7 @@
   "acceptableOutputs": [
     {
       "type": "root/modelSourceStateChanged",
-      "id": "source-new",
+      "modelSourceId": "source-new",
       "state": {
         "kind": "authRequired",
         "reason": "rejected",

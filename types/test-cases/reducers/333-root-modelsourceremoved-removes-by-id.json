@@ -47,7 +47,7 @@
   "actions": [
     {
       "type": "root/modelSourceRemoved",
-      "id": "model-source-a"
+      "modelSourceId": "model-source-a"
     }
   ],
   "expected": {

@@ -204,25 +204,26 @@ type RootModelSourceSetAction struct {
 	ModelSource ModelSource `json:"modelSource"`
 }
 
-// Removes the model source with the given `id`, for every client. A no-op
-// when none matches.
+// Removes the model source with the given `modelSourceId`, for every client.
+// A no-op when none matches.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceRemovedAction struct {
 	Type ActionType `json:"type"`
 	// The model source's `id`.
-	Id string `json:"id"`
+	ModelSourceId string `json:"modelSourceId"`
 }
 
 // Updates a model source's host-reported fields together: `state`,
 // `credentialResource`, and `accountId`. A no-op when no model source has
-// `id`. Other fields of the source are preserved. Only the host dispatches it.
+// `modelSourceId`. Other fields of the source are preserved. Only the host
+// dispatches it.
 //
 // Stability: 1.0 - Early development.
 type RootModelSourceStateChangedAction struct {
 	Type ActionType `json:"type"`
 	// The model source's `id`.
-	Id string `json:"id"`
+	ModelSourceId string `json:"modelSourceId"`
 	// The new status.
 	State ModelSourceState `json:"state"`
 	// Replaces the source's `credentialResource`. Absent clears it, for a

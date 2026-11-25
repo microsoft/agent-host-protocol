@@ -2358,8 +2358,7 @@ pub struct ModelSourceFormatInfo {
 
 /// A source that an agent provider offers models from, such as a service,
 /// subscription, or endpoint. The host lists the sources an agent provides
-/// itself, and clients can register more with a definition. Nothing here is
-/// a credential.
+/// itself, and clients can register more with a definition.
 ///
 /// Stability: 1.0 - Early development.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2422,7 +2421,7 @@ pub struct ModelSource {
     /// `credentialResource.resource` is the endpoint URL as the definition
     /// names it, in any scheme the agent supports (for example
     /// `http://localhost:11434/v1`). It's the value a client passes back as
-    /// `authenticate({ resource })`, and nothing fetches it.
+    /// `authenticate({ resource })`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_resource: Option<ProtectedResourceMetadata>,
     /// The {@link AuthenticateParams.accountId} sent with the credential the
@@ -2433,9 +2432,6 @@ pub struct ModelSource {
     /// MUST NOT contain a credential.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Unrecognized wire members retained for full-object edits.
-    #[serde(flatten)]
-    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 /// The agent is reading and validating the definition, or listing the
@@ -6204,12 +6200,15 @@ pub struct UsageInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorInfo {
-    /// Error type identifier. Well-known values:
-    ///
-    /// - `modelSourceUnavailable`: a turn's registered model source can't serve
-    ///   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-    ///   See [Unavailable sources](/guide/model-sources#unavailable-sources).
+    /// Error type identifier
     pub error_type: String,
+    /// The {@link AhpErrorCodes} value for this error, when one applies. For
+    /// example, a turn whose registered model source can't serve it ends with
+    /// `ModelSourceUnavailable`.
+    ///
+    /// Stability: 1.0 - Early development.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<i32>,
     /// Human-readable error message
     pub message: String,
     /// Stack trace

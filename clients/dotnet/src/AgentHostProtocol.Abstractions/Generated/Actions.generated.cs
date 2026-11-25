@@ -377,8 +377,8 @@ public sealed record RootModelSourceSetAction
     public required ModelSource ModelSource { get; init; }
 }
 
-/// <summary>Removes the model source with the given `id`, for every client. A no-op
-/// when none matches.
+/// <summary>Removes the model source with the given `modelSourceId`, for every client.
+/// A no-op when none matches.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceRemovedAction
@@ -386,12 +386,13 @@ public sealed record RootModelSourceRemovedAction
     public ActionType Type { get; init; } = ActionType.RootModelSourceRemoved;
 
     /// <summary>The model source's `id`.</summary>
-    public required string Id { get; init; }
+    public required string ModelSourceId { get; init; }
 }
 
 /// <summary>Updates a model source's host-reported fields together: `state`,
 /// `credentialResource`, and `accountId`. A no-op when no model source has
-/// `id`. Other fields of the source are preserved. Only the host dispatches it.
+/// `modelSourceId`. Other fields of the source are preserved. Only the host
+/// dispatches it.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record RootModelSourceStateChangedAction
@@ -399,7 +400,7 @@ public sealed record RootModelSourceStateChangedAction
     public ActionType Type { get; init; } = ActionType.RootModelSourceStateChanged;
 
     /// <summary>The model source's `id`.</summary>
-    public required string Id { get; init; }
+    public required string ModelSourceId { get; init; }
 
     /// <summary>The new status.</summary>
     public required ModelSourceState State { get; init; }

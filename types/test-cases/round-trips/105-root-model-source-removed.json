@@ -5,12 +5,12 @@
   "type": "StateAction",
   "input": {
     "type": "root/modelSourceRemoved",
-    "id": "source-new"
+    "modelSourceId": "source-new"
   },
   "acceptableOutputs": [
     {
       "type": "root/modelSourceRemoved",
-      "id": "source-new"
+      "modelSourceId": "source-new"
     }
   ]
 }

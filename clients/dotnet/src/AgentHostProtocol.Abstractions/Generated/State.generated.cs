@@ -2659,8 +2659,7 @@ public sealed record ModelSourceFormatInfo
 
 /// <summary>A source that an agent provider offers models from, such as a service,
 /// subscription, or endpoint. The host lists the sources an agent provides
-/// itself, and clients can register more with a definition. Nothing here is
-/// a credential.
+/// itself, and clients can register more with a definition.
 ///
 /// Stability: 1.0 - Early development.</summary>
 public sealed record ModelSource
@@ -2731,7 +2730,7 @@ public sealed record ModelSource
     /// `credentialResource.resource` is the endpoint URL as the definition
     /// names it, in any scheme the agent supports (for example
     /// `http://localhost:11434/v1`). It's the value a client passes back as
-    /// `authenticate({ resource })`, and nothing fetches it.</summary>
+    /// `authenticate({ resource })`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ProtectedResourceMetadata? CredentialResource { get; init; }
 
@@ -2745,10 +2744,6 @@ public sealed record ModelSource
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
-
-    /// <summary>Unrecognized wire members retained for full-object edits.</summary>
-    [JsonExtensionData]
-    public Dictionary<string, JsonElement>? Extra { get; set; }
 }
 
 /// <summary>The agent is reading and validating the definition, or listing the
@@ -7006,12 +7001,16 @@ public sealed record UsageInfo
 
 public sealed record ErrorInfo
 {
-    /// <summary>Error type identifier. Well-known values:
-    ///
-    /// - `modelSourceUnavailable`: a turn's registered model source can't serve
-    ///   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-    ///   See [Unavailable sources](/guide/model-sources#unavailable-sources).</summary>
+    /// <summary>Error type identifier</summary>
     public required string ErrorType { get; init; }
+
+    /// <summary>The {@link AhpErrorCodes} value for this error, when one applies. For
+    /// example, a turn whose registered model source can't serve it ends with
+    /// `ModelSourceUnavailable`.
+    ///
+    /// Stability: 1.0 - Early development.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ErrorCode { get; init; }
 
     /// <summary>Human-readable error message</summary>
     public required string Message { get; init; }

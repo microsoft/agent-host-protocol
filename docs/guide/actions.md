@@ -32,7 +32,7 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 | `root/modelSourceSet` | **Yes** | A [model source](/guide/model-sources) was added, re-registered, or updated by `id` |
-| `root/modelSourceRemoved` | **Yes** | A model source was removed by `id` |
+| `root/modelSourceRemoved` | **Yes** | A model source was removed by `modelSourceId` |
 | `root/modelSourceStateChanged` | No | The host reported a model source's status and credential fields |
 
 ## Automation Catalogue Actions

@@ -129,8 +129,8 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/terminalsChanged`      | Server          | Replaces `terminals`                 |
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
 | `root/modelSourceSet` | Server / Client | Adds a source to `modelSources`, or replaces the one with the same `id`. Keeps its host-reported fields when `provider`, `format`, and `nonce` are unchanged |
-| `root/modelSourceRemoved` | Server / Client | Removes a source by `id` |
-| `root/modelSourceStateChanged` | Server | Sets a source's host-reported fields. A no-op for an unknown `id` |
+| `root/modelSourceRemoved` | Server / Client | Removes the source whose `id` is `modelSourceId` |
+| `root/modelSourceStateChanged` | Server | Sets a source's host-reported fields. A no-op for an unknown `modelSourceId` |
 
 All root-scoped action envelopes have `channel: "ahp-root://"`.
 

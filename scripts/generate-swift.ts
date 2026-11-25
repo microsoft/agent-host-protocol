@@ -114,6 +114,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
 
   // Type aliases
   if (tsType === 'URI') return 'String';
+  if (tsType === 'AhpErrorCode') return 'Int';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
@@ -2431,7 +2432,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
-  lines.push("    /// A request selects a model whose registered model source can't serve it");
+  lines.push("    /// A request or turn needs a registered model source that can't serve it");
   lines.push('    public static let modelSourceUnavailable = -32013');
   lines.push('}');
   lines.push('');

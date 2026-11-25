@@ -2368,33 +2368,34 @@ public struct RootModelSourceSetAction: Codable, Sendable, Equatable {
     }
 }
 
-/// Removes the model source with the given `id`, for every client. A no-op
-/// when none matches.
+/// Removes the model source with the given `modelSourceId`, for every client.
+/// A no-op when none matches.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceRemovedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The model source's `id`.
-    public var id: String
+    public var modelSourceId: String
 
     public init(
         type: ActionType,
-        id: String
+        modelSourceId: String
     ) {
         self.type = type
-        self.id = id
+        self.modelSourceId = modelSourceId
     }
 }
 
 /// Updates a model source's host-reported fields together: `state`,
 /// `credentialResource`, and `accountId`. A no-op when no model source has
-/// `id`. Other fields of the source are preserved. Only the host dispatches it.
+/// `modelSourceId`. Other fields of the source are preserved. Only the host
+/// dispatches it.
 ///
 /// Stability: 1.0 - Early development.
 public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
     public var type: ActionType
     /// The model source's `id`.
-    public var id: String
+    public var modelSourceId: String
     /// The new status.
     public var state: ModelSourceState
     /// Replaces the source's `credentialResource`. Absent clears it, for a
@@ -2405,13 +2406,13 @@ public struct RootModelSourceStateChangedAction: Codable, Sendable, Equatable {
 
     public init(
         type: ActionType,
-        id: String,
+        modelSourceId: String,
         state: ModelSourceState,
         credentialResource: ProtectedResourceMetadata? = nil,
         accountId: String? = nil
     ) {
         self.type = type
-        self.id = id
+        self.modelSourceId = modelSourceId
         self.state = state
         self.credentialResource = credentialResource
         self.accountId = accountId

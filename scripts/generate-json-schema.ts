@@ -703,7 +703,7 @@ function generateErrorsSchema(project: Project): JsonSchema {
       AhpErrorCode: {
         description: 'AHP application-specific error codes.',
         type: 'number',
-        enum: [-32001, -32002, -32003, -32004, -32005, -32007, -32008, -32009, -32010, -32011],
+        enum: [-32001, -32002, -32003, -32004, -32005, -32007, -32008, -32009, -32010, -32011, -32013],
       },
     },
   };
@@ -762,6 +762,12 @@ function collectRefTargets(node: JsonSchema | undefined, acc: Set<string>): void
 function buildDefForName(project: Project, name: string): JsonSchema | undefined {
   const iface = findInterface(project, name);
   if (iface) return interfaceToSchema(iface, project);
+
+  // An error code carried in state is an integer. Receivers keep codes they
+  // don't know, so it isn't limited to the current `AhpErrorCodes` values.
+  if (name === 'AhpErrorCode') {
+    return { type: 'integer', description: 'An AHP application error code, such as a value of `AhpErrorCodes`.' };
+  }
 
   const ta = findTypeAlias(project, name);
   if (ta) {

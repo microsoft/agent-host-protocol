@@ -1552,8 +1552,8 @@ data class RootModelSourceSetAction(
 )
 
 /**
- * Removes the model source with the given `id`, for every client. A no-op
- * when none matches.
+ * Removes the model source with the given `modelSourceId`, for every client.
+ * A no-op when none matches.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1563,13 +1563,14 @@ data class RootModelSourceRemovedAction(
     /**
      * The model source's `id`.
      */
-    val id: String
+    val modelSourceId: String
 )
 
 /**
  * Updates a model source's host-reported fields together: `state`,
  * `credentialResource`, and `accountId`. A no-op when no model source has
- * `id`. Other fields of the source are preserved. Only the host dispatches it.
+ * `modelSourceId`. Other fields of the source are preserved. Only the host
+ * dispatches it.
  *
  * Stability: 1.0 - Early development.
  */
@@ -1579,7 +1580,7 @@ data class RootModelSourceStateChangedAction(
     /**
      * The model source's `id`.
      */
-    val id: String,
+    val modelSourceId: String,
     /**
      * The new status.
      */

@@ -742,7 +742,7 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             let Some(list) = state.model_sources.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            let Some(idx) = list.iter().position(|s| s.id == a.id) else {
+            let Some(idx) = list.iter().position(|s| s.id == a.model_source_id) else {
                 return ReduceOutcome::NoOp;
             };
             list.remove(idx);
@@ -752,7 +752,7 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
             let Some(source) = state
                 .model_sources
                 .as_mut()
-                .and_then(|list| list.iter_mut().find(|s| s.id == a.id))
+                .and_then(|list| list.iter_mut().find(|s| s.id == a.model_source_id))
             else {
                 return ReduceOutcome::NoOp;
             };

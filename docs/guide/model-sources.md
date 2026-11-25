@@ -63,7 +63,7 @@ Each client that registers a source is a **contributing client**. The host track
 
 ## Status
 
-The host reports a registered source's status with [`root/modelSourceStateChanged`](/reference/root#rootmodelsourcestatechangedaction), which sets `state`, `credentialResource`, and `accountId` together. The reducer ignores an unknown `id`, so a late report can't bring back a removed source.
+The host reports a registered source's status with [`root/modelSourceStateChanged`](/reference/root#rootmodelsourcestatechangedaction), which sets `state`, `credentialResource`, and `accountId` together. The reducer ignores an unknown `modelSourceId`, so a late report can't bring back a removed source.
 
 ```mermaid
 stateDiagram-v2
@@ -123,7 +123,7 @@ The host SHOULD reject an automation that names a model from a `contributingClie
 
 ## Unavailable sources
 
-The host checks a selection whenever it uses one, and never runs work on a model other than the one selected. When a turn can't use its source, the host ends the turn with an error part whose `errorType` is `modelSourceUnavailable` and whose `resumable` is `true`. Once the source is ready again, a client can continue the turn with `chat/turnResume`. A request that selects such a model fails with [`ModelSourceUnavailable`](/reference/error-codes#ahp-application-codes) (`-32013`).
+The host checks a selection whenever it uses one, and never runs work on a model other than the one selected. Requests and turns that need an unavailable source fail with [`ModelSourceUnavailable`](/reference/error-codes#ahp-application-codes) (`-32013`). A turn ends with an error part whose `error.errorCode` is that code and whose `resumable` is `true`, so once the source is ready again, a client can continue the turn with `chat/turnResume`.
 
 When a client removes a source or revokes its credential, the host ends running turns that use it.
 
