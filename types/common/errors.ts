@@ -101,7 +101,7 @@ export const AhpErrorCodes = {
    * that fails for this reason ends with an error part whose `errorType` is
    * `modelSourceUnavailable` instead.
    *
-   * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+   * @see {@link /guide/model-sources#unavailable-sources | Model Sources guide}
    */
   ModelSourceUnavailable: -32013,
 } as const;

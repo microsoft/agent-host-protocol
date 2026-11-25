@@ -47,7 +47,7 @@ public static class AhpErrorCodes
     public const int Conflict = -32011;
     /// <summary>The host could not open the requested TCP connection.</summary>
     public const int TcpConnectionOpenFailed = -32012;
-    /// <summary>A request selects a model whose registered model source can't serve it, for example because the source needs a credential or was removed. A turn that fails for this reason ends with an error part whose `errorType` is `modelSourceUnavailable` instead. @see {@link /specification/authentication#model-source-credentials | Model source credentials}</summary>
+    /// <summary>A request selects a model whose registered model source can't serve it, for example because the source needs a credential or was removed. A turn that fails for this reason ends with an error part whose `errorType` is `modelSourceUnavailable` instead. @see {@link /guide/model-sources#unavailable-sources | Model Sources guide}</summary>
     public const int ModelSourceUnavailable = -32013;
 }
 

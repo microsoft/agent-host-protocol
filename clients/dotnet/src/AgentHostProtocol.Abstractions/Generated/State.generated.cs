@@ -6724,7 +6724,7 @@ public sealed record ErrorInfo
     ///
     /// - `modelSourceUnavailable`: a turn's registered model source can't serve
     ///   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-    ///   See [Model source credentials](/specification/authentication#model-source-credentials).</summary>
+    ///   See [Unavailable sources](/guide/model-sources#unavailable-sources).</summary>
     public required string ErrorType { get; init; }
 
     /// <summary>Human-readable error message</summary>

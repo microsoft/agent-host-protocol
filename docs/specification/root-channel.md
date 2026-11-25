@@ -46,23 +46,7 @@ An agent provider can offer models from more than one source, such as a service,
 
 A [`ModelSelection`](/reference/root#modelselection) names a model by its `id`, which also determines the source. The host lists the sources an agent provides itself. They have no `format` or `definition`, and their sign-in uses `AgentInfo.protectedResources`.
 
-#### Registering sources
-
-An agent that serves models from client-registered sources advertises [`AgentCapabilities.modelSourceRegistration`](/reference/root#modelsourceregistrationcapability) with the formats it reads. A client registers a source with `root/modelSourceSet`, giving its `format`, a `definition` that tells the agent how to reach it, and a `nonce` that versions the definition. Every client can read a definition, so it MUST NOT contain a credential. Clients deliver credentials with [`authenticate`](/specification/authentication#model-source-credentials).
-
-`Set` adds the source, or replaces the one with the same `id`. When `provider`, `format`, and `nonce` are unchanged, it keeps the host-reported fields (`state`, `credentialResource`, and `accountId`), so re-registering doesn't disturb a working source. Otherwise it clears them, and the host drops the source's credential. `root/modelSourceRemoved` removes a source for every client.
-
-The host rejects a client's `Set` that lacks `format`, `definition`, or `nonce`, uses a format the agent doesn't list, includes a host-reported field, changes `definition` without changing `nonce`, changes a source the host registered itself, or asks for a `retention` the host won't honor.
-
-A client registers its sources when it starts or reconnects, and when the user changes one. It SHOULD derive `id` from a stable key in its configuration, so every window and device shares one source, and SHOULD NOT replace a source with a different `nonce` unless the user changed it. The host counts each client that registers a source as a contributing client, from `ActionEnvelope.origin`. A host that can verify principals MAY restrict a source to clients of the principal that registered it.
-
-#### Status and catalog
-
-The host reports a registered source's status with `root/modelSourceStateChanged`, which sets `state`, `credentialResource`, and `accountId` together and ignores an unknown `id`. Once a source has been `ready`, its models stay in the agent's `models` through later `starting` and `authRequired` states. They leave when the source is removed or enters `error`, or when an update changes its endpoint. A host SHOULD derive model IDs deterministically from the source and the endpoint's model identifiers, so a source registered again keeps its IDs. The host never runs work on a model other than the one selected. See [Model source credentials](/specification/authentication#turns) for turns on an unavailable source.
-
-#### Retention
-
-When a source's last contributing client disconnects and doesn't return within the host's grace period, `contributingClient` retention, the default, removes the source once running turns finish. `host` retention keeps it until a client removes it or host policy expires it. The host SHOULD reject an automation that names a model from a `contributingClient`-retained source.
+Clients and hosts can also register sources the agent doesn't have, each with a definition the agent reads. The host reports each registered source's status, and clients deliver its credential with [`authenticate`](/specification/authentication#model-source-credentials). See the [Model Sources guide](/guide/model-sources).
 
 ### Paginating the catalogue
 
@@ -120,6 +104,20 @@ target channel instead.
 `auth/required` may also be emitted on `ahp-root://` when the auth requirement
 is root-scoped; see [Authentication](/specification/authentication).
 
+## Server Validation of Client Actions
+
+When the server receives a client-dispatched action on this channel, it MUST validate it before applying. Invalid actions MUST be echoed back with a `rejectionReason` on the `ActionEnvelope`. The following validation rules apply:
+
+| Action | Condition | Server Behavior |
+| --- | --- | --- |
+| `root/modelSourceSet` | The agent named by `provider` doesn't advertise `modelSourceRegistration`, or doesn't list `format` | Server MUST reject the action |
+| `root/modelSourceSet` | `format`, `definition`, or `nonce` is absent, or a host-reported field is present | Server MUST reject the action |
+| `root/modelSourceSet` | `provider`, `format`, and `nonce` match the existing source's, but `definition` differs | Server MUST reject the action |
+| `root/modelSourceSet` | The existing source with that `id` is one the host registered itself | Server MUST reject the action |
+| `root/modelSourceSet` | The host won't honor the requested `retention` | Server MUST reject the action |
+| `root/modelSourceRemoved` | The source is one the host registered itself | Server MAY reject the action |
+| `root/modelSourceSet`, `root/modelSourceRemoved` | The host restricts sources by principal, and the source belongs to another principal | Server MAY reject the action |
+
 ## Actions
 
 Root state is mutated by action envelopes broadcast on this channel. Refer to the [Root Channel Reference](/reference/root#actions) for the full list; the root-scoped actions are:
@@ -130,7 +128,7 @@ Root state is mutated by action envelopes broadcast on this channel. Refer to th
 | `root/activeSessionsChanged` | Server          | Replaces `activeSessions`            |
 | `root/terminalsChanged`      | Server          | Replaces `terminals`                 |
 | `root/configChanged`         | Server / Client | Merges (or replaces) `config.values` |
-| `root/modelSourceSet` | Server / Client | Adds, re-registers, or updates a source in `modelSources` by `id`, including its definition |
+| `root/modelSourceSet` | Server / Client | Adds a source to `modelSources`, or replaces the one with the same `id`. Keeps its host-reported fields when `provider`, `format`, and `nonce` are unchanged |
 | `root/modelSourceRemoved` | Server / Client | Removes a source by `id` |
 | `root/modelSourceStateChanged` | Server | Sets a source's host-reported fields. A no-op for an unknown `id` |
 

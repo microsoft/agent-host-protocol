@@ -142,7 +142,7 @@ export interface AgentCapabilities {
    * definition formats.
    *
    * @stability 1.0
-   * @see {@link /specification/root-channel#registering-sources | Registering sources}
+   * @see {@link /guide/model-sources#registering-a-source | Model Sources guide}
    */
   modelSourceRegistration?: ModelSourceRegistrationCapability;
 }
@@ -325,7 +325,7 @@ export interface ModelSourceFormatInfo {
  * @category Root State
  * @stability 1.0
  * @preserveUnknownMembers
- * @see {@link /specification/root-channel#model-sources | Model sources}
+ * @see {@link /guide/model-sources | Model Sources guide}
  */
 export interface ModelSource {
   /**
@@ -472,7 +472,7 @@ export interface ModelSourceReadyState {
  * @category Root State
  * @stability 1.0
  * @nonexhaustive
- * @see {@link /specification/authentication#model-source-credentials | Model source credentials}
+ * @see {@link /guide/model-sources#credentials | Model Sources guide}
  */
 export const enum ModelSourceAuthRequiredReason {
   /** The host holds no credential yet. */

@@ -843,7 +843,7 @@
       "properties": {
         "errorType": {
           "type": "string",
-          "description": "Error type identifier. Well-known values:\n\n- `modelSourceUnavailable`: a turn's registered model source can't serve\n  it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.\n  See [Model source credentials](/specification/authentication#model-source-credentials)."
+          "description": "Error type identifier. Well-known values:\n\n- `modelSourceUnavailable`: a turn's registered model source can't serve\n  it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.\n  See [Unavailable sources](/guide/model-sources#unavailable-sources)."
         },
         "message": {
           "type": "string",

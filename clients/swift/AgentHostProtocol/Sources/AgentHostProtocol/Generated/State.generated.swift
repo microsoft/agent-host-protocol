@@ -7597,7 +7597,7 @@ public struct ErrorInfo: Codable, Sendable, Equatable {
     ///
     /// - `modelSourceUnavailable`: a turn's registered model source can't serve
     /// it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-    /// See [Model source credentials](/specification/authentication#model-source-credentials).
+    /// See [Unavailable sources](/guide/model-sources#unavailable-sources).
     public var errorType: String
     /// Human-readable error message
     public var message: String

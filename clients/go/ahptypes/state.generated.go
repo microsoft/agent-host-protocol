@@ -4491,7 +4491,7 @@ type ErrorInfo struct {
 	//
 	// - `modelSourceUnavailable`: a turn's registered model source can't serve
 	//   it, the turn-level counterpart of `AhpErrorCodes.ModelSourceUnavailable`.
-	//   See [Model source credentials](/specification/authentication#model-source-credentials).
+	//   See [Unavailable sources](/guide/model-sources#unavailable-sources).
 	ErrorType string `json:"errorType"`
 	// Human-readable error message
 	Message string `json:"message"`

@@ -150,7 +150,7 @@ If the token is invalid or the resource is unrecognized, the server MUST return 
 
 ### Model source credentials
 
-A [registered model source](/specification/root-channel#registering-sources) that takes a credential carries `credentialResource`, RFC 9728 metadata for the endpoint the credential is for, in every state. When the source needs a credential, its state is `authRequired`, with a `reason`. A client delivers the credential with `authenticate`, the source's `credentialResource.resource`, and a `modelSource` target:
+A [registered model source](/guide/model-sources#credentials) that takes a credential carries `credentialResource`, RFC 9728 metadata for the endpoint the credential is for, in every state. When the source needs a credential, its state is `authRequired`, with a `reason`. A client delivers the credential with `authenticate`, the source's `credentialResource.resource`, and a `modelSource` target:
 
 ```jsonc
 // Model source credential delivery
@@ -180,26 +180,11 @@ When `target.kind` is `modelSource`, the host:
 
 A delivery replaces the credential the host holds for the source. `accountId` lets a client that reloads, or one on another device, tell whether the host holds its current key. It MUST NOT be derived from the secret, because every client can read it.
 
-#### Reasons
-
-| `reason` | Meaning | What a client may send |
-| --- | --- | --- |
-| `required` | The host holds no credential yet. | Its key. |
-| `expired` | The credential's lifetime, or the lease a client set with `expiresIn`, lapsed. | A renewed credential. |
-| `rejected` | The endpoint refused the credential. `accountId` still names it. | Only a key whose `accountId` differs. |
-| `revoked` | A client revoked the credential. | Nothing, until a user asks. |
-
-#### Delivering and handling
-
-Clients MUST NOT cache a model source credential they delivered, or replay one, for example after a reconnect. A client delivers one only in answer to the source's current state, and MUST NOT send a stored secret unless the source's `provider` and `format` match its own copy and every endpoint in the source's `definition` that the key would reach is one its own copy sends the key to.
-
 The host holds the credential in memory only. It never places it in state, actions, notifications, logs, telemetry, or error messages, and never exposes it to the model, tools, terminals, or hooks. It attaches the credential only to the endpoints the source's definition names, never to another origin, including on redirect, and drops it when the source is removed or updated, when its lease lapses, and when the host restarts.
 
 Endpoints, including loopback and private addresses, are reached from the host machine. Hosts SHOULD deny link-local and cloud metadata addresses, and require `https` for credentialed endpoints other than loopback.
 
-#### Turns
-
-When a turn can't use its source, the host ends the turn with an error part whose `errorType` is `modelSourceUnavailable` and whose `resumable` is `true`. A request that selects such a model fails with `ModelSourceUnavailable` (`-32013`). The host never switches to a different model. When a client removes a source or revokes its credential, the host ends running turns that use it.
+See the [Model Sources guide](/guide/model-sources#credentials) for the `authRequired` reasons and when clients deliver a credential.
 
 ### Why keyed by `resource` and optional `target`?
 
